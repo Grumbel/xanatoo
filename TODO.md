@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **027** (this delivery is **026**)
+Next bundle number: **028** (this delivery is **027**)
 
 ## Status (2026-10-10)
 
-Stage **01** complete. Stage **02** largely working. Early stretchtext.
+Stage **01** complete. Stage **02** largely working. Early stretchtext / stage **03** links.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -70,12 +70,15 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] Ctrl+Shift+U unwrap stretchtext
 - [x] Alt+↑/↓ reorder blocks
 - [x] Ctrl+D duplicate block
+- [x] Open external http(s)/mailto links via xdg-open (Linux) / open (macOS)
+- [x] Hovered link href shown in status bar
 
 ## Open work / next steps
 
 1. Optional: HarfBuzz for complex scripts
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
-3. Open external http(s) links (currently logged only)
+3. Inline transclusion / hover previews (stage 03 remainder)
+4. Drag-and-drop layout editing (stage 04)
 
 ## Design notes
 
@@ -113,4 +116,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-023.*-scroll-drag-docs-…` — scroll drag + README
 - `glyphtoo-024.*-heading-stretch-…` — heading levels + expand-all
 - `glyphtoo-025.*-stretch-edit-…` — stretch summary + unwrap
-- `glyphtoo-026.*-block-move-…` — this delivery
+- `glyphtoo-026.*-block-move-…` — block reorder + duplicate
+- `glyphtoo-027.*-external-links-…` — this delivery

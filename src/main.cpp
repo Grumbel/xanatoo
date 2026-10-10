@@ -19,8 +19,53 @@
 #include <fstream>
 #include <cstdlib>
 #include <cmath>
+#include <cstring>
+
+#if defined(__linux__) || defined(__APPLE__)
+#include <unistd.h>
+#include <sys/wait.h>
+#endif
 
 namespace fs = std::filesystem;
+
+// Open an external URL in the system browser / handler.
+// Only http(s) and mailto: are allowed (avoids shell injection / local file surprises).
+static void open_external_url(const std::string& url) {
+  if (url.rfind("http://", 0) != 0 && url.rfind("https://", 0) != 0 &&
+      url.rfind("mailto:", 0) != 0) {
+    std::cerr << "Refusing to open non-http(s)/mailto URL: " << url << "\n";
+    return;
+  }
+
+#if defined(__linux__)
+  pid_t pid = fork();
+  if (pid == 0) {
+    // Double-fork so the browser is reparented and does not leave a zombie.
+    if (fork() > 0) _exit(0);
+    setsid();
+    execlp("xdg-open", "xdg-open", url.c_str(), static_cast<char*>(nullptr));
+    _exit(127);
+  } else if (pid > 0) {
+    int status = 0;
+    waitpid(pid, &status, 0);
+  } else {
+    std::cerr << "fork failed for xdg-open\n";
+  }
+#elif defined(__APPLE__)
+  pid_t pid = fork();
+  if (pid == 0) {
+    if (fork() > 0) _exit(0);
+    setsid();
+    execlp("open", "open", url.c_str(), static_cast<char*>(nullptr));
+    _exit(127);
+  } else if (pid > 0) {
+    int status = 0;
+    waitpid(pid, &status, 0);
+  }
+#else
+  std::cout << "Open URL not implemented on this platform: " << url << "\n";
+#endif
+}
 
 static const char* SAMPLE = R"(# The network
 
@@ -54,7 +99,8 @@ Ctrl+C / Ctrl+V / Ctrl+X for clipboard, Ctrl+Z / Ctrl+Y for undo/redo.
 **Ctrl+\\** toggles a second view pane; **Tab** switches focus.
 Drag the gutter to resize. Open two files for independent documents.
 **Ctrl+F** leap search (type to find, F3 next, Esc cancel).
-**Ctrl+←/→** move by word. Click blue links to jump to #anchors.
+**Ctrl+←/→** move by word. Click blue links to jump to #anchors or
+open external http(s) URLs in the system browser.
 Drag the blue corner on images to resize. Home/End move on the line.
 Click a stretchtext marker (▸ / ▾) to expand or collapse.
 
@@ -62,7 +108,8 @@ Inspiration: Ted Nelson's *Xanadu*, Bill Atkinson's **HyperCard**, and
 Jef Raskin's *Canon Cat* — a keyboard-driven work processor that treated
 text as a continuous, searchable stream.
 
-Try the link: [Living documents](#Living documents) — click it to jump.
+Try an internal link: [Living documents](#Living documents) — click to jump.
+Or an external one: [Xanadu](https://en.wikipedia.org/wiki/Project_Xanadu).
 
 Images referenced as `![alt](path.png)` load relative to the document
 directory (PNG, JPEG, BMP, GIF via stb_image).
@@ -349,6 +396,8 @@ int main(int argc, char** argv) {
   bool summary_edit_mode = false;
   std::string summary_edit_text;
   glyphtoo::NodeId summary_edit_node = glyphtoo::INVALID_NODE;
+  // Hovered link href (shown in status bar when not in a modal mode)
+  std::string hovered_href;
 
   Uint32 caret_blink_start = SDL_GetTicks();
   auto reset_blink = [&]() { caret_blink_start = SDL_GetTicks(); };
@@ -509,7 +558,7 @@ int main(int argc, char** argv) {
               }
             }
 
-            // Follow internal links (#anchor)
+            // Follow links: internal #anchors jump in-document; http(s)/mailto open externally
             if (auto href = glyphtoo::hit_test_link(
                     doc_of(p), p.layout, lx, my, p.scroll_y)) {
               if (auto dest = glyphtoo::jump_to_href(doc_of(p), *href)) {
@@ -520,7 +569,9 @@ int main(int argc, char** argv) {
                 std::cout << "Followed link: " << *href << "\n";
                 break;
               } else if (!href->empty() && (*href)[0] != '#') {
-                std::cout << "External link (not opened): " << *href << "\n";
+                std::cout << "Opening external link: " << *href << "\n";
+                open_external_url(*href);
+                break;
               }
             }
 
@@ -598,6 +649,19 @@ int main(int argc, char** argv) {
             if (auto hit = glyphtoo::hit_test(p.layout, lx, my, p.scroll_y)) {
               p.sel.focus = *hit;
               p.preferred_x = lx;
+            }
+          } else {
+            // Track link under cursor for status-bar hover feedback
+            float mx = static_cast<float>(ev.motion.x);
+            float my = static_cast<float>(ev.motion.y);
+            int hover_pane = pane_at(mx);
+            Pane& hp = panes[hover_pane];
+            float lx = local_x(mx, hover_pane);
+            if (auto href = glyphtoo::hit_test_link(doc_of(hp), hp.layout, lx, my,
+                                                    hp.scroll_y)) {
+              hovered_href = *href;
+            } else {
+              hovered_href.clear();
             }
           }
           break;
@@ -1461,10 +1525,18 @@ int main(int argc, char** argv) {
         label += search_query.empty() ? "…" : search_query;
         label += "    F3 next · Esc cancel";
         tr = 220; tg = 230; tb = 245;
+      } else if (!hovered_href.empty()) {
+        label = "Link: ";
+        label += hovered_href;
+        if (hovered_href[0] == '#')
+          label += "    click to jump";
+        else
+          label += "    click to open";
+        tr = 40; tg = 90; tb = 160;
       } else {
         label =
             "Ctrl+S save · Ctrl+Shift+S save as · Ctrl+Z/Y undo · "
-            "Ctrl+S save · Ctrl+Q quit · Ctrl++/- zoom · Ctrl+B/I/` style · Ctrl+H replace · Ctrl+F leap";
+            "Ctrl+Q quit · Ctrl++/- zoom · Ctrl+B/I/` style · Ctrl+H replace · Ctrl+F leap";
         tr = 70; tg = 68; tb = 62;
       }
       float baseline = static_cast<float>(win_h - 8);

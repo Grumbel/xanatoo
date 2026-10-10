@@ -77,7 +77,7 @@ Supported dialect (intentionally small):
 | **Home** / **End** | Line start / end |
 | **Ctrl+A** | Select current block |
 | **Ctrl+Shift+A** | Select whole document |
-| Click blue link | Follow `#anchor` |
+| Click blue link | Follow `#anchor` or open external `http(s)` / `mailto:` |
 | **Ctrl+F** | Leap search |
 | **Ctrl+H** | Leap replace (Tab switches fields) |
 | **F3** / **Ctrl+G** | Next match |
