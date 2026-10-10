@@ -51,6 +51,10 @@ Supported dialect (intentionally small):
 | `:::columns` / `:::column weight=1.5` | Side-by-side columns (draggable widths) |
 | `:::include #Heading` | Transclude (live embed of a passage) |
 
+## UI chrome
+
+A **Dear ImGui** menu bar and toolbar sit above the document (File / Edit / Format / View). Keyboard shortcuts still work; menus mirror the same commands.
+
 ## Keybindings
 
 ### Files

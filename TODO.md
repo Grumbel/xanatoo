@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **053** (this delivery is **052**)
+Next bundle number: **054** (this delivery is **053**)
 
 ## Status (2026-10-10)
 
-Stage **01**–**04** core features in place; selection stats in status bar.
+Stage **01**–**04** core features in place; Dear ImGui menu bar + toolbar.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -188,4 +188,5 @@ Stage **01**–**04** core features in place; selection stats in status bar.
 - `glyphtoo-049.*-find-prev-code-bg-…` — find prev + code background
 - `glyphtoo-050.*-reload-…` — Ctrl+R reload from disk
 - `glyphtoo-051.*-rebased-…` — rebased onto origin/master
-- `glyphtoo-052.*-sel-stats-…` — this delivery
+- `glyphtoo-052.*-sel-stats-…` — selection status stats
+- `glyphtoo-053.*-imgui-…` — this delivery

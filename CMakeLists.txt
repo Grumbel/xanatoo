@@ -20,11 +20,21 @@ add_executable(glyphtoo
   src/parse.cpp
   src/editor.cpp
   src/images.cpp
+  src/ui.cpp
+  # Vendored Dear ImGui (MIT) — menu bar / toolbar shell
+  external/imgui/imgui.cpp
+  external/imgui/imgui_draw.cpp
+  external/imgui/imgui_tables.cpp
+  external/imgui/imgui_widgets.cpp
+  external/imgui/backends/imgui_impl_sdl2.cpp
+  external/imgui/backends/imgui_impl_sdlrenderer2.cpp
 )
 
 target_include_directories(glyphtoo PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${CMAKE_CURRENT_SOURCE_DIR}/external
+  ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui
+  ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/backends
   ${SDL2_INCLUDE_DIRS}
   ${FREETYPE_INCLUDE_DIRS}
   ${FONTCONFIG_INCLUDE_DIRS}

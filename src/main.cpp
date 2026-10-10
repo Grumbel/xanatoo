@@ -10,6 +10,7 @@
 #include "glyphtoo/parse.hpp"
 #include "glyphtoo/editor.hpp"
 #include "glyphtoo/images.hpp"
+#include "glyphtoo/ui.hpp"
 
 #include <SDL.h>
 #include <iostream>
@@ -318,6 +319,11 @@ int main(int argc, char** argv) {
 
   glyphtoo::LayoutEngine layout_engine(fonts, &images);
   glyphtoo::Renderer renderer(sdl, fonts, &images);
+  glyphtoo::Ui ui;
+  if (!ui.init(window, sdl)) {
+    std::cerr << "Warning: ImGui UI failed to init; continuing without menus\n";
+  }
+  float ui_top = 0.f;  // menu + toolbar height (updated each frame)
 
   struct Pane {
     int doc_index = 0;  // which docs[] entry
@@ -513,6 +519,10 @@ int main(int argc, char** argv) {
   while (running) {
     SDL_Event ev;
     while (SDL_PollEvent(&ev)) {
+      ui.process_event(ev);
+      // Let ImGui consume mouse/keyboard when interacting with menus
+      const bool imgui_mouse = ui.want_capture_mouse();
+      const bool imgui_keys = ui.want_capture_keyboard();
       switch (ev.type) {
         case SDL_QUIT:
           running = false;
@@ -527,6 +537,7 @@ int main(int argc, char** argv) {
           break;
 
         case SDL_MOUSEWHEEL: {
+          if (imgui_mouse) break;
           int mx = 0, my = 0;
           SDL_GetMouseState(&mx, &my);
           int pi = pane_at(static_cast<float>(mx));
@@ -537,9 +548,12 @@ int main(int argc, char** argv) {
         }
 
         case SDL_MOUSEBUTTONDOWN:
+          if (imgui_mouse || static_cast<float>(ev.button.y) < ui_top)
+            break;
+
           if (ev.button.button == SDL_BUTTON_LEFT) {
             float mx = static_cast<float>(ev.button.x);
-            float my = static_cast<float>(ev.button.y);
+            float my = static_cast<float>(ev.button.y) - ui_top;
 
             // Outline panel click → jump to heading
             if (outline_mode && ol_pw > 0) {
@@ -786,6 +800,9 @@ int main(int argc, char** argv) {
           break;
 
         case SDL_MOUSEMOTION:
+          if (imgui_mouse)
+            break;
+
           mouse_x = static_cast<float>(ev.motion.x);
           mouse_y = static_cast<float>(ev.motion.y);
           if (dragging_scroll) {
@@ -895,6 +912,7 @@ int main(int argc, char** argv) {
           break;
 
         case SDL_TEXTINPUT: {
+          if (imgui_keys) break;
           if (help_mode || outline_mode) break;
           if (save_as_mode) {
             save_as_path += ev.text.text;
@@ -947,6 +965,7 @@ int main(int argc, char** argv) {
         }
 
         case SDL_KEYDOWN: {
+          if (imgui_keys) break;
           bool shift = (ev.key.keysym.mod & KMOD_SHIFT) != 0;
           bool ctrl = (ev.key.keysym.mod & KMOD_CTRL) != 0;
           Pane& p = F();
@@ -1907,6 +1926,226 @@ int main(int argc, char** argv) {
     if (needs_layout) layout_panes();
 
     float lh = static_cast<float>(body_font.line_height());
+    // ImGui menu + toolbar
+    {
+      glyphtoo::UiState ui_state;
+      ui_state.dirty = dirty_flags[F().doc_index];
+      ui_state.has_path = !path_of(F()).empty();
+      ui_state.split = split;
+      ui_state.outline = outline_mode;
+      ui_state.diff = diff_mode;
+      ui_state.help = help_mode;
+      ui_state.selection = !F().sel.empty();
+      ui_state.doc_label = path_of(F()).empty() ? std::string("untitled")
+                                                : path_of(F());
+      auto ui_frame = ui.begin_frame(ui_state);
+      ui_top = ui_frame.top_reserved;
+
+      using C = glyphtoo::UiCommand;
+      auto& p = F();
+      auto& d = doc_of(p);
+      switch (ui_frame.cmd) {
+        case C::Quit:
+          running = false;
+          break;
+        case C::Save: {
+          std::string& spath = path_of(p);
+          if (spath.empty()) {
+            save_as_mode = true;
+            save_as_path = "untitled.md";
+          } else {
+            std::string text = glyphtoo::serialize_markup(d);
+            std::ofstream out(spath);
+            if (out) {
+              out << text;
+              dirty_flags[p.doc_index] = false;
+              update_title();
+              std::cout << "Saved: " << spath << "\n";
+            }
+          }
+          break;
+        }
+        case C::SaveAs:
+          save_as_mode = true;
+          search_mode = false;
+          save_as_path = path_of(p).empty() ? "untitled.md" : path_of(p);
+          break;
+        case C::Reload:
+        case C::ForceReload: {
+          std::string& rpath = path_of(p);
+          if (rpath.empty()) break;
+          if (dirty_flags[p.doc_index] && ui_frame.cmd == C::Reload) {
+            std::cerr << "Reload: unsaved changes — use Force Reload\n";
+            break;
+          }
+          docs[p.doc_index] = load_doc(rpath);
+          dirty_flags[p.doc_index] = false;
+          histories[p.doc_index].reset(docs[p.doc_index], p.sel);
+          glyphtoo::ensure_valid_caret(docs[p.doc_index], p.sel.focus);
+          p.sel.anchor = p.sel.focus;
+          p.scroll_y = 0.f;
+          update_title();
+          needs_layout = true;
+          break;
+        }
+        case C::Undo:
+          if (histories[p.doc_index].undo(d, p.sel)) needs_layout = true;
+          break;
+        case C::Redo:
+          if (histories[p.doc_index].redo(d, p.sel)) needs_layout = true;
+          break;
+        case C::Cut: {
+          std::string text = glyphtoo::selected_text(d, p.sel);
+          if (!text.empty()) {
+            SDL_SetClipboardText(text.c_str());
+            edit();
+            glyphtoo::delete_selection(d, p.sel);
+            needs_layout = true;
+          }
+          break;
+        }
+        case C::Copy: {
+          std::string text = glyphtoo::selected_text(d, p.sel);
+          if (!text.empty()) SDL_SetClipboardText(text.c_str());
+          break;
+        }
+        case C::Paste:
+          if (SDL_HasClipboardText()) {
+            char* clip = SDL_GetClipboardText();
+            if (clip && clip[0]) {
+              edit();
+              if (!p.sel.empty()) glyphtoo::delete_selection(d, p.sel);
+              glyphtoo::paste_plain_text(d, p.sel.focus, clip);
+              p.sel.anchor = p.sel.focus;
+              needs_layout = true;
+            }
+            if (clip) SDL_free(clip);
+          }
+          break;
+        case C::SelectAll:
+          glyphtoo::move_to_document_start(d, p.sel.anchor);
+          glyphtoo::move_to_document_end(d, p.sel.focus);
+          break;
+        case C::Find:
+          search_mode = true;
+          replace_mode = false;
+          break;
+        case C::Replace:
+          search_mode = true;
+          replace_mode = true;
+          break;
+        case C::Bold:
+          if (!p.sel.empty()) {
+            edit();
+            glyphtoo::apply_style_to_selection(d, p.sel, glyphtoo::InlineKind::Strong);
+            needs_layout = true;
+          }
+          break;
+        case C::Italic:
+          if (!p.sel.empty()) {
+            edit();
+            glyphtoo::apply_style_to_selection(d, p.sel, glyphtoo::InlineKind::Emphasis);
+            needs_layout = true;
+          }
+          break;
+        case C::Code:
+          if (!p.sel.empty()) {
+            edit();
+            glyphtoo::apply_style_to_selection(d, p.sel, glyphtoo::InlineKind::Code);
+            needs_layout = true;
+          }
+          break;
+        case C::Link:
+          if (!p.sel.empty()) {
+            std::string text = glyphtoo::selected_text(d, p.sel);
+            edit();
+            glyphtoo::apply_style_to_selection(d, p.sel, glyphtoo::InlineKind::Link,
+                                              "#" + text);
+            link_edit_mode = true;
+            link_edit_node = p.sel.focus.node;
+            link_edit_span = p.sel.focus.span_index;
+            link_edit_href = "#" + text;
+            needs_layout = true;
+          }
+          break;
+        case C::InsertParagraph:
+          edit();
+          if (glyphtoo::insert_sibling_after(d, p.sel.focus,
+                                             glyphtoo::NodeKind::Paragraph)) {
+            p.sel.anchor = p.sel.focus;
+            needs_layout = true;
+          }
+          break;
+        case C::InsertHr:
+          edit();
+          if (glyphtoo::insert_sibling_after(d, p.sel.focus,
+                                             glyphtoo::NodeKind::HorizontalRule)) {
+            p.sel.anchor = p.sel.focus;
+            needs_layout = true;
+          }
+          break;
+        case C::InsertImage:
+          image_insert_mode = true;
+          image_insert_path.clear();
+          break;
+        case C::ToggleUnorderedList:
+          edit();
+          if (glyphtoo::toggle_list(d, p.sel.focus, false)) needs_layout = true;
+          break;
+        case C::ToggleOrderedList:
+          edit();
+          if (glyphtoo::toggle_list(d, p.sel.focus, true)) needs_layout = true;
+          break;
+        case C::ToggleBlockQuote: {
+          edit();
+          auto& node = d.get(p.sel.focus.node);
+          if (node.kind == glyphtoo::NodeKind::BlockQuote) {
+            node.kind = glyphtoo::NodeKind::Paragraph;
+          } else if (node.kind == glyphtoo::NodeKind::Paragraph ||
+                     node.kind == glyphtoo::NodeKind::Heading ||
+                     node.kind == glyphtoo::NodeKind::ListItem) {
+            node.kind = glyphtoo::NodeKind::BlockQuote;
+            node.level = 0;
+          }
+          needs_layout = true;
+          break;
+        }
+        case C::ToggleSplit:
+          split = !split;
+          needs_layout = true;
+          break;
+        case C::ToggleOutline:
+          outline_mode = !outline_mode;
+          if (outline_mode) {
+            help_mode = false;
+            refresh_outline();
+            outline_sel = 0;
+          }
+          break;
+        case C::ToggleDiff:
+          diff_mode = !diff_mode;
+          refresh_diff();
+          break;
+        case C::ToggleHelp:
+          help_mode = !help_mode;
+          break;
+        case C::ZoomIn:
+          body_px = std::min(48, body_px + 1);
+          heading_px = std::min(64, heading_px + 2);
+          fonts.set_sizes(body_px, heading_px);
+          needs_layout = true;
+          break;
+        case C::ZoomOut:
+          body_px = std::max(10, body_px - 1);
+          heading_px = std::max(14, heading_px - 2);
+          fonts.set_sizes(body_px, heading_px);
+          needs_layout = true;
+          break;
+        default:
+          break;
+      }
+    }
+
     renderer.clear(248, 246, 240);
 
     int pane_count = split ? 2 : 1;
@@ -1915,22 +2154,24 @@ int main(int argc, char** argv) {
       float max_scroll = std::max(0.f, pane.layout.content_height - win_h + 40.f + 28.f);
       if (pane.scroll_y > max_scroll) pane.scroll_y = max_scroll;
 
-      SDL_Rect clip{pane.x, 0, pane.w, win_h - 28};
+      const int clip_y = static_cast<int>(ui_top);
+      SDL_Rect clip{pane.x, clip_y, pane.w, win_h - 28 - clip_y};
       SDL_RenderSetClipRect(sdl, &clip);
 
       float ox = static_cast<float>(pane.x);
+      const float draw_scroll = pane.scroll_y - ui_top;
 
       if (!pane.sel.empty()) {
         auto rects = glyphtoo::selection_rects(
-            pane.layout, pane.sel, pane.scroll_y, lh);
+            pane.layout, pane.sel, draw_scroll, lh);
         renderer.draw_selection(rects, ox);
       }
 
-      renderer.draw(pane.layout, pane.scroll_y, ox);
+      renderer.draw(pane.layout, draw_scroll, ox);
 
       if (i == focus) {
         auto cpos = glyphtoo::caret_screen_pos(
-            pane.layout, pane.sel.focus, pane.scroll_y, lh);
+            pane.layout, pane.sel.focus, draw_scroll, lh);
         if (cpos.valid) pane.preferred_x = cpos.x;
         Uint32 blink_phase = (SDL_GetTicks() - caret_blink_start) % 1000;
         if (blink_phase < 600) {
@@ -1938,10 +2179,10 @@ int main(int argc, char** argv) {
         }
       }
 
-      // Focus indicator: thin bar at top of focused pane
+      // Focus indicator: thin bar at top of focused pane content
       if (i == focus) {
         SDL_SetRenderDrawColor(sdl, 25, 90, 170, 255);
-        SDL_Rect bar{pane.x, 0, pane.w, 3};
+        SDL_Rect bar{pane.x, clip_y, pane.w, 3};
         SDL_RenderFillRect(sdl, &bar);
       }
 
@@ -2404,10 +2645,12 @@ int main(int argc, char** argv) {
                          tip, 230, 235, 245);
     }
 
+    ui.end_frame(sdl);
     renderer.present();
   }
 
   SDL_StopTextInput();
+  ui.shutdown();
   SDL_DestroyRenderer(sdl);
   SDL_DestroyWindow(window);
   SDL_Quit();

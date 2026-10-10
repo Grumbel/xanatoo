@@ -7,7 +7,8 @@ See `PROPOSAL.md` for the full vision (stretchtext, live editing,
 addressable passages, Hypercard/Xanadu/Canon-Cat spirit).
 
 Keep the system **minimalist and portable**. Prefer small, well-scoped
-libraries (SDL2, FreeType, optionally HarfBuzz). No Qt/GTK/KDE.
+libraries (SDL2, FreeType, FontConfig, optionally HarfBuzz).
+Dear ImGui is allowed for chrome (menus/toolbars). No Qt/GTK/KDE.
 
 ## Architecture principles
 
@@ -22,6 +23,8 @@ libraries (SDL2, FreeType, optionally HarfBuzz). No Qt/GTK/KDE.
 - C++20
 - SDL2 (window, events, renderer)
 - FreeType (glyph rasterization)
+- FontConfig (styled faces)
+- Dear ImGui (menu bar / toolbar; vendored under external/imgui)
 - CMake + Nix flake
 
 ## Coding rules

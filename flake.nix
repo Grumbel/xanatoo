@@ -28,6 +28,7 @@
               SDL2
               freetype
               fontconfig
+              xorg.libX11
             ];
 
             cmakeFlags = [
