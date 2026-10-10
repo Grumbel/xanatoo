@@ -1015,6 +1015,69 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
     return;
   }
 
+  if (tag == "deflist" || tag == "dl") {
+    NodeId n = doc.create(NodeKind::DefList, parent);
+    std::string label;
+    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           &label);
+    if (!label.empty()) doc.get(n).label = label;
+    parse_sexpr_children(doc, n, e.kids, i);
+    return;
+  }
+
+  if (tag == "term" || tag == "dt") {
+    NodeId n = doc.create(NodeKind::Term, parent);
+    std::string label;
+    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           &label);
+    if (!label.empty()) doc.get(n).label = label;
+    fill_inlines(doc.get(n), e.kids, i);
+    return;
+  }
+
+  if (tag == "def" || tag == "dd" || tag == "definition") {
+    NodeId n = doc.create(NodeKind::Definition, parent);
+    std::string label;
+    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           &label);
+    if (!label.empty()) doc.get(n).label = label;
+    // Allow nested blocks or plain inlines
+    bool has_block = false;
+    for (size_t j = i; j < e.kids.size(); ++j) {
+      const SExpr& c = e.kids[j];
+      if (c.kind == SExpr::Kind::List && !c.kids.empty() &&
+          c.kids[0].kind == SExpr::Kind::Atom) {
+        const std::string& ht = c.kids[0].text;
+        if (ht != "em" && ht != "strong" && ht != "code" && ht != "a" &&
+            ht != "text") {
+          has_block = true;
+          break;
+        }
+      }
+    }
+    if (has_block)
+      parse_sexpr_children(doc, n, e.kids, i);
+    else
+      fill_inlines(doc.get(n), e.kids, i);
+    return;
+  }
+
+  if (tag == "figure") {
+    NodeId n = doc.create(NodeKind::Figure, parent);
+    std::string label;
+    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           &label);
+    if (!label.empty()) doc.get(n).label = label;
+    parse_sexpr_children(doc, n, e.kids, i);
+    return;
+  }
+
+  if (tag == "caption") {
+    NodeId n = doc.create(NodeKind::Caption, parent);
+    fill_inlines(doc.get(n), e.kids, 1);
+    return;
+  }
+
   if (tag == "hr") {
     doc.create(NodeKind::HorizontalRule, parent);
     return;
@@ -1294,6 +1357,62 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
       for (const auto& sp : node.spans) body += sp.text;
       out.push_back(' ');
       escape_sexpr_string(body, out);
+      out += ")";
+      break;
+    }
+
+    case NodeKind::DefList: {
+      out += pad;
+      out += "(deflist";
+      emit_node_id(node, out);
+      emit_label(node, out);
+      serialize_sexpr_children(doc, node, out, indent + 2);
+      out.push_back('\n');
+      out += pad;
+      out += ")";
+      break;
+    }
+
+    case NodeKind::Term: {
+      out += pad;
+      out += "(term";
+      emit_node_id(node, out);
+      emit_label(node, out);
+      serialize_sexpr_inlines(node, out);
+      out += ")";
+      break;
+    }
+
+    case NodeKind::Definition: {
+      out += pad;
+      out += "(def";
+      emit_node_id(node, out);
+      emit_label(node, out);
+      if (!node.spans.empty())
+        serialize_sexpr_inlines(node, out);
+      if (!node.children.empty())
+        serialize_sexpr_children(doc, node, out, indent + 2);
+      out += ")";
+      break;
+    }
+
+    case NodeKind::Figure: {
+      out += pad;
+      out += "(figure";
+      emit_node_id(node, out);
+      emit_label(node, out);
+      serialize_sexpr_children(doc, node, out, indent + 2);
+      out.push_back('\n');
+      out += pad;
+      out += ")";
+      break;
+    }
+
+    case NodeKind::Caption: {
+      out += pad;
+      out += "(caption";
+      emit_node_id(node, out);
+      serialize_sexpr_inlines(node, out);
       out += ")";
       break;
     }

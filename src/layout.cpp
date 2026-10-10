@@ -305,6 +305,57 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       break;
     }
 
+    case NodeKind::DefList: {
+      float start_y = y;
+      for (NodeId c : node.children)
+        layout_node(doc, c, x, y, max_width, out);
+      y += 8.f;
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
+    case NodeKind::Term: {
+      float start_y = y;
+      layout_paragraph(doc, node, x, y, max_width, out, FontRole::Body);
+      y += 2.f;
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
+    case NodeKind::Definition: {
+      float start_y = y;
+      const float indent = 20.f;
+      float text_x = x + indent;
+      float text_w = max_width - indent;
+      if (text_w < 40.f) {
+        text_x = x + 8.f;
+        text_w = max_width - 8.f;
+      }
+      layout_paragraph(doc, node, text_x, y, text_w, out, FontRole::Body);
+      y += 10.f;
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
+    case NodeKind::Figure: {
+      float start_y = y;
+      for (NodeId c : node.children)
+        layout_node(doc, c, x, y, max_width, out);
+      y += 10.f;
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
+    case NodeKind::Caption: {
+      float start_y = y;
+      const float pad = 4.f;
+      layout_paragraph(doc, node, x + pad, y, max_width - pad * 2.f, out,
+                       FontRole::Body);
+      y += 6.f;
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
     case NodeKind::ListItem: {
       float start_y = y;
       const float bullet_slot = 28.f;

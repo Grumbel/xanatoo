@@ -27,6 +27,11 @@ enum class NodeKind : uint8_t {
   Transclude,      // :::include #Target — live embedding of a passage
   CodeBlock,       // semantic preformatted code (:lang for language)
   Note,            // semantic aside / callout (not a layout box)
+  DefList,         // definition list container
+  Term,            // term in a definition list
+  Definition,      // definition body for the preceding term
+  Figure,          // media + caption as one semantic unit
+  Caption,         // caption under a figure (child of Figure)
 };
 
 enum class InlineKind : uint8_t {

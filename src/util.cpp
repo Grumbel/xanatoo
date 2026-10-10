@@ -14,7 +14,9 @@ std::string ascii_lower(std::string s) {
 bool is_text_node_kind(NodeKind k) {
   return k == NodeKind::Paragraph || k == NodeKind::Heading ||
          k == NodeKind::ListItem || k == NodeKind::BlockQuote ||
-         k == NodeKind::Note || k == NodeKind::CodeBlock;
+         k == NodeKind::Note || k == NodeKind::CodeBlock ||
+         k == NodeKind::Term || k == NodeKind::Definition ||
+         k == NodeKind::Caption;
 }
 
 void collect_text_nodes(const Document& doc, NodeId id,

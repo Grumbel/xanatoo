@@ -53,6 +53,8 @@ stable identity matter.
 | `(columns (column …) …)` | Parallel / multi-track structure |
 | `(include "#label")` | Transclusion of a labelled passage |
 | `(img "path" :alt "…")` | Media with accessible alternative |
+| `(deflist (term …) (def …) …)` | Definition list (glossary-style) |
+| `(figure (img …) (caption …))` | Media + caption as one unit |
 
 Inline: plain strings, `(em …)`, `(strong …)`, `(code …)`, `(a "href" …)`.
 
@@ -78,8 +80,6 @@ Not part of the semantic document:
 
 ## Planned (not all implemented)
 
-- **Definition lists** — `(deflist (term …) (def …) …)`
-- **Figures** — `(figure (img …) (caption …))` as one unit
 - **Citations** — `(cite :key "smith2020")` + bibliography node
 - **Typed links** — `:rel "glossary" | "source" | "contra"`
 - **Range transclusion** — include a span inside a labelled block

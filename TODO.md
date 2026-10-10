@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **071** (this delivery is **070**)
+Next bundle number: **072** (this delivery is **071**)
 
 ## Status (2026-10-10)
 
@@ -116,6 +116,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Help: stretchtext toggle + scrollbar; colorful BeOS/GNOME2 toolbar icons
 - [x] ImGui UI font: DejaVu / Bitstream Vera Sans (GNOME 2 default family)
 - [x] Semantic format: FORMAT.md; :label; doc meta; note; codeblock
+- [x] Semantic format: deflist/term/def; figure/caption
 
 ## Open work / next steps
 
@@ -123,9 +124,9 @@ LCS structural diff marks; cross-document `:::include`.
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Editable transclusion mirror (edits on embed write through to source)
 4. Word-level / intra-block diff highlighting
-5. **Tables** (layout + markup) — denser key/command reference docs, comparison grids
-6. **General document software windows** — open any doc in a floating frame (help is the first case); optional docking
-7. Definition lists / two-column “key → description” blocks if tables are overkill for help-style pages
+5. **Tables** — semantic grid (cells as nodes); presentation left to the view
+6. **General document software windows** — open any doc in a floating frame; optional docking
+7. **Citations** / typed link relations / range transclusion (see FORMAT.md)
 
 ## Design notes
 
@@ -235,4 +236,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `glyphtoo-067.*-help-resize-…` — help resize
 - `glyphtoo-068.*-help-stretch-icons-…` — help stretch + icons
 - `glyphtoo-069.*-ui-font-…` — UI font
-- `glyphtoo-070.*-semantic-format-…` — this delivery
+- `glyphtoo-070.*-semantic-format-…` — meta/label/note/code
+- `glyphtoo-071.*-deflist-figure-…` — this delivery

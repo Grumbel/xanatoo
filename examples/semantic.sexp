@@ -40,4 +40,20 @@
   (include "#identity")
 
   (p "Include points at a label; the view embeds the passage live.")
+
+  (h 2 :label "defs" "Definitions")
+
+  (deflist
+    (term :label "stretchtext-term" "Stretchtext")
+    (def "A passage that expands in place; reading state, not a separate file.")
+    (term "Transclusion")
+    (def "Live embedding of a labelled passage via "
+         (code "include")
+         "."))
+
+  (h 2 :label "fig" "Figures")
+
+  (figure :label "network-fig"
+    (img "network.png" :alt "Network diagram")
+    (caption "A network is a graph of passages and links — structure, not decoration."))
 )
