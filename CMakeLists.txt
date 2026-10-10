@@ -75,7 +75,8 @@ add_custom_command(
 add_custom_target(xanatoo_icons ALL DEPENDS ${XANATOO_ICON_DIR}/.stamp)
 add_dependencies(xanatoo xanatoo_icons)
 
-# Runtime can find icons next to the binary or via compile-time path.
+# Build-tree path for dev runs. Installed layout is found at runtime via
+# XANATOO_ICON_DIR env or <exe>/../share/xanatoo/icons (see Ui::load_icons).
 target_compile_definitions(xanatoo PRIVATE
   "XANATOO_ICON_DIR=\"${XANATOO_ICON_DIR}\"")
 

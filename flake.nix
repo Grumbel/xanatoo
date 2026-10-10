@@ -47,7 +47,7 @@
           };
         in
         {
-          # Default package wraps the binary so a DejaVu font is always available.
+          # Default package wraps the binary with font + installed icon path.
           default = pkgs.symlinkJoin {
             name = "xanatoo";
             paths = [ xanatoo ];
@@ -55,7 +55,9 @@
             postBuild = ''
               wrapProgram $out/bin/xanatoo \
                 --set-default XANATOO_FONT \
-                  "${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSans.ttf"
+                  "${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSans.ttf" \
+                --set-default XANATOO_ICON_DIR \
+                  "${xanatoo}/share/xanatoo/icons"
             '';
             meta = xanatoo.meta;
           };

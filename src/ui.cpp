@@ -8,6 +8,7 @@
 #include "backends/imgui_impl_sdl2.h"
 #include "backends/imgui_impl_sdlrenderer2.h"
 
+#include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <vector>
@@ -114,13 +115,29 @@ void Ui::load_icons(SDL_Renderer* renderer) {
   if (!renderer) return;
   renderer_ = renderer;
 
+  // Search order (first hit wins):
+  //  1. XANATOO_ICON_DIR env (Nix wrapper / explicit override)
+  //  2. Compile-time build-tree path (dev builds before install)
+  //  3. Next to the executable: ../share/xanatoo/icons  (installed layout)
+  //  4. Cwd-relative fallbacks for in-tree cmake builds
   std::vector<fs::path> roots;
+  if (const char* env = std::getenv("XANATOO_ICON_DIR")) {
+    if (env[0] != '\0') roots.emplace_back(env);
+  }
 #ifdef XANATOO_ICON_DIR
   roots.emplace_back(XANATOO_ICON_DIR);
 #endif
+#ifdef __linux__
+  try {
+    fs::path exe = fs::read_symlink("/proc/self/exe");
+    fs::path dir = exe.parent_path();
+    roots.push_back(dir / ".." / "share" / "xanatoo" / "icons");
+    roots.push_back(dir / "icons");
+  } catch (...) {
+  }
+#endif
   roots.emplace_back("icons");
   roots.emplace_back("share/xanatoo/icons");
-  // Relative to cwd build trees
   roots.emplace_back("../icons");
   roots.emplace_back("build/icons");
 
@@ -131,13 +148,17 @@ void Ui::load_icons(SDL_Renderer* renderer) {
 
   fs::path found_dir;
   for (const auto& root : roots) {
-    if (fs::exists(root / "save.png")) {
-      found_dir = root;
+    std::error_code ec;
+    auto canon = fs::weakly_canonical(root, ec);
+    const fs::path& probe = ec ? root : canon;
+    if (fs::exists(probe / "save.png")) {
+      found_dir = probe;
       break;
     }
   }
   if (found_dir.empty()) {
-    std::cerr << "xanatoo: toolbar icons not found (built PNGs next to binary)\n";
+    std::cerr << "xanatoo: toolbar icons not found "
+                 "(set XANATOO_ICON_DIR or install share/xanatoo/icons)\n";
     return;
   }
 
