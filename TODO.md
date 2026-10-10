@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **011** (this delivery is **010**)
+Next bundle number: **012** (this delivery is **011**)
 
 ## Status (2026-10-10)
 
@@ -34,6 +34,8 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] Dual-pane multi-view (Ctrl+\\ toggle, Tab focus)
 - [x] Two-file CLI opens independent docs in dual-pane
 - [x] Draggable pane divider (split_ratio)
+- [x] Per-document undo stacks and dirty flags
+- [x] Leap search (Ctrl+F / F3) — Canon Cat–inspired
 
 ## Open work / next steps
 
@@ -41,7 +43,7 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Save-as / untitled buffer when no path was given
 4. Image drag-resize / interactive placement
-5. Per-document undo stacks when panes hold independent files
+5. On-screen search query rendering (status bar is colour-only for now)
 
 ## Design notes
 
@@ -63,4 +65,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-007.*-images-dirty-…` — images + dirty flag
 - `glyphtoo-008.*-columns-multisel-…` — columns + multi-sel
 - `glyphtoo-009.*-dual-pane-…` — dual-pane multi-view
-- `glyphtoo-010.*-two-docs-divider-…` — this delivery
+- `glyphtoo-010.*-two-docs-divider-…` — two docs + divider
+- `glyphtoo-011.*-undo-leap-…` — this delivery

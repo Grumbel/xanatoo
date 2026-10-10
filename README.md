@@ -16,6 +16,12 @@ See [PROPOSAL.md](PROPOSAL.md) for the full vision.
 - `glyphtoo a.md b.md` — open two independent documents side by side
 - With one file (or Ctrl+\\ alone), both panes share the same live document
 
+## Search
+
+- **Ctrl+F** — leap search: type to jump to the next match
+- **F3** / **Ctrl+G** — next match
+- **Esc** — leave search mode
+
 ## Images
 
 Markup `![alt](path.png)` loads PNG/JPEG/BMP/GIF relative to the

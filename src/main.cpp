@@ -52,6 +52,7 @@ Backspace to delete. **Enter** splits a paragraph. Shift+arrows select.
 Ctrl+C / Ctrl+V / Ctrl+X for clipboard, Ctrl+Z / Ctrl+Y for undo/redo.
 **Ctrl+\\** toggles a second view pane; **Tab** switches focus.
 Drag the gutter to resize. Open two files for independent documents.
+**Ctrl+F** leap search (type to find, F3 next, Esc cancel).
 Click a stretchtext marker (▸ / ▾) to expand or collapse.
 
 Inspiration: Ted Nelson's *Xanadu*, Bill Atkinson's **HyperCard**, and
@@ -250,29 +251,27 @@ int main(int argc, char** argv) {
   docs[1] = paths[1].empty() ? docs[0] : load_doc(paths[1]);
   // If only one file, pane 1 shares docs[0] until a second file is used
   bool shared_doc = paths[1].empty();
+  bool dirty_flags[2] = {false, false};
 
   glyphtoo::ImageCache images(sdl);
 
-  auto update_title = [&](bool dirty_flag) {
+  auto update_title = [&]() {
     std::string title = "glyphtoo";
     auto label = [&](int i) {
       std::string s;
-      if (paths[i].empty()) s = "untitled";
-      else s = paths[i];
+      if (dirty_flags[i]) s += "*";
+      if (paths[i].empty()) s += "untitled";
+      else s += paths[i];
       return s;
     };
     if (shared_doc || paths[1].empty()) {
-      title += " — ";
-      if (dirty_flag) title += "*";
-      title += label(0);
+      title += " — " + label(0);
     } else {
-      title += " — ";
-      if (dirty_flag) title += "*";
-      title += label(0) + " | " + label(1);
+      title += " — " + label(0) + " | " + label(1);
     }
     SDL_SetWindowTitle(window, title.c_str());
   };
-  update_title(false);
+  update_title();
 
   glyphtoo::LayoutEngine layout_engine(body_font, heading_font, &images);
   glyphtoo::Renderer renderer(sdl, body_font, heading_font, &images);
@@ -311,13 +310,18 @@ int main(int argc, char** argv) {
     return parent_dir(paths[p.doc_index]);
   };
 
-  glyphtoo::History history;
-  history.reset(docs[0], panes[0].sel);
+  glyphtoo::History histories[2];
+  histories[0].reset(docs[0], panes[0].sel);
+  histories[1].reset(docs[panes[1].doc_index], panes[1].sel);
 
   int win_w = 920, win_h = 720;
   bool running = true;
   bool needs_layout = true;
-  bool dirty = false;
+
+  // Leap-style search (Canon Cat inspiration)
+  bool search_mode = false;
+  std::string search_query;
+  size_t search_match_len = 0;
 
   Uint32 caret_blink_start = SDL_GetTicks();
   auto reset_blink = [&]() { caret_blink_start = SDL_GetTicks(); };
@@ -325,12 +329,14 @@ int main(int argc, char** argv) {
   auto F = [&]() -> Pane& { return panes[focus]; };
 
   auto checkpoint = [&]() {
-    history.push(doc_of(F()), F().sel);
+    Pane& p = F();
+    histories[p.doc_index].push(doc_of(p), p.sel);
   };
   auto mark_dirty = [&]() {
-    if (!dirty) {
-      dirty = true;
-      update_title(true);
+    int di = F().doc_index;
+    if (!dirty_flags[di]) {
+      dirty_flags[di] = true;
+      update_title();
     }
   };
   auto edit = [&]() {
@@ -464,6 +470,24 @@ int main(int argc, char** argv) {
           break;
 
         case SDL_TEXTINPUT: {
+          if (search_mode) {
+            search_query += ev.text.text;
+            Pane& p = F();
+            size_t mlen = 0;
+            // Search from start of current caret for progressive refine
+            glyphtoo::Caret from = p.sel.focus;
+            if (from.char_index > 0) from.char_index -= 1;  // allow re-match at caret
+            if (auto hit = glyphtoo::find_next(doc_of(p), search_query, from, mlen)) {
+              p.sel.anchor = *hit;
+              p.sel.focus = *hit;
+              // extend focus by match length (ASCII)
+              for (size_t i = 0; i < mlen; ++i)
+                glyphtoo::move_right(doc_of(p), p.sel.focus);
+              search_match_len = mlen;
+            }
+            reset_blink();
+            break;
+          }
           edit();
           Pane& p = F();
           glyphtoo::Document& td = doc_of(p);
@@ -492,7 +516,42 @@ int main(int argc, char** argv) {
 
           switch (ev.key.keysym.sym) {
             case SDLK_ESCAPE:
-              running = false;
+              if (search_mode) {
+                search_mode = false;
+                search_query.clear();
+                reset_blink();
+              } else {
+                running = false;
+              }
+              break;
+
+            case SDLK_f:
+              if (ctrl) {
+                search_mode = true;
+                search_query.clear();
+                search_match_len = 0;
+                std::cout << "Leap search: type to find, F3 next, Esc cancel\n";
+                reset_blink();
+              }
+              break;
+
+            case SDLK_F3:
+            case SDLK_g:
+              if (ev.key.keysym.sym == SDLK_F3 || ctrl) {
+                if (search_query.empty() && !search_mode) break;
+                search_mode = true;
+                Pane& pp = F();
+                size_t mlen = 0;
+                if (auto hit = glyphtoo::find_next(
+                        doc_of(pp), search_query, pp.sel.focus, mlen)) {
+                  pp.sel.anchor = *hit;
+                  pp.sel.focus = *hit;
+                  for (size_t i = 0; i < mlen; ++i)
+                    glyphtoo::move_right(doc_of(pp), pp.sel.focus);
+                  search_match_len = mlen;
+                  reset_blink();
+                }
+              }
               break;
 
             case SDLK_TAB:
@@ -519,6 +578,17 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_BACKSPACE:
+              if (search_mode) {
+                if (!search_query.empty()) {
+                  // erase last UTF-8 character roughly
+                  while (!search_query.empty() &&
+                         (static_cast<unsigned char>(search_query.back()) & 0xc0) == 0x80)
+                    search_query.pop_back();
+                  if (!search_query.empty()) search_query.pop_back();
+                }
+                reset_blink();
+                break;
+              }
               edit();
               if (!p.sel.empty()) {
                 glyphtoo::delete_selection(d, p.sel);
@@ -638,7 +708,7 @@ int main(int argc, char** argv) {
 
             case SDLK_z:
               if (ctrl) {
-                if (history.undo(d, p.sel)) {
+                if (histories[p.doc_index].undo(d, p.sel)) {
                   if (panes[0].doc_index == panes[1].doc_index) {
                     glyphtoo::ensure_valid_caret(
                         doc_of(panes[1 - focus]), panes[1 - focus].sel.focus);
@@ -652,7 +722,7 @@ int main(int argc, char** argv) {
 
             case SDLK_y:
               if (ctrl) {
-                if (history.redo(d, p.sel)) {
+                if (histories[p.doc_index].redo(d, p.sel)) {
                   if (panes[0].doc_index == panes[1].doc_index) {
                     glyphtoo::ensure_valid_caret(
                         doc_of(panes[1 - focus]), panes[1 - focus].sel.focus);
@@ -677,8 +747,8 @@ int main(int argc, char** argv) {
                   } else {
                     out << text;
                     std::cout << "Saved: " << spath << "\n";
-                    dirty = false;
-                    update_title(false);
+                    dirty_flags[p.doc_index] = false;
+                    update_title();
                   }
                 }
               }
@@ -763,6 +833,18 @@ int main(int argc, char** argv) {
       SDL_SetRenderDrawColor(sdl, 210, 208, 200, 255);
       SDL_Rect div{mid, 0, 6, win_h};
       SDL_RenderFillRect(sdl, &div);
+    }
+
+    // Search mode indicator (simple status bar)
+    if (search_mode) {
+      SDL_SetRenderDrawColor(sdl, 30, 30, 40, 230);
+      SDL_Rect bar{0, win_h - 28, win_w, 28};
+      SDL_RenderFillRect(sdl, &bar);
+      // Title bar text via window title is heavy; use stdout already.
+      // Draw a bright caret-line mark so the mode is visible.
+      SDL_SetRenderDrawColor(sdl, 80, 160, 255, 255);
+      SDL_Rect accent{0, win_h - 28, win_w, 3};
+      SDL_RenderFillRect(sdl, &accent);
     }
 
     renderer.present();

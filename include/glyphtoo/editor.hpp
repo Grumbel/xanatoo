@@ -97,6 +97,11 @@ void ensure_valid_caret(Document& doc, Caret& caret);
 // Document-order comparison of two carets (-1, 0, +1).
 int caret_cmp(const Document& doc, const Caret& a, const Caret& b);
 
+// Case-insensitive search starting after `from` (wraps around).
+// Returns the start caret of the match and sets match_len to codepoint length.
+std::optional<Caret> find_next(const Document& doc, const std::string& query,
+                               const Caret& from, size_t& match_len);
+
 // ---------------------------------------------------------------------------
 // Undo / redo via document snapshots (simple, correct at current scale).
 // ---------------------------------------------------------------------------

@@ -734,6 +734,91 @@ std::string selected_text(const Document& doc, const Selection& sel) {
   return out;
 }
 
+
+std::optional<Caret> find_next(const Document& doc, const std::string& query,
+                               const Caret& from, size_t& match_len) {
+  match_len = 0;
+  if (query.empty() || doc.root == INVALID_NODE) return std::nullopt;
+
+  // Lowercase query for case-insensitive ASCII search
+  std::string q = query;
+  for (char& ch : q) {
+    if (ch >= 'A' && ch <= 'Z') ch = static_cast<char>(ch - 'A' + 'a');
+  }
+
+  std::vector<NodeId> nodes;
+  collect_text_nodes(doc, doc.root, nodes);
+  if (nodes.empty()) return std::nullopt;
+
+  auto node_rank = [&](NodeId id) -> size_t {
+    auto it = std::find(nodes.begin(), nodes.end(), id);
+    return it == nodes.end() ? 0 : static_cast<size_t>(it - nodes.begin());
+  };
+
+  size_t start_rank = node_rank(from.node);
+  // Start searching from the character after `from`
+  size_t start_span = from.span_index;
+  size_t start_ch = from.char_index + 1;
+
+  auto search_node = [&](NodeId nid, size_t from_span, size_t from_ch) -> std::optional<Caret> {
+    const Node& n = doc.get(nid);
+    // Build full text with codepoint index map back to (span, ch)
+    struct Map { size_t span; size_t ch; };
+    std::string lower;
+    std::vector<Map> map;
+    for (size_t si = 0; si < n.spans.size(); ++si) {
+      size_t ci = 0;
+      size_t bi = 0;
+      const std::string& t = n.spans[si].text;
+      while (bi < t.size()) {
+        auto [cp, len] = decode_cp(t, bi);
+        if (len == 0) break;
+        char ascii = (cp < 128) ? static_cast<char>(cp) : '?';
+        if (ascii >= 'A' && ascii <= 'Z') ascii = static_cast<char>(ascii - 'A' + 'a');
+        lower.push_back(ascii);
+        map.push_back({si, ci});
+        bi += len;
+        ++ci;
+      }
+    }
+    // Determine byte start in lower from (from_span, from_ch)
+    size_t start = 0;
+    for (size_t i = 0; i < map.size(); ++i) {
+      if (map[i].span > from_span || (map[i].span == from_span && map[i].ch >= from_ch)) {
+        start = i;
+        break;
+      }
+      start = i + 1;
+    }
+    if (start >= lower.size()) return std::nullopt;
+    auto pos = lower.find(q, start);
+    if (pos == std::string::npos) return std::nullopt;
+    Caret c;
+    c.node = nid;
+    c.span_index = map[pos].span;
+    c.char_index = map[pos].ch;
+    match_len = q.size();  // ASCII query length ≈ codepoints for ASCII
+    return c;
+  };
+
+  // Search from current node onward, then wrap
+  for (size_t pass = 0; pass < 2; ++pass) {
+    size_t i0 = (pass == 0) ? start_rank : 0;
+    size_t i1 = (pass == 0) ? nodes.size() : start_rank + 1;
+    for (size_t i = i0; i < i1 && i < nodes.size(); ++i) {
+      size_t fs = 0, fc = 0;
+      if (pass == 0 && i == start_rank) {
+        fs = start_span;
+        fc = start_ch;
+      }
+      if (auto hit = search_node(nodes[i], fs, fc)) {
+        return hit;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
 // ---- History ----
 
 History::History(size_t max_depth) : max_depth_(max_depth) {}
