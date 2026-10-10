@@ -35,6 +35,8 @@ Supported dialect (intentionally small):
 |--------|---------|
 | `#` … `######` | Headings |
 | blank-line separated | Paragraphs |
+| `- ` / `* ` / `+ ` | Unordered list items |
+| `1. ` `2. ` … | Ordered list items |
 | `*em*` `**strong**` `` `code` `` | Inline styles |
 | `[text](#anchor)` / `[text](url)` | Links |
 | `![alt](path.png){scale=1.2}` | Images (PNG/JPEG/BMP/GIF) |

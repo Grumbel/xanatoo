@@ -36,6 +36,34 @@ std::vector<Line> split_lines(std::string_view src) {
   return lines;
 }
 
+// Detect a list-item marker at the start of a trimmed line.
+// Returns bytes to skip past the marker, or 0 if not a list item.
+// Sets *ordered_index to 1-based index for "N. " markers, or 0 for "- "/"* ".
+size_t list_marker_len(std::string_view trimmed, int* ordered_index) {
+  if (ordered_index) *ordered_index = 0;
+  if (trimmed.size() >= 2 &&
+      (trimmed[0] == '-' || trimmed[0] == '*' || trimmed[0] == '+') &&
+      trimmed[1] == ' ') {
+    return 2;
+  }
+  // Ordered: one or more digits, then ". "
+  size_t i = 0;
+  while (i < trimmed.size() &&
+         std::isdigit(static_cast<unsigned char>(trimmed[i])))
+    ++i;
+  if (i > 0 && i + 1 < trimmed.size() && trimmed[i] == '.' &&
+      trimmed[i + 1] == ' ') {
+    if (ordered_index) {
+      int n = 0;
+      for (size_t k = 0; k < i; ++k)
+        n = n * 10 + (trimmed[k] - '0');
+      *ordered_index = n > 0 ? n : 1;
+    }
+    return i + 2;
+  }
+  return 0;
+}
+
 // Parse inline spans for a single paragraph/heading line.
 void parse_inlines(Node& node, std::string_view text) {
   size_t i = 0;
@@ -235,6 +263,42 @@ Document parse_markup(std::string_view source) {
       continue;
     }
 
+    // Unordered / ordered list: consecutive lines with -/*/+/N. markers
+    {
+      int ord = 0;
+      size_t mlen = list_marker_len(trimmed, &ord);
+      if (mlen > 0) {
+        NodeId list = doc.create(NodeKind::List, current_parent());
+        // level 0 = unordered, 1 = ordered (first marker decides)
+        doc.get(list).level = (ord > 0) ? 1 : 0;
+        int item_index = 0;
+        while (i < lines.size() && !lines[i].blank) {
+          std::string_view lt = lines[i].text;
+          size_t llead = 0;
+          while (llead < lt.size() && (lt[llead] == ' ' || lt[llead] == '\t'))
+            ++llead;
+          std::string_view ltrim = lt.substr(llead);
+          int item_ord = 0;
+          size_t imlen = list_marker_len(ltrim, &item_ord);
+          if (imlen == 0) break;
+          // Stay within the same list kind (ul vs ol)
+          bool item_ordered = item_ord > 0;
+          bool list_ordered = doc.get(list).level == 1;
+          if (item_ordered != list_ordered) break;
+
+          NodeId item = doc.create(NodeKind::ListItem, list);
+          ++item_index;
+          // For ordered lists, store the display number in level
+          doc.get(item).level = list_ordered
+                                    ? (item_ord > 0 ? item_ord : item_index)
+                                    : 0;
+          parse_inlines(doc.get(item), ltrim.substr(imlen));
+          ++i;
+        }
+        continue;
+      }
+    }
+
     // Paragraph: gather consecutive non-blank, non-fence lines
     std::string para;
     while (i < lines.size() && !lines[i].blank) {
@@ -243,7 +307,8 @@ Document parse_markup(std::string_view source) {
       while (llead < lt.size() && (lt[llead] == ' ' || lt[llead] == '\t')) ++llead;
       std::string_view ltrim = lt.substr(llead);
       if (ltrim.starts_with(":::") || ltrim.starts_with("# ") ||
-          ltrim.starts_with("## ") || ltrim.starts_with("![") ) {
+          ltrim.starts_with("## ") || ltrim.starts_with("![") ||
+          list_marker_len(ltrim, nullptr) > 0) {
         break;
       }
       if (!para.empty()) para.push_back(' ');
@@ -315,11 +380,24 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
       break;
     }
 
-    case NodeKind::Paragraph:
-    case NodeKind::ListItem: {
+    case NodeKind::Paragraph: {
       out += pad;
       serialize_inlines(node, out);
       out += "\n\n";
+      break;
+    }
+
+    case NodeKind::ListItem: {
+      out += pad;
+      // level > 0 means ordered list item with that display number
+      if (node.level > 0) {
+        out += std::to_string(node.level);
+        out += ". ";
+      } else {
+        out += "- ";
+      }
+      serialize_inlines(node, out);
+      out += "\n";
       break;
     }
 
@@ -385,6 +463,7 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
       for (NodeId c : node.children) {
         serialize_node(doc, c, out, indent);
       }
+      out += "\n";
       break;
 
     default:

@@ -108,6 +108,19 @@ Inspiration: Ted Nelson's *Xanadu*, Bill Atkinson's **HyperCard**, and
 Jef Raskin's *Canon Cat* — a keyboard-driven work processor that treated
 text as a continuous, searchable stream.
 
+Design pillars:
+
+- Addressable passages and stable node IDs
+- Stretchtext that reflows the living layout
+- Side-by-side views of related material
+- Direct manipulation of images and blocks
+
+Ordered steps to explore:
+
+1. Click a stretchtext marker to expand
+2. Follow an internal or external link
+3. Toggle dual-pane with Ctrl+\\
+
 Try an internal link: [Living documents](#Living documents) — click to jump.
 Or an external one: [Xanadu](https://en.wikipedia.org/wiki/Project_Xanadu).
 

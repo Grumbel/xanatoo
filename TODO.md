@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **028** (this delivery is **027**)
+Next bundle number: **029** (this delivery is **028**)
 
 ## Status (2026-10-10)
 
-Stage **01** complete. Stage **02** largely working. Early stretchtext / stage **03** links.
+Stage **01** complete (lists). Stage **02** largely working. Early stretchtext / stage **03** links.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -72,6 +72,7 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext / stage *
 - [x] Ctrl+D duplicate block
 - [x] Open external http(s)/mailto links via xdg-open (Linux) / open (macOS)
 - [x] Hovered link href shown in status bar
+- [x] Unordered lists (`-`/`*`/`+`) and ordered lists (`1.`) — parse, layout bullets, serialize
 
 ## Open work / next steps
 
@@ -79,6 +80,7 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext / stage *
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Inline transclusion / hover previews (stage 03 remainder)
 4. Drag-and-drop layout editing (stage 04)
+5. Enter in a list item creates a new sibling ListItem (currently splits as paragraph)
 
 ## Design notes
 
@@ -88,6 +90,9 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext / stage *
   the glyph list, not stored on the document.
 - Block split creates a new sibling via `Document::insert_after` and
   moves the trailing spans across.
+- List: `level` 0 = unordered, 1 = ordered. ListItem `level` holds the
+  ordered display number (0 for bullets). Layout draws "•" or "N." as
+  synthetic glyphs on the ListItem node.
 
 ## Bundle history
 
@@ -117,4 +122,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext / stage *
 - `glyphtoo-024.*-heading-stretch-…` — heading levels + expand-all
 - `glyphtoo-025.*-stretch-edit-…` — stretch summary + unwrap
 - `glyphtoo-026.*-block-move-…` — block reorder + duplicate
-- `glyphtoo-027.*-external-links-…` — this delivery
+- `glyphtoo-027.*-external-links-…` — external links + hover
+- `glyphtoo-028.*-lists-…` — this delivery

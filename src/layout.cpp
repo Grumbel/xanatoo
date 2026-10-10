@@ -8,6 +8,8 @@ namespace glyphtoo {
 LayoutEngine::LayoutEngine(Font& body, Font& heading, ImageCache* images)
     : body_(body), heading_(heading), images_(images) {}
 
+static void decode_utf8(const std::string& text, std::vector<uint32_t>& out);
+
 LayoutResult LayoutEngine::layout(const Document& doc, float max_width,
                                    const std::string& image_base) {
   LayoutResult result;
@@ -26,10 +28,16 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
   switch (node.kind) {
     case NodeKind::Document:
+      for (NodeId child : node.children) {
+        layout_node(doc, child, x, y, max_width, out);
+      }
+      break;
+
     case NodeKind::List:
       for (NodeId child : node.children) {
         layout_node(doc, child, x, y, max_width, out);
       }
+      y += 8.f;  // trailing gap after the list block
       break;
 
     case NodeKind::Column:
@@ -148,11 +156,46 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       break;
     }
 
-    case NodeKind::Paragraph:
-    case NodeKind::ListItem: {
+    case NodeKind::Paragraph: {
       float start_y = y;
       layout_paragraph(doc, node, x, y, max_width, out, body_, FontRole::Body);
       y += 14.f;
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
+    case NodeKind::ListItem: {
+      float start_y = y;
+      const float bullet_slot = 28.f;
+      // Marker: "•" for unordered, "N." for ordered (level holds the number)
+      std::string marker =
+          (node.level > 0) ? (std::to_string(node.level) + ".") : "•";
+      std::vector<uint32_t> m_cps;
+      decode_utf8(marker, m_cps);
+      float mx = x;
+      float baseline = y + static_cast<float>(body_.ascender());
+      for (uint32_t cp : m_cps) {
+        const Glyph& g = body_.glyph(cp);
+        PositionedGlyph pg;
+        pg.codepoint = cp;
+        pg.x = mx + static_cast<float>(g.bearing_x);
+        pg.y = baseline;
+        pg.node = id;
+        pg.span_index = 0;
+        pg.char_index = 0;
+        pg.kind = InlineKind::Text;
+        pg.font = FontRole::Body;
+        out.glyphs.push_back(pg);
+        mx += static_cast<float>(g.advance >> 6);
+      }
+      float text_x = x + bullet_slot;
+      float text_w = max_width - bullet_slot;
+      if (text_w < 40.f) {
+        text_x = x + 16.f;
+        text_w = max_width - 16.f;
+      }
+      layout_paragraph(doc, node, text_x, y, text_w, out, body_, FontRole::Body);
+      y += 8.f;  // tighter spacing between list items
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
