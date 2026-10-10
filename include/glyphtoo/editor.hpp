@@ -193,9 +193,11 @@ std::optional<std::string> hit_test_link(const Document& doc,
                                          const LayoutResult& layout,
                                          float mx, float my, float scroll_y);
 
-// Sequential text-node comparison for side-by-side version viewing.
-// Fills changed_a / changed_b with NodeIds whose plain text differs (or
-// that have no counterpart in the other document).
+// Structural block diff for side-by-side version viewing.
+// Aligns text-bearing nodes via LCS of plain-text fingerprints, then
+// marks nodes that are not part of the common subsequence (insertions,
+// deletions, or content changes). Survives mid-document inserts without
+// cascading false positives from a pure index-aligned scan.
 void compute_diff_marks(const Document& a, const Document& b,
                         std::vector<NodeId>& changed_a,
                         std::vector<NodeId>& changed_b);

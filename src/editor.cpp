@@ -1702,15 +1702,52 @@ void compute_diff_marks(const Document& a, const Document& b,
   if (a.root != INVALID_NODE) collect_text_nodes(a, a.root, nodes_a);
   if (b.root != INVALID_NODE) collect_text_nodes(b, b.root, nodes_b);
 
-  const size_t n = std::min(nodes_a.size(), nodes_b.size());
-  for (size_t i = 0; i < n; ++i) {
-    if (node_text(a, nodes_a[i]) != node_text(b, nodes_b[i])) {
-      changed_a.push_back(nodes_a[i]);
-      changed_b.push_back(nodes_b[i]);
+  const size_t na = nodes_a.size();
+  const size_t nb = nodes_b.size();
+  if (na == 0 && nb == 0) return;
+
+  // Plain-text fingerprints for equality (structural block alignment).
+  std::vector<std::string> ta(na), tb(nb);
+  for (size_t i = 0; i < na; ++i) ta[i] = node_text(a, nodes_a[i]);
+  for (size_t j = 0; j < nb; ++j) tb[j] = node_text(b, nodes_b[j]);
+
+  // Longest common subsequence of equal block texts. Nodes not in the
+  // LCS are treated as changed / inserted / deleted. This survives
+  // insertions and deletions without cascading false positives the way
+  // a pure index-aligned scan does.
+  // dp[i][j] = LCS length of ta[0..i) and tb[0..j). Flat (na+1)*(nb+1).
+  const size_t cols = nb + 1;
+  std::vector<size_t> dp((na + 1) * cols, 0);
+  auto at = [&](size_t i, size_t j) -> size_t& { return dp[i * cols + j]; };
+
+  for (size_t i = 1; i <= na; ++i) {
+    for (size_t j = 1; j <= nb; ++j) {
+      if (ta[i - 1] == tb[j - 1])
+        at(i, j) = at(i - 1, j - 1) + 1;
+      else
+        at(i, j) = std::max(at(i - 1, j), at(i, j - 1));
     }
   }
-  for (size_t i = n; i < nodes_a.size(); ++i) changed_a.push_back(nodes_a[i]);
-  for (size_t i = n; i < nodes_b.size(); ++i) changed_b.push_back(nodes_b[i]);
+
+  std::vector<char> keep_a(na, 0), keep_b(nb, 0);
+  size_t i = na, j = nb;
+  while (i > 0 && j > 0) {
+    if (ta[i - 1] == tb[j - 1] && at(i, j) == at(i - 1, j - 1) + 1) {
+      keep_a[i - 1] = 1;
+      keep_b[j - 1] = 1;
+      --i;
+      --j;
+    } else if (at(i - 1, j) >= at(i, j - 1)) {
+      --i;
+    } else {
+      --j;
+    }
+  }
+
+  for (size_t k = 0; k < na; ++k)
+    if (!keep_a[k]) changed_a.push_back(nodes_a[k]);
+  for (size_t k = 0; k < nb; ++k)
+    if (!keep_b[k]) changed_b.push_back(nodes_b[k]);
 }
 
 void collect_outline(const Document& doc, std::vector<OutlineEntry>& out) {
