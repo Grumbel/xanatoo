@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "glyphtoo/ui.hpp"
+#include "glyphtoo/font.hpp"
 
 #include "imgui.h"
 #include "backends/imgui_impl_sdl2.h"
@@ -206,6 +207,58 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
   return pressed;
 }
 
+
+// GNOME 2–era UI faces: Bitstream Vera → DejaVu Sans was the usual desktop default.
+static std::string resolve_ui_font_path() {
+  const char* families[] = {
+      "DejaVu Sans",
+      "Bitstream Vera Sans",
+      "Liberation Sans",
+      "FreeSans",
+      "Nimbus Sans L",
+      "Sans",
+      nullptr,
+  };
+  for (const char** f = families; *f; ++f) {
+    std::string path = fontconfig_find(*f, 0, 0);
+    if (!path.empty()) return path;
+  }
+  const char* files[] = {
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/TTF/DejaVuSans.ttf",
+      "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/truetype/ttf-bitstream-vera/Vera.ttf",
+      "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+      nullptr,
+  };
+  for (const char** f = files; *f; ++f) {
+    if (fs::exists(*f)) return *f;
+  }
+  return {};
+}
+
+static void load_ui_fonts(ImGuiIO& io) {
+  // ~10–11 pt at 96 dpi — close to GNOME 2 menu/toolbar size
+  const float size_px = 14.0f;
+  std::string path = resolve_ui_font_path();
+  ImFontConfig cfg;
+  cfg.OversampleH = 2;
+  cfg.OversampleV = 1;
+  cfg.PixelSnapH = true;  // crisper menus on integer positions
+  if (!path.empty()) {
+    ImFont* font = io.Fonts->AddFontFromFileTTF(path.c_str(), size_px, &cfg,
+                                                io.Fonts->GetGlyphRangesDefault());
+    if (font) {
+      std::cout << "UI font: " << path << " @ " << size_px << "px\n";
+      return;
+    }
+    std::cerr << "UI font load failed: " << path << " — using ImGui default\n";
+  } else {
+    std::cerr << "No DejaVu/Vera/Liberation Sans found — using ImGui default\n";
+  }
+  io.Fonts->AddFontDefault();
+}
+
 bool Ui::init(SDL_Window* window, SDL_Renderer* renderer) {
   if (ready_) return true;
   IMGUI_CHECKVERSION();
@@ -214,7 +267,15 @@ bool Ui::init(SDL_Window* window, SDL_Renderer* renderer) {
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   io.IniFilename = nullptr;
 
+  load_ui_fonts(io);
   apply_classic_theme();
+  // Slightly roomier chrome once a proportional face is loaded
+  {
+    ImGuiStyle& s = ImGui::GetStyle();
+    s.FramePadding = ImVec2(7.f, 4.f);
+    s.ItemSpacing = ImVec2(7.f, 5.f);
+    s.ScrollbarSize = 14.f;
+  }
   load_icons(renderer);
 
   if (!ImGui_ImplSDL2_InitForSDLRenderer(window, renderer)) return false;

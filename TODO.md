@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **069** (this delivery is **068**)
+Next bundle number: **070** (this delivery is **069**)
 
 ## Status (2026-10-10)
 
@@ -114,6 +114,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Help is a **real document** (`examples/help.md`) rendered in a software window
 - [x] Help window: non-modal keyboard; document Y offset matches window position
 - [x] Help: stretchtext toggle + scrollbar; colorful BeOS/GNOME2 toolbar icons
+- [x] ImGui UI font: DejaVu / Bitstream Vera Sans (GNOME 2 default family)
 
 ## Open work / next steps
 
@@ -231,4 +232,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `glyphtoo-065.*-help-document-…` — help as real document
 - `glyphtoo-066.*-help-window-fix-…` — help non-modal + Y fix
 - `glyphtoo-067.*-help-resize-…` — help resize
-- `glyphtoo-068.*-help-stretch-icons-…` — this delivery
+- `glyphtoo-068.*-help-stretch-icons-…` — help stretch + icons
+- `glyphtoo-069.*-ui-font-…` — this delivery
