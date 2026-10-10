@@ -130,6 +130,10 @@ std::string selected_text(const Document& doc, const Selection& sel);
 // Concatenate all text of a node (for paste targets / fallbacks).
 std::string node_text(const Document& doc, NodeId id);
 
+// Paste plain text at the caret. Blank-line separated chunks become new
+// sibling paragraphs; single newlines within a chunk become spaces.
+void paste_plain_text(Document& doc, Caret& caret, const std::string& text);
+
 // Plain-text word / character / block counts for status display.
 struct DocStats {
   size_t words = 0;

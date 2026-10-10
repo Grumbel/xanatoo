@@ -1523,7 +1523,7 @@ int main(int argc, char** argv) {
                   if (clip && clip[0]) {
                     edit();
                     if (!p.sel.empty()) glyphtoo::delete_selection(d, p.sel);
-                    glyphtoo::insert_text(d, p.sel.focus, clip);
+                    glyphtoo::paste_plain_text(d, p.sel.focus, clip);
                     p.sel.anchor = p.sel.focus;
                     needs_layout = true;
                     reset_blink();
@@ -2212,7 +2212,7 @@ int main(int argc, char** argv) {
           "  Ctrl+Shift+-        Insert horizontal rule",
           "  Backspace / Delete  Delete (merge at block start)",
           "  Ctrl+Z / Ctrl+Y     Undo / Redo",
-          "  Ctrl+C / X / V      Copy / Cut / Paste",
+          "  Ctrl+C / X / V      Copy / Cut / Paste (multi-para)",
           "  Ctrl+B / I / ` / K  Bold / Italic / Code / Link",
           "  Ctrl+D              Duplicate block",
           "  Alt+Up / Alt+Down   Move block among siblings",

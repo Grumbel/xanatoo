@@ -1569,6 +1569,73 @@ std::string node_text(const Document& doc, NodeId id) {
   return out;
 }
 
+void paste_plain_text(Document& doc, Caret& caret, const std::string& text) {
+  if (text.empty() || caret.node == INVALID_NODE) return;
+
+  // Normalize newlines
+  std::string norm;
+  norm.reserve(text.size());
+  for (size_t i = 0; i < text.size(); ++i) {
+    if (text[i] == '\r') {
+      if (i + 1 < text.size() && text[i + 1] == '\n') continue;
+      norm.push_back('\n');
+    } else {
+      norm.push_back(text[i]);
+    }
+  }
+
+  // Split on blank lines into paragraph chunks
+  std::vector<std::string> chunks;
+  size_t i = 0;
+  while (i < norm.size()) {
+    while (i < norm.size() && norm[i] == '\n') ++i;  // skip leading blanks
+    if (i >= norm.size()) break;
+    size_t start = i;
+    while (i < norm.size()) {
+      if (norm[i] == '\n' && i + 1 < norm.size() && norm[i + 1] == '\n') break;
+      ++i;
+    }
+    std::string chunk = norm.substr(start, i - start);
+    // Single newlines → spaces
+    for (char& c : chunk) {
+      if (c == '\n' || c == '\t') c = ' ';
+    }
+    // Collapse runs of spaces
+    std::string cleaned;
+    bool prev_space = false;
+    for (char c : chunk) {
+      if (c == ' ') {
+        if (!prev_space) cleaned.push_back(' ');
+        prev_space = true;
+      } else {
+        cleaned.push_back(c);
+        prev_space = false;
+      }
+    }
+    // Trim
+    while (!cleaned.empty() && cleaned.front() == ' ') cleaned.erase(cleaned.begin());
+    while (!cleaned.empty() && cleaned.back() == ' ') cleaned.pop_back();
+    if (!cleaned.empty()) chunks.push_back(std::move(cleaned));
+    while (i < norm.size() && norm[i] == '\n') ++i;
+  }
+
+  if (chunks.empty()) return;
+
+  // First chunk into the current caret position
+  insert_text(doc, caret, chunks[0]);
+
+  // Remaining chunks → new sibling paragraphs
+  for (size_t ci = 1; ci < chunks.size(); ++ci) {
+    if (!insert_sibling_after(doc, caret, NodeKind::Paragraph)) {
+      // Fallback: append with separators
+      insert_text(doc, caret, "\n\n");
+      insert_text(doc, caret, chunks[ci]);
+      continue;
+    }
+    insert_text(doc, caret, chunks[ci]);
+  }
+}
+
 DocStats document_stats(const Document& doc) {
   DocStats s;
   std::vector<NodeId> nodes;

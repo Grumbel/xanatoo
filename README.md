@@ -70,7 +70,7 @@ Supported dialect (intentionally small):
 | **Ctrl+Shift+-** | Insert horizontal rule (then a new paragraph) |
 | Backspace at block start | Merge with previous block (drops empty lists) |
 | **Ctrl+Z** / **Ctrl+Y** | Undo / redo |
-| **Ctrl+C** / **X** / **V** | Clipboard |
+| **Ctrl+C** / **X** / **V** | Clipboard (paste: blank lines → paragraphs) |
 | **Ctrl+B** / **I** / **\`** / **K** | Bold / italic / code / link |
 | **Ctrl+D** | Duplicate current block |
 | **Alt+↑ / Alt+↓** | Move block among siblings |

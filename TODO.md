@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **046** (this delivery is **045**)
+Next bundle number: **047** (this delivery is **046**)
 
 ## Status (2026-10-10)
 
-Stage **01**–**04** core features in place; improved page / doc navigation.
+Stage **01**–**04** core features in place; structured multiline paste.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -91,6 +91,7 @@ Stage **01**–**04** core features in place; improved page / doc navigation.
 - [x] Ctrl+Enter new paragraph after block; Ctrl+Shift+- insert HR
 - [x] Status-bar document stats (words, chars, headings)
 - [x] Page Up/Down move caret; Ctrl+Home/End document extremes
+- [x] Paste plain text splits blank lines into sibling paragraphs
 
 ## Open work / next steps
 
@@ -175,4 +176,5 @@ Stage **01**–**04** core features in place; improved page / doc navigation.
 - `glyphtoo-042.*-outline-…` — heading outline
 - `glyphtoo-043.*-insert-blocks-…` — Ctrl+Enter / HR insert
 - `glyphtoo-044.*-doc-stats-…` — status-bar document stats
-- `glyphtoo-045.*-page-nav-…` — this delivery
+- `glyphtoo-045.*-page-nav-…` — page / document navigation
+- `glyphtoo-046.*-paste-paras-…` — this delivery
