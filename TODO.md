@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **062** (this delivery is **061**)
+Next bundle number: **063** (this delivery is **062**)
 
 ## Status (2026-10-10)
 
@@ -107,6 +107,8 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Refactor: `util.hpp` (ascii_lower, anchors, image path); -Wall; dead-code cleanup
 - [x] Extract CLI/bootstrap to `cli.hpp`; multi-delete no longer leaves empty husks
 - [x] Leap-search match highlight (amber); `advance_caret`; ascii_lower in find
+- [x] Fix mouse/selection offset (`content_y` + hit-test); triple-click; select_all/node/word
+- [x] Scrollbar / page / scroll-into-view account for toolbar height
 
 ## Open work / next steps
 
@@ -214,4 +216,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `glyphtoo-058.*-dnd-image-…` — drag-and-drop images
 - `glyphtoo-059.*-refactor-cleanup-…` — util refactor
 - `glyphtoo-060.*-cli-delete-cleanup-…` — CLI extract + delete husks
-- `glyphtoo-061.*-search-highlight-…` — this delivery
+- `glyphtoo-061.*-search-highlight-…` — search highlight
+- `glyphtoo-062.*-mouse-select-…` — this delivery

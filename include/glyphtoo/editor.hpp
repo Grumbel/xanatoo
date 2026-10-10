@@ -178,6 +178,13 @@ int caret_cmp(const Document& doc, const Caret& a, const Caret& b);
 // Returns false if the node ended early.
 bool advance_caret(Document& doc, Caret& caret, size_t n);
 
+// Select the entire text node (paragraph / heading / list item / quote).
+void select_node(Document& doc, Selection& sel, NodeId node);
+// Select the whole document (first → last text node).
+void select_all(Document& doc, Selection& sel);
+// Expand selection to the word under the focus caret.
+void select_word_at(Document& doc, Selection& sel);
+
 std::optional<Caret> find_next(const Document& doc, const std::string& query,
                                const Caret& from, size_t& match_len);
 // Case-insensitive search starting before `from` (wraps around).

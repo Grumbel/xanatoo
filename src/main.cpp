@@ -194,6 +194,7 @@ int main(int argc, char** argv) {
   float col_gap_right_w = 1.f;
   Uint32 last_click_ticks = 0;
   float last_click_x = -999.f, last_click_y = -999.f;
+  int click_count = 0;
 
   auto doc_of = [&](Pane& p) -> glyphtoo::Document& {
     return docs[p.doc_index];
@@ -308,10 +309,13 @@ int main(int argc, char** argv) {
     if (!cpos.valid) return;
     float doc_y = cpos.y;
     float margin = 40.f;
+    // Visible content height excludes menu/toolbar and status bar.
+    float view_h = static_cast<float>(win_h) - ui_top - 28.f;
+    if (view_h < 80.f) view_h = 80.f;
     if (doc_y - p.scroll_y < margin) {
       p.scroll_y = std::max(0.f, doc_y - margin);
-    } else if (doc_y - p.scroll_y > win_h - margin - 30.f) {
-      p.scroll_y = doc_y - (win_h - margin - 30.f);
+    } else if (doc_y - p.scroll_y > view_h - margin) {
+      p.scroll_y = doc_y - (view_h - margin);
     }
   };
 
@@ -334,6 +338,10 @@ int main(int argc, char** argv) {
   auto local_x = [&](float mx, int pi) {
     return mx - static_cast<float>(panes[pi].x);
   };
+
+  // Window Y → content Y (0 at top of document viewport, below menu/toolbar).
+  // Hit-tests compare against glyph.y - scroll_y in this space.
+  auto content_y = [&](float window_y) { return window_y - ui_top; };
 
   // Outline panel geometry (updated each frame when open; used for clicks)
   int ol_px = 0, ol_py = 0, ol_pw = 0, ol_ph = 0;
@@ -380,7 +388,7 @@ int main(int argc, char** argv) {
           Pane& p = F();
           auto& d = doc_of(p);
           float lx = local_x(static_cast<float>(mx), focus);
-          float my = static_cast<float>(my_raw) - ui_top;
+          float my = content_y(static_cast<float>(my_raw));
 
           // Place caret at drop location when possible; otherwise keep current.
           if (auto hit = glyphtoo::hit_test(p.layout, lx, my, p.scroll_y)) {
@@ -441,7 +449,7 @@ int main(int argc, char** argv) {
 
           if (ev.button.button == SDL_BUTTON_LEFT) {
             float mx = static_cast<float>(ev.button.x);
-            float my = static_cast<float>(ev.button.y) - ui_top;
+            float my = content_y(static_cast<float>(ev.button.y));
 
             // Outline panel click → jump to heading
             if (outline_mode && ol_pw > 0) {
@@ -633,25 +641,31 @@ int main(int argc, char** argv) {
 
             if (auto hit = glyphtoo::hit_test(p.layout, lx, my, p.scroll_y)) {
               Uint32 now = SDL_GetTicks();
-              bool dbl = (now - last_click_ticks) < 400 &&
-                         std::abs(mx - last_click_x) < 4.f &&
-                         std::abs(my - last_click_y) < 4.f;
+              bool near = (now - last_click_ticks) < 400 &&
+                          std::abs(mx - last_click_x) < 4.f &&
+                          std::abs(my - last_click_y) < 4.f;
+              click_count = near ? click_count + 1 : 1;
               last_click_ticks = now;
               last_click_x = mx;
               last_click_y = my;
 
               p.sel.focus = *hit;
-              if (dbl) {
-                // Select word under caret
-                glyphtoo::Document& dd = doc_of(p);
-                glyphtoo::move_word_left(dd, p.sel.focus);
-                p.sel.anchor = p.sel.focus;
-                glyphtoo::move_word_right(dd, p.sel.focus);
+              glyphtoo::Document& dd = doc_of(p);
+              if (click_count >= 3) {
+                // Triple-click: select whole block
+                glyphtoo::select_node(dd, p.sel, hit->node);
+                dragging_sel = false;
+              } else if (click_count == 2) {
+                // Double-click: select word
+                glyphtoo::select_word_at(dd, p.sel);
+                dragging_sel = false;
               } else if (!(SDL_GetModState() & KMOD_SHIFT)) {
                 p.sel.anchor = p.sel.focus;
+                dragging_sel = true;
+              } else {
+                dragging_sel = true;
               }
               p.preferred_x = lx;
-              dragging_sel = !dbl;
               reset_blink();
             }
           }
@@ -694,9 +708,9 @@ int main(int argc, char** argv) {
           mouse_x = static_cast<float>(ev.motion.x);
           mouse_y = static_cast<float>(ev.motion.y);
           if (dragging_scroll) {
-            float my = static_cast<float>(ev.motion.y);
+            float my = content_y(static_cast<float>(ev.motion.y));
             Pane& sp = panes[scroll_drag_pane];
-            float view_h = static_cast<float>(win_h - 28);
+            float view_h = static_cast<float>(win_h) - ui_top - 28.f;
             float content_h = std::max(view_h, sp.layout.content_height);
             float max_s = std::max(0.f, content_h - view_h + 40.f);
             float ratio = (view_h > 0.f) ? (my / view_h) : 0.f;
@@ -745,7 +759,7 @@ int main(int argc, char** argv) {
           }
           if (dragging_block && drag_block_id != glyphtoo::INVALID_NODE) {
             Pane& p = F();
-            float adj_y = mouse_y + p.scroll_y;
+            float adj_y = content_y(mouse_y) + p.scroll_y;
             drop_target_id = glyphtoo::INVALID_NODE;
             drop_line_y = -1.f;
             for (const auto& box : p.layout.boxes) {
@@ -767,7 +781,7 @@ int main(int argc, char** argv) {
           }
           if (dragging_sel) {
             float mx = static_cast<float>(ev.motion.x);
-            float my = static_cast<float>(ev.motion.y);
+            float my = content_y(static_cast<float>(ev.motion.y));
             // Keep focus on the pane where drag started
             Pane& p = F();
             float lx = local_x(mx, focus);
@@ -778,9 +792,9 @@ int main(int argc, char** argv) {
           } else {
             // Track link under cursor for status-bar + tooltip hover feedback
             float mx = static_cast<float>(ev.motion.x);
-            float my = static_cast<float>(ev.motion.y);
+            float my = content_y(static_cast<float>(ev.motion.y));
             mouse_x = mx;
-            mouse_y = my;
+            mouse_y = static_cast<float>(ev.motion.y);
             int hover_pane = pane_at(mx);
             Pane& hp = panes[hover_pane];
             float lx = local_x(mx, hover_pane);
@@ -1339,7 +1353,7 @@ int main(int argc, char** argv) {
             case SDLK_PAGEUP:
             case SDLK_PAGEDOWN: {
               const bool up = (ev.key.keysym.sym == SDLK_PAGEUP);
-              const float view_h = static_cast<float>(win_h - 28);
+              const float view_h = static_cast<float>(win_h) - ui_top - 28.f;
               const float step = view_h * 0.85f;
               float max_s = std::max(
                   0.f, p.layout.content_height - view_h + 40.f);
@@ -1769,31 +1783,9 @@ int main(int argc, char** argv) {
 
             case SDLK_a:
               if (ctrl && shift) {
-                // Select entire document (first text node → last)
-                // Walk layout glyphs for bounds
-                if (!p.layout.glyphs.empty()) {
-                  const auto& first = p.layout.glyphs.front();
-                  const auto& last = p.layout.glyphs.back();
-                  p.sel.anchor = {first.node, first.span_index, first.char_index};
-                  p.sel.focus = {last.node, last.span_index, last.char_index + 1};
-                }
+                glyphtoo::select_all(d, p.sel);
               } else if (ctrl) {
-                const auto& n = d.get(p.sel.focus.node);
-                p.sel.anchor = {p.sel.focus.node, 0, 0};
-                p.sel.focus.span_index = n.spans.empty() ? 0 : n.spans.size() - 1;
-                if (!n.spans.empty()) {
-                  size_t len = 0;
-                  const std::string& ts = n.spans.back().text;
-                  for (size_t i = 0; i < ts.size(); ) {
-                    unsigned char c = static_cast<unsigned char>(ts[i]);
-                    if (c < 0x80) { ++i; ++len; }
-                    else if ((c & 0xe0) == 0xc0) { i += 2; ++len; }
-                    else if ((c & 0xf0) == 0xe0) { i += 3; ++len; }
-                    else if ((c & 0xf8) == 0xf0) { i += 4; ++len; }
-                    else ++i;
-                  }
-                  p.sel.focus.char_index = len;
-                }
+                glyphtoo::select_node(d, p.sel, p.sel.focus.node);
               }
               break;
 
@@ -2051,7 +2043,9 @@ int main(int argc, char** argv) {
     int pane_count = split ? 2 : 1;
     for (int i = 0; i < pane_count; ++i) {
       Pane& pane = panes[i];
-      float max_scroll = std::max(0.f, pane.layout.content_height - win_h + 40.f + 28.f);
+      float view_h_pane = static_cast<float>(win_h) - ui_top - 28.f;
+      float max_scroll =
+          std::max(0.f, pane.layout.content_height - view_h_pane + 40.f);
       if (pane.scroll_y > max_scroll) pane.scroll_y = max_scroll;
 
       const int clip_y = static_cast<int>(ui_top);
@@ -2059,6 +2053,7 @@ int main(int argc, char** argv) {
       SDL_RenderSetClipRect(sdl, &clip);
 
       float ox = static_cast<float>(pane.x);
+      // screen_y = content_y - scroll_y + ui_top = content_y - (scroll_y - ui_top)
       const float draw_scroll = pane.scroll_y - ui_top;
 
       if (!pane.sel.empty()) {
@@ -2175,17 +2170,18 @@ int main(int argc, char** argv) {
         }
       }
 
-      // Scrollbar thumb
+      // Scrollbar thumb (in the content band below the toolbar)
       {
-        float view_h = static_cast<float>(win_h - 28);
+        float view_h = static_cast<float>(win_h) - ui_top - 28.f;
+        if (view_h < 1.f) view_h = 1.f;
         float content_h = std::max(view_h, pane.layout.content_height);
         float thumb_h = std::max(24.f, view_h * (view_h / content_h));
-        float track = view_h - thumb_h;
+        float track = std::max(0.f, view_h - thumb_h);
         float ratio = (max_scroll > 0.f) ? (pane.scroll_y / max_scroll) : 0.f;
-        float thumb_y = ratio * track;
+        float thumb_y = ui_top + ratio * track;
         int sx = pane.x + pane.w - 6;
         SDL_SetRenderDrawColor(sdl, 190, 188, 180, 255);
-        SDL_Rect track_r{sx, 0, 5, static_cast<int>(view_h)};
+        SDL_Rect track_r{sx, static_cast<int>(ui_top), 5, static_cast<int>(view_h)};
         SDL_RenderFillRect(sdl, &track_r);
         SDL_SetRenderDrawColor(sdl, 120, 118, 110, 255);
         SDL_Rect thumb{sx, static_cast<int>(thumb_y), 5, static_cast<int>(thumb_h)};
@@ -2199,7 +2195,8 @@ int main(int argc, char** argv) {
     if (split) {
       int mid = panes[1].x - 3;
       SDL_SetRenderDrawColor(sdl, 210, 208, 200, 255);
-      SDL_Rect div{mid, 0, 6, win_h - 28};
+      SDL_Rect div{mid, static_cast<int>(ui_top), 6,
+                 win_h - 28 - static_cast<int>(ui_top)};
       SDL_RenderFillRect(sdl, &div);
     }
 
@@ -2314,8 +2311,8 @@ int main(int argc, char** argv) {
         tr = 40; tg = 90; tb = 160;
       } else {
         label =
-            "F1 help · Ctrl+S save · Ctrl+Z/Y undo · Ctrl+Q quit · "
-            "Ctrl++/- zoom · Ctrl+B/I/` style · Ctrl+F leap · Ctrl+H replace";
+            "F1 help · Ctrl+S save · Ctrl+A block · Ctrl+Shift+A all · "
+            "Ctrl+F leap · Ctrl+B/I style · drag to select";
         tr = 70; tg = 68; tb = 62;
       }
       float baseline = static_cast<float>(win_h - 8);
@@ -2473,7 +2470,10 @@ int main(int argc, char** argv) {
           "  Ctrl+Home / End     Document start / end",
           "  Page Up / Down      Scroll + move caret",
           "  Ctrl+Left/Right     Word motion",
-          "  Ctrl+A / Shift+A    Select block / whole document",
+          "  Ctrl+A              Select current block",
+          "  Ctrl+Shift+A        Select all",
+          "  Double-click         Select word",
+          "  Triple-click         Select block",
           "  Ctrl+F / F3         Leap search / next match",
           "  Shift+F3            Previous match",
           "  Ctrl+H              Leap replace",

@@ -109,6 +109,9 @@ A **Dear ImGui** menu bar and toolbar sit above the document (File / Edit / Form
 | **Ctrl+Home** / **Ctrl+End** | Document start / end |
 | **Page Up** / **Page Down** | Scroll view and move caret |
 | **Ctrl+A** | Select current block |
+| **Ctrl+Shift+A** | Select all |
+| **Double-click** | Select word |
+| **Triple-click** | Select block |
 | **Ctrl+Shift+A** | Select whole document |
 | Click blue link | Follow `#anchor` or open external `http(s)` / `mailto:` |
 | **Ctrl+Click** link | Jump to `#anchor` in the other pane (enables split) |

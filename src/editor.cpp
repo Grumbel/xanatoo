@@ -86,9 +86,13 @@ std::optional<Caret> hit_test(const LayoutResult& layout,
                               float sx, float sy, float scroll_y) {
   if (layout.glyphs.empty()) return std::nullopt;
 
-  float best_dist = std::numeric_limits<float>::max();
-  Caret best{};
-  bool found = false;
+  // Prefer glyphs whose line band contains sy; fall back to nearest overall.
+  // Baseline is g.y; after scroll, gy is viewport Y in content space.
+  float best_on = std::numeric_limits<float>::max();
+  float best_any = std::numeric_limits<float>::max();
+  Caret best_on_c{};
+  Caret best_any_c{};
+  bool found_on = false, found_any = false;
 
   for (size_t i = 0; i < layout.glyphs.size(); ++i) {
     const auto& g = layout.glyphs[i];
@@ -101,21 +105,28 @@ std::optional<Caret> hit_test(const LayoutResult& layout,
       gw = layout.glyphs[i + 1].x - g.x;
       if (gw < 1.f) gw = 8.f;
     }
-    float cx = gx + gw * 0.5f;
-    float cy = gy - 8.f;
-    float dx = sx - cx;
+    float mid = gx + gw * 0.5f;
+    size_t ch = g.char_index + (sx >= mid ? 1 : 0);
+    float dx = sx - mid;
+    float cy = gy - 6.f;  // mid of typical body ink band
     float dy = sy - cy;
-    float d = dx * dx + dy * dy * 3.f;
-    if (d < best_dist) {
-      best_dist = d;
-      best.node = g.node;
-      best.span_index = g.span_index;
-      best.char_index = g.char_index + (sx > cx ? 1 : 0);
-      found = true;
+    float d = dx * dx + dy * dy * 4.f;
+
+    if (d < best_any) {
+      best_any = d;
+      best_any_c = Caret{g.node, g.span_index, ch};
+      found_any = true;
+    }
+    const bool on_line = (sy >= gy - 18.f && sy <= gy + 6.f);
+    if (on_line && d < best_on) {
+      best_on = d;
+      best_on_c = Caret{g.node, g.span_index, ch};
+      found_on = true;
     }
   }
-  if (!found) return std::nullopt;
-  return best;
+  if (found_on) return best_on_c;
+  if (found_any) return best_any_c;
+  return std::nullopt;
 }
 
 std::optional<NodeId> hit_test_stretch(const LayoutResult& layout,
@@ -1285,6 +1296,43 @@ bool advance_caret(Document& doc, Caret& caret, size_t n) {
   }
   return true;
 }
+
+void select_node(Document& doc, Selection& sel, NodeId node) {
+  if (node == INVALID_NODE) return;
+  const Node& n = doc.get(node);
+  if (!is_text_node_kind(n.kind)) return;
+  sel.anchor = {node, 0, 0};
+  sel.focus = {node, 0, 0};
+  if (n.spans.empty()) return;
+  sel.focus.span_index = n.spans.size() - 1;
+  sel.focus.char_index = utf8_char_count(n.spans.back().text);
+}
+
+void select_all(Document& doc, Selection& sel) {
+  std::vector<NodeId> nodes;
+  if (doc.root != INVALID_NODE) collect_text_nodes(doc, doc.root, nodes);
+  if (nodes.empty()) {
+    sel = {};
+    return;
+  }
+  sel.anchor = {nodes.front(), 0, 0};
+  const Node& last = doc.get(nodes.back());
+  sel.focus = {nodes.back(), 0, 0};
+  if (!last.spans.empty()) {
+    sel.focus.span_index = last.spans.size() - 1;
+    sel.focus.char_index = utf8_char_count(last.spans.back().text);
+  }
+}
+
+void select_word_at(Document& doc, Selection& sel) {
+  if (sel.focus.node == INVALID_NODE) return;
+  Caret c = sel.focus;
+  move_word_left(doc, c);
+  sel.anchor = c;
+  sel.focus = c;
+  move_word_right(doc, sel.focus);
+}
+
 
 
 bool move_word_left(Document& doc, Caret& caret) {
