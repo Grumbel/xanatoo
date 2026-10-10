@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **066** (this delivery is **065**)
+Next bundle number: **067** (this delivery is **066**)
 
 ## Status (2026-10-10)
 
@@ -112,6 +112,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Classic Gtk2/Clearlooks-ish ImGui theme + SVG→PNG toolbar icons
 - [x] Help as ImGui software window (draggable/resizable, not OS window)
 - [x] Help is a **real document** (`examples/help.md`) rendered in a software window
+- [x] Help window: non-modal keyboard; document Y offset matches window position
 
 ## Open work / next steps
 
@@ -226,4 +227,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `glyphtoo-062.*-mouse-select-…` — mouse offset + selection
 - `glyphtoo-063.*-classic-ui-icons-…` — classic theme + icons
 - `glyphtoo-064.*-help-window-…` — ImGui help window
-- `glyphtoo-065.*-help-document-…` — this delivery
+- `glyphtoo-065.*-help-document-…` — help as real document
+- `glyphtoo-066.*-help-window-fix-…` — this delivery

@@ -942,7 +942,7 @@ int main(int argc, char** argv) {
 
         case SDL_TEXTINPUT: {
           if (imgui_keys) break;
-          if (help_mode || outline_mode) break;
+          if (outline_mode) break;  // help is non-modal; typing goes to the document
           if (save_as_mode) {
             save_as_path += ev.text.text;
             break;
@@ -998,12 +998,12 @@ int main(int argc, char** argv) {
           Pane& p = F();
           glyphtoo::Document& d = doc_of(p);
 
-          // Help window: F1 toggles; Esc closes
-          if (help_mode) {
-            if (ev.key.keysym.sym == SDLK_ESCAPE ||
-                ev.key.keysym.sym == SDLK_F1) {
-              help_mode = false;
-            }
+          // Help window is non-modal: Esc/F1 close it; other keys edit the document.
+          if (help_mode &&
+              (ev.key.keysym.sym == SDLK_ESCAPE ||
+               ev.key.keysym.sym == SDLK_F1)) {
+            help_mode = false;
+            help_dragging = false;
             break;
           }
 
@@ -2596,7 +2596,10 @@ int main(int argc, char** argv) {
       auto [cx, cy, cw, ch] = help_client_rect();
       SDL_Rect clip{cx, cy, cw, ch};
       SDL_RenderSetClipRect(sdl, &clip);
-      renderer.draw(help_layout, help_scroll, static_cast<float>(cx));
+      // screen_y = content_y - scroll + client_y  ⇒  draw_scroll = scroll - client_y
+      // (mirrors pane path: draw_scroll = scroll_y - ui_top)
+      const float help_draw_scroll = help_scroll - static_cast<float>(cy);
+      renderer.draw(help_layout, help_draw_scroll, static_cast<float>(cx));
       SDL_RenderSetClipRect(sdl, nullptr);
     }
 
