@@ -1,0 +1,38 @@
+# glyphtoo — Agent Notes
+
+## Project goal
+
+Interactive document composition engine (C++ / SDL2).
+See `PROPOSAL.md` for the full vision (stretchtext, live editing,
+addressable passages, Hypercard/Xanadu/Canon-Cat spirit).
+
+Keep the system **minimalist and portable**. Prefer small, well-scoped
+libraries (SDL2, FreeType, optionally HarfBuzz). No Qt/GTK/KDE.
+
+## Architecture principles
+
+- Data-oriented / ECS-friendly: stable IDs for content, separate layout
+  geometry from document identity, systems that transform data.
+- Content model is the source of truth; layout and rendering are derived.
+- Immediate visual feedback after every edit.
+- Local-only for now; network is a later optional layer.
+
+## Tech stack (current)
+
+- C++20
+- SDL2 (window, events, renderer)
+- FreeType (glyph rasterization)
+- CMake + Nix flake
+
+## Coding rules
+
+- GPLv3+ with short SPDX headers on every source file.
+- Author: Ingo Ruhnke <grumbel@gmail.com>
+- Co-authored-by: Grok <grok@x.ai> on every commit.
+- Prefer clear data layouts over clever abstractions.
+- No drive-by feature removal; discuss first.
+
+## Continuity
+
+Read `TODO.md` first. Record plans and outcomes there.
+Handover is via cumulative git bundles only.

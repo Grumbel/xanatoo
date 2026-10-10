@@ -1,0 +1,21 @@
+# Build
+build/
+result
+.direnv/
+*.o
+*.a
+*.so
+*.dylib
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Nix
+.nix-*

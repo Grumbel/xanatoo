@@ -1,0 +1,52 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
+#pragma once
+
+#include "glyphtoo/types.hpp"
+#include "glyphtoo/font.hpp"
+#include <vector>
+#include <string>
+
+namespace glyphtoo {
+
+struct PositionedGlyph {
+  uint32_t codepoint = 0;
+  float x = 0.f;
+  float y = 0.f;   // baseline
+  NodeId node = INVALID_NODE;
+  size_t span_index = 0;
+  size_t char_index = 0;
+};
+
+struct LayoutBox {
+  NodeId node = INVALID_NODE;
+  float x = 0.f;
+  float y = 0.f;
+  float width = 0.f;
+  float height = 0.f;
+};
+
+struct LayoutResult {
+  std::vector<PositionedGlyph> glyphs;
+  std::vector<LayoutBox> boxes;
+  float content_height = 0.f;
+};
+
+class LayoutEngine {
+public:
+  explicit LayoutEngine(Font& font);
+
+  LayoutResult layout(const Document& doc, float max_width);
+
+private:
+  Font& font_;
+
+  void layout_node(const Document& doc, NodeId id,
+                   float x, float& y, float max_width,
+                   LayoutResult& out);
+  void layout_paragraph(const Document& doc, const Node& node,
+                        float x, float& y, float max_width,
+                        LayoutResult& out, float font_scale = 1.f);
+};
+
+}  // namespace glyphtoo
