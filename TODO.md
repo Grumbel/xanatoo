@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **039** (this delivery is **038**)
+Next bundle number: **040** (this delivery is **039**)
 
 ## Status (2026-10-10)
 
-Stage **01**–**04** core features in place; F1 help overlay.
+Stage **01**–**04** core features in place; sample doc is `examples/welcome.md`.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -84,6 +84,7 @@ Stage **01**–**04** core features in place; F1 help overlay.
 - [x] Cross-parent block drag (into/out of columns & lists; ListItem↔Paragraph)
 - [x] Nested lists: Tab/Shift+Tab indent/outdent; indented markup parse/serialize
 - [x] F1 keyboard reference overlay (Esc/F1 to close)
+- [x] Sample document moved to `examples/welcome.md` + PNG images
 
 ## Open work / next steps
 
@@ -161,4 +162,5 @@ Stage **01**–**04** core features in place; F1 help overlay.
 - `glyphtoo-035.*-column-width-…` — column width drag
 - `glyphtoo-036.*-cross-parent-drag-…` — cross-parent block drag
 - `glyphtoo-037.*-nested-lists-…` — nested lists
-- `glyphtoo-038.*-f1-help-…` — this delivery
+- `glyphtoo-038.*-f1-help-…` — F1 help overlay
+- `glyphtoo-039.*-example-doc-…` — this delivery

@@ -38,3 +38,11 @@ if(UNIX AND NOT APPLE)
 endif()
 
 install(TARGETS glyphtoo DESTINATION bin)
+install(DIRECTORY examples/
+        DESTINATION share/glyphtoo/examples
+        FILES_MATCHING
+          PATTERN "*.md"
+          PATTERN "*.png"
+          PATTERN "*.jpg"
+          PATTERN "*.jpeg"
+          PATTERN "*.gif")

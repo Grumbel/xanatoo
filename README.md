@@ -12,20 +12,25 @@ See [PROPOSAL.md](PROPOSAL.md) for the full vision. Local-only for now.
 
 ```bash
 nix build
-./result/bin/glyphtoo                  # built-in sample
+./result/bin/glyphtoo                  # opens examples/welcome.md when found
 ./result/bin/glyphtoo notes.md         # open a file
 ./result/bin/glyphtoo a.md b.md        # dual-pane, two documents
+./glyphtoo examples/welcome.md         # sample with images (from repo root)
 ```
 
 Or with system packages (CMake ≥ 3.16, SDL2, FreeType):
 
 ```bash
 mkdir build && cd build && cmake .. && make -j
-./glyphtoo --font /path/to/font.ttf notes.md
+./glyphtoo --font /path/to/font.ttf ../examples/welcome.md
 ```
 
 Font resolution: `--font` → `GLYPHTOO_FONT` env → common system paths.
 `nix build` wraps the binary with DejaVu Sans.
+
+The demo document lives in **`examples/welcome.md`** (with PNGs alongside).
+With no path argument, glyphtoo searches for that file relative to the
+working directory or the executable.
 
 ## Markup
 

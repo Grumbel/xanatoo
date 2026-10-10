@@ -67,78 +67,46 @@ static void open_external_url(const std::string& url) {
 #endif
 }
 
-static const char* SAMPLE = R"(# The network
+// Fallback when examples/welcome.md cannot be found on disk.
+static const char* FALLBACK_DOC =
+    "# Untitled\n\n"
+    "Open a document with `glyphtoo file.md`, or place "
+    "`examples/welcome.md` next to the binary.\n\n"
+    "Press **F1** for the keyboard reference.\n";
 
-The web connects documents, but [hypertext](#hypertext) connects ideas.
-
-:::stretch summary="What is hypertext?"
-Hypertext is a system of linked information that can be explored
-non-linearly. Passages can expand in place (*stretchtext*), images are
-first-class addressable content, and layout is part of the living
-document rather than a fixed page prescription.
-:::
-
-:::columns
-:::column
-## Original
-
-A passage from the original document, shown in a column.
-:::
-:::column
-## Commentary
-
-An editable annotation linked in spirit to the original passage.
-:::
-:::
-
-## Living documents
-
-This is a live document. Click to place the caret, type to insert text,
-Backspace to delete. **Enter** splits a paragraph (or list item; empty item exits the list). Shift+arrows select.
-Ctrl+C / Ctrl+V / Ctrl+X for clipboard, Ctrl+Z / Ctrl+Y for undo/redo.
-**Ctrl+\\** toggles a second view pane; **Tab** switches focus.
-Drag the gutter to resize. Open two files for independent documents.
-**Ctrl+F** leap search (type to find, F3 next, Esc cancel).
-**Ctrl+←/→** move by word. Click blue links to jump to #anchors or
-open external http(s) URLs in the system browser.
-Drag the blue corner on images to resize. Home/End move on the line.
-Click a stretchtext marker (▸ / ▾) to expand or collapse.
-
-Inspiration: Ted Nelson's *Xanadu*, Bill Atkinson's **HyperCard**, and
-Jef Raskin's *Canon Cat* — a keyboard-driven work processor that treated
-text as a continuous, searchable stream.
-
-> "A document is not just something you render and read. It is a live
-> workspace." — the glyphtoo proposal
-
----
-
-A live embedding of another passage (click to jump to the source):
-
-:::include #Living documents
-
-
-Design pillars:
-
-- Addressable passages and stable node IDs
-- Stretchtext that reflows the living layout
-  - Expand and collapse without losing place
-  - Summary markers (▸ / ▾) stay interactive
-- Side-by-side views of related material
-- Direct manipulation of images and blocks
-
-Ordered steps to explore:
-
-1. Click a stretchtext marker to expand
-2. Follow an internal or external link
-3. Toggle dual-pane with Ctrl+\\
-
-Try an internal link: [Living documents](#Living documents) — click to jump.
-Or an external one: [Xanadu](https://en.wikipedia.org/wiki/Project_Xanadu).
-
-Images referenced as `![alt](path.png)` load relative to the document
-directory (PNG, JPEG, BMP, GIF via stb_image).
-)";
+static std::string find_default_document() {
+  // Prefer a real file so relative image paths resolve.
+  const char* candidates[] = {
+      "examples/welcome.md",
+      "../examples/welcome.md",
+      "../../examples/welcome.md",
+      nullptr,
+  };
+  for (const char** p = candidates; *p; ++p) {
+    if (fs::exists(*p)) return fs::absolute(*p).string();
+  }
+#ifdef __linux__
+  // Relative to the executable: <prefix>/bin/glyphtoo → <prefix>/share/glyphtoo/
+  // and also sibling examples/ when running from a build tree.
+  try {
+    fs::path exe = fs::read_symlink("/proc/self/exe");
+    fs::path dir = exe.parent_path();
+    const fs::path near[] = {
+        dir / "examples" / "welcome.md",
+        dir / ".." / "examples" / "welcome.md",
+        dir / ".." / "share" / "glyphtoo" / "welcome.md",
+        dir / ".." / "share" / "glyphtoo" / "examples" / "welcome.md",
+    };
+    for (const auto& c : near) {
+      std::error_code ec;
+      auto canon = fs::weakly_canonical(c, ec);
+      if (!ec && fs::exists(canon)) return canon.string();
+    }
+  } catch (...) {
+  }
+#endif
+  return {};
+}
 
 static std::string find_system_font() {
   const char* candidates[] = {
@@ -166,6 +134,7 @@ static void print_usage(const char* argv0) {
       << "  -o, --open <path>     Open a markup document\n"
       << "  -h, --help            Show this help\n"
       << "\n"
+      << "With no file, opens examples/welcome.md when found.\n"
       << "One positional path opens that document.\n"
       << "Two paths open dual-pane: left=file1, right=file2.\n"
       << "Ctrl+S saves the focused pane's document.\n"
@@ -302,12 +271,12 @@ int main(int argc, char** argv) {
 
   auto load_doc = [&](const std::string& path) -> glyphtoo::Document {
     if (path.empty()) {
-      return glyphtoo::parse_markup(SAMPLE);
+      return glyphtoo::parse_markup(FALLBACK_DOC);
     }
     std::ifstream in(path);
     if (!in) {
       std::cerr << "Failed to open document: " << path << "\n";
-      return glyphtoo::parse_markup(SAMPLE);
+      return glyphtoo::parse_markup(FALLBACK_DOC);
     }
     std::string source((std::istreambuf_iterator<char>(in)),
                        std::istreambuf_iterator<char>());
@@ -326,6 +295,11 @@ int main(int argc, char** argv) {
   std::string paths[2];
   paths[0] = opt.file_path;
   paths[1] = opt.file_path2;
+  if (paths[0].empty()) {
+    paths[0] = find_default_document();
+    if (paths[0].empty())
+      std::cerr << "Note: examples/welcome.md not found; starting empty.\n";
+  }
   docs[0] = load_doc(paths[0]);
   docs[1] = paths[1].empty() ? docs[0] : load_doc(paths[1]);
   // If only one file, pane 1 shares docs[0] until a second file is used
