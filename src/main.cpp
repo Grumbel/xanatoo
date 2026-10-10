@@ -382,6 +382,12 @@ int main(int argc, char** argv) {
   glyphtoo::NodeId resize_image = glyphtoo::INVALID_NODE;
   float resize_start_x = 0.f;
   float resize_start_scale = 1.f;
+  // Block drag-reorder (grab left margin of a layout box)
+  bool dragging_block = false;
+  glyphtoo::NodeId drag_block_id = glyphtoo::INVALID_NODE;
+  glyphtoo::NodeId drop_target_id = glyphtoo::INVALID_NODE;
+  bool drop_before = true;
+  float drop_line_y = -1.f;  // content y for insertion indicator
   Uint32 last_click_ticks = 0;
   float last_click_x = -999.f, last_click_y = -999.f;
 
@@ -573,6 +579,29 @@ int main(int argc, char** argv) {
               if (dragging_image) break;
             }
 
+            // Block drag: grab left margin (16px) of a layout box
+            {
+              float adj_y = my + p.scroll_y;
+              for (const auto& box : p.layout.boxes) {
+                if (adj_y < box.y || adj_y > box.y + box.height) continue;
+                if (lx < box.x || lx > box.x + 16.f) continue;
+                const auto& bn = doc_of(p).get(box.node);
+                // Only reorder movable siblings (not structural containers)
+                if (bn.kind == glyphtoo::NodeKind::Document ||
+                    bn.kind == glyphtoo::NodeKind::Columns ||
+                    bn.kind == glyphtoo::NodeKind::Column ||
+                    bn.kind == glyphtoo::NodeKind::List)
+                  continue;
+                if (bn.parent == glyphtoo::INVALID_NODE) continue;
+                dragging_block = true;
+                drag_block_id = box.node;
+                drop_target_id = glyphtoo::INVALID_NODE;
+                drop_line_y = -1.f;
+                break;
+              }
+              if (dragging_block) break;
+            }
+
             if (auto sid = glyphtoo::hit_test_stretch(p.layout, lx, my, p.scroll_y)) {
               glyphtoo::NodeId id = *sid;
               if (doc_of(p).get(id).kind == glyphtoo::NodeKind::Stretch) {
@@ -650,10 +679,27 @@ int main(int argc, char** argv) {
 
         case SDL_MOUSEBUTTONUP:
           if (ev.button.button == SDL_BUTTON_LEFT) {
+            if (dragging_block && drag_block_id != glyphtoo::INVALID_NODE &&
+                drop_target_id != glyphtoo::INVALID_NODE &&
+                drop_target_id != drag_block_id) {
+              edit();
+              if (glyphtoo::relocate_block(doc_of(F()), drag_block_id,
+                                          drop_target_id, drop_before)) {
+                needs_layout = true;
+                F().sel.focus.node = drag_block_id;
+                F().sel.focus.span_index = 0;
+                F().sel.focus.char_index = 0;
+                F().sel.anchor = F().sel.focus;
+              }
+            }
             dragging_sel = false;
             dragging_split = false;
             dragging_scroll = false;
             dragging_image = false;
+            dragging_block = false;
+            drag_block_id = glyphtoo::INVALID_NODE;
+            drop_target_id = glyphtoo::INVALID_NODE;
+            drop_line_y = -1.f;
             resize_image = glyphtoo::INVALID_NODE;
           }
           break;
@@ -687,6 +733,26 @@ int main(int argc, char** argv) {
             scale = std::max(0.15f, std::min(3.0f, scale));
             doc_of(F()).get(resize_image).display_scale = scale;
             needs_layout = true;
+            break;
+          }
+          if (dragging_block && drag_block_id != glyphtoo::INVALID_NODE) {
+            Pane& p = F();
+            float lx = local_x(mouse_x, focus);
+            float adj_y = mouse_y + p.scroll_y;
+            drop_target_id = glyphtoo::INVALID_NODE;
+            drop_line_y = -1.f;
+            const auto& drag_n = doc_of(p).get(drag_block_id);
+            for (const auto& box : p.layout.boxes) {
+              if (box.node == drag_block_id) continue;
+              if (adj_y < box.y || adj_y > box.y + box.height) continue;
+              const auto& bn = doc_of(p).get(box.node);
+              if (bn.parent != drag_n.parent) continue;
+              // Top half → before, bottom half → after
+              drop_before = (adj_y < box.y + box.height * 0.5f);
+              drop_target_id = box.node;
+              drop_line_y = drop_before ? box.y : (box.y + box.height);
+              break;
+            }
             break;
           }
           if (dragging_sel) {
@@ -1543,6 +1609,50 @@ int main(int argc, char** argv) {
         SDL_RenderFillRect(sdl, &bar);
       }
 
+      // Block drag-drop: insertion line + source highlight
+      if (dragging_block && i == focus) {
+        // Dim the dragged block
+        for (const auto& box : pane.layout.boxes) {
+          if (box.node != drag_block_id) continue;
+          SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+          SDL_SetRenderDrawColor(sdl, 80, 140, 220, 60);
+          SDL_Rect r{pane.x + static_cast<int>(box.x),
+                     static_cast<int>(box.y - pane.scroll_y),
+                     static_cast<int>(box.width),
+                     static_cast<int>(box.height)};
+          SDL_RenderFillRect(sdl, &r);
+          SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+        }
+        if (drop_line_y >= 0.f) {
+          int ly = static_cast<int>(drop_line_y - pane.scroll_y);
+          SDL_SetRenderDrawColor(sdl, 25, 90, 170, 255);
+          SDL_Rect line{pane.x + 24, ly - 1, pane.w - 40, 3};
+          SDL_RenderFillRect(sdl, &line);
+        }
+      } else if (i == focus && !dragging_block) {
+        // Subtle grip dots on left margin of the box under the cursor
+        float adj_y = mouse_y + pane.scroll_y;
+        float lx = mouse_x - static_cast<float>(pane.x);
+        for (const auto& box : pane.layout.boxes) {
+          if (adj_y < box.y || adj_y > box.y + box.height) continue;
+          if (lx < box.x || lx > box.x + 20.f) continue;
+          const auto& bn = doc_of(pane).get(box.node);
+          if (bn.kind == glyphtoo::NodeKind::Document ||
+              bn.kind == glyphtoo::NodeKind::Columns ||
+              bn.kind == glyphtoo::NodeKind::Column ||
+              bn.kind == glyphtoo::NodeKind::List)
+            continue;
+          int gx = pane.x + static_cast<int>(box.x) + 4;
+          int gy = static_cast<int>(box.y - pane.scroll_y + box.height * 0.5f);
+          SDL_SetRenderDrawColor(sdl, 160, 158, 150, 255);
+          for (int d = -6; d <= 6; d += 6) {
+            SDL_Rect dot{gx, gy + d, 3, 3};
+            SDL_RenderFillRect(sdl, &dot);
+          }
+          break;
+        }
+      }
+
       // Scrollbar thumb
       {
         float view_h = static_cast<float>(win_h - 28);
@@ -1621,6 +1731,9 @@ int main(int argc, char** argv) {
         label += search_query.empty() ? "…" : search_query;
         label += "    F3 next · Esc cancel";
         tr = 220; tg = 230; tb = 245;
+      } else if (dragging_block) {
+        label = "Moving block — drop on a sibling to reorder (same as Alt+↑/↓)";
+        tr = 40; tg = 90; tb = 160;
       } else if (!hovered_href.empty()) {
         label = "Link: ";
         label += hovered_href;

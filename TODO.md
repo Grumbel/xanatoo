@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **034** (this delivery is **033**)
+Next bundle number: **035** (this delivery is **034**)
 
 ## Status (2026-10-10)
 
-Stage **01** complete (lists, quotes, HR). Stage **02** largely working. Stage **03** links, previews, basic transclusion.
+Stage **01**–**03** largely in place. Early stage **04** block drag-reorder.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -79,13 +79,14 @@ Stage **01** complete (lists, quotes, HR). Stage **02** largely working. Stage *
 - [x] Horizontal rules (`---`/`***`/`___`) — parse, layout line, serialize
 - [x] Ctrl+Shift+8 / Ctrl+Shift+7 toggle unordered / ordered list on block
 - [x] Inline transclusion: `:::include #Target` live embed + click-to-source
+- [x] Drag-and-drop block reorder (left-margin grab, sibling relocate)
 
 ## Open work / next steps
 
 1. Optional: HarfBuzz for complex scripts
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Richer transclusion (editable mirror, cross-document includes)
-4. Drag-and-drop layout editing (stage 04)
+4. Cross-parent / column drag-and-drop; adjustable column widths by drag
 
 ## Design notes
 
@@ -107,6 +108,8 @@ Stage **01** complete (lists, quotes, HR). Stage **02** largely working. Stage *
   a text block in a List or unwraps a ListItem back to Paragraph.
 - Transclude: `src` holds `#anchor`. Layout snapshots the target's spans
   (glyphs tagged with the Transclude node). Click jumps to the source.
+- Block drag: grab left 16px of a layout box; drop on a same-parent sibling
+  (top/bottom half = before/after). `relocate_block` splices the child list.
 
 ## Bundle history
 
@@ -142,4 +145,5 @@ Stage **01** complete (lists, quotes, HR). Stage **02** largely working. Stage *
 - `glyphtoo-030.*-link-preview-…` — anchor hover preview
 - `glyphtoo-031.*-blockquote-…` — block quotes
 - `glyphtoo-032.*-hr-list-toggle-…` — HR + list toggle
-- `glyphtoo-033.*-transclude-…` — this delivery
+- `glyphtoo-033.*-transclude-…` — :::include transclusion
+- `glyphtoo-034.*-block-drag-…` — this delivery

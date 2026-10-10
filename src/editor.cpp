@@ -542,6 +542,33 @@ bool move_block_down(Document& doc, NodeId block) {
   return true;
 }
 
+bool relocate_block(Document& doc, NodeId block, NodeId target, bool before) {
+  if (block == INVALID_NODE || target == INVALID_NODE || block == target)
+    return false;
+  Node& bn = doc.get(block);
+  Node& tn = doc.get(target);
+  if (bn.parent == INVALID_NODE || bn.parent != tn.parent) return false;
+  Node& parent = doc.get(bn.parent);
+
+  auto bit = std::find(parent.children.begin(), parent.children.end(), block);
+  auto tit = std::find(parent.children.begin(), parent.children.end(), target);
+  if (bit == parent.children.end() || tit == parent.children.end()) return false;
+
+  size_t bidx = static_cast<size_t>(bit - parent.children.begin());
+  size_t tidx = static_cast<size_t>(tit - parent.children.begin());
+  parent.children.erase(bit);
+  if (bidx < tidx) --tidx;
+
+  size_t insert_at = before ? tidx : tidx + 1;
+  if (insert_at > parent.children.size()) insert_at = parent.children.size();
+  parent.children.insert(
+      parent.children.begin() + static_cast<std::ptrdiff_t>(insert_at), block);
+
+  if (bn.kind == NodeKind::ListItem && parent.kind == NodeKind::List)
+    renumber_ordered_list(doc, bn.parent);
+  return true;
+}
+
 static void copy_node_deep(Document& doc, NodeId src_id, NodeId new_parent,
                            NodeId& out_id);
 

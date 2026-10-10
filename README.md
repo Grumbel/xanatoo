@@ -66,6 +66,7 @@ Supported dialect (intentionally small):
 | **Ctrl+B** / **I** / **\`** / **K** | Bold / italic / code / link |
 | **Ctrl+D** | Duplicate current block |
 | **Alt+↑ / Alt+↓** | Move block among siblings |
+| Drag left margin of block | Reorder block among siblings |
 | **Ctrl+E** | Wrap block in stretchtext |
 | **Ctrl+Shift+E** | Edit stretch summary |
 | **Ctrl+Shift+U** | Unwrap stretchtext |
