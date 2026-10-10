@@ -48,7 +48,7 @@ static size_t utf8_byte_offset(const std::string& s, size_t char_index) {
 
 static bool is_text_node(NodeKind k) {
   return k == NodeKind::Paragraph || k == NodeKind::Heading ||
-         k == NodeKind::ListItem;
+         k == NodeKind::ListItem || k == NodeKind::BlockQuote;
 }
 
 static void collect_text_nodes(const Document& doc, NodeId id, std::vector<NodeId>& out) {

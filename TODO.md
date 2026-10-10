@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **031** (this delivery is **030**)
+Next bundle number: **032** (this delivery is **031**)
 
 ## Status (2026-10-10)
 
-Stage **01** complete (lists). Stage **02** largely working. Stage **03** links + hover previews.
+Stage **01** complete (lists, block quotes). Stage **02** largely working. Stage **03** links + hover previews.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -75,6 +75,7 @@ Stage **01** complete (lists). Stage **02** largely working. Stage **03** links 
 - [x] Unordered lists (`-`/`*`/`+`) and ordered lists (`1.`) — parse, layout bullets, serialize
 - [x] Enter in list item splits to sibling ListItem; empty item exits list; ordered renumber
 - [x] Hover preview tooltip for internal `#anchor` links (target passage snippet)
+- [x] Block quotes (`> …`) — parse, layout bar, serialize; Ctrl+Shift+Q toggle
 
 ## Open work / next steps
 
@@ -97,6 +98,8 @@ Stage **01** complete (lists). Stage **02** largely working. Stage **03** links 
 - Enter on ListItem: same-kind sibling + ordered renumber. Enter on an
   empty ListItem exits the list (paragraph after the list; empty list
   removed). Backspace-merge drops empty List parents.
+- BlockQuote: text node with left bar (`LayoutResult::quote_bars`).
+  Ctrl+Shift+Q toggles; Ctrl+0 demotes to paragraph.
 
 ## Bundle history
 
@@ -129,4 +132,5 @@ Stage **01** complete (lists). Stage **02** largely working. Stage **03** links 
 - `glyphtoo-027.*-external-links-…` — external links + hover
 - `glyphtoo-028.*-lists-…` — list parse/layout/serialize
 - `glyphtoo-029.*-list-edit-…` — list Enter/exit/renumber
-- `glyphtoo-030.*-link-preview-…` — this delivery
+- `glyphtoo-030.*-link-preview-…` — anchor hover preview
+- `glyphtoo-031.*-blockquote-…` — this delivery

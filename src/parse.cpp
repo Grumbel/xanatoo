@@ -299,6 +299,27 @@ Document parse_markup(std::string_view source) {
       }
     }
 
+    // Block quote: consecutive lines starting with "> "
+    if (trimmed.starts_with("> ")) {
+      std::string quote;
+      while (i < lines.size() && !lines[i].blank) {
+        std::string_view lt = lines[i].text;
+        size_t llead = 0;
+        while (llead < lt.size() && (lt[llead] == ' ' || lt[llead] == '\t'))
+          ++llead;
+        std::string_view ltrim = lt.substr(llead);
+        if (!ltrim.starts_with("> ")) break;
+        if (!quote.empty()) quote.push_back(' ');
+        quote.append(ltrim.substr(2));
+        ++i;
+      }
+      if (!quote.empty()) {
+        NodeId n = doc.create(NodeKind::BlockQuote, current_parent());
+        parse_inlines(doc.get(n), quote);
+      }
+      continue;
+    }
+
     // Paragraph: gather consecutive non-blank, non-fence lines
     std::string para;
     while (i < lines.size() && !lines[i].blank) {
@@ -308,6 +329,7 @@ Document parse_markup(std::string_view source) {
       std::string_view ltrim = lt.substr(llead);
       if (ltrim.starts_with(":::") || ltrim.starts_with("# ") ||
           ltrim.starts_with("## ") || ltrim.starts_with("![") ||
+          ltrim.starts_with("> ") ||
           list_marker_len(ltrim, nullptr) > 0) {
         break;
       }
@@ -382,6 +404,14 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
 
     case NodeKind::Paragraph: {
       out += pad;
+      serialize_inlines(node, out);
+      out += "\n\n";
+      break;
+    }
+
+    case NodeKind::BlockQuote: {
+      out += pad;
+      out += "> ";
       serialize_inlines(node, out);
       out += "\n\n";
       break;

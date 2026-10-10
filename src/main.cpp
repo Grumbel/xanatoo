@@ -108,6 +108,10 @@ Inspiration: Ted Nelson's *Xanadu*, Bill Atkinson's **HyperCard**, and
 Jef Raskin's *Canon Cat* — a keyboard-driven work processor that treated
 text as a continuous, searchable stream.
 
+> "A document is not just something you render and read. It is a live
+> workspace." — the glyphtoo proposal
+
+
 Design pillars:
 
 - Addressable passages and stable node IDs
@@ -800,7 +804,21 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_q:
-              if (ctrl) {
+              if (ctrl && shift) {
+                // Toggle block quote on the current text block
+                edit();
+                auto& node = d.get(p.sel.focus.node);
+                if (node.kind == glyphtoo::NodeKind::BlockQuote) {
+                  node.kind = glyphtoo::NodeKind::Paragraph;
+                } else if (node.kind == glyphtoo::NodeKind::Paragraph ||
+                           node.kind == glyphtoo::NodeKind::Heading ||
+                           node.kind == glyphtoo::NodeKind::ListItem) {
+                  node.kind = glyphtoo::NodeKind::BlockQuote;
+                  node.level = 0;
+                }
+                needs_layout = true;
+                reset_blink();
+              } else if (ctrl) {
                 if (dirty_flags[0] || dirty_flags[1]) {
                   std::cerr << "Unsaved changes — Ctrl+S to save, "
                                "Ctrl+Q again after saving, or save and quit.\n";
@@ -1357,7 +1375,8 @@ int main(int argc, char** argv) {
                 edit();
                 auto& node = d.get(p.sel.focus.node);
                 if (level == 0) {
-                  if (node.kind == glyphtoo::NodeKind::Heading)
+                  if (node.kind == glyphtoo::NodeKind::Heading ||
+                      node.kind == glyphtoo::NodeKind::BlockQuote)
                     node.kind = glyphtoo::NodeKind::Paragraph;
                   node.level = 0;
                 } else {

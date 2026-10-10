@@ -85,13 +85,16 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         LayoutResult col_out;
         layout_node(doc, cols[i], cx, cy, col_w, col_out);
 
-        // Merge glyphs / boxes / images
+        // Merge glyphs / boxes / images / quote bars
         out.glyphs.insert(out.glyphs.end(),
                           col_out.glyphs.begin(), col_out.glyphs.end());
         out.boxes.insert(out.boxes.end(),
                          col_out.boxes.begin(), col_out.boxes.end());
         out.images.insert(out.images.end(),
                           col_out.images.begin(), col_out.images.end());
+        out.quote_bars.insert(out.quote_bars.end(),
+                              col_out.quote_bars.begin(),
+                              col_out.quote_bars.end());
 
         if (cy > max_bottom) max_bottom = cy;
       }
@@ -160,6 +163,23 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       float start_y = y;
       layout_paragraph(doc, node, x, y, max_width, out, body_, FontRole::Body);
       y += 14.f;
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
+    case NodeKind::BlockQuote: {
+      float start_y = y;
+      const float bar_w = 3.f;
+      const float indent = 14.f;
+      float text_x = x + bar_w + indent;
+      float text_w = max_width - bar_w - indent;
+      if (text_w < 40.f) {
+        text_x = x + 8.f;
+        text_w = max_width - 8.f;
+      }
+      layout_paragraph(doc, node, text_x, y, text_w, out, body_, FontRole::Body);
+      y += 12.f;
+      out.quote_bars.push_back({id, x, start_y, bar_w, y - start_y});
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }

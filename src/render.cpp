@@ -38,6 +38,19 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
     }
   }
 
+  // Block-quote left bars
+  for (const auto& qb : layout.quote_bars) {
+    SDL_SetRenderDrawColor(sdl_, 140, 155, 180, 255);
+    int bw = static_cast<int>(qb.width);
+    if (bw < 2) bw = 2;
+    SDL_Rect bar{
+        static_cast<int>(qb.x + origin_x),
+        static_cast<int>(qb.y - scroll_y),
+        bw,
+        static_cast<int>(qb.height)};
+    SDL_RenderFillRect(sdl_, &bar);
+  }
+
   for (const auto& pg : layout.glyphs) {
     Font& font = (pg.font == FontRole::Heading) ? heading_ : body_;
     const Glyph& g = font.glyph(pg.codepoint);

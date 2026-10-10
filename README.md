@@ -37,6 +37,7 @@ Supported dialect (intentionally small):
 | blank-line separated | Paragraphs |
 | `- ` / `* ` / `+ ` | Unordered list items |
 | `1. ` `2. ` … | Ordered list items |
+| `> …` | Block quote |
 | `*em*` `**strong**` `` `code` `` | Inline styles |
 | `[text](#anchor)` / `[text](url)` | Links |
 | `![alt](path.png){scale=1.2}` | Images (PNG/JPEG/BMP/GIF) |
@@ -68,6 +69,7 @@ Supported dialect (intentionally small):
 | **Ctrl+Shift+U** | Unwrap stretchtext |
 | **Ctrl+0** | Demote to paragraph |
 | **Ctrl+1…6** | Set heading level |
+| **Ctrl+Shift+Q** | Toggle block quote |
 | **Ctrl+Shift+[** / **]** | Collapse / expand all stretchtext |
 | Double-click | Select word |
 

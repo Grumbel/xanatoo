@@ -45,6 +45,8 @@ struct LayoutResult {
   std::vector<PositionedGlyph> glyphs;
   std::vector<LayoutBox> boxes;
   std::vector<PositionedImage> images;
+  // Vertical bars for block quotes (content coordinates).
+  std::vector<LayoutBox> quote_bars;
   float content_height = 0.f;
 };
 
