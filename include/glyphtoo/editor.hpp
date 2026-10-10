@@ -80,6 +80,11 @@ void delete_forward(Document& doc, Caret& caret);
 // Caret moves to the start of the new block. Returns true on success.
 bool split_block(Document& doc, Caret& caret);
 
+// Wrap a text block in a collapsed Stretch node. Summary defaults to a
+// short prefix of the block text when empty.
+bool wrap_block_in_stretch(Document& doc, NodeId block,
+                           const std::string& summary = {});
+
 // Delete the current selection (or nothing if empty). Caret becomes the start.
 void delete_selection(Document& doc, Selection& sel);
 

@@ -420,6 +420,42 @@ void delete_forward(Document& doc, Caret& caret) {
   span.text.erase(start_byte, end_byte - start_byte);
 }
 
+
+bool wrap_block_in_stretch(Document& doc, NodeId block,
+                           const std::string& summary) {
+  if (block == INVALID_NODE) return false;
+  Node& n = doc.get(block);
+  if (n.parent == INVALID_NODE) return false;
+  if (n.kind == NodeKind::Stretch || n.kind == NodeKind::Document) return false;
+
+  NodeId parent = n.parent;
+  Node& p = doc.get(parent);
+  auto it = std::find(p.children.begin(), p.children.end(), block);
+  if (it == p.children.end()) return false;
+  size_t idx = static_cast<size_t>(it - p.children.begin());
+
+  // Create stretch under same parent, then move block under it
+  NodeId sid = doc.create(NodeKind::Stretch, INVALID_NODE);
+  Node& stretch = doc.get(sid);
+  stretch.parent = parent;
+  stretch.expanded = false;
+  if (!summary.empty()) {
+    stretch.summary = summary;
+  } else {
+    std::string text;
+    for (const auto& sp : n.spans) text += sp.text;
+    if (text.size() > 48) text = text.substr(0, 48) + "…";
+    stretch.summary = text.empty() ? "…" : text;
+  }
+
+  // Replace block with stretch in parent children
+  p.children[idx] = sid;
+  // Detach block from parent and attach under stretch
+  n.parent = sid;
+  stretch.children.push_back(block);
+  return true;
+}
+
 bool split_block(Document& doc, Caret& caret) {
   if (caret.node == INVALID_NODE) return false;
   Node& n = doc.get(caret.node);

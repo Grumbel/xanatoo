@@ -1011,7 +1011,6 @@ int main(int argc, char** argv) {
                 edit();
                 glyphtoo::apply_style_to_selection(
                     d, p.sel, glyphtoo::InlineKind::Link, href);
-                // Enter href edit mode on the new link span
                 link_edit_mode = true;
                 search_mode = false;
                 save_as_mode = false;
@@ -1020,6 +1019,19 @@ int main(int argc, char** argv) {
                 link_edit_href = href;
                 needs_layout = true;
                 reset_blink();
+              }
+              break;
+
+            case SDLK_e:
+              if (ctrl) {
+                // Wrap current block in collapsed stretchtext
+                edit();
+                std::string summary = glyphtoo::selected_text(d, p.sel);
+                if (glyphtoo::wrap_block_in_stretch(d, p.sel.focus.node, summary)) {
+                  // Caret stays on the (now nested) block; layout shows ▸ marker
+                  needs_layout = true;
+                  reset_blink();
+                }
               }
               break;
 
@@ -1153,7 +1165,7 @@ int main(int argc, char** argv) {
       } else {
         label =
             "Ctrl+S save · Ctrl+Shift+S save as · Ctrl+Z/Y undo · "
-            "Ctrl+B/I/K bold/italic/link · Ctrl+F leap · Ctrl+\\ split";
+            "Ctrl+B/I/K style · Ctrl+E stretch · Ctrl+F leap · Ctrl+\\ split";
         tr = 70; tg = 68; tb = 62;
       }
       float baseline = static_cast<float>(win_h - 8);
