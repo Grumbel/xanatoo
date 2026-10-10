@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **081** (this delivery is **080**)
+Next bundle number: **082** (this delivery is **081**)
 
 ## Status (2026-10-10)
 
@@ -128,6 +128,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Icon install/runtime: XANATOO_ICON_DIR env, exe-relative share path, flake wrap
 - [x] Soft-window mouse: browse independent of help_mode; drag/resize/scroll motion
 - [x] Outline as software window (drag/resize/scroll; non-modal; stays open on jump)
+- [x] Multiple document software windows (stack; raise on click; cascade open)
 
 ## Open work / next steps
 
@@ -136,7 +137,7 @@ LCS structural diff marks; cross-document `:::include`.
 3. Editable transclusion mirror (edits on embed write through to source)
 4. Word-level / intra-block diff highlighting
 5. **Tables** — semantic grid (cells as nodes); presentation left to the view
-6. **Docking / multiple software windows** — stack beyond one browse frame + help
+6. **Docking** — snap / tile software windows (stack of doc windows is in)
 7. **Citations** / typed link relations / range transclusion (see FORMAT.md)
 
 ## Design notes
@@ -257,4 +258,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-077.*-nix-icons-libx11-…` — Nix python3 icons + libx11
 - `xanatoo-078.*-icon-install-…` — icon install + XANATOO_ICON_DIR
 - `xanatoo-079.*-softwin-mouse-…` — soft-window mouse hit-testing
-- `xanatoo-080.*-outline-window-…` — this delivery
+- `xanatoo-080.*-outline-window-…` — outline software window
+- `xanatoo-081.*-multi-softwin-…` — this delivery

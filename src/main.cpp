@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <cstring>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -232,9 +233,8 @@ int main(int argc, char** argv) {
   std::string summary_edit_text;
   xanatoo::NodeId summary_edit_node = xanatoo::INVALID_NODE;
 
-  // Floating software window for arbitrary documents (FORMAT.md, etc.)
+  // Floating software windows for arbitrary documents (stack; back = topmost).
   struct SoftWindow {
-    bool open = false;
     std::string title;
     std::string path;
     xanatoo::Document doc;
@@ -249,7 +249,7 @@ int main(int argc, char** argv) {
     int resize_start_x = 0, resize_start_y = 0;
     int resize_start_w = 0, resize_start_h = 0;
   };
-  SoftWindow browse;
+  std::vector<SoftWindow> soft_wins;
   bool path_in_window_mode = false;
   std::string path_in_window_buf;
 
@@ -426,33 +426,63 @@ int main(int argc, char** argv) {
     return {};
   };
 
+  auto soft_client_rect = [&](const SoftWindow& sw) {
+    return std::tuple{sw.x + help_pad, sw.y + help_title_h + 4,
+                      sw.w - help_pad * 2,
+                      sw.h - help_title_h - help_pad - 4};
+  };
+
+  auto layout_soft = [&](SoftWindow& sw) {
+    float mw = static_cast<float>(std::max(120, sw.w - help_pad * 2));
+    sw.layout = layout_engine.layout(sw.doc, mw);
+    sw.needs_layout = false;
+  };
+
+  // Raise window i to the top of the stack (back of vector).
+  auto raise_soft = [&](size_t i) {
+    if (i + 1 >= soft_wins.size()) return;
+    SoftWindow sw = std::move(soft_wins[i]);
+    soft_wins.erase(soft_wins.begin() + static_cast<std::ptrdiff_t>(i));
+    soft_wins.push_back(std::move(sw));
+  };
+
   auto open_browse = [&](const std::string& path, const std::string& title) {
     if (path.empty() || !fs::exists(path)) {
       std::cerr << "Cannot open in window: " << path << "\n";
       return;
     }
-    browse.doc = load_doc(path);
-    browse.path = path;
-    browse.title = title.empty() ? path : title;
-    browse.open = true;
-    browse.needs_layout = true;
-    browse.scroll = 0.f;
-    browse.x = help_x + 30;
-    browse.y = help_y + 30;
+    // Focus existing window for the same path.
+    std::string canon = path;
+    try {
+      canon = fs::weakly_canonical(path).string();
+    } catch (...) {
+    }
+    for (size_t i = 0; i < soft_wins.size(); ++i) {
+      std::string existing = soft_wins[i].path;
+      try {
+        existing = fs::weakly_canonical(existing).string();
+      } catch (...) {
+      }
+      if (existing == canon) {
+        raise_soft(i);
+        std::cout << "Software window (focus): " << path << "\n";
+        return;
+      }
+    }
+    SoftWindow sw;
+    sw.doc = load_doc(path);
+    sw.path = path;
+    sw.title = title.empty() ? path : title;
+    sw.needs_layout = true;
+    sw.scroll = 0.f;
+    // Cascade so multiple windows stay visible.
+    const int cascade = static_cast<int>(soft_wins.size()) * 28;
+    sw.x = help_x + 30 + cascade;
+    sw.y = help_y + 30 + cascade;
+    if (sw.x + sw.w > win_w - 20) sw.x = 40 + (cascade % 60);
+    if (sw.y + sw.h > win_h - 40) sw.y = static_cast<int>(ui_top) + 20 + (cascade % 40);
+    soft_wins.push_back(std::move(sw));
     std::cout << "Software window: " << path << "\n";
-  };
-
-  auto layout_browse = [&]() {
-    if (!browse.open) return;
-    float mw = static_cast<float>(std::max(120, browse.w - help_pad * 2));
-    browse.layout = layout_engine.layout(browse.doc, mw);
-    browse.needs_layout = false;
-  };
-
-  auto browse_client_rect = [&]() {
-    return std::tuple{browse.x + help_pad, browse.y + help_title_h + 4,
-                      browse.w - help_pad * 2,
-                      browse.h - help_title_h - help_pad - 4};
   };
 
   auto ensure_help_doc = [&]() {
@@ -616,11 +646,19 @@ int main(int argc, char** argv) {
             if (ol_scroll < 0.f) ol_scroll = 0.f;
             break;
           }
-          if (browse.open && mxw >= browse.x && mxw < browse.x + browse.w &&
-              myw >= browse.y && myw < browse.y + browse.h) {
-            browse.scroll -= static_cast<float>(ev.wheel.y) * 40.f;
-            if (browse.scroll < 0.f) browse.scroll = 0.f;
-            break;
+          {
+            bool handled = false;
+            for (int i = static_cast<int>(soft_wins.size()) - 1; i >= 0; --i) {
+              SoftWindow& sw = soft_wins[static_cast<size_t>(i)];
+              if (mxw >= sw.x && mxw < sw.x + sw.w && myw >= sw.y &&
+                  myw < sw.y + sw.h) {
+                sw.scroll -= static_cast<float>(ev.wheel.y) * 40.f;
+                if (sw.scroll < 0.f) sw.scroll = 0.f;
+                handled = true;
+                break;
+              }
+            }
+            if (handled) break;
           }
           if (help_mode && mxw >= help_x && mxw < help_x + help_w &&
               myw >= help_y && myw < help_y + help_h) {
@@ -718,93 +756,102 @@ int main(int argc, char** argv) {
               }
             }
 
-            // ---- Browse software window ----
-            if (browse.open &&
-                mxw >= browse.x - help_edge &&
-                mxw <= browse.x + browse.w + help_edge &&
-                myw >= browse.y - help_edge &&
-                myw <= browse.y + browse.h + help_edge) {
-              const bool inside =
-                  mxw >= browse.x && mxw < browse.x + browse.w &&
-                  myw >= browse.y && myw < browse.y + browse.h;
-              // Resize grips (right / bottom / SE corner)
-              {
+            // ---- Document software windows (topmost first) ----
+            {
+              bool soft_hit = false;
+              for (int ii = static_cast<int>(soft_wins.size()) - 1; ii >= 0;
+                   --ii) {
+                const size_t i = static_cast<size_t>(ii);
+                SoftWindow& sw = soft_wins[i];
+                if (mxw < sw.x - help_edge || mxw > sw.x + sw.w + help_edge ||
+                    myw < sw.y - help_edge || myw > sw.y + sw.h + help_edge)
+                  continue;
+                const bool inside =
+                    mxw >= sw.x && mxw < sw.x + sw.w && myw >= sw.y &&
+                    myw < sw.y + sw.h;
                 const bool on_r =
-                    mxw >= browse.x + browse.w - help_edge &&
-                    myw >= browse.y + help_title_h &&
-                    myw <= browse.y + browse.h + help_edge;
+                    mxw >= sw.x + sw.w - help_edge &&
+                    myw >= sw.y + help_title_h &&
+                    myw <= sw.y + sw.h + help_edge;
                 const bool on_b =
-                    myw >= browse.y + browse.h - help_edge &&
-                    mxw >= browse.x &&
-                    mxw <= browse.x + browse.w + help_edge;
+                    myw >= sw.y + sw.h - help_edge && mxw >= sw.x &&
+                    mxw <= sw.x + sw.w + help_edge;
                 if (on_r || on_b) {
-                  browse.resize = (on_r ? 1 : 0) | (on_b ? 2 : 0);
-                  browse.resize_start_x = mxw;
-                  browse.resize_start_y = myw;
-                  browse.resize_start_w = browse.w;
-                  browse.resize_start_h = browse.h;
-                  browse.dragging = false;
+                  raise_soft(i);
+                  SoftWindow& top = soft_wins.back();
+                  top.resize = (on_r ? 1 : 0) | (on_b ? 2 : 0);
+                  top.resize_start_x = mxw;
+                  top.resize_start_y = myw;
+                  top.resize_start_w = top.w;
+                  top.resize_start_h = top.h;
+                  top.dragging = false;
+                  soft_hit = true;
                   break;
                 }
-              }
-              if (inside && myw < browse.y + help_title_h) {
-                if (mxw >= browse.x + browse.w - 28) {
-                  browse.open = false;
-                  browse.dragging = false;
-                  browse.resize = 0;
-                } else {
-                  browse.dragging = true;
-                  browse.drag_dx = mxw - browse.x;
-                  browse.drag_dy = myw - browse.y;
-                }
-                break;
-              }
-              if (inside) {
-                auto [cx, cy, cw, ch] = browse_client_rect();
-                const int sb_w = 10;
-                if (mxw >= cx + cw - sb_w && mxw <= cx + cw + 2 &&
-                    myw >= cy && myw <= cy + ch) {
-                  float max_s = std::max(
-                      0.f, browse.layout.content_height -
-                               static_cast<float>(ch) + 40.f);
-                  float view_h = static_cast<float>(std::max(1, ch));
-                  float ratio =
-                      (static_cast<float>(myw - cy) / view_h);
-                  ratio = std::max(0.f, std::min(1.f, ratio));
-                  browse.scroll = ratio * max_s;
-                  browse.scroll_dragging = true;
-                  break;
-                }
-                float lx = static_cast<float>(mxw - cx);
-                float ly = static_cast<float>(myw - cy);
-                if (lx >= 0 && ly >= 0 && lx <= cw && ly <= ch) {
-                  if (auto sid = xanatoo::hit_test_stretch(
-                          browse.layout, lx, ly, browse.scroll)) {
-                    if (browse.doc.get(*sid).kind ==
-                        xanatoo::NodeKind::Stretch) {
-                      browse.doc.get(*sid).expanded =
-                          !browse.doc.get(*sid).expanded;
-                      browse.needs_layout = true;
-                      break;
-                    }
+                if (inside && myw < sw.y + help_title_h) {
+                  if (mxw >= sw.x + sw.w - 28) {
+                    soft_wins.erase(soft_wins.begin() +
+                                    static_cast<std::ptrdiff_t>(i));
+                  } else {
+                    raise_soft(i);
+                    SoftWindow& top = soft_wins.back();
+                    top.dragging = true;
+                    top.drag_dx = mxw - top.x;
+                    top.drag_dy = myw - top.y;
                   }
-                  if (auto href = xanatoo::hit_test_link(
-                          browse.doc, browse.layout, lx, ly,
-                          browse.scroll)) {
-                    if (!href->empty() && (*href)[0] == '#') {
-                      if (auto dest =
-                              xanatoo::jump_to_href(browse.doc, *href)) {
-                        auto cpos = xanatoo::caret_screen_pos(
-                            browse.layout, *dest, 0.f,
-                            static_cast<float>(body_font.line_height()));
-                        if (cpos.valid)
-                          browse.scroll = std::max(0.f, cpos.y - 24.f);
+                  soft_hit = true;
+                  break;
+                }
+                if (inside) {
+                  raise_soft(i);
+                  SoftWindow& top = soft_wins.back();
+                  auto [cx, cy, cw, ch] = soft_client_rect(top);
+                  const int sb_w = 10;
+                  if (mxw >= cx + cw - sb_w && mxw <= cx + cw + 2 &&
+                      myw >= cy && myw <= cy + ch) {
+                    float max_s = std::max(
+                        0.f, top.layout.content_height -
+                                 static_cast<float>(ch) + 40.f);
+                    float view_h = static_cast<float>(std::max(1, ch));
+                    float ratio =
+                        (static_cast<float>(myw - cy) / view_h);
+                    ratio = std::max(0.f, std::min(1.f, ratio));
+                    top.scroll = ratio * max_s;
+                    top.scroll_dragging = true;
+                    soft_hit = true;
+                    break;
+                  }
+                  float lx = static_cast<float>(mxw - cx);
+                  float ly = static_cast<float>(myw - cy);
+                  if (lx >= 0 && ly >= 0 && lx <= cw && ly <= ch) {
+                    if (auto sid = xanatoo::hit_test_stretch(
+                            top.layout, lx, ly, top.scroll)) {
+                      if (top.doc.get(*sid).kind ==
+                          xanatoo::NodeKind::Stretch) {
+                        top.doc.get(*sid).expanded =
+                            !top.doc.get(*sid).expanded;
+                        top.needs_layout = true;
+                      }
+                    }
+                    if (auto href = xanatoo::hit_test_link(
+                            top.doc, top.layout, lx, ly, top.scroll)) {
+                      if (!href->empty() && (*href)[0] == '#') {
+                        if (auto dest =
+                                xanatoo::jump_to_href(top.doc, *href)) {
+                          auto cpos = xanatoo::caret_screen_pos(
+                              top.layout, *dest, 0.f,
+                              static_cast<float>(body_font.line_height()));
+                          if (cpos.valid)
+                            top.scroll = std::max(0.f, cpos.y - 24.f);
+                        }
                       }
                     }
                   }
+                  soft_hit = true;
+                  break;
                 }
-                break;  // absorb click even if no hit target
               }
+              if (soft_hit) break;
             }
 
             // ---- Help software window ----
@@ -1109,9 +1156,11 @@ int main(int argc, char** argv) {
             help_dragging = false;
             help_resize = 0;
             help_scroll_dragging = false;
-            browse.dragging = false;
-            browse.resize = 0;
-            browse.scroll_dragging = false;
+            for (auto& sw : soft_wins) {
+              sw.dragging = false;
+              sw.resize = 0;
+              sw.scroll_dragging = false;
+            }
             ol_dragging = false;
             ol_resize = 0;
             ol_scroll_dragging = false;
@@ -1187,42 +1236,52 @@ int main(int argc, char** argv) {
             }
             break;
           }
-          if (browse.dragging) {
-            browse.x = ev.motion.x - browse.drag_dx;
-            browse.y = ev.motion.y - browse.drag_dy;
-            if (browse.x < 0) browse.x = 0;
-            if (browse.y < static_cast<int>(ui_top))
-              browse.y = static_cast<int>(ui_top);
-            break;
-          }
-          if (browse.scroll_dragging) {
-            auto [cx, cy, cw, ch] = browse_client_rect();
-            float max_s = std::max(
-                0.f, browse.layout.content_height -
-                         static_cast<float>(ch) + 40.f);
-            float view_h = static_cast<float>(std::max(1, ch));
-            float ratio =
-                (static_cast<float>(ev.motion.y) - static_cast<float>(cy)) /
-                view_h;
-            ratio = std::max(0.f, std::min(1.f, ratio));
-            browse.scroll = ratio * max_s;
-            break;
-          }
-          if (browse.resize) {
-            int dx = ev.motion.x - browse.resize_start_x;
-            int dy = ev.motion.y - browse.resize_start_y;
-            if (browse.resize & 1) {
-              browse.w = browse.resize_start_w + dx;
-              if (browse.w < 280) browse.w = 280;
-              if (browse.w > win_w - 20) browse.w = win_w - 20;
-              browse.needs_layout = true;
+          {
+            bool soft_motion = false;
+            for (auto& sw : soft_wins) {
+              if (sw.dragging) {
+                sw.x = ev.motion.x - sw.drag_dx;
+                sw.y = ev.motion.y - sw.drag_dy;
+                if (sw.x < 0) sw.x = 0;
+                if (sw.y < static_cast<int>(ui_top))
+                  sw.y = static_cast<int>(ui_top);
+                soft_motion = true;
+                break;
+              }
+              if (sw.scroll_dragging) {
+                auto [cx, cy, cw, ch] = soft_client_rect(sw);
+                float max_s = std::max(
+                    0.f, sw.layout.content_height -
+                             static_cast<float>(ch) + 40.f);
+                float view_h = static_cast<float>(std::max(1, ch));
+                float ratio =
+                    (static_cast<float>(ev.motion.y) -
+                     static_cast<float>(cy)) /
+                    view_h;
+                ratio = std::max(0.f, std::min(1.f, ratio));
+                sw.scroll = ratio * max_s;
+                soft_motion = true;
+                break;
+              }
+              if (sw.resize) {
+                int dx = ev.motion.x - sw.resize_start_x;
+                int dy = ev.motion.y - sw.resize_start_y;
+                if (sw.resize & 1) {
+                  sw.w = sw.resize_start_w + dx;
+                  if (sw.w < 280) sw.w = 280;
+                  if (sw.w > win_w - 20) sw.w = win_w - 20;
+                  sw.needs_layout = true;
+                }
+                if (sw.resize & 2) {
+                  sw.h = sw.resize_start_h + dy;
+                  if (sw.h < 160) sw.h = 160;
+                  if (sw.h > win_h - 40) sw.h = win_h - 40;
+                }
+                soft_motion = true;
+                break;
+              }
             }
-            if (browse.resize & 2) {
-              browse.h = browse.resize_start_h + dy;
-              if (browse.h < 160) browse.h = 160;
-              if (browse.h > win_h - 40) browse.h = win_h - 40;
-            }
-            break;
+            if (soft_motion) break;
           }
           if (help_dragging) {
             help_x = ev.motion.x - help_drag_dx;
@@ -3203,52 +3262,54 @@ int main(int argc, char** argv) {
     }
 
 
-    // Browse software window (arbitrary document)
-    if (browse.open) {
-      if (browse.w < 280) browse.w = 280;
-      if (browse.h < 200) browse.h = 200;
-      if (browse.needs_layout) layout_browse();
+    // Document software windows (bottom → top so last is topmost)
+    for (auto& sw : soft_wins) {
+      if (sw.w < 280) sw.w = 280;
+      if (sw.h < 200) sw.h = 200;
+      if (sw.needs_layout) layout_soft(sw);
+      auto [cx, cy, cw, ch] = soft_client_rect(sw);
       {
-        auto [cx, cy, cw, ch] = browse_client_rect();
-        float max_s = std::max(0.f, browse.layout.content_height - static_cast<float>(ch) + 40.f);
-        if (browse.scroll > max_s) browse.scroll = max_s;
+        float max_s = std::max(
+            0.f, sw.layout.content_height - static_cast<float>(ch) + 40.f);
+        if (sw.scroll > max_s) sw.scroll = max_s;
       }
       SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
       SDL_SetRenderDrawColor(sdl, 0, 0, 0, 40);
-      SDL_Rect shadow{browse.x + 3, browse.y + 3, browse.w, browse.h};
+      SDL_Rect shadow{sw.x + 3, sw.y + 3, sw.w, sw.h};
       SDL_RenderFillRect(sdl, &shadow);
       SDL_SetRenderDrawColor(sdl, 246, 245, 244, 255);
-      SDL_Rect frame{browse.x, browse.y, browse.w, browse.h};
+      SDL_Rect frame{sw.x, sw.y, sw.w, sw.h};
       SDL_RenderFillRect(sdl, &frame);
       SDL_SetRenderDrawColor(sdl, 120, 140, 100, 255);
       SDL_RenderDrawRect(sdl, &frame);
       SDL_SetRenderDrawColor(sdl, 210, 225, 190, 255);
-      SDL_Rect title{browse.x + 1, browse.y + 1, browse.w - 2, help_title_h};
+      SDL_Rect title{sw.x + 1, sw.y + 1, sw.w - 2, help_title_h};
       SDL_RenderFillRect(sdl, &title);
       SDL_SetRenderDrawColor(sdl, 120, 140, 100, 255);
-      SDL_RenderDrawLine(sdl, browse.x, browse.y + help_title_h,
-                         browse.x + browse.w, browse.y + help_title_h);
+      SDL_RenderDrawLine(sdl, sw.x, sw.y + help_title_h, sw.x + sw.w,
+                         sw.y + help_title_h);
       SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
-      renderer.draw_text(body_font, static_cast<float>(browse.x + 10),
-                         static_cast<float>(browse.y + 6 + body_font.ascender()),
-                         browse.title.c_str(), 40, 55, 35);
-      renderer.draw_text(body_font, static_cast<float>(browse.x + browse.w - 22),
-                         static_cast<float>(browse.y + 6 + body_font.ascender()),
+      renderer.draw_text(body_font, static_cast<float>(sw.x + 10),
+                         static_cast<float>(sw.y + 6 + body_font.ascender()),
+                         sw.title.c_str(), 40, 55, 35);
+      renderer.draw_text(body_font, static_cast<float>(sw.x + sw.w - 22),
+                         static_cast<float>(sw.y + 6 + body_font.ascender()),
                          "×", 80, 40, 40);
-      auto [cx, cy, cw, ch] = browse_client_rect();
       SDL_Rect clip{cx, cy, cw, ch};
       SDL_RenderSetClipRect(sdl, &clip);
-      renderer.draw(browse.layout, browse.scroll - static_cast<float>(cy),
+      renderer.draw(sw.layout, sw.scroll - static_cast<float>(cy),
                     static_cast<float>(cx));
       SDL_RenderSetClipRect(sdl, nullptr);
       {
-        float max_s = std::max(0.f, browse.layout.content_height - static_cast<float>(ch) + 40.f);
+        float max_s = std::max(
+            0.f, sw.layout.content_height - static_cast<float>(ch) + 40.f);
         if (max_s > 1.f) {
           const int sb_w = 8;
           float view_h = static_cast<float>(ch);
-          float thumb_h = std::max(20.f, view_h * (view_h / (view_h + max_s)));
+          float thumb_h =
+              std::max(20.f, view_h * (view_h / (view_h + max_s)));
           float track = std::max(0.f, view_h - thumb_h);
-          float ratio = browse.scroll / max_s;
+          float ratio = sw.scroll / max_s;
           int thumb_y = cy + static_cast<int>(ratio * track);
           int sx = cx + cw - sb_w;
           SDL_SetRenderDrawColor(sdl, 220, 218, 212, 255);
@@ -3260,8 +3321,8 @@ int main(int argc, char** argv) {
         }
       }
       {
-        const int gx = browse.x + browse.w - 3;
-        const int gy = browse.y + browse.h - 3;
+        const int gx = sw.x + sw.w - 3;
+        const int gy = sw.y + sw.h - 3;
         SDL_SetRenderDrawColor(sdl, 100, 130, 80, 255);
         for (int i = 0; i < 3; ++i)
           SDL_RenderDrawLine(sdl, gx - i * 3, gy, gx, gy - i * 3);
