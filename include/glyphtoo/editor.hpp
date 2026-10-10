@@ -83,6 +83,8 @@ std::string node_text(const Document& doc, NodeId id);
 // Move caret by one codepoint (within the node). Returns false if at boundary.
 bool move_left(Document& doc, Caret& caret);
 bool move_right(Document& doc, Caret& caret);
+bool move_word_left(Document& doc, Caret& caret);
+bool move_word_right(Document& doc, Caret& caret);
 
 // Vertical movement using layout geometry (preferred x preserved by caller).
 bool move_up(const LayoutResult& layout, Caret& caret, float preferred_x);
@@ -101,6 +103,14 @@ int caret_cmp(const Document& doc, const Caret& a, const Caret& b);
 // Returns the start caret of the match and sets match_len to codepoint length.
 std::optional<Caret> find_next(const Document& doc, const std::string& query,
                                const Caret& from, size_t& match_len);
+
+// Internal link: href "#Title" → caret at matching heading/paragraph.
+std::optional<Caret> jump_to_href(const Document& doc, const std::string& href);
+
+// Link under pointer; returns href from the document span.
+std::optional<std::string> hit_test_link(const Document& doc,
+                                         const LayoutResult& layout,
+                                         float mx, float my, float scroll_y);
 
 // ---------------------------------------------------------------------------
 // Undo / redo via document snapshots (simple, correct at current scale).

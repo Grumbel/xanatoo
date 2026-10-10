@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **013** (this delivery is **012.2**)
+Next bundle number: **014** (this delivery is **013**)
 
 ## Status (2026-10-10)
 
@@ -40,6 +40,9 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] Scroll-to-match after search
 - [x] Untitled Ctrl+S → auto `untitled.md` (or untitled-N.md)
 - [x] Build fix: serialize_markup inside namespace glyphtoo
+- [x] Link underlines + click-to-follow `#anchor`
+- [x] Ctrl+←/→ word movement
+- [x] Scroll caret into view on arrow navigation
 
 ## Open work / next steps
 
@@ -47,6 +50,7 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Image drag-resize / interactive placement
 4. Explicit Save As to a chosen path (untitled auto-names for now)
+5. Open external http(s) links (currently logged only)
 
 ## Design notes
 
@@ -70,4 +74,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-009.*-dual-pane-…` — dual-pane multi-view
 - `glyphtoo-010.*-two-docs-divider-…` — two docs + divider
 - `glyphtoo-011.*-undo-leap-…` — per-doc undo + leap search
-- `glyphtoo-012.*-search-ui-save-…` — this delivery
+- `glyphtoo-012.*-search-ui-save-…` — search UI + untitled save + ns fix
+- `glyphtoo-013.*-links-words-…` — this delivery

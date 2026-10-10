@@ -53,11 +53,14 @@ Ctrl+C / Ctrl+V / Ctrl+X for clipboard, Ctrl+Z / Ctrl+Y for undo/redo.
 **Ctrl+\\** toggles a second view pane; **Tab** switches focus.
 Drag the gutter to resize. Open two files for independent documents.
 **Ctrl+F** leap search (type to find, F3 next, Esc cancel).
+**Ctrl+←/→** move by word. Click blue links to jump to #anchors.
 Click a stretchtext marker (▸ / ▾) to expand or collapse.
 
 Inspiration: Ted Nelson's *Xanadu*, Bill Atkinson's **HyperCard**, and
 Jef Raskin's *Canon Cat* — a keyboard-driven work processor that treated
 text as a continuous, searchable stream.
+
+Try the link: [Living documents](#Living documents) — click it to jump.
 
 Images referenced as `![alt](path.png)` load relative to the document
 directory (PNG, JPEG, BMP, GIF via stb_image).
@@ -429,6 +432,21 @@ int main(int argc, char** argv) {
               }
             }
 
+            // Follow internal links (#anchor)
+            if (auto href = glyphtoo::hit_test_link(
+                    doc_of(p), p.layout, lx, my, p.scroll_y)) {
+              if (auto dest = glyphtoo::jump_to_href(doc_of(p), *href)) {
+                p.sel.focus = *dest;
+                p.sel.anchor = p.sel.focus;
+                scroll_caret_into_view(p);
+                reset_blink();
+                std::cout << "Followed link: " << *href << "\n";
+                break;
+              } else if (!href->empty() && (*href)[0] != '#') {
+                std::cout << "External link (not opened): " << *href << "\n";
+              }
+            }
+
             if (auto hit = glyphtoo::hit_test(p.layout, lx, my, p.scroll_y)) {
               p.sel.focus = *hit;
               if (!(SDL_GetModState() & KMOD_SHIFT)) {
@@ -625,17 +643,25 @@ int main(int argc, char** argv) {
 
             case SDLK_LEFT:
               move_and_sel([&] {
-                if (!glyphtoo::move_left(d, p.sel.focus))
+                if (ctrl) {
+                  glyphtoo::move_word_left(d, p.sel.focus);
+                } else if (!glyphtoo::move_left(d, p.sel.focus)) {
                   glyphtoo::move_to_prev_node(d, p.sel.focus);
+                }
               });
+              scroll_caret_into_view(p);
               reset_blink();
               break;
 
             case SDLK_RIGHT:
               move_and_sel([&] {
-                if (!glyphtoo::move_right(d, p.sel.focus))
+                if (ctrl) {
+                  glyphtoo::move_word_right(d, p.sel.focus);
+                } else if (!glyphtoo::move_right(d, p.sel.focus)) {
                   glyphtoo::move_to_next_node(d, p.sel.focus);
+                }
               });
+              scroll_caret_into_view(p);
               reset_blink();
               break;
 
@@ -644,6 +670,7 @@ int main(int argc, char** argv) {
                 if (!glyphtoo::move_up(p.layout, p.sel.focus, p.preferred_x))
                   glyphtoo::move_to_prev_node(d, p.sel.focus);
               });
+              scroll_caret_into_view(p);
               reset_blink();
               break;
 
@@ -652,6 +679,7 @@ int main(int argc, char** argv) {
                 if (!glyphtoo::move_down(p.layout, p.sel.focus, p.preferred_x))
                   glyphtoo::move_to_next_node(d, p.sel.focus);
               });
+              scroll_caret_into_view(p);
               reset_blink();
               break;
 

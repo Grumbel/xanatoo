@@ -496,6 +496,133 @@ bool move_right(Document& doc, Caret& caret) {
   return false;
 }
 
+static bool is_word_char(uint32_t cp) {
+  if (cp >= '0' && cp <= '9') return true;
+  if (cp >= 'A' && cp <= 'Z') return true;
+  if (cp >= 'a' && cp <= 'z') return true;
+  if (cp == '_' || cp >= 0x80) return true;
+  return false;
+}
+
+static uint32_t char_at(const Node& n, size_t span, size_t ch) {
+  if (span >= n.spans.size()) return 0;
+  const std::string& t = n.spans[span].text;
+  size_t bi = utf8_byte_offset(t, ch);
+  auto [cp, len] = decode_cp(t, bi);
+  return cp;
+}
+
+bool move_word_left(Document& doc, Caret& caret) {
+  if (caret.node == INVALID_NODE) return false;
+  if (!move_left(doc, caret)) {
+    if (!move_to_prev_node(doc, caret)) return false;
+  }
+  // Skip non-word to the left
+  while (!(caret.span_index == 0 && caret.char_index == 0)) {
+    Caret prev = caret;
+    if (!move_left(doc, prev) || prev.node != caret.node) break;
+    uint32_t cp = char_at(doc.get(prev.node), prev.span_index, prev.char_index);
+    if (is_word_char(cp)) break;
+    caret = prev;
+  }
+  // Skip word chars to the left
+  while (!(caret.span_index == 0 && caret.char_index == 0)) {
+    Caret prev = caret;
+    if (!move_left(doc, prev) || prev.node != caret.node) break;
+    uint32_t cp = char_at(doc.get(prev.node), prev.span_index, prev.char_index);
+    if (!is_word_char(cp)) break;
+    caret = prev;
+  }
+  return true;
+}
+
+bool move_word_right(Document& doc, Caret& caret) {
+  if (caret.node == INVALID_NODE) return false;
+  auto at_end = [&](const Node& n) {
+    if (n.spans.empty()) return true;
+    size_t last = n.spans.size() - 1;
+    return caret.span_index >= last &&
+           caret.char_index >= utf8_char_count(n.spans[last].text);
+  };
+  Node* n = &doc.get(caret.node);
+  while (!at_end(*n)) {
+    uint32_t cp = char_at(*n, caret.span_index, caret.char_index);
+    if (is_word_char(cp)) break;
+    if (!move_right(doc, caret)) {
+      if (!move_to_next_node(doc, caret)) return true;
+      n = &doc.get(caret.node);
+      break;
+    }
+  }
+  n = &doc.get(caret.node);
+  while (!at_end(*n)) {
+    uint32_t cp = char_at(*n, caret.span_index, caret.char_index);
+    if (!is_word_char(cp)) break;
+    if (!move_right(doc, caret)) {
+      move_to_next_node(doc, caret);
+      break;
+    }
+  }
+  return true;
+}
+
+std::optional<Caret> jump_to_href(const Document& doc, const std::string& href) {
+  if (href.empty() || href[0] != '#') return std::nullopt;
+  std::string target = href.substr(1);
+  auto lower = [](std::string s) {
+    for (char& c : s)
+      if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+    return s;
+  };
+  std::string tlow = lower(target);
+  std::vector<NodeId> nodes;
+  if (doc.root != INVALID_NODE) collect_text_nodes(doc, doc.root, nodes);
+  for (NodeId id : nodes) {
+    const Node& n = doc.get(id);
+    std::string text;
+    for (const auto& sp : n.spans) text += sp.text;
+    if (lower(text) == tlow) return Caret{id, 0, 0};
+  }
+  for (NodeId id : nodes) {
+    const Node& n = doc.get(id);
+    if (n.kind != NodeKind::Heading) continue;
+    std::string text;
+    for (const auto& sp : n.spans) text += sp.text;
+    if (lower(text).find(tlow) != std::string::npos) return Caret{id, 0, 0};
+  }
+  return std::nullopt;
+}
+
+std::optional<std::string> hit_test_link(const Document& doc,
+                                         const LayoutResult& layout,
+                                         float mx, float my, float scroll_y) {
+  const float adj_y = my + scroll_y;
+  for (size_t i = 0; i < layout.glyphs.size(); ++i) {
+    const auto& g = layout.glyphs[i];
+    if (g.kind != InlineKind::Link) continue;
+    float x0 = g.x;
+    float x1 = x0 + 10.f;
+    size_t j = i;
+    while (j + 1 < layout.glyphs.size() &&
+           layout.glyphs[j + 1].kind == InlineKind::Link &&
+           layout.glyphs[j + 1].node == g.node &&
+           layout.glyphs[j + 1].span_index == g.span_index) {
+      ++j;
+      x1 = layout.glyphs[j].x + 10.f;
+    }
+    float y0 = g.y - 18.f;
+    float y1 = g.y + 6.f;
+    if (mx >= x0 && mx <= x1 && adj_y >= y0 && adj_y <= y1) {
+      const Node& n = doc.get(g.node);
+      if (g.span_index < n.spans.size()) {
+        return n.spans[g.span_index].href;
+      }
+    }
+    i = j;
+  }
+  return std::nullopt;
+}
+
 bool move_up(const LayoutResult& layout, Caret& caret, float preferred_x) {
   // Find current baseline
   float cur_y = -1.f;
