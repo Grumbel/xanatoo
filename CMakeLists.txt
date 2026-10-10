@@ -56,6 +56,36 @@ if(UNIX AND NOT APPLE)
 endif()
 
 install(TARGETS glyphtoo DESTINATION bin)
+
+# Toolbar icons: SVG sources → PNG at build time (ImageMagick or pure-Python fallback)
+set(GLYPHTOO_SVG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/icons/svg)
+set(GLYPHTOO_ICON_DIR ${CMAKE_CURRENT_BINARY_DIR}/icons)
+file(GLOB GLYPHTOO_SVGS "${GLYPHTOO_SVG_DIR}/*.svg")
+add_custom_command(
+  OUTPUT ${GLYPHTOO_ICON_DIR}/.stamp
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${GLYPHTOO_ICON_DIR}
+  COMMAND ${CMAKE_COMMAND} -E env python3
+          ${CMAKE_CURRENT_SOURCE_DIR}/scripts/rasterize_icons.py
+          ${GLYPHTOO_SVG_DIR} ${GLYPHTOO_ICON_DIR} 20
+  COMMAND ${CMAKE_COMMAND} -E touch ${GLYPHTOO_ICON_DIR}/.stamp
+  DEPENDS ${GLYPHTOO_SVGS} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/rasterize_icons.py
+  COMMENT "Rasterizing toolbar icons (SVG → PNG)"
+  VERBATIM
+)
+add_custom_target(glyphtoo_icons ALL DEPENDS ${GLYPHTOO_ICON_DIR}/.stamp)
+add_dependencies(glyphtoo glyphtoo_icons)
+
+# Runtime can find icons next to the binary or via compile-time path.
+target_compile_definitions(glyphtoo PRIVATE
+  "GLYPHTOO_ICON_DIR=\"${GLYPHTOO_ICON_DIR}\"")
+
+install(DIRECTORY ${GLYPHTOO_ICON_DIR}/
+        DESTINATION share/glyphtoo/icons
+        FILES_MATCHING PATTERN "*.png"
+        PATTERN ".stamp" EXCLUDE)
+install(DIRECTORY icons/svg/
+        DESTINATION share/glyphtoo/icons/svg
+        FILES_MATCHING PATTERN "*.svg")
 install(DIRECTORY examples/
         DESTINATION share/glyphtoo/examples
         FILES_MATCHING

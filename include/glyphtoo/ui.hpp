@@ -4,6 +4,7 @@
 
 #include <SDL.h>
 #include <string>
+#include <unordered_map>
 
 namespace glyphtoo {
 
@@ -13,8 +14,8 @@ enum class UiCommand {
   // File
   Save,
   SaveAs,
-  ExportSexpr,     // Save As with .sexp extension
-  ExportMarkdown,  // Save As with .md extension
+  ExportSexpr,
+  ExportMarkdown,
   Reload,
   ForceReload,
   Quit,
@@ -55,8 +56,8 @@ struct UiState {
   bool diff = false;
   bool help = false;
   bool selection = false;
-  std::string status_left;   // optional extra label
-  std::string doc_label;     // filename in toolbar
+  std::string status_left;
+  std::string doc_label;
 };
 
 struct UiFrameResult {
@@ -76,20 +77,33 @@ public:
   bool init(SDL_Window* window, SDL_Renderer* renderer);
   void shutdown();
 
-  // Feed every SDL event before application handling.
   void process_event(const SDL_Event& ev);
 
   bool want_capture_keyboard() const;
   bool want_capture_mouse() const;
 
-  // Draw menu + toolbar; returns any command activated this frame.
   UiFrameResult begin_frame(const UiState& state);
   void end_frame(SDL_Renderer* renderer);
 
   bool ready() const { return ready_; }
 
 private:
+  struct Icon {
+    SDL_Texture* texture = nullptr;
+    int w = 0;
+    int h = 0;
+  };
+
+  void apply_classic_theme();
+  void load_icons(SDL_Renderer* renderer);
+  const Icon* icon(const char* name) const;
+  // Toolbar button: icon (if loaded) + optional label; returns true if clicked.
+  bool tool_button(const char* id, const char* icon_name, const char* tip,
+                   UiCommand c, UiCommand& out, bool enabled = true);
+
   bool ready_ = false;
+  SDL_Renderer* renderer_ = nullptr;
+  std::unordered_map<std::string, Icon> icons_;
 };
 
 }  // namespace glyphtoo

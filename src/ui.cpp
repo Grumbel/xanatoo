@@ -7,9 +7,204 @@
 #include "backends/imgui_impl_sdl2.h"
 #include "backends/imgui_impl_sdlrenderer2.h"
 
+#include <filesystem>
+#include <iostream>
+#include <vector>
+
+#define STBI_ONLY_PNG
+#include "stb_image.h"
+
+namespace fs = std::filesystem;
+
 namespace glyphtoo {
 
 Ui::~Ui() { shutdown(); }
+
+// ---------------------------------------------------------------------------
+// Classic desktop theme — Clearlooks / Gtk2 greys with BeOS-ish blue selection.
+// ---------------------------------------------------------------------------
+void Ui::apply_classic_theme() {
+  ImGui::StyleColorsLight();
+  ImGuiStyle& s = ImGui::GetStyle();
+
+  s.WindowPadding = ImVec2(6.f, 4.f);
+  s.FramePadding = ImVec2(6.f, 3.f);
+  s.ItemSpacing = ImVec2(6.f, 4.f);
+  s.ItemInnerSpacing = ImVec2(4.f, 3.f);
+  s.ScrollbarSize = 12.f;
+  s.GrabMinSize = 10.f;
+
+  // Soft corners like Clearlooks; not fully flat, not fully modern.
+  s.WindowRounding = 3.f;
+  s.ChildRounding = 2.f;
+  s.FrameRounding = 3.f;
+  s.PopupRounding = 3.f;
+  s.ScrollbarRounding = 3.f;
+  s.GrabRounding = 2.f;
+  s.TabRounding = 2.f;
+
+  s.WindowBorderSize = 1.f;
+  s.FrameBorderSize = 1.f;
+  s.PopupBorderSize = 1.f;
+
+  auto C = [](int r, int g, int b, int a = 255) {
+    return ImVec4(r / 255.f, g / 255.f, b / 255.f, a / 255.f);
+  };
+
+  // Paper / panel surfaces
+  const ImVec4 bg = C(0xEF, 0xEB, 0xE7);       // Clearlooks window
+  const ImVec4 bg2 = C(0xF6, 0xF5, 0xF4);      // menu / toolbar
+  const ImVec4 bg3 = C(0xE8, 0xE6, 0xE3);      // button face
+  const ImVec4 border = C(0x9C, 0x9A, 0x97);
+  const ImVec4 text = C(0x2E, 0x34, 0x36);
+  const ImVec4 text_dis = C(0x88, 0x88, 0x84);
+  const ImVec4 sel = C(0x4A, 0x90, 0xD9);      // BeOS / classic blue
+  const ImVec4 sel_hi = C(0x6A, 0xA8, 0xE8);
+  const ImVec4 header = C(0xD8, 0xD4, 0xCE);
+  const ImVec4 title = C(0xC8, 0xD4, 0xE8);    // soft title blue
+
+  ImVec4* c = s.Colors;
+  c[ImGuiCol_Text] = text;
+  c[ImGuiCol_TextDisabled] = text_dis;
+  c[ImGuiCol_WindowBg] = bg2;
+  c[ImGuiCol_ChildBg] = bg;
+  c[ImGuiCol_PopupBg] = C(0xFA, 0xF9, 0xF7);
+  c[ImGuiCol_Border] = border;
+  c[ImGuiCol_BorderShadow] = C(0, 0, 0, 0);
+  c[ImGuiCol_FrameBg] = C(0xFF, 0xFF, 0xFF);
+  c[ImGuiCol_FrameBgHovered] = C(0xF0, 0xF6, 0xFC);
+  c[ImGuiCol_FrameBgActive] = C(0xE0, 0xEC, 0xF8);
+  c[ImGuiCol_TitleBg] = title;
+  c[ImGuiCol_TitleBgActive] = C(0xB0, 0xC4, 0xE0);
+  c[ImGuiCol_TitleBgCollapsed] = header;
+  c[ImGuiCol_MenuBarBg] = bg2;
+  c[ImGuiCol_ScrollbarBg] = C(0xE4, 0xE2, 0xDE);
+  c[ImGuiCol_ScrollbarGrab] = C(0xB8, 0xB6, 0xB0);
+  c[ImGuiCol_ScrollbarGrabHovered] = C(0xA0, 0x9E, 0x98);
+  c[ImGuiCol_ScrollbarGrabActive] = C(0x88, 0x86, 0x80);
+  c[ImGuiCol_CheckMark] = sel;
+  c[ImGuiCol_SliderGrab] = sel;
+  c[ImGuiCol_SliderGrabActive] = sel_hi;
+  c[ImGuiCol_Button] = bg3;
+  c[ImGuiCol_ButtonHovered] = C(0xD0, 0xE4, 0xF8);
+  c[ImGuiCol_ButtonActive] = C(0xA8, 0xC8, 0xE8);
+  c[ImGuiCol_Header] = header;
+  c[ImGuiCol_HeaderHovered] = C(0xC0, 0xD8, 0xF0);
+  c[ImGuiCol_HeaderActive] = sel;
+  c[ImGuiCol_Separator] = border;
+  c[ImGuiCol_SeparatorHovered] = sel;
+  c[ImGuiCol_SeparatorActive] = sel_hi;
+  c[ImGuiCol_ResizeGrip] = C(0xB8, 0xB6, 0xB0, 180);
+  c[ImGuiCol_ResizeGripHovered] = sel_hi;
+  c[ImGuiCol_ResizeGripActive] = sel;
+  c[ImGuiCol_Tab] = bg3;
+  c[ImGuiCol_TabHovered] = C(0xD0, 0xE4, 0xF8);
+  c[ImGuiCol_TabActive] = C(0xE8, 0xF0, 0xF8);
+  c[ImGuiCol_TabUnfocused] = bg3;
+  c[ImGuiCol_TabUnfocusedActive] = bg2;
+  c[ImGuiCol_TableHeaderBg] = header;
+  c[ImGuiCol_TableBorderStrong] = border;
+  c[ImGuiCol_TableBorderLight] = C(0xC8, 0xC6, 0xC2);
+  c[ImGuiCol_TextSelectedBg] = C(0x4A, 0x90, 0xD9, 90);
+  c[ImGuiCol_NavHighlight] = sel;
+}
+
+void Ui::load_icons(SDL_Renderer* renderer) {
+  if (!renderer) return;
+  renderer_ = renderer;
+
+  std::vector<fs::path> roots;
+#ifdef GLYPHTOO_ICON_DIR
+  roots.emplace_back(GLYPHTOO_ICON_DIR);
+#endif
+  roots.emplace_back("icons");
+  roots.emplace_back("share/glyphtoo/icons");
+  // Relative to cwd build trees
+  roots.emplace_back("../icons");
+  roots.emplace_back("build/icons");
+
+  const char* names[] = {
+      "save", "undo", "redo", "bold", "italic", "code", "link", "list",
+      "olist", "quote", "image", "split", "find", "help", "cut",
+  };
+
+  fs::path found_dir;
+  for (const auto& root : roots) {
+    if (fs::exists(root / "save.png")) {
+      found_dir = root;
+      break;
+    }
+  }
+  if (found_dir.empty()) {
+    std::cerr << "glyphtoo: toolbar icons not found (built PNGs next to binary)\n";
+    return;
+  }
+
+  for (const char* name : names) {
+    fs::path path = found_dir / (std::string(name) + ".png");
+    int w = 0, h = 0, comp = 0;
+    unsigned char* data = stbi_load(path.string().c_str(), &w, &h, &comp, 4);
+    if (!data) continue;
+
+    SDL_Surface* surf = SDL_CreateRGBSurfaceWithFormatFrom(
+        data, w, h, 32, w * 4, SDL_PIXELFORMAT_RGBA32);
+    if (!surf) {
+      stbi_image_free(data);
+      continue;
+    }
+    Icon ic;
+    ic.texture = SDL_CreateTextureFromSurface(renderer, surf);
+    SDL_FreeSurface(surf);
+    stbi_image_free(data);
+    if (!ic.texture) continue;
+    SDL_SetTextureBlendMode(ic.texture, SDL_BLENDMODE_BLEND);
+    ic.w = w;
+    ic.h = h;
+    icons_[name] = ic;
+  }
+  std::cout << "Loaded " << icons_.size() << " toolbar icons from " << found_dir
+            << "\n";
+}
+
+const Ui::Icon* Ui::icon(const char* name) const {
+  auto it = icons_.find(name);
+  if (it == icons_.end() || !it->second.texture) return nullptr;
+  return &it->second;
+}
+
+bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
+                     UiCommand c, UiCommand& out, bool enabled) {
+  const Icon* ic = icon(icon_name);
+  bool pressed = false;
+  ImGui::BeginDisabled(!enabled);
+  if (ic) {
+    ImGui::PushID(id);
+    ImVec2 size(static_cast<float>(ic->w), static_cast<float>(ic->h));
+    // Pad hit target a little for classic toolbar feel
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.f, 3.f));
+    if (ImGui::ImageButton(
+            id, reinterpret_cast<ImTextureID>(ic->texture), size,
+            ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0),
+            ImVec4(1, 1, 1, enabled ? 1.f : 0.4f))) {
+      pressed = true;
+      out = c;
+    }
+    ImGui::PopStyleVar();
+    ImGui::PopID();
+  } else {
+    // Text fallback when icons failed to load
+    if (ImGui::SmallButton(id)) {
+      pressed = true;
+      out = c;
+    }
+  }
+  ImGui::EndDisabled();
+  if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && tip && tip[0]) {
+    ImGui::SetTooltip("%s", tip);
+  }
+  ImGui::SameLine(0.f, 2.f);
+  return pressed;
+}
 
 bool Ui::init(SDL_Window* window, SDL_Renderer* renderer) {
   if (ready_) return true;
@@ -17,15 +212,10 @@ bool Ui::init(SDL_Window* window, SDL_Renderer* renderer) {
   ImGui::CreateContext();
   ImGuiIO& io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-  io.IniFilename = nullptr;  // no imgui.ini for now
+  io.IniFilename = nullptr;
 
-  ImGui::StyleColorsLight();
-  ImGuiStyle& style = ImGui::GetStyle();
-  style.WindowBorderSize = 0.f;
-  style.FrameBorderSize = 0.f;
-  style.WindowPadding = ImVec2(8.f, 4.f);
-  style.FramePadding = ImVec2(8.f, 4.f);
-  style.ItemSpacing = ImVec2(8.f, 4.f);
+  apply_classic_theme();
+  load_icons(renderer);
 
   if (!ImGui_ImplSDL2_InitForSDLRenderer(window, renderer)) return false;
   if (!ImGui_ImplSDLRenderer2_Init(renderer)) return false;
@@ -35,6 +225,10 @@ bool Ui::init(SDL_Window* window, SDL_Renderer* renderer) {
 
 void Ui::shutdown() {
   if (!ready_) return;
+  for (auto& [k, ic] : icons_) {
+    if (ic.texture) SDL_DestroyTexture(ic.texture);
+  }
+  icons_.clear();
   ImGui_ImplSDLRenderer2_Shutdown();
   ImGui_ImplSDL2_Shutdown();
   ImGui::DestroyContext();
@@ -107,21 +301,17 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Bold", UiCommand::Bold, cmd, state.selection, "Ctrl+B");
       menu_item_cmd("Italic", UiCommand::Italic, cmd, state.selection, "Ctrl+I");
       menu_item_cmd("Code", UiCommand::Code, cmd, state.selection, "Ctrl+`");
-      menu_item_cmd("Link", UiCommand::Link, cmd, state.selection, "Ctrl+K");
+      menu_item_cmd("Link…", UiCommand::Link, cmd, state.selection, "Ctrl+K");
       ImGui::Separator();
-      menu_item_cmd("New Paragraph", UiCommand::InsertParagraph, cmd, true,
-                    "Ctrl+Enter");
-      menu_item_cmd("Horizontal Rule", UiCommand::InsertHr, cmd, true,
-                    "Ctrl+Shift+-");
-      menu_item_cmd("Insert Image…", UiCommand::InsertImage, cmd, true,
-                    "Ctrl+Shift+I");
+      menu_item_cmd("Paragraph", UiCommand::InsertParagraph, cmd);
+      menu_item_cmd("Horizontal Rule", UiCommand::InsertHr, cmd);
+      menu_item_cmd("Image…", UiCommand::InsertImage, cmd, true, "Ctrl+Shift+I");
       ImGui::Separator();
-      menu_item_cmd("Toggle Bullet List", UiCommand::ToggleUnorderedList, cmd,
-                    true, "Ctrl+Shift+8");
-      menu_item_cmd("Toggle Numbered List", UiCommand::ToggleOrderedList, cmd,
-                    true, "Ctrl+Shift+7");
-      menu_item_cmd("Toggle Block Quote", UiCommand::ToggleBlockQuote, cmd, true,
-                    "Ctrl+Shift+Q");
+      menu_item_cmd("Unordered List", UiCommand::ToggleUnorderedList, cmd, true,
+                    "Ctrl+Shift+8");
+      menu_item_cmd("Ordered List", UiCommand::ToggleOrderedList, cmd, true,
+                    "Ctrl+Shift+7");
+      menu_item_cmd("Block Quote", UiCommand::ToggleBlockQuote, cmd);
       ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("View")) {
@@ -139,9 +329,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleHelp;
       ImGui::EndMenu();
     }
-    // Path / dirty indicator on the right of the menu bar
-    {
-      std::string right = state.doc_label.empty() ? "untitled" : state.doc_label;
+
+    // Document label on the right of the menu bar
+    if (!state.doc_label.empty()) {
+      std::string right = state.doc_label;
       if (state.dirty) right = "*" + right;
       float w = ImGui::CalcTextSize(right.c_str()).x;
       float avail = ImGui::GetWindowWidth();
@@ -150,50 +341,64 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ImGui::TextDisabled("%s", right.c_str());
       }
     }
+
     result.top_reserved = ImGui::GetFrameHeight();
     ImGui::EndMainMenuBar();
   }
 
-  // ---- Toolbar under the menu ----
-  const float toolbar_h = 36.f;
+  // ---- Toolbar under the menu (icon strip) ----
+  const float toolbar_h = 32.f;
   ImGuiViewport* vp = ImGui::GetMainViewport();
   ImGui::SetNextWindowPos(ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
   ImGui::SetNextWindowSize(ImVec2(vp->Size.x, toolbar_h));
   ImGuiWindowFlags tb_flags =
       ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
-      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNavFocus;
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.f, 6.f));
+      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse;
+
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.f, 4.f));
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.f);
   if (ImGui::Begin("##toolbar", nullptr, tb_flags)) {
-    auto btn = [&](const char* label, UiCommand c, bool enabled = true) {
-      if (!enabled) ImGui::BeginDisabled();
-      if (ImGui::SmallButton(label)) cmd = c;
-      if (!enabled) ImGui::EndDisabled();
-      ImGui::SameLine();
-    };
-    btn("Save", UiCommand::Save);
-    btn("Undo", UiCommand::Undo);
-    btn("Redo", UiCommand::Redo);
+    tool_button("tb_save", "save", "Save (Ctrl+S)", UiCommand::Save, cmd);
+    tool_button("tb_undo", "undo", "Undo (Ctrl+Z)", UiCommand::Undo, cmd);
+    tool_button("tb_redo", "redo", "Redo (Ctrl+Y)", UiCommand::Redo, cmd);
+
     ImGui::TextDisabled("|");
-    ImGui::SameLine();
-    btn("B", UiCommand::Bold, state.selection);
-    btn("I", UiCommand::Italic, state.selection);
-    btn("`code`", UiCommand::Code, state.selection);
-    btn("Link", UiCommand::Link, state.selection);
+    ImGui::SameLine(0.f, 4.f);
+
+    tool_button("tb_cut", "cut", "Cut (Ctrl+X)", UiCommand::Cut, cmd,
+                state.selection);
+    tool_button("tb_bold", "bold", "Bold (Ctrl+B)", UiCommand::Bold, cmd,
+                state.selection);
+    tool_button("tb_italic", "italic", "Italic (Ctrl+I)", UiCommand::Italic,
+                cmd, state.selection);
+    tool_button("tb_code", "code", "Code (Ctrl+`)", UiCommand::Code, cmd,
+                state.selection);
+    tool_button("tb_link", "link", "Link (Ctrl+K)", UiCommand::Link, cmd,
+                state.selection);
+
     ImGui::TextDisabled("|");
-    ImGui::SameLine();
-    btn("• List", UiCommand::ToggleUnorderedList);
-    btn("1. List", UiCommand::ToggleOrderedList);
-    btn("Quote", UiCommand::ToggleBlockQuote);
+    ImGui::SameLine(0.f, 4.f);
+
+    tool_button("tb_list", "list", "Unordered list", UiCommand::ToggleUnorderedList,
+                cmd);
+    tool_button("tb_olist", "olist", "Ordered list", UiCommand::ToggleOrderedList,
+                cmd);
+    tool_button("tb_quote", "quote", "Block quote", UiCommand::ToggleBlockQuote,
+                cmd);
+    tool_button("tb_image", "image", "Insert image (Ctrl+Shift+I)",
+                UiCommand::InsertImage, cmd);
+
     ImGui::TextDisabled("|");
-    ImGui::SameLine();
-    btn(state.split ? "Unsplit" : "Split", UiCommand::ToggleSplit);
-    btn("Outline", UiCommand::ToggleOutline);
-    btn("Find", UiCommand::Find);
-    btn("Help", UiCommand::ToggleHelp);
+    ImGui::SameLine(0.f, 4.f);
+
+    tool_button("tb_split", "split", "Split pane (Ctrl+\\)", UiCommand::ToggleSplit,
+                cmd);
+    tool_button("tb_find", "find", "Find (Ctrl+F)", UiCommand::Find, cmd);
+    tool_button("tb_help", "help", "Help (F1)", UiCommand::ToggleHelp, cmd);
   }
   ImGui::End();
-  ImGui::PopStyleVar();
+  ImGui::PopStyleVar(2);
 
   result.top_reserved += toolbar_h;
   result.cmd = cmd;

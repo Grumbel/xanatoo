@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **063** (this delivery is **062**)
+Next bundle number: **064** (this delivery is **063**)
 
 ## Status (2026-10-10)
 
@@ -109,6 +109,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Leap-search match highlight (amber); `advance_caret`; ascii_lower in find
 - [x] Fix mouse/selection offset (`content_y` + hit-test); triple-click; select_all/node/word
 - [x] Scrollbar / page / scroll-into-view account for toolbar height
+- [x] Classic Gtk2/Clearlooks-ish ImGui theme + SVG→PNG toolbar icons
 
 ## Open work / next steps
 
@@ -217,4 +218,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `glyphtoo-059.*-refactor-cleanup-…` — util refactor
 - `glyphtoo-060.*-cli-delete-cleanup-…` — CLI extract + delete husks
 - `glyphtoo-061.*-search-highlight-…` — search highlight
-- `glyphtoo-062.*-mouse-select-…` — this delivery
+- `glyphtoo-062.*-mouse-select-…` — mouse offset + selection
+- `glyphtoo-063.*-classic-ui-icons-…` — this delivery

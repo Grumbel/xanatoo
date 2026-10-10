@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">
+  <g fill="none" stroke="#2e3436" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="8" y1="5" x2="16" y2="5"/>
+    <line x1="8" y1="10" x2="16" y2="10"/>
+    <line x1="8" y1="15" x2="16" y2="15"/>
+    <text x="3.5" y="7" font-size="5" fill="#2e3436" stroke="none" font-family="sans-serif">1</text>
+    <text x="3.5" y="12" font-size="5" fill="#2e3436" stroke="none" font-family="sans-serif">2</text>
+    <text x="3.5" y="17" font-size="5" fill="#2e3436" stroke="none" font-family="sans-serif">3</text>
+  </g>
+</svg>
