@@ -109,6 +109,9 @@ std::optional<NodeId> duplicate_block(Document& doc, NodeId block);
 // moves the caret into that paragraph (so typing can continue).
 std::optional<NodeId> insert_sibling_after(Document& doc, Caret& caret,
                                           NodeKind kind);
+// Semantic structure helpers (table / deflist skeletons).
+std::optional<NodeId> insert_table(Document& doc, Caret& caret);
+std::optional<NodeId> insert_deflist(Document& doc, Caret& caret);
 
 // Insert an Image node after the caret's block. Follows with an empty
 // paragraph and moves the caret there so typing can continue.

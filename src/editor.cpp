@@ -703,7 +703,9 @@ std::optional<NodeId> insert_sibling_after(Document& doc, Caret& caret,
   }
 
   if (kind == NodeKind::Paragraph || kind == NodeKind::Heading ||
-      kind == NodeKind::BlockQuote || kind == NodeKind::ListItem) {
+      kind == NodeKind::BlockQuote || kind == NodeKind::ListItem ||
+      kind == NodeKind::Note || kind == NodeKind::CodeBlock ||
+      kind == NodeKind::Term || kind == NodeKind::Definition) {
     caret.node = nid;
     caret.span_index = 0;
     caret.char_index = 0;
@@ -713,6 +715,45 @@ std::optional<NodeId> insert_sibling_after(Document& doc, Caret& caret,
     renumber_ordered_list(doc, bn.parent);
 
   return nid;
+}
+
+std::optional<NodeId> insert_table(Document& doc, Caret& caret) {
+  auto table_id = insert_sibling_after(doc, caret, NodeKind::Table);
+  if (!table_id) return std::nullopt;
+  NodeId table = *table_id;
+  // Header row
+  NodeId hr = doc.create(NodeKind::TableRow, table);
+  NodeId th1 = doc.create(NodeKind::TableCell, hr);
+  doc.get(th1).level = 1;
+  doc.append_text(th1, "Header");
+  NodeId th2 = doc.create(NodeKind::TableCell, hr);
+  doc.get(th2).level = 1;
+  doc.append_text(th2, "Value");
+  // Body row
+  NodeId br = doc.create(NodeKind::TableRow, table);
+  NodeId td1 = doc.create(NodeKind::TableCell, br);
+  doc.append_text(td1, "");
+  NodeId td2 = doc.create(NodeKind::TableCell, br);
+  doc.append_text(td2, "");
+  caret.node = td1;
+  caret.span_index = 0;
+  caret.char_index = 0;
+  return table;
+}
+
+std::optional<NodeId> insert_deflist(Document& doc, Caret& caret) {
+  auto dl = insert_sibling_after(doc, caret, NodeKind::DefList);
+  if (!dl) return std::nullopt;
+  NodeId list = *dl;
+  NodeId term = doc.create(NodeKind::Term, list);
+  doc.append_text(term, "Term");
+  NodeId def = doc.create(NodeKind::Definition, list);
+  doc.append_text(def, "Definition");
+  caret.node = term;
+  caret.span_index = 0;
+  caret.char_index = 0;
+  // Select term text for easy overwrite? leave caret at start
+  return list;
 }
 
 std::optional<NodeId> insert_image(Document& doc, Caret& caret,

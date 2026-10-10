@@ -2186,6 +2186,36 @@ int main(int argc, char** argv) {
             needs_layout = true;
           }
           break;
+        case C::InsertNote:
+          edit();
+          if (glyphtoo::insert_sibling_after(d, p.sel.focus,
+                                             glyphtoo::NodeKind::Note)) {
+            p.sel.anchor = p.sel.focus;
+            needs_layout = true;
+          }
+          break;
+        case C::InsertCodeBlock:
+          edit();
+          if (glyphtoo::insert_sibling_after(d, p.sel.focus,
+                                             glyphtoo::NodeKind::CodeBlock)) {
+            p.sel.anchor = p.sel.focus;
+            needs_layout = true;
+          }
+          break;
+        case C::InsertTable:
+          edit();
+          if (glyphtoo::insert_table(d, p.sel.focus)) {
+            p.sel.anchor = p.sel.focus;
+            needs_layout = true;
+          }
+          break;
+        case C::InsertDefList:
+          edit();
+          if (glyphtoo::insert_deflist(d, p.sel.focus)) {
+            p.sel.anchor = p.sel.focus;
+            needs_layout = true;
+          }
+          break;
         case C::InsertImage:
           image_insert_mode = true;
           image_insert_path.clear();
@@ -2205,7 +2235,8 @@ int main(int argc, char** argv) {
             node.kind = glyphtoo::NodeKind::Paragraph;
           } else if (node.kind == glyphtoo::NodeKind::Paragraph ||
                      node.kind == glyphtoo::NodeKind::Heading ||
-                     node.kind == glyphtoo::NodeKind::ListItem) {
+                     node.kind == glyphtoo::NodeKind::ListItem ||
+                     node.kind == glyphtoo::NodeKind::Note) {
             node.kind = glyphtoo::NodeKind::BlockQuote;
             node.level = 0;
           }

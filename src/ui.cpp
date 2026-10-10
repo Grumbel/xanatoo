@@ -367,6 +367,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Paragraph", UiCommand::InsertParagraph, cmd);
       menu_item_cmd("Horizontal Rule", UiCommand::InsertHr, cmd);
       menu_item_cmd("Image…", UiCommand::InsertImage, cmd, true, "Ctrl+Shift+I");
+      menu_item_cmd("Note", UiCommand::InsertNote, cmd);
+      menu_item_cmd("Code Block", UiCommand::InsertCodeBlock, cmd);
+      menu_item_cmd("Table", UiCommand::InsertTable, cmd);
+      menu_item_cmd("Definition List", UiCommand::InsertDefList, cmd);
       ImGui::Separator();
       menu_item_cmd("Unordered List", UiCommand::ToggleUnorderedList, cmd, true,
                     "Ctrl+Shift+8");
