@@ -426,6 +426,38 @@ void insert_text(Document& doc, Caret& caret, const std::string& utf8) {
 void delete_backward(Document& doc, Caret& caret) {
   if (caret.node == INVALID_NODE) return;
   Node& n = doc.get(caret.node);
+
+  if (caret.char_index == 0 && caret.span_index == 0) {
+    // At start of block: merge with previous text-bearing node
+    NodeId cur_id = caret.node;
+    std::vector<NodeId> nodes;
+    if (doc.root != INVALID_NODE) collect_text_nodes(doc, doc.root, nodes);
+    auto it = std::find(nodes.begin(), nodes.end(), cur_id);
+    if (it == nodes.begin() || it == nodes.end()) return;
+    NodeId prev_id = *(it - 1);
+    Node& prev = doc.get(prev_id);
+    Node& cur = doc.get(cur_id);
+
+    size_t join_span = prev.spans.empty() ? 0 : prev.spans.size() - 1;
+    size_t join_ch = prev.spans.empty() ? 0 : utf8_char_count(prev.spans.back().text);
+
+    for (auto& sp : cur.spans) {
+      prev.spans.push_back(std::move(sp));
+    }
+    cur.spans.clear();
+
+    if (cur.parent != INVALID_NODE) {
+      Node& parent = doc.get(cur.parent);
+      auto cit = std::find(parent.children.begin(), parent.children.end(), cur_id);
+      if (cit != parent.children.end()) parent.children.erase(cit);
+    }
+
+    caret.node = prev_id;
+    caret.span_index = join_span;
+    caret.char_index = join_ch;
+    return;
+  }
+
   if (n.spans.empty()) return;
 
   if (caret.char_index == 0) {

@@ -39,6 +39,12 @@ bool Font::load(const std::string& path, int pixel_size, SDL_Renderer* renderer)
 }
 
 void Font::set_size(int pixel_size) {
+  // Drop cached textures — they are sized for the old pixel size
+  for (auto& [cp, g] : cache_) {
+    if (g.texture) SDL_DestroyTexture(g.texture);
+  }
+  cache_.clear();
+
   pixel_size_ = pixel_size;
   FT_Set_Pixel_Sizes(face_, 0, pixel_size);
   line_height_ = static_cast<int>(face_->size->metrics.height >> 6);

@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **021** (this delivery is **020**)
+Next bundle number: **022** (this delivery is **021**)
 
 ## Status (2026-10-10)
 
@@ -57,6 +57,8 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] Ctrl+E wrap block in stretchtext
 - [x] Multi-node bold/italic/link styling
 - [x] Esc clears selection (no longer quits); Ctrl+Q quits with dirty warn
+- [x] Backspace at block start merges with previous paragraph
+- [x] Ctrl++ / Ctrl+- font zoom (clears glyph cache)
 
 ## Open work / next steps
 
@@ -94,4 +96,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-017.*-style-saveas-…` — styles + save as
 - `glyphtoo-018.*-link-edit-…` — link href edit + wheel + select-all
 - `glyphtoo-019.*-external-stretch-…` — external/ + Ctrl+E stretch
-- `glyphtoo-020.*-multistyle-quit-…` — this delivery
+- `glyphtoo-020.*-multistyle-quit-…` — multi-node style + quit safety
+- `glyphtoo-021.*-merge-zoom-…` — this delivery

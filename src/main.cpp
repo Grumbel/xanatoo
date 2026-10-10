@@ -215,9 +215,11 @@ int main(int argc, char** argv) {
   }
   std::cout << "Font: " << font_path << "\n";
 
+  int body_px = 17;
+  int heading_px = 26;
   glyphtoo::Font body_font, heading_font;
-  if (!body_font.load(font_path, 17, sdl) ||
-      !heading_font.load(font_path, 26, sdl)) {
+  if (!body_font.load(font_path, body_px, sdl) ||
+      !heading_font.load(font_path, heading_px, sdl)) {
     std::cerr << "Failed to load font: " << font_path << "\n";
     SDL_DestroyRenderer(sdl);
     SDL_DestroyWindow(window);
@@ -632,6 +634,29 @@ int main(int argc, char** argv) {
                 reset_blink();
               }
               // Esc no longer quits — use Ctrl+Q
+              break;
+
+            case SDLK_EQUALS:
+            case SDLK_PLUS:
+            case SDLK_KP_PLUS:
+              if (ctrl) {
+                body_px = std::min(48, body_px + 1);
+                heading_px = std::min(64, heading_px + 2);
+                body_font.set_size(body_px);
+                heading_font.set_size(heading_px);
+                needs_layout = true;
+              }
+              break;
+
+            case SDLK_MINUS:
+            case SDLK_KP_MINUS:
+              if (ctrl) {
+                body_px = std::max(10, body_px - 1);
+                heading_px = std::max(14, heading_px - 2);
+                body_font.set_size(body_px);
+                heading_font.set_size(heading_px);
+                needs_layout = true;
+              }
               break;
 
             case SDLK_q:
@@ -1183,7 +1208,7 @@ int main(int argc, char** argv) {
       } else {
         label =
             "Ctrl+S save · Ctrl+Shift+S save as · Ctrl+Z/Y undo · "
-            "Ctrl+S save · Ctrl+Q quit · Ctrl+B/I/K style · Ctrl+E stretch · Ctrl+F leap";
+            "Ctrl+S save · Ctrl+Q quit · Ctrl++/- zoom · Ctrl+B/I/K style · Ctrl+E stretch · Ctrl+F leap";
         tr = 70; tg = 68; tb = 62;
       }
       float baseline = static_cast<float>(win_h - 8);
