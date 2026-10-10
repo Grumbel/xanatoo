@@ -3,6 +3,7 @@
 
 #include "glyphtoo/parse.hpp"
 #include <cctype>
+#include <algorithm>
 #include <vector>
 
 namespace glyphtoo {
@@ -248,3 +249,140 @@ Document parse_markup(std::string_view source) {
 }
 
 }  // namespace glyphtoo
+
+namespace {
+
+void serialize_inlines(const Node& node, std::string& out) {
+  for (const auto& sp : node.spans) {
+    switch (sp.kind) {
+      case InlineKind::Strong:
+        out += "**";
+        out += sp.text;
+        out += "**";
+        break;
+      case InlineKind::Emphasis:
+        out += "*";
+        out += sp.text;
+        out += "*";
+        break;
+      case InlineKind::Code:
+        out += "`";
+        out += sp.text;
+        out += "`";
+        break;
+      case InlineKind::Link:
+        out += "[";
+        out += sp.text;
+        out += "](";
+        out += sp.href;
+        out += ")";
+        break;
+      default:
+        out += sp.text;
+        break;
+    }
+  }
+}
+
+void serialize_node(const Document& doc, NodeId id, std::string& out,
+                    int indent) {
+  const Node& node = doc.get(id);
+  std::string pad(static_cast<size_t>(indent), ' ');
+
+  switch (node.kind) {
+    case NodeKind::Document:
+      for (NodeId c : node.children) {
+        serialize_node(doc, c, out, indent);
+      }
+      break;
+
+    case NodeKind::Heading: {
+      out += pad;
+      out.append(static_cast<size_t>(std::max(1, std::min(node.level, 6))), '#');
+      out += ' ';
+      serialize_inlines(node, out);
+      out += "\n\n";
+      break;
+    }
+
+    case NodeKind::Paragraph:
+    case NodeKind::ListItem: {
+      out += pad;
+      serialize_inlines(node, out);
+      out += "\n\n";
+      break;
+    }
+
+    case NodeKind::Image: {
+      out += pad;
+      out += "![";
+      out += node.alt;
+      out += "](";
+      out += node.src;
+      out += ")\n\n";
+      break;
+    }
+
+    case NodeKind::Stretch: {
+      out += pad;
+      out += ":::stretch";
+      if (!node.summary.empty()) {
+        out += " summary=\"";
+        out += node.summary;
+        out += "\"";
+      }
+      out += "\n";
+      for (NodeId c : node.children) {
+        serialize_node(doc, c, out, indent + 2);
+      }
+      out += pad;
+      out += ":::\n\n";
+      break;
+    }
+
+    case NodeKind::Columns: {
+      out += pad;
+      out += ":::columns\n";
+      for (NodeId c : node.children) {
+        serialize_node(doc, c, out, indent + 2);
+      }
+      out += pad;
+      out += ":::\n\n";
+      break;
+    }
+
+    case NodeKind::Column: {
+      out += pad;
+      out += ":::column\n";
+      for (NodeId c : node.children) {
+        serialize_node(doc, c, out, indent + 2);
+      }
+      out += pad;
+      out += ":::\n\n";
+      break;
+    }
+
+    case NodeKind::List:
+      for (NodeId c : node.children) {
+        serialize_node(doc, c, out, indent);
+      }
+      break;
+
+    default:
+      for (NodeId c : node.children) {
+        serialize_node(doc, c, out, indent);
+      }
+      break;
+  }
+}
+
+}  // namespace
+
+std::string serialize_markup(const Document& doc) {
+  std::string out;
+  if (doc.root != INVALID_NODE) {
+    serialize_node(doc, doc.root, out, 0);
+  }
+  return out;
+}
+

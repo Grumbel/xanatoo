@@ -14,9 +14,7 @@
       packages = forAllSystems (system:
         let
           pkgs = import nixpkgs { inherit system; };
-        in
-        {
-          default = pkgs.stdenv.mkDerivation {
+          glyphtoo = pkgs.stdenv.mkDerivation {
             pname = "glyphtoo";
             version = "0.1.0";
             src = ./.;
@@ -39,8 +37,26 @@
               description = "Interactive document composition engine";
               license = licenses.gpl3Plus;
               platforms = platforms.linux ++ platforms.darwin;
+              mainProgram = "glyphtoo";
             };
           };
+        in
+        {
+          # Default package wraps the binary so a DejaVu font is always available.
+          default = pkgs.symlinkJoin {
+            name = "glyphtoo";
+            paths = [ glyphtoo ];
+            nativeBuildInputs = [ pkgs.makeWrapper ];
+            postBuild = ''
+              wrapProgram $out/bin/glyphtoo \
+                --set-default GLYPHTOO_FONT \
+                  "${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSans.ttf"
+            '';
+            meta = glyphtoo.meta;
+          };
+
+          # Unwrapped binary for packaging / debugging
+          glyphtoo-unwrapped = glyphtoo;
         });
 
       devShells = forAllSystems (system:
@@ -54,9 +70,13 @@
               pkg-config
               SDL2
               freetype
+              dejavu_fonts
               gdb
               clang-tools
             ];
+            shellHook = ''
+              export GLYPHTOO_FONT="${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSans.ttf"
+            '';
           };
         });
     };

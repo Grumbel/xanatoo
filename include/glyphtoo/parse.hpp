@@ -15,11 +15,16 @@ namespace glyphtoo {
 //   paragraphs (blank-line separated)
 //   *emphasis*  **strong**
 //   [link text](#target) or [link text](url)
-//   :::stretch ... :::   (treated as a block container for now)
+//   :::stretch summary="..." ... :::
 //   :::columns / :::column  (containers)
 //   ![alt](src)
 //
 // Not a full CommonMark implementation — deliberately small.
 Document parse_markup(std::string_view source);
+
+// Serialize a document back to the same lightweight markup dialect.
+// Round-trips the structures we parse; unknown/richer structure is
+// flattened conservatively.
+std::string serialize_markup(const Document& doc);
 
 }  // namespace glyphtoo

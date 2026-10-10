@@ -15,6 +15,8 @@
 #include <string>
 #include <filesystem>
 #include <algorithm>
+#include <fstream>
+#include <cstdlib>
 
 namespace fs = std::filesystem;
 
@@ -60,17 +62,22 @@ static std::string find_system_font() {
 
 static void print_usage(const char* argv0) {
   std::cerr
-      << "Usage: " << argv0 << " [options]\n"
+      << "Usage: " << argv0 << " [options] [file]\n"
       << "\n"
       << "Options:\n"
-      << "  -f, --font <path>   TTF/OTF font file to use (body + headings)\n"
-      << "  -h, --help          Show this help\n"
+      << "  -f, --font <path>     TTF/OTF font file (body + headings)\n"
+      << "  -o, --open <path>     Open a markup document\n"
+      << "  -h, --help            Show this help\n"
       << "\n"
-      << "If --font is omitted, a common system sans-serif is searched for.\n";
+      << "A positional path is treated as the document to open.\n"
+      << "Ctrl+S saves back to that path.\n"
+      << "\n"
+      << "Font resolution order: --font, GLYPHTOO_FONT env, system search.\n";
 }
 
 struct Options {
   std::string font_path;
+  std::string file_path;  // open this markup file (empty = built-in sample)
 };
 
 static bool parse_args(int argc, char** argv, Options& opt) {
@@ -92,6 +99,25 @@ static bool parse_args(int argc, char** argv, Options& opt) {
     if (a.rfind("--font=", 0) == 0) {
       opt.font_path = a.substr(7);
       continue;
+    }
+    if (a == "-o" || a == "--open" || a == "--file") {
+      if (i + 1 >= argc) {
+        std::cerr << "error: " << a << " requires a path argument\n";
+        print_usage(argv[0]);
+        return false;
+      }
+      opt.file_path = argv[++i];
+      continue;
+    }
+    if (!a.empty() && a[0] != '-') {
+      // positional: document path
+      if (opt.file_path.empty()) {
+        opt.file_path = a;
+        continue;
+      }
+      std::cerr << "error: unexpected argument: " << a << "\n";
+      print_usage(argv[0]);
+      return false;
     }
     std::cerr << "error: unknown argument: " << a << "\n";
     print_usage(argv[0]);
@@ -134,6 +160,11 @@ int main(int argc, char** argv) {
 
   std::string font_path = opt.font_path;
   if (font_path.empty()) {
+    if (const char* env = std::getenv("GLYPHTOO_FONT")) {
+      if (env[0] != '\0') font_path = env;
+    }
+  }
+  if (font_path.empty()) {
     font_path = find_system_font();
   }
   if (font_path.empty()) {
@@ -163,7 +194,30 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  glyphtoo::Document doc = glyphtoo::parse_markup(SAMPLE);
+  std::string doc_path = opt.file_path;
+  glyphtoo::Document doc;
+  if (!doc_path.empty()) {
+    std::ifstream in(doc_path);
+    if (!in) {
+      std::cerr << "Failed to open document: " << doc_path << "\n";
+      SDL_DestroyRenderer(sdl);
+      SDL_DestroyWindow(window);
+      SDL_Quit();
+      return 1;
+    }
+    std::string source((std::istreambuf_iterator<char>(in)),
+                       std::istreambuf_iterator<char>());
+    doc = glyphtoo::parse_markup(source);
+    std::cout << "Opened: " << doc_path << "\n";
+  } else {
+    doc = glyphtoo::parse_markup(SAMPLE);
+  }
+  {
+    std::string title = "glyphtoo";
+    if (!doc_path.empty()) title += " — " + doc_path;
+    SDL_SetWindowTitle(window, title.c_str());
+  }
+
   glyphtoo::LayoutEngine layout_engine(body_font, heading_font);
   glyphtoo::Renderer renderer(sdl, body_font, heading_font);
 
@@ -418,6 +472,23 @@ int main(int argc, char** argv) {
                 if (history.redo(doc, sel)) {
                   needs_layout = true;
                   reset_blink();
+                }
+              }
+              break;
+
+            case SDLK_s:
+              if (ctrl) {
+                if (doc_path.empty()) {
+                  std::cerr << "No file path — open with: glyphtoo file.md\n";
+                } else {
+                  std::string text = glyphtoo::serialize_markup(doc);
+                  std::ofstream out(doc_path);
+                  if (!out) {
+                    std::cerr << "Failed to save: " << doc_path << "\n";
+                  } else {
+                    out << text;
+                    std::cout << "Saved: " << doc_path << "\n";
+                  }
                 }
               }
               break;

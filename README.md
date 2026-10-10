@@ -49,12 +49,24 @@ cmake .. && make -j
 ### Command-line options
 
 ```
--f, --font <path>   TTF/OTF font file (used for body and headings)
--h, --help          Show help
+glyphtoo [options] [file.md]
+
+-f, --font <path>     TTF/OTF font file (body + headings)
+-o, --open <path>     Open a markup document
+-h, --help            Show help
 ```
 
-If `--font` is omitted, glyphtoo searches a few common system locations
-(DejaVu, Liberation, FreeSans, Arial on macOS).
+A positional path opens that file. **Ctrl+S** saves it back (round-trips
+through the lightweight markup serializer).
+
+Font resolution order:
+
+1. `--font` / `-f`
+2. `GLYPHTOO_FONT` environment variable
+3. Common system paths (DejaVu, Liberation, FreeSans, Arial)
+
+`nix build` wraps the binary so `GLYPHTOO_FONT` points at DejaVu Sans
+from nixpkgs — no system font required.
 
 ## License
 

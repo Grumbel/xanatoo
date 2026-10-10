@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **006** (this delivery is **005.2**)
+Next bundle number: **007** (this delivery is **006**)
 
 ## Status (2026-10-10)
 
@@ -24,15 +24,18 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] Undo / redo via document snapshots (Ctrl+Z / Ctrl+Y)
 - [x] Caret blink
 - [x] Build fix: qualify NodeId in main.cpp
+- [x] Open document from CLI (`file.md` / `--open`)
+- [x] Save with Ctrl+S via `serialize_markup`
+- [x] Default font via `GLYPHTOO_FONT` + flake wrapper (DejaVu)
 
 ## Open work / next steps
 
 1. Multi-node selection delete / copy (currently single-node only)
 2. Proper image loading and display
 3. Multi-view / side-by-side panes (stage 03)
-4. Package a default font in the flake
-5. Optional: HarfBuzz for complex scripts
-6. Replace snapshot undo with a tighter operation log if memory becomes an issue
+4. Optional: HarfBuzz for complex scripts
+5. Replace snapshot undo with a tighter operation log if memory becomes an issue
+6. Save-as / untitled buffer when no path was given
 
 ## Design notes
 
@@ -50,3 +53,4 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-003.*-selection-stretch-…` — selection, stretchtext
 - `glyphtoo-004.*-font-cli-…` — `--font` CLI
 - `glyphtoo-005.*-clipboard-undo-…` — clipboard, undo, blink + NodeId fix
+- `glyphtoo-006.*-open-save-font-…` — this delivery
