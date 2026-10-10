@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **072** (this delivery is **071**)
+Next bundle number: **073** (this delivery is **072**)
 
 ## Status (2026-10-10)
 
@@ -117,6 +117,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] ImGui UI font: DejaVu / Bitstream Vera Sans (GNOME 2 default family)
 - [x] Semantic format: FORMAT.md; :label; doc meta; note; codeblock
 - [x] Semantic format: deflist/term/def; figure/caption
+- [x] Semantic format: cite + biblio; typed links (:rel)
 
 ## Open work / next steps
 
@@ -237,4 +238,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `glyphtoo-068.*-help-stretch-icons-…` — help stretch + icons
 - `glyphtoo-069.*-ui-font-…` — UI font
 - `glyphtoo-070.*-semantic-format-…` — meta/label/note/code
-- `glyphtoo-071.*-deflist-figure-…` — this delivery
+- `glyphtoo-071.*-deflist-figure-…` — deflist + figure
+- `glyphtoo-072.*-cite-rel-…` — this delivery

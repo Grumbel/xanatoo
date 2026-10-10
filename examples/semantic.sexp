@@ -56,4 +56,16 @@
   (figure :label "network-fig"
     (img "network.png" :alt "Network diagram")
     (caption "A network is a graph of passages and links — structure, not decoration."))
+
+  (h 2 :label "refs" "References and typed links")
+
+  (p "Stretchtext is related to "
+     (a "#stretchtext-term" :rel "glossary" "the glossary entry")
+     ". Classic work includes "
+     (cite :key "nelson65" "Nelson 1965")
+     ".")
+
+  (biblio
+    (ref :key "nelson65"
+         "Nelson, T. (1965). Complex information processing: a file structure for the complex, the changing and the indeterminate."))
 )

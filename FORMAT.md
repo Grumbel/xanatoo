@@ -55,8 +55,18 @@ stable identity matter.
 | `(img "path" :alt "…")` | Media with accessible alternative |
 | `(deflist (term …) (def …) …)` | Definition list (glossary-style) |
 | `(figure (img …) (caption …))` | Media + caption as one unit |
+| `(biblio (ref :key "…" …) …)` | Bibliography; keys match citations |
 
-Inline: plain strings, `(em …)`, `(strong …)`, `(code …)`, `(a "href" …)`.
+Inline: plain strings, `(em …)`, `(strong …)`, `(code …)`,
+`(a "href" …)`, `(a "href" :rel "glossary" …)`,
+`(cite :key "nelson65" "Nelson 1965")`.
+
+### Typed links and citations
+
+- `:rel` on `(a …)` names the *relationship* (e.g. `glossary`, `source`,
+  `contra`) without prescribing presentation.
+- `(cite :key "…")` points at a `(ref :key "…")` in `(biblio …)`.
+  Clicking a citation jumps to that entry (`#key` resolution).
 
 ## Identity and linking
 
@@ -80,8 +90,6 @@ Not part of the semantic document:
 
 ## Planned (not all implemented)
 
-- **Citations** — `(cite :key "smith2020")` + bibliography node
-- **Typed links** — `:rel "glossary" | "source" | "contra"`
 - **Range transclusion** — include a span inside a labelled block
 - **Tables** — semantic grid (cells as nodes), presentation left to the view
 - **i18n variants** — alternate `lang` branches for the same `:label`

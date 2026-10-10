@@ -16,7 +16,7 @@ bool is_text_node_kind(NodeKind k) {
          k == NodeKind::ListItem || k == NodeKind::BlockQuote ||
          k == NodeKind::Note || k == NodeKind::CodeBlock ||
          k == NodeKind::Term || k == NodeKind::Definition ||
-         k == NodeKind::Caption;
+         k == NodeKind::Caption || k == NodeKind::BiblioEntry;
 }
 
 void collect_text_nodes(const Document& doc, NodeId id,
@@ -41,6 +41,9 @@ NodeId find_anchor_node(const Document& doc, std::string_view href) {
   if (tlow.empty() || doc.root == INVALID_NODE) return INVALID_NODE;
 
   // Prefer stable :label (semantic id) over heading text match.
+  // Bibliography keys are labels; cite:key and #key both resolve here.
+  if (tlow.size() > 5 && tlow.compare(0, 5, "cite:") == 0)
+    tlow = tlow.substr(5);
   for (const Node& n : doc.nodes) {
     if (n.id == INVALID_NODE) continue;
     if (!n.label.empty() && ascii_lower(n.label) == tlow) return n.id;

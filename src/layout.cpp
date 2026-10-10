@@ -356,6 +356,26 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       break;
     }
 
+    case NodeKind::Biblio: {
+      float start_y = y;
+      for (NodeId c : node.children)
+        layout_node(doc, c, x, y, max_width, out);
+      y += 8.f;
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
+    case NodeKind::BiblioEntry: {
+      float start_y = y;
+      // Hanging indent style for references
+      const float hang = 16.f;
+      layout_paragraph(doc, node, x + hang, y, max_width - hang, out,
+                       FontRole::Body);
+      y += 8.f;
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
     case NodeKind::ListItem: {
       float start_y = y;
       const float bullet_slot = 28.f;

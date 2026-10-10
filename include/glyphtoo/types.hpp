@@ -32,6 +32,8 @@ enum class NodeKind : uint8_t {
   Definition,      // definition body for the preceding term
   Figure,          // media + caption as one semantic unit
   Caption,         // caption under a figure (child of Figure)
+  Biblio,          // bibliography section (container)
+  BiblioEntry,     // one reference; label/key matches cite keys
 };
 
 enum class InlineKind : uint8_t {
@@ -40,12 +42,14 @@ enum class InlineKind : uint8_t {
   Strong,
   Link,
   Code,
+  Cite,  // citation pointer; href holds bibliography key
 };
 
 struct InlineSpan {
   InlineKind kind = InlineKind::Text;
   std::string text;
-  std::string href;   // for Link
+  std::string href;   // Link target, or Cite key
+  std::string rel;    // typed relation: glossary, source, contra, …
   NodeId target = INVALID_NODE;
 };
 

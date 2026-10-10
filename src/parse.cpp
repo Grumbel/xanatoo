@@ -831,14 +831,62 @@ void append_inline_from_sexpr(Node& node, const SExpr& e) {
   const SExpr& head = e.kids[0];
   if (!is_atom(head, "em") && !is_atom(head, "strong") &&
       !is_atom(head, "code") && !is_atom(head, "a") &&
-      !is_atom(head, "text"))
+      !is_atom(head, "cite") && !is_atom(head, "text"))
     return;
 
   if (is_atom(head, "a")) {
     InlineSpan sp;
     sp.kind = InlineKind::Link;
-    if (e.kids.size() >= 2) sp.href = sexpr_text(e.kids[1]);
-    for (size_t i = 2; i < e.kids.size(); ++i) sp.text += sexpr_text(e.kids[i]);
+    size_t i = 1;
+    if (i < e.kids.size() &&
+        !(e.kids[i].kind == SExpr::Kind::Atom && !e.kids[i].text.empty() &&
+          e.kids[i].text[0] == ':')) {
+      sp.href = sexpr_text(e.kids[i]);
+      ++i;
+    }
+    while (i + 1 < e.kids.size() && e.kids[i].kind == SExpr::Kind::Atom &&
+           !e.kids[i].text.empty() && e.kids[i].text[0] == ':') {
+      const std::string& k = e.kids[i].text;
+      if (k == ":rel" || k == ":relation") sp.rel = sexpr_text(e.kids[i + 1]);
+      else if (k == ":href") sp.href = sexpr_text(e.kids[i + 1]);
+      i += 2;
+    }
+    for (; i < e.kids.size(); ++i) {
+      if (e.kids[i].kind == SExpr::Kind::Atom && !e.kids[i].text.empty() &&
+          e.kids[i].text[0] == ':') {
+        if (i + 1 < e.kids.size()) ++i;
+        continue;
+      }
+      sp.text += sexpr_text(e.kids[i]);
+    }
+    node.spans.push_back(std::move(sp));
+    return;
+  }
+  if (is_atom(head, "cite")) {
+    InlineSpan sp;
+    sp.kind = InlineKind::Cite;
+    size_t i = 1;
+    while (i + 1 < e.kids.size() && e.kids[i].kind == SExpr::Kind::Atom &&
+           !e.kids[i].text.empty() && e.kids[i].text[0] == ':') {
+      const std::string& k = e.kids[i].text;
+      if (k == ":key" || k == ":id") sp.href = sexpr_text(e.kids[i + 1]);
+      i += 2;
+    }
+    // Bare first string may be the key when no :key
+    if (sp.href.empty() && i < e.kids.size()) {
+      sp.href = sexpr_text(e.kids[i]);
+      ++i;
+    }
+    for (; i < e.kids.size(); ++i) {
+      if (e.kids[i].kind == SExpr::Kind::Atom && !e.kids[i].text.empty() &&
+          e.kids[i].text[0] == ':') {
+        if (i + 1 < e.kids.size()) ++i;
+        continue;
+      }
+      if (!sp.text.empty()) sp.text.push_back(' ');
+      sp.text += sexpr_text(e.kids[i]);
+    }
+    if (sp.text.empty() && !sp.href.empty()) sp.text = sp.href;
     node.spans.push_back(std::move(sp));
     return;
   }
@@ -1078,6 +1126,40 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
     return;
   }
 
+  if (tag == "biblio" || tag == "bibliography") {
+    NodeId n = doc.create(NodeKind::Biblio, parent);
+    std::string label;
+    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           &label);
+    if (!label.empty()) doc.get(n).label = label;
+    parse_sexpr_children(doc, n, e.kids, i);
+    return;
+  }
+
+  if (tag == "ref" || tag == "biblio-entry") {
+    NodeId n = doc.create(NodeKind::BiblioEntry, parent);
+    std::string label, key;
+    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           &label, &key);
+    // :key may land in lang slot of read_kwargs — also scan manually
+    if (!label.empty()) doc.get(n).label = label;
+    // Re-scan for :key
+    for (size_t j = 1; j + 1 < e.kids.size(); ++j) {
+      if (e.kids[j].kind == SExpr::Kind::Atom && e.kids[j].text == ":key") {
+        doc.get(n).label = sexpr_text(e.kids[j + 1]);
+        break;
+      }
+    }
+    if (doc.get(n).label.empty() && !key.empty()) doc.get(n).label = key;
+    // skip kwargs for inlines
+    i = 1;
+    while (i + 1 < e.kids.size() && e.kids[i].kind == SExpr::Kind::Atom &&
+           !e.kids[i].text.empty() && e.kids[i].text[0] == ':')
+      i += 2;
+    fill_inlines(doc.get(n), e.kids, i);
+    return;
+  }
+
   if (tag == "hr") {
     doc.create(NodeKind::HorizontalRule, parent);
     return;
@@ -1260,6 +1342,17 @@ void serialize_sexpr_inlines(const Node& node, std::string& out) {
       case InlineKind::Link:
         out += "(a ";
         escape_sexpr_string(sp.href, out);
+        if (!sp.rel.empty()) {
+          out += " :rel ";
+          escape_sexpr_string(sp.rel, out);
+        }
+        out.push_back(' ');
+        escape_sexpr_string(sp.text, out);
+        out += ")";
+        break;
+      case InlineKind::Cite:
+        out += "(cite :key ";
+        escape_sexpr_string(sp.href, out);
         out.push_back(' ');
         escape_sexpr_string(sp.text, out);
         out += ")";
@@ -1412,6 +1505,31 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
       out += pad;
       out += "(caption";
       emit_node_id(node, out);
+      serialize_sexpr_inlines(node, out);
+      out += ")";
+      break;
+    }
+
+    case NodeKind::Biblio: {
+      out += pad;
+      out += "(biblio";
+      emit_node_id(node, out);
+      emit_label(node, out);
+      serialize_sexpr_children(doc, node, out, indent + 2);
+      out.push_back('\n');
+      out += pad;
+      out += ")";
+      break;
+    }
+
+    case NodeKind::BiblioEntry: {
+      out += pad;
+      out += "(ref";
+      emit_node_id(node, out);
+      if (!node.label.empty()) {
+        out += " :key ";
+        escape_sexpr_string(node.label, out);
+      }
       serialize_sexpr_inlines(node, out);
       out += ")";
       break;

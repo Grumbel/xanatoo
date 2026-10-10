@@ -125,6 +125,9 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
       case InlineKind::Link:
         SDL_SetTextureColorMod(g.texture, 30, 90, 180);
         break;
+      case InlineKind::Cite:
+        SDL_SetTextureColorMod(g.texture, 90, 50, 140);  // violet for citations
+        break;
       case InlineKind::Code:
         SDL_SetTextureColorMod(g.texture, 130, 55, 30);
         break;
@@ -135,8 +138,11 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
         break;
     }
     SDL_RenderCopy(sdl_, g.texture, nullptr, &dst);
-    if (pg.kind == InlineKind::Link) {
-      SDL_SetRenderDrawColor(sdl_, 30, 90, 180, 255);
+    if (pg.kind == InlineKind::Link || pg.kind == InlineKind::Cite) {
+      if (pg.kind == InlineKind::Cite)
+        SDL_SetRenderDrawColor(sdl_, 90, 50, 140, 255);
+      else
+        SDL_SetRenderDrawColor(sdl_, 30, 90, 180, 255);
       int uy = static_cast<int>(pg.y + 2.f - scroll_y);
       int ux = static_cast<int>(pg.x + origin_x);
       int uw = static_cast<int>((g.advance >> 6) > 0 ? (g.advance >> 6) : (g.width + 1));
