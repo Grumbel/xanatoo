@@ -945,10 +945,10 @@ int main(int argc, char** argv) {
     int pane_count = split ? 2 : 1;
     for (int i = 0; i < pane_count; ++i) {
       Pane& pane = panes[i];
-      float max_scroll = std::max(0.f, pane.layout.content_height - win_h + 40.f);
+      float max_scroll = std::max(0.f, pane.layout.content_height - win_h + 40.f + 28.f);
       if (pane.scroll_y > max_scroll) pane.scroll_y = max_scroll;
 
-      SDL_Rect clip{pane.x, 0, pane.w, win_h};
+      SDL_Rect clip{pane.x, 0, pane.w, win_h - 28};
       SDL_RenderSetClipRect(sdl, &clip);
 
       float ox = static_cast<float>(pane.x);
@@ -985,26 +985,45 @@ int main(int argc, char** argv) {
     if (split) {
       int mid = panes[1].x - 3;
       SDL_SetRenderDrawColor(sdl, 210, 208, 200, 255);
-      SDL_Rect div{mid, 0, 6, win_h};
+      SDL_Rect div{mid, 0, 6, win_h - 28};
       SDL_RenderFillRect(sdl, &div);
     }
 
-    // Search mode status bar with query text
-    if (search_mode) {
+    // Bottom status bar — shortcuts, or leap query when searching
+    {
+      const int bar_h = 28;
       SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
-      SDL_SetRenderDrawColor(sdl, 30, 30, 40, 235);
-      SDL_Rect bar{0, win_h - 32, win_w, 32};
+      if (search_mode) {
+        SDL_SetRenderDrawColor(sdl, 30, 30, 40, 240);
+      } else {
+        SDL_SetRenderDrawColor(sdl, 236, 234, 228, 245);
+      }
+      SDL_Rect bar{0, win_h - bar_h, win_w, bar_h};
       SDL_RenderFillRect(sdl, &bar);
-      SDL_SetRenderDrawColor(sdl, 80, 160, 255, 255);
-      SDL_Rect accent{0, win_h - 32, win_w, 3};
-      SDL_RenderFillRect(sdl, &accent);
+      // Top edge line
+      if (search_mode) {
+        SDL_SetRenderDrawColor(sdl, 80, 160, 255, 255);
+      } else {
+        SDL_SetRenderDrawColor(sdl, 200, 198, 190, 255);
+      }
+      SDL_RenderDrawLine(sdl, 0, win_h - bar_h, win_w, win_h - bar_h);
       SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
 
-      std::string label = "Leap: ";
-      label += search_query.empty() ? "…" : search_query;
-      label += "   (F3 next, Esc cancel)";
-      float baseline = static_cast<float>(win_h - 10);
-      renderer.draw_text(body_font, 12.f, baseline, label, 220, 230, 245);
+      std::string label;
+      uint8_t tr = 40, tg = 40, tb = 45;
+      if (search_mode) {
+        label = "Leap: ";
+        label += search_query.empty() ? "…" : search_query;
+        label += "    F3 next · Esc cancel";
+        tr = 220; tg = 230; tb = 245;
+      } else {
+        label =
+            "Ctrl+S save · Ctrl+Z/Y undo · Ctrl+F leap · Ctrl+\\ split · "
+            "Tab pane · Ctrl+←/→ word · click link · drag image corner";
+        tr = 70; tg = 68; tb = 62;
+      }
+      float baseline = static_cast<float>(win_h - 8);
+      renderer.draw_text(body_font, 10.f, baseline, label, tr, tg, tb);
     }
 
     renderer.present();

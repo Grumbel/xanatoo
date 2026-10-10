@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **016** (this delivery is **015**)
+Next bundle number: **017** (this delivery is **016**)
 
 ## Status (2026-10-10)
 
@@ -47,6 +47,7 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] Home/End line movement
 - [x] Persist image `{scale=…}` in markup round-trip
 - [x] Double-click selects word
+- [x] Bottom status bar with common keyboard shortcuts
 
 ## Open work / next steps
 
@@ -80,4 +81,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-012.*-search-ui-save-…` — search UI + untitled save + ns fix
 - `glyphtoo-013.*-links-words-…` — links + word move + scroll fix
 - `glyphtoo-014.*-image-resize-…` — image resize + Home/End
-- `glyphtoo-015.*-scale-persist-…` — this delivery
+- `glyphtoo-015.*-scale-persist-…` — scale persist + dblclick
+- `glyphtoo-016.*-status-bar-…` — this delivery
