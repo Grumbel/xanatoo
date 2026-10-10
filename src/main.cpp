@@ -627,7 +627,25 @@ int main(int argc, char** argv) {
                 search_mode = false;
                 search_query.clear();
                 reset_blink();
-              } else {
+              } else if (!p.sel.empty()) {
+                p.sel.anchor = p.sel.focus;
+                reset_blink();
+              }
+              // Esc no longer quits — use Ctrl+Q
+              break;
+
+            case SDLK_q:
+              if (ctrl) {
+                if (dirty_flags[0] || dirty_flags[1]) {
+                  std::cerr << "Unsaved changes — Ctrl+S to save, "
+                               "Ctrl+Q again after saving, or save and quit.\n";
+                  // Soft warning once: if already warned, allow quit
+                  static bool quit_warned = false;
+                  if (!quit_warned) {
+                    quit_warned = true;
+                    break;
+                  }
+                }
                 running = false;
               }
               break;
@@ -1165,7 +1183,7 @@ int main(int argc, char** argv) {
       } else {
         label =
             "Ctrl+S save · Ctrl+Shift+S save as · Ctrl+Z/Y undo · "
-            "Ctrl+B/I/K style · Ctrl+E stretch · Ctrl+F leap · Ctrl+\\ split";
+            "Ctrl+S save · Ctrl+Q quit · Ctrl+B/I/K style · Ctrl+E stretch · Ctrl+F leap";
         tr = 70; tg = 68; tb = 62;
       }
       float baseline = static_cast<float>(win_h - 8);

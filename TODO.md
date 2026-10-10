@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **020** (this delivery is **019**)
+Next bundle number: **021** (this delivery is **020**)
 
 ## Status (2026-10-10)
 
@@ -55,13 +55,14 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] Ctrl+Shift+A select whole document
 - [x] Rename third_party/ → external/
 - [x] Ctrl+E wrap block in stretchtext
+- [x] Multi-node bold/italic/link styling
+- [x] Esc clears selection (no longer quits); Ctrl+Q quits with dirty warn
 
 ## Open work / next steps
 
 1. Optional: HarfBuzz for complex scripts
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Open external http(s) links (currently logged only)
-4. Multi-node apply_style (bold/italic/link currently single-node)
 
 ## Design notes
 
@@ -92,4 +93,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-016.*-status-bar-…` — shortcuts status bar
 - `glyphtoo-017.*-style-saveas-…` — styles + save as
 - `glyphtoo-018.*-link-edit-…` — link href edit + wheel + select-all
-- `glyphtoo-019.*-external-stretch-…` — this delivery
+- `glyphtoo-019.*-external-stretch-…` — external/ + Ctrl+E stretch
+- `glyphtoo-020.*-multistyle-quit-…` — this delivery

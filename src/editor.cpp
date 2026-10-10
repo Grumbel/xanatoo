@@ -318,37 +318,86 @@ void insert_styled(Document& doc, Caret& caret, const std::string& utf8,
   caret.char_index = utf8_char_count(utf8);
 }
 
-void apply_style_to_selection(Document& doc, Selection& sel, InlineKind kind,
-                              const std::string& href) {
-  if (sel.empty()) return;
-  if (sel.anchor.node != sel.focus.node) {
-    // Multi-node: apply per-node would be better later; for now no-op
-    return;
-  }
-  std::string text = selected_text(doc, sel);
+static void apply_style_one_node(Document& doc, NodeId nid,
+                                 size_t from_span, size_t from_ch,
+                                 size_t to_span, size_t to_ch,
+                                 InlineKind kind, const std::string& href) {
+  Selection local;
+  local.anchor = {nid, from_span, from_ch};
+  local.focus = {nid, to_span, to_ch};
+  if (local.empty()) return;
+
+  std::string text = selected_text(doc, local);
   if (text.empty()) return;
 
-  // Toggle off if already entirely this style (single span covering selection)
-  Caret a = sel.anchor, b = sel.focus;
-  if (caret_cmp(doc, a, b) > 0) std::swap(a, b);
-  const Node& n = doc.get(a.node);
+  const Node& n = doc.get(nid);
   bool already = false;
-  if (a.span_index == b.span_index && a.span_index < n.spans.size()) {
-    const InlineSpan& sp = n.spans[a.span_index];
-    if (sp.kind == kind && a.char_index == 0 &&
-        b.char_index == utf8_char_count(sp.text)) {
+  if (from_span == to_span && from_span < n.spans.size()) {
+    const InlineSpan& sp = n.spans[from_span];
+    if (sp.kind == kind && from_ch == 0 &&
+        to_ch == utf8_char_count(sp.text)) {
       already = true;
     }
   }
 
-  delete_selection(doc, sel);
-  // sel collapsed at a after delete
+  delete_selection(doc, local);
   if (already) {
-    insert_text(doc, sel.focus, text);
+    insert_text(doc, local.focus, text);
   } else {
-    insert_styled(doc, sel.focus, text, kind, href);
+    insert_styled(doc, local.focus, text, kind, href);
   }
-  sel.anchor = sel.focus;
+}
+
+void apply_style_to_selection(Document& doc, Selection& sel, InlineKind kind,
+                              const std::string& href) {
+  if (sel.empty()) return;
+  Caret a = sel.anchor, b = sel.focus;
+  if (caret_cmp(doc, a, b) > 0) std::swap(a, b);
+
+  if (a.node == b.node) {
+    apply_style_one_node(doc, a.node, a.span_index, a.char_index,
+                         b.span_index, b.char_index, kind, href);
+    sel.anchor = sel.focus = a;  // approximate; caret may have moved
+    // Re-find end of styled run roughly at a
+    ensure_valid_caret(doc, sel.focus);
+    sel.anchor = sel.focus;
+    return;
+  }
+
+  std::vector<NodeId> nodes;
+  if (doc.root != INVALID_NODE) collect_text_nodes(doc, doc.root, nodes);
+  auto rank = [&](NodeId id) -> size_t {
+    auto it = std::find(nodes.begin(), nodes.end(), id);
+    return it == nodes.end() ? nodes.size() : static_cast<size_t>(it - nodes.begin());
+  };
+  size_t ra = rank(a.node), rb = rank(b.node);
+  if (ra > rb) {
+    std::swap(a, b);
+    std::swap(ra, rb);
+  }
+
+  // Apply from last node to first so earlier indices stay stable enough
+  for (size_t i = rb + 1; i-- > ra; ) {
+    if (i >= nodes.size()) continue;
+    NodeId nid = nodes[i];
+    Node& n = doc.get(nid);
+    if (n.spans.empty()) continue;
+    size_t last = n.spans.size() - 1;
+    size_t last_len = utf8_char_count(n.spans[last].text);
+    size_t fs = 0, fc = 0, ts = last, tc = last_len;
+    if (i == ra) {
+      fs = a.span_index;
+      fc = a.char_index;
+    }
+    if (i == rb) {
+      ts = b.span_index;
+      tc = b.char_index;
+    }
+    apply_style_one_node(doc, nid, fs, fc, ts, tc, kind, href);
+  }
+
+  ensure_valid_caret(doc, a);
+  sel.anchor = sel.focus = a;
 }
 
 void insert_text(Document& doc, Caret& caret, const std::string& utf8) {
