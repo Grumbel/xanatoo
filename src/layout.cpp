@@ -27,11 +27,53 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
     case NodeKind::Columns:
     case NodeKind::Column:
     case NodeKind::List:
-    case NodeKind::Stretch:
       for (NodeId child : node.children) {
         layout_node(doc, child, x, y, max_width, out);
       }
       break;
+
+    case NodeKind::Stretch: {
+      if (!node.expanded) {
+        // Collapsed: show summary as a single interactive line
+        Node fake = node;
+        fake.kind = NodeKind::Paragraph;
+        fake.spans.clear();
+        InlineSpan s;
+        s.kind = InlineKind::Link;  // visual cue
+        s.text = node.summary.empty() ? "▸ …" : ("▸ " + node.summary);
+        fake.spans.push_back(std::move(s));
+        float start_y = y;
+        layout_paragraph(doc, fake, x, y, max_width, out, body_, FontRole::Body);
+        // Rewrite glyph node ids back to the stretch node so hit-testing works
+        for (auto& g : out.glyphs) {
+          if (g.node == fake.id) g.node = id;
+        }
+        y += 10.f;
+        out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      } else {
+        // Expanded: optional summary header + children
+        if (!node.summary.empty()) {
+          Node fake = node;
+          fake.kind = NodeKind::Paragraph;
+          fake.spans.clear();
+          InlineSpan s;
+          s.kind = InlineKind::Link;
+          s.text = "▾ " + node.summary;
+          fake.spans.push_back(std::move(s));
+          float start_y = y;
+          layout_paragraph(doc, fake, x, y, max_width, out, body_, FontRole::Body);
+          for (auto& g : out.glyphs) {
+            if (g.node == fake.id) g.node = id;
+          }
+          out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+        }
+        for (NodeId child : node.children) {
+          layout_node(doc, child, x + 12.f, y, max_width - 12.f, out);
+        }
+        y += 6.f;
+      }
+      break;
+    }
 
     case NodeKind::Heading: {
       Font& f = (node.level <= 2) ? heading_ : body_;
@@ -96,6 +138,7 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
                                     float x, float& y, float max_width,
                                     LayoutResult& out, Font& font,
                                     FontRole role) {
+  (void)doc;
   struct CharInfo {
     uint32_t cp;
     size_t span_idx;

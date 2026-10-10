@@ -156,6 +156,16 @@ Document parse_markup(std::string_view source) {
     // Opening fences
     if (trimmed.starts_with(":::stretch")) {
       NodeId n = doc.create(NodeKind::Stretch, current_parent());
+      // Parse summary="..." if present
+      auto pos = trimmed.find("summary=\"");
+      if (pos != std::string_view::npos) {
+        pos += 9; // after summary="
+        auto end = trimmed.find('"', pos);
+        if (end != std::string_view::npos) {
+          doc.get(n).summary = std::string(trimmed.substr(pos, end - pos));
+        }
+      }
+      doc.get(n).expanded = false; // start collapsed — classic stretchtext
       stack.push_back(n);
       ++i;
       continue;

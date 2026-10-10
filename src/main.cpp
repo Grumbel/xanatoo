@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 //
 // glyphtoo — interactive document composition engine
-// Stage 01 + early stage 02: markup, layout, caret, basic editing
 
 #include "glyphtoo/types.hpp"
 #include "glyphtoo/font.hpp"
@@ -23,15 +22,18 @@ static const char* SAMPLE = R"(# The network
 
 The web connects documents, but [hypertext](#hypertext) connects ideas.
 
-## What is hypertext?
+:::stretch summary="What is hypertext?"
+Hypertext is a system of linked information that can be explored
+non-linearly. Passages can expand in place (*stretchtext*), images are
+first-class addressable content, and layout is part of the living
+document rather than a fixed page prescription.
+:::
 
-Hypertext is a system of linked information that can be explored non-linearly.
-Passages can expand in place (*stretchtext*), images are first-class
-addressable content, and layout is part of the living document rather than a
-fixed page prescription.
+## Living documents
 
 This is a live document. Click to place the caret, type to insert text,
-Backspace to delete. Arrow keys move the caret; PageUp / PageDown scroll.
+Backspace to delete. **Enter** splits a paragraph. Shift+arrows select.
+Click a stretchtext marker (▸ / ▾) to expand or collapse.
 
 Inspiration: Ted Nelson's *Xanadu*, Bill Atkinson's **HyperCard**, and
 Jef Raskin's *Canon Cat* — a keyboard-driven work processor that treated
@@ -106,19 +108,24 @@ int main(int argc, char** argv) {
   glyphtoo::LayoutEngine layout_engine(body_font, heading_font);
   glyphtoo::Renderer renderer(sdl, body_font, heading_font);
 
-  glyphtoo::Caret caret;
-  glyphtoo::ensure_valid_caret(doc, caret);
+  glyphtoo::Selection sel;
+  glyphtoo::ensure_valid_caret(doc, sel.focus);
+  sel.anchor = sel.focus;
 
   int win_w = 920, win_h = 720;
   float scroll_y = 0.f;
+  float preferred_x = 0.f;  // for vertical movement
   bool running = true;
   bool needs_layout = true;
+  bool dragging = false;
   glyphtoo::LayoutResult layout;
 
   auto reflow = [&]() {
     layout = layout_engine.layout(doc, static_cast<float>(win_w));
     needs_layout = false;
   };
+
+  auto clear_sel = [&]() { sel.anchor = sel.focus; };
 
   while (running) {
     SDL_Event ev;
@@ -145,64 +152,163 @@ int main(int argc, char** argv) {
           if (ev.button.button == SDL_BUTTON_LEFT) {
             float mx = static_cast<float>(ev.button.x);
             float my = static_cast<float>(ev.button.y);
+
+            // Stretchtext toggle?
+            if (auto sid = glyphtoo::hit_test_stretch(layout, mx, my, scroll_y)) {
+              NodeId id = *sid;
+              if (doc.get(id).kind == glyphtoo::NodeKind::Stretch) {
+                doc.get(id).expanded = !doc.get(id).expanded;
+                needs_layout = true;
+                break;
+              }
+            }
+
             if (auto hit = glyphtoo::hit_test(layout, mx, my, scroll_y)) {
-              caret = *hit;
+              sel.focus = *hit;
+              if (!(SDL_GetModState() & KMOD_SHIFT)) {
+                sel.anchor = sel.focus;
+              }
+              preferred_x = mx;
+              dragging = true;
+            }
+          }
+          break;
+
+        case SDL_MOUSEBUTTONUP:
+          if (ev.button.button == SDL_BUTTON_LEFT) dragging = false;
+          break;
+
+        case SDL_MOUSEMOTION:
+          if (dragging) {
+            float mx = static_cast<float>(ev.motion.x);
+            float my = static_cast<float>(ev.motion.y);
+            if (auto hit = glyphtoo::hit_test(layout, mx, my, scroll_y)) {
+              sel.focus = *hit;
+              preferred_x = mx;
             }
           }
           break;
 
         case SDL_TEXTINPUT: {
-          glyphtoo::insert_text(doc, caret, ev.text.text);
+          if (!sel.empty()) {
+            glyphtoo::delete_selection(doc, sel);
+          }
+          glyphtoo::insert_text(doc, sel.focus, ev.text.text);
+          sel.anchor = sel.focus;
           needs_layout = true;
           break;
         }
 
         case SDL_KEYDOWN: {
           bool shift = (ev.key.keysym.mod & KMOD_SHIFT) != 0;
-          (void)shift;
+          bool ctrl = (ev.key.keysym.mod & KMOD_CTRL) != 0;
+          (void)ctrl;
+
+          auto move_and_sel = [&](auto mover) {
+            if (!shift) clear_sel();
+            mover();
+            if (!shift) sel.anchor = sel.focus;
+          };
+
           switch (ev.key.keysym.sym) {
             case SDLK_ESCAPE:
               running = false;
               break;
+
             case SDLK_BACKSPACE:
-              glyphtoo::delete_backward(doc, caret);
+              if (!sel.empty()) {
+                glyphtoo::delete_selection(doc, sel);
+              } else {
+                glyphtoo::delete_backward(doc, sel.focus);
+                sel.anchor = sel.focus;
+              }
               needs_layout = true;
               break;
+
             case SDLK_DELETE:
-              glyphtoo::delete_forward(doc, caret);
+              if (!sel.empty()) {
+                glyphtoo::delete_selection(doc, sel);
+              } else {
+                glyphtoo::delete_forward(doc, sel.focus);
+                sel.anchor = sel.focus;
+              }
               needs_layout = true;
               break;
+
+            case SDLK_RETURN:
+            case SDLK_KP_ENTER:
+              if (!sel.empty()) glyphtoo::delete_selection(doc, sel);
+              glyphtoo::split_block(doc, sel.focus);
+              sel.anchor = sel.focus;
+              needs_layout = true;
+              break;
+
             case SDLK_LEFT:
-              if (!glyphtoo::move_left(doc, caret))
-                glyphtoo::move_to_prev_node(doc, caret);
+              move_and_sel([&] {
+                if (!glyphtoo::move_left(doc, sel.focus))
+                  glyphtoo::move_to_prev_node(doc, sel.focus);
+              });
               break;
+
             case SDLK_RIGHT:
-              if (!glyphtoo::move_right(doc, caret))
-                glyphtoo::move_to_next_node(doc, caret);
+              move_and_sel([&] {
+                if (!glyphtoo::move_right(doc, sel.focus))
+                  glyphtoo::move_to_next_node(doc, sel.focus);
+              });
               break;
+
             case SDLK_UP:
-              // crude: previous node
-              glyphtoo::move_to_prev_node(doc, caret);
+              move_and_sel([&] {
+                if (!glyphtoo::move_up(layout, sel.focus, preferred_x))
+                  glyphtoo::move_to_prev_node(doc, sel.focus);
+              });
               break;
+
             case SDLK_DOWN:
-              glyphtoo::move_to_next_node(doc, caret);
+              move_and_sel([&] {
+                if (!glyphtoo::move_down(layout, sel.focus, preferred_x))
+                  glyphtoo::move_to_next_node(doc, sel.focus);
+              });
               break;
+
             case SDLK_PAGEUP:
               scroll_y = std::max(0.f, scroll_y - win_h * 0.8f);
               break;
             case SDLK_PAGEDOWN:
               scroll_y += win_h * 0.8f;
               break;
+
             case SDLK_HOME:
-              caret.span_index = 0;
-              caret.char_index = 0;
+              move_and_sel([&] {
+                sel.focus.span_index = 0;
+                sel.focus.char_index = 0;
+              });
               break;
-            case SDLK_RETURN:
-            case SDLK_KP_ENTER:
-              // For now insert a space-newline marker; proper block split later
-              glyphtoo::insert_text(doc, caret, "\n");
-              needs_layout = true;
+
+            case SDLK_a:
+              if (ctrl) {
+                // Select all text nodes — set anchor to first, focus to last char
+                // Simple: select current node entirely
+                const auto& n = doc.get(sel.focus.node);
+                sel.anchor = {sel.focus.node, 0, 0};
+                sel.focus.span_index = n.spans.empty() ? 0 : n.spans.size() - 1;
+                if (!n.spans.empty()) {
+                  // end of last span
+                  size_t len = 0;
+                  const std::string& t = n.spans.back().text;
+                  for (size_t i = 0; i < t.size(); ) {
+                    unsigned char c = static_cast<unsigned char>(t[i]);
+                    if (c < 0x80) { ++i; ++len; }
+                    else if ((c & 0xe0) == 0xc0) { i += 2; ++len; }
+                    else if ((c & 0xf0) == 0xe0) { i += 3; ++len; }
+                    else if ((c & 0xf8) == 0xf0) { i += 4; ++len; }
+                    else ++i;
+                  }
+                  sel.focus.char_index = len;
+                }
+              }
               break;
+
             default:
               break;
           }
@@ -213,15 +319,22 @@ int main(int argc, char** argv) {
 
     if (needs_layout) reflow();
 
-    // Clamp scroll
     float max_scroll = std::max(0.f, layout.content_height - win_h + 40.f);
     if (scroll_y > max_scroll) scroll_y = max_scroll;
 
+    float lh = static_cast<float>(body_font.line_height());
     renderer.clear(248, 246, 240);
+
+    if (!sel.empty()) {
+      auto rects = glyphtoo::selection_rects(layout, sel, scroll_y, lh);
+      renderer.draw_selection(rects);
+    }
+
     renderer.draw(layout, scroll_y);
 
-    auto cpos = glyphtoo::caret_screen_pos(
-        layout, caret, scroll_y, static_cast<float>(body_font.line_height()));
+    auto cpos = glyphtoo::caret_screen_pos(layout, sel.focus, scroll_y, lh);
+    // Keep preferred_x in sync when moving horizontally
+    if (cpos.valid) preferred_x = cpos.x;
     renderer.draw_caret(cpos);
     renderer.present();
   }

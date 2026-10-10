@@ -4,6 +4,7 @@
 #include "glyphtoo/types.hpp"
 #include <stdexcept>
 #include <cassert>
+#include <algorithm>
 
 namespace glyphtoo {
 
@@ -25,8 +26,6 @@ NodeId Document::create(NodeKind kind, NodeId parent) {
 
 Node& Document::get(NodeId id) {
   assert(id != INVALID_NODE && id < next_id);
-  // IDs start at 1; vector is 0-based and may have holes later.
-  // For the simple contiguous case we store at index id-1.
   size_t idx = static_cast<size_t>(id - 1);
   if (idx >= nodes.size()) {
     throw std::runtime_error("invalid node id");
@@ -54,6 +53,17 @@ void Document::append_text(NodeId node, const std::string& text,
   span.kind = kind;
   span.text = text;
   get(node).spans.push_back(std::move(span));
+}
+
+bool Document::insert_after(NodeId after, NodeId child) {
+  Node& after_n = get(after);
+  if (after_n.parent == INVALID_NODE) return false;
+  Node& parent = get(after_n.parent);
+  auto it = std::find(parent.children.begin(), parent.children.end(), after);
+  if (it == parent.children.end()) return false;
+  get(child).parent = after_n.parent;
+  parent.children.insert(it + 1, child);
+  return true;
 }
 
 }  // namespace glyphtoo

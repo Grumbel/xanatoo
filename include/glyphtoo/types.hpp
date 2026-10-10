@@ -19,8 +19,8 @@ enum class NodeKind : uint8_t {
   List,
   ListItem,
   Image,
-  Stretch,   // expandable block (future)
-  Columns,   // layout container (future)
+  Stretch,   // expandable block
+  Columns,
   Column,
 };
 
@@ -49,6 +49,7 @@ struct Node {
   std::string alt;                // image alt text
   std::string src;                // image path
   bool expanded = true;           // for Stretch
+  std::string summary;            // stretchtext collapsed label
 };
 
 // Simple arena-style store: contiguous nodes, IDs are indices+1
@@ -63,6 +64,10 @@ struct Document {
   void add_child(NodeId parent, NodeId child);
   void append_text(NodeId node, const std::string& text,
                    InlineKind kind = InlineKind::Text);
+
+  // Insert `child` as a sibling immediately after `after` under the same parent.
+  // Returns false if after has no parent or is not found among siblings.
+  bool insert_after(NodeId after, NodeId child);
 };
 
 }  // namespace glyphtoo

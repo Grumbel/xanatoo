@@ -6,6 +6,7 @@
 #include "glyphtoo/font.hpp"
 #include "glyphtoo/editor.hpp"
 #include <SDL.h>
+#include <vector>
 
 namespace glyphtoo {
 
@@ -15,6 +16,7 @@ public:
 
   void clear(uint8_t r, uint8_t g, uint8_t b);
   void draw(const LayoutResult& layout, float scroll_y = 0.f);
+  void draw_selection(const std::vector<SelRect>& rects);
   void draw_caret(const CaretScreenPos& pos);
   void present();
 

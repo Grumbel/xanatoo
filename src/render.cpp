@@ -46,6 +46,18 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y) {
   }
 }
 
+void Renderer::draw_selection(const std::vector<SelRect>& rects) {
+  SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(sdl_, 160, 190, 230, 120);
+  for (const auto& r : rects) {
+    SDL_Rect sr{
+        static_cast<int>(r.x), static_cast<int>(r.y),
+        static_cast<int>(r.w), static_cast<int>(r.h)};
+    SDL_RenderFillRect(sdl_, &sr);
+  }
+  SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
+}
+
 void Renderer::draw_caret(const CaretScreenPos& pos) {
   if (!pos.valid) return;
   SDL_SetRenderDrawColor(sdl_, 25, 90, 170, 255);
