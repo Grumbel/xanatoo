@@ -243,6 +243,7 @@ int main(int argc, char** argv) {
   int help_drag_dx = 0, help_drag_dy = 0;
   // Resize: bit flags 1=right, 2=bottom (corner = both)
   int help_resize = 0;
+  bool help_scroll_dragging = false;
   int help_resize_start_x = 0, help_resize_start_y = 0;
   int help_resize_start_w = 0, help_resize_start_h = 0;
   const int help_title_h = 28;
@@ -572,9 +573,33 @@ int main(int argc, char** argv) {
                   break;
                 }
                 auto [cx, cy, cw, ch] = help_client_rect();
+                // Scrollbar track on the right of the client
+                const int sb_w = 10;
+                if (mxw >= cx + cw - sb_w && mxw <= cx + cw + 2 &&
+                    myw >= cy && myw <= cy + ch) {
+                  float max_s = std::max(
+                      0.f, help_layout.content_height - static_cast<float>(ch) + 40.f);
+                  float view_h = static_cast<float>(ch);
+                  float ratio = (view_h > 0.f)
+                                    ? (static_cast<float>(myw - cy) / view_h)
+                                    : 0.f;
+                  ratio = std::max(0.f, std::min(1.f, ratio));
+                  help_scroll = ratio * max_s;
+                  help_scroll_dragging = true;
+                  break;
+                }
                 float lx = static_cast<float>(mxw - cx);
                 float ly = static_cast<float>(myw - cy);
                 if (lx >= 0 && ly >= 0 && lx <= cw && ly <= ch) {
+                  // Stretchtext expand/collapse
+                  if (auto sid = glyphtoo::hit_test_stretch(
+                          help_layout, lx, ly, help_scroll)) {
+                    if (help_doc.get(*sid).kind == glyphtoo::NodeKind::Stretch) {
+                      help_doc.get(*sid).expanded = !help_doc.get(*sid).expanded;
+                      help_needs_layout = true;
+                      break;
+                    }
+                  }
                   if (auto href = glyphtoo::hit_test_link(
                           help_doc, help_layout, lx, ly, help_scroll)) {
                     if (!href->empty() && (*href)[0] == '#') {
@@ -820,6 +845,7 @@ int main(int argc, char** argv) {
           if (ev.button.button == SDL_BUTTON_LEFT) {
             help_dragging = false;
             help_resize = 0;
+            help_scroll_dragging = false;
             if (dragging_block && drag_block_id != glyphtoo::INVALID_NODE &&
                 drop_target_id != glyphtoo::INVALID_NODE &&
                 drop_target_id != drag_block_id) {
@@ -859,6 +885,16 @@ int main(int argc, char** argv) {
             help_y = ev.motion.y - help_drag_dy;
             if (help_x < 0) help_x = 0;
             if (help_y < static_cast<int>(ui_top)) help_y = static_cast<int>(ui_top);
+            break;
+          }
+          if (help_scroll_dragging) {
+            auto [cx, cy, cw, ch] = help_client_rect();
+            float max_s = std::max(
+                0.f, help_layout.content_height - static_cast<float>(ch) + 40.f);
+            float view_h = static_cast<float>(std::max(1, ch));
+            float ratio = (static_cast<float>(ev.motion.y) - static_cast<float>(cy)) / view_h;
+            ratio = std::max(0.f, std::min(1.f, ratio));
+            help_scroll = ratio * max_s;
             break;
           }
           if (help_resize) {
@@ -2644,6 +2680,27 @@ int main(int argc, char** argv) {
       const float help_draw_scroll = help_scroll - static_cast<float>(cy);
       renderer.draw(help_layout, help_draw_scroll, static_cast<float>(cx));
       SDL_RenderSetClipRect(sdl, nullptr);
+
+      // Client scrollbar when content overflows
+      {
+        float max_s = std::max(
+            0.f, help_layout.content_height - static_cast<float>(ch) + 40.f);
+        if (max_s > 1.f) {
+          const int sb_w = 8;
+          float view_h = static_cast<float>(ch);
+          float thumb_h = std::max(20.f, view_h * (view_h / (view_h + max_s)));
+          float track = std::max(0.f, view_h - thumb_h);
+          float ratio = help_scroll / max_s;
+          int thumb_y = cy + static_cast<int>(ratio * track);
+          int sx = cx + cw - sb_w;
+          SDL_SetRenderDrawColor(sdl, 220, 218, 212, 255);
+          SDL_Rect track_r{sx, cy, sb_w, ch};
+          SDL_RenderFillRect(sdl, &track_r);
+          SDL_SetRenderDrawColor(sdl, 140, 138, 130, 255);
+          SDL_Rect thumb{sx, thumb_y, sb_w, static_cast<int>(thumb_h)};
+          SDL_RenderFillRect(sdl, &thumb);
+        }
+      }
 
       // SE resize grip (classic desktop affordance)
       {

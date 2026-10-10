@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **068** (this delivery is **067**)
+Next bundle number: **069** (this delivery is **068**)
 
 ## Status (2026-10-10)
 
@@ -113,6 +113,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Help as ImGui software window (draggable/resizable, not OS window)
 - [x] Help is a **real document** (`examples/help.md`) rendered in a software window
 - [x] Help window: non-modal keyboard; document Y offset matches window position
+- [x] Help: stretchtext toggle + scrollbar; colorful BeOS/GNOME2 toolbar icons
 
 ## Open work / next steps
 
@@ -229,4 +230,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `glyphtoo-064.*-help-window-…` — ImGui help window
 - `glyphtoo-065.*-help-document-…` — help as real document
 - `glyphtoo-066.*-help-window-fix-…` — help non-modal + Y fix
-- `glyphtoo-067.*-help-resize-…` — this delivery
+- `glyphtoo-067.*-help-resize-…` — help resize
+- `glyphtoo-068.*-help-stretch-icons-…` — this delivery
