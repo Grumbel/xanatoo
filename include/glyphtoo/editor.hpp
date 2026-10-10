@@ -174,6 +174,10 @@ int caret_cmp(const Document& doc, const Caret& a, const Caret& b);
 
 // Case-insensitive search starting after `from` (wraps around).
 // Returns the start caret of the match and sets match_len to codepoint length.
+// Move caret forward by up to n codepoints within the current text node.
+// Returns false if the node ended early.
+bool advance_caret(Document& doc, Caret& caret, size_t n);
+
 std::optional<Caret> find_next(const Document& doc, const std::string& query,
                                const Caret& from, size_t& match_len);
 // Case-insensitive search starting before `from` (wraps around).

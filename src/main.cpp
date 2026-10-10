@@ -831,8 +831,7 @@ int main(int argc, char** argv) {
             if (auto hit = glyphtoo::find_next(doc_of(p), search_query, from, mlen)) {
               p.sel.anchor = *hit;
               p.sel.focus = *hit;
-              for (size_t i = 0; i < mlen; ++i)
-                glyphtoo::move_right(doc_of(p), p.sel.focus);
+              glyphtoo::advance_caret(doc_of(p), p.sel.focus, mlen);
               scroll_caret_into_view(p);
             }
             reset_blink();
@@ -1054,9 +1053,8 @@ int main(int argc, char** argv) {
                 if (hit) {
                   pp.sel.anchor = *hit;
                   pp.sel.focus = *hit;
-                  for (size_t i = 0; i < mlen; ++i)
-                    glyphtoo::move_right(doc_of(pp), pp.sel.focus);
-                      scroll_caret_into_view(pp);
+                  glyphtoo::advance_caret(doc_of(pp), pp.sel.focus, mlen);
+                  scroll_caret_into_view(pp);
                   reset_blink();
                 }
               }
@@ -1198,9 +1196,8 @@ int main(int argc, char** argv) {
                 if (auto hit = glyphtoo::find_next(dd, search_query, pp.sel.focus, mlen)) {
                   pp.sel.anchor = *hit;
                   pp.sel.focus = *hit;
-                  for (size_t i = 0; i < mlen; ++i)
-                    glyphtoo::move_right(dd, pp.sel.focus);
-                      scroll_caret_into_view(pp);
+                  glyphtoo::advance_caret(dd, pp.sel.focus, mlen);
+                  scroll_caret_into_view(pp);
                 }
                 reset_blink();
                 break;
@@ -2067,7 +2064,11 @@ int main(int argc, char** argv) {
       if (!pane.sel.empty()) {
         auto rects = glyphtoo::selection_rects(
             pane.layout, pane.sel, draw_scroll, lh);
-        renderer.draw_selection(rects, ox);
+        // Leap-search match uses amber so it is distinct from a user selection.
+        if (search_mode && i == focus)
+          renderer.draw_selection(rects, ox, 230, 190, 70, 150);
+        else
+          renderer.draw_selection(rects, ox);
       }
 
       renderer.draw(pane.layout, draw_scroll, ox);

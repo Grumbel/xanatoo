@@ -20,6 +20,9 @@ public:
   void draw(const LayoutResult& layout, float scroll_y = 0.f,
             float origin_x = 0.f);
   void draw_selection(const std::vector<SelRect>& rects, float origin_x = 0.f);
+  // Custom-colour selection (e.g. leap-search match highlight).
+  void draw_selection(const std::vector<SelRect>& rects, float origin_x,
+                      uint8_t r, uint8_t g, uint8_t b, uint8_t a);
   void draw_caret(const CaretScreenPos& pos, float origin_x = 0.f);
   // Simple left-to-right UTF-8 run (status bars, overlays).
   void draw_text(Font& font, float x, float y_baseline, const std::string& text,

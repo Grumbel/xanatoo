@@ -146,12 +146,17 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
 }
 
 void Renderer::draw_selection(const std::vector<SelRect>& rects, float origin_x) {
+  draw_selection(rects, origin_x, 160, 190, 230, 120);
+}
+
+void Renderer::draw_selection(const std::vector<SelRect>& rects, float origin_x,
+                              uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
   SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(sdl_, 160, 190, 230, 120);
-  for (const auto& r : rects) {
+  SDL_SetRenderDrawColor(sdl_, r, g, b, a);
+  for (const auto& rect : rects) {
     SDL_Rect sr{
-        static_cast<int>(r.x + origin_x), static_cast<int>(r.y),
-        static_cast<int>(r.w), static_cast<int>(r.h)};
+        static_cast<int>(rect.x + origin_x), static_cast<int>(rect.y),
+        static_cast<int>(rect.w), static_cast<int>(rect.h)};
     SDL_RenderFillRect(sdl_, &sr);
   }
   SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);

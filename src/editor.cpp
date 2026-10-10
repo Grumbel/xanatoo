@@ -1279,6 +1279,14 @@ static uint32_t char_at(const Node& n, size_t span, size_t ch) {
   return cp;
 }
 
+bool advance_caret(Document& doc, Caret& caret, size_t n) {
+  for (size_t i = 0; i < n; ++i) {
+    if (!move_right(doc, caret)) return false;
+  }
+  return true;
+}
+
+
 bool move_word_left(Document& doc, Caret& caret) {
   if (caret.node == INVALID_NODE) return false;
   if (!move_left(doc, caret)) {
@@ -1839,10 +1847,7 @@ std::optional<Caret> find_next(const Document& doc, const std::string& query,
   if (query.empty() || doc.root == INVALID_NODE) return std::nullopt;
 
   // Lowercase query for case-insensitive ASCII search
-  std::string q = query;
-  for (char& ch : q) {
-    if (ch >= 'A' && ch <= 'Z') ch = static_cast<char>(ch - 'A' + 'a');
-  }
+  std::string q = ascii_lower(query);
 
   std::vector<NodeId> nodes;
   collect_text_nodes(doc, doc.root, nodes);
@@ -1922,10 +1927,7 @@ std::optional<Caret> find_prev(const Document& doc, const std::string& query,
   match_len = 0;
   if (query.empty() || doc.root == INVALID_NODE) return std::nullopt;
 
-  std::string q = query;
-  for (char& ch : q) {
-    if (ch >= 'A' && ch <= 'Z') ch = static_cast<char>(ch - 'A' + 'a');
-  }
+  std::string q = ascii_lower(query);
 
   std::vector<NodeId> nodes;
   collect_text_nodes(doc, doc.root, nodes);
