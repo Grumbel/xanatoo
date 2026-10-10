@@ -335,6 +335,10 @@ int main(int argc, char** argv) {
   size_t search_match_len = 0;
   bool save_as_mode = false;
   std::string save_as_path;
+  bool link_edit_mode = false;
+  std::string link_edit_href;
+  glyphtoo::NodeId link_edit_node = glyphtoo::INVALID_NODE;
+  size_t link_edit_span = 0;
 
   Uint32 caret_blink_start = SDL_GetTicks();
   auto reset_blink = [&]() { caret_blink_start = SDL_GetTicks(); };
@@ -421,7 +425,10 @@ int main(int argc, char** argv) {
           break;
 
         case SDL_MOUSEWHEEL: {
-          Pane& p = F();
+          int mx = 0, my = 0;
+          SDL_GetMouseState(&mx, &my);
+          int pi = pane_at(static_cast<float>(mx));
+          Pane& p = panes[pi];
           p.scroll_y -= ev.wheel.y * 48.f;
           p.scroll_y = std::max(0.f, p.scroll_y);
           break;
@@ -560,6 +567,10 @@ int main(int argc, char** argv) {
             save_as_path += ev.text.text;
             break;
           }
+          if (link_edit_mode) {
+            link_edit_href += ev.text.text;
+            break;
+          }
           if (search_mode) {
             search_query += ev.text.text;
             Pane& p = F();
@@ -609,6 +620,9 @@ int main(int argc, char** argv) {
               if (save_as_mode) {
                 save_as_mode = false;
                 save_as_path.clear();
+              } else if (link_edit_mode) {
+                link_edit_mode = false;
+                link_edit_href.clear();
               } else if (search_mode) {
                 search_mode = false;
                 search_query.clear();
@@ -681,6 +695,15 @@ int main(int argc, char** argv) {
                 }
                 break;
               }
+              if (link_edit_mode) {
+                if (!link_edit_href.empty()) {
+                  while (!link_edit_href.empty() &&
+                         (static_cast<unsigned char>(link_edit_href.back()) & 0xc0) == 0x80)
+                    link_edit_href.pop_back();
+                  if (!link_edit_href.empty()) link_edit_href.pop_back();
+                }
+                break;
+              }
               if (search_mode) {
                 if (!search_query.empty()) {
                   // erase last UTF-8 character roughly
@@ -717,6 +740,21 @@ int main(int argc, char** argv) {
 
             case SDLK_RETURN:
             case SDLK_KP_ENTER:
+              if (link_edit_mode) {
+                if (link_edit_node != glyphtoo::INVALID_NODE) {
+                  auto& node = d.get(link_edit_node);
+                  if (link_edit_span < node.spans.size()) {
+                    node.spans[link_edit_span].href = link_edit_href;
+                    node.spans[link_edit_span].kind = glyphtoo::InlineKind::Link;
+                    mark_dirty();
+                    needs_layout = true;
+                    std::cout << "Link href: " << link_edit_href << "\n";
+                  }
+                }
+                link_edit_mode = false;
+                link_edit_href.clear();
+                break;
+              }
               if (save_as_mode) {
                 if (!save_as_path.empty()) {
                   std::string text = glyphtoo::serialize_markup(d);
@@ -968,19 +1006,34 @@ int main(int argc, char** argv) {
 
             case SDLK_k:
               if (ctrl && !p.sel.empty()) {
-                // Link: use selected text as both label and #anchor target
                 std::string text = glyphtoo::selected_text(d, p.sel);
                 std::string href = "#" + text;
                 edit();
                 glyphtoo::apply_style_to_selection(
                     d, p.sel, glyphtoo::InlineKind::Link, href);
+                // Enter href edit mode on the new link span
+                link_edit_mode = true;
+                search_mode = false;
+                save_as_mode = false;
+                link_edit_node = p.sel.focus.node;
+                link_edit_span = p.sel.focus.span_index;
+                link_edit_href = href;
                 needs_layout = true;
                 reset_blink();
               }
               break;
 
             case SDLK_a:
-              if (ctrl) {
+              if (ctrl && shift) {
+                // Select entire document (first text node → last)
+                // Walk layout glyphs for bounds
+                if (!p.layout.glyphs.empty()) {
+                  const auto& first = p.layout.glyphs.front();
+                  const auto& last = p.layout.glyphs.back();
+                  p.sel.anchor = {first.node, first.span_index, first.char_index};
+                  p.sel.focus = {last.node, last.span_index, last.char_index + 1};
+                }
+              } else if (ctrl) {
                 const auto& n = d.get(p.sel.focus.node);
                 p.sel.anchor = {p.sel.focus.node, 0, 0};
                 p.sel.focus.span_index = n.spans.empty() ? 0 : n.spans.size() - 1;
@@ -1064,7 +1117,7 @@ int main(int argc, char** argv) {
     {
       const int bar_h = 28;
       SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
-      if (search_mode || save_as_mode) {
+      if (search_mode || save_as_mode || link_edit_mode) {
         SDL_SetRenderDrawColor(sdl, 30, 30, 40, 240);
       } else {
         SDL_SetRenderDrawColor(sdl, 236, 234, 228, 245);
@@ -1072,7 +1125,7 @@ int main(int argc, char** argv) {
       SDL_Rect bar{0, win_h - bar_h, win_w, bar_h};
       SDL_RenderFillRect(sdl, &bar);
       // Top edge line
-      if (search_mode || save_as_mode) {
+      if (search_mode || save_as_mode || link_edit_mode) {
         SDL_SetRenderDrawColor(sdl, 80, 160, 255, 255);
       } else {
         SDL_SetRenderDrawColor(sdl, 200, 198, 190, 255);
@@ -1085,6 +1138,11 @@ int main(int argc, char** argv) {
       if (save_as_mode) {
         label = "Save as: ";
         label += save_as_path.empty() ? "…" : save_as_path;
+        label += "    Enter confirm · Esc cancel";
+        tr = 220; tg = 230; tb = 245;
+      } else if (link_edit_mode) {
+        label = "Link href: ";
+        label += link_edit_href.empty() ? "…" : link_edit_href;
         label += "    Enter confirm · Esc cancel";
         tr = 220; tg = 230; tb = 245;
       } else if (search_mode) {

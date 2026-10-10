@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **018** (this delivery is **017**)
+Next bundle number: **019** (this delivery is **018**)
 
 ## Status (2026-10-10)
 
@@ -50,6 +50,9 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] Bottom status bar with common keyboard shortcuts
 - [x] Ctrl+B / Ctrl+I / Ctrl+K bold, italic, link on selection
 - [x] Ctrl+Shift+S Save As (path entry in status bar)
+- [x] Ctrl+K link href edit mode in status bar
+- [x] Mouse wheel scrolls pane under cursor
+- [x] Ctrl+Shift+A select whole document
 
 ## Open work / next steps
 
@@ -57,7 +60,6 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Open external http(s) links (currently logged only)
 4. Multi-node apply_style (bold/italic/link currently single-node)
-5. Ctrl+K link target editing (currently href=#selected_text)
 
 ## Design notes
 
@@ -86,4 +88,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-014.*-image-resize-…` — image resize + Home/End
 - `glyphtoo-015.*-scale-persist-…` — scale persist + dblclick
 - `glyphtoo-016.*-status-bar-…` — shortcuts status bar
-- `glyphtoo-017.*-style-saveas-…` — this delivery
+- `glyphtoo-017.*-style-saveas-…` — styles + save as
+- `glyphtoo-018.*-link-edit-…` — this delivery
