@@ -791,16 +791,18 @@ int main(int argc, char** argv) {
           }
           if (dragging_block && drag_block_id != glyphtoo::INVALID_NODE) {
             Pane& p = F();
-            float lx = local_x(mouse_x, focus);
             float adj_y = mouse_y + p.scroll_y;
             drop_target_id = glyphtoo::INVALID_NODE;
             drop_line_y = -1.f;
-            const auto& drag_n = doc_of(p).get(drag_block_id);
             for (const auto& box : p.layout.boxes) {
               if (box.node == drag_block_id) continue;
               if (adj_y < box.y || adj_y > box.y + box.height) continue;
               const auto& bn = doc_of(p).get(box.node);
-              if (bn.parent != drag_n.parent) continue;
+              // Skip structural containers as drop targets
+              if (bn.kind == glyphtoo::NodeKind::Document ||
+                  bn.kind == glyphtoo::NodeKind::Columns ||
+                  bn.kind == glyphtoo::NodeKind::List)
+                continue;
               // Top half → before, bottom half → after
               drop_before = (adj_y < box.y + box.height * 0.5f);
               drop_target_id = box.node;
@@ -1798,7 +1800,7 @@ int main(int argc, char** argv) {
         label += "    F3 next · Esc cancel";
         tr = 220; tg = 230; tb = 245;
       } else if (dragging_block) {
-        label = "Moving block — drop on a sibling to reorder (same as Alt+↑/↓)";
+        label = "Moving block — drop before/after any block (columns & lists OK)";
         tr = 40; tg = 90; tb = 160;
       } else if (dragging_col_gap) {
         label = "Resizing columns — drag to adjust relative widths";

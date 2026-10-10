@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **036** (this delivery is **035**)
+Next bundle number: **037** (this delivery is **036**)
 
 ## Status (2026-10-10)
 
-Stage **01**–**03** largely in place. Stage **04**: block drag + column width drag.
+Stage **01**–**04** core features largely in place (drag, columns, transclude).
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -81,13 +81,15 @@ Stage **01**–**03** largely in place. Stage **04**: block drag + column width 
 - [x] Inline transclusion: `:::include #Target` live embed + click-to-source
 - [x] Drag-and-drop block reorder (left-margin grab, sibling relocate)
 - [x] Adjustable column widths by dragging gutters (`Column.display_scale` weights)
+- [x] Cross-parent block drag (into/out of columns & lists; ListItem↔Paragraph)
 
 ## Open work / next steps
 
 1. Optional: HarfBuzz for complex scripts
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Richer transclusion (editable mirror, cross-document includes)
-4. Cross-parent block drag (e.g. into/out of columns)
+4. Version comparison / visual links between panes
+5. Nested list indentation (Tab / Shift+Tab)
 
 ## Design notes
 
@@ -114,6 +116,8 @@ Stage **01**–**03** largely in place. Stage **04**: block drag + column width 
 - Column widths: `Column.display_scale` is a relative weight (default 1).
   Layout emits `column_gaps`; dragging a gap shifts weight between neighbours.
   Markup: `:::column weight=1.5`.
+- Cross-parent `relocate_block`: reparents across Columns/Lists; converts
+  ListItem↔Paragraph when crossing a List; drops emptied lists.
 
 ## Bundle history
 
@@ -151,4 +155,5 @@ Stage **01**–**03** largely in place. Stage **04**: block drag + column width 
 - `glyphtoo-032.*-hr-list-toggle-…` — HR + list toggle
 - `glyphtoo-033.*-transclude-…` — :::include transclusion
 - `glyphtoo-034.*-block-drag-…` — block drag reorder
-- `glyphtoo-035.*-column-width-…` — this delivery
+- `glyphtoo-035.*-column-width-…` — column width drag
+- `glyphtoo-036.*-cross-parent-drag-…` — this delivery

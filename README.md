@@ -66,7 +66,7 @@ Supported dialect (intentionally small):
 | **Ctrl+B** / **I** / **\`** / **K** | Bold / italic / code / link |
 | **Ctrl+D** | Duplicate current block |
 | **Alt+↑ / Alt+↓** | Move block among siblings |
-| Drag left margin of block | Reorder block among siblings |
+| Drag left margin of block | Reorder / reparent block (columns & lists) |
 | Drag column gutter | Adjust relative column widths |
 | **Ctrl+E** | Wrap block in stretchtext |
 | **Ctrl+Shift+E** | Edit stretch summary |

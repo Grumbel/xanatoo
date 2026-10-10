@@ -96,8 +96,9 @@ NodeId enclosing_stretch(const Document& doc, NodeId id);
 bool move_block_up(Document& doc, NodeId block);
 bool move_block_down(Document& doc, NodeId block);
 
-// Move `block` to just before or after `target` among shared siblings.
-// Returns false if parents differ, either id is invalid, or no change needed.
+// Move `block` to just before or after `target`. Same-parent reorder, or
+// cross-parent reparent (into/out of columns and lists). ListItem↔Paragraph
+// conversion happens when crossing a List boundary. Empty lists are dropped.
 bool relocate_block(Document& doc, NodeId block, NodeId target, bool before);
 
 // Duplicate a block as the next sibling; returns the new node id.

@@ -547,25 +547,92 @@ bool relocate_block(Document& doc, NodeId block, NodeId target, bool before) {
     return false;
   Node& bn = doc.get(block);
   Node& tn = doc.get(target);
-  if (bn.parent == INVALID_NODE || bn.parent != tn.parent) return false;
-  Node& parent = doc.get(bn.parent);
+  if (bn.parent == INVALID_NODE || tn.parent == INVALID_NODE) return false;
 
-  auto bit = std::find(parent.children.begin(), parent.children.end(), block);
-  auto tit = std::find(parent.children.begin(), parent.children.end(), target);
-  if (bit == parent.children.end() || tit == parent.children.end()) return false;
+  // Refuse to nest a node under itself or under one of its descendants.
+  for (NodeId walk = tn.parent; walk != INVALID_NODE; walk = doc.get(walk).parent) {
+    if (walk == block) return false;
+  }
 
-  size_t bidx = static_cast<size_t>(bit - parent.children.begin());
-  size_t tidx = static_cast<size_t>(tit - parent.children.begin());
-  parent.children.erase(bit);
-  if (bidx < tidx) --tidx;
+  NodeId old_parent_id = bn.parent;
+  NodeId new_parent_id = tn.parent;
+  Node& old_parent = doc.get(old_parent_id);
+  Node& new_parent = doc.get(new_parent_id);
 
-  size_t insert_at = before ? tidx : tidx + 1;
-  if (insert_at > parent.children.size()) insert_at = parent.children.size();
-  parent.children.insert(
-      parent.children.begin() + static_cast<std::ptrdiff_t>(insert_at), block);
+  // Structural containers stay put (Columns/Column/Document/List wrappers)
+  if (bn.kind == NodeKind::Document || bn.kind == NodeKind::Columns ||
+      bn.kind == NodeKind::Column || bn.kind == NodeKind::List)
+    return false;
+  // Don't drop onto the structural wrapper itself as a "sibling" of content
+  // that lives under a different kind of parent — target must be a real sibling
+  // candidate under new_parent.
+  if (tn.kind == NodeKind::Document || tn.kind == NodeKind::Columns)
+    return false;
 
-  if (bn.kind == NodeKind::ListItem && parent.kind == NodeKind::List)
-    renumber_ordered_list(doc, bn.parent);
+  auto bit =
+      std::find(old_parent.children.begin(), old_parent.children.end(), block);
+  auto tit =
+      std::find(new_parent.children.begin(), new_parent.children.end(), target);
+  if (bit == old_parent.children.end() || tit == new_parent.children.end())
+    return false;
+
+  if (old_parent_id == new_parent_id) {
+    size_t bidx = static_cast<size_t>(bit - old_parent.children.begin());
+    size_t tidx = static_cast<size_t>(tit - new_parent.children.begin());
+    old_parent.children.erase(bit);
+    if (bidx < tidx) --tidx;
+    size_t insert_at = before ? tidx : tidx + 1;
+    if (insert_at > new_parent.children.size())
+      insert_at = new_parent.children.size();
+    new_parent.children.insert(
+        new_parent.children.begin() + static_cast<std::ptrdiff_t>(insert_at),
+        block);
+  } else {
+    // Cross-parent: detach, then attach
+    old_parent.children.erase(bit);
+    bn.parent = new_parent_id;
+
+    // List membership: convert kind when crossing List boundary
+    if (old_parent.kind == NodeKind::List && new_parent.kind != NodeKind::List) {
+      if (bn.kind == NodeKind::ListItem) {
+        bn.kind = NodeKind::Paragraph;
+        bn.level = 0;
+      }
+    } else if (old_parent.kind != NodeKind::List &&
+               new_parent.kind == NodeKind::List) {
+      if (bn.kind == NodeKind::Paragraph || bn.kind == NodeKind::Heading ||
+          bn.kind == NodeKind::BlockQuote) {
+        bn.kind = NodeKind::ListItem;
+        bn.level = (new_parent.level == 1) ? 1 : 0;
+      }
+    }
+
+    size_t tidx = static_cast<size_t>(
+        std::find(new_parent.children.begin(), new_parent.children.end(),
+                  target) -
+        new_parent.children.begin());
+    // target is still in new_parent
+    size_t insert_at = before ? tidx : tidx + 1;
+    if (insert_at > new_parent.children.size())
+      insert_at = new_parent.children.size();
+    new_parent.children.insert(
+        new_parent.children.begin() + static_cast<std::ptrdiff_t>(insert_at),
+        block);
+
+    // Drop empty List left behind
+    if (old_parent.kind == NodeKind::List && old_parent.children.empty() &&
+        old_parent.parent != INVALID_NODE) {
+      Node& gp = doc.get(old_parent.parent);
+      auto oit = std::find(gp.children.begin(), gp.children.end(), old_parent_id);
+      if (oit != gp.children.end()) gp.children.erase(oit);
+      old_parent.parent = INVALID_NODE;
+    } else if (old_parent.kind == NodeKind::List) {
+      renumber_ordered_list(doc, old_parent_id);
+    }
+  }
+
+  if (new_parent.kind == NodeKind::List)
+    renumber_ordered_list(doc, new_parent_id);
   return true;
 }
 
