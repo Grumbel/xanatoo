@@ -93,4 +93,5 @@ install(DIRECTORY examples/
           PATTERN "*.png"
           PATTERN "*.jpg"
           PATTERN "*.jpeg"
-          PATTERN "*.gif")
+          PATTERN "*.gif"
+          PATTERN "*.sexp")

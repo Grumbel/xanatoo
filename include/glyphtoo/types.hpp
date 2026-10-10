@@ -25,6 +25,8 @@ enum class NodeKind : uint8_t {
   BlockQuote,      // Markdown "> …" indented quotation
   HorizontalRule,  // Markdown "---" thematic break
   Transclude,      // :::include #Target — live embedding of a passage
+  CodeBlock,       // semantic preformatted code (:lang for language)
+  Note,            // semantic aside / callout (not a layout box)
 };
 
 enum class InlineKind : uint8_t {
@@ -54,6 +56,15 @@ struct Node {
   bool expanded = true;           // for Stretch
   std::string summary;            // stretchtext collapsed label
   float display_scale = 1.f;      // image interactive scale (1 = natural fit)
+  std::string label;              // stable semantic anchor (links: #label)
+  // CodeBlock: language id in `src` (e.g. "cpp"); Note: optional kind in `src`
+};
+
+// Document-level semantic metadata (not layout).
+struct DocumentMeta {
+  std::string title;
+  std::string lang;   // BCP 47, e.g. "en"
+  std::string author;
 };
 
 // Simple arena-style store: contiguous nodes, IDs are indices+1
@@ -61,6 +72,7 @@ struct Document {
   std::vector<Node> nodes;
   NodeId root = INVALID_NODE;
   NodeId next_id = 1;
+  DocumentMeta meta;
 
   NodeId create(NodeKind kind, NodeId parent = INVALID_NODE);
   Node& get(NodeId id);

@@ -272,7 +272,8 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       break;
     }
 
-    case NodeKind::BlockQuote: {
+    case NodeKind::BlockQuote:
+    case NodeKind::Note: {
       float start_y = y;
       const float bar_w = 3.f;
       const float indent = 14.f;
@@ -285,6 +286,21 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       layout_paragraph(doc, node, text_x, y, text_w, out, FontRole::Body);
       y += 12.f;
       out.quote_bars.push_back({id, x, start_y, bar_w, y - start_y});
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
+    case NodeKind::CodeBlock: {
+      float start_y = y;
+      const float pad = 8.f;
+      float text_x = x + pad;
+      float text_w = max_width - pad * 2.f;
+      if (text_w < 40.f) {
+        text_x = x;
+        text_w = max_width;
+      }
+      layout_paragraph(doc, node, text_x, y, text_w, out, FontRole::Code);
+      y += 10.f;
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }

@@ -783,7 +783,8 @@ int sexpr_int(const SExpr& e, int def = 0) {
 
 size_t read_kwargs(const std::vector<SExpr>& kids, size_t start,
                    std::string* summary, bool* expanded, float* weight,
-                   float* scale, std::string* alt) {
+                   float* scale, std::string* alt, std::string* label = nullptr,
+                   std::string* lang = nullptr) {
   size_t i = start;
   while (i + 1 < kids.size() && kids[i].kind == SExpr::Kind::Atom &&
          !kids[i].text.empty() && kids[i].text[0] == ':') {
@@ -794,6 +795,24 @@ size_t read_kwargs(const std::vector<SExpr>& kids, size_t start,
     else if (k == ":weight" && weight) *weight = sexpr_float(v, 1.f);
     else if (k == ":scale" && scale) *scale = sexpr_float(v, 1.f);
     else if (k == ":alt" && alt) *alt = sexpr_text(v);
+    else if ((k == ":label" || k == ":anchor") && label) *label = sexpr_text(v);
+    else if ((k == ":lang" || k == ":language") && lang) *lang = sexpr_text(v);
+    // :title / :author handled at doc root only
+    i += 2;
+  }
+  return i;
+}
+
+size_t read_meta_kwargs(const std::vector<SExpr>& kids, size_t start,
+                        DocumentMeta& meta) {
+  size_t i = start;
+  while (i + 1 < kids.size() && kids[i].kind == SExpr::Kind::Atom &&
+         !kids[i].text.empty() && kids[i].text[0] == ':') {
+    const std::string& k = kids[i].text;
+    const SExpr& v = kids[i + 1];
+    if (k == ":title") meta.title = sexpr_text(v);
+    else if (k == ":lang" || k == ":language") meta.lang = sexpr_text(v);
+    else if (k == ":author") meta.author = sexpr_text(v);
     i += 2;
   }
   return i;
@@ -880,7 +899,8 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
   const std::string& tag = head.text;
 
   if (tag == "doc") {
-    parse_sexpr_children(doc, parent, e.kids, 1);
+    size_t i = read_meta_kwargs(e.kids, 1, doc.meta);
+    parse_sexpr_children(doc, parent, e.kids, i);
     return;
   }
 
@@ -888,22 +908,110 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
     NodeId n = doc.create(NodeKind::Heading, parent);
     size_t i = 1;
     int level = 1;
-    if (i < e.kids.size() && e.kids[i].kind == SExpr::Kind::Atom)
+    std::string label;
+    // Optional kwargs before or after level
+    if (i < e.kids.size() && e.kids[i].kind == SExpr::Kind::Atom &&
+        !e.kids[i].text.empty() && e.kids[i].text[0] != ':')
+      level = std::max(1, std::min(6, sexpr_int(e.kids[i++], 1)));
+    i = read_kwargs(e.kids, i, nullptr, nullptr, nullptr, nullptr, nullptr, &label);
+    if (i < e.kids.size() && e.kids[i].kind == SExpr::Kind::Atom &&
+        e.kids[i].text.size() == 1 && e.kids[i].text[0] >= '1' &&
+        e.kids[i].text[0] <= '6')
       level = std::max(1, std::min(6, sexpr_int(e.kids[i++], 1)));
     doc.get(n).level = level;
+    if (!label.empty()) doc.get(n).label = label;
     fill_inlines(doc.get(n), e.kids, i);
     return;
   }
 
   if (tag == "p" || tag == "para" || tag == "paragraph") {
     NodeId n = doc.create(NodeKind::Paragraph, parent);
-    fill_inlines(doc.get(n), e.kids, 1);
+    std::string label;
+    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           &label);
+    if (!label.empty()) doc.get(n).label = label;
+    fill_inlines(doc.get(n), e.kids, i);
     return;
   }
 
   if (tag == "quote" || tag == "blockquote") {
     NodeId n = doc.create(NodeKind::BlockQuote, parent);
-    fill_inlines(doc.get(n), e.kids, 1);
+    std::string label;
+    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           &label);
+    if (!label.empty()) doc.get(n).label = label;
+    fill_inlines(doc.get(n), e.kids, i);
+    return;
+  }
+
+  if (tag == "note" || tag == "aside" || tag == "callout") {
+    NodeId n = doc.create(NodeKind::Note, parent);
+    std::string label, kind;
+    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           &label, &kind);
+    if (!label.empty()) doc.get(n).label = label;
+    if (!kind.empty()) doc.get(n).src = kind;  // note subtype
+    fill_inlines(doc.get(n), e.kids, i);
+    return;
+  }
+
+  if (tag == "codeblock" || tag == "pre") {
+    NodeId n = doc.create(NodeKind::CodeBlock, parent);
+    std::string label, lang;
+    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           &label, &lang);
+    if (!label.empty()) doc.get(n).label = label;
+    if (!lang.empty()) doc.get(n).src = lang;
+    // Remaining strings become the code body (joined)
+    std::string body;
+    for (; i < e.kids.size(); ++i) {
+      if (e.kids[i].kind == SExpr::Kind::Atom && !e.kids[i].text.empty() &&
+          e.kids[i].text[0] == ':') {
+        ++i;
+        continue;
+      }
+      if (!body.empty()) body.push_back('\n');
+      body += sexpr_text(e.kids[i]);
+    }
+    if (!body.empty()) {
+      InlineSpan sp;
+      sp.kind = InlineKind::Code;
+      sp.text = body;
+      doc.get(n).spans.push_back(std::move(sp));
+    }
+    return;
+  }
+
+  // (code :lang "…" "body…") as block when :lang present or multiple lines
+  if (tag == "code") {
+    std::string label, lang;
+    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           &label, &lang);
+    bool looks_block = !lang.empty() || (e.kids.size() - i) > 1;
+    if (looks_block || !lang.empty()) {
+      NodeId n = doc.create(NodeKind::CodeBlock, parent);
+      if (!label.empty()) doc.get(n).label = label;
+      if (!lang.empty()) doc.get(n).src = lang;
+      std::string body;
+      for (; i < e.kids.size(); ++i) {
+        if (e.kids[i].kind == SExpr::Kind::Atom && !e.kids[i].text.empty() &&
+            e.kids[i].text[0] == ':') {
+          ++i;
+          continue;
+        }
+        if (!body.empty()) body.push_back('\n');
+        body += sexpr_text(e.kids[i]);
+      }
+      InlineSpan sp;
+      sp.kind = InlineKind::Code;
+      sp.text = body;
+      doc.get(n).spans.push_back(std::move(sp));
+      return;
+    }
+    // else: single inline-ish — still create a short code block for top-level
+    NodeId n = doc.create(NodeKind::CodeBlock, parent);
+    fill_inlines(doc.get(n), e.kids, i);
+    for (auto& sp : doc.get(n).spans) sp.kind = InlineKind::Code;
     return;
   }
 
@@ -1048,6 +1156,12 @@ void emit_node_id(const Node& node, std::string& out) {
   out += std::to_string(static_cast<unsigned long long>(node.id));
 }
 
+void emit_label(const Node& node, std::string& out) {
+  if (node.label.empty()) return;
+  out += " :label ";
+  escape_sexpr_string(node.label, out);
+}
+
 void serialize_sexpr_inlines(const Node& node, std::string& out) {
   // Merge adjacent plain-text spans so output is not a string salad.
   std::string pending;
@@ -1115,6 +1229,18 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
     case NodeKind::Document:
       out += pad;
       out += "(doc";
+      if (!doc.meta.title.empty()) {
+        out += " :title ";
+        escape_sexpr_string(doc.meta.title, out);
+      }
+      if (!doc.meta.lang.empty()) {
+        out += " :lang ";
+        escape_sexpr_string(doc.meta.lang, out);
+      }
+      if (!doc.meta.author.empty()) {
+        out += " :author ";
+        escape_sexpr_string(doc.meta.author, out);
+      }
       serialize_sexpr_children(doc, node, out, indent + 2);
       out += ")\n";
       break;
@@ -1124,6 +1250,7 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
       out += "(h ";
       out += std::to_string(std::max(1, std::min(6, node.level)));
       emit_node_id(node, out);
+      emit_label(node, out);
       serialize_sexpr_inlines(node, out);
       out += ")";
       break;
@@ -1133,7 +1260,40 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
       out += pad;
       out += "(p";
       emit_node_id(node, out);
+      emit_label(node, out);
       serialize_sexpr_inlines(node, out);
+      out += ")";
+      break;
+    }
+
+    case NodeKind::Note: {
+      out += pad;
+      out += "(note";
+      emit_node_id(node, out);
+      emit_label(node, out);
+      if (!node.src.empty()) {
+        out += " :lang ";  // subtype stored in src
+        escape_sexpr_string(node.src, out);
+      }
+      serialize_sexpr_inlines(node, out);
+      out += ")";
+      break;
+    }
+
+    case NodeKind::CodeBlock: {
+      out += pad;
+      out += "(codeblock";
+      emit_node_id(node, out);
+      emit_label(node, out);
+      if (!node.src.empty()) {
+        out += " :lang ";
+        escape_sexpr_string(node.src, out);
+      }
+      // Body as a single string (prefer plain text of spans)
+      std::string body;
+      for (const auto& sp : node.spans) body += sp.text;
+      out.push_back(' ');
+      escape_sexpr_string(body, out);
       out += ")";
       break;
     }

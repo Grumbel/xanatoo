@@ -13,7 +13,8 @@ std::string ascii_lower(std::string s) {
 
 bool is_text_node_kind(NodeKind k) {
   return k == NodeKind::Paragraph || k == NodeKind::Heading ||
-         k == NodeKind::ListItem || k == NodeKind::BlockQuote;
+         k == NodeKind::ListItem || k == NodeKind::BlockQuote ||
+         k == NodeKind::Note || k == NodeKind::CodeBlock;
 }
 
 void collect_text_nodes(const Document& doc, NodeId id,
@@ -36,6 +37,12 @@ NodeId find_anchor_node(const Document& doc, std::string_view href) {
   if (href.empty() || href[0] != '#') return INVALID_NODE;
   std::string tlow = ascii_lower(std::string(href.substr(1)));
   if (tlow.empty() || doc.root == INVALID_NODE) return INVALID_NODE;
+
+  // Prefer stable :label (semantic id) over heading text match.
+  for (const Node& n : doc.nodes) {
+    if (n.id == INVALID_NODE) continue;
+    if (!n.label.empty() && ascii_lower(n.label) == tlow) return n.id;
+  }
 
   std::vector<NodeId> nodes;
   collect_text_nodes(doc, doc.root, nodes);
