@@ -50,6 +50,7 @@ struct Node {
   std::string src;                // image path
   bool expanded = true;           // for Stretch
   std::string summary;            // stretchtext collapsed label
+  float display_scale = 1.f;      // image interactive scale (1 = natural fit)
 };
 
 // Simple arena-style store: contiguous nodes, IDs are indices+1

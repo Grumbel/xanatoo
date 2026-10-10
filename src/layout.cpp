@@ -167,10 +167,16 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           if (static_cast<float>(img.width) > max_width) {
             scale = max_width / static_cast<float>(img.width);
           }
-          // Cap height so a huge photo does not dominate the view
           float max_h = 480.f;
           if (img.height * scale > max_h) {
             scale = max_h / static_cast<float>(img.height);
+          }
+          // User interactive scale on top of fit-to-column
+          float user = node.display_scale > 0.05f ? node.display_scale : 1.f;
+          scale *= user;
+          // Keep within column
+          if (img.width * scale > max_width) {
+            scale = max_width / static_cast<float>(img.width);
           }
           disp_w = img.width * scale;
           disp_h = img.height * scale;

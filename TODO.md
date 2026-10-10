@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **014** (this delivery is **013**)
+Next bundle number: **015** (this delivery is **014**)
 
 ## Status (2026-10-10)
 
@@ -43,14 +43,16 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] Link underlines + click-to-follow `#anchor`
 - [x] Ctrl+←/→ word movement
 - [x] Scroll caret into view on arrow navigation
+- [x] Image drag-resize (display_scale + corner handle)
+- [x] Home/End line movement
 
 ## Open work / next steps
 
 1. Optional: HarfBuzz for complex scripts
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
-3. Image drag-resize / interactive placement
-4. Explicit Save As to a chosen path (untitled auto-names for now)
-5. Open external http(s) links (currently logged only)
+3. Explicit Save As to a chosen path (untitled auto-names for now)
+4. Open external http(s) links (currently logged only)
+5. Persist display_scale in serialize_markup (currently session-only)
 
 ## Design notes
 
@@ -75,4 +77,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-010.*-two-docs-divider-…` — two docs + divider
 - `glyphtoo-011.*-undo-leap-…` — per-doc undo + leap search
 - `glyphtoo-012.*-search-ui-save-…` — search UI + untitled save + ns fix
-- `glyphtoo-013.*-links-words-…` — this delivery
+- `glyphtoo-013.*-links-words-…` — links + word move + scroll fix
+- `glyphtoo-014.*-image-resize-…` — this delivery

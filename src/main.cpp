@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <fstream>
 #include <cstdlib>
+#include <cmath>
 
 namespace fs = std::filesystem;
 
@@ -54,6 +55,7 @@ Ctrl+C / Ctrl+V / Ctrl+X for clipboard, Ctrl+Z / Ctrl+Y for undo/redo.
 Drag the gutter to resize. Open two files for independent documents.
 **Ctrl+F** leap search (type to find, F3 next, Esc cancel).
 **Ctrl+←/→** move by word. Click blue links to jump to #anchors.
+Drag the blue corner on images to resize. Home/End move on the line.
 Click a stretchtext marker (▸ / ▾) to expand or collapse.
 
 Inspiration: Ted Nelson's *Xanadu*, Bill Atkinson's **HyperCard**, and
@@ -302,6 +304,10 @@ int main(int argc, char** argv) {
   float split_ratio = 0.5f;        // left pane fraction
   bool dragging_sel = false;
   bool dragging_split = false;
+  bool dragging_image = false;
+  glyphtoo::NodeId resize_image = glyphtoo::INVALID_NODE;
+  float resize_start_x = 0.f;
+  float resize_start_scale = 1.f;
 
   auto doc_of = [&](Pane& p) -> glyphtoo::Document& {
     return docs[p.doc_index];
@@ -435,6 +441,25 @@ int main(int argc, char** argv) {
             Pane& p = F();
             float lx = local_x(mx, focus);
 
+            // Image resize handle (bottom-right 12px square)?
+            {
+              const float hs = 12.f;
+              for (const auto& pi : p.layout.images) {
+                float hx = pi.x + pi.width - hs;
+                float hy = pi.y + pi.height - hs - p.scroll_y;
+                if (lx >= hx && lx <= hx + hs && my >= hy && my <= hy + hs) {
+                  edit();
+                  dragging_image = true;
+                  resize_image = pi.node;
+                  resize_start_x = mx;
+                  resize_start_scale = doc_of(p).get(pi.node).display_scale;
+                  if (resize_start_scale < 0.05f) resize_start_scale = 1.f;
+                  break;
+                }
+              }
+              if (dragging_image) break;
+            }
+
             if (auto sid = glyphtoo::hit_test_stretch(p.layout, lx, my, p.scroll_y)) {
               glyphtoo::NodeId id = *sid;
               if (doc_of(p).get(id).kind == glyphtoo::NodeKind::Stretch) {
@@ -476,6 +501,8 @@ int main(int argc, char** argv) {
           if (ev.button.button == SDL_BUTTON_LEFT) {
             dragging_sel = false;
             dragging_split = false;
+            dragging_image = false;
+            resize_image = glyphtoo::INVALID_NODE;
           }
           break;
 
@@ -484,6 +511,16 @@ int main(int argc, char** argv) {
             float mx = static_cast<float>(ev.motion.x);
             split_ratio = mx / static_cast<float>(win_w);
             split_ratio = std::max(0.15f, std::min(0.85f, split_ratio));
+            needs_layout = true;
+            break;
+          }
+          if (dragging_image && resize_image != glyphtoo::INVALID_NODE) {
+            float mx = static_cast<float>(ev.motion.x);
+            float dx = mx - resize_start_x;
+            // 200px drag ≈ 1.0 scale change
+            float scale = resize_start_scale + dx / 200.f;
+            scale = std::max(0.15f, std::min(3.0f, scale));
+            doc_of(F()).get(resize_image).display_scale = scale;
             needs_layout = true;
             break;
           }
@@ -705,9 +742,59 @@ int main(int argc, char** argv) {
 
             case SDLK_HOME:
               move_and_sel([&] {
-                p.sel.focus.span_index = 0;
-                p.sel.focus.char_index = 0;
+                if (ctrl) {
+                  // Document start
+                  glyphtoo::ensure_valid_caret(d, p.sel.focus);
+                  // walk to first text node
+                  p.sel.focus.span_index = 0;
+                  p.sel.focus.char_index = 0;
+                } else {
+                  // Line start via layout: find leftmost glyph on same baseline
+                  auto cpos = glyphtoo::caret_screen_pos(
+                      p.layout, p.sel.focus, p.scroll_y,
+                      static_cast<float>(body_font.line_height()));
+                  if (cpos.valid) {
+                    float best_x = 1e9f;
+                    glyphtoo::Caret best = p.sel.focus;
+                    for (const auto& g : p.layout.glyphs) {
+                      if (g.node != p.sel.focus.node) continue;
+                      if (std::abs(g.y - (cpos.y + p.scroll_y)) > 2.f) continue;
+                      if (g.x < best_x) {
+                        best_x = g.x;
+                        best = {g.node, g.span_index, g.char_index};
+                      }
+                    }
+                    p.sel.focus = best;
+                  } else {
+                    p.sel.focus.span_index = 0;
+                    p.sel.focus.char_index = 0;
+                  }
+                }
               });
+              scroll_caret_into_view(p);
+              reset_blink();
+              break;
+
+            case SDLK_END:
+              move_and_sel([&] {
+                auto cpos = glyphtoo::caret_screen_pos(
+                    p.layout, p.sel.focus, p.scroll_y,
+                    static_cast<float>(body_font.line_height()));
+                if (cpos.valid) {
+                  float best_x = -1e9f;
+                  glyphtoo::Caret best = p.sel.focus;
+                  for (const auto& g : p.layout.glyphs) {
+                    if (g.node != p.sel.focus.node) continue;
+                    if (std::abs(g.y - (cpos.y + p.scroll_y)) > 2.f) continue;
+                    if (g.x >= best_x) {
+                      best_x = g.x;
+                      best = {g.node, g.span_index, g.char_index + 1};
+                    }
+                  }
+                  p.sel.focus = best;
+                }
+              });
+              scroll_caret_into_view(p);
               reset_blink();
               break;
 

@@ -30,6 +30,11 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
         SDL_SetRenderDrawColor(sdl_, 230, 230, 235, 255);
         SDL_RenderFillRect(sdl_, &dst);
       }
+      // Resize handle (bottom-right corner)
+      const int hs = 10;
+      SDL_Rect handle{dst.x + dst.w - hs, dst.y + dst.h - hs, hs, hs};
+      SDL_SetRenderDrawColor(sdl_, 25, 90, 170, 255);
+      SDL_RenderFillRect(sdl_, &handle);
     }
   }
 
