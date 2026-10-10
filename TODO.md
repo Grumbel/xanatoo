@@ -53,4 +53,4 @@ markup. Type, click, delete — layout reflows immediately.
 ## Bundle history
 
 - `glyphtoo-001.*-stage01-scaffold-568a91b.bundle` — initial scaffold
-- `glyphtoo-002.*-markup-caret-edit-568a91b.bundle` — this delivery
+- `glyphtoo-002.1-markup-caret-edit-568a91b.bundle` — this delivery
