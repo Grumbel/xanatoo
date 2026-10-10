@@ -6,6 +6,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Catch common mistakes; ImGui is vendored and not under our control.
+add_compile_options(-Wall -Wextra -Wno-unused-parameter)
+
 find_package(SDL2 REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(PkgConfig REQUIRED)
@@ -21,6 +24,7 @@ add_executable(glyphtoo
   src/editor.cpp
   src/images.cpp
   src/ui.cpp
+  src/util.cpp
   # Vendored Dear ImGui (MIT) — menu bar / toolbar shell
   external/imgui/imgui.cpp
   external/imgui/imgui_draw.cpp

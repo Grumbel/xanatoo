@@ -11,6 +11,7 @@
 #include "glyphtoo/editor.hpp"
 #include "glyphtoo/images.hpp"
 #include "glyphtoo/ui.hpp"
+#include "glyphtoo/util.hpp"
 
 #include <SDL.h>
 #include <iostream>
@@ -106,23 +107,6 @@ static std::string find_default_document() {
   } catch (...) {
   }
 #endif
-  return {};
-}
-
-static std::string find_system_font() {
-  const char* candidates[] = {
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-      "/usr/share/fonts/TTF/DejaVuSans.ttf",
-      "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-      "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-      "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-      "/System/Library/Fonts/Supplemental/Arial.ttf",
-      "/Library/Fonts/Arial.ttf",
-      nullptr
-  };
-  for (const char** p = candidates; *p; ++p) {
-    if (fs::exists(*p)) return *p;
-  }
   return {};
 }
 
@@ -257,7 +241,6 @@ int main(int argc, char** argv) {
     return 1;
   }
   glyphtoo::Font& body_font = fonts.regular;
-  glyphtoo::Font& heading_font = fonts.heading;
 
 
   auto load_doc = [&](const std::string& path) -> glyphtoo::Document {
@@ -391,7 +374,6 @@ int main(int argc, char** argv) {
   // Leap-style search (Canon Cat inspiration)
   bool search_mode = false;
   std::string search_query;
-  size_t search_match_len = 0;
   bool replace_mode = false;
   bool replace_focus = false;  // false=edit find, true=edit replacement
   std::string replace_text;
@@ -543,20 +525,7 @@ int main(int argc, char** argv) {
           std::string fpath(dropped);
           SDL_free(dropped);
 
-          auto lower_ext = [](std::string s) {
-            for (char& c : s)
-              if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
-            return s;
-          };
-          std::string ext;
-          {
-            auto pos = fpath.find_last_of('.');
-            if (pos != std::string::npos) ext = lower_ext(fpath.substr(pos));
-          }
-          const bool is_img =
-              ext == ".png" || ext == ".jpg" || ext == ".jpeg" ||
-              ext == ".gif" || ext == ".bmp";
-          if (!is_img) {
+          if (!glyphtoo::is_raster_image_path(fpath)) {
             std::cerr << "Drop ignored (not an image): " << fpath << "\n";
             break;
           }
@@ -1022,7 +991,6 @@ int main(int argc, char** argv) {
               p.sel.focus = *hit;
               for (size_t i = 0; i < mlen; ++i)
                 glyphtoo::move_right(doc_of(p), p.sel.focus);
-              search_match_len = mlen;
               scroll_caret_into_view(p);
             }
             reset_blink();
@@ -1206,7 +1174,6 @@ int main(int argc, char** argv) {
                 search_mode = true;
                 replace_mode = false;
                 search_query.clear();
-                search_match_len = 0;
                 std::cout << "Leap search: type to find, F3 next, Esc cancel\n";
                 reset_blink();
               }
@@ -1247,8 +1214,7 @@ int main(int argc, char** argv) {
                   pp.sel.focus = *hit;
                   for (size_t i = 0; i < mlen; ++i)
                     glyphtoo::move_right(doc_of(pp), pp.sel.focus);
-                  search_match_len = mlen;
-                  scroll_caret_into_view(pp);
+                      scroll_caret_into_view(pp);
                   reset_blink();
                 }
               }
@@ -1392,8 +1358,7 @@ int main(int argc, char** argv) {
                   pp.sel.focus = *hit;
                   for (size_t i = 0; i < mlen; ++i)
                     glyphtoo::move_right(dd, pp.sel.focus);
-                  search_match_len = mlen;
-                  scroll_caret_into_view(pp);
+                      scroll_caret_into_view(pp);
                 }
                 reset_blink();
                 break;

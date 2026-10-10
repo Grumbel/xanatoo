@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **059** (this delivery is **058**)
+Next bundle number: **060** (this delivery is **059**)
 
 ## Status (2026-10-10)
 
@@ -104,6 +104,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Experimental S-expression serialize/parse (`.sexp` / `.glyph` / `.ss`)
 - [x] Sexpr polish: `:id`, merged text spans, compact floats; File→Export; cache flush on reload
 - [x] Drag-and-drop image files into a pane (PNG/JPEG/GIF/BMP)
+- [x] Refactor: `util.hpp` (ascii_lower, anchors, image path); -Wall; dead-code cleanup
 
 ## Open work / next steps
 
@@ -145,6 +146,9 @@ LCS structural diff marks; cross-document `:::include`.
   ListItem↔Paragraph when crossing a List; drops emptied lists.
 - Nested lists: ListItem may own a child List. Tab nests under the previous
   sibling; Shift+Tab promotes. Markup uses 2-space indent per level.
+- Shared helpers live in `util.hpp` (ascii_lower, collect_text_nodes,
+  find_anchor_node, is_raster_image_path) so layout/editor/main do not
+  each reimplement anchor matching or extension checks.
 
 ## Bundle history
 
@@ -205,4 +209,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `glyphtoo-055.*-lcs-diff-xdoc-…` — LCS diff + cross-doc include
 - `glyphtoo-056.*-sexpr-…` — S-expression format
 - `glyphtoo-057.*-sexpr-polish-…` — sexpr polish
-- `glyphtoo-058.*-dnd-image-…` — this delivery
+- `glyphtoo-058.*-dnd-image-…` — drag-and-drop images
+- `glyphtoo-059.*-refactor-cleanup-…` — this delivery

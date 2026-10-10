@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
+
+#include "glyphtoo/util.hpp"
+
+namespace glyphtoo {
+
+std::string ascii_lower(std::string s) {
+  for (char& c : s)
+    if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+  return s;
+}
+
+bool is_text_node_kind(NodeKind k) {
+  return k == NodeKind::Paragraph || k == NodeKind::Heading ||
+         k == NodeKind::ListItem || k == NodeKind::BlockQuote;
+}
+
+void collect_text_nodes(const Document& doc, NodeId id,
+                        std::vector<NodeId>& out) {
+  if (id == INVALID_NODE) return;
+  const Node& n = doc.get(id);
+  if (is_text_node_kind(n.kind)) out.push_back(id);
+  for (NodeId c : n.children) collect_text_nodes(doc, c, out);
+}
+
+std::string plain_text(const Document& doc, NodeId id) {
+  if (id == INVALID_NODE) return {};
+  const Node& n = doc.get(id);
+  std::string out;
+  for (const auto& sp : n.spans) out += sp.text;
+  return out;
+}
+
+NodeId find_anchor_node(const Document& doc, std::string_view href) {
+  if (href.empty() || href[0] != '#') return INVALID_NODE;
+  std::string tlow = ascii_lower(std::string(href.substr(1)));
+  if (tlow.empty() || doc.root == INVALID_NODE) return INVALID_NODE;
+
+  std::vector<NodeId> nodes;
+  collect_text_nodes(doc, doc.root, nodes);
+
+  for (NodeId id : nodes) {
+    if (ascii_lower(plain_text(doc, id)) == tlow) return id;
+  }
+  for (NodeId id : nodes) {
+    if (doc.get(id).kind != NodeKind::Heading) continue;
+    if (ascii_lower(plain_text(doc, id)).find(tlow) != std::string::npos)
+      return id;
+  }
+  return INVALID_NODE;
+}
+
+bool path_ends_with_ci(std::string_view path, std::string_view suffix) {
+  if (path.size() < suffix.size()) return false;
+  auto a = ascii_lower(std::string(path.substr(path.size() - suffix.size())));
+  auto b = ascii_lower(std::string(suffix));
+  return a == b;
+}
+
+bool is_raster_image_path(std::string_view path) {
+  return path_ends_with_ci(path, ".png") || path_ends_with_ci(path, ".jpg") ||
+         path_ends_with_ci(path, ".jpeg") || path_ends_with_ci(path, ".gif") ||
+         path_ends_with_ci(path, ".bmp");
+}
+
+}  // namespace glyphtoo

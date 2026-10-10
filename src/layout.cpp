@@ -3,6 +3,7 @@
 
 #include "glyphtoo/layout.hpp"
 #include "glyphtoo/parse.hpp"
+#include "glyphtoo/util.hpp"
 
 #include <fstream>
 #include <map>
@@ -41,49 +42,6 @@ const Document* load_external_doc(const std::string& path) {
   Document doc = parse_document(source, path);
   auto [ins, _] = cache.emplace(key, std::move(doc));
   return &ins->second;
-}
-
-std::string lower_ascii(std::string s) {
-  for (char& c : s)
-    if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
-  return s;
-}
-
-// Resolve #anchor inside doc → text node id (exact match, then heading
-// substring). Mirrors jump_to_href without depending on editor.cpp.
-NodeId resolve_anchor(const Document& doc, const std::string& href) {
-  if (href.empty() || href[0] != '#') return INVALID_NODE;
-  std::string tlow = lower_ascii(href.substr(1));
-  if (tlow.empty() || doc.root == INVALID_NODE) return INVALID_NODE;
-
-  std::vector<NodeId> stack = {doc.root};
-  std::vector<NodeId> text_nodes;
-  while (!stack.empty()) {
-    NodeId cur = stack.back();
-    stack.pop_back();
-    if (cur == INVALID_NODE) continue;
-    const Node& cn = doc.get(cur);
-    if (cn.kind == NodeKind::Paragraph || cn.kind == NodeKind::Heading ||
-        cn.kind == NodeKind::ListItem || cn.kind == NodeKind::BlockQuote) {
-      text_nodes.push_back(cur);
-    }
-    for (auto it = cn.children.rbegin(); it != cn.children.rend(); ++it)
-      stack.push_back(*it);
-  }
-  for (NodeId tid : text_nodes) {
-    const Node& tn = doc.get(tid);
-    std::string text;
-    for (const auto& sp : tn.spans) text += sp.text;
-    if (lower_ascii(text) == tlow) return tid;
-  }
-  for (NodeId tid : text_nodes) {
-    const Node& tn = doc.get(tid);
-    if (tn.kind != NodeKind::Heading) continue;
-    std::string text;
-    for (const auto& sp : tn.spans) text += sp.text;
-    if (lower_ascii(text).find(tlow) != std::string::npos) return tid;
-  }
-  return INVALID_NODE;
 }
 
 // Split src into (path, #anchor). path empty ⇒ same-document.
@@ -461,7 +419,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       std::vector<InlineSpan> body_spans;
       if (src_doc) {
         if (!href_part.empty()) {
-          target_id = resolve_anchor(*src_doc, href_part);
+          target_id = find_anchor_node(*src_doc, href_part);
           if (target_id != INVALID_NODE)
             body_spans = src_doc->get(target_id).spans;
         } else if (external) {

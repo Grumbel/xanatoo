@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "glyphtoo/parse.hpp"
+#include "glyphtoo/util.hpp"
 #include <cctype>
 #include <algorithm>
 #include <vector>
@@ -406,9 +407,7 @@ Document parse_markup(std::string_view source) {
           parse_inlines(doc.get(item), ltrim.substr(imlen));
           ++i;
         }
-        // Renumber every list we created
-        for (const auto& f : frames)
-          ;  // renumber happens via display numbers already set
+        // Ordered item numbers were set while scanning; no second pass.
         continue;
       }
     }
@@ -1261,11 +1260,8 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
 }  // namespace
 
 bool path_uses_sexpr(std::string_view path) {
-  auto ends_with = [&](const char* ext) {
-    size_t n = std::char_traits<char>::length(ext);
-    return path.size() >= n && path.compare(path.size() - n, n, ext) == 0;
-  };
-  return ends_with(".sexp") || ends_with(".glyph") || ends_with(".ss");
+  return path_ends_with_ci(path, ".sexp") || path_ends_with_ci(path, ".glyph") ||
+         path_ends_with_ci(path, ".ss");
 }
 
 bool looks_like_sexpr(std::string_view source) {

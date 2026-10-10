@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "glyphtoo/editor.hpp"
+#include "glyphtoo/util.hpp"
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -44,21 +45,6 @@ static size_t utf8_byte_offset(const std::string& s, size_t char_index) {
     ++n;
   }
   return i;
-}
-
-static bool is_text_node(NodeKind k) {
-  return k == NodeKind::Paragraph || k == NodeKind::Heading ||
-         k == NodeKind::ListItem || k == NodeKind::BlockQuote;
-}
-
-static void collect_text_nodes(const Document& doc, NodeId id, std::vector<NodeId>& out) {
-  const Node& n = doc.get(id);
-  if (is_text_node(n.kind)) {
-    out.push_back(id);
-  }
-  for (NodeId c : n.children) {
-    collect_text_nodes(doc, c, out);
-  }
 }
 
 struct CaretKey {
@@ -721,19 +707,30 @@ std::optional<NodeId> insert_sibling_after(Document& doc, Caret& caret,
 std::optional<NodeId> insert_image(Document& doc, Caret& caret,
                                    const std::string& path,
                                    const std::string& alt) {
-  if (path.empty() || caret.node == INVALID_NODE) return std::nullopt;
-  NodeId block = caret.node;
-  Node& bn = doc.get(block);
-  if (bn.parent == INVALID_NODE) return std::nullopt;
-  if (bn.kind == NodeKind::Document || bn.kind == NodeKind::Columns ||
-      bn.kind == NodeKind::Column || bn.kind == NodeKind::List) {
-    return std::nullopt;
-  }
+  if (path.empty()) return std::nullopt;
 
+  // Resolve a block we can insert after. Containers (Document/Columns/List)
+  // are not valid insertion anchors; prefer the caret node, then the last
+  // child of the root.
+  NodeId block = caret.node;
+  if (block != INVALID_NODE) {
+    const Node& bn = doc.get(block);
+    if (bn.kind == NodeKind::Document || bn.kind == NodeKind::Columns ||
+        bn.kind == NodeKind::Column || bn.kind == NodeKind::List ||
+        bn.parent == INVALID_NODE) {
+      block = INVALID_NODE;
+    }
+  }
+  if (block == INVALID_NODE && doc.root != INVALID_NODE) {
+    const Node& root = doc.get(doc.root);
+    if (!root.children.empty()) block = root.children.back();
+  }
+  if (block == INVALID_NODE || doc.get(block).parent == INVALID_NODE)
+    return std::nullopt;
+
+  Node& bn = doc.get(block);
   NodeId nid = doc.create(NodeKind::Image, INVALID_NODE);
   Node& img = doc.get(nid);
-  img.kind = NodeKind::Image;
-  img.parent = bn.parent;
   img.src = path;
   img.alt = alt.empty() ? path : alt;
   img.display_scale = 1.f;
@@ -743,7 +740,6 @@ std::optional<NodeId> insert_image(Document& doc, Caret& caret,
   }
 
   NodeId para = doc.create(NodeKind::Paragraph, INVALID_NODE);
-  doc.get(para).parent = bn.parent;
   if (!doc.insert_after(nid, para)) doc.add_child(bn.parent, para);
   caret.node = para;
   caret.span_index = 0;
@@ -1031,7 +1027,7 @@ static bool detach_from_parent(Document& doc, NodeId id) {
 bool split_block(Document& doc, Caret& caret) {
   if (caret.node == INVALID_NODE) return false;
   Node& n = doc.get(caret.node);
-  if (!is_text_node(n.kind)) return false;
+  if (!is_text_node_kind(n.kind)) return false;
 
   // Enter on an empty list item exits the list: drop the item and place a
   // fresh paragraph after the list (common editor behaviour).
@@ -1326,30 +1322,9 @@ bool move_word_right(Document& doc, Caret& caret) {
 }
 
 std::optional<Caret> jump_to_href(const Document& doc, const std::string& href) {
-  if (href.empty() || href[0] != '#') return std::nullopt;
-  std::string target = href.substr(1);
-  auto lower = [](std::string s) {
-    for (char& c : s)
-      if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
-    return s;
-  };
-  std::string tlow = lower(target);
-  std::vector<NodeId> nodes;
-  if (doc.root != INVALID_NODE) collect_text_nodes(doc, doc.root, nodes);
-  for (NodeId id : nodes) {
-    const Node& n = doc.get(id);
-    std::string text;
-    for (const auto& sp : n.spans) text += sp.text;
-    if (lower(text) == tlow) return Caret{id, 0, 0};
-  }
-  for (NodeId id : nodes) {
-    const Node& n = doc.get(id);
-    if (n.kind != NodeKind::Heading) continue;
-    std::string text;
-    for (const auto& sp : n.spans) text += sp.text;
-    if (lower(text).find(tlow) != std::string::npos) return Caret{id, 0, 0};
-  }
-  return std::nullopt;
+  NodeId id = find_anchor_node(doc, href);
+  if (id == INVALID_NODE) return std::nullopt;
+  return Caret{id, 0, 0};
 }
 
 std::optional<std::string> link_preview_text(const Document& doc,
@@ -1568,7 +1543,7 @@ bool move_to_document_end(Document& doc, Caret& caret) {
 void ensure_valid_caret(Document& doc, Caret& caret) {
   if (caret.node != INVALID_NODE) {
     const Node& n = doc.get(caret.node);
-    if (is_text_node(n.kind)) {
+    if (is_text_node_kind(n.kind)) {
       if (n.spans.empty()) {
         caret.span_index = 0;
         caret.char_index = 0;
@@ -1594,12 +1569,7 @@ void ensure_valid_caret(Document& doc, Caret& caret) {
 
 
 std::string node_text(const Document& doc, NodeId id) {
-  const Node& n = doc.get(id);
-  std::string out;
-  for (const auto& sp : n.spans) {
-    out += sp.text;
-  }
-  return out;
+  return plain_text(doc, id);
 }
 
 void paste_plain_text(Document& doc, Caret& caret, const std::string& text) {
