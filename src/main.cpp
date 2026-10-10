@@ -308,6 +308,8 @@ int main(int argc, char** argv) {
   glyphtoo::NodeId resize_image = glyphtoo::INVALID_NODE;
   float resize_start_x = 0.f;
   float resize_start_scale = 1.f;
+  Uint32 last_click_ticks = 0;
+  float last_click_x = -999.f, last_click_y = -999.f;
 
   auto doc_of = [&](Pane& p) -> glyphtoo::Document& {
     return docs[p.doc_index];
@@ -486,12 +488,26 @@ int main(int argc, char** argv) {
             }
 
             if (auto hit = glyphtoo::hit_test(p.layout, lx, my, p.scroll_y)) {
+              Uint32 now = SDL_GetTicks();
+              bool dbl = (now - last_click_ticks) < 400 &&
+                         std::abs(mx - last_click_x) < 4.f &&
+                         std::abs(my - last_click_y) < 4.f;
+              last_click_ticks = now;
+              last_click_x = mx;
+              last_click_y = my;
+
               p.sel.focus = *hit;
-              if (!(SDL_GetModState() & KMOD_SHIFT)) {
+              if (dbl) {
+                // Select word under caret
+                glyphtoo::Document& dd = doc_of(p);
+                glyphtoo::move_word_left(dd, p.sel.focus);
+                p.sel.anchor = p.sel.focus;
+                glyphtoo::move_word_right(dd, p.sel.focus);
+              } else if (!(SDL_GetModState() & KMOD_SHIFT)) {
                 p.sel.anchor = p.sel.focus;
               }
               p.preferred_x = lx;
-              dragging_sel = true;
+              dragging_sel = !dbl;
               reset_blink();
             }
           }

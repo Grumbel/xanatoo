@@ -192,7 +192,7 @@ Document parse_markup(std::string_view source) {
       continue;
     }
 
-    // Image ![alt](src)
+    // Image ![alt](src) optional {scale=1.5}
     if (trimmed.starts_with("![")) {
       size_t mid = trimmed.find("](");
       size_t end = trimmed.find(')', mid == std::string_view::npos ? 0 : mid);
@@ -200,6 +200,18 @@ Document parse_markup(std::string_view source) {
         NodeId n = doc.create(NodeKind::Image, current_parent());
         doc.get(n).alt = std::string(trimmed.substr(2, mid - 2));
         doc.get(n).src = std::string(trimmed.substr(mid + 2, end - (mid + 2)));
+        // Optional {scale=…} after the closing paren
+        size_t brace = trimmed.find("{scale=", end);
+        if (brace != std::string_view::npos) {
+          size_t bend = trimmed.find('}', brace);
+          if (bend != std::string_view::npos) {
+            std::string num(trimmed.substr(brace + 7, bend - (brace + 7)));
+            try {
+              float s = std::stof(num);
+              if (s > 0.05f && s < 10.f) doc.get(n).display_scale = s;
+            } catch (...) {}
+          }
+        }
         ++i;
         continue;
       }
@@ -317,7 +329,16 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
       out += node.alt;
       out += "](";
       out += node.src;
-      out += ")\n\n";
+      out += ")";
+      if (node.display_scale > 0.05f &&
+          (node.display_scale < 0.99f || node.display_scale > 1.01f)) {
+        out += "{scale=";
+        out += std::to_string(node.display_scale);
+        // trim excess float digits: keep ~2
+        // (to_string is fine for round-trip)
+        out += "}";
+      }
+      out += "\n\n";
       break;
     }
 
