@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **080** (this delivery is **079**)
+Next bundle number: **081** (this delivery is **080**)
 
 ## Status (2026-10-10)
 
@@ -127,6 +127,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Nix build: python3 for icon rasterize; libx11 (drop deprecated xorg.libX11)
 - [x] Icon install/runtime: XANATOO_ICON_DIR env, exe-relative share path, flake wrap
 - [x] Soft-window mouse: browse independent of help_mode; drag/resize/scroll motion
+- [x] Outline as software window (drag/resize/scroll; non-modal; stays open on jump)
 
 ## Open work / next steps
 
@@ -255,4 +256,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-076.*-doc-window-…` — software windows for arbitrary files
 - `xanatoo-077.*-nix-icons-libx11-…` — Nix python3 icons + libx11
 - `xanatoo-078.*-icon-install-…` — icon install + XANATOO_ICON_DIR
-- `xanatoo-079.*-softwin-mouse-…` — this delivery
+- `xanatoo-079.*-softwin-mouse-…` — soft-window mouse hit-testing
+- `xanatoo-080.*-outline-window-…` — this delivery

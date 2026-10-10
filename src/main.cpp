@@ -271,9 +271,18 @@ int main(int argc, char** argv) {
   const int help_title_h = 28;
   const int help_pad = 12;
   const int help_edge = 6;  // hit thickness for edges/corner
-  bool outline_mode = false;  // Ctrl+Shift+O heading outline
+  // Heading outline as a software window (Ctrl+Shift+O) — same chrome as Help.
+  bool outline_mode = false;
   std::vector<xanatoo::OutlineEntry> outline;
   int outline_sel = 0;
+  int ol_x = 40, ol_y = 90, ol_w = 320, ol_h = 420;
+  bool ol_dragging = false;
+  int ol_drag_dx = 0, ol_drag_dy = 0;
+  int ol_resize = 0;  // 1=right, 2=bottom
+  int ol_resize_start_x = 0, ol_resize_start_y = 0;
+  int ol_resize_start_w = 0, ol_resize_start_h = 0;
+  float ol_scroll = 0.f;
+  bool ol_scroll_dragging = false;
   // Side-by-side version marks (two independent documents)
   bool diff_mode = false;
   std::vector<xanatoo::NodeId> diff_marks[2];
@@ -504,10 +513,14 @@ int main(int argc, char** argv) {
   // Hit-tests compare against glyph.y - scroll_y in this space.
   auto content_y = [&](float window_y) { return window_y - ui_top; };
 
-  // Outline panel geometry (updated each frame when open; used for clicks)
-  int ol_px = 0, ol_py = 0, ol_pw = 0, ol_ph = 0;
-  float ol_step = 20.f;
-  int ol_header = 36;
+  auto outline_client_rect = [&]() {
+    return std::tuple{ol_x + help_pad, ol_y + help_title_h + 4,
+                      ol_w - help_pad * 2,
+                      ol_h - help_title_h - help_pad - 4};
+  };
+  auto outline_row_step = [&]() {
+    return static_cast<float>(std::max(16, body_font.line_height() + 4));
+  };
 
   while (running) {
     SDL_Event ev;
@@ -596,7 +609,13 @@ int main(int argc, char** argv) {
         case SDL_MOUSEWHEEL: {
           int mxw = 0, myw = 0;
           SDL_GetMouseState(&mxw, &myw);
-          // Soft windows first (match paint z-order).
+          // Soft windows first (match paint z-order: outline → browse → help).
+          if (outline_mode && mxw >= ol_x && mxw < ol_x + ol_w &&
+              myw >= ol_y && myw < ol_y + ol_h) {
+            ol_scroll -= static_cast<float>(ev.wheel.y) * 40.f;
+            if (ol_scroll < 0.f) ol_scroll = 0.f;
+            break;
+          }
           if (browse.open && mxw >= browse.x && mxw < browse.x + browse.w &&
               myw >= browse.y && myw < browse.y + browse.h) {
             browse.scroll -= static_cast<float>(ev.wheel.y) * 40.f;
@@ -626,7 +645,78 @@ int main(int argc, char** argv) {
 
             // Software windows are custom-drawn (not ImGui). Hit-test them
             // before the ImGui capture check and before the document panes.
-            // Z-order matches paint order: browse on top of help.
+            // Z-order matches paint order: outline → browse → help.
+
+            // ---- Outline software window ----
+            if (outline_mode &&
+                mxw >= ol_x - help_edge &&
+                mxw <= ol_x + ol_w + help_edge &&
+                myw >= ol_y - help_edge &&
+                myw <= ol_y + ol_h + help_edge) {
+              const bool inside =
+                  mxw >= ol_x && mxw < ol_x + ol_w &&
+                  myw >= ol_y && myw < ol_y + ol_h;
+              {
+                const bool on_r =
+                    mxw >= ol_x + ol_w - help_edge &&
+                    myw >= ol_y + help_title_h &&
+                    myw <= ol_y + ol_h + help_edge;
+                const bool on_b =
+                    myw >= ol_y + ol_h - help_edge &&
+                    mxw >= ol_x &&
+                    mxw <= ol_x + ol_w + help_edge;
+                if (on_r || on_b) {
+                  ol_resize = (on_r ? 1 : 0) | (on_b ? 2 : 0);
+                  ol_resize_start_x = mxw;
+                  ol_resize_start_y = myw;
+                  ol_resize_start_w = ol_w;
+                  ol_resize_start_h = ol_h;
+                  ol_dragging = false;
+                  break;
+                }
+              }
+              if (inside && myw < ol_y + help_title_h) {
+                if (mxw >= ol_x + ol_w - 28) {
+                  outline_mode = false;
+                  ol_dragging = false;
+                  ol_resize = 0;
+                } else {
+                  ol_dragging = true;
+                  ol_drag_dx = mxw - ol_x;
+                  ol_drag_dy = myw - ol_y;
+                }
+                break;
+              }
+              if (inside) {
+                auto [cx, cy, cw, ch] = outline_client_rect();
+                const float step = outline_row_step();
+                const int sb_w = 10;
+                if (mxw >= cx + cw - sb_w && mxw <= cx + cw + 2 &&
+                    myw >= cy && myw <= cy + ch) {
+                  float content_h =
+                      static_cast<float>(outline.size()) * step + 8.f;
+                  float max_s =
+                      std::max(0.f, content_h - static_cast<float>(ch));
+                  float view_h = static_cast<float>(std::max(1, ch));
+                  float ratio =
+                      (static_cast<float>(myw - cy) / view_h);
+                  ratio = std::max(0.f, std::min(1.f, ratio));
+                  ol_scroll = ratio * max_s;
+                  ol_scroll_dragging = true;
+                  break;
+                }
+                if (mxw >= cx && mxw < cx + cw && myw >= cy && myw < cy + ch) {
+                  int row = static_cast<int>(
+                      (static_cast<float>(myw - cy) + ol_scroll) / step);
+                  if (row >= 0 && row < static_cast<int>(outline.size())) {
+                    outline_sel = row;
+                    jump_outline_sel();
+                    // Keep window open (TOC stays available).
+                  }
+                }
+                break;
+              }
+            }
 
             // ---- Browse software window ----
             if (browse.open &&
@@ -809,22 +899,6 @@ int main(int argc, char** argv) {
 
             float mx = static_cast<float>(ev.button.x);
             float my = content_y(static_cast<float>(ev.button.y));
-
-            // Outline panel click → jump to heading
-            if (outline_mode && ol_pw > 0) {
-              if (mx >= ol_px && mx < ol_px + ol_pw && my >= ol_py &&
-                  my < ol_py + ol_ph) {
-                int row = static_cast<int>((my - ol_py - ol_header) / ol_step);
-                if (row >= 0 && row < static_cast<int>(outline.size())) {
-                  outline_sel = row;
-                  jump_outline_sel();
-                  outline_mode = false;
-                }
-              } else {
-                outline_mode = false;  // click outside closes
-              }
-              break;
-            }
 
             // Drag scrollbar (right edge of a pane)?
             {
@@ -1038,6 +1112,9 @@ int main(int argc, char** argv) {
             browse.dragging = false;
             browse.resize = 0;
             browse.scroll_dragging = false;
+            ol_dragging = false;
+            ol_resize = 0;
+            ol_scroll_dragging = false;
             if (dragging_block && drag_block_id != xanatoo::INVALID_NODE &&
                 drop_target_id != xanatoo::INVALID_NODE &&
                 drop_target_id != drag_block_id) {
@@ -1072,6 +1149,44 @@ int main(int argc, char** argv) {
 
           // Soft-window drag/resize continue even if ImGui wants the mouse
           // (capture flag can lag one frame after a title-bar grab).
+          if (ol_dragging) {
+            ol_x = ev.motion.x - ol_drag_dx;
+            ol_y = ev.motion.y - ol_drag_dy;
+            if (ol_x < 0) ol_x = 0;
+            if (ol_y < static_cast<int>(ui_top))
+              ol_y = static_cast<int>(ui_top);
+            break;
+          }
+          if (ol_scroll_dragging) {
+            auto [cx, cy, cw, ch] = outline_client_rect();
+            float step = outline_row_step();
+            float content_h =
+                static_cast<float>(outline.size()) * step + 8.f;
+            float max_s =
+                std::max(0.f, content_h - static_cast<float>(ch));
+            float view_h = static_cast<float>(std::max(1, ch));
+            float ratio =
+                (static_cast<float>(ev.motion.y) - static_cast<float>(cy)) /
+                view_h;
+            ratio = std::max(0.f, std::min(1.f, ratio));
+            ol_scroll = ratio * max_s;
+            break;
+          }
+          if (ol_resize) {
+            int dx = ev.motion.x - ol_resize_start_x;
+            int dy = ev.motion.y - ol_resize_start_y;
+            if (ol_resize & 1) {
+              ol_w = ol_resize_start_w + dx;
+              if (ol_w < 200) ol_w = 200;
+              if (ol_w > win_w - 20) ol_w = win_w - 20;
+            }
+            if (ol_resize & 2) {
+              ol_h = ol_resize_start_h + dy;
+              if (ol_h < 140) ol_h = 140;
+              if (ol_h > win_h - 40) ol_h = win_h - 40;
+            }
+            break;
+          }
           if (browse.dragging) {
             browse.x = ev.motion.x - browse.drag_dx;
             browse.y = ev.motion.y - browse.drag_dy;
@@ -1253,7 +1368,7 @@ int main(int argc, char** argv) {
 
         case SDL_TEXTINPUT: {
           if (imgui_keys) break;
-          if (outline_mode) break;  // help is non-modal; typing goes to the document
+          // Outline is a software window (non-modal): typing goes to the document.
           if (save_as_mode) {
             save_as_path += ev.text.text;
             break;
@@ -1318,45 +1433,54 @@ int main(int argc, char** argv) {
             break;
           }
 
-          // Outline: navigate headings, Enter/click jumps, Esc closes
+          // Outline software window: Esc/toggle close; arrows + 1-9 + Enter
+          // navigate without eating other document keys.
           if (outline_mode) {
             if (ev.key.keysym.sym == SDLK_ESCAPE ||
                 (ev.key.keysym.sym == SDLK_o && ctrl && shift)) {
               outline_mode = false;
+              ol_dragging = false;
+              ol_resize = 0;
               break;
             }
+            bool outline_consumed = false;
             switch (ev.key.keysym.sym) {
               case SDLK_UP:
                 if (outline_sel > 0) --outline_sel;
+                outline_consumed = true;
                 break;
               case SDLK_DOWN:
                 if (outline_sel + 1 < static_cast<int>(outline.size()))
                   ++outline_sel;
+                outline_consumed = true;
                 break;
               case SDLK_HOME:
                 outline_sel = 0;
+                outline_consumed = true;
                 break;
               case SDLK_END:
                 if (!outline.empty())
                   outline_sel = static_cast<int>(outline.size()) - 1;
+                outline_consumed = true;
                 break;
               case SDLK_RETURN:
               case SDLK_KP_ENTER:
                 jump_outline_sel();
-                outline_mode = false;
+                outline_consumed = true;
                 break;
               default:
-                if (ev.key.keysym.sym >= SDLK_1 && ev.key.keysym.sym <= SDLK_9) {
+                if (ev.key.keysym.sym >= SDLK_1 &&
+                    ev.key.keysym.sym <= SDLK_9) {
                   int idx = static_cast<int>(ev.key.keysym.sym - SDLK_1);
                   if (idx < static_cast<int>(outline.size())) {
                     outline_sel = idx;
                     jump_outline_sel();
-                    outline_mode = false;
+                    outline_consumed = true;
                   }
                 }
                 break;
             }
-            break;
+            if (outline_consumed) break;
           }
 
           auto clear_sel = [&]() { p.sel.anchor = p.sel.focus; };
@@ -2005,9 +2129,9 @@ int main(int argc, char** argv) {
               if (ctrl && shift) {
                 outline_mode = !outline_mode;
                 if (outline_mode) {
-                  help_mode = false;
                   refresh_outline();
                   outline_sel = 0;
+                  ol_scroll = 0.f;
                   // Prefer selecting the heading nearest the caret
                   for (int i = 0; i < static_cast<int>(outline.size()); ++i) {
                     if (outline[static_cast<size_t>(i)].node ==
@@ -2263,6 +2387,7 @@ int main(int argc, char** argv) {
     }
 
     if (needs_layout) layout_panes();
+    if (outline_mode) refresh_outline();
 
     float lh = static_cast<float>(body_font.line_height());
     // ImGui menu + toolbar
@@ -2505,9 +2630,9 @@ int main(int argc, char** argv) {
         case C::ToggleOutline:
           outline_mode = !outline_mode;
           if (outline_mode) {
-            help_mode = false;
             refresh_outline();
             outline_sel = 0;
+            ol_scroll = 0.f;
           }
           break;
         case C::ToggleDiff:
@@ -2881,35 +3006,53 @@ int main(int argc, char** argv) {
       }
     }
 
-    // Heading outline overlay (Ctrl+Shift+O)
+    // Heading outline software window (Ctrl+Shift+O)
     if (outline_mode) {
+      if (ol_w < 200) ol_w = 200;
+      if (ol_h < 140) ol_h = 140;
+      const float step = outline_row_step();
+      auto [cx, cy, cw, ch] = outline_client_rect();
+      {
+        float content_h =
+            static_cast<float>(outline.size()) * step + 8.f;
+        float max_s = std::max(0.f, content_h - static_cast<float>(ch));
+        if (ol_scroll > max_s) ol_scroll = max_s;
+      }
+
       SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
-      SDL_SetRenderDrawColor(sdl, 20, 22, 28, 180);
-      SDL_Rect dim{0, 0, win_w, win_h};
-      SDL_RenderFillRect(sdl, &dim);
-
-      ol_pw = std::min(480, win_w - 48);
-      ol_ph = std::min(win_h - 48, std::max(120, static_cast<int>(outline.size()) * 22 + 56));
-      ol_px = (win_w - ol_pw) / 2;
-      ol_py = (win_h - ol_ph) / 2;
-      ol_header = 40;
-      ol_step = static_cast<float>(
-          std::max(16, body_font.line_height() + 4));
-
-      SDL_SetRenderDrawColor(sdl, 248, 246, 240, 250);
-      SDL_Rect panel{ol_px, ol_py, ol_pw, ol_ph};
-      SDL_RenderFillRect(sdl, &panel);
+      SDL_SetRenderDrawColor(sdl, 0, 0, 0, 40);
+      SDL_Rect shadow{ol_x + 3, ol_y + 3, ol_w, ol_h};
+      SDL_RenderFillRect(sdl, &shadow);
+      SDL_SetRenderDrawColor(sdl, 248, 246, 240, 255);
+      SDL_Rect frame{ol_x, ol_y, ol_w, ol_h};
+      SDL_RenderFillRect(sdl, &frame);
       SDL_SetRenderDrawColor(sdl, 25, 90, 170, 255);
-      SDL_RenderDrawRect(sdl, &panel);
+      SDL_RenderDrawRect(sdl, &frame);
+      // Title bar
+      SDL_SetRenderDrawColor(sdl, 200, 216, 240, 255);
+      SDL_Rect title{ol_x + 1, ol_y + 1, ol_w - 2, help_title_h};
+      SDL_RenderFillRect(sdl, &title);
+      SDL_SetRenderDrawColor(sdl, 25, 90, 170, 255);
+      SDL_RenderDrawLine(sdl, ol_x, ol_y + help_title_h, ol_x + ol_w,
+                         ol_y + help_title_h);
       SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
 
-      renderer.draw_text(body_font, static_cast<float>(ol_px + 16),
-                         static_cast<float>(ol_py + 12 + body_font.ascender()),
-                         "Outline — Enter jump · Esc close", 25, 90, 170);
+      renderer.draw_text(body_font, static_cast<float>(ol_x + 10),
+                         static_cast<float>(ol_y + 6 + body_font.ascender()),
+                         "Outline", 25, 90, 170);
+      renderer.draw_text(body_font, static_cast<float>(ol_x + ol_w - 22),
+                         static_cast<float>(ol_y + 6 + body_font.ascender()),
+                         "×", 80, 40, 40);
 
-      float ty = static_cast<float>(ol_py + ol_header + body_font.ascender());
+      SDL_Rect clip{cx, cy, cw, ch};
+      SDL_RenderSetClipRect(sdl, &clip);
+      float ty = static_cast<float>(cy) + body_font.ascender() - ol_scroll;
       for (int i = 0; i < static_cast<int>(outline.size()); ++i) {
-        if (ty > ol_py + ol_ph - 8) break;
+        if (ty > static_cast<float>(cy + ch) + step) break;
+        if (ty + step < static_cast<float>(cy)) {
+          ty += step;
+          continue;
+        }
         const auto& e = outline[static_cast<size_t>(i)];
         std::string line;
         if (i < 9) {
@@ -2923,22 +3066,56 @@ int main(int argc, char** argv) {
         if (i == outline_sel) {
           SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
           SDL_SetRenderDrawColor(sdl, 25, 90, 170, 40);
-          SDL_Rect hi{ol_px + 4,
+          SDL_Rect hi{cx + 2,
                       static_cast<int>(ty - body_font.ascender() - 2),
-                      ol_pw - 8, static_cast<int>(ol_step)};
+                      cw - 4, static_cast<int>(step)};
           SDL_RenderFillRect(sdl, &hi);
           SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
-          renderer.draw_text(body_font, static_cast<float>(ol_px + 16), ty, line,
+          renderer.draw_text(body_font, static_cast<float>(cx + 8), ty, line,
                              25, 90, 170);
         } else {
-          renderer.draw_text(body_font, static_cast<float>(ol_px + 16), ty, line,
+          renderer.draw_text(body_font, static_cast<float>(cx + 8), ty, line,
                              50, 48, 42);
         }
-        ty += ol_step;
+        ty += step;
       }
       if (outline.empty()) {
-        renderer.draw_text(body_font, static_cast<float>(ol_px + 16), ty,
-                           "(no headings in this document)", 120, 118, 110);
+        renderer.draw_text(
+            body_font, static_cast<float>(cx + 8),
+            static_cast<float>(cy) + body_font.ascender(),
+            "(no headings in this document)", 120, 118, 110);
+      }
+      SDL_RenderSetClipRect(sdl, nullptr);
+
+      // Scrollbar
+      {
+        float content_h =
+            static_cast<float>(outline.size()) * step + 8.f;
+        float max_s = std::max(0.f, content_h - static_cast<float>(ch));
+        if (max_s > 1.f) {
+          const int sb_w = 8;
+          float view_h = static_cast<float>(ch);
+          float thumb_h =
+              std::max(20.f, view_h * (view_h / (view_h + max_s)));
+          float track = std::max(0.f, view_h - thumb_h);
+          float ratio = ol_scroll / max_s;
+          int thumb_y = cy + static_cast<int>(ratio * track);
+          int sx = cx + cw - sb_w;
+          SDL_SetRenderDrawColor(sdl, 220, 218, 212, 255);
+          SDL_Rect track_r{sx, cy, sb_w, ch};
+          SDL_RenderFillRect(sdl, &track_r);
+          SDL_SetRenderDrawColor(sdl, 25, 90, 170, 255);
+          SDL_Rect thumb{sx, thumb_y, sb_w, static_cast<int>(thumb_h)};
+          SDL_RenderFillRect(sdl, &thumb);
+        }
+      }
+      // Resize grip
+      {
+        const int gx = ol_x + ol_w - 3;
+        const int gy = ol_y + ol_h - 3;
+        SDL_SetRenderDrawColor(sdl, 25, 90, 170, 255);
+        for (int i = 0; i < 3; ++i)
+          SDL_RenderDrawLine(sdl, gx - i * 3, gy, gx, gy - i * 3);
       }
     }
 
