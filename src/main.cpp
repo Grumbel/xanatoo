@@ -388,6 +388,13 @@ int main(int argc, char** argv) {
   glyphtoo::NodeId drop_target_id = glyphtoo::INVALID_NODE;
   bool drop_before = true;
   float drop_line_y = -1.f;  // content y for insertion indicator
+  // Column gutter drag (adjust relative display_scale weights)
+  bool dragging_col_gap = false;
+  glyphtoo::NodeId col_gap_left = glyphtoo::INVALID_NODE;
+  glyphtoo::NodeId col_gap_right = glyphtoo::INVALID_NODE;
+  float col_gap_start_x = 0.f;
+  float col_gap_left_w = 1.f;
+  float col_gap_right_w = 1.f;
   Uint32 last_click_ticks = 0;
   float last_click_x = -999.f, last_click_y = -999.f;
 
@@ -579,6 +586,28 @@ int main(int argc, char** argv) {
               if (dragging_image) break;
             }
 
+            // Column gutter drag (between side-by-side columns)
+            {
+              float adj_y = my + p.scroll_y;
+              for (const auto& gap : p.layout.column_gaps) {
+                if (adj_y < gap.y || adj_y > gap.y + gap.height) continue;
+                if (std::abs(lx - gap.x) > 8.f) continue;
+                edit();
+                dragging_col_gap = true;
+                col_gap_left = gap.left;
+                col_gap_right = gap.right;
+                col_gap_start_x = mx;
+                float lw = doc_of(p).get(gap.left).display_scale;
+                float rw = doc_of(p).get(gap.right).display_scale;
+                if (lw < 0.1f) lw = 1.f;
+                if (rw < 0.1f) rw = 1.f;
+                col_gap_left_w = lw;
+                col_gap_right_w = rw;
+                break;
+              }
+              if (dragging_col_gap) break;
+            }
+
             // Block drag: grab left margin (16px) of a layout box
             {
               float adj_y = my + p.scroll_y;
@@ -700,6 +729,9 @@ int main(int argc, char** argv) {
             drag_block_id = glyphtoo::INVALID_NODE;
             drop_target_id = glyphtoo::INVALID_NODE;
             drop_line_y = -1.f;
+            dragging_col_gap = false;
+            col_gap_left = glyphtoo::INVALID_NODE;
+            col_gap_right = glyphtoo::INVALID_NODE;
             resize_image = glyphtoo::INVALID_NODE;
           }
           break;
@@ -732,6 +764,28 @@ int main(int argc, char** argv) {
             float scale = resize_start_scale + dx / 200.f;
             scale = std::max(0.15f, std::min(3.0f, scale));
             doc_of(F()).get(resize_image).display_scale = scale;
+            needs_layout = true;
+            break;
+          }
+          if (dragging_col_gap && col_gap_left != glyphtoo::INVALID_NODE &&
+              col_gap_right != glyphtoo::INVALID_NODE) {
+            float mx = static_cast<float>(ev.motion.x);
+            float dx = mx - col_gap_start_x;
+            // Shift weight from one column to the other; keep total constant
+            float total = col_gap_left_w + col_gap_right_w;
+            float delta = dx / 200.f * total;
+            float nl = col_gap_left_w + delta;
+            float nr = col_gap_right_w - delta;
+            if (nl < 0.2f) {
+              nl = 0.2f;
+              nr = total - nl;
+            }
+            if (nr < 0.2f) {
+              nr = 0.2f;
+              nl = total - nr;
+            }
+            doc_of(F()).get(col_gap_left).display_scale = nl;
+            doc_of(F()).get(col_gap_right).display_scale = nr;
             needs_layout = true;
             break;
           }
@@ -1609,6 +1663,18 @@ int main(int argc, char** argv) {
         SDL_RenderFillRect(sdl, &bar);
       }
 
+      // Column gutters (subtle vertical handles)
+      for (const auto& gap : pane.layout.column_gaps) {
+        int gx = pane.x + static_cast<int>(gap.x);
+        int gy = static_cast<int>(gap.y - pane.scroll_y);
+        int gh = static_cast<int>(gap.height);
+        bool active = dragging_col_gap && gap.left == col_gap_left;
+        SDL_SetRenderDrawColor(sdl, active ? 25 : 190, active ? 90 : 188,
+                               active ? 170 : 180, 255);
+        SDL_Rect gbar{gx - 1, gy, 3, gh};
+        SDL_RenderFillRect(sdl, &gbar);
+      }
+
       // Block drag-drop: insertion line + source highlight
       if (dragging_block && i == focus) {
         // Dim the dragged block
@@ -1733,6 +1799,9 @@ int main(int argc, char** argv) {
         tr = 220; tg = 230; tb = 245;
       } else if (dragging_block) {
         label = "Moving block — drop on a sibling to reorder (same as Alt+↑/↓)";
+        tr = 40; tg = 90; tb = 160;
+      } else if (dragging_col_gap) {
+        label = "Resizing columns — drag to adjust relative widths";
         tr = 40; tg = 90; tb = 160;
       } else if (!hovered_href.empty()) {
         label = "Link: ";

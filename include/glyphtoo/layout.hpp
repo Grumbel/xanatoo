@@ -41,6 +41,16 @@ struct PositionedImage {
   std::string base;  // directory for relative path resolution
 };
 
+// Draggable gap between two Column children under a Columns node.
+struct ColumnGap {
+  NodeId columns = INVALID_NODE;
+  NodeId left = INVALID_NODE;
+  NodeId right = INVALID_NODE;
+  float x = 0.f;       // center of the gutter
+  float y = 0.f;
+  float height = 0.f;
+};
+
 struct LayoutResult {
   std::vector<PositionedGlyph> glyphs;
   std::vector<LayoutBox> boxes;
@@ -49,6 +59,7 @@ struct LayoutResult {
   std::vector<LayoutBox> quote_bars;
   // Horizontal rules (x, y = center line, width, height = stroke thickness).
   std::vector<LayoutBox> hr_lines;
+  std::vector<ColumnGap> column_gaps;
   float content_height = 0.f;
 };
 

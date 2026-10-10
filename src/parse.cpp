@@ -207,6 +207,20 @@ Document parse_markup(std::string_view source) {
     }
     if (trimmed.starts_with(":::column")) {
       NodeId n = doc.create(NodeKind::Column, current_parent());
+      // Optional weight=1.5 (relative column width)
+      auto wpos = trimmed.find("weight=");
+      if (wpos != std::string_view::npos) {
+        wpos += 7;
+        size_t wend = wpos;
+        while (wend < trimmed.size() &&
+               (std::isdigit(static_cast<unsigned char>(trimmed[wend])) ||
+                trimmed[wend] == '.'))
+          ++wend;
+        try {
+          float w = std::stof(std::string(trimmed.substr(wpos, wend - wpos)));
+          if (w > 0.1f && w < 20.f) doc.get(n).display_scale = w;
+        } catch (...) {}
+      }
       stack.push_back(n);
       ++i;
       continue;
@@ -534,7 +548,13 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
 
     case NodeKind::Column: {
       out += pad;
-      out += ":::column\n";
+      out += ":::column";
+      if (node.display_scale > 0.15f &&
+          (node.display_scale < 0.99f || node.display_scale > 1.01f)) {
+        out += " weight=";
+        out += std::to_string(node.display_scale);
+      }
+      out += "\n";
       for (NodeId c : node.children) {
         serialize_node(doc, c, out, indent + 2);
       }

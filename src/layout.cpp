@@ -48,7 +48,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       break;
 
     case NodeKind::Columns: {
-      // Side-by-side columns. Equal width split with a small gutter.
+      // Side-by-side columns. Widths from Column.display_scale (relative weight).
       std::vector<NodeId> cols;
       for (NodeId child : node.children) {
         if (doc.get(child).kind == NodeKind::Column) {
@@ -56,7 +56,6 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         }
       }
       if (cols.empty()) {
-        // No explicit column children — fall back to stacking everything
         for (NodeId child : node.children) {
           layout_node(doc, child, x, y, max_width, out);
         }
@@ -65,9 +64,18 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
       const float gutter = 16.f;
       const float n = static_cast<float>(cols.size());
-      const float col_w = (max_width - gutter * (n - 1.f)) / n;
-      if (col_w < 40.f) {
-        // Too narrow — stack vertically instead of crushing text
+      float weight_sum = 0.f;
+      std::vector<float> weights(cols.size(), 1.f);
+      for (size_t i = 0; i < cols.size(); ++i) {
+        float w = doc.get(cols[i]).display_scale;
+        if (w < 0.1f) w = 1.f;
+        weights[i] = w;
+        weight_sum += w;
+      }
+      if (weight_sum < 0.1f) weight_sum = n;
+
+      const float usable = max_width - gutter * (n - 1.f);
+      if (usable / n < 40.f) {
         for (NodeId child : cols) {
           layout_node(doc, child, x, y, max_width, out);
         }
@@ -76,16 +84,17 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
       float start_y = y;
       float max_bottom = y;
+      float cx = x;
+      size_t gap_base = out.column_gaps.size();
 
       for (size_t i = 0; i < cols.size(); ++i) {
-        float cx = x + static_cast<float>(i) * (col_w + gutter);
+        float col_w = usable * (weights[i] / weight_sum);
+        if (col_w < 40.f) col_w = 40.f;
         float cy = start_y;
 
-        // Layout this column into a temporary result, then merge
         LayoutResult col_out;
         layout_node(doc, cols[i], cx, cy, col_w, col_out);
 
-        // Merge glyphs / boxes / images / quote bars
         out.glyphs.insert(out.glyphs.end(),
                           col_out.glyphs.begin(), col_out.glyphs.end());
         out.boxes.insert(out.boxes.end(),
@@ -97,11 +106,30 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
                               col_out.quote_bars.end());
         out.hr_lines.insert(out.hr_lines.end(),
                             col_out.hr_lines.begin(), col_out.hr_lines.end());
+        out.column_gaps.insert(out.column_gaps.end(),
+                               col_out.column_gaps.begin(),
+                               col_out.column_gaps.end());
 
         if (cy > max_bottom) max_bottom = cy;
+
+        if (i + 1 < cols.size()) {
+          ColumnGap gap;
+          gap.columns = id;
+          gap.left = cols[i];
+          gap.right = cols[i + 1];
+          gap.x = cx + col_w + gutter * 0.5f;
+          gap.y = start_y;
+          gap.height = 0.f;
+          out.column_gaps.push_back(gap);
+        }
+        cx += col_w + gutter;
       }
 
-      // Optional subtle column separators
+      for (size_t gi = gap_base; gi < out.column_gaps.size(); ++gi) {
+        if (out.column_gaps[gi].columns == id)
+          out.column_gaps[gi].height = max_bottom - start_y;
+      }
+
       out.boxes.push_back({id, x, start_y, max_width, max_bottom - start_y});
       y = max_bottom + 12.f;
       break;

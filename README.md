@@ -43,7 +43,7 @@ Supported dialect (intentionally small):
 | `[text](#anchor)` / `[text](url)` | Links |
 | `![alt](path.png){scale=1.2}` | Images (PNG/JPEG/BMP/GIF) |
 | `:::stretch summary="…"` … `:::` | Collapsed stretchtext |
-| `:::columns` / `:::column` | Side-by-side columns |
+| `:::columns` / `:::column weight=1.5` | Side-by-side columns (draggable widths) |
 | `:::include #Heading` | Transclude (live embed of a passage) |
 
 ## Keybindings
@@ -67,6 +67,7 @@ Supported dialect (intentionally small):
 | **Ctrl+D** | Duplicate current block |
 | **Alt+↑ / Alt+↓** | Move block among siblings |
 | Drag left margin of block | Reorder block among siblings |
+| Drag column gutter | Adjust relative column widths |
 | **Ctrl+E** | Wrap block in stretchtext |
 | **Ctrl+Shift+E** | Edit stretch summary |
 | **Ctrl+Shift+U** | Unwrap stretchtext |

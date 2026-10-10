@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **035** (this delivery is **034**)
+Next bundle number: **036** (this delivery is **035**)
 
 ## Status (2026-10-10)
 
-Stage **01**–**03** largely in place. Early stage **04** block drag-reorder.
+Stage **01**–**03** largely in place. Stage **04**: block drag + column width drag.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -80,13 +80,14 @@ Stage **01**–**03** largely in place. Early stage **04** block drag-reorder.
 - [x] Ctrl+Shift+8 / Ctrl+Shift+7 toggle unordered / ordered list on block
 - [x] Inline transclusion: `:::include #Target` live embed + click-to-source
 - [x] Drag-and-drop block reorder (left-margin grab, sibling relocate)
+- [x] Adjustable column widths by dragging gutters (`Column.display_scale` weights)
 
 ## Open work / next steps
 
 1. Optional: HarfBuzz for complex scripts
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Richer transclusion (editable mirror, cross-document includes)
-4. Cross-parent / column drag-and-drop; adjustable column widths by drag
+4. Cross-parent block drag (e.g. into/out of columns)
 
 ## Design notes
 
@@ -110,6 +111,9 @@ Stage **01**–**03** largely in place. Early stage **04** block drag-reorder.
   (glyphs tagged with the Transclude node). Click jumps to the source.
 - Block drag: grab left 16px of a layout box; drop on a same-parent sibling
   (top/bottom half = before/after). `relocate_block` splices the child list.
+- Column widths: `Column.display_scale` is a relative weight (default 1).
+  Layout emits `column_gaps`; dragging a gap shifts weight between neighbours.
+  Markup: `:::column weight=1.5`.
 
 ## Bundle history
 
@@ -146,4 +150,5 @@ Stage **01**–**03** largely in place. Early stage **04** block drag-reorder.
 - `glyphtoo-031.*-blockquote-…` — block quotes
 - `glyphtoo-032.*-hr-list-toggle-…` — HR + list toggle
 - `glyphtoo-033.*-transclude-…` — :::include transclusion
-- `glyphtoo-034.*-block-drag-…` — this delivery
+- `glyphtoo-034.*-block-drag-…` — block drag reorder
+- `glyphtoo-035.*-column-width-…` — this delivery
