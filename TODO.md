@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **051** (this delivery is **050**)
+Next bundle number: **052** (this delivery is **051**)
 
 ## Status (2026-10-10)
 
-Stage **01**–**04** core features in place; reload from disk.
+Stage **01**–**04** core features in place; reload from disk (rebased onto origin).
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -185,4 +185,5 @@ Stage **01**–**04** core features in place; reload from disk.
 - `glyphtoo-047.*-insert-image-…` — insert image by path
 - `glyphtoo-048.*-fontconfig-…` — FontConfig styled faces
 - `glyphtoo-049.*-find-prev-code-bg-…` — find prev + code background
-- `glyphtoo-050.*-reload-…` — this delivery
+- `glyphtoo-050.*-reload-…` — Ctrl+R reload from disk
+- `glyphtoo-051.*-rebased-…` — this delivery (rebased onto origin/master)
