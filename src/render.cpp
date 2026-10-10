@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "glyphtoo/render.hpp"
+#include <cmath>
 
 namespace glyphtoo {
 
@@ -62,6 +63,51 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
         static_cast<int>(hr.width),
         th};
     SDL_RenderFillRect(sdl_, &line);
+  }
+
+  // Soft background runs under inline code
+  {
+    SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
+    float run_x0 = 0.f, run_y = 0.f, run_x1 = 0.f;
+    bool in_run = false;
+    auto flush_run = [&]() {
+      if (!in_run) return;
+      int x = static_cast<int>(run_x0 + origin_x) - 2;
+      int y = static_cast<int>(run_y - scroll_y) - 2;
+      int w = static_cast<int>(run_x1 - run_x0) + 4;
+      int h = fonts_.pick(FontRole::Code).line_height() + 2;
+      SDL_SetRenderDrawColor(sdl_, 245, 235, 220, 200);
+      SDL_Rect r{x, y, w, h};
+      SDL_RenderFillRect(sdl_, &r);
+      in_run = false;
+    };
+    for (const auto& pg : layout.glyphs) {
+      if (pg.kind != InlineKind::Code) {
+        flush_run();
+        continue;
+      }
+      Font& font = fonts_.pick(pg.font);
+      const Glyph& g = font.glyph(pg.codepoint);
+      float adv = static_cast<float>((g.advance >> 6) > 0 ? (g.advance >> 6)
+                                                          : (g.width + 1));
+      float top = pg.y - static_cast<float>(font.ascender());
+      if (!in_run) {
+        run_x0 = pg.x;
+        run_x1 = pg.x + adv;
+        run_y = top;
+        in_run = true;
+      } else if (std::abs(top - run_y) < 0.5f && pg.x <= run_x1 + 2.f) {
+        run_x1 = pg.x + adv;
+      } else {
+        flush_run();
+        run_x0 = pg.x;
+        run_x1 = pg.x + adv;
+        run_y = top;
+        in_run = true;
+      }
+    }
+    flush_run();
+    SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
   }
 
   for (const auto& pg : layout.glyphs) {

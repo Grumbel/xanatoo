@@ -1138,8 +1138,15 @@ int main(int argc, char** argv) {
                 search_mode = true;
                 Pane& pp = F();
                 size_t mlen = 0;
-                if (auto hit = glyphtoo::find_next(
-                        doc_of(pp), search_query, pp.sel.focus, mlen)) {
+                const bool backward =
+                    shift || (ev.key.keysym.mod & KMOD_SHIFT) != 0;
+                auto hit =
+                    backward
+                        ? glyphtoo::find_prev(doc_of(pp), search_query,
+                                             pp.sel.focus, mlen)
+                        : glyphtoo::find_next(doc_of(pp), search_query,
+                                             pp.sel.focus, mlen);
+                if (hit) {
                   pp.sel.anchor = *hit;
                   pp.sel.focus = *hit;
                   for (size_t i = 0; i < mlen; ++i)
@@ -2108,7 +2115,7 @@ int main(int argc, char** argv) {
       } else if (search_mode) {
         label = "Leap: ";
         label += search_query.empty() ? "…" : search_query;
-        label += "    F3 next · Esc cancel";
+        label += "    F3 next · Shift+F3 prev · Esc cancel";
         tr = 220; tg = 230; tb = 245;
       } else if (dragging_block) {
         label = "Moving block — drop before/after any block (columns & lists OK)";
@@ -2269,6 +2276,7 @@ int main(int argc, char** argv) {
           "  Ctrl+Left/Right     Word motion",
           "  Ctrl+A / Shift+A    Select block / whole document",
           "  Ctrl+F / F3         Leap search / next match",
+          "  Shift+F3            Previous match",
           "  Ctrl+H              Leap replace",
           "  Ctrl+Shift+O        Heading outline",
           "  Click link          Follow #anchor or open URL",

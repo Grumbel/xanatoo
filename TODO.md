@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **048** (this delivery is **047**)
+Next bundle number: **050** (this delivery is **049**)
 
 ## Status (2026-10-10)
 
-Stage **01**–**04** core features in place; insert image by path.
+Stage **01**–**04** core features in place; find-prev + code backgrounds.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -94,6 +94,7 @@ Stage **01**–**04** core features in place; insert image by path.
 - [x] Paste plain text splits blank lines into sibling paragraphs
 - [x] Insert image (Ctrl+Shift+I path prompt)
 - [x] FontConfig: bold/italic/bold-italic/mono faces for styled text
+- [x] Shift+F3 / find_prev; soft background under inline code
 
 ## Open work / next steps
 
@@ -181,4 +182,5 @@ Stage **01**–**04** core features in place; insert image by path.
 - `glyphtoo-045.*-page-nav-…` — page / document navigation
 - `glyphtoo-046.*-paste-paras-…` — structured multiline paste
 - `glyphtoo-047.*-insert-image-…` — insert image by path
-- `glyphtoo-048.*-fontconfig-…` — this delivery
+- `glyphtoo-048.*-fontconfig-…` — FontConfig styled faces
+- `glyphtoo-049.*-find-prev-code-bg-…` — this delivery

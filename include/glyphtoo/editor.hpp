@@ -176,6 +176,9 @@ int caret_cmp(const Document& doc, const Caret& a, const Caret& b);
 // Returns the start caret of the match and sets match_len to codepoint length.
 std::optional<Caret> find_next(const Document& doc, const std::string& query,
                                const Caret& from, size_t& match_len);
+// Case-insensitive search starting before `from` (wraps around).
+std::optional<Caret> find_prev(const Document& doc, const std::string& query,
+                               const Caret& from, size_t& match_len);
 
 // Internal link: href "#Title" → caret at matching heading/paragraph.
 std::optional<Caret> jump_to_href(const Document& doc, const std::string& href);

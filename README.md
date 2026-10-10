@@ -107,6 +107,7 @@ Supported dialect (intentionally small):
 | **Ctrl+Shift+O** | Heading outline (jump to section) |
 | **Ctrl+H** | Leap replace (Tab switches fields) |
 | **F3** / **Ctrl+G** | Next match |
+| **Shift+F3** | Previous match |
 | **Esc** | Cancel mode / clear selection |
 
 ### View

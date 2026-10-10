@@ -1898,6 +1898,113 @@ std::optional<Caret> find_next(const Document& doc, const std::string& query,
   return std::nullopt;
 }
 
+std::optional<Caret> find_prev(const Document& doc, const std::string& query,
+                               const Caret& from, size_t& match_len) {
+  match_len = 0;
+  if (query.empty() || doc.root == INVALID_NODE) return std::nullopt;
+
+  std::string q = query;
+  for (char& ch : q) {
+    if (ch >= 'A' && ch <= 'Z') ch = static_cast<char>(ch - 'A' + 'a');
+  }
+
+  std::vector<NodeId> nodes;
+  collect_text_nodes(doc, doc.root, nodes);
+  if (nodes.empty()) return std::nullopt;
+
+  auto node_rank = [&](NodeId id) -> size_t {
+    auto it = std::find(nodes.begin(), nodes.end(), id);
+    return it == nodes.end() ? 0 : static_cast<size_t>(it - nodes.begin());
+  };
+
+  size_t start_rank = node_rank(from.node);
+
+  auto search_node_back = [&](NodeId nid, size_t to_span,
+                              size_t to_ch) -> std::optional<Caret> {
+    const Node& n = doc.get(nid);
+    struct Map { size_t span; size_t ch; };
+    std::string lower;
+    std::vector<Map> map;
+    for (size_t si = 0; si < n.spans.size(); ++si) {
+      size_t ci = 0;
+      size_t bi = 0;
+      const std::string& t = n.spans[si].text;
+      while (bi < t.size()) {
+        auto [cp, len] = decode_cp(t, bi);
+        if (len == 0) break;
+        char ascii = (cp < 128) ? static_cast<char>(cp) : '?';
+        if (ascii >= 'A' && ascii <= 'Z') ascii = static_cast<char>(ascii - 'A' + 'a');
+        lower.push_back(ascii);
+        map.push_back({si, ci});
+        bi += len;
+        ++ci;
+      }
+    }
+    if (lower.empty() || q.size() > lower.size()) return std::nullopt;
+
+    // End exclusive index: first map entry at or after (to_span, to_ch)
+    size_t end = 0;
+    bool found = false;
+    for (size_t i = 0; i < map.size(); ++i) {
+      if (map[i].span > to_span ||
+          (map[i].span == to_span && map[i].ch >= to_ch)) {
+        end = i;
+        found = true;
+        break;
+      }
+    }
+    if (!found) end = lower.size();
+    if (end == 0) return std::nullopt;
+
+    // Search in [0, end) for the last occurrence of q
+    size_t search_end = end;
+    if (search_end < q.size()) return std::nullopt;
+    auto pos = lower.rfind(q, search_end - q.size());
+    if (pos == std::string::npos || pos + q.size() > end) return std::nullopt;
+
+    Caret c;
+    c.node = nid;
+    c.span_index = map[pos].span;
+    c.char_index = map[pos].ch;
+    match_len = q.size();
+    return c;
+  };
+
+  // Search current node before caret, then earlier nodes, then wrap from end
+  for (size_t pass = 0; pass < 2; ++pass) {
+    if (pass == 0) {
+      // Current node: only before the caret
+      if (auto hit =
+              search_node_back(nodes[start_rank], from.span_index, from.char_index))
+        return hit;
+      // Earlier nodes (full text)
+      for (size_t i = start_rank; i > 0; --i) {
+        size_t idx = i - 1;
+        const Node& n = doc.get(nodes[idx]);
+        size_t last_span = n.spans.empty() ? 0 : n.spans.size() - 1;
+        size_t last_ch = 0;
+        if (!n.spans.empty())
+          last_ch = utf8_char_count(n.spans[last_span].text) + 1;
+        if (auto hit = search_node_back(nodes[idx], last_span, last_ch))
+          return hit;
+      }
+    } else {
+      // Wrap: nodes after start_rank, from the end
+      for (size_t i = nodes.size(); i > start_rank + 1; --i) {
+        size_t idx = i - 1;
+        const Node& n = doc.get(nodes[idx]);
+        size_t last_span = n.spans.empty() ? 0 : n.spans.size() - 1;
+        size_t last_ch = 0;
+        if (!n.spans.empty())
+          last_ch = utf8_char_count(n.spans[last_span].text) + 1;
+        if (auto hit = search_node_back(nodes[idx], last_span, last_ch))
+          return hit;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
 // ---- History ----
 
 History::History(size_t max_depth) : max_depth_(max_depth) {}
