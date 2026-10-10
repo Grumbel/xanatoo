@@ -110,6 +110,12 @@ std::optional<NodeId> duplicate_block(Document& doc, NodeId block);
 std::optional<NodeId> insert_sibling_after(Document& doc, Caret& caret,
                                           NodeKind kind);
 
+// Insert an Image node after the caret's block. Follows with an empty
+// paragraph and moves the caret there so typing can continue.
+std::optional<NodeId> insert_image(Document& doc, Caret& caret,
+                                   const std::string& path,
+                                   const std::string& alt = {});
+
 // Toggle list membership of the caret's text block.
 // - Paragraph/Heading/BlockQuote → become a ListItem under a new List
 // - ListItem → unwrap to Paragraph (list dropped if emptied)

@@ -718,6 +718,39 @@ std::optional<NodeId> insert_sibling_after(Document& doc, Caret& caret,
   return nid;
 }
 
+std::optional<NodeId> insert_image(Document& doc, Caret& caret,
+                                   const std::string& path,
+                                   const std::string& alt) {
+  if (path.empty() || caret.node == INVALID_NODE) return std::nullopt;
+  NodeId block = caret.node;
+  Node& bn = doc.get(block);
+  if (bn.parent == INVALID_NODE) return std::nullopt;
+  if (bn.kind == NodeKind::Document || bn.kind == NodeKind::Columns ||
+      bn.kind == NodeKind::Column || bn.kind == NodeKind::List) {
+    return std::nullopt;
+  }
+
+  NodeId nid = doc.create(NodeKind::Image, INVALID_NODE);
+  Node& img = doc.get(nid);
+  img.kind = NodeKind::Image;
+  img.parent = bn.parent;
+  img.src = path;
+  img.alt = alt.empty() ? path : alt;
+  img.display_scale = 1.f;
+
+  if (!doc.insert_after(block, nid)) {
+    doc.add_child(bn.parent, nid);
+  }
+
+  NodeId para = doc.create(NodeKind::Paragraph, INVALID_NODE);
+  doc.get(para).parent = bn.parent;
+  if (!doc.insert_after(nid, para)) doc.add_child(bn.parent, para);
+  caret.node = para;
+  caret.span_index = 0;
+  caret.char_index = 0;
+  return nid;
+}
+
 bool toggle_list(Document& doc, Caret& caret, bool ordered) {
   if (caret.node == INVALID_NODE) return false;
   Node& n = doc.get(caret.node);

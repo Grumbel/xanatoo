@@ -401,6 +401,8 @@ int main(int argc, char** argv) {
   std::string replace_text;
   bool save_as_mode = false;
   std::string save_as_path;
+  bool image_insert_mode = false;
+  std::string image_insert_path;
   bool link_edit_mode = false;
   std::string link_edit_href;
   glyphtoo::NodeId link_edit_node = glyphtoo::INVALID_NODE;
@@ -908,6 +910,10 @@ int main(int argc, char** argv) {
             save_as_path += ev.text.text;
             break;
           }
+          if (image_insert_mode) {
+            image_insert_path += ev.text.text;
+            break;
+          }
           if (link_edit_mode) {
             link_edit_href += ev.text.text;
             break;
@@ -1020,6 +1026,9 @@ int main(int argc, char** argv) {
               } else if (save_as_mode) {
                 save_as_mode = false;
                 save_as_path.clear();
+              } else if (image_insert_mode) {
+                image_insert_mode = false;
+                image_insert_path.clear();
               } else if (link_edit_mode) {
                 link_edit_mode = false;
                 link_edit_href.clear();
@@ -1209,6 +1218,16 @@ int main(int argc, char** argv) {
                 }
                 break;
               }
+              if (image_insert_mode) {
+                if (!image_insert_path.empty()) {
+                  while (!image_insert_path.empty() &&
+                         (static_cast<unsigned char>(image_insert_path.back()) &
+                          0xc0) == 0x80)
+                    image_insert_path.pop_back();
+                  if (!image_insert_path.empty()) image_insert_path.pop_back();
+                }
+                break;
+              }
               if (link_edit_mode) {
                 if (!link_edit_href.empty()) {
                   while (!link_edit_href.empty() &&
@@ -1329,6 +1348,20 @@ int main(int argc, char** argv) {
                 }
                 save_as_mode = false;
                 save_as_path.clear();
+                break;
+              }
+              if (image_insert_mode) {
+                if (!image_insert_path.empty()) {
+                  edit();
+                  if (glyphtoo::insert_image(d, p.sel.focus, image_insert_path)) {
+                    p.sel.anchor = p.sel.focus;
+                    needs_layout = true;
+                    reset_blink();
+                    std::cout << "Inserted image: " << image_insert_path << "\n";
+                  }
+                }
+                image_insert_mode = false;
+                image_insert_path.clear();
                 break;
               }
               // Ctrl+Enter: new empty paragraph after current block
@@ -1677,6 +1710,16 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_i:
+              if (ctrl && shift) {
+                // Insert image — prompt for path in status bar
+                image_insert_mode = true;
+                image_insert_path.clear();
+                save_as_mode = false;
+                search_mode = false;
+                link_edit_mode = false;
+                summary_edit_mode = false;
+                break;
+              }
               if (ctrl && !p.sel.empty()) {
                 edit();
                 glyphtoo::apply_style_to_selection(d, p.sel, glyphtoo::InlineKind::Emphasis);
@@ -2051,6 +2094,11 @@ int main(int argc, char** argv) {
         label += save_as_path.empty() ? "…" : save_as_path;
         label += "    Enter confirm · Esc cancel";
         tr = 220; tg = 230; tb = 245;
+      } else if (image_insert_mode) {
+        label = "Image path: ";
+        label += image_insert_path.empty() ? "…" : image_insert_path;
+        label += "    Enter insert · Esc cancel";
+        tr = 220; tg = 230; tb = 245;
       } else if (link_edit_mode) {
         label = "Link href: ";
         label += link_edit_href.empty() ? "…" : link_edit_href;
@@ -2210,6 +2258,7 @@ int main(int argc, char** argv) {
           "  Enter               Split paragraph / list item",
           "  Ctrl+Enter          New paragraph after block",
           "  Ctrl+Shift+-        Insert horizontal rule",
+          "  Ctrl+Shift+I        Insert image (path prompt)",
           "  Backspace / Delete  Delete (merge at block start)",
           "  Ctrl+Z / Ctrl+Y     Undo / Redo",
           "  Ctrl+C / X / V      Copy / Cut / Paste (multi-para)",

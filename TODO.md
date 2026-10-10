@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **047** (this delivery is **046**)
+Next bundle number: **048** (this delivery is **047**)
 
 ## Status (2026-10-10)
 
-Stage **01**–**04** core features in place; structured multiline paste.
+Stage **01**–**04** core features in place; insert image by path.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -92,6 +92,7 @@ Stage **01**–**04** core features in place; structured multiline paste.
 - [x] Status-bar document stats (words, chars, headings)
 - [x] Page Up/Down move caret; Ctrl+Home/End document extremes
 - [x] Paste plain text splits blank lines into sibling paragraphs
+- [x] Insert image (Ctrl+Shift+I path prompt)
 
 ## Open work / next steps
 
@@ -177,4 +178,5 @@ Stage **01**–**04** core features in place; structured multiline paste.
 - `glyphtoo-043.*-insert-blocks-…` — Ctrl+Enter / HR insert
 - `glyphtoo-044.*-doc-stats-…` — status-bar document stats
 - `glyphtoo-045.*-page-nav-…` — page / document navigation
-- `glyphtoo-046.*-paste-paras-…` — this delivery
+- `glyphtoo-046.*-paste-paras-…` — structured multiline paste
+- `glyphtoo-047.*-insert-image-…` — this delivery
