@@ -333,6 +333,8 @@ int main(int argc, char** argv) {
   bool search_mode = false;
   std::string search_query;
   size_t search_match_len = 0;
+  bool save_as_mode = false;
+  std::string save_as_path;
 
   Uint32 caret_blink_start = SDL_GetTicks();
   auto reset_blink = [&]() { caret_blink_start = SDL_GetTicks(); };
@@ -554,6 +556,10 @@ int main(int argc, char** argv) {
           break;
 
         case SDL_TEXTINPUT: {
+          if (save_as_mode) {
+            save_as_path += ev.text.text;
+            break;
+          }
           if (search_mode) {
             search_query += ev.text.text;
             Pane& p = F();
@@ -600,7 +606,10 @@ int main(int argc, char** argv) {
 
           switch (ev.key.keysym.sym) {
             case SDLK_ESCAPE:
-              if (search_mode) {
+              if (save_as_mode) {
+                save_as_mode = false;
+                save_as_path.clear();
+              } else if (search_mode) {
                 search_mode = false;
                 search_query.clear();
                 reset_blink();
@@ -663,6 +672,15 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_BACKSPACE:
+              if (save_as_mode) {
+                if (!save_as_path.empty()) {
+                  while (!save_as_path.empty() &&
+                         (static_cast<unsigned char>(save_as_path.back()) & 0xc0) == 0x80)
+                    save_as_path.pop_back();
+                  if (!save_as_path.empty()) save_as_path.pop_back();
+                }
+                break;
+              }
               if (search_mode) {
                 if (!search_query.empty()) {
                   // erase last UTF-8 character roughly
@@ -699,6 +717,24 @@ int main(int argc, char** argv) {
 
             case SDLK_RETURN:
             case SDLK_KP_ENTER:
+              if (save_as_mode) {
+                if (!save_as_path.empty()) {
+                  std::string text = glyphtoo::serialize_markup(d);
+                  std::ofstream out(save_as_path);
+                  if (!out) {
+                    std::cerr << "Failed to save: " << save_as_path << "\n";
+                  } else {
+                    out << text;
+                    path_of(p) = save_as_path;
+                    dirty_flags[p.doc_index] = false;
+                    update_title();
+                    std::cout << "Saved as: " << save_as_path << "\n";
+                  }
+                }
+                save_as_mode = false;
+                save_as_path.clear();
+                break;
+              }
               edit();
               if (!p.sel.empty()) glyphtoo::delete_selection(d, p.sel);
               glyphtoo::split_block(d, p.sel.focus);
@@ -880,10 +916,15 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_s:
+              if (ctrl && shift) {
+                save_as_mode = true;
+                search_mode = false;
+                save_as_path = path_of(p).empty() ? "untitled.md" : path_of(p);
+                break;
+              }
               if (ctrl) {
                 std::string& spath = path_of(p);
                 if (spath.empty()) {
-                  // Untitled: pick a free name in the current directory
                   std::string candidate = "untitled.md";
                   for (int n = 1; n < 1000; ++n) {
                     if (!std::filesystem::exists(candidate)) break;
@@ -901,10 +942,40 @@ int main(int argc, char** argv) {
                     out << text;
                     std::cout << "Saved: " << spath << "\n";
                     dirty_flags[p.doc_index] = false;
-                    // Ensure image base follows new path
                     update_title();
                   }
                 }
+              }
+              break;
+
+            case SDLK_b:
+              if (ctrl && !p.sel.empty()) {
+                edit();
+                glyphtoo::apply_style_to_selection(d, p.sel, glyphtoo::InlineKind::Strong);
+                needs_layout = true;
+                reset_blink();
+              }
+              break;
+
+            case SDLK_i:
+              if (ctrl && !p.sel.empty()) {
+                edit();
+                glyphtoo::apply_style_to_selection(d, p.sel, glyphtoo::InlineKind::Emphasis);
+                needs_layout = true;
+                reset_blink();
+              }
+              break;
+
+            case SDLK_k:
+              if (ctrl && !p.sel.empty()) {
+                // Link: use selected text as both label and #anchor target
+                std::string text = glyphtoo::selected_text(d, p.sel);
+                std::string href = "#" + text;
+                edit();
+                glyphtoo::apply_style_to_selection(
+                    d, p.sel, glyphtoo::InlineKind::Link, href);
+                needs_layout = true;
+                reset_blink();
               }
               break;
 
@@ -993,7 +1064,7 @@ int main(int argc, char** argv) {
     {
       const int bar_h = 28;
       SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
-      if (search_mode) {
+      if (search_mode || save_as_mode) {
         SDL_SetRenderDrawColor(sdl, 30, 30, 40, 240);
       } else {
         SDL_SetRenderDrawColor(sdl, 236, 234, 228, 245);
@@ -1001,7 +1072,7 @@ int main(int argc, char** argv) {
       SDL_Rect bar{0, win_h - bar_h, win_w, bar_h};
       SDL_RenderFillRect(sdl, &bar);
       // Top edge line
-      if (search_mode) {
+      if (search_mode || save_as_mode) {
         SDL_SetRenderDrawColor(sdl, 80, 160, 255, 255);
       } else {
         SDL_SetRenderDrawColor(sdl, 200, 198, 190, 255);
@@ -1011,15 +1082,20 @@ int main(int argc, char** argv) {
 
       std::string label;
       uint8_t tr = 40, tg = 40, tb = 45;
-      if (search_mode) {
+      if (save_as_mode) {
+        label = "Save as: ";
+        label += save_as_path.empty() ? "…" : save_as_path;
+        label += "    Enter confirm · Esc cancel";
+        tr = 220; tg = 230; tb = 245;
+      } else if (search_mode) {
         label = "Leap: ";
         label += search_query.empty() ? "…" : search_query;
         label += "    F3 next · Esc cancel";
         tr = 220; tg = 230; tb = 245;
       } else {
         label =
-            "Ctrl+S save · Ctrl+Z/Y undo · Ctrl+F leap · Ctrl+\\ split · "
-            "Tab pane · Ctrl+←/→ word · click link · drag image corner";
+            "Ctrl+S save · Ctrl+Shift+S save as · Ctrl+Z/Y undo · "
+            "Ctrl+B/I/K bold/italic/link · Ctrl+F leap · Ctrl+\\ split";
         tr = 70; tg = 68; tb = 62;
       }
       float baseline = static_cast<float>(win_h - 8);

@@ -64,6 +64,15 @@ std::vector<SelRect> selection_rects(const LayoutResult& layout,
 
 // Editing operations (mutate Document, caller re-layouts afterwards).
 void insert_text(Document& doc, Caret& caret, const std::string& utf8);
+
+// Insert styled run at caret (splits the current span as needed).
+void insert_styled(Document& doc, Caret& caret, const std::string& utf8,
+                   InlineKind kind, const std::string& href = {});
+
+// Apply style to the current selection (single-node selections).
+// If the selection is already entirely that style, reverts to plain Text.
+void apply_style_to_selection(Document& doc, Selection& sel, InlineKind kind,
+                              const std::string& href = {});
 void delete_backward(Document& doc, Caret& caret);
 void delete_forward(Document& doc, Caret& caret);
 

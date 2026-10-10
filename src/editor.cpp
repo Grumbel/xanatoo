@@ -264,6 +264,93 @@ std::vector<SelRect> selection_rects(const LayoutResult& layout,
 
 // ---- Editing ----
 
+
+void insert_styled(Document& doc, Caret& caret, const std::string& utf8,
+                   InlineKind kind, const std::string& href) {
+  if (caret.node == INVALID_NODE || utf8.empty()) return;
+  Node& n = doc.get(caret.node);
+  if (n.spans.empty()) {
+    InlineSpan s;
+    s.kind = kind;
+    s.text = utf8;
+    s.href = href;
+    n.spans.push_back(std::move(s));
+    caret.span_index = 0;
+    caret.char_index = utf8_char_count(utf8);
+    return;
+  }
+  if (caret.span_index >= n.spans.size()) {
+    caret.span_index = n.spans.size() - 1;
+    caret.char_index = utf8_char_count(n.spans.back().text);
+  }
+
+  size_t si = caret.span_index;
+  InlineSpan& cur = n.spans[si];
+  size_t byte_off = utf8_byte_offset(cur.text, caret.char_index);
+  std::string before = cur.text.substr(0, byte_off);
+  std::string after = cur.text.substr(byte_off);
+
+  InlineSpan mid;
+  mid.kind = kind;
+  mid.text = utf8;
+  mid.href = href;
+
+  // Rebuild: before | mid | after (drop empty before/after)
+  std::vector<InlineSpan> rebuilt;
+  for (size_t i = 0; i < si; ++i) rebuilt.push_back(std::move(n.spans[i]));
+  if (!before.empty()) {
+    InlineSpan b = cur;
+    b.text = before;
+    rebuilt.push_back(std::move(b));
+  }
+  size_t mid_index = rebuilt.size();
+  rebuilt.push_back(std::move(mid));
+  if (!after.empty()) {
+    InlineSpan a = cur;
+    a.text = after;
+    a.href = (a.kind == InlineKind::Link) ? a.href : std::string{};
+    rebuilt.push_back(std::move(a));
+  }
+  for (size_t i = si + 1; i < n.spans.size(); ++i)
+    rebuilt.push_back(std::move(n.spans[i]));
+  n.spans = std::move(rebuilt);
+  caret.span_index = mid_index;
+  caret.char_index = utf8_char_count(utf8);
+}
+
+void apply_style_to_selection(Document& doc, Selection& sel, InlineKind kind,
+                              const std::string& href) {
+  if (sel.empty()) return;
+  if (sel.anchor.node != sel.focus.node) {
+    // Multi-node: apply per-node would be better later; for now no-op
+    return;
+  }
+  std::string text = selected_text(doc, sel);
+  if (text.empty()) return;
+
+  // Toggle off if already entirely this style (single span covering selection)
+  Caret a = sel.anchor, b = sel.focus;
+  if (caret_cmp(doc, a, b) > 0) std::swap(a, b);
+  const Node& n = doc.get(a.node);
+  bool already = false;
+  if (a.span_index == b.span_index && a.span_index < n.spans.size()) {
+    const InlineSpan& sp = n.spans[a.span_index];
+    if (sp.kind == kind && a.char_index == 0 &&
+        b.char_index == utf8_char_count(sp.text)) {
+      already = true;
+    }
+  }
+
+  delete_selection(doc, sel);
+  // sel collapsed at a after delete
+  if (already) {
+    insert_text(doc, sel.focus, text);
+  } else {
+    insert_styled(doc, sel.focus, text, kind, href);
+  }
+  sel.anchor = sel.focus;
+}
+
 void insert_text(Document& doc, Caret& caret, const std::string& utf8) {
   if (caret.node == INVALID_NODE || utf8.empty()) return;
   // Reject control chars except we allow nothing special here
