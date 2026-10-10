@@ -12,6 +12,7 @@
 #include "glyphtoo/images.hpp"
 #include "glyphtoo/ui.hpp"
 #include "glyphtoo/util.hpp"
+#include "glyphtoo/cli.hpp"
 
 #include <SDL.h>
 #include <iostream>
@@ -23,170 +24,11 @@
 #include <cmath>
 #include <cstring>
 
-#if defined(__linux__) || defined(__APPLE__)
-#include <unistd.h>
-#include <sys/wait.h>
-#endif
-
 namespace fs = std::filesystem;
 
-// Open an external URL in the system browser / handler.
-// Only http(s) and mailto: are allowed (avoids shell injection / local file surprises).
-static void open_external_url(const std::string& url) {
-  if (url.rfind("http://", 0) != 0 && url.rfind("https://", 0) != 0 &&
-      url.rfind("mailto:", 0) != 0) {
-    std::cerr << "Refusing to open non-http(s)/mailto URL: " << url << "\n";
-    return;
-  }
-
-#if defined(__linux__)
-  pid_t pid = fork();
-  if (pid == 0) {
-    // Double-fork so the browser is reparented and does not leave a zombie.
-    if (fork() > 0) _exit(0);
-    setsid();
-    execlp("xdg-open", "xdg-open", url.c_str(), static_cast<char*>(nullptr));
-    _exit(127);
-  } else if (pid > 0) {
-    int status = 0;
-    waitpid(pid, &status, 0);
-  } else {
-    std::cerr << "fork failed for xdg-open\n";
-  }
-#elif defined(__APPLE__)
-  pid_t pid = fork();
-  if (pid == 0) {
-    if (fork() > 0) _exit(0);
-    setsid();
-    execlp("open", "open", url.c_str(), static_cast<char*>(nullptr));
-    _exit(127);
-  } else if (pid > 0) {
-    int status = 0;
-    waitpid(pid, &status, 0);
-  }
-#else
-  std::cout << "Open URL not implemented on this platform: " << url << "\n";
-#endif
-}
-
-// Fallback when examples/welcome.md cannot be found on disk.
-static const char* FALLBACK_DOC =
-    "# Untitled\n\n"
-    "Open a document with `glyphtoo file.md`, or place "
-    "`examples/welcome.md` next to the binary.\n\n"
-    "Press **F1** for the keyboard reference.\n";
-
-static std::string find_default_document() {
-  // Prefer a real file so relative image paths resolve.
-  const char* candidates[] = {
-      "examples/welcome.md",
-      "../examples/welcome.md",
-      "../../examples/welcome.md",
-      nullptr,
-  };
-  for (const char** p = candidates; *p; ++p) {
-    if (fs::exists(*p)) return fs::absolute(*p).string();
-  }
-#ifdef __linux__
-  // Relative to the executable: <prefix>/bin/glyphtoo → <prefix>/share/glyphtoo/
-  // and also sibling examples/ when running from a build tree.
-  try {
-    fs::path exe = fs::read_symlink("/proc/self/exe");
-    fs::path dir = exe.parent_path();
-    const fs::path near[] = {
-        dir / "examples" / "welcome.md",
-        dir / ".." / "examples" / "welcome.md",
-        dir / ".." / "share" / "glyphtoo" / "welcome.md",
-        dir / ".." / "share" / "glyphtoo" / "examples" / "welcome.md",
-    };
-    for (const auto& c : near) {
-      std::error_code ec;
-      auto canon = fs::weakly_canonical(c, ec);
-      if (!ec && fs::exists(canon)) return canon.string();
-    }
-  } catch (...) {
-  }
-#endif
-  return {};
-}
-
-static void print_usage(const char* argv0) {
-  std::cerr
-      << "Usage: " << argv0 << " [options] [file] [file2]\n"
-      << "\n"
-      << "Options:\n"
-      << "  -f, --font <path>     TTF/OTF font file (body + headings)\n"
-      << "  -o, --open <path>     Open a markup document\n"
-      << "  -h, --help            Show this help\n"
-      << "\n"
-      << "With no file, opens examples/welcome.md when found.\n"
-      << "One positional path opens that document.\n"
-      << "Two paths open dual-pane: left=file1, right=file2.\n"
-      << "Ctrl+S saves the focused pane's document.\n"
-      << "Ctrl+\\ toggles split; drag the gutter to resize panes.\n"
-      << "\n"
-      << "Font resolution: --font / GLYPHTOO_FONT, then FontConfig\n"
-      << "(regular/bold/italic/mono faces for styled text).\n";
-}
-
-struct Options {
-  std::string font_path;
-  std::string file_path;   // primary document
-  std::string file_path2;  // optional second document → opens dual-pane
-};
-
-static bool parse_args(int argc, char** argv, Options& opt) {
-  for (int i = 1; i < argc; ++i) {
-    std::string a = argv[i];
-    if (a == "-h" || a == "--help") {
-      print_usage(argv[0]);
-      return false;
-    }
-    if (a == "-f" || a == "--font") {
-      if (i + 1 >= argc) {
-        std::cerr << "error: " << a << " requires a path argument\n";
-        print_usage(argv[0]);
-        return false;
-      }
-      opt.font_path = argv[++i];
-      continue;
-    }
-    if (a.rfind("--font=", 0) == 0) {
-      opt.font_path = a.substr(7);
-      continue;
-    }
-    if (a == "-o" || a == "--open" || a == "--file") {
-      if (i + 1 >= argc) {
-        std::cerr << "error: " << a << " requires a path argument\n";
-        print_usage(argv[0]);
-        return false;
-      }
-      opt.file_path = argv[++i];
-      continue;
-    }
-    if (!a.empty() && a[0] != '-') {
-      if (opt.file_path.empty()) {
-        opt.file_path = a;
-        continue;
-      }
-      if (opt.file_path2.empty()) {
-        opt.file_path2 = a;
-        continue;
-      }
-      std::cerr << "error: unexpected argument: " << a << "\n";
-      print_usage(argv[0]);
-      return false;
-    }
-    std::cerr << "error: unknown argument: " << a << "\n";
-    print_usage(argv[0]);
-    return false;
-  }
-  return true;
-}
-
 int main(int argc, char** argv) {
-  Options opt;
-  if (!parse_args(argc, argv, opt)) {
+  glyphtoo::CliOptions opt;
+  if (!glyphtoo::parse_cli(argc, argv, opt)) {
     return 1;
   }
 
@@ -245,12 +87,12 @@ int main(int argc, char** argv) {
 
   auto load_doc = [&](const std::string& path) -> glyphtoo::Document {
     if (path.empty()) {
-      return glyphtoo::parse_document(FALLBACK_DOC, {});
+      return glyphtoo::parse_document(glyphtoo::fallback_document(), {});
     }
     std::ifstream in(path);
     if (!in) {
       std::cerr << "Failed to open document: " << path << "\n";
-      return glyphtoo::parse_document(FALLBACK_DOC, {});
+      return glyphtoo::parse_document(glyphtoo::fallback_document(), {});
     }
     std::string source((std::istreambuf_iterator<char>(in)),
                        std::istreambuf_iterator<char>());
@@ -270,7 +112,7 @@ int main(int argc, char** argv) {
   paths[0] = opt.file_path;
   paths[1] = opt.file_path2;
   if (paths[0].empty()) {
-    paths[0] = find_default_document();
+    paths[0] = glyphtoo::find_default_document();
     if (paths[0].empty())
       std::cerr << "Note: examples/welcome.md not found; starting empty.\n";
   }
@@ -756,7 +598,7 @@ int main(int argc, char** argv) {
                 break;
               } else if (!href->empty() && (*href)[0] != '#') {
                 std::cout << "Opening external link: " << *href << "\n";
-                open_external_url(*href);
+                glyphtoo::open_external_url(*href);
                 break;
               }
             }

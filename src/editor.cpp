@@ -1140,6 +1140,13 @@ bool split_block(Document& doc, Caret& caret) {
   return true;
 }
 
+// Drop empty inline spans; keep the node itself (may be an empty paragraph).
+static void compact_spans(Node& n) {
+  n.spans.erase(std::remove_if(n.spans.begin(), n.spans.end(),
+                               [](const InlineSpan& s) { return s.text.empty(); }),
+                n.spans.end());
+}
+
 static void erase_range_in_node(Node& n, size_t from_span, size_t from_ch,
                                 size_t to_span, size_t to_ch) {
   if (n.spans.empty()) return;
@@ -1173,6 +1180,7 @@ void delete_selection(Document& doc, Selection& sel) {
   if (a.node == b.node) {
     Node& n = doc.get(a.node);
     erase_range_in_node(n, a.span_index, a.char_index, b.span_index, b.char_index);
+    compact_spans(n);
     sel.anchor = sel.focus = a;
     return;
   }
@@ -1201,10 +1209,13 @@ void delete_selection(Document& doc, Selection& sel) {
       size_t last_len = utf8_char_count(n.spans[last].text);
       erase_range_in_node(n, a.span_index, a.char_index, last, last_len);
     }
+    compact_spans(n);
   }
-  // Middle nodes: clear all text
+  // Middle nodes: detach emptied text blocks (leave start/end anchors)
   for (size_t i = ra + 1; i < rb && i < nodes.size(); ++i) {
-    doc.get(nodes[i]).spans.clear();
+    NodeId mid = nodes[i];
+    doc.get(mid).spans.clear();
+    detach_from_parent(doc, mid);
   }
   // End node: from start to b
   {
@@ -1212,6 +1223,7 @@ void delete_selection(Document& doc, Selection& sel) {
     if (!n.spans.empty()) {
       erase_range_in_node(n, 0, 0, b.span_index, b.char_index);
     }
+    compact_spans(n);
   }
 
   sel.anchor = sel.focus = a;

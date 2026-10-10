@@ -25,6 +25,7 @@ add_executable(glyphtoo
   src/images.cpp
   src/ui.cpp
   src/util.cpp
+  src/cli.cpp
   # Vendored Dear ImGui (MIT) — menu bar / toolbar shell
   external/imgui/imgui.cpp
   external/imgui/imgui_draw.cpp

@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **060** (this delivery is **059**)
+Next bundle number: **061** (this delivery is **060**)
 
 ## Status (2026-10-10)
 
@@ -105,6 +105,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Sexpr polish: `:id`, merged text spans, compact floats; File→Export; cache flush on reload
 - [x] Drag-and-drop image files into a pane (PNG/JPEG/GIF/BMP)
 - [x] Refactor: `util.hpp` (ascii_lower, anchors, image path); -Wall; dead-code cleanup
+- [x] Extract CLI/bootstrap to `cli.hpp`; multi-delete no longer leaves empty husks
 
 ## Open work / next steps
 
@@ -210,4 +211,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `glyphtoo-056.*-sexpr-…` — S-expression format
 - `glyphtoo-057.*-sexpr-polish-…` — sexpr polish
 - `glyphtoo-058.*-dnd-image-…` — drag-and-drop images
-- `glyphtoo-059.*-refactor-cleanup-…` — this delivery
+- `glyphtoo-059.*-refactor-cleanup-…` — util refactor
+- `glyphtoo-060.*-cli-delete-cleanup-…` — this delivery
