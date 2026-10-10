@@ -104,6 +104,12 @@ bool relocate_block(Document& doc, NodeId block, NodeId target, bool before);
 // Duplicate a block as the next sibling; returns the new node id.
 std::optional<NodeId> duplicate_block(Document& doc, NodeId block);
 
+// Insert a new sibling after the caret's block. Returns the new node id.
+// For HorizontalRule, also inserts an empty Paragraph after the rule and
+// moves the caret into that paragraph (so typing can continue).
+std::optional<NodeId> insert_sibling_after(Document& doc, Caret& caret,
+                                          NodeKind kind);
+
 // Toggle list membership of the caret's text block.
 // - Paragraph/Heading/BlockQuote → become a ListItem under a new List
 // - ListItem → unwrap to Paragraph (list dropped if emptied)

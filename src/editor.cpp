@@ -669,6 +669,55 @@ std::optional<NodeId> duplicate_block(Document& doc, NodeId block) {
   return nid;
 }
 
+std::optional<NodeId> insert_sibling_after(Document& doc, Caret& caret,
+                                          NodeKind kind) {
+  if (caret.node == INVALID_NODE) return std::nullopt;
+  NodeId block = caret.node;
+  Node& bn = doc.get(block);
+  if (bn.parent == INVALID_NODE) return std::nullopt;
+
+  if (bn.kind == NodeKind::Document || bn.kind == NodeKind::Columns ||
+      bn.kind == NodeKind::Column || bn.kind == NodeKind::List) {
+    return std::nullopt;
+  }
+
+  NodeId nid = doc.create(kind, INVALID_NODE);
+  Node& nn = doc.get(nid);
+  nn.kind = kind;
+  nn.parent = bn.parent;
+  if (kind == NodeKind::Heading) nn.level = 1;
+  if (kind == NodeKind::ListItem) {
+    Node& parent = doc.get(bn.parent);
+    nn.level = (parent.kind == NodeKind::List && parent.level == 1) ? 1 : 0;
+  }
+
+  if (!doc.insert_after(block, nid)) {
+    doc.add_child(bn.parent, nid);
+  }
+
+  if (kind == NodeKind::HorizontalRule) {
+    NodeId para = doc.create(NodeKind::Paragraph, INVALID_NODE);
+    doc.get(para).parent = bn.parent;
+    if (!doc.insert_after(nid, para)) doc.add_child(bn.parent, para);
+    caret.node = para;
+    caret.span_index = 0;
+    caret.char_index = 0;
+    return nid;
+  }
+
+  if (kind == NodeKind::Paragraph || kind == NodeKind::Heading ||
+      kind == NodeKind::BlockQuote || kind == NodeKind::ListItem) {
+    caret.node = nid;
+    caret.span_index = 0;
+    caret.char_index = 0;
+  }
+
+  if (kind == NodeKind::ListItem && doc.get(bn.parent).kind == NodeKind::List)
+    renumber_ordered_list(doc, bn.parent);
+
+  return nid;
+}
+
 bool toggle_list(Document& doc, Caret& caret, bool ordered) {
   if (caret.node == INVALID_NODE) return false;
   Node& n = doc.get(caret.node);

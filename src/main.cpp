@@ -1058,6 +1058,17 @@ int main(int argc, char** argv) {
 
             case SDLK_MINUS:
             case SDLK_KP_MINUS:
+              if (ctrl && shift) {
+                // Insert horizontal rule after current block
+                edit();
+                if (glyphtoo::insert_sibling_after(
+                        d, p.sel.focus, glyphtoo::NodeKind::HorizontalRule)) {
+                  p.sel.anchor = p.sel.focus;
+                  needs_layout = true;
+                  reset_blink();
+                }
+                break;
+              }
               if (ctrl) {
                 body_px = std::max(10, body_px - 1);
                 heading_px = std::max(14, heading_px - 2);
@@ -1318,6 +1329,17 @@ int main(int argc, char** argv) {
                 }
                 save_as_mode = false;
                 save_as_path.clear();
+                break;
+              }
+              // Ctrl+Enter: new empty paragraph after current block
+              if (ctrl) {
+                edit();
+                if (glyphtoo::insert_sibling_after(
+                        d, p.sel.focus, glyphtoo::NodeKind::Paragraph)) {
+                  p.sel.anchor = p.sel.focus;
+                  needs_layout = true;
+                  reset_blink();
+                }
                 break;
               }
               edit();
@@ -2149,6 +2171,8 @@ int main(int argc, char** argv) {
           "",
           "Edit",
           "  Enter               Split paragraph / list item",
+          "  Ctrl+Enter          New paragraph after block",
+          "  Ctrl+Shift+-        Insert horizontal rule",
           "  Backspace / Delete  Delete (merge at block start)",
           "  Ctrl+Z / Ctrl+Y     Undo / Redo",
           "  Ctrl+C / X / V      Copy / Cut / Paste",

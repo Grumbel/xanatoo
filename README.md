@@ -66,6 +66,8 @@ Supported dialect (intentionally small):
 |-----|--------|
 | Type / Backspace / Delete | Insert / delete |
 | **Enter** | Split paragraph / list item (empty list item exits list) |
+| **Ctrl+Enter** | Insert empty paragraph after current block |
+| **Ctrl+Shift+-** | Insert horizontal rule (then a new paragraph) |
 | Backspace at block start | Merge with previous block (drops empty lists) |
 | **Ctrl+Z** / **Ctrl+Y** | Undo / redo |
 | **Ctrl+C** / **X** / **V** | Clipboard |
