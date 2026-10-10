@@ -2,18 +2,18 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "glyphtoo/layout.hpp"
-#include <cctype>
 
 namespace glyphtoo {
 
-LayoutEngine::LayoutEngine(Font& font) : font_(font) {}
+LayoutEngine::LayoutEngine(Font& body, Font& heading)
+    : body_(body), heading_(heading) {}
 
 LayoutResult LayoutEngine::layout(const Document& doc, float max_width) {
   LayoutResult result;
   if (doc.root == INVALID_NODE) return result;
-  float y = 16.f;
-  layout_node(doc, doc.root, 24.f, y, max_width - 48.f, result);
-  result.content_height = y + 32.f;
+  float y = 24.f;
+  layout_node(doc, doc.root, 32.f, y, max_width - 64.f, result);
+  result.content_height = y + 48.f;
   return result;
 }
 
@@ -27,47 +27,38 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
     case NodeKind::Columns:
     case NodeKind::Column:
     case NodeKind::List:
+    case NodeKind::Stretch:
       for (NodeId child : node.children) {
         layout_node(doc, child, x, y, max_width, out);
       }
       break;
 
     case NodeKind::Heading: {
-      float scale = 1.0f + 0.35f * (4 - std::min(node.level, 4));
-      // Temporarily we just use the same font; scale is visual later.
+      Font& f = (node.level <= 2) ? heading_ : body_;
+      FontRole role = (node.level <= 2) ? FontRole::Heading : FontRole::Body;
       float start_y = y;
-      layout_paragraph(doc, node, x, y, max_width, out, scale);
-      y += 8.f * scale;
-      LayoutBox box{id, x, start_y, max_width, y - start_y};
-      out.boxes.push_back(box);
+      y += (node.level == 1) ? 12.f : 8.f;
+      layout_paragraph(doc, node, x, y, max_width, out, f, role);
+      y += (node.level == 1) ? 14.f : 10.f;
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
 
     case NodeKind::Paragraph:
     case NodeKind::ListItem: {
       float start_y = y;
-      layout_paragraph(doc, node, x, y, max_width, out);
-      y += 12.f;
-      LayoutBox box{id, x, start_y, max_width, y - start_y};
-      out.boxes.push_back(box);
+      layout_paragraph(doc, node, x, y, max_width, out, body_, FontRole::Body);
+      y += 14.f;
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
 
     case NodeKind::Image: {
-      // Placeholder box for now
-      float h = 120.f;
-      LayoutBox box{id, x, y, max_width, h};
-      out.boxes.push_back(box);
-      y += h + 12.f;
+      float h = 100.f;
+      out.boxes.push_back({id, x, y, max_width, h});
+      y += h + 14.f;
       break;
     }
-
-    case NodeKind::Stretch:
-      // For now treat as normal block; expand/collapse later
-      for (NodeId child : node.children) {
-        layout_node(doc, child, x, y, max_width, out);
-      }
-      break;
 
     default:
       break;
@@ -103,60 +94,60 @@ static void decode_utf8(const std::string& text,
 
 void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
                                     float x, float& y, float max_width,
-                                    LayoutResult& out, float font_scale) {
-  // Collect all codepoints with source tracking
+                                    LayoutResult& out, Font& font,
+                                    FontRole role) {
   struct CharInfo {
     uint32_t cp;
     size_t span_idx;
     size_t char_idx;
+    InlineKind kind;
   };
   std::vector<CharInfo> chars;
   for (size_t si = 0; si < node.spans.size(); ++si) {
     std::vector<uint32_t> cps;
     decode_utf8(node.spans[si].text, cps);
     for (size_t ci = 0; ci < cps.size(); ++ci) {
-      chars.push_back({cps[ci], si, ci});
+      chars.push_back({cps[ci], si, ci, node.spans[si].kind});
     }
   }
 
   if (chars.empty()) {
-    y += font_.line_height() * font_scale;
+    y += font.line_height();
     return;
   }
 
   float pen_x = x;
-  float baseline = y + font_.ascender() * font_scale;
+  float baseline = y + font.ascender();
   float line_start = x;
   size_t line_start_idx = 0;
 
   auto break_line = [&](size_t end_idx) {
-    // Emit glyphs for the line
     float lx = line_start;
     for (size_t i = line_start_idx; i < end_idx; ++i) {
-      const Glyph& g = font_.glyph(chars[i].cp);
+      const Glyph& g = font.glyph(chars[i].cp);
       PositionedGlyph pg;
       pg.codepoint = chars[i].cp;
-      pg.x = lx + g.bearing_x * font_scale;
+      pg.x = lx + static_cast<float>(g.bearing_x);
       pg.y = baseline;
       pg.node = node.id;
       pg.span_index = chars[i].span_idx;
       pg.char_index = chars[i].char_idx;
+      pg.kind = chars[i].kind;
+      pg.font = role;
       out.glyphs.push_back(pg);
-      lx += (g.advance >> 6) * font_scale;
+      lx += static_cast<float>(g.advance >> 6);
     }
-    baseline += font_.line_height() * font_scale * 1.25f;
+    baseline += font.line_height() * 1.3f;
     pen_x = x;
     line_start = x;
     line_start_idx = end_idx;
   };
 
   for (size_t i = 0; i < chars.size(); ++i) {
-    const Glyph& g = font_.glyph(chars[i].cp);
-    float adv = (g.advance >> 6) * font_scale;
+    const Glyph& g = font.glyph(chars[i].cp);
+    float adv = static_cast<float>(g.advance >> 6);
 
-    // Simple word-wrap: break on space when exceeding width
     if (pen_x + adv > x + max_width && chars[i].cp != ' ' && i > line_start_idx) {
-      // Find last space
       size_t break_at = i;
       for (size_t j = i; j > line_start_idx; --j) {
         if (chars[j - 1].cp == ' ') {
@@ -164,23 +155,19 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
           break;
         }
       }
-      if (break_at == i) break_at = i;  // hard break
       break_line(break_at);
-      // Skip leading spaces on new line
       while (i < chars.size() && chars[i].cp == ' ') ++i;
       if (i >= chars.size()) break;
-      --i;  // loop will ++
+      --i;
       continue;
     }
-
     pen_x += adv;
   }
-  // Final line
   if (line_start_idx < chars.size()) {
     break_line(chars.size());
   }
 
-  y = baseline - font_.ascender() * font_scale + font_.line_height() * font_scale * 0.25f;
+  y = baseline - font.ascender() + font.line_height() * 0.2f;
 }
 
 }  // namespace glyphtoo

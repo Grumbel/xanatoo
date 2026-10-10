@@ -10,15 +10,14 @@ See [PROPOSAL.md](PROPOSAL.md) for the full vision.
 
 ## Status
 
-Stage 01 scaffolding:
+Stage 01 (document model + layout) is working.
+Early stage 02 (caret, hit-testing, basic editing) is in place.
 
 - Data-oriented document model with stable node IDs
-- Simple paragraph / heading layout with line breaking
-- FreeType glyph rendering via SDL2
-- Nix flake for reproducible builds
-
-Editing, caret, stretchtext, multiple views and interactive layout
-are planned for later stages.
+- Minimal Markdown-ish parser
+- FreeType glyph rendering (body + heading sizes) via SDL2
+- Click to place caret, type to edit, Backspace/Delete, arrows
+- Immediate reflow after every change
 
 ## Build (Nix)
 
@@ -27,24 +26,23 @@ nix build
 ./result/bin/glyphtoo
 ```
 
-Or enter a development shell:
+Or:
 
 ```bash
 nix develop
 mkdir build && cd build
-cmake ..
-make -j
+cmake .. && make -j
 ./glyphtoo
 ```
 
 ## Build (system packages)
 
-Requires: CMake ≥ 3.16, SDL2, FreeType, a C++20 compiler.
+Requires: CMake ≥ 3.16, SDL2, FreeType, C++20 compiler, a system font
+(DejaVu or Liberation).
 
 ```bash
 mkdir build && cd build
-cmake ..
-make -j
+cmake .. && make -j
 ./glyphtoo
 ```
 

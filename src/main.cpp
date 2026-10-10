@@ -2,78 +2,50 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 //
 // glyphtoo — interactive document composition engine
-// Stage 01: document model + layout + basic FreeType rendering
+// Stage 01 + early stage 02: markup, layout, caret, basic editing
 
 #include "glyphtoo/types.hpp"
 #include "glyphtoo/font.hpp"
 #include "glyphtoo/layout.hpp"
 #include "glyphtoo/render.hpp"
+#include "glyphtoo/parse.hpp"
+#include "glyphtoo/editor.hpp"
 
 #include <SDL.h>
 #include <iostream>
 #include <string>
-#include <vector>
 #include <filesystem>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 
-// Build a small sample document inspired by the proposal
-glyphtoo::Document make_sample() {
-  using namespace glyphtoo;
-  Document doc;
+static const char* SAMPLE = R"(# The network
 
-  NodeId root = doc.create(NodeKind::Document);
+The web connects documents, but [hypertext](#hypertext) connects ideas.
 
-  // Heading
-  NodeId h1 = doc.create(NodeKind::Heading, root);
-  doc.get(h1).level = 1;
-  doc.append_text(h1, "The network");
+## What is hypertext?
 
-  // Paragraph
-  NodeId p1 = doc.create(NodeKind::Paragraph, root);
-  doc.append_text(p1, "The web connects documents, but ");
-  doc.append_text(p1, "hypertext", InlineKind::Link);
-  doc.append_text(p1, " connects ideas.");
+Hypertext is a system of linked information that can be explored non-linearly.
+Passages can expand in place (*stretchtext*), images are first-class
+addressable content, and layout is part of the living document rather than a
+fixed page prescription.
 
-  // Another heading
-  NodeId h2 = doc.create(NodeKind::Heading, root);
-  doc.get(h2).level = 2;
-  doc.append_text(h2, "What is hypertext?");
+This is a live document. Click to place the caret, type to insert text,
+Backspace to delete. Arrow keys move the caret; PageUp / PageDown scroll.
 
-  NodeId p2 = doc.create(NodeKind::Paragraph, root);
-  doc.append_text(p2,
-      "Hypertext is a system of linked information that can be "
-      "explored non-linearly. Passages can expand in place "
-      "(stretchtext), images are first-class addressable content, "
-      "and layout is part of the living document rather than a "
-      "fixed page prescription.");
-
-  NodeId p3 = doc.create(NodeKind::Paragraph, root);
-  doc.append_text(p3,
-      "This is the first runnable skeleton of glyphtoo. "
-      "It demonstrates a data-oriented document model with stable "
-      "node IDs, a simple line-breaking layout engine, and FreeType "
-      "glyph rendering through SDL2. Editing, caret, stretchtext and "
-      "parallel views will arrive in later stages.");
-
-  NodeId p4 = doc.create(NodeKind::Paragraph, root);
-  doc.append_text(p4,
-      "Inspiration: Ted Nelson's Xanadu, Bill Atkinson's HyperCard, "
-      "and Jef Raskin's Canon Cat — a keyboard-driven work processor "
-      "that treated text as a continuous, searchable stream.");
-
-  return doc;
-}
+Inspiration: Ted Nelson's *Xanadu*, Bill Atkinson's **HyperCard**, and
+Jef Raskin's *Canon Cat* — a keyboard-driven work processor that treated
+text as a continuous, searchable stream.
+)";
 
 static std::string find_font() {
-  // Common locations for a readable system font
   const char* candidates[] = {
       "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
       "/usr/share/fonts/TTF/DejaVuSans.ttf",
       "/usr/share/fonts/dejavu/DejaVuSans.ttf",
       "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
       "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-      "/System/Library/Fonts/Supplemental/Arial.ttf",  // macOS
+      "/System/Library/Fonts/Supplemental/Arial.ttf",
       "/Library/Fonts/Arial.ttf",
       nullptr
   };
@@ -87,26 +59,26 @@ int main(int argc, char** argv) {
   (void)argc;
   (void)argv;
 
-  if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
     std::cerr << "SDL_Init: " << SDL_GetError() << "\n";
     return 1;
   }
+  SDL_StartTextInput();
 
   SDL_Window* window = SDL_CreateWindow(
-      "glyphtoo — interactive document composition",
+      "glyphtoo",
       SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-      900, 700,
+      920, 720,
       SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN);
-
   if (!window) {
     std::cerr << "SDL_CreateWindow: " << SDL_GetError() << "\n";
     SDL_Quit();
     return 1;
   }
 
-  SDL_Renderer* sdl_renderer = SDL_CreateRenderer(
+  SDL_Renderer* sdl = SDL_CreateRenderer(
       window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-  if (!sdl_renderer) {
+  if (!sdl) {
     std::cerr << "SDL_CreateRenderer: " << SDL_GetError() << "\n";
     SDL_DestroyWindow(window);
     SDL_Quit();
@@ -115,32 +87,38 @@ int main(int argc, char** argv) {
 
   std::string font_path = find_font();
   if (font_path.empty()) {
-    std::cerr << "No suitable system font found. Install DejaVu or Liberation.\n";
-    SDL_DestroyRenderer(sdl_renderer);
+    std::cerr << "No system font found (need DejaVu or Liberation).\n";
+    SDL_DestroyRenderer(sdl);
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 1;
   }
-  std::cout << "Using font: " << font_path << "\n";
+  std::cout << "Font: " << font_path << "\n";
 
-  glyphtoo::Font font;
-  if (!font.load(font_path, 18, sdl_renderer)) {
-    std::cerr << "Failed to load font\n";
-    SDL_DestroyRenderer(sdl_renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
+  glyphtoo::Font body_font, heading_font;
+  if (!body_font.load(font_path, 17, sdl) ||
+      !heading_font.load(font_path, 26, sdl)) {
+    std::cerr << "Font load failed\n";
     return 1;
   }
 
-  glyphtoo::Document doc = make_sample();
-  glyphtoo::LayoutEngine layout_engine(font);
-  glyphtoo::Renderer renderer(sdl_renderer, font);
+  glyphtoo::Document doc = glyphtoo::parse_markup(SAMPLE);
+  glyphtoo::LayoutEngine layout_engine(body_font, heading_font);
+  glyphtoo::Renderer renderer(sdl, body_font, heading_font);
 
-  int win_w = 900, win_h = 700;
+  glyphtoo::Caret caret;
+  glyphtoo::ensure_valid_caret(doc, caret);
+
+  int win_w = 920, win_h = 720;
   float scroll_y = 0.f;
   bool running = true;
   bool needs_layout = true;
   glyphtoo::LayoutResult layout;
+
+  auto reflow = [&]() {
+    layout = layout_engine.layout(doc, static_cast<float>(win_w));
+    needs_layout = false;
+  };
 
   while (running) {
     SDL_Event ev;
@@ -149,6 +127,7 @@ int main(int argc, char** argv) {
         case SDL_QUIT:
           running = false;
           break;
+
         case SDL_WINDOWEVENT:
           if (ev.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
             win_w = ev.window.data1;
@@ -156,30 +135,99 @@ int main(int argc, char** argv) {
             needs_layout = true;
           }
           break;
+
         case SDL_MOUSEWHEEL:
-          scroll_y -= ev.wheel.y * 40.f;
-          if (scroll_y < 0.f) scroll_y = 0.f;
+          scroll_y -= ev.wheel.y * 48.f;
+          scroll_y = std::max(0.f, scroll_y);
           break;
-        case SDL_KEYDOWN:
-          if (ev.key.keysym.sym == SDLK_ESCAPE) running = false;
-          if (ev.key.keysym.sym == SDLK_UP) scroll_y = std::max(0.f, scroll_y - 30.f);
-          if (ev.key.keysym.sym == SDLK_DOWN) scroll_y += 30.f;
+
+        case SDL_MOUSEBUTTONDOWN:
+          if (ev.button.button == SDL_BUTTON_LEFT) {
+            float mx = static_cast<float>(ev.button.x);
+            float my = static_cast<float>(ev.button.y);
+            if (auto hit = glyphtoo::hit_test(layout, mx, my, scroll_y)) {
+              caret = *hit;
+            }
+          }
           break;
+
+        case SDL_TEXTINPUT: {
+          glyphtoo::insert_text(doc, caret, ev.text.text);
+          needs_layout = true;
+          break;
+        }
+
+        case SDL_KEYDOWN: {
+          bool shift = (ev.key.keysym.mod & KMOD_SHIFT) != 0;
+          (void)shift;
+          switch (ev.key.keysym.sym) {
+            case SDLK_ESCAPE:
+              running = false;
+              break;
+            case SDLK_BACKSPACE:
+              glyphtoo::delete_backward(doc, caret);
+              needs_layout = true;
+              break;
+            case SDLK_DELETE:
+              glyphtoo::delete_forward(doc, caret);
+              needs_layout = true;
+              break;
+            case SDLK_LEFT:
+              if (!glyphtoo::move_left(doc, caret))
+                glyphtoo::move_to_prev_node(doc, caret);
+              break;
+            case SDLK_RIGHT:
+              if (!glyphtoo::move_right(doc, caret))
+                glyphtoo::move_to_next_node(doc, caret);
+              break;
+            case SDLK_UP:
+              // crude: previous node
+              glyphtoo::move_to_prev_node(doc, caret);
+              break;
+            case SDLK_DOWN:
+              glyphtoo::move_to_next_node(doc, caret);
+              break;
+            case SDLK_PAGEUP:
+              scroll_y = std::max(0.f, scroll_y - win_h * 0.8f);
+              break;
+            case SDLK_PAGEDOWN:
+              scroll_y += win_h * 0.8f;
+              break;
+            case SDLK_HOME:
+              caret.span_index = 0;
+              caret.char_index = 0;
+              break;
+            case SDLK_RETURN:
+            case SDLK_KP_ENTER:
+              // For now insert a space-newline marker; proper block split later
+              glyphtoo::insert_text(doc, caret, "\n");
+              needs_layout = true;
+              break;
+            default:
+              break;
+          }
+          break;
+        }
       }
     }
 
-    if (needs_layout) {
-      layout = layout_engine.layout(doc, static_cast<float>(win_w));
-      needs_layout = false;
-    }
+    if (needs_layout) reflow();
 
-    // Paper-like background
+    // Clamp scroll
+    float max_scroll = std::max(0.f, layout.content_height - win_h + 40.f);
+    if (scroll_y > max_scroll) scroll_y = max_scroll;
+
     renderer.clear(248, 246, 240);
     renderer.draw(layout, scroll_y);
+
+    auto cpos = glyphtoo::caret_screen_pos(
+        layout, caret, scroll_y, static_cast<float>(body_font.line_height()));
+    renderer.draw_caret(cpos);
     renderer.present();
   }
 
-  SDL_DestroyRenderer(sdl_renderer);
+  SDL_StopTextInput();
+  SDL_DestroyRenderer(sdl);
   SDL_DestroyWindow(window);
   SDL_Quit();
   return 0;

@@ -5,8 +5,8 @@
 
 namespace glyphtoo {
 
-Renderer::Renderer(SDL_Renderer* sdl, Font& font)
-    : sdl_(sdl), font_(font) {}
+Renderer::Renderer(SDL_Renderer* sdl, Font& body, Font& heading)
+    : sdl_(sdl), body_(body), heading_(heading) {}
 
 void Renderer::clear(uint8_t r, uint8_t g, uint8_t b) {
   SDL_SetRenderDrawColor(sdl_, r, g, b, 255);
@@ -14,9 +14,9 @@ void Renderer::clear(uint8_t r, uint8_t g, uint8_t b) {
 }
 
 void Renderer::draw(const LayoutResult& layout, float scroll_y) {
-  // Soft off-white background already cleared
   for (const auto& pg : layout.glyphs) {
-    const Glyph& g = font_.glyph(pg.codepoint);
+    Font& font = (pg.font == FontRole::Heading) ? heading_ : body_;
+    const Glyph& g = font.glyph(pg.codepoint);
     if (!g.texture) continue;
 
     SDL_Rect dst;
@@ -25,18 +25,36 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y) {
     dst.w = g.width;
     dst.h = g.height;
 
-    // Dark text on light paper
-    SDL_SetTextureColorMod(g.texture, 30, 30, 35);
+    switch (pg.kind) {
+      case InlineKind::Link:
+        SDL_SetTextureColorMod(g.texture, 30, 90, 180);
+        break;
+      case InlineKind::Strong:
+        SDL_SetTextureColorMod(g.texture, 15, 15, 20);
+        break;
+      case InlineKind::Emphasis:
+        SDL_SetTextureColorMod(g.texture, 45, 45, 55);
+        break;
+      case InlineKind::Code:
+        SDL_SetTextureColorMod(g.texture, 130, 55, 30);
+        break;
+      default:
+        SDL_SetTextureColorMod(g.texture, 28, 28, 32);
+        break;
+    }
     SDL_RenderCopy(sdl_, g.texture, nullptr, &dst);
   }
+}
 
-  // Optional: draw layout boxes for debugging (very subtle)
-  // SDL_SetRenderDrawColor(sdl_, 200, 200, 210, 40);
-  // for (const auto& box : layout.boxes) {
-  //   SDL_Rect r{static_cast<int>(box.x), static_cast<int>(box.y - scroll_y),
-  //              static_cast<int>(box.width), static_cast<int>(box.height)};
-  //   SDL_RenderDrawRect(sdl_, &r);
-  // }
+void Renderer::draw_caret(const CaretScreenPos& pos) {
+  if (!pos.valid) return;
+  SDL_SetRenderDrawColor(sdl_, 25, 90, 170, 255);
+  SDL_Rect r;
+  r.x = static_cast<int>(pos.x);
+  r.y = static_cast<int>(pos.y - pos.height * 0.85f);
+  r.w = 2;
+  r.h = static_cast<int>(pos.height * 0.95f);
+  SDL_RenderFillRect(sdl_, &r);
 }
 
 void Renderer::present() {

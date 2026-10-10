@@ -16,6 +16,8 @@ add_executable(glyphtoo
   src/document.cpp
   src/layout.cpp
   src/render.cpp
+  src/parse.cpp
+  src/editor.cpp
 )
 
 target_include_directories(glyphtoo PRIVATE
