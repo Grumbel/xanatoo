@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **005** (this delivery is **004**)
+Next bundle number: **006** (this delivery is **005**)
 
 ## Status (2026-10-10)
 
@@ -20,17 +20,18 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
       click ▸ / ▾ marker to expand/collapse and reflow
 - [x] Ctrl+A selects current block
 - [x] `--font` / `-f` CLI option to choose the TTF
+- [x] Clipboard (Ctrl+C / Ctrl+V / Ctrl+X)
+- [x] Undo / redo via document snapshots (Ctrl+Z / Ctrl+Y)
+- [x] Caret blink
 
 ## Open work / next steps
 
 1. Multi-node selection delete / copy (currently single-node only)
-2. Clipboard (Ctrl+C / Ctrl+V) — needs SDL clipboard API
-3. Undo/redo as an operation log
-4. Proper image loading and display
-5. Multi-view / side-by-side panes (stage 03)
-6. Package a default font in the flake
-7. Smooth caret blink
-8. Optional: HarfBuzz for complex scripts
+2. Proper image loading and display
+3. Multi-view / side-by-side panes (stage 03)
+4. Package a default font in the flake
+5. Optional: HarfBuzz for complex scripts
+6. Replace snapshot undo with a tighter operation log if memory becomes an issue
 
 ## Design notes
 
@@ -46,4 +47,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-001.*` — stage 01 scaffold
 - `glyphtoo-002.*` — markup, caret, basic edit
 - `glyphtoo-003.*-selection-stretch-…` — selection, stretchtext
-- `glyphtoo-004.*-font-cli-…` — this delivery (`--font`)
+- `glyphtoo-004.*-font-cli-…` — `--font` CLI
+- `glyphtoo-005.*-clipboard-undo-…` — this delivery

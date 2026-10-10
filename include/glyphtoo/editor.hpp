@@ -36,8 +36,6 @@ struct Selection {
   Caret focus;
 
   bool empty() const { return anchor == focus; }
-  Caret start() const;  // document-order minimum
-  Caret end() const;
 };
 
 // Map a screen point to a caret location using the current layout.
@@ -76,6 +74,12 @@ bool split_block(Document& doc, Caret& caret);
 // Delete the current selection (or nothing if empty). Caret becomes the start.
 void delete_selection(Document& doc, Selection& sel);
 
+// Plain-text extraction of the current selection (single-node for now).
+std::string selected_text(const Document& doc, const Selection& sel);
+
+// Concatenate all text of a node (for paste targets / fallbacks).
+std::string node_text(const Document& doc, NodeId id);
+
 // Move caret by one codepoint (within the node). Returns false if at boundary.
 bool move_left(Document& doc, Caret& caret);
 bool move_right(Document& doc, Caret& caret);
@@ -92,5 +96,36 @@ void ensure_valid_caret(Document& doc, Caret& caret);
 
 // Document-order comparison of two carets (-1, 0, +1).
 int caret_cmp(const Document& doc, const Caret& a, const Caret& b);
+
+// ---------------------------------------------------------------------------
+// Undo / redo via document snapshots (simple, correct at current scale).
+// ---------------------------------------------------------------------------
+struct EditorSnapshot {
+  Document doc;
+  Selection sel;
+};
+
+class History {
+public:
+  explicit History(size_t max_depth = 128);
+
+  // Call *before* a mutating edit. Clears the redo side.
+  void push(const Document& doc, const Selection& sel);
+
+  bool can_undo() const { return undo_.size() > 1; }  // keep baseline
+  bool can_redo() const { return !redo_.empty(); }
+
+  // Restores previous state into doc/sel. Returns false if nothing to undo.
+  bool undo(Document& doc, Selection& sel);
+  bool redo(Document& doc, Selection& sel);
+
+  // Seed the stack with the initial document (call once after load).
+  void reset(const Document& doc, const Selection& sel);
+
+private:
+  size_t max_depth_;
+  std::vector<EditorSnapshot> undo_;
+  std::vector<EditorSnapshot> redo_;
+};
 
 }  // namespace glyphtoo

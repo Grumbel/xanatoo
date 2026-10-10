@@ -33,6 +33,7 @@ document rather than a fixed page prescription.
 
 This is a live document. Click to place the caret, type to insert text,
 Backspace to delete. **Enter** splits a paragraph. Shift+arrows select.
+Ctrl+C / Ctrl+V / Ctrl+X for clipboard, Ctrl+Z / Ctrl+Y for undo/redo.
 Click a stretchtext marker (▸ / ▾) to expand or collapse.
 
 Inspiration: Ted Nelson's *Xanadu*, Bill Atkinson's **HyperCard**, and
@@ -170,6 +171,9 @@ int main(int argc, char** argv) {
   glyphtoo::ensure_valid_caret(doc, sel.focus);
   sel.anchor = sel.focus;
 
+  glyphtoo::History history;
+  history.reset(doc, sel);
+
   int win_w = 920, win_h = 720;
   float scroll_y = 0.f;
   float preferred_x = 0.f;  // for vertical movement
@@ -177,6 +181,14 @@ int main(int argc, char** argv) {
   bool needs_layout = true;
   bool dragging = false;
   glyphtoo::LayoutResult layout;
+
+  // Caret blink
+  Uint32 caret_blink_start = SDL_GetTicks();
+  auto reset_blink = [&]() { caret_blink_start = SDL_GetTicks(); };
+
+  auto checkpoint = [&]() {
+    history.push(doc, sel);
+  };
 
   auto reflow = [&]() {
     layout = layout_engine.layout(doc, static_cast<float>(win_w));
@@ -215,6 +227,7 @@ int main(int argc, char** argv) {
             if (auto sid = glyphtoo::hit_test_stretch(layout, mx, my, scroll_y)) {
               NodeId id = *sid;
               if (doc.get(id).kind == glyphtoo::NodeKind::Stretch) {
+                checkpoint();
                 doc.get(id).expanded = !doc.get(id).expanded;
                 needs_layout = true;
                 break;
@@ -228,6 +241,7 @@ int main(int argc, char** argv) {
               }
               preferred_x = mx;
               dragging = true;
+              reset_blink();
             }
           }
           break;
@@ -248,12 +262,14 @@ int main(int argc, char** argv) {
           break;
 
         case SDL_TEXTINPUT: {
+          checkpoint();
           if (!sel.empty()) {
             glyphtoo::delete_selection(doc, sel);
           }
           glyphtoo::insert_text(doc, sel.focus, ev.text.text);
           sel.anchor = sel.focus;
           needs_layout = true;
+          reset_blink();
           break;
         }
 
@@ -274,6 +290,7 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_BACKSPACE:
+              checkpoint();
               if (!sel.empty()) {
                 glyphtoo::delete_selection(doc, sel);
               } else {
@@ -281,9 +298,11 @@ int main(int argc, char** argv) {
                 sel.anchor = sel.focus;
               }
               needs_layout = true;
+              reset_blink();
               break;
 
             case SDLK_DELETE:
+              checkpoint();
               if (!sel.empty()) {
                 glyphtoo::delete_selection(doc, sel);
               } else {
@@ -291,14 +310,17 @@ int main(int argc, char** argv) {
                 sel.anchor = sel.focus;
               }
               needs_layout = true;
+              reset_blink();
               break;
 
             case SDLK_RETURN:
             case SDLK_KP_ENTER:
+              checkpoint();
               if (!sel.empty()) glyphtoo::delete_selection(doc, sel);
               glyphtoo::split_block(doc, sel.focus);
               sel.anchor = sel.focus;
               needs_layout = true;
+              reset_blink();
               break;
 
             case SDLK_LEFT:
@@ -341,6 +363,63 @@ int main(int argc, char** argv) {
                 sel.focus.span_index = 0;
                 sel.focus.char_index = 0;
               });
+              break;
+
+            case SDLK_c:
+              if (ctrl) {
+                std::string text = glyphtoo::selected_text(doc, sel);
+                if (!text.empty()) {
+                  SDL_SetClipboardText(text.c_str());
+                }
+              }
+              break;
+
+            case SDLK_x:
+              if (ctrl) {
+                std::string text = glyphtoo::selected_text(doc, sel);
+                if (!text.empty()) {
+                  SDL_SetClipboardText(text.c_str());
+                  checkpoint();
+                  glyphtoo::delete_selection(doc, sel);
+                  needs_layout = true;
+                  reset_blink();
+                }
+              }
+              break;
+
+            case SDLK_v:
+              if (ctrl) {
+                if (SDL_HasClipboardText()) {
+                  char* clip = SDL_GetClipboardText();
+                  if (clip && clip[0]) {
+                    checkpoint();
+                    if (!sel.empty()) glyphtoo::delete_selection(doc, sel);
+                    glyphtoo::insert_text(doc, sel.focus, clip);
+                    sel.anchor = sel.focus;
+                    needs_layout = true;
+                    reset_blink();
+                  }
+                  if (clip) SDL_free(clip);
+                }
+              }
+              break;
+
+            case SDLK_z:
+              if (ctrl) {
+                if (history.undo(doc, sel)) {
+                  needs_layout = true;
+                  reset_blink();
+                }
+              }
+              break;
+
+            case SDLK_y:
+              if (ctrl) {
+                if (history.redo(doc, sel)) {
+                  needs_layout = true;
+                  reset_blink();
+                }
+              }
               break;
 
             case SDLK_a:
@@ -393,7 +472,11 @@ int main(int argc, char** argv) {
     auto cpos = glyphtoo::caret_screen_pos(layout, sel.focus, scroll_y, lh);
     // Keep preferred_x in sync when moving horizontally
     if (cpos.valid) preferred_x = cpos.x;
-    renderer.draw_caret(cpos);
+    // Blink: visible 600ms, hidden 400ms
+    Uint32 blink_phase = (SDL_GetTicks() - caret_blink_start) % 1000;
+    if (blink_phase < 600) {
+      renderer.draw_caret(cpos);
+    }
     renderer.present();
   }
 

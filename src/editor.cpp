@@ -8,9 +8,7 @@
 
 namespace glyphtoo {
 
-namespace {
-
-std::pair<uint32_t, size_t> decode_cp(const std::string& s, size_t byte_i) {
+static std::pair<uint32_t, size_t> decode_cp(const std::string& s, size_t byte_i) {
   if (byte_i >= s.size()) return {0, 0};
   unsigned char c = static_cast<unsigned char>(s[byte_i]);
   if (c < 0x80) return {c, 1};
@@ -24,7 +22,7 @@ std::pair<uint32_t, size_t> decode_cp(const std::string& s, size_t byte_i) {
   return {c, 1};
 }
 
-size_t utf8_char_count(const std::string& s) {
+static size_t utf8_char_count(const std::string& s) {
   size_t n = 0, i = 0;
   while (i < s.size()) {
     auto [cp, len] = decode_cp(s, i);
@@ -36,7 +34,7 @@ size_t utf8_char_count(const std::string& s) {
   return n;
 }
 
-size_t utf8_byte_offset(const std::string& s, size_t char_index) {
+static size_t utf8_byte_offset(const std::string& s, size_t char_index) {
   size_t i = 0, n = 0;
   while (i < s.size() && n < char_index) {
     auto [cp, len] = decode_cp(s, i);
@@ -48,12 +46,12 @@ size_t utf8_byte_offset(const std::string& s, size_t char_index) {
   return i;
 }
 
-bool is_text_node(NodeKind k) {
+static bool is_text_node(NodeKind k) {
   return k == NodeKind::Paragraph || k == NodeKind::Heading ||
          k == NodeKind::ListItem;
 }
 
-void collect_text_nodes(const Document& doc, NodeId id, std::vector<NodeId>& out) {
+static void collect_text_nodes(const Document& doc, NodeId id, std::vector<NodeId>& out) {
   const Node& n = doc.get(id);
   if (is_text_node(n.kind)) {
     out.push_back(id);
@@ -63,14 +61,13 @@ void collect_text_nodes(const Document& doc, NodeId id, std::vector<NodeId>& out
   }
 }
 
-// Linear rank of a caret for ordering (node order * big + span * mid + char)
 struct CaretKey {
   size_t node_ord = 0;
   size_t span = 0;
   size_t ch = 0;
 };
 
-CaretKey make_key(const Document& doc, const Caret& c) {
+static CaretKey make_key(const Document& doc, const Caret& c) {
   std::vector<NodeId> nodes;
   if (doc.root != INVALID_NODE) collect_text_nodes(doc, doc.root, nodes);
   CaretKey k;
@@ -81,23 +78,13 @@ CaretKey make_key(const Document& doc, const Caret& c) {
   return k;
 }
 
-bool key_less(const CaretKey& a, const CaretKey& b) {
+static bool key_less(const CaretKey& a, const CaretKey& b) {
   if (a.node_ord != b.node_ord) return a.node_ord < b.node_ord;
   if (a.span != b.span) return a.span < b.span;
   return a.ch < b.ch;
 }
 
-}  // namespace
-
 // ---- Selection helpers ----
-
-Caret Selection::start() const {
-  // Without document we can't order properly; callers should use caret_cmp.
-  // Fallback: assume focus is start if we can't tell — real order via caret_cmp.
-  return anchor;  // placeholder; real start/end use caret_cmp in callers
-}
-
-Caret Selection::end() const { return focus; }
 
 int caret_cmp(const Document& doc, const Caret& a, const Caret& b) {
   CaretKey ka = make_key(doc, a);
@@ -628,6 +615,94 @@ void ensure_valid_caret(Document& doc, Caret& caret) {
   } else {
     caret = {};
   }
+}
+
+
+std::string node_text(const Document& doc, NodeId id) {
+  const Node& n = doc.get(id);
+  std::string out;
+  for (const auto& sp : n.spans) {
+    out += sp.text;
+  }
+  return out;
+}
+
+std::string selected_text(const Document& doc, const Selection& sel) {
+  if (sel.empty()) return {};
+  if (sel.anchor.node != sel.focus.node) {
+    // Multi-node: concatenate whole nodes between anchors (simple)
+    // For now only same-node selection is fully supported for partial text.
+    return node_text(doc, sel.focus.node);
+  }
+
+  Caret a = sel.anchor;
+  Caret b = sel.focus;
+  if (caret_cmp(doc, a, b) > 0) std::swap(a, b);
+
+  const Node& n = doc.get(a.node);
+  if (n.spans.empty()) return {};
+
+  auto slice_span = [](const InlineSpan& sp, size_t from_ch, size_t to_ch) {
+    size_t from_b = utf8_byte_offset(sp.text, from_ch);
+    size_t to_b = utf8_byte_offset(sp.text, to_ch);
+    if (to_b < from_b) return std::string{};
+    return sp.text.substr(from_b, to_b - from_b);
+  };
+
+  std::string out;
+  if (a.span_index == b.span_index) {
+    if (a.span_index < n.spans.size()) {
+      out = slice_span(n.spans[a.span_index], a.char_index, b.char_index);
+    }
+  } else {
+    if (a.span_index < n.spans.size()) {
+      size_t len = utf8_char_count(n.spans[a.span_index].text);
+      out += slice_span(n.spans[a.span_index], a.char_index, len);
+    }
+    for (size_t si = a.span_index + 1; si < b.span_index && si < n.spans.size(); ++si) {
+      out += n.spans[si].text;
+    }
+    if (b.span_index < n.spans.size()) {
+      out += slice_span(n.spans[b.span_index], 0, b.char_index);
+    }
+  }
+  return out;
+}
+
+// ---- History ----
+
+History::History(size_t max_depth) : max_depth_(max_depth) {}
+
+void History::reset(const Document& doc, const Selection& sel) {
+  undo_.clear();
+  redo_.clear();
+  undo_.push_back({doc, sel});
+}
+
+void History::push(const Document& doc, const Selection& sel) {
+  redo_.clear();
+  undo_.push_back({doc, sel});
+  if (undo_.size() > max_depth_) {
+    undo_.erase(undo_.begin());
+  }
+}
+
+bool History::undo(Document& doc, Selection& sel) {
+  if (undo_.size() <= 1) return false;
+  redo_.push_back({doc, sel});
+  undo_.pop_back();
+  doc = undo_.back().doc;
+  sel = undo_.back().sel;
+  return true;
+}
+
+bool History::redo(Document& doc, Selection& sel) {
+  if (redo_.empty()) return false;
+  undo_.push_back({doc, sel});
+  doc = redo_.back().doc;
+  sel = redo_.back().sel;
+  redo_.pop_back();
+  return true;
 }
 
 }  // namespace glyphtoo
