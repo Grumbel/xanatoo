@@ -49,4 +49,4 @@ inspired by the proposal. No editing yet.
 
 ## Bundle history
 
-- `glyphtoo-001.3-stage01-scaffold-568a91b.bundle` — this delivery
+- `glyphtoo-001.4-stage01-scaffold-568a91b.bundle` — this delivery
