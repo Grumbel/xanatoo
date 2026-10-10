@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **013** (this delivery is **012**)
+Next bundle number: **013** (this delivery is **012.2**)
 
 ## Status (2026-10-10)
 
@@ -39,6 +39,7 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] On-screen leap query status bar
 - [x] Scroll-to-match after search
 - [x] Untitled Ctrl+S → auto `untitled.md` (or untitled-N.md)
+- [x] Build fix: serialize_markup inside namespace glyphtoo
 
 ## Open work / next steps
 

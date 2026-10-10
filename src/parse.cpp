@@ -248,8 +248,6 @@ Document parse_markup(std::string_view source) {
   return doc;
 }
 
-}  // namespace glyphtoo
-
 namespace {
 
 void serialize_inlines(const Node& node, std::string& out) {
@@ -386,3 +384,4 @@ std::string serialize_markup(const Document& doc) {
   return out;
 }
 
+}  // namespace glyphtoo
