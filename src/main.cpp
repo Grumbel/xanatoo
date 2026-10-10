@@ -231,6 +231,28 @@ int main(int argc, char** argv) {
   bool summary_edit_mode = false;
   std::string summary_edit_text;
   xanatoo::NodeId summary_edit_node = xanatoo::INVALID_NODE;
+
+  // Floating software window for arbitrary documents (FORMAT.md, etc.)
+  struct SoftWindow {
+    bool open = false;
+    std::string title;
+    std::string path;
+    xanatoo::Document doc;
+    xanatoo::LayoutResult layout;
+    float scroll = 0.f;
+    bool needs_layout = true;
+    int x = 120, y = 70, w = 540, h = 440;
+    bool dragging = false;
+    int drag_dx = 0, drag_dy = 0;
+    int resize = 0;  // 1=right, 2=bottom
+    bool scroll_dragging = false;
+    int resize_start_x = 0, resize_start_y = 0;
+    int resize_start_w = 0, resize_start_h = 0;
+  };
+  SoftWindow browse;
+  bool path_in_window_mode = false;
+  std::string path_in_window_buf;
+
   bool help_mode = false;  // F1 help as a real document in a software window
   xanatoo::Document help_doc;
   xanatoo::LayoutResult help_layout;
@@ -364,6 +386,64 @@ int main(int argc, char** argv) {
     }
 #endif
     return {};
+  };
+
+
+  auto find_repo_file = [&](const char* name) -> std::string {
+    // try relative paths with common prefixes
+    const char* prefixes[] = {"", "examples/", "../", "../examples/", "../../", "../../examples/", nullptr};
+    for (const char** pre = prefixes; *pre; ++pre) {
+      std::string pth = std::string(*pre) + name;
+      if (fs::exists(pth)) return fs::absolute(pth).string();
+    }
+#ifdef __linux__
+    try {
+      fs::path exe = fs::read_symlink("/proc/self/exe");
+      fs::path dir = exe.parent_path();
+      for (const auto& c : {
+               dir / name,
+               dir / "examples" / name,
+               dir / ".." / name,
+               dir / ".." / "examples" / name,
+               dir / ".." / "share" / "xanatoo" / "examples" / name,
+           }) {
+        std::error_code ec;
+        auto canon = fs::weakly_canonical(c, ec);
+        if (!ec && fs::exists(canon)) return canon.string();
+      }
+    } catch (...) {
+    }
+#endif
+    return {};
+  };
+
+  auto open_browse = [&](const std::string& path, const std::string& title) {
+    if (path.empty() || !fs::exists(path)) {
+      std::cerr << "Cannot open in window: " << path << "\n";
+      return;
+    }
+    browse.doc = load_doc(path);
+    browse.path = path;
+    browse.title = title.empty() ? path : title;
+    browse.open = true;
+    browse.needs_layout = true;
+    browse.scroll = 0.f;
+    browse.x = help_x + 30;
+    browse.y = help_y + 30;
+    std::cout << "Software window: " << path << "\n";
+  };
+
+  auto layout_browse = [&]() {
+    if (!browse.open) return;
+    float mw = static_cast<float>(std::max(120, browse.w - help_pad * 2));
+    browse.layout = layout_engine.layout(browse.doc, mw);
+    browse.needs_layout = false;
+  };
+
+  auto browse_client_rect = [&]() {
+    return std::tuple{browse.x + help_pad, browse.y + help_title_h + 4,
+                      browse.w - help_pad * 2,
+                      browse.h - help_title_h - help_pad - 4};
   };
 
   auto ensure_help_doc = [&]() {
@@ -513,7 +593,17 @@ int main(int argc, char** argv) {
           break;
         }
 
-        case SDL_MOUSEWHEEL: {
+        case SDL_MOUSEWHEEL:
+          if (browse.open) {
+            int mxw = 0, myw = 0;
+            SDL_GetMouseState(&mxw, &myw);
+            if (mxw >= browse.x && mxw < browse.x + browse.w &&
+                myw >= browse.y && myw < browse.y + browse.h) {
+              browse.scroll -= static_cast<float>(ev.wheel.y) * 40.f;
+              if (browse.scroll < 0.f) browse.scroll = 0.f;
+              break;
+            }
+          } {
           if (imgui_mouse) break;
           int mx = 0, my = 0;
           SDL_GetMouseState(&mx, &my);
@@ -557,6 +647,58 @@ int main(int argc, char** argv) {
                   help_dragging = false;
                   break;
                 }
+              }
+              if (browse.open && mxw >= browse.x && mxw < browse.x + browse.w &&
+                  myw >= browse.y && myw < browse.y + browse.h) {
+                if (myw < browse.y + help_title_h) {
+                  if (mxw >= browse.x + browse.w - 28) {
+                    browse.open = false;
+                    browse.dragging = false;
+                    browse.resize = 0;
+                  } else {
+                    browse.dragging = true;
+                    browse.drag_dx = mxw - browse.x;
+                    browse.drag_dy = myw - browse.y;
+                  }
+                  break;
+                }
+                // edge resize
+                bool on_r = mxw >= browse.x + browse.w - help_edge;
+                bool on_b = myw >= browse.y + browse.h - help_edge;
+                if (on_r || on_b) {
+                  browse.resize = (on_r ? 1 : 0) | (on_b ? 2 : 0);
+                  browse.resize_start_x = mxw;
+                  browse.resize_start_y = myw;
+                  browse.resize_start_w = browse.w;
+                  browse.resize_start_h = browse.h;
+                  break;
+                }
+                auto [cx, cy, cw, ch] = browse_client_rect();
+                float lx = static_cast<float>(mxw - cx);
+                float ly = static_cast<float>(myw - cy);
+                if (lx >= 0 && ly >= 0 && lx <= cw && ly <= ch) {
+                  if (auto sid = xanatoo::hit_test_stretch(
+                          browse.layout, lx, ly, browse.scroll)) {
+                    if (browse.doc.get(*sid).kind == xanatoo::NodeKind::Stretch) {
+                      browse.doc.get(*sid).expanded = !browse.doc.get(*sid).expanded;
+                      browse.needs_layout = true;
+                      break;
+                    }
+                  }
+                  if (auto href = xanatoo::hit_test_link(
+                          browse.doc, browse.layout, lx, ly, browse.scroll)) {
+                    if (!href->empty() && (*href)[0] == '#') {
+                      if (auto dest = xanatoo::jump_to_href(browse.doc, *href)) {
+                        auto cpos = xanatoo::caret_screen_pos(
+                            browse.layout, *dest, 0.f,
+                            static_cast<float>(body_font.line_height()));
+                        if (cpos.valid)
+                          browse.scroll = std::max(0.f, cpos.y - 24.f);
+                      }
+                    }
+                  }
+                }
+                break;
               }
               if (mxw >= help_x && mxw < help_x + help_w &&
                   myw >= help_y && myw < help_y + help_h) {
@@ -846,6 +988,9 @@ int main(int argc, char** argv) {
             help_dragging = false;
             help_resize = 0;
             help_scroll_dragging = false;
+            browse.dragging = false;
+            browse.resize = 0;
+            browse.scroll_dragging = false;
             if (dragging_block && drag_block_id != xanatoo::INVALID_NODE &&
                 drop_target_id != xanatoo::INVALID_NODE &&
                 drop_target_id != drag_block_id) {
@@ -1330,6 +1475,16 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_BACKSPACE:
+              if (path_in_window_mode) {
+                if (!path_in_window_buf.empty()) {
+                  while (!path_in_window_buf.empty() &&
+                         (static_cast<unsigned char>(path_in_window_buf.back()) & 0xc0) ==
+                             0x80)
+                    path_in_window_buf.pop_back();
+                  if (!path_in_window_buf.empty()) path_in_window_buf.pop_back();
+                }
+                break;
+              }
               if (save_as_mode) {
                 if (!save_as_path.empty()) {
                   while (!save_as_path.empty() &&
@@ -1449,6 +1604,19 @@ int main(int argc, char** argv) {
                 }
                 summary_edit_mode = false;
                 summary_edit_text.clear();
+                break;
+              }
+              if (path_in_window_mode) {
+                if (!path_in_window_buf.empty()) {
+                  std::string path = path_in_window_buf;
+                  if (!fs::exists(path)) {
+                    std::string found = find_repo_file(path.c_str());
+                    if (!found.empty()) path = found;
+                  }
+                  open_browse(path, path);
+                }
+                path_in_window_mode = false;
+                path_in_window_buf.clear();
                 break;
               }
               if (save_as_mode) {
@@ -2266,6 +2434,27 @@ int main(int argc, char** argv) {
             help_needs_layout = true;
           }
           break;
+        case C::OpenFormatDoc: {
+          std::string path = find_repo_file("FORMAT.md");
+          if (path.empty()) path = find_repo_file("FORMAT.md");
+          open_browse(path, "FORMAT.md — format spec");
+          break;
+        }
+        case C::OpenSemanticDoc: {
+          std::string path = find_repo_file("semantic.sexp");
+          if (path.empty()) path = find_repo_file("examples/semantic.sexp");
+          // find_repo_file already tries examples/
+          if (path.empty()) {
+            for (const char* c : {"examples/semantic.sexp", "../examples/semantic.sexp"})
+              if (fs::exists(c)) { path = fs::absolute(c).string(); break; }
+          }
+          open_browse(path, "semantic.sexp — demo");
+          break;
+        }
+        case C::OpenInWindow:
+          path_in_window_mode = true;
+          path_in_window_buf.clear();
+          break;
         case C::ZoomIn:
           body_px = std::min(48, body_px + 1);
           heading_px = std::min(64, heading_px + 2);
@@ -2483,7 +2672,8 @@ int main(int argc, char** argv) {
     {
       const int bar_h = 28;
       SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
-      if (search_mode || save_as_mode || link_edit_mode || summary_edit_mode) {
+      if (search_mode || save_as_mode || path_in_window_mode || link_edit_mode ||
+          summary_edit_mode) {
         SDL_SetRenderDrawColor(sdl, 30, 30, 40, 240);
       } else {
         SDL_SetRenderDrawColor(sdl, 236, 234, 228, 245);
@@ -2491,7 +2681,8 @@ int main(int argc, char** argv) {
       SDL_Rect bar{0, win_h - bar_h, win_w, bar_h};
       SDL_RenderFillRect(sdl, &bar);
       // Top edge line
-      if (search_mode || save_as_mode || link_edit_mode || summary_edit_mode) {
+      if (search_mode || save_as_mode || path_in_window_mode || link_edit_mode ||
+          summary_edit_mode) {
         SDL_SetRenderDrawColor(sdl, 80, 160, 255, 255);
       } else {
         SDL_SetRenderDrawColor(sdl, 200, 198, 190, 255);
@@ -2501,7 +2692,10 @@ int main(int argc, char** argv) {
 
       std::string label;
       uint8_t tr = 40, tg = 40, tb = 45;
-      if (save_as_mode) {
+      if (path_in_window_mode) {
+        label = "Open in window: ";
+        label += path_in_window_buf.empty() ? "…" : path_in_window_buf;
+      } else if (save_as_mode) {
         label = "Save as: ";
         label += save_as_path.empty() ? "…" : save_as_path;
         label += "    Enter confirm · Esc cancel";
@@ -2741,6 +2935,72 @@ int main(int argc, char** argv) {
         for (int i = 0; i < 3; ++i) {
           SDL_RenderDrawLine(sdl, gx - i * 3, gy, gx, gy - i * 3);
         }
+      }
+    }
+
+
+    // Browse software window (arbitrary document)
+    if (browse.open) {
+      if (browse.w < 280) browse.w = 280;
+      if (browse.h < 200) browse.h = 200;
+      if (browse.needs_layout) layout_browse();
+      {
+        auto [cx, cy, cw, ch] = browse_client_rect();
+        float max_s = std::max(0.f, browse.layout.content_height - static_cast<float>(ch) + 40.f);
+        if (browse.scroll > max_s) browse.scroll = max_s;
+      }
+      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+      SDL_SetRenderDrawColor(sdl, 0, 0, 0, 40);
+      SDL_Rect shadow{browse.x + 3, browse.y + 3, browse.w, browse.h};
+      SDL_RenderFillRect(sdl, &shadow);
+      SDL_SetRenderDrawColor(sdl, 246, 245, 244, 255);
+      SDL_Rect frame{browse.x, browse.y, browse.w, browse.h};
+      SDL_RenderFillRect(sdl, &frame);
+      SDL_SetRenderDrawColor(sdl, 120, 140, 100, 255);
+      SDL_RenderDrawRect(sdl, &frame);
+      SDL_SetRenderDrawColor(sdl, 210, 225, 190, 255);
+      SDL_Rect title{browse.x + 1, browse.y + 1, browse.w - 2, help_title_h};
+      SDL_RenderFillRect(sdl, &title);
+      SDL_SetRenderDrawColor(sdl, 120, 140, 100, 255);
+      SDL_RenderDrawLine(sdl, browse.x, browse.y + help_title_h,
+                         browse.x + browse.w, browse.y + help_title_h);
+      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+      renderer.draw_text(body_font, static_cast<float>(browse.x + 10),
+                         static_cast<float>(browse.y + 6 + body_font.ascender()),
+                         browse.title.c_str(), 40, 55, 35);
+      renderer.draw_text(body_font, static_cast<float>(browse.x + browse.w - 22),
+                         static_cast<float>(browse.y + 6 + body_font.ascender()),
+                         "×", 80, 40, 40);
+      auto [cx, cy, cw, ch] = browse_client_rect();
+      SDL_Rect clip{cx, cy, cw, ch};
+      SDL_RenderSetClipRect(sdl, &clip);
+      renderer.draw(browse.layout, browse.scroll - static_cast<float>(cy),
+                    static_cast<float>(cx));
+      SDL_RenderSetClipRect(sdl, nullptr);
+      {
+        float max_s = std::max(0.f, browse.layout.content_height - static_cast<float>(ch) + 40.f);
+        if (max_s > 1.f) {
+          const int sb_w = 8;
+          float view_h = static_cast<float>(ch);
+          float thumb_h = std::max(20.f, view_h * (view_h / (view_h + max_s)));
+          float track = std::max(0.f, view_h - thumb_h);
+          float ratio = browse.scroll / max_s;
+          int thumb_y = cy + static_cast<int>(ratio * track);
+          int sx = cx + cw - sb_w;
+          SDL_SetRenderDrawColor(sdl, 220, 218, 212, 255);
+          SDL_Rect track_r{sx, cy, sb_w, ch};
+          SDL_RenderFillRect(sdl, &track_r);
+          SDL_SetRenderDrawColor(sdl, 100, 130, 80, 255);
+          SDL_Rect thumb{sx, thumb_y, sb_w, static_cast<int>(thumb_h)};
+          SDL_RenderFillRect(sdl, &thumb);
+        }
+      }
+      {
+        const int gx = browse.x + browse.w - 3;
+        const int gy = browse.y + browse.h - 3;
+        SDL_SetRenderDrawColor(sdl, 100, 130, 80, 255);
+        for (int i = 0; i < 3; ++i)
+          SDL_RenderDrawLine(sdl, gx - i * 3, gy, gx, gy - i * 3);
       }
     }
 

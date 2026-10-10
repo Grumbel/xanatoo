@@ -48,6 +48,9 @@ enum class UiCommand {
   ToggleOutline,
   ToggleDiff,
   ToggleHelp,
+  OpenInWindow,
+  OpenFormatDoc,
+  OpenSemanticDoc,
   ZoomIn,
   ZoomOut,
 };

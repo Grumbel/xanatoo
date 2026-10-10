@@ -392,6 +392,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::Separator();
       if (ImGui::MenuItem("Keyboard Help", "F1", state.help))
         cmd = UiCommand::ToggleHelp;
+      ImGui::Separator();
+      menu_item_cmd("FORMAT.md in window", UiCommand::OpenFormatDoc, cmd);
+      menu_item_cmd("semantic.sexp in window", UiCommand::OpenSemanticDoc, cmd);
+      menu_item_cmd("Open path in window…", UiCommand::OpenInWindow, cmd);
       ImGui::EndMenu();
     }
 

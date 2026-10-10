@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **076** (this delivery is **075**)
+Next bundle number: **077** (this delivery is **076**)
 
 ## Status (2026-10-10)
 
@@ -123,6 +123,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Semantic format: include :excerpt ranges; semantic tables
 - [x] Editor: insert note / code block / table / definition list
 - [x] Project renamed glyphtoo → **xanatoo** (namespace, paths, binary, env)
+- [x] Software windows for arbitrary docs (FORMAT.md, semantic.sexp, path…)
 
 ## Open work / next steps
 
@@ -131,7 +132,7 @@ LCS structural diff marks; cross-document `:::include`.
 3. Editable transclusion mirror (edits on embed write through to source)
 4. Word-level / intra-block diff highlighting
 5. **Tables** — semantic grid (cells as nodes); presentation left to the view
-6. **General document software windows** — open any doc in a floating frame; optional docking
+6. **Docking / multiple software windows** — stack beyond one browse frame + help
 7. **Citations** / typed link relations / range transclusion (see FORMAT.md)
 
 ## Design notes
@@ -247,4 +248,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-072.*-cite-rel-…` — cite + :rel
 - `xanatoo-073.*-excerpt-table-…` — excerpt + table
 - `xanatoo-074.*-insert-semantic-…` — insert semantic (as glyphtoo tip before rename)
-- `xanatoo-075.*-rename-…` — this delivery (glyphtoo → xanatoo)
+- `xanatoo-075.*-rename-…` — rename glyphtoo → xanatoo
+- `xanatoo-076.*-doc-window-…` — this delivery
