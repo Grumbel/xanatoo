@@ -95,6 +95,7 @@ Supported dialect (intentionally small):
 | **Ctrl+A** | Select current block |
 | **Ctrl+Shift+A** | Select whole document |
 | Click blue link | Follow `#anchor` or open external `http(s)` / `mailto:` |
+| **Ctrl+Click** link | Jump to `#anchor` in the other pane (enables split) |
 | Hover `#anchor` link | Preview tooltip of the target passage |
 | Click transclusion | Jump to the source passage |
 | **Ctrl+F** | Leap search |

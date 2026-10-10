@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **040** (this delivery is **039**)
+Next bundle number: **041** (this delivery is **040**)
 
 ## Status (2026-10-10)
 
-Stage **01**–**04** core features in place; sample doc is `examples/welcome.md`.
+Stage **01**–**04** core features in place; dual-pane visual links.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -85,13 +85,14 @@ Stage **01**–**04** core features in place; sample doc is `examples/welcome.md
 - [x] Nested lists: Tab/Shift+Tab indent/outdent; indented markup parse/serialize
 - [x] F1 keyboard reference overlay (Esc/F1 to close)
 - [x] Sample document moved to `examples/welcome.md` + PNG images
+- [x] Dual-pane visual links: sync jump, Ctrl+Click other pane, connector line
 
 ## Open work / next steps
 
 1. Optional: HarfBuzz for complex scripts
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Richer transclusion (editable mirror, cross-document includes)
-4. Version comparison / visual links between panes
+4. Version comparison between two files / snapshots
 
 ## Design notes
 
@@ -163,4 +164,5 @@ Stage **01**–**04** core features in place; sample doc is `examples/welcome.md
 - `glyphtoo-036.*-cross-parent-drag-…` — cross-parent block drag
 - `glyphtoo-037.*-nested-lists-…` — nested lists
 - `glyphtoo-038.*-f1-help-…` — F1 help overlay
-- `glyphtoo-039.*-example-doc-…` — this delivery
+- `glyphtoo-039.*-example-doc-…` — examples/welcome.md + images
+- `glyphtoo-040.*-pane-links-…` — this delivery

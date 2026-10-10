@@ -622,11 +622,33 @@ int main(int argc, char** argv) {
             if (auto href = glyphtoo::hit_test_link(
                     doc_of(p), p.layout, lx, my, p.scroll_y)) {
               if (auto dest = glyphtoo::jump_to_href(doc_of(p), *href)) {
-                p.sel.focus = *dest;
-                p.sel.anchor = p.sel.focus;
-                scroll_caret_into_view(p);
+                const bool ctrl_click =
+                    (SDL_GetModState() & KMOD_CTRL) != 0;
+                // Ctrl+click: open target in the other pane (enable split)
+                if (ctrl_click) {
+                  if (!split) {
+                    split = true;
+                    needs_layout = true;
+                  }
+                  int other = 1 - focus;
+                  panes[other].sel.focus = *dest;
+                  panes[other].sel.anchor = *dest;
+                  scroll_caret_into_view(panes[other]);
+                  std::cout << "Opened link in other pane: " << *href << "\n";
+                } else {
+                  p.sel.focus = *dest;
+                  p.sel.anchor = p.sel.focus;
+                  scroll_caret_into_view(p);
+                  // Dual-pane shared doc: mirror target in the other view
+                  if (split && shared_doc) {
+                    int other = 1 - focus;
+                    panes[other].sel.focus = *dest;
+                    panes[other].sel.anchor = *dest;
+                    scroll_caret_into_view(panes[other]);
+                  }
+                  std::cout << "Followed link: " << *href << "\n";
+                }
                 reset_blink();
-                std::cout << "Followed link: " << *href << "\n";
                 break;
               } else if (!href->empty() && (*href)[0] != '#') {
                 std::cout << "Opening external link: " << *href << "\n";
@@ -648,6 +670,12 @@ int main(int argc, char** argv) {
                   p.sel.focus = *dest;
                   p.sel.anchor = p.sel.focus;
                   scroll_caret_into_view(p);
+                  if (split && shared_doc) {
+                    int other = 1 - focus;
+                    panes[other].sel.focus = *dest;
+                    panes[other].sel.anchor = *dest;
+                    scroll_caret_into_view(panes[other]);
+                  }
                   reset_blink();
                   std::cout << "Followed transclusion: " << bn.src << "\n";
                   followed = true;
@@ -1758,6 +1786,40 @@ int main(int argc, char** argv) {
       SDL_RenderFillRect(sdl, &div);
     }
 
+    // Visual link between panes when both carets sit on the same node
+    // (e.g. after following an internal link in dual-pane shared view).
+    if (split && shared_doc &&
+        panes[0].sel.focus.node != glyphtoo::INVALID_NODE &&
+        panes[0].sel.focus.node == panes[1].sel.focus.node) {
+      float lh = static_cast<float>(body_font.line_height());
+      auto c0 = glyphtoo::caret_screen_pos(panes[0].layout, panes[0].sel.focus,
+                                           panes[0].scroll_y, lh);
+      auto c1 = glyphtoo::caret_screen_pos(panes[1].layout, panes[1].sel.focus,
+                                           panes[1].scroll_y, lh);
+      if (c0.valid && c1.valid) {
+        int x0 = panes[0].x + static_cast<int>(c0.x);
+        int y0 = static_cast<int>(c0.y);
+        int x1 = panes[1].x + static_cast<int>(c1.x);
+        int y1 = static_cast<int>(c1.y);
+        // Clamp into content area
+        int max_y = win_h - 28;
+        if (y0 >= 0 && y0 < max_y && y1 >= 0 && y1 < max_y) {
+          SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+          SDL_SetRenderDrawColor(sdl, 25, 90, 170, 160);
+          // Straight connector + soft endpoints
+          SDL_RenderDrawLine(sdl, x0, y0, x1, y1);
+          SDL_RenderDrawLine(sdl, x0, y0 + 1, x1, y1 + 1);
+          auto dot = [&](int x, int y) {
+            SDL_Rect r{x - 3, y - 3, 7, 7};
+            SDL_RenderFillRect(sdl, &r);
+          };
+          dot(x0, y0);
+          dot(x1, y1);
+          SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+        }
+      }
+    }
+
     // Bottom status bar — shortcuts, or leap query when searching
     {
       const int bar_h = 28;
@@ -1883,11 +1945,13 @@ int main(int argc, char** argv) {
           "  Ctrl+F / F3         Leap search / next match",
           "  Ctrl+H              Leap replace",
           "  Click link          Follow #anchor or open URL",
+          "  Ctrl+Click link     Open #anchor in other pane",
           "  Click transclusion  Jump to source passage",
           "",
           "View & layout",
           "  Ctrl+\\              Toggle dual pane",
           "  Tab (not on list)   Focus other pane",
+          "  Dual-pane link      Syncs both views + connector",
           "  Drag left margin    Reorder / reparent block",
           "  Drag column gutter  Resize column widths",
           "  Drag image corner   Resize image",
