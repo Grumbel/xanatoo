@@ -49,7 +49,8 @@ Supported dialect (intentionally small):
 | `![alt](path.png){scale=1.2}` | Images (PNG/JPEG/BMP/GIF) |
 | `:::stretch summary="…"` … `:::` | Collapsed stretchtext |
 | `:::columns` / `:::column weight=1.5` | Side-by-side columns (draggable widths) |
-| `:::include #Heading` | Transclude (live embed of a passage) |
+| `:::include #Heading` | Transclude (live embed of a local passage) |
+| `:::include other.md#H` | Cross-document transclude (path relative to host doc) |
 
 ## UI chrome
 

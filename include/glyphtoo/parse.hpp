@@ -17,6 +17,7 @@ namespace glyphtoo {
 //   [link text](#target) or [link text](url)
 //   :::stretch summary="..." ... :::
 //   :::columns / :::column  (containers)
+//   :::include #Anchor | path.md#Anchor
 //   ![alt](src)
 //
 // Not a full CommonMark implementation — deliberately small.

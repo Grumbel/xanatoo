@@ -4,11 +4,12 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **055** (this delivery is **054**)
+Next bundle number: **056** (this delivery is **055**)
 
 ## Status (2026-10-10)
 
 Stage **01**–**04** core features in place; ImGui without X11 syswm dependency.
+LCS structural diff marks; cross-document `:::include`.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -97,13 +98,17 @@ Stage **01**–**04** core features in place; ImGui without X11 syswm dependency
 - [x] Shift+F3 / find_prev; soft background under inline code
 - [x] Ctrl+R reload from disk (Ctrl+Shift+R force)
 - [x] Selection word/char counts in status bar
+- [x] Dear ImGui menu bar / toolbar (no X11 syswm on Linux)
+- [x] Structural LCS-based dual-pane diff marks (insertions no longer cascade)
+- [x] Cross-document transclude: `:::include path.md#Heading` (and whole-file)
 
 ## Open work / next steps
 
 1. Optional: HarfBuzz for complex scripts
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
-3. Richer transclusion (editable mirror, cross-document includes)
-4. Finer-grained diff (word-level / structural tree diff)
+3. Editable transclusion mirror (edits on embed write through to source)
+4. Word-level / intra-block diff highlighting
+5. Flush external-doc cache on host Ctrl+R when included files change
 
 ## Design notes
 
@@ -123,8 +128,12 @@ Stage **01**–**04** core features in place; ImGui without X11 syswm dependency
   Ctrl+Shift+Q toggles; Ctrl+0 demotes to paragraph.
 - HorizontalRule: non-text node; `hr_lines` in layout. Toggle list wraps
   a text block in a List or unwraps a ListItem back to Paragraph.
-- Transclude: `src` holds `#anchor`. Layout snapshots the target's spans
-  (glyphs tagged with the Transclude node). Click jumps to the source.
+- Transclude: `src` holds `#anchor` or `path.md[#anchor]`. Layout snapshots
+  the target's spans (glyphs tagged with the Transclude node). Local click
+  jumps to the source. Cross-doc paths resolve relative to the host file's
+  directory via a process-wide external document cache.
+- Diff marks: LCS of plain-text block fingerprints; only non-common nodes
+  are marked (insertions/deletions no longer cascade).
 - Block drag: grab left 16px of a layout box; drop on a same-parent sibling
   (top/bottom half = before/after). `relocate_block` splices the child list.
 - Column widths: `Column.display_scale` is a relative weight (default 1).
@@ -190,4 +199,5 @@ Stage **01**–**04** core features in place; ImGui without X11 syswm dependency
 - `glyphtoo-051.*-rebased-…` — rebased onto origin/master
 - `glyphtoo-052.*-sel-stats-…` — selection status stats
 - `glyphtoo-053.*-imgui-…` — Dear ImGui menu/toolbar
-- `glyphtoo-054.*-imgui-no-x11-…` — this delivery
+- `glyphtoo-054.*-imgui-no-x11-…` — ImGui without X11 syswm
+- `glyphtoo-055.*-lcs-diff-xdoc-…` — this delivery (LCS diff + cross-doc include)

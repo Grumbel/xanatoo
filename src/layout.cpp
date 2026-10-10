@@ -2,8 +2,109 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "glyphtoo/layout.hpp"
+#include "glyphtoo/parse.hpp"
+
+#include <fstream>
+#include <map>
+#include <filesystem>
 
 namespace glyphtoo {
+
+namespace {
+
+// Cached external documents for :::include path.md[#anchor].
+// Keyed by resolved absolute path. Loaded lazily; never invalidated in
+// this process (Ctrl+R on the host doc re-layouts and reuses the cache;
+// a future flush can clear it if needed).
+std::map<std::string, Document>& external_doc_cache() {
+  static std::map<std::string, Document> cache;
+  return cache;
+}
+
+const Document* load_external_doc(const std::string& path) {
+  if (path.empty()) return nullptr;
+  std::string key = path;
+  try {
+    key = std::filesystem::absolute(path).lexically_normal().string();
+  } catch (...) {
+  }
+  auto& cache = external_doc_cache();
+  auto it = cache.find(key);
+  if (it != cache.end()) return &it->second;
+
+  std::ifstream in(path);
+  if (!in) return nullptr;
+  std::string source((std::istreambuf_iterator<char>(in)),
+                     std::istreambuf_iterator<char>());
+  Document doc = parse_markup(source);
+  auto [ins, _] = cache.emplace(key, std::move(doc));
+  return &ins->second;
+}
+
+std::string lower_ascii(std::string s) {
+  for (char& c : s)
+    if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+  return s;
+}
+
+// Resolve #anchor inside doc → text node id (exact match, then heading
+// substring). Mirrors jump_to_href without depending on editor.cpp.
+NodeId resolve_anchor(const Document& doc, const std::string& href) {
+  if (href.empty() || href[0] != '#') return INVALID_NODE;
+  std::string tlow = lower_ascii(href.substr(1));
+  if (tlow.empty() || doc.root == INVALID_NODE) return INVALID_NODE;
+
+  std::vector<NodeId> stack = {doc.root};
+  std::vector<NodeId> text_nodes;
+  while (!stack.empty()) {
+    NodeId cur = stack.back();
+    stack.pop_back();
+    if (cur == INVALID_NODE) continue;
+    const Node& cn = doc.get(cur);
+    if (cn.kind == NodeKind::Paragraph || cn.kind == NodeKind::Heading ||
+        cn.kind == NodeKind::ListItem || cn.kind == NodeKind::BlockQuote) {
+      text_nodes.push_back(cur);
+    }
+    for (auto it = cn.children.rbegin(); it != cn.children.rend(); ++it)
+      stack.push_back(*it);
+  }
+  for (NodeId tid : text_nodes) {
+    const Node& tn = doc.get(tid);
+    std::string text;
+    for (const auto& sp : tn.spans) text += sp.text;
+    if (lower_ascii(text) == tlow) return tid;
+  }
+  for (NodeId tid : text_nodes) {
+    const Node& tn = doc.get(tid);
+    if (tn.kind != NodeKind::Heading) continue;
+    std::string text;
+    for (const auto& sp : tn.spans) text += sp.text;
+    if (lower_ascii(text).find(tlow) != std::string::npos) return tid;
+  }
+  return INVALID_NODE;
+}
+
+// Split src into (path, #anchor). path empty ⇒ same-document.
+// Forms: "#H", "file.md#H", "file.md", "dir/x.md#H"
+void split_include_src(const std::string& src, std::string& path_out,
+                       std::string& href_out) {
+  path_out.clear();
+  href_out.clear();
+  if (src.empty()) return;
+  if (src[0] == '#') {
+    href_out = src;
+    return;
+  }
+  size_t hash = src.find('#');
+  if (hash == std::string::npos) {
+    path_out = src;
+    return;
+  }
+  path_out = src.substr(0, hash);
+  href_out = src.substr(hash);  // includes '#'
+}
+
+}  // namespace
 
 LayoutEngine::LayoutEngine(FontSet& fonts, ImageCache* images)
     : fonts_(fonts), images_(images) {}
@@ -324,61 +425,67 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
     }
 
     case NodeKind::Transclude: {
-      // Live embedding: resolve src as #anchor and layout a snapshot of
-      // the target's text (glyphs tagged with this Transclude node).
+      // Live embedding: resolve src as local #anchor or path.md[#anchor]
+      // and layout a snapshot of the target's text (glyphs tagged with
+      // this Transclude node). Cross-document paths are relative to the
+      // host document directory (image_base_).
       float start_y = y;
       const float indent = 12.f;
       const float bar_w = 3.f;
 
-      std::string href = node.src;
-      if (!href.empty() && href[0] != '#') href = "#" + href;
+      std::string path_part, href_part;
+      split_include_src(node.src, path_part, href_part);
 
-      // Resolve target (same rules as jump_to_href, local to avoid editor dep)
+      const Document* src_doc = &doc;
+      bool external = false;
+      if (!path_part.empty()) {
+        std::filesystem::path resolved = path_part;
+        if (!image_base_.empty() && resolved.is_relative())
+          resolved = std::filesystem::path(image_base_) / path_part;
+        const Document* ext = load_external_doc(resolved.string());
+        if (ext) {
+          src_doc = ext;
+          external = true;
+        } else {
+          src_doc = nullptr;
+        }
+      }
+
       NodeId target_id = INVALID_NODE;
-      if (!href.empty() && href[0] == '#') {
-        auto lower = [](std::string s) {
-          for (char& c : s)
-            if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
-          return s;
-        };
-        std::string tlow = lower(href.substr(1));
-        // Collect text-bearing nodes
-        std::vector<NodeId> stack = {doc.root};
-        std::vector<NodeId> text_nodes;
-        while (!stack.empty()) {
-          NodeId cur = stack.back();
-          stack.pop_back();
-          if (cur == INVALID_NODE) continue;
-          const Node& cn = doc.get(cur);
-          if (cn.kind == NodeKind::Paragraph || cn.kind == NodeKind::Heading ||
-              cn.kind == NodeKind::ListItem || cn.kind == NodeKind::BlockQuote) {
-            text_nodes.push_back(cur);
-          }
-          for (auto it = cn.children.rbegin(); it != cn.children.rend(); ++it)
-            stack.push_back(*it);
-        }
-        for (NodeId tid : text_nodes) {
-          const Node& tn = doc.get(tid);
-          std::string text;
-          for (const auto& sp : tn.spans) text += sp.text;
-          if (lower(text) == tlow) {
-            target_id = tid;
-            break;
-          }
-        }
-        if (target_id == INVALID_NODE) {
-          for (NodeId tid : text_nodes) {
-            const Node& tn = doc.get(tid);
-            if (tn.kind != NodeKind::Heading) continue;
-            std::string text;
-            for (const auto& sp : tn.spans) text += sp.text;
-            if (lower(text).find(tlow) != std::string::npos) {
-              target_id = tid;
-              break;
+      std::vector<InlineSpan> body_spans;
+      if (src_doc) {
+        if (!href_part.empty()) {
+          target_id = resolve_anchor(*src_doc, href_part);
+          if (target_id != INVALID_NODE)
+            body_spans = src_doc->get(target_id).spans;
+        } else if (external) {
+          // Whole-document include: concatenate first few text nodes.
+          std::vector<NodeId> stack = {src_doc->root};
+          int taken = 0;
+          while (!stack.empty() && taken < 8) {
+            NodeId cur = stack.back();
+            stack.pop_back();
+            if (cur == INVALID_NODE) continue;
+            const Node& cn = src_doc->get(cur);
+            if (cn.kind == NodeKind::Paragraph || cn.kind == NodeKind::Heading ||
+                cn.kind == NodeKind::ListItem || cn.kind == NodeKind::BlockQuote) {
+              if (!body_spans.empty()) {
+                InlineSpan gap;
+                gap.kind = InlineKind::Text;
+                gap.text = " ";
+                body_spans.push_back(std::move(gap));
+              }
+              for (const auto& sp : cn.spans) body_spans.push_back(sp);
+              ++taken;
             }
+            for (auto it = cn.children.rbegin(); it != cn.children.rend(); ++it)
+              stack.push_back(*it);
           }
         }
       }
+
+      std::string label_href = node.src.empty() ? std::string{"(no target)"}
+                                                : node.src;
 
       // Label line
       {
@@ -388,7 +495,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         InlineSpan s;
         s.kind = InlineKind::Emphasis;
         s.text = "↗ ";
-        s.text += href.empty() ? std::string{"(no target)"} : href;
+        s.text += label_href;
         label.spans.push_back(std::move(s));
         layout_paragraph(doc, label, x + bar_w + indent, y,
                          max_width - bar_w - indent, out, FontRole::Body);
@@ -400,12 +507,15 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         Node body;
         body.id = id;
         body.kind = NodeKind::Paragraph;
-        if (target_id != INVALID_NODE) {
-          body.spans = doc.get(target_id).spans;
+        if (!body_spans.empty()) {
+          body.spans = std::move(body_spans);
         } else {
           InlineSpan s;
           s.kind = InlineKind::Emphasis;
-          s.text = "[missing transclusion]";
+          if (!src_doc && !path_part.empty())
+            s.text = "[missing file: " + path_part + "]";
+          else
+            s.text = "[missing transclusion]";
           body.spans.push_back(std::move(s));
         }
         layout_paragraph(doc, body, x + bar_w + indent, y,

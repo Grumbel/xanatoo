@@ -233,7 +233,12 @@ Document parse_markup(std::string_view source) {
       ++i;
       continue;
     }
-    // Self-closing include: :::include #Target  or  :::include Target
+    // Self-closing include:
+    //   :::include #LocalHeading
+    //   :::include LocalHeading          → #LocalHeading
+    //   :::include other.md#Section      → cross-document (path kept)
+    //   :::include other.md              → whole external document body
+    //   :::include "path with spaces.md#H"
     if (trimmed.starts_with(":::include")) {
       NodeId n = doc.create(NodeKind::Transclude, current_parent());
       std::string_view rest = trimmed.substr(10);  // after :::include
@@ -249,7 +254,18 @@ Document parse_markup(std::string_view source) {
       while (!target.empty() &&
              (target.back() == ' ' || target.back() == '\t'))
         target.pop_back();
-      if (!target.empty() && target[0] != '#') target = "#" + target;
+      // Local anchors get a leading '#'; paths (file.md, dir/x, …) stay raw.
+      auto looks_like_path = [](const std::string& s) {
+        if (s.empty() || s[0] == '#') return false;
+        size_t hash = s.find('#');
+        std::string path_part = hash == std::string::npos ? s : s.substr(0, hash);
+        if (path_part.empty()) return false;
+        return path_part.find('/') != std::string::npos ||
+               path_part.find('\\') != std::string::npos ||
+               path_part.find('.') != std::string::npos;
+      };
+      if (!target.empty() && target[0] != '#' && !looks_like_path(target))
+        target = "#" + target;
       doc.get(n).src = target;
       ++i;
       continue;
