@@ -79,6 +79,7 @@ A **Dear ImGui** menu bar and toolbar sit above the document (File / Edit / Form
 | **Ctrl+Enter** | Insert empty paragraph after current block |
 | **Ctrl+Shift+-** | Insert horizontal rule (then a new paragraph) |
 | **Ctrl+Shift+I** | Insert image (type path in status bar) |
+| **Drag image file** | Drop PNG/JPEG/GIF/BMP onto a pane to insert at caret |
 | Backspace at block start | Merge with previous block (drops empty lists) |
 | **Ctrl+Z** / **Ctrl+Y** | Undo / redo |
 | **Ctrl+C** / **X** / **V** | Clipboard (paste: blank lines → paragraphs) |

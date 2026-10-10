@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **058** (this delivery is **057**)
+Next bundle number: **059** (this delivery is **058**)
 
 ## Status (2026-10-10)
 
@@ -103,6 +103,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Cross-document transclude: `:::include path.md#Heading` (and whole-file)
 - [x] Experimental S-expression serialize/parse (`.sexp` / `.glyph` / `.ss`)
 - [x] Sexpr polish: `:id`, merged text spans, compact floats; File→Export; cache flush on reload
+- [x] Drag-and-drop image files into a pane (PNG/JPEG/GIF/BMP)
 
 ## Open work / next steps
 
@@ -203,4 +204,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `glyphtoo-054.*-imgui-no-x11-…` — ImGui without X11 syswm
 - `glyphtoo-055.*-lcs-diff-xdoc-…` — LCS diff + cross-doc include
 - `glyphtoo-056.*-sexpr-…` — S-expression format
-- `glyphtoo-057.*-sexpr-polish-…` — this delivery
+- `glyphtoo-057.*-sexpr-polish-…` — sexpr polish
+- `glyphtoo-058.*-dnd-image-…` — this delivery

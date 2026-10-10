@@ -536,6 +536,83 @@ int main(int argc, char** argv) {
           }
           break;
 
+        case SDL_DROPFILE: {
+          // Drag-and-drop image files from the desktop/file manager into a pane.
+          char* dropped = ev.drop.file;
+          if (!dropped) break;
+          std::string fpath(dropped);
+          SDL_free(dropped);
+
+          auto lower_ext = [](std::string s) {
+            for (char& c : s)
+              if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+            return s;
+          };
+          std::string ext;
+          {
+            auto pos = fpath.find_last_of('.');
+            if (pos != std::string::npos) ext = lower_ext(fpath.substr(pos));
+          }
+          const bool is_img =
+              ext == ".png" || ext == ".jpg" || ext == ".jpeg" ||
+              ext == ".gif" || ext == ".bmp";
+          if (!is_img) {
+            std::cerr << "Drop ignored (not an image): " << fpath << "\n";
+            break;
+          }
+
+          int mx = 0, my_raw = 0;
+          SDL_GetMouseState(&mx, &my_raw);
+          if (static_cast<float>(my_raw) < ui_top) break;
+
+          focus = pane_at(static_cast<float>(mx));
+          Pane& p = F();
+          auto& d = doc_of(p);
+          float lx = local_x(static_cast<float>(mx), focus);
+          float my = static_cast<float>(my_raw) - ui_top;
+
+          // Place caret at drop location when possible; otherwise keep current.
+          if (auto hit = glyphtoo::hit_test(p.layout, lx, my, p.scroll_y)) {
+            p.sel.focus = *hit;
+            p.sel.anchor = p.sel.focus;
+          }
+          glyphtoo::ensure_valid_caret(d, p.sel.focus);
+          if (p.sel.focus.node == glyphtoo::INVALID_NODE) {
+            std::cerr << "Drop: no place to insert image\n";
+            break;
+          }
+
+          // Prefer a path relative to the document directory for portable markup.
+          std::string store = fpath;
+          std::string base = parent_dir(path_of(p));
+          if (!base.empty()) {
+            try {
+              std::filesystem::path rel =
+                  std::filesystem::relative(fpath, base);
+              if (!rel.empty() && rel.native().find("..") == std::string::npos)
+                store = rel.generic_string();
+            } catch (...) {
+            }
+          }
+          std::string alt;
+          try {
+            alt = std::filesystem::path(fpath).stem().string();
+          } catch (...) {
+            alt = store;
+          }
+
+          edit();
+          if (glyphtoo::insert_image(d, p.sel.focus, store, alt)) {
+            p.sel.anchor = p.sel.focus;
+            needs_layout = true;
+            reset_blink();
+            std::cout << "Dropped image: " << store << "\n";
+          } else {
+            std::cerr << "Drop: could not insert image at caret\n";
+          }
+          break;
+        }
+
         case SDL_MOUSEWHEEL: {
           if (imgui_mouse) break;
           int mx = 0, my = 0;
@@ -2567,6 +2644,7 @@ int main(int argc, char** argv) {
           "  Ctrl+Enter          New paragraph after block",
           "  Ctrl+Shift+-        Insert horizontal rule",
           "  Ctrl+Shift+I        Insert image (path prompt)",
+          "  Drag image file     Drop PNG/JPEG/GIF/BMP into a pane",
           "  Backspace / Delete  Delete (merge at block start)",
           "  Ctrl+Z / Ctrl+Y     Undo / Redo",
           "  Ctrl+C / X / V      Copy / Cut / Paste (multi-para)",
