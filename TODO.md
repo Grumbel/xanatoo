@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **008** (this delivery is **007**)
+Next bundle number: **009** (this delivery is **008**)
 
 ## Status (2026-10-10)
 
@@ -29,15 +29,17 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] Default font via `GLYPHTOO_FONT` + flake wrapper (DejaVu)
 - [x] Image loading (stb_image: PNG/JPEG/BMP/GIF) + layout/render
 - [x] Dirty flag / asterisk in window title
+- [x] Side-by-side `:::columns` / `:::column` layout
+- [x] Multi-node selection copy and delete
 
 ## Open work / next steps
 
-1. Multi-node selection delete / copy (currently single-node only)
-2. Multi-view / side-by-side panes (stage 03)
-3. Optional: HarfBuzz for complex scripts
-4. Replace snapshot undo with a tighter operation log if memory becomes an issue
-5. Save-as / untitled buffer when no path was given
-6. Image drag-resize / interactive placement
+1. Multi-view / side-by-side *document panes* (stage 03) — columns are
+   in-document layout; separate view panes are still open
+2. Optional: HarfBuzz for complex scripts
+3. Replace snapshot undo with a tighter operation log if memory becomes an issue
+4. Save-as / untitled buffer when no path was given
+5. Image drag-resize / interactive placement
 
 ## Design notes
 
@@ -56,4 +58,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-004.*-font-cli-…` — `--font` CLI
 - `glyphtoo-005.*-clipboard-undo-…` — clipboard, undo, blink + NodeId fix
 - `glyphtoo-006.*-open-save-font-…` — open/save + default font
-- `glyphtoo-007.*-images-dirty-…` — this delivery
+- `glyphtoo-007.*-images-dirty-…` — images + dirty flag
+- `glyphtoo-008.*-columns-multisel-…` — this delivery

@@ -24,13 +24,73 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
   switch (node.kind) {
     case NodeKind::Document:
-    case NodeKind::Columns:
-    case NodeKind::Column:
     case NodeKind::List:
       for (NodeId child : node.children) {
         layout_node(doc, child, x, y, max_width, out);
       }
       break;
+
+    case NodeKind::Column:
+      // Column content is laid out by the parent Columns node.
+      for (NodeId child : node.children) {
+        layout_node(doc, child, x, y, max_width, out);
+      }
+      break;
+
+    case NodeKind::Columns: {
+      // Side-by-side columns. Equal width split with a small gutter.
+      std::vector<NodeId> cols;
+      for (NodeId child : node.children) {
+        if (doc.get(child).kind == NodeKind::Column) {
+          cols.push_back(child);
+        }
+      }
+      if (cols.empty()) {
+        // No explicit column children — fall back to stacking everything
+        for (NodeId child : node.children) {
+          layout_node(doc, child, x, y, max_width, out);
+        }
+        break;
+      }
+
+      const float gutter = 16.f;
+      const float n = static_cast<float>(cols.size());
+      const float col_w = (max_width - gutter * (n - 1.f)) / n;
+      if (col_w < 40.f) {
+        // Too narrow — stack vertically instead of crushing text
+        for (NodeId child : cols) {
+          layout_node(doc, child, x, y, max_width, out);
+        }
+        break;
+      }
+
+      float start_y = y;
+      float max_bottom = y;
+
+      for (size_t i = 0; i < cols.size(); ++i) {
+        float cx = x + static_cast<float>(i) * (col_w + gutter);
+        float cy = start_y;
+
+        // Layout this column into a temporary result, then merge
+        LayoutResult col_out;
+        layout_node(doc, cols[i], cx, cy, col_w, col_out);
+
+        // Merge glyphs / boxes / images
+        out.glyphs.insert(out.glyphs.end(),
+                          col_out.glyphs.begin(), col_out.glyphs.end());
+        out.boxes.insert(out.boxes.end(),
+                         col_out.boxes.begin(), col_out.boxes.end());
+        out.images.insert(out.images.end(),
+                          col_out.images.begin(), col_out.images.end());
+
+        if (cy > max_bottom) max_bottom = cy;
+      }
+
+      // Optional subtle column separators
+      out.boxes.push_back({id, x, start_y, max_width, max_bottom - start_y});
+      y = max_bottom + 12.f;
+      break;
+    }
 
     case NodeKind::Stretch: {
       if (!node.expanded) {

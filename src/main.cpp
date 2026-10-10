@@ -32,6 +32,19 @@ first-class addressable content, and layout is part of the living
 document rather than a fixed page prescription.
 :::
 
+:::columns
+:::column
+## Original
+
+A passage from the original document, shown in a column.
+:::
+:::column
+## Commentary
+
+An editable annotation linked in spirit to the original passage.
+:::
+:::
+
 ## Living documents
 
 This is a live document. Click to place the caret, type to insert text,

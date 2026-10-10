@@ -385,47 +385,77 @@ bool split_block(Document& doc, Caret& caret) {
   return true;
 }
 
-void delete_selection(Document& doc, Selection& sel) {
-  if (sel.empty()) return;
-  // Simple version: only support selection within a single node for now
-  if (sel.anchor.node != sel.focus.node) {
-    // Collapse to focus and ignore multi-node for this iteration
-    sel.anchor = sel.focus;
+static void erase_range_in_node(Node& n, size_t from_span, size_t from_ch,
+                                size_t to_span, size_t to_ch) {
+  if (n.spans.empty()) return;
+  auto erase_in_span = [&](size_t si, size_t from, size_t to) {
+    if (si >= n.spans.size()) return;
+    InlineSpan& sp = n.spans[si];
+    size_t from_b = utf8_byte_offset(sp.text, from);
+    size_t to_b = utf8_byte_offset(sp.text, to);
+    if (to_b > from_b) sp.text.erase(from_b, to_b - from_b);
+  };
+  if (from_span == to_span) {
+    erase_in_span(from_span, from_ch, to_ch);
     return;
   }
+  size_t start_len = utf8_char_count(n.spans[from_span].text);
+  erase_in_span(from_span, from_ch, start_len);
+  for (size_t si = from_span + 1; si < to_span && si < n.spans.size(); ++si) {
+    n.spans[si].text.clear();
+  }
+  if (to_span < n.spans.size()) {
+    erase_in_span(to_span, 0, to_ch);
+  }
+}
+
+void delete_selection(Document& doc, Selection& sel) {
+  if (sel.empty()) return;
   Caret a = sel.anchor;
   Caret b = sel.focus;
   if (caret_cmp(doc, a, b) > 0) std::swap(a, b);
 
-  Node& n = doc.get(a.node);
-  if (n.spans.empty()) {
+  if (a.node == b.node) {
+    Node& n = doc.get(a.node);
+    erase_range_in_node(n, a.span_index, a.char_index, b.span_index, b.char_index);
     sel.anchor = sel.focus = a;
     return;
   }
 
-  // Walk spans and erase the range
-  // Convert to byte ranges per span
-  auto erase_in_span = [&](size_t si, size_t from_ch, size_t to_ch) {
-    if (si >= n.spans.size()) return;
-    InlineSpan& sp = n.spans[si];
-    size_t from_b = utf8_byte_offset(sp.text, from_ch);
-    size_t to_b = utf8_byte_offset(sp.text, to_ch);
-    if (to_b > from_b) sp.text.erase(from_b, to_b - from_b);
-  };
+  // Multi-node: clear from caret a to end of start node, clear full middle
+  // text nodes, clear from start of end node to caret b.
+  std::vector<NodeId> nodes;
+  if (doc.root != INVALID_NODE) collect_text_nodes(doc, doc.root, nodes);
 
-  if (a.span_index == b.span_index) {
-    erase_in_span(a.span_index, a.char_index, b.char_index);
-  } else {
-    // Truncate start span
-    size_t start_len = utf8_char_count(n.spans[a.span_index].text);
-    erase_in_span(a.span_index, a.char_index, start_len);
-    // Clear middle spans
-    for (size_t si = a.span_index + 1; si < b.span_index && si < n.spans.size(); ++si) {
-      n.spans[si].text.clear();
+  auto rank = [&](NodeId id) -> size_t {
+    auto it = std::find(nodes.begin(), nodes.end(), id);
+    return it == nodes.end() ? nodes.size() : static_cast<size_t>(it - nodes.begin());
+  };
+  size_t ra = rank(a.node);
+  size_t rb = rank(b.node);
+  if (ra > rb) {
+    std::swap(a, b);
+    std::swap(ra, rb);
+  }
+
+  // Start node: from a to end
+  {
+    Node& n = doc.get(a.node);
+    if (!n.spans.empty()) {
+      size_t last = n.spans.size() - 1;
+      size_t last_len = utf8_char_count(n.spans[last].text);
+      erase_range_in_node(n, a.span_index, a.char_index, last, last_len);
     }
-    // Truncate end span from 0 to b.char_index
-    if (b.span_index < n.spans.size()) {
-      erase_in_span(b.span_index, 0, b.char_index);
+  }
+  // Middle nodes: clear all text
+  for (size_t i = ra + 1; i < rb && i < nodes.size(); ++i) {
+    doc.get(nodes[i]).spans.clear();
+  }
+  // End node: from start to b
+  {
+    Node& n = doc.get(b.node);
+    if (!n.spans.empty()) {
+      erase_range_in_node(n, 0, 0, b.span_index, b.char_index);
     }
   }
 
@@ -627,43 +657,78 @@ std::string node_text(const Document& doc, NodeId id) {
   return out;
 }
 
+static std::string slice_node_text(const Node& n, size_t from_span, size_t from_ch,
+                                   size_t to_span, size_t to_ch) {
+  if (n.spans.empty()) return {};
+  auto slice_span = [](const InlineSpan& sp, size_t from, size_t to) {
+    size_t from_b = utf8_byte_offset(sp.text, from);
+    size_t to_b = utf8_byte_offset(sp.text, to);
+    if (to_b < from_b) return std::string{};
+    return sp.text.substr(from_b, to_b - from_b);
+  };
+  std::string out;
+  if (from_span == to_span) {
+    if (from_span < n.spans.size()) {
+      out = slice_span(n.spans[from_span], from_ch, to_ch);
+    }
+    return out;
+  }
+  if (from_span < n.spans.size()) {
+    size_t len = utf8_char_count(n.spans[from_span].text);
+    out += slice_span(n.spans[from_span], from_ch, len);
+  }
+  for (size_t si = from_span + 1; si < to_span && si < n.spans.size(); ++si) {
+    out += n.spans[si].text;
+  }
+  if (to_span < n.spans.size()) {
+    out += slice_span(n.spans[to_span], 0, to_ch);
+  }
+  return out;
+}
+
 std::string selected_text(const Document& doc, const Selection& sel) {
   if (sel.empty()) return {};
-  if (sel.anchor.node != sel.focus.node) {
-    // Multi-node: concatenate whole nodes between anchors (simple)
-    // For now only same-node selection is fully supported for partial text.
-    return node_text(doc, sel.focus.node);
-  }
-
   Caret a = sel.anchor;
   Caret b = sel.focus;
   if (caret_cmp(doc, a, b) > 0) std::swap(a, b);
 
-  const Node& n = doc.get(a.node);
-  if (n.spans.empty()) return {};
+  if (a.node == b.node) {
+    return slice_node_text(doc.get(a.node), a.span_index, a.char_index,
+                           b.span_index, b.char_index);
+  }
 
-  auto slice_span = [](const InlineSpan& sp, size_t from_ch, size_t to_ch) {
-    size_t from_b = utf8_byte_offset(sp.text, from_ch);
-    size_t to_b = utf8_byte_offset(sp.text, to_ch);
-    if (to_b < from_b) return std::string{};
-    return sp.text.substr(from_b, to_b - from_b);
+  std::vector<NodeId> nodes;
+  if (doc.root != INVALID_NODE) collect_text_nodes(doc, doc.root, nodes);
+  auto rank = [&](NodeId id) -> size_t {
+    auto it = std::find(nodes.begin(), nodes.end(), id);
+    return it == nodes.end() ? nodes.size() : static_cast<size_t>(it - nodes.begin());
   };
+  size_t ra = rank(a.node);
+  size_t rb = rank(b.node);
+  if (ra > rb) {
+    std::swap(a, b);
+    std::swap(ra, rb);
+  }
 
   std::string out;
-  if (a.span_index == b.span_index) {
-    if (a.span_index < n.spans.size()) {
-      out = slice_span(n.spans[a.span_index], a.char_index, b.char_index);
+  // Start node: from a to end
+  {
+    const Node& n = doc.get(a.node);
+    if (!n.spans.empty()) {
+      size_t last = n.spans.size() - 1;
+      size_t last_len = utf8_char_count(n.spans[last].text);
+      out += slice_node_text(n, a.span_index, a.char_index, last, last_len);
     }
-  } else {
-    if (a.span_index < n.spans.size()) {
-      size_t len = utf8_char_count(n.spans[a.span_index].text);
-      out += slice_span(n.spans[a.span_index], a.char_index, len);
-    }
-    for (size_t si = a.span_index + 1; si < b.span_index && si < n.spans.size(); ++si) {
-      out += n.spans[si].text;
-    }
-    if (b.span_index < n.spans.size()) {
-      out += slice_span(n.spans[b.span_index], 0, b.char_index);
+  }
+  for (size_t i = ra + 1; i < rb && i < nodes.size(); ++i) {
+    if (!out.empty()) out += "\n\n";
+    out += node_text(doc, nodes[i]);
+  }
+  {
+    const Node& n = doc.get(b.node);
+    if (!n.spans.empty()) {
+      if (!out.empty()) out += "\n\n";
+      out += slice_node_text(n, 0, 0, b.span_index, b.char_index);
     }
   }
   return out;
