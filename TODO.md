@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **054** (this delivery is **053**)
+Next bundle number: **055** (this delivery is **054**)
 
 ## Status (2026-10-10)
 
-Stage **01**–**04** core features in place; Dear ImGui menu bar + toolbar.
+Stage **01**–**04** core features in place; ImGui without X11 syswm dependency.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -189,4 +189,5 @@ Stage **01**–**04** core features in place; Dear ImGui menu bar + toolbar.
 - `glyphtoo-050.*-reload-…` — Ctrl+R reload from disk
 - `glyphtoo-051.*-rebased-…` — rebased onto origin/master
 - `glyphtoo-052.*-sel-stats-…` — selection status stats
-- `glyphtoo-053.*-imgui-…` — this delivery
+- `glyphtoo-053.*-imgui-…` — Dear ImGui menu/toolbar
+- `glyphtoo-054.*-imgui-no-x11-…` — this delivery

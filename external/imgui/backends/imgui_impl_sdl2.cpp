@@ -101,7 +101,11 @@
 
 // SDL
 #include <SDL.h>
+// PlatformHandleRaw is only filled on Windows / Cocoa.  On Linux (X11/Wayland)
+// we skip SDL_syswm so the build does not require X11 headers.
+#if defined(SDL_VIDEO_DRIVER_WINDOWS) || (defined(__APPLE__) && defined(SDL_VIDEO_DRIVER_COCOA))
 #include <SDL_syswm.h>
+#endif
 #ifdef __APPLE__
 #include <TargetConditionals.h>
 #endif
@@ -502,6 +506,7 @@ static bool ImGui_ImplSDL2_Init(SDL_Window* window, SDL_Renderer* renderer, void
     ImGuiViewport* main_viewport = ImGui::GetMainViewport();
     main_viewport->PlatformHandle = (void*)(intptr_t)bd->WindowID;
     main_viewport->PlatformHandleRaw = nullptr;
+#if defined(SDL_VIDEO_DRIVER_WINDOWS) || (defined(__APPLE__) && defined(SDL_VIDEO_DRIVER_COCOA))
     SDL_SysWMinfo info;
     SDL_VERSION(&info.version);
     if (SDL_GetWindowWMInfo(window, &info))
@@ -512,6 +517,7 @@ static bool ImGui_ImplSDL2_Init(SDL_Window* window, SDL_Renderer* renderer, void
         main_viewport->PlatformHandleRaw = (void*)info.info.cocoa.window;
 #endif
     }
+#endif
 
     // From 2.0.5: Set SDL hint to receive mouse click events on window focus, otherwise SDL doesn't emit the event.
     // Without this, when clicking to gain focus, our widgets wouldn't activate even though they showed as hovered.
