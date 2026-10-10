@@ -245,6 +245,25 @@ Document parse_markup(std::string_view source) {
       }
     }
 
+    // Horizontal rule: a line of only -, *, or _ (at least three)
+    if (trimmed.size() >= 3) {
+      char hc = trimmed[0];
+      if (hc == '-' || hc == '*' || hc == '_') {
+        bool all_same = true;
+        for (char ch : trimmed) {
+          if (ch != hc) {
+            all_same = false;
+            break;
+          }
+        }
+        if (all_same) {
+          doc.create(NodeKind::HorizontalRule, current_parent());
+          ++i;
+          continue;
+        }
+      }
+    }
+
     // Headings
     int heading_level = 0;
     if (trimmed.starts_with("###### ")) heading_level = 6;
@@ -414,6 +433,12 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
       out += "> ";
       serialize_inlines(node, out);
       out += "\n\n";
+      break;
+    }
+
+    case NodeKind::HorizontalRule: {
+      out += pad;
+      out += "---\n\n";
       break;
     }
 

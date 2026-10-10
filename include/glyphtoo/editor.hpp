@@ -99,6 +99,12 @@ bool move_block_down(Document& doc, NodeId block);
 // Duplicate a block as the next sibling; returns the new node id.
 std::optional<NodeId> duplicate_block(Document& doc, NodeId block);
 
+// Toggle list membership of the caret's text block.
+// - Paragraph/Heading/BlockQuote → become a ListItem under a new List
+// - ListItem → unwrap to Paragraph (list dropped if emptied)
+// `ordered` selects ul vs ol when creating a list.
+bool toggle_list(Document& doc, Caret& caret, bool ordered);
+
 // Delete the current selection (or nothing if empty). Caret becomes the start.
 void delete_selection(Document& doc, Selection& sel);
 

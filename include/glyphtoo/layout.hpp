@@ -47,6 +47,8 @@ struct LayoutResult {
   std::vector<PositionedImage> images;
   // Vertical bars for block quotes (content coordinates).
   std::vector<LayoutBox> quote_bars;
+  // Horizontal rules (x, y = center line, width, height = stroke thickness).
+  std::vector<LayoutBox> hr_lines;
   float content_height = 0.f;
 };
 

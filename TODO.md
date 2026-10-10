@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **032** (this delivery is **031**)
+Next bundle number: **033** (this delivery is **032**)
 
 ## Status (2026-10-10)
 
-Stage **01** complete (lists, block quotes). Stage **02** largely working. Stage **03** links + hover previews.
+Stage **01** complete (lists, quotes, HR). Stage **02** largely working. Stage **03** links + hover previews.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -76,6 +76,8 @@ Stage **01** complete (lists, block quotes). Stage **02** largely working. Stage
 - [x] Enter in list item splits to sibling ListItem; empty item exits list; ordered renumber
 - [x] Hover preview tooltip for internal `#anchor` links (target passage snippet)
 - [x] Block quotes (`> …`) — parse, layout bar, serialize; Ctrl+Shift+Q toggle
+- [x] Horizontal rules (`---`/`***`/`___`) — parse, layout line, serialize
+- [x] Ctrl+Shift+8 / Ctrl+Shift+7 toggle unordered / ordered list on block
 
 ## Open work / next steps
 
@@ -100,6 +102,8 @@ Stage **01** complete (lists, block quotes). Stage **02** largely working. Stage
   removed). Backspace-merge drops empty List parents.
 - BlockQuote: text node with left bar (`LayoutResult::quote_bars`).
   Ctrl+Shift+Q toggles; Ctrl+0 demotes to paragraph.
+- HorizontalRule: non-text node; `hr_lines` in layout. Toggle list wraps
+  a text block in a List or unwraps a ListItem back to Paragraph.
 
 ## Bundle history
 
@@ -133,4 +137,5 @@ Stage **01** complete (lists, block quotes). Stage **02** largely working. Stage
 - `glyphtoo-028.*-lists-…` — list parse/layout/serialize
 - `glyphtoo-029.*-list-edit-…` — list Enter/exit/renumber
 - `glyphtoo-030.*-link-preview-…` — anchor hover preview
-- `glyphtoo-031.*-blockquote-…` — this delivery
+- `glyphtoo-031.*-blockquote-…` — block quotes
+- `glyphtoo-032.*-hr-list-toggle-…` — this delivery

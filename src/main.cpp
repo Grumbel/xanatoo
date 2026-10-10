@@ -111,6 +111,8 @@ text as a continuous, searchable stream.
 > "A document is not just something you render and read. It is a live
 > workspace." — the glyphtoo proposal
 
+---
+
 
 Design pillars:
 
@@ -1274,6 +1276,30 @@ int main(int argc, char** argv) {
                   p.sel.focus.node = *nid;
                   p.sel.focus.span_index = 0;
                   p.sel.focus.char_index = 0;
+                  p.sel.anchor = p.sel.focus;
+                  needs_layout = true;
+                  reset_blink();
+                }
+              }
+              break;
+
+            case SDLK_8:
+              // Ctrl+Shift+8 — toggle unordered list (common editor binding)
+              if (ctrl && shift) {
+                edit();
+                if (glyphtoo::toggle_list(d, p.sel.focus, false)) {
+                  p.sel.anchor = p.sel.focus;
+                  needs_layout = true;
+                  reset_blink();
+                }
+              }
+              break;
+
+            case SDLK_7:
+              // Ctrl+Shift+7 — toggle ordered list
+              if (ctrl && shift) {
+                edit();
+                if (glyphtoo::toggle_list(d, p.sel.focus, true)) {
                   p.sel.anchor = p.sel.focus;
                   needs_layout = true;
                   reset_blink();

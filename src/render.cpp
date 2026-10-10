@@ -51,6 +51,19 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
     SDL_RenderFillRect(sdl_, &bar);
   }
 
+  // Horizontal rules
+  for (const auto& hr : layout.hr_lines) {
+    SDL_SetRenderDrawColor(sdl_, 170, 168, 160, 255);
+    int th = static_cast<int>(hr.height);
+    if (th < 1) th = 1;
+    SDL_Rect line{
+        static_cast<int>(hr.x + origin_x),
+        static_cast<int>(hr.y - scroll_y),
+        static_cast<int>(hr.width),
+        th};
+    SDL_RenderFillRect(sdl_, &line);
+  }
+
   for (const auto& pg : layout.glyphs) {
     Font& font = (pg.font == FontRole::Heading) ? heading_ : body_;
     const Glyph& g = font.glyph(pg.codepoint);

@@ -38,6 +38,7 @@ Supported dialect (intentionally small):
 | `- ` / `* ` / `+ ` | Unordered list items |
 | `1. ` `2. ` … | Ordered list items |
 | `> …` | Block quote |
+| `---` / `***` / `___` | Horizontal rule |
 | `*em*` `**strong**` `` `code` `` | Inline styles |
 | `[text](#anchor)` / `[text](url)` | Links |
 | `![alt](path.png){scale=1.2}` | Images (PNG/JPEG/BMP/GIF) |
@@ -70,6 +71,8 @@ Supported dialect (intentionally small):
 | **Ctrl+0** | Demote to paragraph |
 | **Ctrl+1…6** | Set heading level |
 | **Ctrl+Shift+Q** | Toggle block quote |
+| **Ctrl+Shift+8** | Toggle unordered list |
+| **Ctrl+Shift+7** | Toggle ordered list |
 | **Ctrl+Shift+[** / **]** | Collapse / expand all stretchtext |
 | Double-click | Select word |
 

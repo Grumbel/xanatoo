@@ -22,7 +22,8 @@ enum class NodeKind : uint8_t {
   Stretch,   // expandable block
   Columns,
   Column,
-  BlockQuote,  // Markdown "> …" indented quotation
+  BlockQuote,      // Markdown "> …" indented quotation
+  HorizontalRule,  // Markdown "---" thematic break
 };
 
 enum class InlineKind : uint8_t {

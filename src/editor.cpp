@@ -575,6 +575,80 @@ std::optional<NodeId> duplicate_block(Document& doc, NodeId block) {
   return nid;
 }
 
+bool toggle_list(Document& doc, Caret& caret, bool ordered) {
+  if (caret.node == INVALID_NODE) return false;
+  Node& n = doc.get(caret.node);
+
+  // Unwrap: ListItem → Paragraph, drop empty List
+  if (n.kind == NodeKind::ListItem) {
+    NodeId item_id = caret.node;
+    NodeId list_id = n.parent;
+    if (list_id == INVALID_NODE) return false;
+    Node& list = doc.get(list_id);
+    if (list.kind != NodeKind::List) return false;
+    NodeId list_parent = list.parent;
+    if (list_parent == INVALID_NODE) return false;
+
+    Node& lp = doc.get(list_parent);
+
+    auto iit = std::find(list.children.begin(), list.children.end(), item_id);
+    if (iit != list.children.end()) list.children.erase(iit);
+    n.kind = NodeKind::Paragraph;
+    n.level = 0;
+    n.parent = list_parent;
+
+    if (list.children.empty()) {
+      auto lit = std::find(lp.children.begin(), lp.children.end(), list_id);
+      if (lit != lp.children.end()) {
+        *lit = item_id;
+      } else {
+        lp.children.push_back(item_id);
+      }
+      list.parent = INVALID_NODE;
+    } else {
+      auto lit = std::find(lp.children.begin(), lp.children.end(), list_id);
+      size_t insert_at =
+          (lit != lp.children.end())
+              ? static_cast<size_t>(lit - lp.children.begin()) + 1
+              : lp.children.size();
+      if (insert_at > lp.children.size()) insert_at = lp.children.size();
+      lp.children.insert(
+          lp.children.begin() + static_cast<std::ptrdiff_t>(insert_at),
+          item_id);
+      renumber_ordered_list(doc, list_id);
+    }
+    return true;
+  }
+
+  // Wrap: Paragraph / Heading / BlockQuote → ListItem under new List
+  if (n.kind != NodeKind::Paragraph && n.kind != NodeKind::Heading &&
+      n.kind != NodeKind::BlockQuote) {
+    return false;
+  }
+  if (n.parent == INVALID_NODE) return false;
+
+  NodeId block_id = caret.node;
+  NodeId parent_id = n.parent;
+  Node& parent = doc.get(parent_id);
+  auto pit =
+      std::find(parent.children.begin(), parent.children.end(), block_id);
+  if (pit == parent.children.end()) return false;
+  size_t idx = static_cast<size_t>(pit - parent.children.begin());
+
+  NodeId list_id = doc.create(NodeKind::List, INVALID_NODE);
+  Node& list = doc.get(list_id);
+  list.level = ordered ? 1 : 0;
+  list.parent = parent_id;
+
+  n.kind = NodeKind::ListItem;
+  n.level = ordered ? 1 : 0;
+  n.parent = list_id;
+  list.children.push_back(block_id);
+
+  parent.children[idx] = list_id;
+  return true;
+}
+
 static void copy_node_deep(Document& doc, NodeId src_id, NodeId new_parent,
                            NodeId& out_id) {
   const Node& src = doc.get(src_id);

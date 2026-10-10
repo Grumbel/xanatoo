@@ -95,6 +95,8 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         out.quote_bars.insert(out.quote_bars.end(),
                               col_out.quote_bars.begin(),
                               col_out.quote_bars.end());
+        out.hr_lines.insert(out.hr_lines.end(),
+                            col_out.hr_lines.begin(), col_out.hr_lines.end());
 
         if (cy > max_bottom) max_bottom = cy;
       }
@@ -262,6 +264,16 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       } else {
         y += disp_h + 14.f;
       }
+      break;
+    }
+
+    case NodeKind::HorizontalRule: {
+      float start_y = y;
+      y += 10.f;
+      const float thickness = 2.f;
+      out.hr_lines.push_back({id, x, y, max_width, thickness});
+      y += 10.f + thickness;
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
 
