@@ -13,20 +13,18 @@ void Renderer::clear(uint8_t r, uint8_t g, uint8_t b) {
   SDL_RenderClear(sdl_);
 }
 
-void Renderer::draw(const LayoutResult& layout, float scroll_y) {
-  // Images first (behind text of the same region)
+void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) {
   if (images_) {
     for (const auto& pi : layout.images) {
       const Image& img = images_->get(pi.src);
       SDL_Rect dst{
-          static_cast<int>(pi.x),
+          static_cast<int>(pi.x + origin_x),
           static_cast<int>(pi.y - scroll_y),
           static_cast<int>(pi.width),
           static_cast<int>(pi.height)};
       if (img.ok && img.texture) {
         SDL_RenderCopy(sdl_, img.texture, nullptr, &dst);
       } else {
-        // Placeholder frame
         SDL_SetRenderDrawColor(sdl_, 200, 200, 210, 255);
         SDL_RenderDrawRect(sdl_, &dst);
         SDL_SetRenderDrawColor(sdl_, 230, 230, 235, 255);
@@ -41,7 +39,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y) {
     if (!g.texture) continue;
 
     SDL_Rect dst;
-    dst.x = static_cast<int>(pg.x);
+    dst.x = static_cast<int>(pg.x + origin_x);
     dst.y = static_cast<int>(pg.y - g.bearing_y - scroll_y);
     dst.w = g.width;
     dst.h = g.height;
@@ -67,23 +65,23 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y) {
   }
 }
 
-void Renderer::draw_selection(const std::vector<SelRect>& rects) {
+void Renderer::draw_selection(const std::vector<SelRect>& rects, float origin_x) {
   SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
   SDL_SetRenderDrawColor(sdl_, 160, 190, 230, 120);
   for (const auto& r : rects) {
     SDL_Rect sr{
-        static_cast<int>(r.x), static_cast<int>(r.y),
+        static_cast<int>(r.x + origin_x), static_cast<int>(r.y),
         static_cast<int>(r.w), static_cast<int>(r.h)};
     SDL_RenderFillRect(sdl_, &sr);
   }
   SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
 }
 
-void Renderer::draw_caret(const CaretScreenPos& pos) {
+void Renderer::draw_caret(const CaretScreenPos& pos, float origin_x) {
   if (!pos.valid) return;
   SDL_SetRenderDrawColor(sdl_, 25, 90, 170, 255);
   SDL_Rect r;
-  r.x = static_cast<int>(pos.x);
+  r.x = static_cast<int>(pos.x + origin_x);
   r.y = static_cast<int>(pos.y - pos.height * 0.85f);
   r.w = 2;
   r.h = static_cast<int>(pos.height * 0.95f);

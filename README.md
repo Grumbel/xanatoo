@@ -8,6 +8,12 @@ HyperCard, and the Canon Cat.
 
 See [PROPOSAL.md](PROPOSAL.md) for the full vision.
 
+## Multi-view
+
+- **Ctrl+\\** — toggle a second side-by-side view of the same document
+- **Tab** — switch keyboard focus between panes
+- Each pane has independent scroll and selection; the document is shared
+
 ## Images
 
 Markup `![alt](path.png)` loads PNG/JPEG/BMP/GIF relative to the

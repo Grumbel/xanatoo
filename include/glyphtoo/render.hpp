@@ -17,9 +17,11 @@ public:
            ImageCache* images = nullptr);
 
   void clear(uint8_t r, uint8_t g, uint8_t b);
-  void draw(const LayoutResult& layout, float scroll_y = 0.f);
-  void draw_selection(const std::vector<SelRect>& rects);
-  void draw_caret(const CaretScreenPos& pos);
+  // origin_x shifts all content horizontally (for multi-pane views).
+  void draw(const LayoutResult& layout, float scroll_y = 0.f,
+            float origin_x = 0.f);
+  void draw_selection(const std::vector<SelRect>& rects, float origin_x = 0.f);
+  void draw_caret(const CaretScreenPos& pos, float origin_x = 0.f);
   void present();
 
   SDL_Renderer* sdl() { return sdl_; }
