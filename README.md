@@ -2,99 +2,98 @@
 
 Interactive document composition engine.
 
-A lightweight, realtime, editable document system built with C++ and SDL2.
-Inspired by Markdown, classical typesetting, Ted Nelson's hypertext ideas,
-HyperCard, and the Canon Cat.
+A lightweight, realtime, editable document system built with **C++20**, **SDL2**,
+and **FreeType**. Inspired by Markdown, classical typesetting, Ted Nelson's
+hypertext ideas, HyperCard, and the Canon Cat.
 
-See [PROPOSAL.md](PROPOSAL.md) for the full vision.
+See [PROPOSAL.md](PROPOSAL.md) for the full vision. Local-only for now.
 
-## Multi-view
-
-- **Ctrl+\\** — toggle a second side-by-side view
-- **Tab** — switch keyboard focus between panes
-- Drag the centre gutter to resize panes
-- `glyphtoo a.md b.md` — open two independent documents side by side
-- With one file (or Ctrl+\\ alone), both panes share the same live document
-
-## Navigation
-
-- **Ctrl+← / Ctrl+→** — move by word
-- Click blue underlined links to follow `#anchor` targets in-document
-
-## Search
-
-- **Ctrl+F** — leap search: type to jump to the next match
-- **F3** / **Ctrl+G** — next match
-- **Esc** — leave search mode
-- Query is shown in a bottom status bar; matches scroll into view
-
-Untitled buffers: **Ctrl+S** writes `untitled.md` (or `untitled-N.md`) and
-binds that path for further saves.
-
-## Images
-
-Markup `![alt](path.png)` loads PNG/JPEG/BMP/GIF relative to the
-document directory (via stb_image). Missing files show a placeholder.
-
-## Status
-
-Stage 01 (document model + layout) is working.
-Early stage 02 (caret, hit-testing, basic editing) is in place.
-
-- Data-oriented document model with stable node IDs
-- Minimal Markdown-ish parser
-- FreeType glyph rendering (body + heading sizes) via SDL2
-- Click to place caret, type to edit, Backspace/Delete, arrows
-- Immediate reflow after every change
-
-## Build (Nix)
+## Quick start
 
 ```bash
 nix build
-./result/bin/glyphtoo
+./result/bin/glyphtoo                  # built-in sample
+./result/bin/glyphtoo notes.md         # open a file
+./result/bin/glyphtoo a.md b.md        # dual-pane, two documents
 ```
 
-Or:
+Or with system packages (CMake ≥ 3.16, SDL2, FreeType):
 
 ```bash
-nix develop
-mkdir build && cd build
-cmake .. && make -j
-./glyphtoo
+mkdir build && cd build && cmake .. && make -j
+./glyphtoo --font /path/to/font.ttf notes.md
 ```
 
-## Build (system packages)
+Font resolution: `--font` → `GLYPHTOO_FONT` env → common system paths.
+`nix build` wraps the binary with DejaVu Sans.
 
-Requires: CMake ≥ 3.16, SDL2, FreeType, C++20 compiler.
+## Markup
 
-```bash
-mkdir build && cd build
-cmake .. && make -j
-./glyphtoo
-./glyphtoo --font /path/to/SomeFont.ttf
-```
+Supported dialect (intentionally small):
 
-### Command-line options
+| Syntax | Meaning |
+|--------|---------|
+| `#` … `######` | Headings |
+| blank-line separated | Paragraphs |
+| `*em*` `**strong**` `` `code` `` | Inline styles |
+| `[text](#anchor)` / `[text](url)` | Links |
+| `![alt](path.png){scale=1.2}` | Images (PNG/JPEG/BMP/GIF) |
+| `:::stretch summary="…"` … `:::` | Collapsed stretchtext |
+| `:::columns` / `:::column` | Side-by-side columns |
 
-```
-glyphtoo [options] [file.md]
+## Keybindings
 
--f, --font <path>     TTF/OTF font file (body + headings)
--o, --open <path>     Open a markup document
--h, --help            Show help
-```
+### Files
+| Key | Action |
+|-----|--------|
+| **Ctrl+S** | Save (untitled → `untitled.md`) |
+| **Ctrl+Shift+S** | Save As (path in status bar) |
+| **Ctrl+Q** | Quit (warns once if dirty) |
 
-A positional path opens that file. **Ctrl+S** saves it back (round-trips
-through the lightweight markup serializer).
+### Edit
+| Key | Action |
+|-----|--------|
+| Type / Backspace / Delete | Insert / delete |
+| **Enter** | Split paragraph |
+| Backspace at block start | Merge with previous paragraph |
+| **Ctrl+Z** / **Ctrl+Y** | Undo / redo |
+| **Ctrl+C** / **X** / **V** | Clipboard |
+| **Ctrl+B** / **I** / **\`** / **K** | Bold / italic / code / link |
+| **Ctrl+E** | Wrap block in stretchtext |
+| Double-click | Select word |
 
-Font resolution order:
+### Navigate
+| Key | Action |
+|-----|--------|
+| Arrows | Move caret (scrolls into view) |
+| **Ctrl+←/→** | Word motion |
+| **Home** / **End** | Line start / end |
+| **Ctrl+A** | Select current block |
+| **Ctrl+Shift+A** | Select whole document |
+| Click blue link | Follow `#anchor` |
+| **Ctrl+F** | Leap search |
+| **Ctrl+H** | Leap replace (Tab switches fields) |
+| **F3** / **Ctrl+G** | Next match |
+| **Esc** | Cancel mode / clear selection |
 
-1. `--font` / `-f`
-2. `GLYPHTOO_FONT` environment variable
-3. Common system paths (DejaVu, Liberation, FreeSans, Arial)
+### View
+| Key | Action |
+|-----|--------|
+| **Ctrl+\\** | Toggle dual pane |
+| **Tab** | Focus other pane (or switch replace field) |
+| Drag gutter | Resize panes |
+| Drag scrollbar | Scroll |
+| Drag image corner | Resize image |
+| **Ctrl++** / **Ctrl+-** | Zoom text |
+| Click ▸/▾ | Expand / collapse stretchtext |
 
-`nix build` wraps the binary so `GLYPHTOO_FONT` points at DejaVu Sans
-from nixpkgs — no system font required.
+## Architecture notes
+
+- **Document** — arena of nodes with stable `NodeId`s; layout is a pure function
+  of document state (data-oriented, Casey Muratori–style).
+- **Selection** — two carets (anchor + focus); highlights derived from glyphs.
+- **Undo** — per-document snapshot stacks.
+- **Vendored** — `external/stb_image.h` (public domain).
 
 ## License
 

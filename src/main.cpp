@@ -306,6 +306,8 @@ int main(int argc, char** argv) {
   float split_ratio = 0.5f;        // left pane fraction
   bool dragging_sel = false;
   bool dragging_split = false;
+  bool dragging_scroll = false;
+  int scroll_drag_pane = 0;
   bool dragging_image = false;
   glyphtoo::NodeId resize_image = glyphtoo::INVALID_NODE;
   float resize_start_x = 0.f;
@@ -444,6 +446,24 @@ int main(int argc, char** argv) {
             float mx = static_cast<float>(ev.button.x);
             float my = static_cast<float>(ev.button.y);
 
+            // Drag scrollbar (right edge of a pane)?
+            {
+              int pi = pane_at(mx);
+              int sx = panes[pi].x + panes[pi].w - 8;
+              if (mx >= sx && my < win_h - 28) {
+                focus = pi;
+                dragging_scroll = true;
+                scroll_drag_pane = pi;
+                // Jump scroll so thumb centres under cursor
+                float view_h = static_cast<float>(win_h - 28);
+                float content_h = std::max(view_h, panes[pi].layout.content_height);
+                float max_s = std::max(0.f, content_h - view_h + 40.f);
+                float ratio = (view_h > 0.f) ? (my / view_h) : 0.f;
+                panes[pi].scroll_y = std::max(0.f, std::min(max_s, ratio * max_s));
+                break;
+              }
+            }
+
             // Drag the split gutter?
             if (split) {
               int gutter_x = panes[1].x - 3;
@@ -531,12 +551,24 @@ int main(int argc, char** argv) {
           if (ev.button.button == SDL_BUTTON_LEFT) {
             dragging_sel = false;
             dragging_split = false;
+            dragging_scroll = false;
             dragging_image = false;
             resize_image = glyphtoo::INVALID_NODE;
           }
           break;
 
         case SDL_MOUSEMOTION:
+          if (dragging_scroll) {
+            float my = static_cast<float>(ev.motion.y);
+            Pane& sp = panes[scroll_drag_pane];
+            float view_h = static_cast<float>(win_h - 28);
+            float content_h = std::max(view_h, sp.layout.content_height);
+            float max_s = std::max(0.f, content_h - view_h + 40.f);
+            float ratio = (view_h > 0.f) ? (my / view_h) : 0.f;
+            ratio = std::max(0.f, std::min(1.f, ratio));
+            sp.scroll_y = ratio * max_s;
+            break;
+          }
           if (dragging_split && split) {
             float mx = static_cast<float>(ev.motion.x);
             split_ratio = mx / static_cast<float>(win_w);

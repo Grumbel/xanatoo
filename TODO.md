@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **023** (this delivery is **022**)
+Next bundle number: **024** (this delivery is **023**)
 
 ## Status (2026-10-10)
 
@@ -62,6 +62,8 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] Scrollbar thumb per pane
 - [x] Ctrl+` code span style
 - [x] Ctrl+H leap-replace (Tab switches find/replace)
+- [x] Draggable scrollbar
+- [x] README keybinding reference
 
 ## Open work / next steps
 
@@ -101,4 +103,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-019.*-external-stretch-…` — external/ + Ctrl+E stretch
 - `glyphtoo-020.*-multistyle-quit-…` — multi-node style + quit safety
 - `glyphtoo-021.*-merge-zoom-…` — merge + zoom
-- `glyphtoo-022.*-scroll-replace-…` — this delivery
+- `glyphtoo-022.*-scroll-replace-…` — scrollbar + replace + code style
+- `glyphtoo-023.*-scroll-drag-docs-…` — this delivery
