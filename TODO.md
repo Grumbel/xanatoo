@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **010** (this delivery is **009**)
+Next bundle number: **011** (this delivery is **010**)
 
 ## Status (2026-10-10)
 
@@ -32,15 +32,16 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] Side-by-side `:::columns` / `:::column` layout
 - [x] Multi-node selection copy and delete
 - [x] Dual-pane multi-view (Ctrl+\\ toggle, Tab focus)
+- [x] Two-file CLI opens independent docs in dual-pane
+- [x] Draggable pane divider (split_ratio)
 
 ## Open work / next steps
 
-1. Load a *different* document in the second pane (currently same doc)
-2. Draggable pane divider
-3. Optional: HarfBuzz for complex scripts
-4. Replace snapshot undo with a tighter operation log if memory becomes an issue
-5. Save-as / untitled buffer when no path was given
-6. Image drag-resize / interactive placement
+1. Optional: HarfBuzz for complex scripts
+2. Replace snapshot undo with a tighter operation log if memory becomes an issue
+3. Save-as / untitled buffer when no path was given
+4. Image drag-resize / interactive placement
+5. Per-document undo stacks when panes hold independent files
 
 ## Design notes
 
@@ -61,4 +62,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-006.*-open-save-font-…` — open/save + default font
 - `glyphtoo-007.*-images-dirty-…` — images + dirty flag
 - `glyphtoo-008.*-columns-multisel-…` — columns + multi-sel
-- `glyphtoo-009.*-dual-pane-…` — this delivery
+- `glyphtoo-009.*-dual-pane-…` — dual-pane multi-view
+- `glyphtoo-010.*-two-docs-divider-…` — this delivery

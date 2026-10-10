@@ -38,6 +38,7 @@ struct PositionedImage {
   float width = 0.f;
   float height = 0.f;
   std::string src;
+  std::string base;  // directory for relative path resolution
 };
 
 struct LayoutResult {
@@ -51,12 +52,15 @@ class LayoutEngine {
 public:
   LayoutEngine(Font& body_font, Font& heading_font, ImageCache* images = nullptr);
 
-  LayoutResult layout(const Document& doc, float max_width);
+  LayoutResult layout(const Document& doc, float max_width,
+                      const std::string& image_base = {});
 
 private:
   Font& body_;
   Font& heading_;
   ImageCache* images_;
+
+  std::string image_base_;
 
   void layout_node(const Document& doc, NodeId id,
                    float x, float& y, float max_width,

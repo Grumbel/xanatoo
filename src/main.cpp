@@ -51,6 +51,7 @@ This is a live document. Click to place the caret, type to insert text,
 Backspace to delete. **Enter** splits a paragraph. Shift+arrows select.
 Ctrl+C / Ctrl+V / Ctrl+X for clipboard, Ctrl+Z / Ctrl+Y for undo/redo.
 **Ctrl+\\** toggles a second view pane; **Tab** switches focus.
+Drag the gutter to resize. Open two files for independent documents.
 Click a stretchtext marker (▸ / ▾) to expand or collapse.
 
 Inspiration: Ted Nelson's *Xanadu*, Bill Atkinson's **HyperCard**, and
@@ -80,22 +81,25 @@ static std::string find_system_font() {
 
 static void print_usage(const char* argv0) {
   std::cerr
-      << "Usage: " << argv0 << " [options] [file]\n"
+      << "Usage: " << argv0 << " [options] [file] [file2]\n"
       << "\n"
       << "Options:\n"
       << "  -f, --font <path>     TTF/OTF font file (body + headings)\n"
       << "  -o, --open <path>     Open a markup document\n"
       << "  -h, --help            Show this help\n"
       << "\n"
-      << "A positional path is treated as the document to open.\n"
-      << "Ctrl+S saves back to that path.\n"
+      << "One positional path opens that document.\n"
+      << "Two paths open dual-pane: left=file1, right=file2.\n"
+      << "Ctrl+S saves the focused pane's document.\n"
+      << "Ctrl+\\ toggles split; drag the gutter to resize panes.\n"
       << "\n"
       << "Font resolution order: --font, GLYPHTOO_FONT env, system search.\n";
 }
 
 struct Options {
   std::string font_path;
-  std::string file_path;  // open this markup file (empty = built-in sample)
+  std::string file_path;   // primary document
+  std::string file_path2;  // optional second document → opens dual-pane
 };
 
 static bool parse_args(int argc, char** argv, Options& opt) {
@@ -128,9 +132,12 @@ static bool parse_args(int argc, char** argv, Options& opt) {
       continue;
     }
     if (!a.empty() && a[0] != '-') {
-      // positional: document path
       if (opt.file_path.empty()) {
         opt.file_path = a;
+        continue;
+      }
+      if (opt.file_path2.empty()) {
+        opt.file_path2 = a;
         continue;
       }
       std::cerr << "error: unexpected argument: " << a << "\n";
@@ -212,40 +219,56 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  std::string doc_path = opt.file_path;
-  glyphtoo::Document doc;
-  if (!doc_path.empty()) {
-    std::ifstream in(doc_path);
+
+  auto load_doc = [&](const std::string& path) -> glyphtoo::Document {
+    if (path.empty()) {
+      return glyphtoo::parse_markup(SAMPLE);
+    }
+    std::ifstream in(path);
     if (!in) {
-      std::cerr << "Failed to open document: " << doc_path << "\n";
-      SDL_DestroyRenderer(sdl);
-      SDL_DestroyWindow(window);
-      SDL_Quit();
-      return 1;
+      std::cerr << "Failed to open document: " << path << "\n";
+      return glyphtoo::parse_markup(SAMPLE);
     }
     std::string source((std::istreambuf_iterator<char>(in)),
                        std::istreambuf_iterator<char>());
-    doc = glyphtoo::parse_markup(source);
-    std::cout << "Opened: " << doc_path << "\n";
-  } else {
-    doc = glyphtoo::parse_markup(SAMPLE);
-  }
-  glyphtoo::ImageCache images(sdl);
-  if (!doc_path.empty()) {
-    std::filesystem::path p(doc_path);
-    if (p.has_parent_path()) {
-      images.set_base_dir(p.parent_path().string());
-    }
-  }
+    std::cout << "Opened: " << path << "\n";
+    return glyphtoo::parse_markup(source);
+  };
 
-  auto update_title = [&](bool dirty) {
+  auto parent_dir = [](const std::string& path) -> std::string {
+    if (path.empty()) return {};
+    std::filesystem::path p(path);
+    if (p.has_parent_path()) return p.parent_path().string();
+    return {};
+  };
+
+  glyphtoo::Document docs[2];
+  std::string paths[2];
+  paths[0] = opt.file_path;
+  paths[1] = opt.file_path2;
+  docs[0] = load_doc(paths[0]);
+  docs[1] = paths[1].empty() ? docs[0] : load_doc(paths[1]);
+  // If only one file, pane 1 shares docs[0] until a second file is used
+  bool shared_doc = paths[1].empty();
+
+  glyphtoo::ImageCache images(sdl);
+
+  auto update_title = [&](bool dirty_flag) {
     std::string title = "glyphtoo";
-    if (!doc_path.empty()) {
+    auto label = [&](int i) {
+      std::string s;
+      if (paths[i].empty()) s = "untitled";
+      else s = paths[i];
+      return s;
+    };
+    if (shared_doc || paths[1].empty()) {
       title += " — ";
-      if (dirty) title += "*";
-      title += doc_path;
-    } else if (dirty) {
-      title += " — *untitled";
+      if (dirty_flag) title += "*";
+      title += label(0);
+    } else {
+      title += " — ";
+      if (dirty_flag) title += "*";
+      title += label(0) + " | " + label(1);
     }
     SDL_SetWindowTitle(window, title.c_str());
   };
@@ -255,6 +278,7 @@ int main(int argc, char** argv) {
   glyphtoo::Renderer renderer(sdl, body_font, heading_font, &images);
 
   struct Pane {
+    int doc_index = 0;  // which docs[] entry
     glyphtoo::Selection sel{};
     float scroll_y = 0.f;
     float preferred_x = 0.f;
@@ -264,21 +288,36 @@ int main(int argc, char** argv) {
   };
 
   Pane panes[2];
-  glyphtoo::ensure_valid_caret(doc, panes[0].sel.focus);
+  panes[0].doc_index = 0;
+  panes[1].doc_index = shared_doc ? 0 : 1;
+  glyphtoo::ensure_valid_caret(docs[0], panes[0].sel.focus);
   panes[0].sel.anchor = panes[0].sel.focus;
-  panes[1].sel = panes[0].sel;
+  glyphtoo::ensure_valid_caret(docs[panes[1].doc_index], panes[1].sel.focus);
+  panes[1].sel.anchor = panes[1].sel.focus;
 
   int focus = 0;
-  bool split = false;
+  bool split = !paths[1].empty();  // auto-split when two files given
+  float split_ratio = 0.5f;        // left pane fraction
+  bool dragging_sel = false;
+  bool dragging_split = false;
+
+  auto doc_of = [&](Pane& p) -> glyphtoo::Document& {
+    return docs[p.doc_index];
+  };
+  auto path_of = [&](Pane& p) -> std::string& {
+    return paths[p.doc_index];
+  };
+  auto base_of = [&](Pane& p) -> std::string {
+    return parent_dir(paths[p.doc_index]);
+  };
 
   glyphtoo::History history;
-  history.reset(doc, panes[0].sel);
+  history.reset(docs[0], panes[0].sel);
 
   int win_w = 920, win_h = 720;
   bool running = true;
   bool needs_layout = true;
   bool dirty = false;
-  bool dragging = false;
 
   Uint32 caret_blink_start = SDL_GetTicks();
   auto reset_blink = [&]() { caret_blink_start = SDL_GetTicks(); };
@@ -286,7 +325,7 @@ int main(int argc, char** argv) {
   auto F = [&]() -> Pane& { return panes[focus]; };
 
   auto checkpoint = [&]() {
-    history.push(doc, F().sel);
+    history.push(doc_of(F()), F().sel);
   };
   auto mark_dirty = [&]() {
     if (!dirty) {
@@ -302,9 +341,11 @@ int main(int argc, char** argv) {
   auto layout_panes = [&]() {
     const int gutter = split ? 6 : 0;
     if (split) {
+      int left_w = static_cast<int>(split_ratio * (win_w - gutter));
+      left_w = std::max(120, std::min(win_w - gutter - 120, left_w));
       panes[0].x = 0;
-      panes[0].w = (win_w - gutter) / 2;
-      panes[1].x = panes[0].w + gutter;
+      panes[0].w = left_w;
+      panes[1].x = left_w + gutter;
       panes[1].w = win_w - panes[1].x;
     } else {
       panes[0].x = 0;
@@ -312,12 +353,15 @@ int main(int argc, char** argv) {
       panes[1].x = 0;
       panes[1].w = 0;
     }
-    panes[0].layout = layout_engine.layout(doc, static_cast<float>(panes[0].w));
+    panes[0].layout = layout_engine.layout(
+        doc_of(panes[0]), static_cast<float>(panes[0].w), base_of(panes[0]));
     if (split) {
-      panes[1].layout = layout_engine.layout(doc, static_cast<float>(panes[1].w));
+      panes[1].layout = layout_engine.layout(
+          doc_of(panes[1]), static_cast<float>(panes[1].w), base_of(panes[1]));
     }
     needs_layout = false;
   };
+
 
   auto pane_at = [&](float mx) -> int {
     if (!split) return 0;
@@ -355,15 +399,25 @@ int main(int argc, char** argv) {
           if (ev.button.button == SDL_BUTTON_LEFT) {
             float mx = static_cast<float>(ev.button.x);
             float my = static_cast<float>(ev.button.y);
+
+            // Drag the split gutter?
+            if (split) {
+              int gutter_x = panes[1].x - 3;
+              if (mx >= gutter_x && mx <= gutter_x + 6) {
+                dragging_split = true;
+                break;
+              }
+            }
+
             focus = pane_at(mx);
             Pane& p = F();
             float lx = local_x(mx, focus);
 
             if (auto sid = glyphtoo::hit_test_stretch(p.layout, lx, my, p.scroll_y)) {
               glyphtoo::NodeId id = *sid;
-              if (doc.get(id).kind == glyphtoo::NodeKind::Stretch) {
+              if (doc_of(p).get(id).kind == glyphtoo::NodeKind::Stretch) {
                 edit();
-                doc.get(id).expanded = !doc.get(id).expanded;
+                doc_of(p).get(id).expanded = !doc_of(p).get(id).expanded;
                 needs_layout = true;
                 break;
               }
@@ -375,18 +429,28 @@ int main(int argc, char** argv) {
                 p.sel.anchor = p.sel.focus;
               }
               p.preferred_x = lx;
-              dragging = true;
+              dragging_sel = true;
               reset_blink();
             }
           }
           break;
 
         case SDL_MOUSEBUTTONUP:
-          if (ev.button.button == SDL_BUTTON_LEFT) dragging = false;
+          if (ev.button.button == SDL_BUTTON_LEFT) {
+            dragging_sel = false;
+            dragging_split = false;
+          }
           break;
 
         case SDL_MOUSEMOTION:
-          if (dragging) {
+          if (dragging_split && split) {
+            float mx = static_cast<float>(ev.motion.x);
+            split_ratio = mx / static_cast<float>(win_w);
+            split_ratio = std::max(0.15f, std::min(0.85f, split_ratio));
+            needs_layout = true;
+            break;
+          }
+          if (dragging_sel) {
             float mx = static_cast<float>(ev.motion.x);
             float my = static_cast<float>(ev.motion.y);
             // Keep focus on the pane where drag started
@@ -402,10 +466,11 @@ int main(int argc, char** argv) {
         case SDL_TEXTINPUT: {
           edit();
           Pane& p = F();
+          glyphtoo::Document& td = doc_of(p);
           if (!p.sel.empty()) {
-            glyphtoo::delete_selection(doc, p.sel);
+            glyphtoo::delete_selection(td, p.sel);
           }
-          glyphtoo::insert_text(doc, p.sel.focus, ev.text.text);
+          glyphtoo::insert_text(td, p.sel.focus, ev.text.text);
           p.sel.anchor = p.sel.focus;
           needs_layout = true;
           reset_blink();
@@ -416,6 +481,7 @@ int main(int argc, char** argv) {
           bool shift = (ev.key.keysym.mod & KMOD_SHIFT) != 0;
           bool ctrl = (ev.key.keysym.mod & KMOD_CTRL) != 0;
           Pane& p = F();
+          glyphtoo::Document& d = doc_of(p);
 
           auto clear_sel = [&]() { p.sel.anchor = p.sel.focus; };
           auto move_and_sel = [&](auto mover) {
@@ -440,7 +506,9 @@ int main(int argc, char** argv) {
               if (ctrl) {
                 split = !split;
                 if (split) {
-                  // Seed right pane from left
+                  if (shared_doc) {
+                    panes[1].doc_index = 0;
+                  }
                   panes[1].sel = panes[0].sel;
                   panes[1].scroll_y = panes[0].scroll_y;
                 } else {
@@ -453,9 +521,9 @@ int main(int argc, char** argv) {
             case SDLK_BACKSPACE:
               edit();
               if (!p.sel.empty()) {
-                glyphtoo::delete_selection(doc, p.sel);
+                glyphtoo::delete_selection(d, p.sel);
               } else {
-                glyphtoo::delete_backward(doc, p.sel.focus);
+                glyphtoo::delete_backward(d, p.sel.focus);
                 p.sel.anchor = p.sel.focus;
               }
               needs_layout = true;
@@ -465,9 +533,9 @@ int main(int argc, char** argv) {
             case SDLK_DELETE:
               edit();
               if (!p.sel.empty()) {
-                glyphtoo::delete_selection(doc, p.sel);
+                glyphtoo::delete_selection(d, p.sel);
               } else {
-                glyphtoo::delete_forward(doc, p.sel.focus);
+                glyphtoo::delete_forward(d, p.sel.focus);
                 p.sel.anchor = p.sel.focus;
               }
               needs_layout = true;
@@ -477,8 +545,8 @@ int main(int argc, char** argv) {
             case SDLK_RETURN:
             case SDLK_KP_ENTER:
               edit();
-              if (!p.sel.empty()) glyphtoo::delete_selection(doc, p.sel);
-              glyphtoo::split_block(doc, p.sel.focus);
+              if (!p.sel.empty()) glyphtoo::delete_selection(d, p.sel);
+              glyphtoo::split_block(d, p.sel.focus);
               p.sel.anchor = p.sel.focus;
               needs_layout = true;
               reset_blink();
@@ -486,16 +554,16 @@ int main(int argc, char** argv) {
 
             case SDLK_LEFT:
               move_and_sel([&] {
-                if (!glyphtoo::move_left(doc, p.sel.focus))
-                  glyphtoo::move_to_prev_node(doc, p.sel.focus);
+                if (!glyphtoo::move_left(d, p.sel.focus))
+                  glyphtoo::move_to_prev_node(d, p.sel.focus);
               });
               reset_blink();
               break;
 
             case SDLK_RIGHT:
               move_and_sel([&] {
-                if (!glyphtoo::move_right(doc, p.sel.focus))
-                  glyphtoo::move_to_next_node(doc, p.sel.focus);
+                if (!glyphtoo::move_right(d, p.sel.focus))
+                  glyphtoo::move_to_next_node(d, p.sel.focus);
               });
               reset_blink();
               break;
@@ -503,7 +571,7 @@ int main(int argc, char** argv) {
             case SDLK_UP:
               move_and_sel([&] {
                 if (!glyphtoo::move_up(p.layout, p.sel.focus, p.preferred_x))
-                  glyphtoo::move_to_prev_node(doc, p.sel.focus);
+                  glyphtoo::move_to_prev_node(d, p.sel.focus);
               });
               reset_blink();
               break;
@@ -511,7 +579,7 @@ int main(int argc, char** argv) {
             case SDLK_DOWN:
               move_and_sel([&] {
                 if (!glyphtoo::move_down(p.layout, p.sel.focus, p.preferred_x))
-                  glyphtoo::move_to_next_node(doc, p.sel.focus);
+                  glyphtoo::move_to_next_node(d, p.sel.focus);
               });
               reset_blink();
               break;
@@ -533,18 +601,18 @@ int main(int argc, char** argv) {
 
             case SDLK_c:
               if (ctrl) {
-                std::string text = glyphtoo::selected_text(doc, p.sel);
+                std::string text = glyphtoo::selected_text(d, p.sel);
                 if (!text.empty()) SDL_SetClipboardText(text.c_str());
               }
               break;
 
             case SDLK_x:
               if (ctrl) {
-                std::string text = glyphtoo::selected_text(doc, p.sel);
+                std::string text = glyphtoo::selected_text(d, p.sel);
                 if (!text.empty()) {
                   SDL_SetClipboardText(text.c_str());
                   edit();
-                  glyphtoo::delete_selection(doc, p.sel);
+                  glyphtoo::delete_selection(d, p.sel);
                   needs_layout = true;
                   reset_blink();
                 }
@@ -557,8 +625,8 @@ int main(int argc, char** argv) {
                   char* clip = SDL_GetClipboardText();
                   if (clip && clip[0]) {
                     edit();
-                    if (!p.sel.empty()) glyphtoo::delete_selection(doc, p.sel);
-                    glyphtoo::insert_text(doc, p.sel.focus, clip);
+                    if (!p.sel.empty()) glyphtoo::delete_selection(d, p.sel);
+                    glyphtoo::insert_text(d, p.sel.focus, clip);
                     p.sel.anchor = p.sel.focus;
                     needs_layout = true;
                     reset_blink();
@@ -570,10 +638,12 @@ int main(int argc, char** argv) {
 
             case SDLK_z:
               if (ctrl) {
-                if (history.undo(doc, p.sel)) {
-                  // Keep other pane caret valid
-                  glyphtoo::ensure_valid_caret(doc, panes[1 - focus].sel.focus);
-                  panes[1 - focus].sel.anchor = panes[1 - focus].sel.focus;
+                if (history.undo(d, p.sel)) {
+                  if (panes[0].doc_index == panes[1].doc_index) {
+                    glyphtoo::ensure_valid_caret(
+                        doc_of(panes[1 - focus]), panes[1 - focus].sel.focus);
+                    panes[1 - focus].sel.anchor = panes[1 - focus].sel.focus;
+                  }
                   needs_layout = true;
                   reset_blink();
                 }
@@ -582,9 +652,12 @@ int main(int argc, char** argv) {
 
             case SDLK_y:
               if (ctrl) {
-                if (history.redo(doc, p.sel)) {
-                  glyphtoo::ensure_valid_caret(doc, panes[1 - focus].sel.focus);
-                  panes[1 - focus].sel.anchor = panes[1 - focus].sel.focus;
+                if (history.redo(d, p.sel)) {
+                  if (panes[0].doc_index == panes[1].doc_index) {
+                    glyphtoo::ensure_valid_caret(
+                        doc_of(panes[1 - focus]), panes[1 - focus].sel.focus);
+                    panes[1 - focus].sel.anchor = panes[1 - focus].sel.focus;
+                  }
                   needs_layout = true;
                   reset_blink();
                 }
@@ -593,16 +666,17 @@ int main(int argc, char** argv) {
 
             case SDLK_s:
               if (ctrl) {
-                if (doc_path.empty()) {
+                std::string& spath = path_of(p);
+                if (spath.empty()) {
                   std::cerr << "No file path — open with: glyphtoo file.md\n";
                 } else {
-                  std::string text = glyphtoo::serialize_markup(doc);
-                  std::ofstream out(doc_path);
+                  std::string text = glyphtoo::serialize_markup(d);
+                  std::ofstream out(spath);
                   if (!out) {
-                    std::cerr << "Failed to save: " << doc_path << "\n";
+                    std::cerr << "Failed to save: " << spath << "\n";
                   } else {
                     out << text;
-                    std::cout << "Saved: " << doc_path << "\n";
+                    std::cout << "Saved: " << spath << "\n";
                     dirty = false;
                     update_title(false);
                   }
@@ -612,7 +686,7 @@ int main(int argc, char** argv) {
 
             case SDLK_a:
               if (ctrl) {
-                const auto& n = doc.get(p.sel.focus.node);
+                const auto& n = d.get(p.sel.focus.node);
                 p.sel.anchor = {p.sel.focus.node, 0, 0};
                 p.sel.focus.span_index = n.spans.empty() ? 0 : n.spans.size() - 1;
                 if (!n.spans.empty()) {

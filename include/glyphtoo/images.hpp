@@ -30,7 +30,8 @@ public:
   const std::string& base_dir() const { return base_dir_; }
 
   // Returns a cached entry (may have ok=false if load failed).
-  const Image& get(const std::string& path);
+  // If base is non-empty, relative paths resolve against it instead of base_dir_.
+  const Image& get(const std::string& path, const std::string& base = {});
 
   void clear();
 

@@ -64,17 +64,20 @@ Image ImageCache::load(const std::string& resolved_path) {
   return img;
 }
 
-const Image& ImageCache::get(const std::string& path) {
-  auto it = cache_.find(path);
+const Image& ImageCache::get(const std::string& path, const std::string& base) {
+  const std::string& root = !base.empty() ? base : base_dir_;
+  // Cache key includes root so the same relative name from two docs does not clash
+  std::string key = root + "\0" + path;
+  auto it = cache_.find(key);
   if (it != cache_.end()) return it->second;
 
   fs::path resolved = path;
-  if (!resolved.is_absolute() && !base_dir_.empty()) {
-    resolved = fs::path(base_dir_) / path;
+  if (!resolved.is_absolute() && !root.empty()) {
+    resolved = fs::path(root) / path;
   }
 
   Image img = load(resolved.string());
-  auto [ins, _] = cache_.emplace(path, std::move(img));
+  auto [ins, _] = cache_.emplace(key, std::move(img));
   return ins->second;
 }
 

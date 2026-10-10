@@ -8,8 +8,10 @@ namespace glyphtoo {
 LayoutEngine::LayoutEngine(Font& body, Font& heading, ImageCache* images)
     : body_(body), heading_(heading), images_(images) {}
 
-LayoutResult LayoutEngine::layout(const Document& doc, float max_width) {
+LayoutResult LayoutEngine::layout(const Document& doc, float max_width,
+                                   const std::string& image_base) {
   LayoutResult result;
+  image_base_ = image_base;
   if (doc.root == INVALID_NODE) return result;
   float y = 24.f;
   layout_node(doc, doc.root, 32.f, y, max_width - 64.f, result);
@@ -159,7 +161,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       float disp_w = max_width;
       float disp_h = 120.f;
       if (images_ && !node.src.empty()) {
-        const Image& img = images_->get(node.src);
+        const Image& img = images_->get(node.src, image_base_);
         if (img.ok && img.width > 0) {
           float scale = 1.f;
           if (static_cast<float>(img.width) > max_width) {
@@ -174,7 +176,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           disp_h = img.height * scale;
         }
       }
-      out.images.push_back({id, x, y, disp_w, disp_h, node.src});
+      out.images.push_back({id, x, y, disp_w, disp_h, node.src, image_base_});
       out.boxes.push_back({id, x, y, disp_w, disp_h});
       // Alt text under image if present
       if (!node.alt.empty()) {

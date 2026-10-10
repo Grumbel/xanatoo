@@ -16,7 +16,7 @@ void Renderer::clear(uint8_t r, uint8_t g, uint8_t b) {
 void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) {
   if (images_) {
     for (const auto& pi : layout.images) {
-      const Image& img = images_->get(pi.src);
+      const Image& img = images_->get(pi.src, pi.base);
       SDL_Rect dst{
           static_cast<int>(pi.x + origin_x),
           static_cast<int>(pi.y - scroll_y),

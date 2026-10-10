@@ -10,9 +10,11 @@ See [PROPOSAL.md](PROPOSAL.md) for the full vision.
 
 ## Multi-view
 
-- **Ctrl+\\** — toggle a second side-by-side view of the same document
+- **Ctrl+\\** — toggle a second side-by-side view
 - **Tab** — switch keyboard focus between panes
-- Each pane has independent scroll and selection; the document is shared
+- Drag the centre gutter to resize panes
+- `glyphtoo a.md b.md` — open two independent documents side by side
+- With one file (or Ctrl+\\ alone), both panes share the same live document
 
 ## Images
 
