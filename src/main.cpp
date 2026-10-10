@@ -335,6 +335,9 @@ int main(int argc, char** argv) {
   bool search_mode = false;
   std::string search_query;
   size_t search_match_len = 0;
+  bool replace_mode = false;
+  bool replace_focus = false;  // false=edit find, true=edit replacement
+  std::string replace_text;
   bool save_as_mode = false;
   std::string save_as_path;
   bool link_edit_mode = false;
@@ -574,12 +577,15 @@ int main(int argc, char** argv) {
             break;
           }
           if (search_mode) {
+            if (replace_mode && !search_query.empty() && replace_focus) {
+              replace_text += ev.text.text;
+              break;
+            }
             search_query += ev.text.text;
             Pane& p = F();
             size_t mlen = 0;
-            // Search from start of current caret for progressive refine
             glyphtoo::Caret from = p.sel.focus;
-            if (from.char_index > 0) from.char_index -= 1;  // allow re-match at caret
+            if (from.char_index > 0) from.char_index -= 1;
             if (auto hit = glyphtoo::find_next(doc_of(p), search_query, from, mlen)) {
               p.sel.anchor = *hit;
               p.sel.focus = *hit;
@@ -627,7 +633,10 @@ int main(int argc, char** argv) {
                 link_edit_href.clear();
               } else if (search_mode) {
                 search_mode = false;
+                replace_mode = false;
+                replace_focus = false;
                 search_query.clear();
+                replace_text.clear();
                 reset_blink();
               } else if (!p.sel.empty()) {
                 p.sel.anchor = p.sel.focus;
@@ -678,9 +687,25 @@ int main(int argc, char** argv) {
             case SDLK_f:
               if (ctrl) {
                 search_mode = true;
+                replace_mode = false;
                 search_query.clear();
                 search_match_len = 0;
                 std::cout << "Leap search: type to find, F3 next, Esc cancel\n";
+                reset_blink();
+              }
+              break;
+
+            case SDLK_h:
+              if (ctrl) {
+                // Leap replace: find with current query (or enter search), then type replacement
+                search_mode = true;
+                replace_mode = true;
+                replace_text.clear();
+                if (search_query.empty()) {
+                  std::cout << "Leap replace: type find text, Tab to edit replacement, Enter replaces\n";
+                } else {
+                  std::cout << "Leap replace: type replacement for \"" << search_query << "\"\n";
+                }
                 reset_blink();
               }
               break;
@@ -706,6 +731,10 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_TAB:
+              if (replace_mode) {
+                replace_focus = !replace_focus;
+                break;
+              }
               if (split) {
                 focus = 1 - focus;
                 reset_blink();
@@ -748,12 +777,12 @@ int main(int argc, char** argv) {
                 break;
               }
               if (search_mode) {
-                if (!search_query.empty()) {
-                  // erase last UTF-8 character roughly
-                  while (!search_query.empty() &&
-                         (static_cast<unsigned char>(search_query.back()) & 0xc0) == 0x80)
-                    search_query.pop_back();
-                  if (!search_query.empty()) search_query.pop_back();
+                std::string& target = (replace_mode && replace_focus) ? replace_text : search_query;
+                if (!target.empty()) {
+                  while (!target.empty() &&
+                         (static_cast<unsigned char>(target.back()) & 0xc0) == 0x80)
+                    target.pop_back();
+                  if (!target.empty()) target.pop_back();
                 }
                 reset_blink();
                 break;
@@ -783,6 +812,31 @@ int main(int argc, char** argv) {
 
             case SDLK_RETURN:
             case SDLK_KP_ENTER:
+              if (replace_mode && search_mode && !search_query.empty()) {
+                Pane& pp = F();
+                glyphtoo::Document& dd = doc_of(pp);
+                if (!pp.sel.empty()) {
+                  edit();
+                  glyphtoo::delete_selection(dd, pp.sel);
+                  if (!replace_text.empty()) {
+                    glyphtoo::insert_text(dd, pp.sel.focus, replace_text);
+                    pp.sel.anchor = pp.sel.focus;
+                  }
+                  needs_layout = true;
+                }
+                // Find next
+                size_t mlen = 0;
+                if (auto hit = glyphtoo::find_next(dd, search_query, pp.sel.focus, mlen)) {
+                  pp.sel.anchor = *hit;
+                  pp.sel.focus = *hit;
+                  for (size_t i = 0; i < mlen; ++i)
+                    glyphtoo::move_right(dd, pp.sel.focus);
+                  search_match_len = mlen;
+                  scroll_caret_into_view(pp);
+                }
+                reset_blink();
+                break;
+              }
               if (link_edit_mode) {
                 if (link_edit_node != glyphtoo::INVALID_NODE) {
                   auto& node = d.get(link_edit_node);
@@ -1047,6 +1101,15 @@ int main(int argc, char** argv) {
               }
               break;
 
+            case SDLK_BACKQUOTE:
+              if (ctrl && !p.sel.empty()) {
+                edit();
+                glyphtoo::apply_style_to_selection(d, p.sel, glyphtoo::InlineKind::Code);
+                needs_layout = true;
+                reset_blink();
+              }
+              break;
+
             case SDLK_k:
               if (ctrl && !p.sel.empty()) {
                 std::string text = glyphtoo::selected_text(d, p.sel);
@@ -1156,6 +1219,23 @@ int main(int argc, char** argv) {
         SDL_Rect bar{pane.x, 0, pane.w, 3};
         SDL_RenderFillRect(sdl, &bar);
       }
+
+      // Scrollbar thumb
+      {
+        float view_h = static_cast<float>(win_h - 28);
+        float content_h = std::max(view_h, pane.layout.content_height);
+        float thumb_h = std::max(24.f, view_h * (view_h / content_h));
+        float track = view_h - thumb_h;
+        float ratio = (max_scroll > 0.f) ? (pane.scroll_y / max_scroll) : 0.f;
+        float thumb_y = ratio * track;
+        int sx = pane.x + pane.w - 6;
+        SDL_SetRenderDrawColor(sdl, 190, 188, 180, 255);
+        SDL_Rect track_r{sx, 0, 5, static_cast<int>(view_h)};
+        SDL_RenderFillRect(sdl, &track_r);
+        SDL_SetRenderDrawColor(sdl, 120, 118, 110, 255);
+        SDL_Rect thumb{sx, static_cast<int>(thumb_y), 5, static_cast<int>(thumb_h)};
+        SDL_RenderFillRect(sdl, &thumb);
+      }
     }
 
     SDL_RenderSetClipRect(sdl, nullptr);
@@ -1200,6 +1280,14 @@ int main(int argc, char** argv) {
         label += link_edit_href.empty() ? "…" : link_edit_href;
         label += "    Enter confirm · Esc cancel";
         tr = 220; tg = 230; tb = 245;
+      } else if (search_mode && replace_mode) {
+        label = "Find: ";
+        label += search_query.empty() ? "…" : search_query;
+        label += "  →  Replace: ";
+        label += replace_text.empty() ? "…" : replace_text;
+        label += replace_focus ? "  [repl] " : "  [find] ";
+        label += " Tab switch · Enter replace · Esc cancel";
+        tr = 220; tg = 230; tb = 245;
       } else if (search_mode) {
         label = "Leap: ";
         label += search_query.empty() ? "…" : search_query;
@@ -1208,7 +1296,7 @@ int main(int argc, char** argv) {
       } else {
         label =
             "Ctrl+S save · Ctrl+Shift+S save as · Ctrl+Z/Y undo · "
-            "Ctrl+S save · Ctrl+Q quit · Ctrl++/- zoom · Ctrl+B/I/K style · Ctrl+E stretch · Ctrl+F leap";
+            "Ctrl+S save · Ctrl+Q quit · Ctrl++/- zoom · Ctrl+B/I/` style · Ctrl+H replace · Ctrl+F leap";
         tr = 70; tg = 68; tb = 62;
       }
       float baseline = static_cast<float>(win_h - 8);

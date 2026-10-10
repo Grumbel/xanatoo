@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **022** (this delivery is **021**)
+Next bundle number: **023** (this delivery is **022**)
 
 ## Status (2026-10-10)
 
@@ -59,6 +59,9 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] Esc clears selection (no longer quits); Ctrl+Q quits with dirty warn
 - [x] Backspace at block start merges with previous paragraph
 - [x] Ctrl++ / Ctrl+- font zoom (clears glyph cache)
+- [x] Scrollbar thumb per pane
+- [x] Ctrl+` code span style
+- [x] Ctrl+H leap-replace (Tab switches find/replace)
 
 ## Open work / next steps
 
@@ -97,4 +100,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-018.*-link-edit-…` — link href edit + wheel + select-all
 - `glyphtoo-019.*-external-stretch-…` — external/ + Ctrl+E stretch
 - `glyphtoo-020.*-multistyle-quit-…` — multi-node style + quit safety
-- `glyphtoo-021.*-merge-zoom-…` — this delivery
+- `glyphtoo-021.*-merge-zoom-…` — merge + zoom
+- `glyphtoo-022.*-scroll-replace-…` — this delivery
