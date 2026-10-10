@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **064** (this delivery is **063**)
+Next bundle number: **065** (this delivery is **064**)
 
 ## Status (2026-10-10)
 
@@ -110,6 +110,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Fix mouse/selection offset (`content_y` + hit-test); triple-click; select_all/node/word
 - [x] Scrollbar / page / scroll-into-view account for toolbar height
 - [x] Classic Gtk2/Clearlooks-ish ImGui theme + SVG→PNG toolbar icons
+- [x] Help as ImGui software window (draggable/resizable, not OS window)
 
 ## Open work / next steps
 
@@ -219,4 +220,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `glyphtoo-060.*-cli-delete-cleanup-…` — CLI extract + delete husks
 - `glyphtoo-061.*-search-highlight-…` — search highlight
 - `glyphtoo-062.*-mouse-select-…` — mouse offset + selection
-- `glyphtoo-063.*-classic-ui-icons-…` — this delivery
+- `glyphtoo-063.*-classic-ui-icons-…` — classic theme + icons
+- `glyphtoo-064.*-help-window-…` — this delivery
