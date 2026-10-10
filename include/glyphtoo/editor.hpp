@@ -130,6 +130,15 @@ std::string selected_text(const Document& doc, const Selection& sel);
 // Concatenate all text of a node (for paste targets / fallbacks).
 std::string node_text(const Document& doc, NodeId id);
 
+// Plain-text word / character / block counts for status display.
+struct DocStats {
+  size_t words = 0;
+  size_t chars = 0;
+  size_t text_blocks = 0;
+  size_t headings = 0;
+};
+DocStats document_stats(const Document& doc);
+
 // Move caret by one codepoint (within the node). Returns false if at boundary.
 bool move_left(Document& doc, Caret& caret);
 bool move_right(Document& doc, Caret& caret);

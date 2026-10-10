@@ -2079,6 +2079,20 @@ int main(int argc, char** argv) {
       }
       float baseline = static_cast<float>(win_h - 8);
       renderer.draw_text(body_font, 10.f, baseline, label, tr, tg, tb);
+
+      // Document stats on the right (idle status only)
+      if (!search_mode && !save_as_mode && !link_edit_mode &&
+          !summary_edit_mode && !help_mode && !outline_mode) {
+        auto st = glyphtoo::document_stats(doc_of(F()));
+        std::string stats = std::to_string(st.words) + " words · " +
+                            std::to_string(st.chars) + " chars";
+        if (st.headings > 0)
+          stats += " · " + std::to_string(st.headings) + " headings";
+        int sw = body_font.measure(stats);
+        renderer.draw_text(body_font,
+                           static_cast<float>(win_w - sw - 12), baseline, stats,
+                           110, 108, 100);
+      }
     }
 
     // Heading outline overlay (Ctrl+Shift+O)

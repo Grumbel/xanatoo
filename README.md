@@ -124,6 +124,7 @@ Supported dialect (intentionally small):
   of document state (data-oriented, Casey Muratori–style).
 - **Selection** — two carets (anchor + focus); highlights derived from glyphs.
 - **Undo** — per-document snapshot stacks.
+- **Status bar** — idle right side shows word / character / heading counts.
 - **Vendored** — `external/stb_image.h` (public domain).
 
 ## License

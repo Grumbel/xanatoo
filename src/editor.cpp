@@ -1543,6 +1543,30 @@ std::string node_text(const Document& doc, NodeId id) {
   return out;
 }
 
+DocStats document_stats(const Document& doc) {
+  DocStats s;
+  std::vector<NodeId> nodes;
+  if (doc.root != INVALID_NODE) collect_text_nodes(doc, doc.root, nodes);
+  for (NodeId id : nodes) {
+    const Node& n = doc.get(id);
+    if (n.kind == NodeKind::Heading) ++s.headings;
+    ++s.text_blocks;
+    const std::string t = node_text(doc, id);
+    s.chars += t.size();
+    bool in_word = false;
+    for (unsigned char c : t) {
+      const bool ws = (c == ' ' || c == '\t' || c == '\n' || c == '\r');
+      if (ws) {
+        in_word = false;
+      } else if (!in_word) {
+        in_word = true;
+        ++s.words;
+      }
+    }
+  }
+  return s;
+}
+
 void compute_diff_marks(const Document& a, const Document& b,
                         std::vector<NodeId>& changed_a,
                         std::vector<NodeId>& changed_b) {
