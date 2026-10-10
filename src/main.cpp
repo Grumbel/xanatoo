@@ -262,17 +262,17 @@ int main(int argc, char** argv) {
 
   auto load_doc = [&](const std::string& path) -> glyphtoo::Document {
     if (path.empty()) {
-      return glyphtoo::parse_markup(FALLBACK_DOC);
+      return glyphtoo::parse_document(FALLBACK_DOC, {});
     }
     std::ifstream in(path);
     if (!in) {
       std::cerr << "Failed to open document: " << path << "\n";
-      return glyphtoo::parse_markup(FALLBACK_DOC);
+      return glyphtoo::parse_document(FALLBACK_DOC, {});
     }
     std::string source((std::istreambuf_iterator<char>(in)),
                        std::istreambuf_iterator<char>());
     std::cout << "Opened: " << path << "\n";
-    return glyphtoo::parse_markup(source);
+    return glyphtoo::parse_document(source, path);
   };
 
   auto parent_dir = [](const std::string& path) -> std::string {
@@ -1348,7 +1348,7 @@ int main(int argc, char** argv) {
               }
               if (save_as_mode) {
                 if (!save_as_path.empty()) {
-                  std::string text = glyphtoo::serialize_markup(d);
+                  std::string text = glyphtoo::serialize_document(d, save_as_path);
                   std::ofstream out(save_as_path);
                   if (!out) {
                     std::cerr << "Failed to save: " << save_as_path << "\n";
@@ -1627,7 +1627,7 @@ int main(int argc, char** argv) {
                   std::cout << "Saving untitled buffer as: " << spath << "\n";
                 }
                 {
-                  std::string text = glyphtoo::serialize_markup(d);
+                  std::string text = glyphtoo::serialize_document(d, spath);
                   std::ofstream out(spath);
                   if (!out) {
                     std::cerr << "Failed to save: " << spath << "\n";
@@ -1954,7 +1954,7 @@ int main(int argc, char** argv) {
             save_as_mode = true;
             save_as_path = "untitled.md";
           } else {
-            std::string text = glyphtoo::serialize_markup(d);
+            std::string text = glyphtoo::serialize_document(d, spath);
             std::ofstream out(spath);
             if (out) {
               out << text;

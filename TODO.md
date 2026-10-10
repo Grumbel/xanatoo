@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **056** (this delivery is **055**)
+Next bundle number: **057** (this delivery is **056**)
 
 ## Status (2026-10-10)
 
@@ -101,6 +101,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Dear ImGui menu bar / toolbar (no X11 syswm on Linux)
 - [x] Structural LCS-based dual-pane diff marks (insertions no longer cascade)
 - [x] Cross-document transclude: `:::include path.md#Heading` (and whole-file)
+- [x] Experimental S-expression serialize/parse (`.sexp` / `.glyph` / `.ss`)
 
 ## Open work / next steps
 
@@ -200,4 +201,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `glyphtoo-052.*-sel-stats-…` — selection status stats
 - `glyphtoo-053.*-imgui-…` — Dear ImGui menu/toolbar
 - `glyphtoo-054.*-imgui-no-x11-…` — ImGui without X11 syswm
-- `glyphtoo-055.*-lcs-diff-xdoc-…` — this delivery (LCS diff + cross-doc include)
+- `glyphtoo-055.*-lcs-diff-xdoc-…` — LCS diff + cross-doc include
+- `glyphtoo-056.*-sexpr-…` — this delivery (S-expression format)

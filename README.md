@@ -16,6 +16,7 @@ nix build
 ./result/bin/glyphtoo notes.md         # open a file
 ./result/bin/glyphtoo a.md b.md        # dual-pane, two documents
 ./glyphtoo examples/welcome.md         # sample with images (from repo root)
+./glyphtoo examples/sample.sexp        # experimental S-expression form
 ```
 
 Or with system packages (CMake ≥ 3.16, SDL2, FreeType):
@@ -51,6 +52,7 @@ Supported dialect (intentionally small):
 | `:::columns` / `:::column weight=1.5` | Side-by-side columns (draggable widths) |
 | `:::include #Heading` | Transclude (live embed of a local passage) |
 | `:::include other.md#H` | Cross-document transclude (path relative to host doc) |
+| `.sexp` / `.glyph` / `.ss` | Experimental S-expression form of the same model |
 
 ## UI chrome
 
