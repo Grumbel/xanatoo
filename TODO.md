@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **007** (this delivery is **006**)
+Next bundle number: **008** (this delivery is **007**)
 
 ## Status (2026-10-10)
 
@@ -27,15 +27,17 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] Open document from CLI (`file.md` / `--open`)
 - [x] Save with Ctrl+S via `serialize_markup`
 - [x] Default font via `GLYPHTOO_FONT` + flake wrapper (DejaVu)
+- [x] Image loading (stb_image: PNG/JPEG/BMP/GIF) + layout/render
+- [x] Dirty flag / asterisk in window title
 
 ## Open work / next steps
 
 1. Multi-node selection delete / copy (currently single-node only)
-2. Proper image loading and display
-3. Multi-view / side-by-side panes (stage 03)
-4. Optional: HarfBuzz for complex scripts
-5. Replace snapshot undo with a tighter operation log if memory becomes an issue
-6. Save-as / untitled buffer when no path was given
+2. Multi-view / side-by-side panes (stage 03)
+3. Optional: HarfBuzz for complex scripts
+4. Replace snapshot undo with a tighter operation log if memory becomes an issue
+5. Save-as / untitled buffer when no path was given
+6. Image drag-resize / interactive placement
 
 ## Design notes
 
@@ -53,4 +55,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-003.*-selection-stretch-…` — selection, stretchtext
 - `glyphtoo-004.*-font-cli-…` — `--font` CLI
 - `glyphtoo-005.*-clipboard-undo-…` — clipboard, undo, blink + NodeId fix
-- `glyphtoo-006.*-open-save-font-…` — this delivery
+- `glyphtoo-006.*-open-save-font-…` — open/save + default font
+- `glyphtoo-007.*-images-dirty-…` — this delivery

@@ -5,8 +5,8 @@
 
 namespace glyphtoo {
 
-LayoutEngine::LayoutEngine(Font& body, Font& heading)
-    : body_(body), heading_(heading) {}
+LayoutEngine::LayoutEngine(Font& body, Font& heading, ImageCache* images)
+    : body_(body), heading_(heading), images_(images) {}
 
 LayoutResult LayoutEngine::layout(const Document& doc, float max_width) {
   LayoutResult result;
@@ -96,9 +96,41 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
     }
 
     case NodeKind::Image: {
-      float h = 100.f;
-      out.boxes.push_back({id, x, y, max_width, h});
-      y += h + 14.f;
+      float disp_w = max_width;
+      float disp_h = 120.f;
+      if (images_ && !node.src.empty()) {
+        const Image& img = images_->get(node.src);
+        if (img.ok && img.width > 0) {
+          float scale = 1.f;
+          if (static_cast<float>(img.width) > max_width) {
+            scale = max_width / static_cast<float>(img.width);
+          }
+          // Cap height so a huge photo does not dominate the view
+          float max_h = 480.f;
+          if (img.height * scale > max_h) {
+            scale = max_h / static_cast<float>(img.height);
+          }
+          disp_w = img.width * scale;
+          disp_h = img.height * scale;
+        }
+      }
+      out.images.push_back({id, x, y, disp_w, disp_h, node.src});
+      out.boxes.push_back({id, x, y, disp_w, disp_h});
+      // Alt text under image if present
+      if (!node.alt.empty()) {
+        float y2 = y + disp_h + 4.f;
+        Node fake = node;
+        fake.kind = NodeKind::Paragraph;
+        fake.spans.clear();
+        InlineSpan s;
+        s.kind = InlineKind::Emphasis;
+        s.text = node.alt;
+        fake.spans.push_back(std::move(s));
+        layout_paragraph(doc, fake, x, y2, max_width, out, body_, FontRole::Body);
+        y = y2 + 10.f;
+      } else {
+        y += disp_h + 14.f;
+      }
       break;
     }
 

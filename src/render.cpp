@@ -5,8 +5,8 @@
 
 namespace glyphtoo {
 
-Renderer::Renderer(SDL_Renderer* sdl, Font& body, Font& heading)
-    : sdl_(sdl), body_(body), heading_(heading) {}
+Renderer::Renderer(SDL_Renderer* sdl, Font& body, Font& heading, ImageCache* images)
+    : sdl_(sdl), body_(body), heading_(heading), images_(images) {}
 
 void Renderer::clear(uint8_t r, uint8_t g, uint8_t b) {
   SDL_SetRenderDrawColor(sdl_, r, g, b, 255);
@@ -14,6 +14,27 @@ void Renderer::clear(uint8_t r, uint8_t g, uint8_t b) {
 }
 
 void Renderer::draw(const LayoutResult& layout, float scroll_y) {
+  // Images first (behind text of the same region)
+  if (images_) {
+    for (const auto& pi : layout.images) {
+      const Image& img = images_->get(pi.src);
+      SDL_Rect dst{
+          static_cast<int>(pi.x),
+          static_cast<int>(pi.y - scroll_y),
+          static_cast<int>(pi.width),
+          static_cast<int>(pi.height)};
+      if (img.ok && img.texture) {
+        SDL_RenderCopy(sdl_, img.texture, nullptr, &dst);
+      } else {
+        // Placeholder frame
+        SDL_SetRenderDrawColor(sdl_, 200, 200, 210, 255);
+        SDL_RenderDrawRect(sdl_, &dst);
+        SDL_SetRenderDrawColor(sdl_, 230, 230, 235, 255);
+        SDL_RenderFillRect(sdl_, &dst);
+      }
+    }
+  }
+
   for (const auto& pg : layout.glyphs) {
     Font& font = (pg.font == FontRole::Heading) ? heading_ : body_;
     const Glyph& g = font.glyph(pg.codepoint);

@@ -8,6 +8,11 @@ HyperCard, and the Canon Cat.
 
 See [PROPOSAL.md](PROPOSAL.md) for the full vision.
 
+## Images
+
+Markup `![alt](path.png)` loads PNG/JPEG/BMP/GIF relative to the
+document directory (via stb_image). Missing files show a placeholder.
+
 ## Status
 
 Stage 01 (document model + layout) is working.

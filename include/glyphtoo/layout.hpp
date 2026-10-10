@@ -4,6 +4,7 @@
 
 #include "glyphtoo/types.hpp"
 #include "glyphtoo/font.hpp"
+#include "glyphtoo/images.hpp"
 #include <vector>
 #include <string>
 
@@ -30,21 +31,32 @@ struct LayoutBox {
   float height = 0.f;
 };
 
+struct PositionedImage {
+  NodeId node = INVALID_NODE;
+  float x = 0.f;
+  float y = 0.f;
+  float width = 0.f;
+  float height = 0.f;
+  std::string src;
+};
+
 struct LayoutResult {
   std::vector<PositionedGlyph> glyphs;
   std::vector<LayoutBox> boxes;
+  std::vector<PositionedImage> images;
   float content_height = 0.f;
 };
 
 class LayoutEngine {
 public:
-  LayoutEngine(Font& body_font, Font& heading_font);
+  LayoutEngine(Font& body_font, Font& heading_font, ImageCache* images = nullptr);
 
   LayoutResult layout(const Document& doc, float max_width);
 
 private:
   Font& body_;
   Font& heading_;
+  ImageCache* images_;
 
   void layout_node(const Document& doc, NodeId id,
                    float x, float& y, float max_width,

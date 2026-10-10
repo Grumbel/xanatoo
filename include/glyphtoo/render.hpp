@@ -5,6 +5,7 @@
 #include "glyphtoo/layout.hpp"
 #include "glyphtoo/font.hpp"
 #include "glyphtoo/editor.hpp"
+#include "glyphtoo/images.hpp"
 #include <SDL.h>
 #include <vector>
 
@@ -12,7 +13,8 @@ namespace glyphtoo {
 
 class Renderer {
 public:
-  Renderer(SDL_Renderer* sdl, Font& body_font, Font& heading_font);
+  Renderer(SDL_Renderer* sdl, Font& body_font, Font& heading_font,
+           ImageCache* images = nullptr);
 
   void clear(uint8_t r, uint8_t g, uint8_t b);
   void draw(const LayoutResult& layout, float scroll_y = 0.f);
@@ -26,6 +28,7 @@ private:
   SDL_Renderer* sdl_;
   Font& body_;
   Font& heading_;
+  ImageCache* images_;
 };
 
 }  // namespace glyphtoo

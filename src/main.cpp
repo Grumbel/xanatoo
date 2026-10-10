@@ -9,6 +9,7 @@
 #include "glyphtoo/render.hpp"
 #include "glyphtoo/parse.hpp"
 #include "glyphtoo/editor.hpp"
+#include "glyphtoo/images.hpp"
 
 #include <SDL.h>
 #include <iostream>
@@ -41,6 +42,9 @@ Click a stretchtext marker (▸ / ▾) to expand or collapse.
 Inspiration: Ted Nelson's *Xanadu*, Bill Atkinson's **HyperCard**, and
 Jef Raskin's *Canon Cat* — a keyboard-driven work processor that treated
 text as a continuous, searchable stream.
+
+Images referenced as `![alt](path.png)` load relative to the document
+directory (PNG, JPEG, BMP, GIF via stb_image).
 )";
 
 static std::string find_system_font() {
@@ -212,14 +216,29 @@ int main(int argc, char** argv) {
   } else {
     doc = glyphtoo::parse_markup(SAMPLE);
   }
-  {
-    std::string title = "glyphtoo";
-    if (!doc_path.empty()) title += " — " + doc_path;
-    SDL_SetWindowTitle(window, title.c_str());
+  glyphtoo::ImageCache images(sdl);
+  if (!doc_path.empty()) {
+    std::filesystem::path p(doc_path);
+    if (p.has_parent_path()) {
+      images.set_base_dir(p.parent_path().string());
+    }
   }
 
-  glyphtoo::LayoutEngine layout_engine(body_font, heading_font);
-  glyphtoo::Renderer renderer(sdl, body_font, heading_font);
+  auto update_title = [&](bool dirty) {
+    std::string title = "glyphtoo";
+    if (!doc_path.empty()) {
+      title += " — ";
+      if (dirty) title += "*";
+      title += doc_path;
+    } else if (dirty) {
+      title += " — *untitled";
+    }
+    SDL_SetWindowTitle(window, title.c_str());
+  };
+  update_title(false);
+
+  glyphtoo::LayoutEngine layout_engine(body_font, heading_font, &images);
+  glyphtoo::Renderer renderer(sdl, body_font, heading_font, &images);
 
   glyphtoo::Selection sel;
   glyphtoo::ensure_valid_caret(doc, sel.focus);
@@ -233,6 +252,7 @@ int main(int argc, char** argv) {
   float preferred_x = 0.f;  // for vertical movement
   bool running = true;
   bool needs_layout = true;
+  bool dirty = false;
   bool dragging = false;
   glyphtoo::LayoutResult layout;
 
@@ -242,6 +262,16 @@ int main(int argc, char** argv) {
 
   auto checkpoint = [&]() {
     history.push(doc, sel);
+  };
+  auto mark_dirty = [&]() {
+    if (!dirty) {
+      dirty = true;
+      update_title(true);
+    }
+  };
+  auto edit = [&]() {
+    checkpoint();
+    mark_dirty();
   };
 
   auto reflow = [&]() {
@@ -281,7 +311,7 @@ int main(int argc, char** argv) {
             if (auto sid = glyphtoo::hit_test_stretch(layout, mx, my, scroll_y)) {
               glyphtoo::NodeId id = *sid;
               if (doc.get(id).kind == glyphtoo::NodeKind::Stretch) {
-                checkpoint();
+                edit();
                 doc.get(id).expanded = !doc.get(id).expanded;
                 needs_layout = true;
                 break;
@@ -316,7 +346,7 @@ int main(int argc, char** argv) {
           break;
 
         case SDL_TEXTINPUT: {
-          checkpoint();
+          edit();
           if (!sel.empty()) {
             glyphtoo::delete_selection(doc, sel);
           }
@@ -344,7 +374,7 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_BACKSPACE:
-              checkpoint();
+              edit();
               if (!sel.empty()) {
                 glyphtoo::delete_selection(doc, sel);
               } else {
@@ -356,7 +386,7 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_DELETE:
-              checkpoint();
+              edit();
               if (!sel.empty()) {
                 glyphtoo::delete_selection(doc, sel);
               } else {
@@ -369,7 +399,7 @@ int main(int argc, char** argv) {
 
             case SDLK_RETURN:
             case SDLK_KP_ENTER:
-              checkpoint();
+              edit();
               if (!sel.empty()) glyphtoo::delete_selection(doc, sel);
               glyphtoo::split_block(doc, sel.focus);
               sel.anchor = sel.focus;
@@ -433,7 +463,7 @@ int main(int argc, char** argv) {
                 std::string text = glyphtoo::selected_text(doc, sel);
                 if (!text.empty()) {
                   SDL_SetClipboardText(text.c_str());
-                  checkpoint();
+                  edit();
                   glyphtoo::delete_selection(doc, sel);
                   needs_layout = true;
                   reset_blink();
@@ -446,7 +476,7 @@ int main(int argc, char** argv) {
                 if (SDL_HasClipboardText()) {
                   char* clip = SDL_GetClipboardText();
                   if (clip && clip[0]) {
-                    checkpoint();
+                    edit();
                     if (!sel.empty()) glyphtoo::delete_selection(doc, sel);
                     glyphtoo::insert_text(doc, sel.focus, clip);
                     sel.anchor = sel.focus;
@@ -488,6 +518,8 @@ int main(int argc, char** argv) {
                   } else {
                     out << text;
                     std::cout << "Saved: " << doc_path << "\n";
+                    dirty = false;
+                    update_title(false);
                   }
                 }
               }
