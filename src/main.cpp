@@ -241,8 +241,13 @@ int main(int argc, char** argv) {
   int help_x = 80, help_y = 60, help_w = 560, help_h = 480;
   bool help_dragging = false;
   int help_drag_dx = 0, help_drag_dy = 0;
+  // Resize: bit flags 1=right, 2=bottom (corner = both)
+  int help_resize = 0;
+  int help_resize_start_x = 0, help_resize_start_y = 0;
+  int help_resize_start_w = 0, help_resize_start_h = 0;
   const int help_title_h = 28;
   const int help_pad = 12;
+  const int help_edge = 6;  // hit thickness for edges/corner
   bool outline_mode = false;  // Ctrl+Shift+O heading outline
   std::vector<glyphtoo::OutlineEntry> outline;
   int outline_sel = 0;
@@ -532,12 +537,33 @@ int main(int argc, char** argv) {
             // Help document software window (window coordinates)
             if (help_mode) {
               int mxw = ev.button.x, myw = ev.button.y;
+              // Resize grips: right edge, bottom edge, SE corner (slightly outside OK)
+              if (mxw >= help_x && mxw <= help_x + help_w + help_edge &&
+                  myw >= help_y && myw <= help_y + help_h + help_edge) {
+                const bool on_right =
+                    mxw >= help_x + help_w - help_edge &&
+                    myw >= help_y + help_title_h &&
+                    myw <= help_y + help_h + help_edge;
+                const bool on_bottom =
+                    myw >= help_y + help_h - help_edge &&
+                    mxw >= help_x && mxw <= help_x + help_w + help_edge;
+                if (on_right || on_bottom) {
+                  help_resize = (on_right ? 1 : 0) | (on_bottom ? 2 : 0);
+                  help_resize_start_x = mxw;
+                  help_resize_start_y = myw;
+                  help_resize_start_w = help_w;
+                  help_resize_start_h = help_h;
+                  help_dragging = false;
+                  break;
+                }
+              }
               if (mxw >= help_x && mxw < help_x + help_w &&
                   myw >= help_y && myw < help_y + help_h) {
                 if (myw < help_y + help_title_h) {
                   if (mxw >= help_x + help_w - 28) {
                     help_mode = false;
                     help_dragging = false;
+                    help_resize = 0;
                   } else {
                     help_dragging = true;
                     help_drag_dx = mxw - help_x;
@@ -793,6 +819,7 @@ int main(int argc, char** argv) {
         case SDL_MOUSEBUTTONUP:
           if (ev.button.button == SDL_BUTTON_LEFT) {
             help_dragging = false;
+            help_resize = 0;
             if (dragging_block && drag_block_id != glyphtoo::INVALID_NODE &&
                 drop_target_id != glyphtoo::INVALID_NODE &&
                 drop_target_id != drag_block_id) {
@@ -832,6 +859,22 @@ int main(int argc, char** argv) {
             help_y = ev.motion.y - help_drag_dy;
             if (help_x < 0) help_x = 0;
             if (help_y < static_cast<int>(ui_top)) help_y = static_cast<int>(ui_top);
+            break;
+          }
+          if (help_resize) {
+            int dx = ev.motion.x - help_resize_start_x;
+            int dy = ev.motion.y - help_resize_start_y;
+            if (help_resize & 1) {
+              help_w = help_resize_start_w + dx;
+              if (help_w < 280) help_w = 280;
+              if (help_w > win_w - 20) help_w = win_w - 20;
+              help_needs_layout = true;
+            }
+            if (help_resize & 2) {
+              help_h = help_resize_start_h + dy;
+              if (help_h < 160) help_h = 160;
+              if (help_h > win_h - 40) help_h = win_h - 40;
+            }
             break;
           }
           if (dragging_scroll) {
@@ -2601,6 +2644,16 @@ int main(int argc, char** argv) {
       const float help_draw_scroll = help_scroll - static_cast<float>(cy);
       renderer.draw(help_layout, help_draw_scroll, static_cast<float>(cx));
       SDL_RenderSetClipRect(sdl, nullptr);
+
+      // SE resize grip (classic desktop affordance)
+      {
+        const int gx = help_x + help_w - 3;
+        const int gy = help_y + help_h - 3;
+        SDL_SetRenderDrawColor(sdl, 120, 118, 110, 255);
+        for (int i = 0; i < 3; ++i) {
+          SDL_RenderDrawLine(sdl, gx - i * 3, gy, gx, gy - i * 3);
+        }
+      }
     }
 
     // Hover preview tooltip for internal #anchor links

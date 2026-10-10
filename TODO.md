@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **067** (this delivery is **066**)
+Next bundle number: **068** (this delivery is **067**)
 
 ## Status (2026-10-10)
 
@@ -228,4 +228,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `glyphtoo-063.*-classic-ui-icons-…` — classic theme + icons
 - `glyphtoo-064.*-help-window-…` — ImGui help window
 - `glyphtoo-065.*-help-document-…` — help as real document
-- `glyphtoo-066.*-help-window-fix-…` — this delivery
+- `glyphtoo-066.*-help-window-fix-…` — help non-modal + Y fix
+- `glyphtoo-067.*-help-resize-…` — this delivery
