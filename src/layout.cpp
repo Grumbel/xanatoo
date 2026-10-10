@@ -13,12 +13,14 @@ namespace glyphtoo {
 namespace {
 
 // Cached external documents for :::include path.md[#anchor].
-// Keyed by resolved absolute path. Loaded lazily; never invalidated in
-// this process (Ctrl+R on the host doc re-layouts and reuses the cache;
-// a future flush can clear it if needed).
-std::map<std::string, Document>& external_doc_cache() {
+// Keyed by resolved absolute path. Cleared via clear_external_doc_cache().
+std::map<std::string, Document>& external_doc_cache_map() {
   static std::map<std::string, Document> cache;
   return cache;
+}
+
+void clear_external_doc_cache_impl() {
+  external_doc_cache_map().clear();
 }
 
 const Document* load_external_doc(const std::string& path) {
@@ -28,7 +30,7 @@ const Document* load_external_doc(const std::string& path) {
     key = std::filesystem::absolute(path).lexically_normal().string();
   } catch (...) {
   }
-  auto& cache = external_doc_cache();
+  auto& cache = external_doc_cache_map();
   auto it = cache.find(key);
   if (it != cache.end()) return &it->second;
 
@@ -36,7 +38,7 @@ const Document* load_external_doc(const std::string& path) {
   if (!in) return nullptr;
   std::string source((std::istreambuf_iterator<char>(in)),
                      std::istreambuf_iterator<char>());
-  Document doc = parse_markup(source);
+  Document doc = parse_document(source, path);
   auto [ins, _] = cache.emplace(key, std::move(doc));
   return &ins->second;
 }
@@ -105,6 +107,10 @@ void split_include_src(const std::string& src, std::string& path_out,
 }
 
 }  // namespace
+
+void clear_external_doc_cache() {
+  clear_external_doc_cache_impl();
+}
 
 LayoutEngine::LayoutEngine(FontSet& fonts, ImageCache* images)
     : fonts_(fonts), images_(images) {}

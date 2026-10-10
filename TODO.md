@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **057** (this delivery is **056**)
+Next bundle number: **058** (this delivery is **057**)
 
 ## Status (2026-10-10)
 
@@ -102,6 +102,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Structural LCS-based dual-pane diff marks (insertions no longer cascade)
 - [x] Cross-document transclude: `:::include path.md#Heading` (and whole-file)
 - [x] Experimental S-expression serialize/parse (`.sexp` / `.glyph` / `.ss`)
+- [x] Sexpr polish: `:id`, merged text spans, compact floats; File→Export; cache flush on reload
 
 ## Open work / next steps
 
@@ -109,7 +110,6 @@ LCS structural diff marks; cross-document `:::include`.
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Editable transclusion mirror (edits on embed write through to source)
 4. Word-level / intra-block diff highlighting
-5. Flush external-doc cache on host Ctrl+R when included files change
 
 ## Design notes
 
@@ -202,4 +202,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `glyphtoo-053.*-imgui-…` — Dear ImGui menu/toolbar
 - `glyphtoo-054.*-imgui-no-x11-…` — ImGui without X11 syswm
 - `glyphtoo-055.*-lcs-diff-xdoc-…` — LCS diff + cross-doc include
-- `glyphtoo-056.*-sexpr-…` — this delivery (S-expression format)
+- `glyphtoo-056.*-sexpr-…` — S-expression format
+- `glyphtoo-057.*-sexpr-polish-…` — this delivery

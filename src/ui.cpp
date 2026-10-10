@@ -80,6 +80,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     if (ImGui::BeginMenu("File")) {
       menu_item_cmd("Save", UiCommand::Save, cmd, true, "Ctrl+S");
       menu_item_cmd("Save As…", UiCommand::SaveAs, cmd, true, "Ctrl+Shift+S");
+      menu_item_cmd("Export as S-expression…", UiCommand::ExportSexpr, cmd, true);
+      menu_item_cmd("Export as Markdown…", UiCommand::ExportMarkdown, cmd, true);
       ImGui::Separator();
       menu_item_cmd("Reload", UiCommand::Reload, cmd, state.has_path, "Ctrl+R");
       menu_item_cmd("Force Reload", UiCommand::ForceReload, cmd, state.has_path,

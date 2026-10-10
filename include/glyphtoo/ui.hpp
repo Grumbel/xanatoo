@@ -13,6 +13,8 @@ enum class UiCommand {
   // File
   Save,
   SaveAs,
+  ExportSexpr,     // Save As with .sexp extension
+  ExportMarkdown,  // Save As with .md extension
   Reload,
   ForceReload,
   Quit,

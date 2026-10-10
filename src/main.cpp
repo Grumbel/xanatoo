@@ -1673,6 +1673,7 @@ int main(int argc, char** argv) {
                                "Ctrl+Shift+R to discard and reload\n";
                   break;
                 }
+                glyphtoo::clear_external_doc_cache();
                 docs[p.doc_index] = load_doc(rpath);
                 dirty_flags[p.doc_index] = false;
                 histories[p.doc_index].reset(docs[p.doc_index], p.sel);
@@ -1970,6 +1971,23 @@ int main(int argc, char** argv) {
           search_mode = false;
           save_as_path = path_of(p).empty() ? "untitled.md" : path_of(p);
           break;
+        case C::ExportSexpr:
+        case C::ExportMarkdown: {
+          save_as_mode = true;
+          search_mode = false;
+          const bool as_sexp = (ui_frame.cmd == C::ExportSexpr);
+          const char* ext = as_sexp ? ".sexp" : ".md";
+          std::string cur = path_of(p);
+          if (cur.empty()) {
+            save_as_path = as_sexp ? "untitled.sexp" : "untitled.md";
+          } else {
+            std::filesystem::path fp(cur);
+            save_as_path = fp.stem().string() + ext;
+            if (fp.has_parent_path() && !fp.parent_path().empty())
+              save_as_path = (fp.parent_path() / (fp.stem().string() + ext)).string();
+          }
+          break;
+        }
         case C::Reload:
         case C::ForceReload: {
           std::string& rpath = path_of(p);
@@ -1978,6 +1996,7 @@ int main(int argc, char** argv) {
             std::cerr << "Reload: unsaved changes — use Force Reload\n";
             break;
           }
+          glyphtoo::clear_external_doc_cache();
           docs[p.doc_index] = load_doc(rpath);
           dirty_flags[p.doc_index] = false;
           histories[p.doc_index].reset(docs[p.doc_index], p.sel);

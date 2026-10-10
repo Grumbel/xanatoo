@@ -5,6 +5,7 @@
 #include <cctype>
 #include <algorithm>
 #include <vector>
+#include <cstdio>
 
 namespace glyphtoo {
 
@@ -837,8 +838,15 @@ void append_inline_from_sexpr(Node& node, const SExpr& e) {
 }
 
 void fill_inlines(Node& node, const std::vector<SExpr>& kids, size_t from) {
-  for (size_t i = from; i < kids.size(); ++i)
+  for (size_t i = from; i < kids.size(); ++i) {
+    // Skip :keyword value pairs (e.g. :id 12) so they never become text.
+    if (kids[i].kind == SExpr::Kind::Atom && !kids[i].text.empty() &&
+        kids[i].text[0] == ':') {
+      if (i + 1 < kids.size()) ++i;
+      continue;
+    }
     append_inline_from_sexpr(node, kids[i]);
+  }
 }
 
 void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e);
@@ -907,13 +915,16 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
 
   if (tag == "include" || tag == "transclude") {
     NodeId n = doc.create(NodeKind::Transclude, parent);
-    if (e.kids.size() >= 2) doc.get(n).src = sexpr_text(e.kids[1]);
+    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr);
+    if (i < e.kids.size()) doc.get(n).src = sexpr_text(e.kids[i]);
     return;
   }
 
   if (tag == "img" || tag == "image") {
     NodeId n = doc.create(NodeKind::Image, parent);
     size_t i = 1;
+    // Optional leading kwargs (:id, …), then src string, then more kwargs.
+    i = read_kwargs(e.kids, i, nullptr, nullptr, nullptr, nullptr, nullptr);
     if (i < e.kids.size()) {
       doc.get(n).src = sexpr_text(e.kids[i]);
       ++i;
@@ -983,6 +994,11 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
       }
       for (; j < item.kids.size(); ++j) {
         const SExpr& part = item.kids[j];
+        if (part.kind == SExpr::Kind::Atom && !part.text.empty() &&
+            part.text[0] == ':') {
+          if (j + 1 < item.kids.size()) ++j;  // skip :id value
+          continue;
+        }
         if (part.kind == SExpr::Kind::List && !part.kids.empty() &&
             part.kids[0].kind == SExpr::Kind::Atom &&
             (part.kids[0].text == "ul" || part.kids[0].text == "ol")) {
@@ -1016,8 +1032,38 @@ void escape_sexpr_string(const std::string& s, std::string& out) {
   out.push_back('"');
 }
 
+// Compact float for :scale / :weight (trim trailing zeros).
+std::string format_sexpr_float(float v) {
+  char buf[64];
+  std::snprintf(buf, sizeof(buf), "%.4f", static_cast<double>(v));
+  std::string s(buf);
+  while (!s.empty() && s.back() == '0') s.pop_back();
+  if (!s.empty() && s.back() == '.') s.pop_back();
+  if (s.empty() || s == "-" || s == "-0") s = "0";
+  return s;
+}
+
+void emit_node_id(const Node& node, std::string& out) {
+  if (node.id == INVALID_NODE) return;
+  out += " :id ";
+  out += std::to_string(static_cast<unsigned long long>(node.id));
+}
+
 void serialize_sexpr_inlines(const Node& node, std::string& out) {
+  // Merge adjacent plain-text spans so output is not a string salad.
+  std::string pending;
+  auto flush_pending = [&]() {
+    if (pending.empty()) return;
+    out.push_back(' ');
+    escape_sexpr_string(pending, out);
+    pending.clear();
+  };
   for (const auto& sp : node.spans) {
+    if (sp.kind == InlineKind::Text) {
+      pending += sp.text;
+      continue;
+    }
+    flush_pending();
     out.push_back(' ');
     switch (sp.kind) {
       case InlineKind::Strong:
@@ -1047,6 +1093,7 @@ void serialize_sexpr_inlines(const Node& node, std::string& out) {
         break;
     }
   }
+  flush_pending();
 }
 
 void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
@@ -1077,6 +1124,7 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
       out += pad;
       out += "(h ";
       out += std::to_string(std::max(1, std::min(6, node.level)));
+      emit_node_id(node, out);
       serialize_sexpr_inlines(node, out);
       out += ")";
       break;
@@ -1085,6 +1133,7 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
     case NodeKind::Paragraph: {
       out += pad;
       out += "(p";
+      emit_node_id(node, out);
       serialize_sexpr_inlines(node, out);
       out += ")";
       break;
@@ -1093,6 +1142,7 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
     case NodeKind::BlockQuote: {
       out += pad;
       out += "(quote";
+      emit_node_id(node, out);
       serialize_sexpr_inlines(node, out);
       out += ")";
       break;
@@ -1100,12 +1150,16 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
 
     case NodeKind::HorizontalRule:
       out += pad;
-      out += "(hr)";
+      out += "(hr";
+      emit_node_id(node, out);
+      out += ")";
       break;
 
     case NodeKind::Transclude: {
       out += pad;
-      out += "(include ";
+      out += "(include";
+      emit_node_id(node, out);
+      out += " ";
       escape_sexpr_string(node.src, out);
       out += ")";
       break;
@@ -1113,7 +1167,9 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
 
     case NodeKind::Image: {
       out += pad;
-      out += "(img ";
+      out += "(img";
+      emit_node_id(node, out);
+      out += " ";
       escape_sexpr_string(node.src, out);
       if (!node.alt.empty()) {
         out += " :alt ";
@@ -1122,7 +1178,7 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
       if (node.display_scale > 0.05f &&
           (node.display_scale < 0.99f || node.display_scale > 1.01f)) {
         out += " :scale ";
-        out += std::to_string(node.display_scale);
+        out += format_sexpr_float(node.display_scale);
       }
       out += ")";
       break;
@@ -1131,6 +1187,7 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
     case NodeKind::Stretch: {
       out += pad;
       out += "(stretch";
+      emit_node_id(node, out);
       if (!node.summary.empty()) {
         out += " :summary ";
         escape_sexpr_string(node.summary, out);
@@ -1145,6 +1202,7 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
     case NodeKind::Columns: {
       out += pad;
       out += "(columns";
+      emit_node_id(node, out);
       serialize_sexpr_children(doc, node, out, indent + 2);
       out += ")";
       break;
@@ -1153,10 +1211,11 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
     case NodeKind::Column: {
       out += pad;
       out += "(column";
+      emit_node_id(node, out);
       if (node.display_scale > 0.05f &&
           (node.display_scale < 0.99f || node.display_scale > 1.01f)) {
         out += " :weight ";
-        out += std::to_string(node.display_scale);
+        out += format_sexpr_float(node.display_scale);
       }
       serialize_sexpr_children(doc, node, out, indent + 2);
       out += ")";
@@ -1166,6 +1225,7 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
     case NodeKind::List: {
       out += pad;
       out += (node.level == 1) ? "(ol" : "(ul";
+      emit_node_id(node, out);
       for (NodeId c : node.children) {
         out.push_back('\n');
         serialize_sexpr_node(doc, c, out, indent + 2);
@@ -1181,6 +1241,7 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
         out.push_back(' ');
         out += std::to_string(node.level);
       }
+      emit_node_id(node, out);
       serialize_sexpr_inlines(node, out);
       for (NodeId c : node.children) {
         if (doc.get(c).kind == NodeKind::List) {

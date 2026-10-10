@@ -53,6 +53,7 @@ Supported dialect (intentionally small):
 | `:::include #Heading` | Transclude (live embed of a local passage) |
 | `:::include other.md#H` | Cross-document transclude (path relative to host doc) |
 | `.sexp` / `.glyph` / `.ss` | Experimental S-expression form of the same model |
+| File → Export as S-expression / Markdown | Save As with the chosen extension |
 
 ## UI chrome
 

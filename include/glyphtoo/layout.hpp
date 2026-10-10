@@ -61,6 +61,10 @@ struct LayoutResult {
   float content_height = 0.f;
 };
 
+// Drop cached external documents used by :::include path.md[…].
+// Call after reload so changed includes are picked up.
+void clear_external_doc_cache();
+
 class LayoutEngine {
 public:
   LayoutEngine(FontSet& fonts, ImageCache* images = nullptr);
