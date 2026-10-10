@@ -1494,6 +1494,26 @@ std::string node_text(const Document& doc, NodeId id) {
   return out;
 }
 
+void compute_diff_marks(const Document& a, const Document& b,
+                        std::vector<NodeId>& changed_a,
+                        std::vector<NodeId>& changed_b) {
+  changed_a.clear();
+  changed_b.clear();
+  std::vector<NodeId> nodes_a, nodes_b;
+  if (a.root != INVALID_NODE) collect_text_nodes(a, a.root, nodes_a);
+  if (b.root != INVALID_NODE) collect_text_nodes(b, b.root, nodes_b);
+
+  const size_t n = std::min(nodes_a.size(), nodes_b.size());
+  for (size_t i = 0; i < n; ++i) {
+    if (node_text(a, nodes_a[i]) != node_text(b, nodes_b[i])) {
+      changed_a.push_back(nodes_a[i]);
+      changed_b.push_back(nodes_b[i]);
+    }
+  }
+  for (size_t i = n; i < nodes_a.size(); ++i) changed_a.push_back(nodes_a[i]);
+  for (size_t i = n; i < nodes_b.size(); ++i) changed_b.push_back(nodes_b[i]);
+}
+
 static std::string slice_node_text(const Node& n, size_t from_span, size_t from_ch,
                                    size_t to_span, size_t to_ch) {
   if (n.spans.empty()) return {};

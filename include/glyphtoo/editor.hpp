@@ -161,6 +161,13 @@ std::optional<std::string> hit_test_link(const Document& doc,
                                          const LayoutResult& layout,
                                          float mx, float my, float scroll_y);
 
+// Sequential text-node comparison for side-by-side version viewing.
+// Fills changed_a / changed_b with NodeIds whose plain text differs (or
+// that have no counterpart in the other document).
+void compute_diff_marks(const Document& a, const Document& b,
+                        std::vector<NodeId>& changed_a,
+                        std::vector<NodeId>& changed_b);
+
 // ---------------------------------------------------------------------------
 // Undo / redo via document snapshots (simple, correct at current scale).
 // ---------------------------------------------------------------------------

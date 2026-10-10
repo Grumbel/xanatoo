@@ -107,6 +107,7 @@ Supported dialect (intentionally small):
 | Key | Action |
 |-----|--------|
 | **Ctrl+\\** | Toggle dual pane |
+| **Ctrl+Shift+D** | Diff marks between two open files (orange bars) |
 | **Tab** | List indent, else focus other pane (or replace field) |
 | Drag gutter | Resize panes |
 | Drag scrollbar | Scroll |

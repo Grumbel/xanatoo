@@ -409,6 +409,9 @@ int main(int argc, char** argv) {
   std::string summary_edit_text;
   glyphtoo::NodeId summary_edit_node = glyphtoo::INVALID_NODE;
   bool help_mode = false;  // F1 keyboard reference overlay
+  // Side-by-side version marks (two independent documents)
+  bool diff_mode = false;
+  std::vector<glyphtoo::NodeId> diff_marks[2];
   // Hovered link href (shown in status bar when not in a modal mode)
   std::string hovered_href;
   std::string hovered_preview;  // internal #anchor target snippet
@@ -418,6 +421,13 @@ int main(int argc, char** argv) {
   auto reset_blink = [&]() { caret_blink_start = SDL_GetTicks(); };
 
   auto F = [&]() -> Pane& { return panes[focus]; };
+
+  auto refresh_diff = [&]() {
+    diff_marks[0].clear();
+    diff_marks[1].clear();
+    if (!diff_mode || shared_doc || paths[1].empty()) return;
+    glyphtoo::compute_diff_marks(docs[0], docs[1], diff_marks[0], diff_marks[1]);
+  };
 
   auto checkpoint = [&]() {
     Pane& p = F();
@@ -457,6 +467,7 @@ int main(int argc, char** argv) {
           doc_of(panes[1]), static_cast<float>(panes[1].w), base_of(panes[1]));
     }
     needs_layout = false;
+    refresh_diff();
   };
 
   auto scroll_caret_into_view = [&](Pane& p) {
@@ -1455,6 +1466,22 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_d:
+              if (ctrl && shift) {
+                // Side-by-side version marks (needs two independent docs)
+                if (!split) {
+                  split = true;
+                  needs_layout = true;
+                }
+                if (shared_doc || paths[1].empty()) {
+                  std::cout << "Diff marks need two open files "
+                               "(glyphtoo a.md b.md).\n";
+                } else {
+                  diff_mode = !diff_mode;
+                  refresh_diff();
+                  std::cout << (diff_mode ? "Diff marks on\n" : "Diff marks off\n");
+                }
+                break;
+              }
               if (ctrl) {
                 edit();
                 if (auto nid = glyphtoo::duplicate_block(d, p.sel.focus.node)) {
@@ -1702,6 +1729,35 @@ int main(int argc, char** argv) {
         SDL_RenderFillRect(sdl, &bar);
       }
 
+      // Version-diff marks (orange bars on changed text blocks)
+      if (diff_mode && !shared_doc) {
+        int di = pane.doc_index;
+        const auto& marks = diff_marks[di];
+        if (!marks.empty()) {
+          SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+          for (const auto& box : pane.layout.boxes) {
+            bool hit = false;
+            for (glyphtoo::NodeId id : marks) {
+              if (id == box.node) {
+                hit = true;
+                break;
+              }
+            }
+            if (!hit) continue;
+            int by = static_cast<int>(box.y - pane.scroll_y);
+            int bh = static_cast<int>(box.height);
+            if (by + bh < 0 || by > win_h - 28) continue;
+            SDL_SetRenderDrawColor(sdl, 200, 120, 40, 200);
+            SDL_Rect mark{pane.x + 2, by, 4, bh};
+            SDL_RenderFillRect(sdl, &mark);
+            SDL_SetRenderDrawColor(sdl, 200, 120, 40, 40);
+            SDL_Rect wash{pane.x, by, pane.w - 6, bh};
+            SDL_RenderFillRect(sdl, &wash);
+          }
+          SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+        }
+      }
+
       // Column gutters (subtle vertical handles)
       for (const auto& gap : pane.layout.column_gaps) {
         int gx = pane.x + static_cast<int>(gap.x);
@@ -1876,6 +1932,9 @@ int main(int argc, char** argv) {
       } else if (dragging_col_gap) {
         label = "Resizing columns — drag to adjust relative widths";
         tr = 40; tg = 90; tb = 160;
+      } else if (diff_mode) {
+        label = "Diff marks on — orange bars mark passages that differ · Ctrl+Shift+D toggles";
+        tr = 160; tg = 90; tb = 30;
       } else if (!hovered_href.empty()) {
         label = "Link: ";
         label += hovered_href;
@@ -1952,6 +2011,7 @@ int main(int argc, char** argv) {
           "  Ctrl+\\              Toggle dual pane",
           "  Tab (not on list)   Focus other pane",
           "  Dual-pane link      Syncs both views + connector",
+          "  Ctrl+Shift+D        Diff marks (two open files)",
           "  Drag left margin    Reorder / reparent block",
           "  Drag column gutter  Resize column widths",
           "  Drag image corner   Resize image",

@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **041** (this delivery is **040**)
+Next bundle number: **042** (this delivery is **041**)
 
 ## Status (2026-10-10)
 
-Stage **01**–**04** core features in place; dual-pane visual links.
+Stage **01**–**04** core features in place; dual-pane diff marks.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -86,13 +86,14 @@ Stage **01**–**04** core features in place; dual-pane visual links.
 - [x] F1 keyboard reference overlay (Esc/F1 to close)
 - [x] Sample document moved to `examples/welcome.md` + PNG images
 - [x] Dual-pane visual links: sync jump, Ctrl+Click other pane, connector line
+- [x] Side-by-side diff marks (Ctrl+Shift+D, two independent files)
 
 ## Open work / next steps
 
 1. Optional: HarfBuzz for complex scripts
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Richer transclusion (editable mirror, cross-document includes)
-4. Version comparison between two files / snapshots
+4. Finer-grained diff (word-level / structural tree diff)
 
 ## Design notes
 
@@ -165,4 +166,5 @@ Stage **01**–**04** core features in place; dual-pane visual links.
 - `glyphtoo-037.*-nested-lists-…` — nested lists
 - `glyphtoo-038.*-f1-help-…` — F1 help overlay
 - `glyphtoo-039.*-example-doc-…` — examples/welcome.md + images
-- `glyphtoo-040.*-pane-links-…` — this delivery
+- `glyphtoo-040.*-pane-links-…` — dual-pane visual links
+- `glyphtoo-041.*-diff-marks-…` — this delivery
