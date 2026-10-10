@@ -13,8 +13,7 @@ namespace glyphtoo {
 
 class Renderer {
 public:
-  Renderer(SDL_Renderer* sdl, Font& body_font, Font& heading_font,
-           ImageCache* images = nullptr);
+  Renderer(SDL_Renderer* sdl, FontSet& fonts, ImageCache* images = nullptr);
 
   void clear(uint8_t r, uint8_t g, uint8_t b);
   // origin_x shifts all content horizontally (for multi-pane views).
@@ -31,8 +30,7 @@ public:
 
 private:
   SDL_Renderer* sdl_;
-  Font& body_;
-  Font& heading_;
+  FontSet& fonts_;
   ImageCache* images_;
 };
 

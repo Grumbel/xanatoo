@@ -2,8 +2,9 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "glyphtoo/font.hpp"
-#include <stdexcept>
+#include <fontconfig/fontconfig.h>
 #include <iostream>
+#include <cstring>
 
 namespace glyphtoo {
 
@@ -26,7 +27,17 @@ Font::~Font() {
 
 bool Font::load(const std::string& path, int pixel_size, SDL_Renderer* renderer) {
   renderer_ = renderer;
-  if (FT_Init_FreeType(&library_)) {
+  path_ = path;
+  // Clear previous face if reloading
+  for (auto& [cp, g] : cache_) {
+    if (g.texture) SDL_DestroyTexture(g.texture);
+  }
+  cache_.clear();
+  if (face_) {
+    FT_Done_Face(face_);
+    face_ = nullptr;
+  }
+  if (!library_ && FT_Init_FreeType(&library_)) {
     std::cerr << "FreeType init failed\n";
     return false;
   }
@@ -129,6 +140,174 @@ int Font::measure(const std::string& text) {
     width += g.advance >> 6;
   }
   return width;
+}
+
+std::string fontconfig_find(const std::string& family, int weight, int slant) {
+  if (!FcInit()) return {};
+
+  FcPattern* pat = FcPatternCreate();
+  if (!pat) return {};
+  if (!family.empty())
+    FcPatternAddString(pat, FC_FAMILY, reinterpret_cast<const FcChar8*>(family.c_str()));
+  FcPatternAddInteger(pat, FC_WEIGHT,
+                      weight ? FC_WEIGHT_BOLD : FC_WEIGHT_REGULAR);
+  FcPatternAddInteger(pat, FC_SLANT,
+                      slant ? FC_SLANT_ITALIC : FC_SLANT_ROMAN);
+  FcPatternAddString(pat, FC_STYLE, reinterpret_cast<const FcChar8*>(""));
+  FcConfigSubstitute(nullptr, pat, FcMatchPattern);
+  FcDefaultSubstitute(pat);
+
+  FcResult result = FcResultNoMatch;
+  FcPattern* match = FcFontMatch(nullptr, pat, &result);
+  FcPatternDestroy(pat);
+  if (!match) return {};
+
+  FcChar8* file = nullptr;
+  std::string path;
+  if (FcPatternGetString(match, FC_FILE, 0, &file) == FcResultMatch && file) {
+    path = reinterpret_cast<const char*>(file);
+  }
+  FcPatternDestroy(match);
+  return path;
+}
+
+std::string fontconfig_family_from_file(const std::string& path) {
+  if (path.empty() || !FcInit()) return {};
+  FcPattern* pat = FcPatternCreate();
+  if (!pat) return {};
+  FcPatternAddString(pat, FC_FILE, reinterpret_cast<const FcChar8*>(path.c_str()));
+  FcConfigSubstitute(nullptr, pat, FcMatchPattern);
+  FcDefaultSubstitute(pat);
+  FcResult result = FcResultNoMatch;
+  FcPattern* match = FcFontMatch(nullptr, pat, &result);
+  FcPatternDestroy(pat);
+  if (!match) return {};
+  FcChar8* family = nullptr;
+  std::string name;
+  if (FcPatternGetString(match, FC_FAMILY, 0, &family) == FcResultMatch && family) {
+    name = reinterpret_cast<const char*>(family);
+  }
+  FcPatternDestroy(match);
+  return name;
+}
+
+static bool try_load(Font& font, const std::string& path, int px,
+                     SDL_Renderer* r, const char* label) {
+  if (path.empty()) return false;
+  if (font.load(path, px, r)) {
+    std::cout << "Font (" << label << "): " << path << "\n";
+    return true;
+  }
+  return false;
+}
+
+bool FontSet::load(SDL_Renderer* renderer, const std::string& preferred_path,
+                   int body_px, int heading_px) {
+  std::string family;
+  if (!preferred_path.empty()) {
+    family = fontconfig_family_from_file(preferred_path);
+    if (family.empty()) {
+      // Fall back: use the path for regular; FontConfig for variants by guessing
+      // common DejaVu/Liberation naming from the basename.
+      family = "DejaVu Sans";
+    }
+  }
+  if (family.empty()) {
+    // Prefer widely available families
+    const char* candidates[] = {
+        "DejaVu Sans", "Liberation Sans", "FreeSans", "Noto Sans",
+        "Ubuntu", "Cantarell", "Arial", "Helvetica", nullptr};
+    for (const char** p = candidates; *p; ++p) {
+      std::string path = fontconfig_find(*p, 0, 0);
+      if (!path.empty()) {
+        family = *p;
+        break;
+      }
+    }
+  }
+  if (family.empty()) family = "sans-serif";
+
+  std::string reg = preferred_path;
+  if (reg.empty() || !try_load(regular, reg, body_px, renderer, "regular")) {
+    reg = fontconfig_find(family, 0, 0);
+    if (!try_load(regular, reg, body_px, renderer, "regular")) {
+      std::cerr << "Failed to load a regular body font (family=" << family << ")\n";
+      return false;
+    }
+  }
+
+  std::string b = fontconfig_find(family, 1, 0);
+  if (!try_load(bold, b, body_px, renderer, "bold")) {
+    // Soft-fail: share regular face metrics by loading same file
+    try_load(bold, regular.path(), body_px, renderer, "bold(fallback)");
+  }
+  std::string it = fontconfig_find(family, 0, 1);
+  if (!try_load(italic, it, body_px, renderer, "italic")) {
+    try_load(italic, regular.path(), body_px, renderer, "italic(fallback)");
+  }
+  std::string bi = fontconfig_find(family, 1, 1);
+  if (!try_load(bold_italic, bi, body_px, renderer, "bold-italic")) {
+    if (bold.loaded())
+      try_load(bold_italic, bold.path(), body_px, renderer, "bold-italic(fallback)");
+    else
+      try_load(bold_italic, regular.path(), body_px, renderer, "bold-italic(fallback)");
+  }
+
+  // Heading: same family, bold if available, larger size applied via set_sizes
+  std::string h = bold.loaded() ? bold.path() : regular.path();
+  if (!try_load(heading, h, heading_px, renderer, "heading")) {
+    try_load(heading, regular.path(), heading_px, renderer, "heading(fallback)");
+  }
+
+  // Monospace for code
+  const char* mono_families[] = {
+      "DejaVu Sans Mono", "Liberation Mono", "FreeMono", "Noto Sans Mono",
+      "Ubuntu Mono", "Courier New", "monospace", nullptr};
+  bool mono_ok = false;
+  for (const char** p = mono_families; *p; ++p) {
+    std::string mp = fontconfig_find(*p, 0, 0);
+    if (try_load(mono, mp, body_px, renderer, "mono")) {
+      mono_ok = true;
+      break;
+    }
+  }
+  if (!mono_ok) {
+    try_load(mono, regular.path(), body_px, renderer, "mono(fallback)");
+  }
+
+  return regular.loaded();
+}
+
+void FontSet::set_sizes(int body_px, int heading_px) {
+  if (regular.loaded()) regular.set_size(body_px);
+  if (bold.loaded()) bold.set_size(body_px);
+  if (italic.loaded()) italic.set_size(body_px);
+  if (bold_italic.loaded()) bold_italic.set_size(body_px);
+  if (heading.loaded()) heading.set_size(heading_px);
+  if (mono.loaded()) mono.set_size(body_px);
+}
+
+Font& FontSet::pick(FontRole role) {
+  switch (role) {
+    case FontRole::BodyBold:
+      return bold.loaded() ? bold : regular;
+    case FontRole::BodyItalic:
+      return italic.loaded() ? italic : regular;
+    case FontRole::BodyBoldItalic:
+      return bold_italic.loaded() ? bold_italic
+             : (bold.loaded() ? bold : regular);
+    case FontRole::Heading:
+      return heading.loaded() ? heading : regular;
+    case FontRole::Code:
+      return mono.loaded() ? mono : regular;
+    case FontRole::Body:
+    default:
+      return regular;
+  }
+}
+
+const Font& FontSet::pick(FontRole role) const {
+  return const_cast<FontSet*>(this)->pick(role);
 }
 
 }  // namespace glyphtoo

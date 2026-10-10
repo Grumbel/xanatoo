@@ -9,6 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(SDL2 REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(PkgConfig REQUIRED)
+pkg_check_modules(FONTCONFIG REQUIRED fontconfig)
 
 add_executable(glyphtoo
   src/main.cpp
@@ -26,11 +27,13 @@ target_include_directories(glyphtoo PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/external
   ${SDL2_INCLUDE_DIRS}
   ${FREETYPE_INCLUDE_DIRS}
+  ${FONTCONFIG_INCLUDE_DIRS}
 )
 
 target_link_libraries(glyphtoo PRIVATE
   ${SDL2_LIBRARIES}
   Freetype::Freetype
+  ${FONTCONFIG_LIBRARIES}
 )
 
 if(UNIX AND NOT APPLE)

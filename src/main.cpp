@@ -140,7 +140,8 @@ static void print_usage(const char* argv0) {
       << "Ctrl+S saves the focused pane's document.\n"
       << "Ctrl+\\ toggles split; drag the gutter to resize panes.\n"
       << "\n"
-      << "Font resolution order: --font, GLYPHTOO_FONT env, system search.\n";
+      << "Font resolution: --font / GLYPHTOO_FONT, then FontConfig\n"
+      << "(regular/bold/italic/mono faces for styled text).\n";
 }
 
 struct Options {
@@ -236,37 +237,26 @@ int main(int argc, char** argv) {
       if (env[0] != '\0') font_path = env;
     }
   }
-  if (font_path.empty()) {
-    font_path = find_system_font();
+  // Preferred path is optional — FontConfig resolves a full family set.
+  if (!font_path.empty() && !fs::exists(font_path)) {
+    std::cerr << "Font file does not exist: " << font_path
+              << " (falling back to FontConfig)\n";
+    font_path.clear();
   }
-  if (font_path.empty()) {
-    std::cerr << "No font found. Pass one with --font <path.ttf>\n"
-              << "(tried common DejaVu / Liberation / FreeSans locations)\n";
-    SDL_DestroyRenderer(sdl);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
-    return 1;
-  }
-  if (!fs::exists(font_path)) {
-    std::cerr << "Font file does not exist: " << font_path << "\n";
-    SDL_DestroyRenderer(sdl);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
-    return 1;
-  }
-  std::cout << "Font: " << font_path << "\n";
 
   int body_px = 17;
   int heading_px = 26;
-  glyphtoo::Font body_font, heading_font;
-  if (!body_font.load(font_path, body_px, sdl) ||
-      !heading_font.load(font_path, heading_px, sdl)) {
-    std::cerr << "Failed to load font: " << font_path << "\n";
+  glyphtoo::FontSet fonts;
+  if (!fonts.load(sdl, font_path, body_px, heading_px)) {
+    std::cerr << "Failed to load fonts via FontConfig. "
+                 "Pass a TTF with --font or install DejaVu/Liberation.\n";
     SDL_DestroyRenderer(sdl);
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 1;
   }
+  glyphtoo::Font& body_font = fonts.regular;
+  glyphtoo::Font& heading_font = fonts.heading;
 
 
   auto load_doc = [&](const std::string& path) -> glyphtoo::Document {
@@ -326,8 +316,8 @@ int main(int argc, char** argv) {
   };
   update_title();
 
-  glyphtoo::LayoutEngine layout_engine(body_font, heading_font, &images);
-  glyphtoo::Renderer renderer(sdl, body_font, heading_font, &images);
+  glyphtoo::LayoutEngine layout_engine(fonts, &images);
+  glyphtoo::Renderer renderer(sdl, fonts, &images);
 
   struct Pane {
     int doc_index = 0;  // which docs[] entry
@@ -1059,8 +1049,7 @@ int main(int argc, char** argv) {
               if (ctrl) {
                 body_px = std::min(48, body_px + 1);
                 heading_px = std::min(64, heading_px + 2);
-                body_font.set_size(body_px);
-                heading_font.set_size(heading_px);
+                fonts.set_sizes(body_px, heading_px);
                 needs_layout = true;
               }
               break;
@@ -1081,8 +1070,7 @@ int main(int argc, char** argv) {
               if (ctrl) {
                 body_px = std::max(10, body_px - 1);
                 heading_px = std::max(14, heading_px - 2);
-                body_font.set_size(body_px);
-                heading_font.set_size(heading_px);
+                fonts.set_sizes(body_px, heading_px);
                 needs_layout = true;
               }
               break;

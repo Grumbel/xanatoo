@@ -5,8 +5,19 @@
 
 namespace glyphtoo {
 
-LayoutEngine::LayoutEngine(Font& body, Font& heading, ImageCache* images)
-    : body_(body), heading_(heading), images_(images) {}
+LayoutEngine::LayoutEngine(FontSet& fonts, ImageCache* images)
+    : fonts_(fonts), images_(images) {}
+
+static FontRole style_role(FontRole base, InlineKind kind) {
+  if (kind == InlineKind::Code) return FontRole::Code;
+  if (base == FontRole::Heading) return FontRole::Heading;
+  const bool strong = (kind == InlineKind::Strong);
+  const bool emph = (kind == InlineKind::Emphasis);
+  if (strong && emph) return FontRole::BodyBoldItalic;
+  if (strong) return FontRole::BodyBold;
+  if (emph) return FontRole::BodyItalic;
+  return FontRole::Body;
+}
 
 static void decode_utf8(const std::string& text, std::vector<uint32_t>& out);
 
@@ -146,7 +157,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         s.text = node.summary.empty() ? "▸ …" : ("▸ " + node.summary);
         fake.spans.push_back(std::move(s));
         float start_y = y;
-        layout_paragraph(doc, fake, x, y, max_width, out, body_, FontRole::Body);
+        layout_paragraph(doc, fake, x, y, max_width, out, FontRole::Body);
         // Rewrite glyph node ids back to the stretch node so hit-testing works
         for (auto& g : out.glyphs) {
           if (g.node == fake.id) g.node = id;
@@ -164,7 +175,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           s.text = "▾ " + node.summary;
           fake.spans.push_back(std::move(s));
           float start_y = y;
-          layout_paragraph(doc, fake, x, y, max_width, out, body_, FontRole::Body);
+          layout_paragraph(doc, fake, x, y, max_width, out, FontRole::Body);
           for (auto& g : out.glyphs) {
             if (g.node == fake.id) g.node = id;
           }
@@ -179,11 +190,10 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
     }
 
     case NodeKind::Heading: {
-      Font& f = (node.level <= 2) ? heading_ : body_;
       FontRole role = (node.level <= 2) ? FontRole::Heading : FontRole::Body;
       float start_y = y;
       y += (node.level == 1) ? 12.f : 8.f;
-      layout_paragraph(doc, node, x, y, max_width, out, f, role);
+      layout_paragraph(doc, node, x, y, max_width, out, role);
       y += (node.level == 1) ? 14.f : 10.f;
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
@@ -191,7 +201,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
     case NodeKind::Paragraph: {
       float start_y = y;
-      layout_paragraph(doc, node, x, y, max_width, out, body_, FontRole::Body);
+      layout_paragraph(doc, node, x, y, max_width, out, FontRole::Body);
       y += 14.f;
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
@@ -207,7 +217,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         text_x = x + 8.f;
         text_w = max_width - 8.f;
       }
-      layout_paragraph(doc, node, text_x, y, text_w, out, body_, FontRole::Body);
+      layout_paragraph(doc, node, text_x, y, text_w, out, FontRole::Body);
       y += 12.f;
       out.quote_bars.push_back({id, x, start_y, bar_w, y - start_y});
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
@@ -223,9 +233,10 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       std::vector<uint32_t> m_cps;
       decode_utf8(marker, m_cps);
       float mx = x;
-      float baseline = y + static_cast<float>(body_.ascender());
+      Font& marker_font = fonts_.pick(FontRole::Body);
+      float baseline = y + static_cast<float>(marker_font.ascender());
       for (uint32_t cp : m_cps) {
-        const Glyph& g = body_.glyph(cp);
+        const Glyph& g = marker_font.glyph(cp);
         PositionedGlyph pg;
         pg.codepoint = cp;
         pg.x = mx + static_cast<float>(g.bearing_x);
@@ -244,7 +255,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         text_x = x + 16.f;
         text_w = max_width - 16.f;
       }
-      layout_paragraph(doc, node, text_x, y, text_w, out, body_, FontRole::Body);
+      layout_paragraph(doc, node, text_x, y, text_w, out, FontRole::Body);
       // Nested lists under this item
       for (NodeId child : node.children) {
         if (doc.get(child).kind == NodeKind::List) {
@@ -294,7 +305,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         s.kind = InlineKind::Emphasis;
         s.text = node.alt;
         fake.spans.push_back(std::move(s));
-        layout_paragraph(doc, fake, x, y2, max_width, out, body_, FontRole::Body);
+        layout_paragraph(doc, fake, x, y2, max_width, out, FontRole::Body);
         y = y2 + 10.f;
       } else {
         y += disp_h + 14.f;
@@ -380,8 +391,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         s.text += href.empty() ? std::string{"(no target)"} : href;
         label.spans.push_back(std::move(s));
         layout_paragraph(doc, label, x + bar_w + indent, y,
-                         max_width - bar_w - indent, out, body_,
-                         FontRole::Body);
+                         max_width - bar_w - indent, out, FontRole::Body);
         y += 4.f;
       }
 
@@ -399,8 +409,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           body.spans.push_back(std::move(s));
         }
         layout_paragraph(doc, body, x + bar_w + indent, y,
-                         max_width - bar_w - indent, out, body_,
-                         FontRole::Body);
+                         max_width - bar_w - indent, out, FontRole::Body);
       }
       y += 10.f;
       out.quote_bars.push_back({id, x, start_y, bar_w, y - start_y});
@@ -442,37 +451,41 @@ static void decode_utf8(const std::string& text,
 
 void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
                                     float x, float& y, float max_width,
-                                    LayoutResult& out, Font& font,
-                                    FontRole role) {
+                                    LayoutResult& out, FontRole base_role) {
   (void)doc;
   struct CharInfo {
     uint32_t cp;
     size_t span_idx;
     size_t char_idx;
     InlineKind kind;
+    FontRole role;
   };
   std::vector<CharInfo> chars;
   for (size_t si = 0; si < node.spans.size(); ++si) {
     std::vector<uint32_t> cps;
     decode_utf8(node.spans[si].text, cps);
+    FontRole r = style_role(base_role, node.spans[si].kind);
     for (size_t ci = 0; ci < cps.size(); ++ci) {
-      chars.push_back({cps[ci], si, ci, node.spans[si].kind});
+      chars.push_back({cps[ci], si, ci, node.spans[si].kind, r});
     }
   }
 
+  Font& metrics = fonts_.pick(base_role == FontRole::Heading ? FontRole::Heading
+                                                             : FontRole::Body);
   if (chars.empty()) {
-    y += font.line_height();
+    y += metrics.line_height();
     return;
   }
 
   float pen_x = x;
-  float baseline = y + font.ascender();
+  float baseline = y + metrics.ascender();
   float line_start = x;
   size_t line_start_idx = 0;
 
   auto break_line = [&](size_t end_idx) {
     float lx = line_start;
     for (size_t i = line_start_idx; i < end_idx; ++i) {
+      Font& font = fonts_.pick(chars[i].role);
       const Glyph& g = font.glyph(chars[i].cp);
       PositionedGlyph pg;
       pg.codepoint = chars[i].cp;
@@ -482,17 +495,18 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
       pg.span_index = chars[i].span_idx;
       pg.char_index = chars[i].char_idx;
       pg.kind = chars[i].kind;
-      pg.font = role;
+      pg.font = chars[i].role;
       out.glyphs.push_back(pg);
       lx += static_cast<float>(g.advance >> 6);
     }
-    baseline += font.line_height() * 1.3f;
+    baseline += metrics.line_height() * 1.3f;
     pen_x = x;
     line_start = x;
     line_start_idx = end_idx;
   };
 
   for (size_t i = 0; i < chars.size(); ++i) {
+    Font& font = fonts_.pick(chars[i].role);
     const Glyph& g = font.glyph(chars[i].cp);
     float adv = static_cast<float>(g.advance >> 6);
 
@@ -516,7 +530,7 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     break_line(chars.size());
   }
 
-  y = baseline - font.ascender() + font.line_height() * 0.2f;
+  y = baseline - metrics.ascender() + metrics.line_height() * 0.2f;
 }
 
 }  // namespace glyphtoo

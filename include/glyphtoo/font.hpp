@@ -37,6 +37,8 @@ public:
   int ascender() const { return ascender_; }
   int descender() const { return descender_; }
   int pixel_size() const { return pixel_size_; }
+  bool loaded() const { return face_ != nullptr; }
+  const std::string& path() const { return path_; }
 
   // Measure a UTF-8 string width in pixels
   int measure(const std::string& text);
@@ -45,6 +47,7 @@ private:
   FT_Library library_ = nullptr;
   FT_Face face_ = nullptr;
   SDL_Renderer* renderer_ = nullptr;
+  std::string path_;
   int pixel_size_ = 0;
   int line_height_ = 0;
   int ascender_ = 0;
@@ -52,6 +55,43 @@ private:
   std::unordered_map<uint32_t, Glyph> cache_;
 
   Glyph load_glyph(uint32_t codepoint);
+};
+
+// Which face to use when laying out / drawing a glyph.
+enum class FontRole : uint8_t {
+  Body = 0,
+  BodyBold,
+  BodyItalic,
+  BodyBoldItalic,
+  Heading,
+  Code,
+};
+
+// Resolve a font file via FontConfig (family + weight + slant).
+// weight: 0=regular, 1=bold; slant: 0=roman, 1=italic.
+std::string fontconfig_find(const std::string& family, int weight, int slant);
+
+// Infer a family name from a user-supplied TTF/OTF path (best-effort).
+std::string fontconfig_family_from_file(const std::string& path);
+
+// Body regular/bold/italic + heading + monospace for code.
+class FontSet {
+public:
+  Font regular;
+  Font bold;
+  Font italic;
+  Font bold_italic;
+  Font heading;
+  Font mono;
+
+  // preferred_path may be empty (FontConfig defaults) or a concrete .ttf.
+  bool load(SDL_Renderer* renderer, const std::string& preferred_path,
+            int body_px, int heading_px);
+
+  void set_sizes(int body_px, int heading_px);
+
+  Font& pick(FontRole role);
+  const Font& pick(FontRole role) const;
 };
 
 }  // namespace glyphtoo

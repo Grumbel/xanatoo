@@ -27,6 +27,7 @@
             buildInputs = with pkgs; [
               SDL2
               freetype
+              fontconfig
             ];
 
             cmakeFlags = [
@@ -70,6 +71,7 @@
               pkg-config
               SDL2
               freetype
+              fontconfig
               dejavu_fonts
               gdb
               clang-tools

@@ -10,8 +10,6 @@
 
 namespace glyphtoo {
 
-enum class FontRole : uint8_t { Body, Heading };
-
 struct PositionedGlyph {
   uint32_t codepoint = 0;
   float x = 0.f;
@@ -65,14 +63,13 @@ struct LayoutResult {
 
 class LayoutEngine {
 public:
-  LayoutEngine(Font& body_font, Font& heading_font, ImageCache* images = nullptr);
+  LayoutEngine(FontSet& fonts, ImageCache* images = nullptr);
 
   LayoutResult layout(const Document& doc, float max_width,
                       const std::string& image_base = {});
 
 private:
-  Font& body_;
-  Font& heading_;
+  FontSet& fonts_;
   ImageCache* images_;
 
   std::string image_base_;
@@ -82,7 +79,7 @@ private:
                    LayoutResult& out);
   void layout_paragraph(const Document& doc, const Node& node,
                         float x, float& y, float max_width,
-                        LayoutResult& out, Font& font, FontRole role);
+                        LayoutResult& out, FontRole base_role);
 };
 
 }  // namespace glyphtoo

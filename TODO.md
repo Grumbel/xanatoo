@@ -93,6 +93,7 @@ Stage **01**–**04** core features in place; insert image by path.
 - [x] Page Up/Down move caret; Ctrl+Home/End document extremes
 - [x] Paste plain text splits blank lines into sibling paragraphs
 - [x] Insert image (Ctrl+Shift+I path prompt)
+- [x] FontConfig: bold/italic/bold-italic/mono faces for styled text
 
 ## Open work / next steps
 
@@ -179,4 +180,5 @@ Stage **01**–**04** core features in place; insert image by path.
 - `glyphtoo-044.*-doc-stats-…` — status-bar document stats
 - `glyphtoo-045.*-page-nav-…` — page / document navigation
 - `glyphtoo-046.*-paste-paras-…` — structured multiline paste
-- `glyphtoo-047.*-insert-image-…` — this delivery
+- `glyphtoo-047.*-insert-image-…` — insert image by path
+- `glyphtoo-048.*-fontconfig-…` — this delivery

@@ -5,8 +5,8 @@
 
 namespace glyphtoo {
 
-Renderer::Renderer(SDL_Renderer* sdl, Font& body, Font& heading, ImageCache* images)
-    : sdl_(sdl), body_(body), heading_(heading), images_(images) {}
+Renderer::Renderer(SDL_Renderer* sdl, FontSet& fonts, ImageCache* images)
+    : sdl_(sdl), fonts_(fonts), images_(images) {}
 
 void Renderer::clear(uint8_t r, uint8_t g, uint8_t b) {
   SDL_SetRenderDrawColor(sdl_, r, g, b, 255);
@@ -65,7 +65,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
   }
 
   for (const auto& pg : layout.glyphs) {
-    Font& font = (pg.font == FontRole::Heading) ? heading_ : body_;
+    Font& font = fonts_.pick(pg.font);
     const Glyph& g = font.glyph(pg.codepoint);
     if (!g.texture) continue;
 
@@ -79,15 +79,11 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
       case InlineKind::Link:
         SDL_SetTextureColorMod(g.texture, 30, 90, 180);
         break;
-      case InlineKind::Strong:
-        SDL_SetTextureColorMod(g.texture, 15, 15, 20);
-        break;
-      case InlineKind::Emphasis:
-        SDL_SetTextureColorMod(g.texture, 45, 45, 55);
-        break;
       case InlineKind::Code:
         SDL_SetTextureColorMod(g.texture, 130, 55, 30);
         break;
+      case InlineKind::Strong:
+      case InlineKind::Emphasis:
       default:
         SDL_SetTextureColorMod(g.texture, 28, 28, 32);
         break;
