@@ -2176,14 +2176,36 @@ int main(int argc, char** argv) {
       float baseline = static_cast<float>(win_h - 8);
       renderer.draw_text(body_font, 10.f, baseline, label, tr, tg, tb);
 
-      // Document stats on the right (idle status only)
+      // Document / selection stats on the right (idle status only)
       if (!search_mode && !save_as_mode && !link_edit_mode &&
-          !summary_edit_mode && !help_mode && !outline_mode) {
-        auto st = glyphtoo::document_stats(doc_of(F()));
-        std::string stats = std::to_string(st.words) + " words · " +
-                            std::to_string(st.chars) + " chars";
-        if (st.headings > 0)
-          stats += " · " + std::to_string(st.headings) + " headings";
+          !summary_edit_mode && !help_mode && !outline_mode &&
+          !image_insert_mode) {
+        std::string stats;
+        const auto& fsel = F().sel;
+        if (!fsel.empty()) {
+          std::string t = glyphtoo::selected_text(doc_of(F()), fsel);
+          size_t words = 0, chars = 0;
+          bool in_word = false;
+          for (unsigned char c : t) {
+            if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+              in_word = false;
+            } else {
+              ++chars;
+              if (!in_word) {
+                in_word = true;
+                ++words;
+              }
+            }
+          }
+          stats = std::to_string(words) + " sel words · " +
+                  std::to_string(chars) + " sel chars";
+        } else {
+          auto st = glyphtoo::document_stats(doc_of(F()));
+          stats = std::to_string(st.words) + " words · " +
+                  std::to_string(st.chars) + " chars";
+          if (st.headings > 0)
+            stats += " · " + std::to_string(st.headings) + " headings";
+        }
         int sw = body_font.measure(stats);
         renderer.draw_text(body_font,
                            static_cast<float>(win_w - sw - 12), baseline, stats,

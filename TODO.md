@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **052** (this delivery is **051**)
+Next bundle number: **053** (this delivery is **052**)
 
 ## Status (2026-10-10)
 
-Stage **01**–**04** core features in place; reload from disk (rebased onto origin).
+Stage **01**–**04** core features in place; selection stats in status bar.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -96,6 +96,7 @@ Stage **01**–**04** core features in place; reload from disk (rebased onto ori
 - [x] FontConfig: bold/italic/bold-italic/mono faces for styled text
 - [x] Shift+F3 / find_prev; soft background under inline code
 - [x] Ctrl+R reload from disk (Ctrl+Shift+R force)
+- [x] Selection word/char counts in status bar
 
 ## Open work / next steps
 
@@ -186,4 +187,5 @@ Stage **01**–**04** core features in place; reload from disk (rebased onto ori
 - `glyphtoo-048.*-fontconfig-…` — FontConfig styled faces
 - `glyphtoo-049.*-find-prev-code-bg-…` — find prev + code background
 - `glyphtoo-050.*-reload-…` — Ctrl+R reload from disk
-- `glyphtoo-051.*-rebased-…` — this delivery (rebased onto origin/master)
+- `glyphtoo-051.*-rebased-…` — rebased onto origin/master
+- `glyphtoo-052.*-sel-stats-…` — this delivery
