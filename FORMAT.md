@@ -56,6 +56,8 @@ stable identity matter.
 | `(deflist (term …) (def …) …)` | Definition list (glossary-style) |
 | `(figure (img …) (caption …))` | Media + caption as one unit |
 | `(biblio (ref :key "…" …) …)` | Bibliography; keys match citations |
+| `(include "#lab" :excerpt "…")` | Transclude a *range* (phrase match) inside a labelled block |
+| `(table (tr (th…) (td…)) …)` | Semantic grid; cells are nodes, not CSS |
 
 Inline: plain strings, `(em …)`, `(strong …)`, `(code …)`,
 `(a "href" …)`, `(a "href" :rel "glossary" …)`,
@@ -90,9 +92,9 @@ Not part of the semantic document:
 
 ## Planned (not all implemented)
 
-- **Range transclusion** — include a span inside a labelled block
-- **Tables** — semantic grid (cells as nodes), presentation left to the view
+- **Richer table presentation** — column weights, row/col spans (still semantic)
 - **i18n variants** — alternate `lang` branches for the same `:label`
+- **Byte/character-accurate ranges** — when phrase excerpt is not enough
 
 ## Example
 

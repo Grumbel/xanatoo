@@ -1167,8 +1167,57 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
 
   if (tag == "include" || tag == "transclude") {
     NodeId n = doc.create(NodeKind::Transclude, parent);
-    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr);
-    if (i < e.kids.size()) doc.get(n).src = sexpr_text(e.kids[i]);
+    std::string excerpt, label;
+    size_t i = read_kwargs(e.kids, 1, &excerpt, nullptr, nullptr, nullptr, nullptr,
+                           &label);
+    // Also accept :excerpt explicitly via summary slot; re-scan for clarity
+    for (size_t j = 1; j + 1 < e.kids.size(); ++j) {
+      if (e.kids[j].kind != SExpr::Kind::Atom) continue;
+      const std::string& k = e.kids[j].text;
+      if (k == ":excerpt" || k == ":range") {
+        excerpt = sexpr_text(e.kids[j + 1]);
+      } else if (k == ":src" || k == ":href") {
+        // handled below as positional too
+      }
+    }
+    // Positional src: first non-kw string
+    i = 1;
+    while (i + 1 < e.kids.size() && e.kids[i].kind == SExpr::Kind::Atom &&
+           !e.kids[i].text.empty() && e.kids[i].text[0] == ':')
+      i += 2;
+    if (i < e.kids.size()) {
+      doc.get(n).src = sexpr_text(e.kids[i]);
+      ++i;
+    }
+    if (!excerpt.empty()) doc.get(n).summary = excerpt;
+    if (!label.empty()) doc.get(n).label = label;
+    return;
+  }
+
+  if (tag == "table") {
+    NodeId n = doc.create(NodeKind::Table, parent);
+    std::string label;
+    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           &label);
+    if (!label.empty()) doc.get(n).label = label;
+    parse_sexpr_children(doc, n, e.kids, i);
+    return;
+  }
+
+  if (tag == "tr" || tag == "row") {
+    NodeId n = doc.create(NodeKind::TableRow, parent);
+    parse_sexpr_children(doc, n, e.kids, 1);
+    return;
+  }
+
+  if (tag == "td" || tag == "th" || tag == "cell") {
+    NodeId n = doc.create(NodeKind::TableCell, parent);
+    doc.get(n).level = (tag == "th") ? 1 : 0;
+    size_t i = 1;
+    while (i + 1 < e.kids.size() && e.kids[i].kind == SExpr::Kind::Atom &&
+           !e.kids[i].text.empty() && e.kids[i].text[0] == ':')
+      i += 2;
+    fill_inlines(doc.get(n), e.kids, i);
     return;
   }
 
@@ -1555,8 +1604,43 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
       out += pad;
       out += "(include";
       emit_node_id(node, out);
+      emit_label(node, out);
       out += " ";
       escape_sexpr_string(node.src, out);
+      if (!node.summary.empty()) {
+        out += " :excerpt ";
+        escape_sexpr_string(node.summary, out);
+      }
+      out += ")";
+      break;
+    }
+
+    case NodeKind::Table: {
+      out += pad;
+      out += "(table";
+      emit_node_id(node, out);
+      emit_label(node, out);
+      serialize_sexpr_children(doc, node, out, indent + 2);
+      out.push_back('\n');
+      out += pad;
+      out += ")";
+      break;
+    }
+
+    case NodeKind::TableRow: {
+      out += pad;
+      out += "(tr";
+      emit_node_id(node, out);
+      serialize_sexpr_children(doc, node, out, indent + 2);
+      out += ")";
+      break;
+    }
+
+    case NodeKind::TableCell: {
+      out += pad;
+      out += (node.level > 0) ? "(th" : "(td";
+      emit_node_id(node, out);
+      serialize_sexpr_inlines(node, out);
       out += ")";
       break;
     }

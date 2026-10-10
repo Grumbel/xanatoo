@@ -376,6 +376,56 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       break;
     }
 
+    case NodeKind::Table: {
+      float start_y = y;
+      for (NodeId c : node.children)
+        layout_node(doc, c, x, y, max_width, out);
+      y += 10.f;
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
+    case NodeKind::TableRow: {
+      float start_y = y;
+      // Semantic table row: equal-width columns (view may improve later).
+      std::vector<NodeId> cells;
+      for (NodeId c : node.children) {
+        if (doc.get(c).kind == NodeKind::TableCell) cells.push_back(c);
+      }
+      if (cells.empty()) {
+        for (NodeId c : node.children)
+          layout_node(doc, c, x, y, max_width, out);
+      } else {
+        float col_w = max_width / static_cast<float>(cells.size());
+        if (col_w < 40.f) col_w = 40.f;
+        float max_bottom = start_y;
+        for (size_t i = 0; i < cells.size(); ++i) {
+          float cx = x + col_w * static_cast<float>(i);
+          float cy = start_y;
+          LayoutResult cell_out;
+          layout_node(doc, cells[i], cx, cy, col_w - 6.f, cell_out);
+          out.glyphs.insert(out.glyphs.end(), cell_out.glyphs.begin(),
+                            cell_out.glyphs.end());
+          out.boxes.insert(out.boxes.end(), cell_out.boxes.begin(),
+                           cell_out.boxes.end());
+          if (cy > max_bottom) max_bottom = cy;
+        }
+        y = max_bottom + 6.f;
+      }
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
+    case NodeKind::TableCell: {
+      float start_y = y;
+      FontRole role =
+          (node.level > 0) ? FontRole::BodyBold : FontRole::Body;
+      layout_paragraph(doc, node, x, y, max_width, out, role);
+      y += 4.f;
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
     case NodeKind::ListItem: {
       float start_y = y;
       const float bullet_slot = 28.f;
@@ -509,6 +559,28 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           target_id = find_anchor_node(*src_doc, href_part);
           if (target_id != INVALID_NODE)
             body_spans = src_doc->get(target_id).spans;
+          // Range/excerpt: keep only the span(s) containing the phrase,
+          // or trim text around the first match (semantic range, not bytes).
+          if (!body_spans.empty() && !node.summary.empty()) {
+            const std::string& ex = node.summary;
+            std::vector<InlineSpan> filtered;
+            for (const auto& sp : body_spans) {
+              if (sp.text.find(ex) != std::string::npos) {
+                InlineSpan cut = sp;
+                // Prefer exposing the excerpt itself when the span is long
+                size_t pos = sp.text.find(ex);
+                if (sp.text.size() > ex.size() * 3 && pos != std::string::npos) {
+                  size_t start = pos > 40 ? pos - 40 : 0;
+                  size_t end = std::min(sp.text.size(), pos + ex.size() + 40);
+                  cut.text = sp.text.substr(start, end - start);
+                  if (start > 0) cut.text = "…" + cut.text;
+                  if (end < sp.text.size()) cut.text += "…";
+                }
+                filtered.push_back(std::move(cut));
+              }
+            }
+            if (!filtered.empty()) body_spans = std::move(filtered);
+          }
         } else if (external) {
           // Whole-document include: concatenate first few text nodes.
           std::vector<NodeId> stack = {src_doc->root};

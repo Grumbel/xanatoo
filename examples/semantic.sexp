@@ -39,7 +39,11 @@
 
   (include "#identity")
 
-  (p "Include points at a label; the view embeds the passage live.")
+  (p "Full include of a labelled block; the view embeds the passage live.")
+
+  (include "#identity" :excerpt "Stable identity")
+
+  (p "Excerpt include keeps only the range matching a phrase inside the target.")
 
   (h 2 :label "defs" "Definitions")
 
@@ -68,4 +72,12 @@
   (biblio
     (ref :key "nelson65"
          "Nelson, T. (1965). Complex information processing: a file structure for the complex, the changing and the indeterminate."))
+
+  (h 2 :label "roles-table" "Role cheat-sheet")
+
+  (table
+    (tr (th "Form") (th "Role"))
+    (tr (td "label") (td "Stable anchor for links and includes"))
+    (tr (td "cite") (td "Pointer into a bibliography entry"))
+    (tr (td "excerpt") (td "Range within a transcluded passage")))
 )

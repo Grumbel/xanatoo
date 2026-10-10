@@ -16,7 +16,8 @@ bool is_text_node_kind(NodeKind k) {
          k == NodeKind::ListItem || k == NodeKind::BlockQuote ||
          k == NodeKind::Note || k == NodeKind::CodeBlock ||
          k == NodeKind::Term || k == NodeKind::Definition ||
-         k == NodeKind::Caption || k == NodeKind::BiblioEntry;
+         k == NodeKind::Caption || k == NodeKind::BiblioEntry ||
+         k == NodeKind::TableCell;
 }
 
 void collect_text_nodes(const Document& doc, NodeId id,

@@ -34,6 +34,9 @@ enum class NodeKind : uint8_t {
   Caption,         // caption under a figure (child of Figure)
   Biblio,          // bibliography section (container)
   BiblioEntry,     // one reference; label/key matches cite keys
+  Table,           // semantic grid (rows of cells; not pixel layout)
+  TableRow,
+  TableCell,       // level 0 = data cell, 1 = header cell
 };
 
 enum class InlineKind : uint8_t {
@@ -67,6 +70,8 @@ struct Node {
   float display_scale = 1.f;      // image interactive scale (1 = natural fit)
   std::string label;              // stable semantic anchor (links: #label)
   // CodeBlock: language id in `src` (e.g. "cpp"); Note: optional kind in `src`
+  // Transclude: summary holds optional :excerpt phrase (range within target)
+  // TableCell: level 1 = header cell, 0 = body cell
 };
 
 // Document-level semantic metadata (not layout).

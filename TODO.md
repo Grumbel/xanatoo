@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **073** (this delivery is **072**)
+Next bundle number: **074** (this delivery is **073**)
 
 ## Status (2026-10-10)
 
@@ -118,6 +118,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Semantic format: FORMAT.md; :label; doc meta; note; codeblock
 - [x] Semantic format: deflist/term/def; figure/caption
 - [x] Semantic format: cite + biblio; typed links (:rel)
+- [x] Semantic format: include :excerpt ranges; semantic tables
 
 ## Open work / next steps
 
@@ -239,4 +240,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `glyphtoo-069.*-ui-font-…` — UI font
 - `glyphtoo-070.*-semantic-format-…` — meta/label/note/code
 - `glyphtoo-071.*-deflist-figure-…` — deflist + figure
-- `glyphtoo-072.*-cite-rel-…` — this delivery
+- `glyphtoo-072.*-cite-rel-…` — cite + :rel
+- `glyphtoo-073.*-excerpt-table-…` — this delivery
