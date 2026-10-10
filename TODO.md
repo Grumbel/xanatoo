@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **079** (this delivery is **078**)
+Next bundle number: **080** (this delivery is **079**)
 
 ## Status (2026-10-10)
 
@@ -126,6 +126,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Software windows for arbitrary docs (FORMAT.md, semantic.sexp, path…)
 - [x] Nix build: python3 for icon rasterize; libx11 (drop deprecated xorg.libX11)
 - [x] Icon install/runtime: XANATOO_ICON_DIR env, exe-relative share path, flake wrap
+- [x] Soft-window mouse: browse independent of help_mode; drag/resize/scroll motion
 
 ## Open work / next steps
 
@@ -253,4 +254,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-075.*-rename-…` — rename glyphtoo → xanatoo
 - `xanatoo-076.*-doc-window-…` — software windows for arbitrary files
 - `xanatoo-077.*-nix-icons-libx11-…` — Nix python3 icons + libx11
-- `xanatoo-078.*-icon-install-…` — this delivery
+- `xanatoo-078.*-icon-install-…` — icon install + XANATOO_ICON_DIR
+- `xanatoo-079.*-softwin-mouse-…` — this delivery
