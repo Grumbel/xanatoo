@@ -411,6 +411,8 @@ int main(int argc, char** argv) {
   glyphtoo::NodeId summary_edit_node = glyphtoo::INVALID_NODE;
   // Hovered link href (shown in status bar when not in a modal mode)
   std::string hovered_href;
+  std::string hovered_preview;  // internal #anchor target snippet
+  float mouse_x = 0.f, mouse_y = 0.f;
 
   Uint32 caret_blink_start = SDL_GetTicks();
   auto reset_blink = [&]() { caret_blink_start = SDL_GetTicks(); };
@@ -625,6 +627,8 @@ int main(int argc, char** argv) {
           break;
 
         case SDL_MOUSEMOTION:
+          mouse_x = static_cast<float>(ev.motion.x);
+          mouse_y = static_cast<float>(ev.motion.y);
           if (dragging_scroll) {
             float my = static_cast<float>(ev.motion.y);
             Pane& sp = panes[scroll_drag_pane];
@@ -664,17 +668,25 @@ int main(int argc, char** argv) {
               p.preferred_x = lx;
             }
           } else {
-            // Track link under cursor for status-bar hover feedback
+            // Track link under cursor for status-bar + tooltip hover feedback
             float mx = static_cast<float>(ev.motion.x);
             float my = static_cast<float>(ev.motion.y);
+            mouse_x = mx;
+            mouse_y = my;
             int hover_pane = pane_at(mx);
             Pane& hp = panes[hover_pane];
             float lx = local_x(mx, hover_pane);
             if (auto href = glyphtoo::hit_test_link(doc_of(hp), hp.layout, lx, my,
                                                     hp.scroll_y)) {
               hovered_href = *href;
+              if (auto prev = glyphtoo::link_preview_text(doc_of(hp), *href)) {
+                hovered_preview = *prev;
+              } else {
+                hovered_preview.clear();
+              }
             } else {
               hovered_href.clear();
+              hovered_preview.clear();
             }
           }
           break;
@@ -1554,6 +1566,35 @@ int main(int argc, char** argv) {
       }
       float baseline = static_cast<float>(win_h - 8);
       renderer.draw_text(body_font, 10.f, baseline, label, tr, tg, tb);
+    }
+
+    // Hover preview tooltip for internal #anchor links
+    if (!hovered_preview.empty() && !search_mode && !save_as_mode &&
+        !link_edit_mode && !summary_edit_mode) {
+      const std::string tip = hovered_preview;
+      int tw = body_font.measure(tip);
+      const int pad_x = 10, pad_y = 6;
+      int box_w = tw + pad_x * 2;
+      int box_h = body_font.line_height() + pad_y * 2;
+      int bx = static_cast<int>(mouse_x) + 12;
+      int by = static_cast<int>(mouse_y) - box_h - 8;
+      // Clamp to window (above status bar)
+      if (bx + box_w > win_w - 4) bx = win_w - box_w - 4;
+      if (bx < 4) bx = 4;
+      if (by < 4) by = static_cast<int>(mouse_y) + 16;
+      if (by + box_h > win_h - 32) by = win_h - 32 - box_h;
+
+      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+      SDL_SetRenderDrawColor(sdl, 30, 40, 55, 230);
+      SDL_Rect box{bx, by, box_w, box_h};
+      SDL_RenderFillRect(sdl, &box);
+      SDL_SetRenderDrawColor(sdl, 90, 140, 210, 255);
+      SDL_RenderDrawRect(sdl, &box);
+      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+      float tip_baseline =
+          static_cast<float>(by + pad_y + body_font.ascender());
+      renderer.draw_text(body_font, static_cast<float>(bx + pad_x), tip_baseline,
+                         tip, 230, 235, 245);
     }
 
     renderer.present();

@@ -1019,6 +1019,39 @@ std::optional<Caret> jump_to_href(const Document& doc, const std::string& href) 
   return std::nullopt;
 }
 
+std::optional<std::string> link_preview_text(const Document& doc,
+                                            const std::string& href) {
+  if (href.empty() || href[0] != '#') return std::nullopt;
+  auto dest = jump_to_href(doc, href);
+  if (!dest) return std::nullopt;
+  std::string text = node_text(doc, dest->node);
+  // Collapse internal whitespace for a single-line tooltip.
+  std::string compact;
+  compact.reserve(text.size());
+  bool space = false;
+  for (char c : text) {
+    if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+      space = true;
+      continue;
+    }
+    if (space && !compact.empty()) compact.push_back(' ');
+    space = false;
+    compact.push_back(c);
+  }
+  constexpr size_t kMax = 80;
+  if (compact.size() > kMax) {
+    // Truncate on a UTF-8 boundary.
+    size_t cut = kMax;
+    while (cut > 0 &&
+           (static_cast<unsigned char>(compact[cut]) & 0xc0) == 0x80)
+      --cut;
+    compact.resize(cut);
+    compact += "…";
+  }
+  if (compact.empty()) return std::string{"(empty)"};
+  return compact;
+}
+
 std::optional<std::string> hit_test_link(const Document& doc,
                                          const LayoutResult& layout,
                                          float mx, float my, float scroll_y) {

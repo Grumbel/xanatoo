@@ -80,6 +80,7 @@ Supported dialect (intentionally small):
 | **Ctrl+A** | Select current block |
 | **Ctrl+Shift+A** | Select whole document |
 | Click blue link | Follow `#anchor` or open external `http(s)` / `mailto:` |
+| Hover `#anchor` link | Preview tooltip of the target passage |
 | **Ctrl+F** | Leap search |
 | **Ctrl+H** | Leap replace (Tab switches fields) |
 | **F3** / **Ctrl+G** | Next match |

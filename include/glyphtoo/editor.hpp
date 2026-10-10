@@ -135,6 +135,11 @@ std::optional<Caret> find_next(const Document& doc, const std::string& query,
 // Internal link: href "#Title" → caret at matching heading/paragraph.
 std::optional<Caret> jump_to_href(const Document& doc, const std::string& href);
 
+// Short preview of an internal #anchor target (first ~80 chars of the node).
+// Empty optional for external or unresolved hrefs.
+std::optional<std::string> link_preview_text(const Document& doc,
+                                            const std::string& href);
+
 // Link under pointer; returns href from the document span.
 std::optional<std::string> hit_test_link(const Document& doc,
                                          const LayoutResult& layout,

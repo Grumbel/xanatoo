@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **030** (this delivery is **029**)
+Next bundle number: **031** (this delivery is **030**)
 
 ## Status (2026-10-10)
 
-Stage **01** complete (lists). Stage **02** largely working. Early stretchtext / stage **03** links.
+Stage **01** complete (lists). Stage **02** largely working. Stage **03** links + hover previews.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -74,12 +74,13 @@ Stage **01** complete (lists). Stage **02** largely working. Early stretchtext /
 - [x] Hovered link href shown in status bar
 - [x] Unordered lists (`-`/`*`/`+`) and ordered lists (`1.`) — parse, layout bullets, serialize
 - [x] Enter in list item splits to sibling ListItem; empty item exits list; ordered renumber
+- [x] Hover preview tooltip for internal `#anchor` links (target passage snippet)
 
 ## Open work / next steps
 
 1. Optional: HarfBuzz for complex scripts
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
-3. Inline transclusion / hover previews (stage 03 remainder)
+3. Inline transclusion (stage 03 remainder)
 4. Drag-and-drop layout editing (stage 04)
 
 ## Design notes
@@ -127,4 +128,5 @@ Stage **01** complete (lists). Stage **02** largely working. Early stretchtext /
 - `glyphtoo-026.*-block-move-…` — block reorder + duplicate
 - `glyphtoo-027.*-external-links-…` — external links + hover
 - `glyphtoo-028.*-lists-…` — list parse/layout/serialize
-- `glyphtoo-029.*-list-edit-…` — this delivery
+- `glyphtoo-029.*-list-edit-…` — list Enter/exit/renumber
+- `glyphtoo-030.*-link-preview-…` — this delivery
