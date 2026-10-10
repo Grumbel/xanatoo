@@ -58,6 +58,8 @@ Supported dialect (intentionally small):
 |-----|--------|
 | **Ctrl+S** | Save (untitled → `untitled.md`) |
 | **Ctrl+Shift+S** | Save As (path in status bar) |
+| **Ctrl+R** | Reload from disk (refuses if dirty) |
+| **Ctrl+Shift+R** | Force reload (discard unsaved changes) |
 | **Ctrl+Q** | Quit (warns once if dirty) |
 | **F1** | Keyboard reference overlay |
 

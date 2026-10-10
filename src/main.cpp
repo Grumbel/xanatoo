@@ -1641,6 +1641,36 @@ int main(int argc, char** argv) {
               }
               break;
 
+            case SDLK_r:
+              if (ctrl) {
+                // Reload focused document from disk
+                std::string& rpath = path_of(p);
+                if (rpath.empty()) {
+                  std::cerr << "Reload: buffer has no path (Save As first)\n";
+                  break;
+                }
+                if (dirty_flags[p.doc_index] && !shift) {
+                  std::cerr << "Reload: unsaved changes — "
+                               "Ctrl+Shift+R to discard and reload\n";
+                  break;
+                }
+                docs[p.doc_index] = load_doc(rpath);
+                dirty_flags[p.doc_index] = false;
+                histories[p.doc_index].reset(docs[p.doc_index], p.sel);
+                for (int pi = 0; pi < 2; ++pi) {
+                  if (panes[pi].doc_index != p.doc_index) continue;
+                  glyphtoo::ensure_valid_caret(docs[p.doc_index],
+                                              panes[pi].sel.focus);
+                  panes[pi].sel.anchor = panes[pi].sel.focus;
+                  panes[pi].scroll_y = 0.f;
+                }
+                update_title();
+                needs_layout = true;
+                reset_blink();
+                std::cout << "Reloaded: " << rpath << "\n";
+              }
+              break;
+
             case SDLK_d:
               if (ctrl && shift) {
                 // Side-by-side version marks (needs two independent docs)
@@ -2247,6 +2277,7 @@ int main(int argc, char** argv) {
           "Files",
           "  Ctrl+S              Save",
           "  Ctrl+Shift+S        Save As",
+          "  Ctrl+R / Shift+R    Reload / force reload",
           "  Ctrl+Q              Quit",
           "",
           "Edit",
