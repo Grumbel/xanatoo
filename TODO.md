@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **082** (this delivery is **081**)
+Next bundle number: **083** (this delivery is **082**)
 
 ## Status (2026-10-10)
 
@@ -129,6 +129,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Soft-window mouse: browse independent of help_mode; drag/resize/scroll motion
 - [x] Outline as software window (drag/resize/scroll; non-modal; stays open on jump)
 - [x] Multiple document software windows (stack; raise on click; cascade open)
+- [x] Soft-window docking: edge snap + double-click title maximize/restore
 
 ## Open work / next steps
 
@@ -137,7 +138,7 @@ LCS structural diff marks; cross-document `:::include`.
 3. Editable transclusion mirror (edits on embed write through to source)
 4. Word-level / intra-block diff highlighting
 5. **Tables** — semantic grid (cells as nodes); presentation left to the view
-6. **Docking** — snap / tile software windows (stack of doc windows is in)
+6. **Docking** — tile/split zones (edge snap + maximize is in)
 7. **Citations** / typed link relations / range transclusion (see FORMAT.md)
 
 ## Design notes
@@ -259,4 +260,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-078.*-icon-install-…` — icon install + XANATOO_ICON_DIR
 - `xanatoo-079.*-softwin-mouse-…` — soft-window mouse hit-testing
 - `xanatoo-080.*-outline-window-…` — outline software window
-- `xanatoo-081.*-multi-softwin-…` — this delivery
+- `xanatoo-081.*-multi-softwin-…` — multiple document software windows
+- `xanatoo-082.*-softwin-dock-…` — this delivery

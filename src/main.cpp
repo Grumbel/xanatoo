@@ -248,8 +248,14 @@ int main(int argc, char** argv) {
     bool scroll_dragging = false;
     int resize_start_x = 0, resize_start_y = 0;
     int resize_start_w = 0, resize_start_h = 0;
+    // Docking / maximize
+    bool maximized = false;
+    int restore_x = 120, restore_y = 70, restore_w = 540, restore_h = 440;
+    Uint32 last_title_click = 0;
   };
   std::vector<SoftWindow> soft_wins;
+  const int soft_snap_px = 16;
+  const int status_bar_h = 28;
   bool path_in_window_mode = false;
   std::string path_in_window_buf;
 
@@ -430,6 +436,38 @@ int main(int argc, char** argv) {
     return std::tuple{sw.x + help_pad, sw.y + help_title_h + 4,
                       sw.w - help_pad * 2,
                       sw.h - help_title_h - help_pad - 4};
+  };
+
+  // Edge-snap into the client area (below menu/toolbar, above status bar).
+  auto snap_soft_geom = [&](int& x, int& y, int w, int h) {
+    const int top = static_cast<int>(ui_top);
+    const int bottom = win_h - status_bar_h;
+    if (x < soft_snap_px) x = 0;
+    if (y < top + soft_snap_px) y = top;
+    if (x + w > win_w - soft_snap_px) x = std::max(0, win_w - w);
+    if (y + h > bottom - soft_snap_px) y = std::max(top, bottom - h);
+  };
+
+  auto maximize_soft = [&](SoftWindow& sw) {
+    if (!sw.maximized) {
+      sw.restore_x = sw.x;
+      sw.restore_y = sw.y;
+      sw.restore_w = sw.w;
+      sw.restore_h = sw.h;
+      sw.x = 0;
+      sw.y = static_cast<int>(ui_top);
+      sw.w = win_w;
+      sw.h = std::max(160, win_h - status_bar_h - static_cast<int>(ui_top));
+      sw.maximized = true;
+      sw.needs_layout = true;
+    } else {
+      sw.x = sw.restore_x;
+      sw.y = sw.restore_y;
+      sw.w = sw.restore_w;
+      sw.h = sw.restore_h;
+      sw.maximized = false;
+      sw.needs_layout = true;
+    }
   };
 
   auto layout_soft = [&](SoftWindow& sw) {
@@ -795,9 +833,30 @@ int main(int argc, char** argv) {
                   } else {
                     raise_soft(i);
                     SoftWindow& top = soft_wins.back();
-                    top.dragging = true;
-                    top.drag_dx = mxw - top.x;
-                    top.drag_dy = myw - top.y;
+                    const Uint32 now = SDL_GetTicks();
+                    if (top.last_title_click != 0 &&
+                        now - top.last_title_click < 400) {
+                      maximize_soft(top);
+                      top.last_title_click = 0;
+                      top.dragging = false;
+                    } else {
+                      top.last_title_click = now;
+                      // Dragging a maximized window restores first.
+                      if (top.maximized) {
+                        top.maximized = false;
+                        top.w = top.restore_w;
+                        top.h = top.restore_h;
+                        top.x = mxw - top.w / 2;
+                        top.y = myw - help_title_h / 2;
+                        if (top.x < 0) top.x = 0;
+                        if (top.y < static_cast<int>(ui_top))
+                          top.y = static_cast<int>(ui_top);
+                        top.needs_layout = true;
+                      }
+                      top.dragging = true;
+                      top.drag_dx = mxw - top.x;
+                      top.drag_dy = myw - top.y;
+                    }
                   }
                   soft_hit = true;
                   break;
@@ -1153,14 +1212,24 @@ int main(int argc, char** argv) {
 
         case SDL_MOUSEBUTTONUP:
           if (ev.button.button == SDL_BUTTON_LEFT) {
-            help_dragging = false;
-            help_resize = 0;
-            help_scroll_dragging = false;
             for (auto& sw : soft_wins) {
+              if (sw.dragging || sw.resize) {
+                snap_soft_geom(sw.x, sw.y, sw.w, sw.h);
+                if (sw.resize) sw.needs_layout = true;
+              }
               sw.dragging = false;
               sw.resize = 0;
               sw.scroll_dragging = false;
             }
+            if (help_dragging || help_resize) {
+              snap_soft_geom(help_x, help_y, help_w, help_h);
+              if (help_resize) help_needs_layout = true;
+            }
+            help_dragging = false;
+            help_resize = 0;
+            help_scroll_dragging = false;
+            if (ol_dragging || ol_resize)
+              snap_soft_geom(ol_x, ol_y, ol_w, ol_h);
             ol_dragging = false;
             ol_resize = 0;
             ol_scroll_dragging = false;
