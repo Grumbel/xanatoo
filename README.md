@@ -56,8 +56,8 @@ Supported dialect (intentionally small):
 | Key | Action |
 |-----|--------|
 | Type / Backspace / Delete | Insert / delete |
-| **Enter** | Split paragraph |
-| Backspace at block start | Merge with previous paragraph |
+| **Enter** | Split paragraph / list item (empty list item exits list) |
+| Backspace at block start | Merge with previous block (drops empty lists) |
 | **Ctrl+Z** / **Ctrl+Y** | Undo / redo |
 | **Ctrl+C** / **X** / **V** | Clipboard |
 | **Ctrl+B** / **I** / **\`** / **K** | Bold / italic / code / link |

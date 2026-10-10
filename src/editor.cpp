@@ -423,6 +423,8 @@ void insert_text(Document& doc, Caret& caret, const std::string& utf8) {
   caret.char_index += utf8_char_count(utf8);
 }
 
+static void renumber_ordered_list(Document& doc, NodeId list_id);
+
 void delete_backward(Document& doc, Caret& caret) {
   if (caret.node == INVALID_NODE) return;
   Node& n = doc.get(caret.node);
@@ -446,10 +448,24 @@ void delete_backward(Document& doc, Caret& caret) {
     }
     cur.spans.clear();
 
+    NodeId list_to_renumber = INVALID_NODE;
     if (cur.parent != INVALID_NODE) {
       Node& parent = doc.get(cur.parent);
+      if (parent.kind == NodeKind::List) list_to_renumber = cur.parent;
       auto cit = std::find(parent.children.begin(), parent.children.end(), cur_id);
       if (cit != parent.children.end()) parent.children.erase(cit);
+      // Drop empty list containers left behind
+      if (parent.kind == NodeKind::List && parent.children.empty() &&
+          parent.parent != INVALID_NODE) {
+        Node& gp = doc.get(parent.parent);
+        auto lit =
+            std::find(gp.children.begin(), gp.children.end(), cur.parent);
+        if (lit != gp.children.end()) gp.children.erase(lit);
+        list_to_renumber = INVALID_NODE;
+      }
+    }
+    if (list_to_renumber != INVALID_NODE) {
+      renumber_ordered_list(doc, list_to_renumber);
     }
 
     caret.node = prev_id;
@@ -646,12 +662,104 @@ bool wrap_block_in_stretch(Document& doc, NodeId block,
   return true;
 }
 
+static bool node_content_empty(const Node& n) {
+  for (const auto& sp : n.spans) {
+    if (!sp.text.empty()) return false;
+  }
+  return true;
+}
+
+// Renumber ordered-list items 1..N under a List node.
+static void renumber_ordered_list(Document& doc, NodeId list_id) {
+  if (list_id == INVALID_NODE) return;
+  Node& list = doc.get(list_id);
+  if (list.kind != NodeKind::List || list.level != 1) return;
+  int num = 1;
+  for (NodeId c : list.children) {
+    Node& item = doc.get(c);
+    if (item.kind == NodeKind::ListItem) {
+      item.level = num++;
+    }
+  }
+}
+
+// Remove a child id from its parent’s children vector (does not destroy the node).
+static bool detach_from_parent(Document& doc, NodeId id) {
+  Node& n = doc.get(id);
+  if (n.parent == INVALID_NODE) return false;
+  Node& parent = doc.get(n.parent);
+  auto it = std::find(parent.children.begin(), parent.children.end(), id);
+  if (it == parent.children.end()) return false;
+  parent.children.erase(it);
+  n.parent = INVALID_NODE;
+  return true;
+}
+
 bool split_block(Document& doc, Caret& caret) {
   if (caret.node == INVALID_NODE) return false;
   Node& n = doc.get(caret.node);
   if (!is_text_node(n.kind)) return false;
 
-  // Create a new sibling of the same kind
+  // Enter on an empty list item exits the list: drop the item and place a
+  // fresh paragraph after the list (common editor behaviour).
+  if (n.kind == NodeKind::ListItem && node_content_empty(n) &&
+      caret.span_index == 0 && caret.char_index == 0) {
+    NodeId item_id = caret.node;
+    NodeId list_id = n.parent;
+    if (list_id == INVALID_NODE) return false;
+    Node& list = doc.get(list_id);
+    if (list.kind != NodeKind::List) return false;
+
+    // Remember list position before we possibly remove it.
+    NodeId list_parent = list.parent;
+    size_t list_index = 0;
+    bool have_index = false;
+    if (list_parent != INVALID_NODE) {
+      Node& lp = doc.get(list_parent);
+      auto lit = std::find(lp.children.begin(), lp.children.end(), list_id);
+      if (lit != lp.children.end()) {
+        list_index = static_cast<size_t>(lit - lp.children.begin());
+        have_index = true;
+      }
+    }
+
+    detach_from_parent(doc, item_id);
+
+    // If the list is now empty, remove it and put a paragraph where it was.
+    if (list.children.empty()) {
+      detach_from_parent(doc, list_id);
+      NodeId para = doc.create(NodeKind::Paragraph, INVALID_NODE);
+      if (list_parent != INVALID_NODE) {
+        Node& lp = doc.get(list_parent);
+        doc.get(para).parent = list_parent;
+        if (have_index && list_index <= lp.children.size()) {
+          lp.children.insert(lp.children.begin() +
+                                 static_cast<std::ptrdiff_t>(list_index),
+                             para);
+        } else {
+          lp.children.push_back(para);
+        }
+      }
+      caret.node = para;
+      caret.span_index = 0;
+      caret.char_index = 0;
+      return true;
+    }
+
+    renumber_ordered_list(doc, list_id);
+
+    NodeId para = doc.create(NodeKind::Paragraph, INVALID_NODE);
+    if (!doc.insert_after(list_id, para)) {
+      if (list_parent != INVALID_NODE) doc.add_child(list_parent, para);
+      else return false;
+    }
+    caret.node = para;
+    caret.span_index = 0;
+    caret.char_index = 0;
+    return true;
+  }
+
+  // Create a new sibling of the same kind (ListItem stays a ListItem).
   NodeId new_id = doc.create(n.kind, INVALID_NODE);  // parent set by insert_after
   Node& neu = doc.get(new_id);
   neu.level = n.level;
@@ -690,6 +798,11 @@ bool split_block(Document& doc, Caret& caret) {
     } else {
       return false;
     }
+  }
+
+  // Ordered lists: renumber so the new item and following ones stay sequential.
+  if (n.kind == NodeKind::ListItem && n.parent != INVALID_NODE) {
+    renumber_ordered_list(doc, n.parent);
   }
 
   caret.node = new_id;

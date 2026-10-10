@@ -94,7 +94,7 @@ An editable annotation linked in spirit to the original passage.
 ## Living documents
 
 This is a live document. Click to place the caret, type to insert text,
-Backspace to delete. **Enter** splits a paragraph. Shift+arrows select.
+Backspace to delete. **Enter** splits a paragraph (or list item; empty item exits the list). Shift+arrows select.
 Ctrl+C / Ctrl+V / Ctrl+X for clipboard, Ctrl+Z / Ctrl+Y for undo/redo.
 **Ctrl+\\** toggles a second view pane; **Tab** switches focus.
 Drag the gutter to resize. Open two files for independent documents.
