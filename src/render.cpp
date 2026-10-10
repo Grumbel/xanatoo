@@ -88,6 +88,45 @@ void Renderer::draw_caret(const CaretScreenPos& pos, float origin_x) {
   SDL_RenderFillRect(sdl_, &r);
 }
 
+void Renderer::draw_text(Font& font, float x, float y_baseline,
+                         const std::string& text,
+                         uint8_t r, uint8_t g, uint8_t b) {
+  size_t i = 0;
+  float pen = x;
+  while (i < text.size()) {
+    unsigned char c = static_cast<unsigned char>(text[i]);
+    uint32_t cp = 0;
+    size_t len = 1;
+    if (c < 0x80) {
+      cp = c;
+    } else if ((c & 0xe0) == 0xc0 && i + 1 < text.size()) {
+      cp = ((c & 0x1f) << 6) | (text[i + 1] & 0x3f);
+      len = 2;
+    } else if ((c & 0xf0) == 0xe0 && i + 2 < text.size()) {
+      cp = ((c & 0x0f) << 12) | ((text[i + 1] & 0x3f) << 6) | (text[i + 2] & 0x3f);
+      len = 3;
+    } else if ((c & 0xf8) == 0xf0 && i + 3 < text.size()) {
+      cp = ((c & 0x07) << 18) | ((text[i + 1] & 0x3f) << 12) |
+           ((text[i + 2] & 0x3f) << 6) | (text[i + 3] & 0x3f);
+      len = 4;
+    } else {
+      ++i;
+      continue;
+    }
+    i += len;
+    const Glyph& gl = font.glyph(cp);
+    if (gl.texture) {
+      SDL_SetTextureColorMod(gl.texture, r, g, b);
+      SDL_Rect dst{
+          static_cast<int>(pen + gl.bearing_x),
+          static_cast<int>(y_baseline - gl.bearing_y),
+          gl.width, gl.height};
+      SDL_RenderCopy(sdl_, gl.texture, nullptr, &dst);
+    }
+    pen += static_cast<float>(gl.advance >> 6);
+  }
+}
+
 void Renderer::present() {
   SDL_RenderPresent(sdl_);
 }

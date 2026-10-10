@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **012** (this delivery is **011**)
+Next bundle number: **013** (this delivery is **012**)
 
 ## Status (2026-10-10)
 
@@ -36,14 +36,16 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] Draggable pane divider (split_ratio)
 - [x] Per-document undo stacks and dirty flags
 - [x] Leap search (Ctrl+F / F3) — Canon Cat–inspired
+- [x] On-screen leap query status bar
+- [x] Scroll-to-match after search
+- [x] Untitled Ctrl+S → auto `untitled.md` (or untitled-N.md)
 
 ## Open work / next steps
 
 1. Optional: HarfBuzz for complex scripts
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
-3. Save-as / untitled buffer when no path was given
-4. Image drag-resize / interactive placement
-5. On-screen search query rendering (status bar is colour-only for now)
+3. Image drag-resize / interactive placement
+4. Explicit Save As to a chosen path (untitled auto-names for now)
 
 ## Design notes
 
@@ -66,4 +68,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-008.*-columns-multisel-…` — columns + multi-sel
 - `glyphtoo-009.*-dual-pane-…` — dual-pane multi-view
 - `glyphtoo-010.*-two-docs-divider-…` — two docs + divider
-- `glyphtoo-011.*-undo-leap-…` — this delivery
+- `glyphtoo-011.*-undo-leap-…` — per-doc undo + leap search
+- `glyphtoo-012.*-search-ui-save-…` — this delivery

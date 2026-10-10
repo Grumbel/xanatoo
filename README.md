@@ -21,6 +21,10 @@ See [PROPOSAL.md](PROPOSAL.md) for the full vision.
 - **Ctrl+F** — leap search: type to jump to the next match
 - **F3** / **Ctrl+G** — next match
 - **Esc** — leave search mode
+- Query is shown in a bottom status bar; matches scroll into view
+
+Untitled buffers: **Ctrl+S** writes `untitled.md` (or `untitled-N.md`) and
+binds that path for further saves.
 
 ## Images
 

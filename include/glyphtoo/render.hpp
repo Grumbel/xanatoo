@@ -22,6 +22,9 @@ public:
             float origin_x = 0.f);
   void draw_selection(const std::vector<SelRect>& rects, float origin_x = 0.f);
   void draw_caret(const CaretScreenPos& pos, float origin_x = 0.f);
+  // Simple left-to-right UTF-8 run (status bars, overlays).
+  void draw_text(Font& font, float x, float y_baseline, const std::string& text,
+                 uint8_t r, uint8_t g, uint8_t b);
   void present();
 
   SDL_Renderer* sdl() { return sdl_; }

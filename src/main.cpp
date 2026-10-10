@@ -480,10 +480,10 @@ int main(int argc, char** argv) {
             if (auto hit = glyphtoo::find_next(doc_of(p), search_query, from, mlen)) {
               p.sel.anchor = *hit;
               p.sel.focus = *hit;
-              // extend focus by match length (ASCII)
               for (size_t i = 0; i < mlen; ++i)
                 glyphtoo::move_right(doc_of(p), p.sel.focus);
               search_match_len = mlen;
+              scroll_caret_into_view(p);
             }
             reset_blink();
             break;
@@ -549,6 +549,7 @@ int main(int argc, char** argv) {
                   for (size_t i = 0; i < mlen; ++i)
                     glyphtoo::move_right(doc_of(pp), pp.sel.focus);
                   search_match_len = mlen;
+                  scroll_caret_into_view(pp);
                   reset_blink();
                 }
               }
@@ -738,8 +739,16 @@ int main(int argc, char** argv) {
               if (ctrl) {
                 std::string& spath = path_of(p);
                 if (spath.empty()) {
-                  std::cerr << "No file path — open with: glyphtoo file.md\n";
-                } else {
+                  // Untitled: pick a free name in the current directory
+                  std::string candidate = "untitled.md";
+                  for (int n = 1; n < 1000; ++n) {
+                    if (!std::filesystem::exists(candidate)) break;
+                    candidate = "untitled-" + std::to_string(n) + ".md";
+                  }
+                  spath = candidate;
+                  std::cout << "Saving untitled buffer as: " << spath << "\n";
+                }
+                {
                   std::string text = glyphtoo::serialize_markup(d);
                   std::ofstream out(spath);
                   if (!out) {
@@ -748,6 +757,7 @@ int main(int argc, char** argv) {
                     out << text;
                     std::cout << "Saved: " << spath << "\n";
                     dirty_flags[p.doc_index] = false;
+                    // Ensure image base follows new path
                     update_title();
                   }
                 }
@@ -835,16 +845,22 @@ int main(int argc, char** argv) {
       SDL_RenderFillRect(sdl, &div);
     }
 
-    // Search mode indicator (simple status bar)
+    // Search mode status bar with query text
     if (search_mode) {
-      SDL_SetRenderDrawColor(sdl, 30, 30, 40, 230);
-      SDL_Rect bar{0, win_h - 28, win_w, 28};
+      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+      SDL_SetRenderDrawColor(sdl, 30, 30, 40, 235);
+      SDL_Rect bar{0, win_h - 32, win_w, 32};
       SDL_RenderFillRect(sdl, &bar);
-      // Title bar text via window title is heavy; use stdout already.
-      // Draw a bright caret-line mark so the mode is visible.
       SDL_SetRenderDrawColor(sdl, 80, 160, 255, 255);
-      SDL_Rect accent{0, win_h - 28, win_w, 3};
+      SDL_Rect accent{0, win_h - 32, win_w, 3};
       SDL_RenderFillRect(sdl, &accent);
+      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+
+      std::string label = "Leap: ";
+      label += search_query.empty() ? "…" : search_query;
+      label += "   (F3 next, Esc cancel)";
+      float baseline = static_cast<float>(win_h - 10);
+      renderer.draw_text(body_font, 12.f, baseline, label, 220, 230, 245);
     }
 
     renderer.present();
