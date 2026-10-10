@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **004** (this delivery is **003**)
+Next bundle number: **005** (this delivery is **004**)
 
 ## Status (2026-10-10)
 
@@ -19,6 +19,7 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] **Stretchtext** — `:::stretch summary="…"` starts collapsed;
       click ▸ / ▾ marker to expand/collapse and reflow
 - [x] Ctrl+A selects current block
+- [x] `--font` / `-f` CLI option to choose the TTF
 
 ## Open work / next steps
 
@@ -44,4 +45,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 
 - `glyphtoo-001.*` — stage 01 scaffold
 - `glyphtoo-002.*` — markup, caret, basic edit
-- `glyphtoo-003.*-selection-stretch-…` — this delivery
+- `glyphtoo-003.*-selection-stretch-…` — selection, stretchtext
+- `glyphtoo-004.*-font-cli-…` — this delivery (`--font`)

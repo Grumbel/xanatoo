@@ -37,14 +37,24 @@ cmake .. && make -j
 
 ## Build (system packages)
 
-Requires: CMake ≥ 3.16, SDL2, FreeType, C++20 compiler, a system font
-(DejaVu or Liberation).
+Requires: CMake ≥ 3.16, SDL2, FreeType, C++20 compiler.
 
 ```bash
 mkdir build && cd build
 cmake .. && make -j
 ./glyphtoo
+./glyphtoo --font /path/to/SomeFont.ttf
 ```
+
+### Command-line options
+
+```
+-f, --font <path>   TTF/OTF font file (used for body and headings)
+-h, --help          Show help
+```
+
+If `--font` is omitted, glyphtoo searches a few common system locations
+(DejaVu, Liberation, FreeSans, Arial on macOS).
 
 ## License
 

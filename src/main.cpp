@@ -40,7 +40,7 @@ Jef Raskin's *Canon Cat* — a keyboard-driven work processor that treated
 text as a continuous, searchable stream.
 )";
 
-static std::string find_font() {
+static std::string find_system_font() {
   const char* candidates[] = {
       "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
       "/usr/share/fonts/TTF/DejaVuSans.ttf",
@@ -57,9 +57,53 @@ static std::string find_font() {
   return {};
 }
 
+static void print_usage(const char* argv0) {
+  std::cerr
+      << "Usage: " << argv0 << " [options]\n"
+      << "\n"
+      << "Options:\n"
+      << "  -f, --font <path>   TTF/OTF font file to use (body + headings)\n"
+      << "  -h, --help          Show this help\n"
+      << "\n"
+      << "If --font is omitted, a common system sans-serif is searched for.\n";
+}
+
+struct Options {
+  std::string font_path;
+};
+
+static bool parse_args(int argc, char** argv, Options& opt) {
+  for (int i = 1; i < argc; ++i) {
+    std::string a = argv[i];
+    if (a == "-h" || a == "--help") {
+      print_usage(argv[0]);
+      return false;
+    }
+    if (a == "-f" || a == "--font") {
+      if (i + 1 >= argc) {
+        std::cerr << "error: " << a << " requires a path argument\n";
+        print_usage(argv[0]);
+        return false;
+      }
+      opt.font_path = argv[++i];
+      continue;
+    }
+    if (a.rfind("--font=", 0) == 0) {
+      opt.font_path = a.substr(7);
+      continue;
+    }
+    std::cerr << "error: unknown argument: " << a << "\n";
+    print_usage(argv[0]);
+    return false;
+  }
+  return true;
+}
+
 int main(int argc, char** argv) {
-  (void)argc;
-  (void)argv;
+  Options opt;
+  if (!parse_args(argc, argv, opt)) {
+    return 1;
+  }
 
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
     std::cerr << "SDL_Init: " << SDL_GetError() << "\n";
@@ -87,9 +131,20 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  std::string font_path = find_font();
+  std::string font_path = opt.font_path;
   if (font_path.empty()) {
-    std::cerr << "No system font found (need DejaVu or Liberation).\n";
+    font_path = find_system_font();
+  }
+  if (font_path.empty()) {
+    std::cerr << "No font found. Pass one with --font <path.ttf>\n"
+              << "(tried common DejaVu / Liberation / FreeSans locations)\n";
+    SDL_DestroyRenderer(sdl);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+    return 1;
+  }
+  if (!fs::exists(font_path)) {
+    std::cerr << "Font file does not exist: " << font_path << "\n";
     SDL_DestroyRenderer(sdl);
     SDL_DestroyWindow(window);
     SDL_Quit();
@@ -100,7 +155,10 @@ int main(int argc, char** argv) {
   glyphtoo::Font body_font, heading_font;
   if (!body_font.load(font_path, 17, sdl) ||
       !heading_font.load(font_path, 26, sdl)) {
-    std::cerr << "Font load failed\n";
+    std::cerr << "Failed to load font: " << font_path << "\n";
+    SDL_DestroyRenderer(sdl);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
     return 1;
   }
 
