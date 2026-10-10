@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **077** (this delivery is **076**)
+Next bundle number: **078** (this delivery is **077**)
 
 ## Status (2026-10-10)
 
@@ -124,6 +124,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Editor: insert note / code block / table / definition list
 - [x] Project renamed glyphtoo → **xanatoo** (namespace, paths, binary, env)
 - [x] Software windows for arbitrary docs (FORMAT.md, semantic.sexp, path…)
+- [x] Nix build: python3 for icon rasterize; libx11 (drop deprecated xorg.libX11)
 
 ## Open work / next steps
 
@@ -249,4 +250,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-073.*-excerpt-table-…` — excerpt + table
 - `xanatoo-074.*-insert-semantic-…` — insert semantic (as glyphtoo tip before rename)
 - `xanatoo-075.*-rename-…` — rename glyphtoo → xanatoo
-- `xanatoo-076.*-doc-window-…` — this delivery
+- `xanatoo-076.*-doc-window-…` — software windows for arbitrary files
+- `xanatoo-077.*-nix-icons-libx11-…` — this delivery

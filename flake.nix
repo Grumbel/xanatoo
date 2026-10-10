@@ -22,13 +22,16 @@
             nativeBuildInputs = with pkgs; [
               cmake
               pkg-config
+              # CMake custom command runs scripts/rasterize_icons.py (SVG→PNG).
+              python3
             ];
 
             buildInputs = with pkgs; [
               SDL2
               freetype
               fontconfig
-              xorg.libX11
+              # Prefer top-level libx11; xorg.* package set is deprecated.
+              libx11
             ];
 
             cmakeFlags = [
@@ -70,9 +73,11 @@
             packages = with pkgs; [
               cmake
               pkg-config
+              python3
               SDL2
               freetype
               fontconfig
+              libx11
               dejavu_fonts
               gdb
               clang-tools
