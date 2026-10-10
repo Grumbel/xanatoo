@@ -502,6 +502,41 @@ void delete_forward(Document& doc, Caret& caret) {
 }
 
 
+
+NodeId enclosing_stretch(const Document& doc, NodeId id) {
+  while (id != INVALID_NODE) {
+    const Node& n = doc.get(id);
+    if (n.kind == NodeKind::Stretch) return id;
+    id = n.parent;
+  }
+  return INVALID_NODE;
+}
+
+std::optional<NodeId> unwrap_stretch(Document& doc, NodeId block_or_stretch) {
+  NodeId sid = enclosing_stretch(doc, block_or_stretch);
+  if (sid == INVALID_NODE) return std::nullopt;
+  Node& stretch = doc.get(sid);
+  if (stretch.parent == INVALID_NODE) return std::nullopt;
+  Node& parent = doc.get(stretch.parent);
+  auto it = std::find(parent.children.begin(), parent.children.end(), sid);
+  if (it == parent.children.end()) return std::nullopt;
+  size_t idx = static_cast<size_t>(it - parent.children.begin());
+
+  std::vector<NodeId> kids = stretch.children;
+  stretch.children.clear();
+  // Remove stretch from parent
+  parent.children.erase(parent.children.begin() + static_cast<std::ptrdiff_t>(idx));
+  // Insert children in its place
+  for (size_t i = 0; i < kids.size(); ++i) {
+    NodeId cid = kids[i];
+    doc.get(cid).parent = parent.id;
+    parent.children.insert(
+        parent.children.begin() + static_cast<std::ptrdiff_t>(idx + i), cid);
+  }
+  if (kids.empty()) return std::nullopt;
+  return kids.front();
+}
+
 bool wrap_block_in_stretch(Document& doc, NodeId block,
                            const std::string& summary) {
   if (block == INVALID_NODE) return false;

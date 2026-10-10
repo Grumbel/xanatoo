@@ -346,6 +346,9 @@ int main(int argc, char** argv) {
   std::string link_edit_href;
   glyphtoo::NodeId link_edit_node = glyphtoo::INVALID_NODE;
   size_t link_edit_span = 0;
+  bool summary_edit_mode = false;
+  std::string summary_edit_text;
+  glyphtoo::NodeId summary_edit_node = glyphtoo::INVALID_NODE;
 
   Uint32 caret_blink_start = SDL_GetTicks();
   auto reset_blink = [&]() { caret_blink_start = SDL_GetTicks(); };
@@ -608,6 +611,10 @@ int main(int argc, char** argv) {
             link_edit_href += ev.text.text;
             break;
           }
+          if (summary_edit_mode) {
+            summary_edit_text += ev.text.text;
+            break;
+          }
           if (search_mode) {
             if (replace_mode && !search_query.empty() && replace_focus) {
               replace_text += ev.text.text;
@@ -663,6 +670,9 @@ int main(int argc, char** argv) {
               } else if (link_edit_mode) {
                 link_edit_mode = false;
                 link_edit_href.clear();
+              } else if (summary_edit_mode) {
+                summary_edit_mode = false;
+                summary_edit_text.clear();
               } else if (search_mode) {
                 search_mode = false;
                 replace_mode = false;
@@ -808,6 +818,15 @@ int main(int argc, char** argv) {
                 }
                 break;
               }
+              if (summary_edit_mode) {
+                if (!summary_edit_text.empty()) {
+                  while (!summary_edit_text.empty() &&
+                         (static_cast<unsigned char>(summary_edit_text.back()) & 0xc0) == 0x80)
+                    summary_edit_text.pop_back();
+                  if (!summary_edit_text.empty()) summary_edit_text.pop_back();
+                }
+                break;
+              }
               if (search_mode) {
                 std::string& target = (replace_mode && replace_focus) ? replace_text : search_query;
                 if (!target.empty()) {
@@ -882,6 +901,16 @@ int main(int argc, char** argv) {
                 }
                 link_edit_mode = false;
                 link_edit_href.clear();
+                break;
+              }
+              if (summary_edit_mode) {
+                if (summary_edit_node != glyphtoo::INVALID_NODE) {
+                  d.get(summary_edit_node).summary = summary_edit_text;
+                  mark_dirty();
+                  needs_layout = true;
+                }
+                summary_edit_mode = false;
+                summary_edit_text.clear();
                 break;
               }
               if (save_as_mode) {
@@ -1161,10 +1190,36 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_e:
-              if (ctrl) {
+              if (ctrl && shift) {
+                // Edit summary of enclosing stretch
+                glyphtoo::NodeId sid = glyphtoo::enclosing_stretch(d, p.sel.focus.node);
+                if (sid != glyphtoo::INVALID_NODE) {
+                  summary_edit_mode = true;
+                  summary_edit_node = sid;
+                  summary_edit_text = d.get(sid).summary;
+                  search_mode = false;
+                  save_as_mode = false;
+                  link_edit_mode = false;
+                }
+              } else if (ctrl) {
                 edit();
                 std::string summary = glyphtoo::selected_text(d, p.sel);
                 if (glyphtoo::wrap_block_in_stretch(d, p.sel.focus.node, summary)) {
+                  needs_layout = true;
+                  reset_blink();
+                }
+              }
+              break;
+
+            case SDLK_u:
+              if (ctrl && shift) {
+                // Unwrap enclosing stretch
+                edit();
+                if (auto first = glyphtoo::unwrap_stretch(d, p.sel.focus.node)) {
+                  p.sel.focus.node = *first;
+                  p.sel.focus.span_index = 0;
+                  p.sel.focus.char_index = 0;
+                  p.sel.anchor = p.sel.focus;
                   needs_layout = true;
                   reset_blink();
                 }
@@ -1330,7 +1385,7 @@ int main(int argc, char** argv) {
     {
       const int bar_h = 28;
       SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
-      if (search_mode || save_as_mode || link_edit_mode) {
+      if (search_mode || save_as_mode || link_edit_mode || summary_edit_mode) {
         SDL_SetRenderDrawColor(sdl, 30, 30, 40, 240);
       } else {
         SDL_SetRenderDrawColor(sdl, 236, 234, 228, 245);
@@ -1338,7 +1393,7 @@ int main(int argc, char** argv) {
       SDL_Rect bar{0, win_h - bar_h, win_w, bar_h};
       SDL_RenderFillRect(sdl, &bar);
       // Top edge line
-      if (search_mode || save_as_mode || link_edit_mode) {
+      if (search_mode || save_as_mode || link_edit_mode || summary_edit_mode) {
         SDL_SetRenderDrawColor(sdl, 80, 160, 255, 255);
       } else {
         SDL_SetRenderDrawColor(sdl, 200, 198, 190, 255);
@@ -1356,6 +1411,11 @@ int main(int argc, char** argv) {
       } else if (link_edit_mode) {
         label = "Link href: ";
         label += link_edit_href.empty() ? "…" : link_edit_href;
+        label += "    Enter confirm · Esc cancel";
+        tr = 220; tg = 230; tb = 245;
+      } else if (summary_edit_mode) {
+        label = "Stretch summary: ";
+        label += summary_edit_text.empty() ? "…" : summary_edit_text;
         label += "    Enter confirm · Esc cancel";
         tr = 220; tg = 230; tb = 245;
       } else if (search_mode && replace_mode) {

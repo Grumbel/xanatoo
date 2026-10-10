@@ -85,6 +85,13 @@ bool split_block(Document& doc, Caret& caret);
 bool wrap_block_in_stretch(Document& doc, NodeId block,
                            const std::string& summary = {});
 
+// If `block` is inside a Stretch, unwrap it: promote stretch children to the
+// stretch's parent and remove the stretch node. Returns the first child id.
+std::optional<NodeId> unwrap_stretch(Document& doc, NodeId block_or_stretch);
+
+// Walk parents to find enclosing Stretch node (or INVALID_NODE).
+NodeId enclosing_stretch(const Document& doc, NodeId id);
+
 // Delete the current selection (or nothing if empty). Caret becomes the start.
 void delete_selection(Document& doc, Selection& sel);
 

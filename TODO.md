@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **025** (this delivery is **024**)
+Next bundle number: **026** (this delivery is **025**)
 
 ## Status (2026-10-10)
 
@@ -66,6 +66,8 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] README keybinding reference
 - [x] Ctrl+0–6 paragraph / heading levels
 - [x] Ctrl+Shift+[ / ] collapse / expand all stretchtext
+- [x] Ctrl+Shift+E edit stretch summary
+- [x] Ctrl+Shift+U unwrap stretchtext
 
 ## Open work / next steps
 
@@ -107,4 +109,5 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-021.*-merge-zoom-…` — merge + zoom
 - `glyphtoo-022.*-scroll-replace-…` — scrollbar + replace + code style
 - `glyphtoo-023.*-scroll-drag-docs-…` — scroll drag + README
-- `glyphtoo-024.*-heading-stretch-…` — this delivery
+- `glyphtoo-024.*-heading-stretch-…` — heading levels + expand-all
+- `glyphtoo-025.*-stretch-edit-…` — this delivery
