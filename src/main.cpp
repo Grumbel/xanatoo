@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 //
-// glyphtoo — interactive document composition engine
+// xanatoo — interactive document composition engine
 
-#include "glyphtoo/types.hpp"
-#include "glyphtoo/font.hpp"
-#include "glyphtoo/layout.hpp"
-#include "glyphtoo/render.hpp"
-#include "glyphtoo/parse.hpp"
-#include "glyphtoo/editor.hpp"
-#include "glyphtoo/images.hpp"
-#include "glyphtoo/ui.hpp"
-#include "glyphtoo/util.hpp"
-#include "glyphtoo/cli.hpp"
+#include "xanatoo/types.hpp"
+#include "xanatoo/font.hpp"
+#include "xanatoo/layout.hpp"
+#include "xanatoo/render.hpp"
+#include "xanatoo/parse.hpp"
+#include "xanatoo/editor.hpp"
+#include "xanatoo/images.hpp"
+#include "xanatoo/ui.hpp"
+#include "xanatoo/util.hpp"
+#include "xanatoo/cli.hpp"
 
 #include <SDL.h>
 #include <iostream>
@@ -27,8 +27,8 @@
 namespace fs = std::filesystem;
 
 int main(int argc, char** argv) {
-  glyphtoo::CliOptions opt;
-  if (!glyphtoo::parse_cli(argc, argv, opt)) {
+  xanatoo::CliOptions opt;
+  if (!xanatoo::parse_cli(argc, argv, opt)) {
     return 1;
   }
 
@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
   SDL_StartTextInput();
 
   SDL_Window* window = SDL_CreateWindow(
-      "glyphtoo",
+      "xanatoo",
       SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
       920, 720,
       SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN);
@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
 
   std::string font_path = opt.font_path;
   if (font_path.empty()) {
-    if (const char* env = std::getenv("GLYPHTOO_FONT")) {
+    if (const char* env = std::getenv("XANATOO_FONT")) {
       if (env[0] != '\0') font_path = env;
     }
   }
@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
 
   int body_px = 17;
   int heading_px = 26;
-  glyphtoo::FontSet fonts;
+  xanatoo::FontSet fonts;
   if (!fonts.load(sdl, font_path, body_px, heading_px)) {
     std::cerr << "Failed to load fonts via FontConfig. "
                  "Pass a TTF with --font or install DejaVu/Liberation.\n";
@@ -82,22 +82,22 @@ int main(int argc, char** argv) {
     SDL_Quit();
     return 1;
   }
-  glyphtoo::Font& body_font = fonts.regular;
+  xanatoo::Font& body_font = fonts.regular;
 
 
-  auto load_doc = [&](const std::string& path) -> glyphtoo::Document {
+  auto load_doc = [&](const std::string& path) -> xanatoo::Document {
     if (path.empty()) {
-      return glyphtoo::parse_document(glyphtoo::fallback_document(), {});
+      return xanatoo::parse_document(xanatoo::fallback_document(), {});
     }
     std::ifstream in(path);
     if (!in) {
       std::cerr << "Failed to open document: " << path << "\n";
-      return glyphtoo::parse_document(glyphtoo::fallback_document(), {});
+      return xanatoo::parse_document(xanatoo::fallback_document(), {});
     }
     std::string source((std::istreambuf_iterator<char>(in)),
                        std::istreambuf_iterator<char>());
     std::cout << "Opened: " << path << "\n";
-    return glyphtoo::parse_document(source, path);
+    return xanatoo::parse_document(source, path);
   };
 
   auto parent_dir = [](const std::string& path) -> std::string {
@@ -107,12 +107,12 @@ int main(int argc, char** argv) {
     return {};
   };
 
-  glyphtoo::Document docs[2];
+  xanatoo::Document docs[2];
   std::string paths[2];
   paths[0] = opt.file_path;
   paths[1] = opt.file_path2;
   if (paths[0].empty()) {
-    paths[0] = glyphtoo::find_default_document();
+    paths[0] = xanatoo::find_default_document();
     if (paths[0].empty())
       std::cerr << "Note: examples/welcome.md not found; starting empty.\n";
   }
@@ -122,10 +122,10 @@ int main(int argc, char** argv) {
   bool shared_doc = paths[1].empty();
   bool dirty_flags[2] = {false, false};
 
-  glyphtoo::ImageCache images(sdl);
+  xanatoo::ImageCache images(sdl);
 
   auto update_title = [&]() {
-    std::string title = "glyphtoo";
+    std::string title = "xanatoo";
     auto label = [&](int i) {
       std::string s;
       if (dirty_flags[i]) s += "*";
@@ -142,9 +142,9 @@ int main(int argc, char** argv) {
   };
   update_title();
 
-  glyphtoo::LayoutEngine layout_engine(fonts, &images);
-  glyphtoo::Renderer renderer(sdl, fonts, &images);
-  glyphtoo::Ui ui;
+  xanatoo::LayoutEngine layout_engine(fonts, &images);
+  xanatoo::Renderer renderer(sdl, fonts, &images);
+  xanatoo::Ui ui;
   if (!ui.init(window, sdl)) {
     std::cerr << "Warning: ImGui UI failed to init; continuing without menus\n";
   }
@@ -152,10 +152,10 @@ int main(int argc, char** argv) {
 
   struct Pane {
     int doc_index = 0;  // which docs[] entry
-    glyphtoo::Selection sel{};
+    xanatoo::Selection sel{};
     float scroll_y = 0.f;
     float preferred_x = 0.f;
-    glyphtoo::LayoutResult layout{};
+    xanatoo::LayoutResult layout{};
     int x = 0;
     int w = 0;
   };
@@ -163,9 +163,9 @@ int main(int argc, char** argv) {
   Pane panes[2];
   panes[0].doc_index = 0;
   panes[1].doc_index = shared_doc ? 0 : 1;
-  glyphtoo::ensure_valid_caret(docs[0], panes[0].sel.focus);
+  xanatoo::ensure_valid_caret(docs[0], panes[0].sel.focus);
   panes[0].sel.anchor = panes[0].sel.focus;
-  glyphtoo::ensure_valid_caret(docs[panes[1].doc_index], panes[1].sel.focus);
+  xanatoo::ensure_valid_caret(docs[panes[1].doc_index], panes[1].sel.focus);
   panes[1].sel.anchor = panes[1].sel.focus;
 
   int focus = 0;
@@ -176,19 +176,19 @@ int main(int argc, char** argv) {
   bool dragging_scroll = false;
   int scroll_drag_pane = 0;
   bool dragging_image = false;
-  glyphtoo::NodeId resize_image = glyphtoo::INVALID_NODE;
+  xanatoo::NodeId resize_image = xanatoo::INVALID_NODE;
   float resize_start_x = 0.f;
   float resize_start_scale = 1.f;
   // Block drag-reorder (grab left margin of a layout box)
   bool dragging_block = false;
-  glyphtoo::NodeId drag_block_id = glyphtoo::INVALID_NODE;
-  glyphtoo::NodeId drop_target_id = glyphtoo::INVALID_NODE;
+  xanatoo::NodeId drag_block_id = xanatoo::INVALID_NODE;
+  xanatoo::NodeId drop_target_id = xanatoo::INVALID_NODE;
   bool drop_before = true;
   float drop_line_y = -1.f;  // content y for insertion indicator
   // Column gutter drag (adjust relative display_scale weights)
   bool dragging_col_gap = false;
-  glyphtoo::NodeId col_gap_left = glyphtoo::INVALID_NODE;
-  glyphtoo::NodeId col_gap_right = glyphtoo::INVALID_NODE;
+  xanatoo::NodeId col_gap_left = xanatoo::INVALID_NODE;
+  xanatoo::NodeId col_gap_right = xanatoo::INVALID_NODE;
   float col_gap_start_x = 0.f;
   float col_gap_left_w = 1.f;
   float col_gap_right_w = 1.f;
@@ -196,7 +196,7 @@ int main(int argc, char** argv) {
   float last_click_x = -999.f, last_click_y = -999.f;
   int click_count = 0;
 
-  auto doc_of = [&](Pane& p) -> glyphtoo::Document& {
+  auto doc_of = [&](Pane& p) -> xanatoo::Document& {
     return docs[p.doc_index];
   };
   auto path_of = [&](Pane& p) -> std::string& {
@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
     return parent_dir(paths[p.doc_index]);
   };
 
-  glyphtoo::History histories[2];
+  xanatoo::History histories[2];
   histories[0].reset(docs[0], panes[0].sel);
   histories[1].reset(docs[panes[1].doc_index], panes[1].sel);
 
@@ -226,14 +226,14 @@ int main(int argc, char** argv) {
   std::string image_insert_path;
   bool link_edit_mode = false;
   std::string link_edit_href;
-  glyphtoo::NodeId link_edit_node = glyphtoo::INVALID_NODE;
+  xanatoo::NodeId link_edit_node = xanatoo::INVALID_NODE;
   size_t link_edit_span = 0;
   bool summary_edit_mode = false;
   std::string summary_edit_text;
-  glyphtoo::NodeId summary_edit_node = glyphtoo::INVALID_NODE;
+  xanatoo::NodeId summary_edit_node = xanatoo::INVALID_NODE;
   bool help_mode = false;  // F1 help as a real document in a software window
-  glyphtoo::Document help_doc;
-  glyphtoo::LayoutResult help_layout;
+  xanatoo::Document help_doc;
+  xanatoo::LayoutResult help_layout;
   float help_scroll = 0.f;
   bool help_needs_layout = true;
   bool help_loaded = false;
@@ -250,11 +250,11 @@ int main(int argc, char** argv) {
   const int help_pad = 12;
   const int help_edge = 6;  // hit thickness for edges/corner
   bool outline_mode = false;  // Ctrl+Shift+O heading outline
-  std::vector<glyphtoo::OutlineEntry> outline;
+  std::vector<xanatoo::OutlineEntry> outline;
   int outline_sel = 0;
   // Side-by-side version marks (two independent documents)
   bool diff_mode = false;
-  std::vector<glyphtoo::NodeId> diff_marks[2];
+  std::vector<xanatoo::NodeId> diff_marks[2];
   // Hovered link href (shown in status bar when not in a modal mode)
   std::string hovered_href;
   std::string hovered_preview;  // internal #anchor target snippet
@@ -266,7 +266,7 @@ int main(int argc, char** argv) {
   auto F = [&]() -> Pane& { return panes[focus]; };
 
   auto refresh_outline = [&]() {
-    glyphtoo::collect_outline(doc_of(F()), outline);
+    xanatoo::collect_outline(doc_of(F()), outline);
     if (outline_sel >= static_cast<int>(outline.size()))
       outline_sel = std::max(0, static_cast<int>(outline.size()) - 1);
   };
@@ -275,7 +275,7 @@ int main(int argc, char** argv) {
     diff_marks[0].clear();
     diff_marks[1].clear();
     if (!diff_mode || shared_doc || paths[1].empty()) return;
-    glyphtoo::compute_diff_marks(docs[0], docs[1], diff_marks[0], diff_marks[1]);
+    xanatoo::compute_diff_marks(docs[0], docs[1], diff_marks[0], diff_marks[1]);
   };
 
   auto checkpoint = [&]() {
@@ -320,7 +320,7 @@ int main(int argc, char** argv) {
   };
 
   auto scroll_caret_into_view = [&](Pane& p) {
-    auto cpos = glyphtoo::caret_screen_pos(
+    auto cpos = xanatoo::caret_screen_pos(
         p.layout, p.sel.focus, 0.f,
         static_cast<float>(body_font.line_height()));
     if (!cpos.valid) return;
@@ -354,7 +354,7 @@ int main(int argc, char** argv) {
       for (const auto& c : {
                dir / "examples" / "help.md",
                dir / ".." / "examples" / "help.md",
-               dir / ".." / "share" / "glyphtoo" / "examples" / "help.md",
+               dir / ".." / "share" / "xanatoo" / "examples" / "help.md",
            }) {
         std::error_code ec;
         auto canon = fs::weakly_canonical(c, ec);
@@ -374,8 +374,8 @@ int main(int argc, char** argv) {
       std::cout << "Help document: " << hp << "\n";
     } else {
       // Minimal built-in so F1 always works offline
-      help_doc = glyphtoo::parse_document(
-          "# glyphtoo help\n\n"
+      help_doc = xanatoo::parse_document(
+          "# xanatoo help\n\n"
           "Place `examples/help.md` next to the binary for the full reference.\n\n"
           "Press **F1** or **Esc** to close.\n",
           {});
@@ -456,7 +456,7 @@ int main(int argc, char** argv) {
           std::string fpath(dropped);
           SDL_free(dropped);
 
-          if (!glyphtoo::is_raster_image_path(fpath)) {
+          if (!xanatoo::is_raster_image_path(fpath)) {
             std::cerr << "Drop ignored (not an image): " << fpath << "\n";
             break;
           }
@@ -472,12 +472,12 @@ int main(int argc, char** argv) {
           float my = content_y(static_cast<float>(my_raw));
 
           // Place caret at drop location when possible; otherwise keep current.
-          if (auto hit = glyphtoo::hit_test(p.layout, lx, my, p.scroll_y)) {
+          if (auto hit = xanatoo::hit_test(p.layout, lx, my, p.scroll_y)) {
             p.sel.focus = *hit;
             p.sel.anchor = p.sel.focus;
           }
-          glyphtoo::ensure_valid_caret(d, p.sel.focus);
-          if (p.sel.focus.node == glyphtoo::INVALID_NODE) {
+          xanatoo::ensure_valid_caret(d, p.sel.focus);
+          if (p.sel.focus.node == xanatoo::INVALID_NODE) {
             std::cerr << "Drop: no place to insert image\n";
             break;
           }
@@ -502,7 +502,7 @@ int main(int argc, char** argv) {
           }
 
           edit();
-          if (glyphtoo::insert_image(d, p.sel.focus, store, alt)) {
+          if (xanatoo::insert_image(d, p.sel.focus, store, alt)) {
             p.sel.anchor = p.sel.focus;
             needs_layout = true;
             reset_blink();
@@ -592,20 +592,20 @@ int main(int argc, char** argv) {
                 float ly = static_cast<float>(myw - cy);
                 if (lx >= 0 && ly >= 0 && lx <= cw && ly <= ch) {
                   // Stretchtext expand/collapse
-                  if (auto sid = glyphtoo::hit_test_stretch(
+                  if (auto sid = xanatoo::hit_test_stretch(
                           help_layout, lx, ly, help_scroll)) {
-                    if (help_doc.get(*sid).kind == glyphtoo::NodeKind::Stretch) {
+                    if (help_doc.get(*sid).kind == xanatoo::NodeKind::Stretch) {
                       help_doc.get(*sid).expanded = !help_doc.get(*sid).expanded;
                       help_needs_layout = true;
                       break;
                     }
                   }
-                  if (auto href = glyphtoo::hit_test_link(
+                  if (auto href = xanatoo::hit_test_link(
                           help_doc, help_layout, lx, ly, help_scroll)) {
                     if (!href->empty() && (*href)[0] == '#') {
                       if (auto dest =
-                              glyphtoo::jump_to_href(help_doc, *href)) {
-                        auto cpos = glyphtoo::caret_screen_pos(
+                              xanatoo::jump_to_href(help_doc, *href)) {
+                        auto cpos = xanatoo::caret_screen_pos(
                             help_layout, *dest, 0.f,
                             static_cast<float>(body_font.line_height()));
                         if (cpos.valid)
@@ -717,24 +717,24 @@ int main(int argc, char** argv) {
                 if (lx < box.x || lx > box.x + 16.f) continue;
                 const auto& bn = doc_of(p).get(box.node);
                 // Only reorder movable siblings (not structural containers)
-                if (bn.kind == glyphtoo::NodeKind::Document ||
-                    bn.kind == glyphtoo::NodeKind::Columns ||
-                    bn.kind == glyphtoo::NodeKind::Column ||
-                    bn.kind == glyphtoo::NodeKind::List)
+                if (bn.kind == xanatoo::NodeKind::Document ||
+                    bn.kind == xanatoo::NodeKind::Columns ||
+                    bn.kind == xanatoo::NodeKind::Column ||
+                    bn.kind == xanatoo::NodeKind::List)
                   continue;
-                if (bn.parent == glyphtoo::INVALID_NODE) continue;
+                if (bn.parent == xanatoo::INVALID_NODE) continue;
                 dragging_block = true;
                 drag_block_id = box.node;
-                drop_target_id = glyphtoo::INVALID_NODE;
+                drop_target_id = xanatoo::INVALID_NODE;
                 drop_line_y = -1.f;
                 break;
               }
               if (dragging_block) break;
             }
 
-            if (auto sid = glyphtoo::hit_test_stretch(p.layout, lx, my, p.scroll_y)) {
-              glyphtoo::NodeId id = *sid;
-              if (doc_of(p).get(id).kind == glyphtoo::NodeKind::Stretch) {
+            if (auto sid = xanatoo::hit_test_stretch(p.layout, lx, my, p.scroll_y)) {
+              xanatoo::NodeId id = *sid;
+              if (doc_of(p).get(id).kind == xanatoo::NodeKind::Stretch) {
                 edit();
                 doc_of(p).get(id).expanded = !doc_of(p).get(id).expanded;
                 needs_layout = true;
@@ -743,9 +743,9 @@ int main(int argc, char** argv) {
             }
 
             // Follow links: internal #anchors jump in-document; http(s)/mailto open externally
-            if (auto href = glyphtoo::hit_test_link(
+            if (auto href = xanatoo::hit_test_link(
                     doc_of(p), p.layout, lx, my, p.scroll_y)) {
-              if (auto dest = glyphtoo::jump_to_href(doc_of(p), *href)) {
+              if (auto dest = xanatoo::jump_to_href(doc_of(p), *href)) {
                 const bool ctrl_click =
                     (SDL_GetModState() & KMOD_CTRL) != 0;
                 // Ctrl+click: open target in the other pane (enable split)
@@ -776,7 +776,7 @@ int main(int argc, char** argv) {
                 break;
               } else if (!href->empty() && (*href)[0] != '#') {
                 std::cout << "Opening external link: " << *href << "\n";
-                glyphtoo::open_external_url(*href);
+                xanatoo::open_external_url(*href);
                 break;
               }
             }
@@ -789,8 +789,8 @@ int main(int argc, char** argv) {
                 if (adj_y < box.y || adj_y > box.y + box.height) continue;
                 if (lx < box.x || lx > box.x + box.width) continue;
                 const auto& bn = doc_of(p).get(box.node);
-                if (bn.kind != glyphtoo::NodeKind::Transclude) continue;
-                if (auto dest = glyphtoo::jump_to_href(doc_of(p), bn.src)) {
+                if (bn.kind != xanatoo::NodeKind::Transclude) continue;
+                if (auto dest = xanatoo::jump_to_href(doc_of(p), bn.src)) {
                   p.sel.focus = *dest;
                   p.sel.anchor = p.sel.focus;
                   scroll_caret_into_view(p);
@@ -809,7 +809,7 @@ int main(int argc, char** argv) {
               if (followed) break;
             }
 
-            if (auto hit = glyphtoo::hit_test(p.layout, lx, my, p.scroll_y)) {
+            if (auto hit = xanatoo::hit_test(p.layout, lx, my, p.scroll_y)) {
               Uint32 now = SDL_GetTicks();
               bool near = (now - last_click_ticks) < 400 &&
                           std::abs(mx - last_click_x) < 4.f &&
@@ -820,14 +820,14 @@ int main(int argc, char** argv) {
               last_click_y = my;
 
               p.sel.focus = *hit;
-              glyphtoo::Document& dd = doc_of(p);
+              xanatoo::Document& dd = doc_of(p);
               if (click_count >= 3) {
                 // Triple-click: select whole block
-                glyphtoo::select_node(dd, p.sel, hit->node);
+                xanatoo::select_node(dd, p.sel, hit->node);
                 dragging_sel = false;
               } else if (click_count == 2) {
                 // Double-click: select word
-                glyphtoo::select_word_at(dd, p.sel);
+                xanatoo::select_word_at(dd, p.sel);
                 dragging_sel = false;
               } else if (!(SDL_GetModState() & KMOD_SHIFT)) {
                 p.sel.anchor = p.sel.focus;
@@ -846,11 +846,11 @@ int main(int argc, char** argv) {
             help_dragging = false;
             help_resize = 0;
             help_scroll_dragging = false;
-            if (dragging_block && drag_block_id != glyphtoo::INVALID_NODE &&
-                drop_target_id != glyphtoo::INVALID_NODE &&
+            if (dragging_block && drag_block_id != xanatoo::INVALID_NODE &&
+                drop_target_id != xanatoo::INVALID_NODE &&
                 drop_target_id != drag_block_id) {
               edit();
-              if (glyphtoo::relocate_block(doc_of(F()), drag_block_id,
+              if (xanatoo::relocate_block(doc_of(F()), drag_block_id,
                                           drop_target_id, drop_before)) {
                 needs_layout = true;
                 F().sel.focus.node = drag_block_id;
@@ -864,13 +864,13 @@ int main(int argc, char** argv) {
             dragging_scroll = false;
             dragging_image = false;
             dragging_block = false;
-            drag_block_id = glyphtoo::INVALID_NODE;
-            drop_target_id = glyphtoo::INVALID_NODE;
+            drag_block_id = xanatoo::INVALID_NODE;
+            drop_target_id = xanatoo::INVALID_NODE;
             drop_line_y = -1.f;
             dragging_col_gap = false;
-            col_gap_left = glyphtoo::INVALID_NODE;
-            col_gap_right = glyphtoo::INVALID_NODE;
-            resize_image = glyphtoo::INVALID_NODE;
+            col_gap_left = xanatoo::INVALID_NODE;
+            col_gap_right = xanatoo::INVALID_NODE;
+            resize_image = xanatoo::INVALID_NODE;
           }
           break;
 
@@ -931,7 +931,7 @@ int main(int argc, char** argv) {
             needs_layout = true;
             break;
           }
-          if (dragging_image && resize_image != glyphtoo::INVALID_NODE) {
+          if (dragging_image && resize_image != xanatoo::INVALID_NODE) {
             float mx = static_cast<float>(ev.motion.x);
             float dx = mx - resize_start_x;
             // 200px drag ≈ 1.0 scale change
@@ -941,8 +941,8 @@ int main(int argc, char** argv) {
             needs_layout = true;
             break;
           }
-          if (dragging_col_gap && col_gap_left != glyphtoo::INVALID_NODE &&
-              col_gap_right != glyphtoo::INVALID_NODE) {
+          if (dragging_col_gap && col_gap_left != xanatoo::INVALID_NODE &&
+              col_gap_right != xanatoo::INVALID_NODE) {
             float mx = static_cast<float>(ev.motion.x);
             float dx = mx - col_gap_start_x;
             // Shift weight from one column to the other; keep total constant
@@ -963,19 +963,19 @@ int main(int argc, char** argv) {
             needs_layout = true;
             break;
           }
-          if (dragging_block && drag_block_id != glyphtoo::INVALID_NODE) {
+          if (dragging_block && drag_block_id != xanatoo::INVALID_NODE) {
             Pane& p = F();
             float adj_y = content_y(mouse_y) + p.scroll_y;
-            drop_target_id = glyphtoo::INVALID_NODE;
+            drop_target_id = xanatoo::INVALID_NODE;
             drop_line_y = -1.f;
             for (const auto& box : p.layout.boxes) {
               if (box.node == drag_block_id) continue;
               if (adj_y < box.y || adj_y > box.y + box.height) continue;
               const auto& bn = doc_of(p).get(box.node);
               // Skip structural containers as drop targets
-              if (bn.kind == glyphtoo::NodeKind::Document ||
-                  bn.kind == glyphtoo::NodeKind::Columns ||
-                  bn.kind == glyphtoo::NodeKind::List)
+              if (bn.kind == xanatoo::NodeKind::Document ||
+                  bn.kind == xanatoo::NodeKind::Columns ||
+                  bn.kind == xanatoo::NodeKind::List)
                 continue;
               // Top half → before, bottom half → after
               drop_before = (adj_y < box.y + box.height * 0.5f);
@@ -991,7 +991,7 @@ int main(int argc, char** argv) {
             // Keep focus on the pane where drag started
             Pane& p = F();
             float lx = local_x(mx, focus);
-            if (auto hit = glyphtoo::hit_test(p.layout, lx, my, p.scroll_y)) {
+            if (auto hit = xanatoo::hit_test(p.layout, lx, my, p.scroll_y)) {
               p.sel.focus = *hit;
               p.preferred_x = lx;
             }
@@ -1004,10 +1004,10 @@ int main(int argc, char** argv) {
             int hover_pane = pane_at(mx);
             Pane& hp = panes[hover_pane];
             float lx = local_x(mx, hover_pane);
-            if (auto href = glyphtoo::hit_test_link(doc_of(hp), hp.layout, lx, my,
+            if (auto href = xanatoo::hit_test_link(doc_of(hp), hp.layout, lx, my,
                                                     hp.scroll_y)) {
               hovered_href = *href;
-              if (auto prev = glyphtoo::link_preview_text(doc_of(hp), *href)) {
+              if (auto prev = xanatoo::link_preview_text(doc_of(hp), *href)) {
                 hovered_preview = *prev;
               } else {
                 hovered_preview.clear();
@@ -1046,12 +1046,12 @@ int main(int argc, char** argv) {
             search_query += ev.text.text;
             Pane& p = F();
             size_t mlen = 0;
-            glyphtoo::Caret from = p.sel.focus;
+            xanatoo::Caret from = p.sel.focus;
             if (from.char_index > 0) from.char_index -= 1;
-            if (auto hit = glyphtoo::find_next(doc_of(p), search_query, from, mlen)) {
+            if (auto hit = xanatoo::find_next(doc_of(p), search_query, from, mlen)) {
               p.sel.anchor = *hit;
               p.sel.focus = *hit;
-              glyphtoo::advance_caret(doc_of(p), p.sel.focus, mlen);
+              xanatoo::advance_caret(doc_of(p), p.sel.focus, mlen);
               scroll_caret_into_view(p);
             }
             reset_blink();
@@ -1059,11 +1059,11 @@ int main(int argc, char** argv) {
           }
           edit();
           Pane& p = F();
-          glyphtoo::Document& td = doc_of(p);
+          xanatoo::Document& td = doc_of(p);
           if (!p.sel.empty()) {
-            glyphtoo::delete_selection(td, p.sel);
+            xanatoo::delete_selection(td, p.sel);
           }
-          glyphtoo::insert_text(td, p.sel.focus, ev.text.text);
+          xanatoo::insert_text(td, p.sel.focus, ev.text.text);
           p.sel.anchor = p.sel.focus;
           needs_layout = true;
           reset_blink();
@@ -1075,7 +1075,7 @@ int main(int argc, char** argv) {
           bool shift = (ev.key.keysym.mod & KMOD_SHIFT) != 0;
           bool ctrl = (ev.key.keysym.mod & KMOD_CTRL) != 0;
           Pane& p = F();
-          glyphtoo::Document& d = doc_of(p);
+          xanatoo::Document& d = doc_of(p);
 
           // Help window is non-modal: Esc/F1 close it; other keys edit the document.
           if (help_mode &&
@@ -1188,8 +1188,8 @@ int main(int argc, char** argv) {
               if (ctrl && shift) {
                 // Insert horizontal rule after current block
                 edit();
-                if (glyphtoo::insert_sibling_after(
-                        d, p.sel.focus, glyphtoo::NodeKind::HorizontalRule)) {
+                if (xanatoo::insert_sibling_after(
+                        d, p.sel.focus, xanatoo::NodeKind::HorizontalRule)) {
                   p.sel.anchor = p.sel.focus;
                   needs_layout = true;
                   reset_blink();
@@ -1209,12 +1209,12 @@ int main(int argc, char** argv) {
                 // Toggle block quote on the current text block
                 edit();
                 auto& node = d.get(p.sel.focus.node);
-                if (node.kind == glyphtoo::NodeKind::BlockQuote) {
-                  node.kind = glyphtoo::NodeKind::Paragraph;
-                } else if (node.kind == glyphtoo::NodeKind::Paragraph ||
-                           node.kind == glyphtoo::NodeKind::Heading ||
-                           node.kind == glyphtoo::NodeKind::ListItem) {
-                  node.kind = glyphtoo::NodeKind::BlockQuote;
+                if (node.kind == xanatoo::NodeKind::BlockQuote) {
+                  node.kind = xanatoo::NodeKind::Paragraph;
+                } else if (node.kind == xanatoo::NodeKind::Paragraph ||
+                           node.kind == xanatoo::NodeKind::Heading ||
+                           node.kind == xanatoo::NodeKind::ListItem) {
+                  node.kind = xanatoo::NodeKind::BlockQuote;
                   node.level = 0;
                 }
                 needs_layout = true;
@@ -1270,14 +1270,14 @@ int main(int argc, char** argv) {
                     shift || (ev.key.keysym.mod & KMOD_SHIFT) != 0;
                 auto hit =
                     backward
-                        ? glyphtoo::find_prev(doc_of(pp), search_query,
+                        ? xanatoo::find_prev(doc_of(pp), search_query,
                                              pp.sel.focus, mlen)
-                        : glyphtoo::find_next(doc_of(pp), search_query,
+                        : xanatoo::find_next(doc_of(pp), search_query,
                                              pp.sel.focus, mlen);
                 if (hit) {
                   pp.sel.anchor = *hit;
                   pp.sel.focus = *hit;
-                  glyphtoo::advance_caret(doc_of(pp), pp.sel.focus, mlen);
+                  xanatoo::advance_caret(doc_of(pp), pp.sel.focus, mlen);
                   scroll_caret_into_view(pp);
                   reset_blink();
                 }
@@ -1293,12 +1293,12 @@ int main(int argc, char** argv) {
               {
                 auto& d = doc_of(F());
                 auto& p = F();
-                if (p.sel.focus.node != glyphtoo::INVALID_NODE &&
+                if (p.sel.focus.node != xanatoo::INVALID_NODE &&
                     d.get(p.sel.focus.node).kind ==
-                        glyphtoo::NodeKind::ListItem) {
+                        xanatoo::NodeKind::ListItem) {
                   edit();
-                  bool ok = shift ? glyphtoo::outdent_list_item(d, p.sel.focus)
-                                  : glyphtoo::indent_list_item(d, p.sel.focus);
+                  bool ok = shift ? xanatoo::outdent_list_item(d, p.sel.focus)
+                                  : xanatoo::indent_list_item(d, p.sel.focus);
                   if (ok) {
                     p.sel.anchor = p.sel.focus;
                     needs_layout = true;
@@ -1380,9 +1380,9 @@ int main(int argc, char** argv) {
               }
               edit();
               if (!p.sel.empty()) {
-                glyphtoo::delete_selection(d, p.sel);
+                xanatoo::delete_selection(d, p.sel);
               } else {
-                glyphtoo::delete_backward(d, p.sel.focus);
+                xanatoo::delete_backward(d, p.sel.focus);
                 p.sel.anchor = p.sel.focus;
               }
               needs_layout = true;
@@ -1392,9 +1392,9 @@ int main(int argc, char** argv) {
             case SDLK_DELETE:
               edit();
               if (!p.sel.empty()) {
-                glyphtoo::delete_selection(d, p.sel);
+                xanatoo::delete_selection(d, p.sel);
               } else {
-                glyphtoo::delete_forward(d, p.sel.focus);
+                xanatoo::delete_forward(d, p.sel.focus);
                 p.sel.anchor = p.sel.focus;
               }
               needs_layout = true;
@@ -1405,33 +1405,33 @@ int main(int argc, char** argv) {
             case SDLK_KP_ENTER:
               if (replace_mode && search_mode && !search_query.empty()) {
                 Pane& pp = F();
-                glyphtoo::Document& dd = doc_of(pp);
+                xanatoo::Document& dd = doc_of(pp);
                 if (!pp.sel.empty()) {
                   edit();
-                  glyphtoo::delete_selection(dd, pp.sel);
+                  xanatoo::delete_selection(dd, pp.sel);
                   if (!replace_text.empty()) {
-                    glyphtoo::insert_text(dd, pp.sel.focus, replace_text);
+                    xanatoo::insert_text(dd, pp.sel.focus, replace_text);
                     pp.sel.anchor = pp.sel.focus;
                   }
                   needs_layout = true;
                 }
                 // Find next
                 size_t mlen = 0;
-                if (auto hit = glyphtoo::find_next(dd, search_query, pp.sel.focus, mlen)) {
+                if (auto hit = xanatoo::find_next(dd, search_query, pp.sel.focus, mlen)) {
                   pp.sel.anchor = *hit;
                   pp.sel.focus = *hit;
-                  glyphtoo::advance_caret(dd, pp.sel.focus, mlen);
+                  xanatoo::advance_caret(dd, pp.sel.focus, mlen);
                   scroll_caret_into_view(pp);
                 }
                 reset_blink();
                 break;
               }
               if (link_edit_mode) {
-                if (link_edit_node != glyphtoo::INVALID_NODE) {
+                if (link_edit_node != xanatoo::INVALID_NODE) {
                   auto& node = d.get(link_edit_node);
                   if (link_edit_span < node.spans.size()) {
                     node.spans[link_edit_span].href = link_edit_href;
-                    node.spans[link_edit_span].kind = glyphtoo::InlineKind::Link;
+                    node.spans[link_edit_span].kind = xanatoo::InlineKind::Link;
                     mark_dirty();
                     needs_layout = true;
                     std::cout << "Link href: " << link_edit_href << "\n";
@@ -1442,7 +1442,7 @@ int main(int argc, char** argv) {
                 break;
               }
               if (summary_edit_mode) {
-                if (summary_edit_node != glyphtoo::INVALID_NODE) {
+                if (summary_edit_node != xanatoo::INVALID_NODE) {
                   d.get(summary_edit_node).summary = summary_edit_text;
                   mark_dirty();
                   needs_layout = true;
@@ -1453,7 +1453,7 @@ int main(int argc, char** argv) {
               }
               if (save_as_mode) {
                 if (!save_as_path.empty()) {
-                  std::string text = glyphtoo::serialize_document(d, save_as_path);
+                  std::string text = xanatoo::serialize_document(d, save_as_path);
                   std::ofstream out(save_as_path);
                   if (!out) {
                     std::cerr << "Failed to save: " << save_as_path << "\n";
@@ -1472,7 +1472,7 @@ int main(int argc, char** argv) {
               if (image_insert_mode) {
                 if (!image_insert_path.empty()) {
                   edit();
-                  if (glyphtoo::insert_image(d, p.sel.focus, image_insert_path)) {
+                  if (xanatoo::insert_image(d, p.sel.focus, image_insert_path)) {
                     p.sel.anchor = p.sel.focus;
                     needs_layout = true;
                     reset_blink();
@@ -1486,8 +1486,8 @@ int main(int argc, char** argv) {
               // Ctrl+Enter: new empty paragraph after current block
               if (ctrl) {
                 edit();
-                if (glyphtoo::insert_sibling_after(
-                        d, p.sel.focus, glyphtoo::NodeKind::Paragraph)) {
+                if (xanatoo::insert_sibling_after(
+                        d, p.sel.focus, xanatoo::NodeKind::Paragraph)) {
                   p.sel.anchor = p.sel.focus;
                   needs_layout = true;
                   reset_blink();
@@ -1495,8 +1495,8 @@ int main(int argc, char** argv) {
                 break;
               }
               edit();
-              if (!p.sel.empty()) glyphtoo::delete_selection(d, p.sel);
-              glyphtoo::split_block(d, p.sel.focus);
+              if (!p.sel.empty()) xanatoo::delete_selection(d, p.sel);
+              xanatoo::split_block(d, p.sel.focus);
               p.sel.anchor = p.sel.focus;
               needs_layout = true;
               reset_blink();
@@ -1505,9 +1505,9 @@ int main(int argc, char** argv) {
             case SDLK_LEFT:
               move_and_sel([&] {
                 if (ctrl) {
-                  glyphtoo::move_word_left(d, p.sel.focus);
-                } else if (!glyphtoo::move_left(d, p.sel.focus)) {
-                  glyphtoo::move_to_prev_node(d, p.sel.focus);
+                  xanatoo::move_word_left(d, p.sel.focus);
+                } else if (!xanatoo::move_left(d, p.sel.focus)) {
+                  xanatoo::move_to_prev_node(d, p.sel.focus);
                 }
               });
               scroll_caret_into_view(p);
@@ -1517,9 +1517,9 @@ int main(int argc, char** argv) {
             case SDLK_RIGHT:
               move_and_sel([&] {
                 if (ctrl) {
-                  glyphtoo::move_word_right(d, p.sel.focus);
-                } else if (!glyphtoo::move_right(d, p.sel.focus)) {
-                  glyphtoo::move_to_next_node(d, p.sel.focus);
+                  xanatoo::move_word_right(d, p.sel.focus);
+                } else if (!xanatoo::move_right(d, p.sel.focus)) {
+                  xanatoo::move_to_next_node(d, p.sel.focus);
                 }
               });
               scroll_caret_into_view(p);
@@ -1529,14 +1529,14 @@ int main(int argc, char** argv) {
             case SDLK_UP:
               if ((ev.key.keysym.mod & KMOD_ALT) != 0) {
                 edit();
-                if (glyphtoo::move_block_up(d, p.sel.focus.node)) {
+                if (xanatoo::move_block_up(d, p.sel.focus.node)) {
                   needs_layout = true;
                   reset_blink();
                 }
               } else {
                 move_and_sel([&] {
-                  if (!glyphtoo::move_up(p.layout, p.sel.focus, p.preferred_x))
-                    glyphtoo::move_to_prev_node(d, p.sel.focus);
+                  if (!xanatoo::move_up(p.layout, p.sel.focus, p.preferred_x))
+                    xanatoo::move_to_prev_node(d, p.sel.focus);
                 });
                 scroll_caret_into_view(p);
                 reset_blink();
@@ -1546,14 +1546,14 @@ int main(int argc, char** argv) {
             case SDLK_DOWN:
               if ((ev.key.keysym.mod & KMOD_ALT) != 0) {
                 edit();
-                if (glyphtoo::move_block_down(d, p.sel.focus.node)) {
+                if (xanatoo::move_block_down(d, p.sel.focus.node)) {
                   needs_layout = true;
                   reset_blink();
                 }
               } else {
                 move_and_sel([&] {
-                  if (!glyphtoo::move_down(p.layout, p.sel.focus, p.preferred_x))
-                    glyphtoo::move_to_next_node(d, p.sel.focus);
+                  if (!xanatoo::move_down(p.layout, p.sel.focus, p.preferred_x))
+                    xanatoo::move_to_next_node(d, p.sel.focus);
                 });
                 scroll_caret_into_view(p);
                 reset_blink();
@@ -1576,7 +1576,7 @@ int main(int argc, char** argv) {
                 if (p.layout.glyphs.empty()) return;
                 float target_y = p.scroll_y + view_h * 0.15f;
                 float best = 1e9f;
-                glyphtoo::Caret best_c = p.sel.focus;
+                xanatoo::Caret best_c = p.sel.focus;
                 for (const auto& g : p.layout.glyphs) {
                   float dy = std::abs(g.y - target_y);
                   if (dy < best) {
@@ -1593,15 +1593,15 @@ int main(int argc, char** argv) {
             case SDLK_HOME:
               move_and_sel([&] {
                 if (ctrl) {
-                  glyphtoo::move_to_document_start(d, p.sel.focus);
+                  xanatoo::move_to_document_start(d, p.sel.focus);
                 } else {
                   // Line start via layout: find leftmost glyph on same baseline
-                  auto cpos = glyphtoo::caret_screen_pos(
+                  auto cpos = xanatoo::caret_screen_pos(
                       p.layout, p.sel.focus, p.scroll_y,
                       static_cast<float>(body_font.line_height()));
                   if (cpos.valid) {
                     float best_x = 1e9f;
-                    glyphtoo::Caret best = p.sel.focus;
+                    xanatoo::Caret best = p.sel.focus;
                     for (const auto& g : p.layout.glyphs) {
                       if (g.node != p.sel.focus.node) continue;
                       if (std::abs(g.y - (cpos.y + p.scroll_y)) > 2.f) continue;
@@ -1624,14 +1624,14 @@ int main(int argc, char** argv) {
             case SDLK_END:
               move_and_sel([&] {
                 if (ctrl) {
-                  glyphtoo::move_to_document_end(d, p.sel.focus);
+                  xanatoo::move_to_document_end(d, p.sel.focus);
                 } else {
-                  auto cpos = glyphtoo::caret_screen_pos(
+                  auto cpos = xanatoo::caret_screen_pos(
                       p.layout, p.sel.focus, p.scroll_y,
                       static_cast<float>(body_font.line_height()));
                   if (cpos.valid) {
                     float best_x = -1e9f;
-                    glyphtoo::Caret best = p.sel.focus;
+                    xanatoo::Caret best = p.sel.focus;
                     for (const auto& g : p.layout.glyphs) {
                       if (g.node != p.sel.focus.node) continue;
                       if (std::abs(g.y - (cpos.y + p.scroll_y)) > 2.f) continue;
@@ -1650,18 +1650,18 @@ int main(int argc, char** argv) {
 
             case SDLK_c:
               if (ctrl) {
-                std::string text = glyphtoo::selected_text(d, p.sel);
+                std::string text = xanatoo::selected_text(d, p.sel);
                 if (!text.empty()) SDL_SetClipboardText(text.c_str());
               }
               break;
 
             case SDLK_x:
               if (ctrl) {
-                std::string text = glyphtoo::selected_text(d, p.sel);
+                std::string text = xanatoo::selected_text(d, p.sel);
                 if (!text.empty()) {
                   SDL_SetClipboardText(text.c_str());
                   edit();
-                  glyphtoo::delete_selection(d, p.sel);
+                  xanatoo::delete_selection(d, p.sel);
                   needs_layout = true;
                   reset_blink();
                 }
@@ -1674,8 +1674,8 @@ int main(int argc, char** argv) {
                   char* clip = SDL_GetClipboardText();
                   if (clip && clip[0]) {
                     edit();
-                    if (!p.sel.empty()) glyphtoo::delete_selection(d, p.sel);
-                    glyphtoo::paste_plain_text(d, p.sel.focus, clip);
+                    if (!p.sel.empty()) xanatoo::delete_selection(d, p.sel);
+                    xanatoo::paste_plain_text(d, p.sel.focus, clip);
                     p.sel.anchor = p.sel.focus;
                     needs_layout = true;
                     reset_blink();
@@ -1689,7 +1689,7 @@ int main(int argc, char** argv) {
               if (ctrl) {
                 if (histories[p.doc_index].undo(d, p.sel)) {
                   if (panes[0].doc_index == panes[1].doc_index) {
-                    glyphtoo::ensure_valid_caret(
+                    xanatoo::ensure_valid_caret(
                         doc_of(panes[1 - focus]), panes[1 - focus].sel.focus);
                     panes[1 - focus].sel.anchor = panes[1 - focus].sel.focus;
                   }
@@ -1703,7 +1703,7 @@ int main(int argc, char** argv) {
               if (ctrl) {
                 if (histories[p.doc_index].redo(d, p.sel)) {
                   if (panes[0].doc_index == panes[1].doc_index) {
-                    glyphtoo::ensure_valid_caret(
+                    xanatoo::ensure_valid_caret(
                         doc_of(panes[1 - focus]), panes[1 - focus].sel.focus);
                     panes[1 - focus].sel.anchor = panes[1 - focus].sel.focus;
                   }
@@ -1732,7 +1732,7 @@ int main(int argc, char** argv) {
                   std::cout << "Saving untitled buffer as: " << spath << "\n";
                 }
                 {
-                  std::string text = glyphtoo::serialize_document(d, spath);
+                  std::string text = xanatoo::serialize_document(d, spath);
                   std::ofstream out(spath);
                   if (!out) {
                     std::cerr << "Failed to save: " << spath << "\n";
@@ -1778,13 +1778,13 @@ int main(int argc, char** argv) {
                                "Ctrl+Shift+R to discard and reload\n";
                   break;
                 }
-                glyphtoo::clear_external_doc_cache();
+                xanatoo::clear_external_doc_cache();
                 docs[p.doc_index] = load_doc(rpath);
                 dirty_flags[p.doc_index] = false;
                 histories[p.doc_index].reset(docs[p.doc_index], p.sel);
                 for (int pi = 0; pi < 2; ++pi) {
                   if (panes[pi].doc_index != p.doc_index) continue;
-                  glyphtoo::ensure_valid_caret(docs[p.doc_index],
+                  xanatoo::ensure_valid_caret(docs[p.doc_index],
                                               panes[pi].sel.focus);
                   panes[pi].sel.anchor = panes[pi].sel.focus;
                   panes[pi].scroll_y = 0.f;
@@ -1805,7 +1805,7 @@ int main(int argc, char** argv) {
                 }
                 if (shared_doc || paths[1].empty()) {
                   std::cout << "Diff marks need two open files "
-                               "(glyphtoo a.md b.md).\n";
+                               "(xanatoo a.md b.md).\n";
                 } else {
                   diff_mode = !diff_mode;
                   refresh_diff();
@@ -1815,7 +1815,7 @@ int main(int argc, char** argv) {
               }
               if (ctrl) {
                 edit();
-                if (auto nid = glyphtoo::duplicate_block(d, p.sel.focus.node)) {
+                if (auto nid = xanatoo::duplicate_block(d, p.sel.focus.node)) {
                   p.sel.focus.node = *nid;
                   p.sel.focus.span_index = 0;
                   p.sel.focus.char_index = 0;
@@ -1830,7 +1830,7 @@ int main(int argc, char** argv) {
               // Ctrl+Shift+8 — toggle unordered list (common editor binding)
               if (ctrl && shift) {
                 edit();
-                if (glyphtoo::toggle_list(d, p.sel.focus, false)) {
+                if (xanatoo::toggle_list(d, p.sel.focus, false)) {
                   p.sel.anchor = p.sel.focus;
                   needs_layout = true;
                   reset_blink();
@@ -1842,7 +1842,7 @@ int main(int argc, char** argv) {
               // Ctrl+Shift+7 — toggle ordered list
               if (ctrl && shift) {
                 edit();
-                if (glyphtoo::toggle_list(d, p.sel.focus, true)) {
+                if (xanatoo::toggle_list(d, p.sel.focus, true)) {
                   p.sel.anchor = p.sel.focus;
                   needs_layout = true;
                   reset_blink();
@@ -1853,7 +1853,7 @@ int main(int argc, char** argv) {
             case SDLK_b:
               if (ctrl && !p.sel.empty()) {
                 edit();
-                glyphtoo::apply_style_to_selection(d, p.sel, glyphtoo::InlineKind::Strong);
+                xanatoo::apply_style_to_selection(d, p.sel, xanatoo::InlineKind::Strong);
                 needs_layout = true;
                 reset_blink();
               }
@@ -1872,7 +1872,7 @@ int main(int argc, char** argv) {
               }
               if (ctrl && !p.sel.empty()) {
                 edit();
-                glyphtoo::apply_style_to_selection(d, p.sel, glyphtoo::InlineKind::Emphasis);
+                xanatoo::apply_style_to_selection(d, p.sel, xanatoo::InlineKind::Emphasis);
                 needs_layout = true;
                 reset_blink();
               }
@@ -1881,7 +1881,7 @@ int main(int argc, char** argv) {
             case SDLK_BACKQUOTE:
               if (ctrl && !p.sel.empty()) {
                 edit();
-                glyphtoo::apply_style_to_selection(d, p.sel, glyphtoo::InlineKind::Code);
+                xanatoo::apply_style_to_selection(d, p.sel, xanatoo::InlineKind::Code);
                 needs_layout = true;
                 reset_blink();
               }
@@ -1889,11 +1889,11 @@ int main(int argc, char** argv) {
 
             case SDLK_k:
               if (ctrl && !p.sel.empty()) {
-                std::string text = glyphtoo::selected_text(d, p.sel);
+                std::string text = xanatoo::selected_text(d, p.sel);
                 std::string href = "#" + text;
                 edit();
-                glyphtoo::apply_style_to_selection(
-                    d, p.sel, glyphtoo::InlineKind::Link, href);
+                xanatoo::apply_style_to_selection(
+                    d, p.sel, xanatoo::InlineKind::Link, href);
                 link_edit_mode = true;
                 search_mode = false;
                 save_as_mode = false;
@@ -1908,8 +1908,8 @@ int main(int argc, char** argv) {
             case SDLK_e:
               if (ctrl && shift) {
                 // Edit summary of enclosing stretch
-                glyphtoo::NodeId sid = glyphtoo::enclosing_stretch(d, p.sel.focus.node);
-                if (sid != glyphtoo::INVALID_NODE) {
+                xanatoo::NodeId sid = xanatoo::enclosing_stretch(d, p.sel.focus.node);
+                if (sid != xanatoo::INVALID_NODE) {
                   summary_edit_mode = true;
                   summary_edit_node = sid;
                   summary_edit_text = d.get(sid).summary;
@@ -1919,8 +1919,8 @@ int main(int argc, char** argv) {
                 }
               } else if (ctrl) {
                 edit();
-                std::string summary = glyphtoo::selected_text(d, p.sel);
-                if (glyphtoo::wrap_block_in_stretch(d, p.sel.focus.node, summary)) {
+                std::string summary = xanatoo::selected_text(d, p.sel);
+                if (xanatoo::wrap_block_in_stretch(d, p.sel.focus.node, summary)) {
                   needs_layout = true;
                   reset_blink();
                 }
@@ -1931,7 +1931,7 @@ int main(int argc, char** argv) {
               if (ctrl && shift) {
                 // Unwrap enclosing stretch
                 edit();
-                if (auto first = glyphtoo::unwrap_stretch(d, p.sel.focus.node)) {
+                if (auto first = xanatoo::unwrap_stretch(d, p.sel.focus.node)) {
                   p.sel.focus.node = *first;
                   p.sel.focus.span_index = 0;
                   p.sel.focus.char_index = 0;
@@ -1954,12 +1954,12 @@ int main(int argc, char** argv) {
                 edit();
                 auto& node = d.get(p.sel.focus.node);
                 if (level == 0) {
-                  if (node.kind == glyphtoo::NodeKind::Heading ||
-                      node.kind == glyphtoo::NodeKind::BlockQuote)
-                    node.kind = glyphtoo::NodeKind::Paragraph;
+                  if (node.kind == xanatoo::NodeKind::Heading ||
+                      node.kind == xanatoo::NodeKind::BlockQuote)
+                    node.kind = xanatoo::NodeKind::Paragraph;
                   node.level = 0;
                 } else {
-                  node.kind = glyphtoo::NodeKind::Heading;
+                  node.kind = xanatoo::NodeKind::Heading;
                   node.level = level;
                 }
                 needs_layout = true;
@@ -1972,7 +1972,7 @@ int main(int argc, char** argv) {
                 // Collapse all stretch nodes
                 edit();
                 for (auto& node : d.nodes) {
-                  if (node.kind == glyphtoo::NodeKind::Stretch)
+                  if (node.kind == xanatoo::NodeKind::Stretch)
                     node.expanded = false;
                 }
                 needs_layout = true;
@@ -1984,7 +1984,7 @@ int main(int argc, char** argv) {
                 // Expand all stretch nodes
                 edit();
                 for (auto& node : d.nodes) {
-                  if (node.kind == glyphtoo::NodeKind::Stretch)
+                  if (node.kind == xanatoo::NodeKind::Stretch)
                     node.expanded = true;
                 }
                 needs_layout = true;
@@ -1993,9 +1993,9 @@ int main(int argc, char** argv) {
 
             case SDLK_a:
               if (ctrl && shift) {
-                glyphtoo::select_all(d, p.sel);
+                xanatoo::select_all(d, p.sel);
               } else if (ctrl) {
-                glyphtoo::select_node(d, p.sel, p.sel.focus.node);
+                xanatoo::select_node(d, p.sel, p.sel.focus.node);
               }
               break;
 
@@ -2012,7 +2012,7 @@ int main(int argc, char** argv) {
     float lh = static_cast<float>(body_font.line_height());
     // ImGui menu + toolbar
     {
-      glyphtoo::UiState ui_state;
+      xanatoo::UiState ui_state;
       ui_state.dirty = dirty_flags[F().doc_index];
       ui_state.has_path = !path_of(F()).empty();
       ui_state.split = split;
@@ -2025,7 +2025,7 @@ int main(int argc, char** argv) {
       auto ui_frame = ui.begin_frame(ui_state);
       ui_top = ui_frame.top_reserved;
 
-      using C = glyphtoo::UiCommand;
+      using C = xanatoo::UiCommand;
       auto& p = F();
       auto& d = doc_of(p);
       switch (ui_frame.cmd) {
@@ -2038,7 +2038,7 @@ int main(int argc, char** argv) {
             save_as_mode = true;
             save_as_path = "untitled.md";
           } else {
-            std::string text = glyphtoo::serialize_document(d, spath);
+            std::string text = xanatoo::serialize_document(d, spath);
             std::ofstream out(spath);
             if (out) {
               out << text;
@@ -2079,11 +2079,11 @@ int main(int argc, char** argv) {
             std::cerr << "Reload: unsaved changes — use Force Reload\n";
             break;
           }
-          glyphtoo::clear_external_doc_cache();
+          xanatoo::clear_external_doc_cache();
           docs[p.doc_index] = load_doc(rpath);
           dirty_flags[p.doc_index] = false;
           histories[p.doc_index].reset(docs[p.doc_index], p.sel);
-          glyphtoo::ensure_valid_caret(docs[p.doc_index], p.sel.focus);
+          xanatoo::ensure_valid_caret(docs[p.doc_index], p.sel.focus);
           p.sel.anchor = p.sel.focus;
           p.scroll_y = 0.f;
           update_title();
@@ -2097,17 +2097,17 @@ int main(int argc, char** argv) {
           if (histories[p.doc_index].redo(d, p.sel)) needs_layout = true;
           break;
         case C::Cut: {
-          std::string text = glyphtoo::selected_text(d, p.sel);
+          std::string text = xanatoo::selected_text(d, p.sel);
           if (!text.empty()) {
             SDL_SetClipboardText(text.c_str());
             edit();
-            glyphtoo::delete_selection(d, p.sel);
+            xanatoo::delete_selection(d, p.sel);
             needs_layout = true;
           }
           break;
         }
         case C::Copy: {
-          std::string text = glyphtoo::selected_text(d, p.sel);
+          std::string text = xanatoo::selected_text(d, p.sel);
           if (!text.empty()) SDL_SetClipboardText(text.c_str());
           break;
         }
@@ -2116,8 +2116,8 @@ int main(int argc, char** argv) {
             char* clip = SDL_GetClipboardText();
             if (clip && clip[0]) {
               edit();
-              if (!p.sel.empty()) glyphtoo::delete_selection(d, p.sel);
-              glyphtoo::paste_plain_text(d, p.sel.focus, clip);
+              if (!p.sel.empty()) xanatoo::delete_selection(d, p.sel);
+              xanatoo::paste_plain_text(d, p.sel.focus, clip);
               p.sel.anchor = p.sel.focus;
               needs_layout = true;
             }
@@ -2125,8 +2125,8 @@ int main(int argc, char** argv) {
           }
           break;
         case C::SelectAll:
-          glyphtoo::move_to_document_start(d, p.sel.anchor);
-          glyphtoo::move_to_document_end(d, p.sel.focus);
+          xanatoo::move_to_document_start(d, p.sel.anchor);
+          xanatoo::move_to_document_end(d, p.sel.focus);
           break;
         case C::Find:
           search_mode = true;
@@ -2139,29 +2139,29 @@ int main(int argc, char** argv) {
         case C::Bold:
           if (!p.sel.empty()) {
             edit();
-            glyphtoo::apply_style_to_selection(d, p.sel, glyphtoo::InlineKind::Strong);
+            xanatoo::apply_style_to_selection(d, p.sel, xanatoo::InlineKind::Strong);
             needs_layout = true;
           }
           break;
         case C::Italic:
           if (!p.sel.empty()) {
             edit();
-            glyphtoo::apply_style_to_selection(d, p.sel, glyphtoo::InlineKind::Emphasis);
+            xanatoo::apply_style_to_selection(d, p.sel, xanatoo::InlineKind::Emphasis);
             needs_layout = true;
           }
           break;
         case C::Code:
           if (!p.sel.empty()) {
             edit();
-            glyphtoo::apply_style_to_selection(d, p.sel, glyphtoo::InlineKind::Code);
+            xanatoo::apply_style_to_selection(d, p.sel, xanatoo::InlineKind::Code);
             needs_layout = true;
           }
           break;
         case C::Link:
           if (!p.sel.empty()) {
-            std::string text = glyphtoo::selected_text(d, p.sel);
+            std::string text = xanatoo::selected_text(d, p.sel);
             edit();
-            glyphtoo::apply_style_to_selection(d, p.sel, glyphtoo::InlineKind::Link,
+            xanatoo::apply_style_to_selection(d, p.sel, xanatoo::InlineKind::Link,
                                               "#" + text);
             link_edit_mode = true;
             link_edit_node = p.sel.focus.node;
@@ -2172,46 +2172,46 @@ int main(int argc, char** argv) {
           break;
         case C::InsertParagraph:
           edit();
-          if (glyphtoo::insert_sibling_after(d, p.sel.focus,
-                                             glyphtoo::NodeKind::Paragraph)) {
+          if (xanatoo::insert_sibling_after(d, p.sel.focus,
+                                             xanatoo::NodeKind::Paragraph)) {
             p.sel.anchor = p.sel.focus;
             needs_layout = true;
           }
           break;
         case C::InsertHr:
           edit();
-          if (glyphtoo::insert_sibling_after(d, p.sel.focus,
-                                             glyphtoo::NodeKind::HorizontalRule)) {
+          if (xanatoo::insert_sibling_after(d, p.sel.focus,
+                                             xanatoo::NodeKind::HorizontalRule)) {
             p.sel.anchor = p.sel.focus;
             needs_layout = true;
           }
           break;
         case C::InsertNote:
           edit();
-          if (glyphtoo::insert_sibling_after(d, p.sel.focus,
-                                             glyphtoo::NodeKind::Note)) {
+          if (xanatoo::insert_sibling_after(d, p.sel.focus,
+                                             xanatoo::NodeKind::Note)) {
             p.sel.anchor = p.sel.focus;
             needs_layout = true;
           }
           break;
         case C::InsertCodeBlock:
           edit();
-          if (glyphtoo::insert_sibling_after(d, p.sel.focus,
-                                             glyphtoo::NodeKind::CodeBlock)) {
+          if (xanatoo::insert_sibling_after(d, p.sel.focus,
+                                             xanatoo::NodeKind::CodeBlock)) {
             p.sel.anchor = p.sel.focus;
             needs_layout = true;
           }
           break;
         case C::InsertTable:
           edit();
-          if (glyphtoo::insert_table(d, p.sel.focus)) {
+          if (xanatoo::insert_table(d, p.sel.focus)) {
             p.sel.anchor = p.sel.focus;
             needs_layout = true;
           }
           break;
         case C::InsertDefList:
           edit();
-          if (glyphtoo::insert_deflist(d, p.sel.focus)) {
+          if (xanatoo::insert_deflist(d, p.sel.focus)) {
             p.sel.anchor = p.sel.focus;
             needs_layout = true;
           }
@@ -2222,22 +2222,22 @@ int main(int argc, char** argv) {
           break;
         case C::ToggleUnorderedList:
           edit();
-          if (glyphtoo::toggle_list(d, p.sel.focus, false)) needs_layout = true;
+          if (xanatoo::toggle_list(d, p.sel.focus, false)) needs_layout = true;
           break;
         case C::ToggleOrderedList:
           edit();
-          if (glyphtoo::toggle_list(d, p.sel.focus, true)) needs_layout = true;
+          if (xanatoo::toggle_list(d, p.sel.focus, true)) needs_layout = true;
           break;
         case C::ToggleBlockQuote: {
           edit();
           auto& node = d.get(p.sel.focus.node);
-          if (node.kind == glyphtoo::NodeKind::BlockQuote) {
-            node.kind = glyphtoo::NodeKind::Paragraph;
-          } else if (node.kind == glyphtoo::NodeKind::Paragraph ||
-                     node.kind == glyphtoo::NodeKind::Heading ||
-                     node.kind == glyphtoo::NodeKind::ListItem ||
-                     node.kind == glyphtoo::NodeKind::Note) {
-            node.kind = glyphtoo::NodeKind::BlockQuote;
+          if (node.kind == xanatoo::NodeKind::BlockQuote) {
+            node.kind = xanatoo::NodeKind::Paragraph;
+          } else if (node.kind == xanatoo::NodeKind::Paragraph ||
+                     node.kind == xanatoo::NodeKind::Heading ||
+                     node.kind == xanatoo::NodeKind::ListItem ||
+                     node.kind == xanatoo::NodeKind::Note) {
+            node.kind = xanatoo::NodeKind::BlockQuote;
             node.level = 0;
           }
           needs_layout = true;
@@ -2302,7 +2302,7 @@ int main(int argc, char** argv) {
       const float draw_scroll = pane.scroll_y - ui_top;
 
       if (!pane.sel.empty()) {
-        auto rects = glyphtoo::selection_rects(
+        auto rects = xanatoo::selection_rects(
             pane.layout, pane.sel, draw_scroll, lh);
         // Leap-search match uses amber so it is distinct from a user selection.
         if (search_mode && i == focus)
@@ -2314,7 +2314,7 @@ int main(int argc, char** argv) {
       renderer.draw(pane.layout, draw_scroll, ox);
 
       if (i == focus) {
-        auto cpos = glyphtoo::caret_screen_pos(
+        auto cpos = xanatoo::caret_screen_pos(
             pane.layout, pane.sel.focus, draw_scroll, lh);
         if (cpos.valid) pane.preferred_x = cpos.x;
         Uint32 blink_phase = (SDL_GetTicks() - caret_blink_start) % 1000;
@@ -2338,7 +2338,7 @@ int main(int argc, char** argv) {
           SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
           for (const auto& box : pane.layout.boxes) {
             bool hit = false;
-            for (glyphtoo::NodeId id : marks) {
+            for (xanatoo::NodeId id : marks) {
               if (id == box.node) {
                 hit = true;
                 break;
@@ -2399,10 +2399,10 @@ int main(int argc, char** argv) {
           if (adj_y < box.y || adj_y > box.y + box.height) continue;
           if (lx < box.x || lx > box.x + 20.f) continue;
           const auto& bn = doc_of(pane).get(box.node);
-          if (bn.kind == glyphtoo::NodeKind::Document ||
-              bn.kind == glyphtoo::NodeKind::Columns ||
-              bn.kind == glyphtoo::NodeKind::Column ||
-              bn.kind == glyphtoo::NodeKind::List)
+          if (bn.kind == xanatoo::NodeKind::Document ||
+              bn.kind == xanatoo::NodeKind::Columns ||
+              bn.kind == xanatoo::NodeKind::Column ||
+              bn.kind == xanatoo::NodeKind::List)
             continue;
           int gx = pane.x + static_cast<int>(box.x) + 4;
           int gy = static_cast<int>(box.y - pane.scroll_y + box.height * 0.5f);
@@ -2448,12 +2448,12 @@ int main(int argc, char** argv) {
     // Visual link between panes when both carets sit on the same node
     // (e.g. after following an internal link in dual-pane shared view).
     if (split && shared_doc &&
-        panes[0].sel.focus.node != glyphtoo::INVALID_NODE &&
+        panes[0].sel.focus.node != xanatoo::INVALID_NODE &&
         panes[0].sel.focus.node == panes[1].sel.focus.node) {
       float lh = static_cast<float>(body_font.line_height());
-      auto c0 = glyphtoo::caret_screen_pos(panes[0].layout, panes[0].sel.focus,
+      auto c0 = xanatoo::caret_screen_pos(panes[0].layout, panes[0].sel.focus,
                                            panes[0].scroll_y, lh);
-      auto c1 = glyphtoo::caret_screen_pos(panes[1].layout, panes[1].sel.focus,
+      auto c1 = xanatoo::caret_screen_pos(panes[1].layout, panes[1].sel.focus,
                                            panes[1].scroll_y, lh);
       if (c0.valid && c1.valid) {
         int x0 = panes[0].x + static_cast<int>(c0.x);
@@ -2570,7 +2570,7 @@ int main(int argc, char** argv) {
         std::string stats;
         const auto& fsel = F().sel;
         if (!fsel.empty()) {
-          std::string t = glyphtoo::selected_text(doc_of(F()), fsel);
+          std::string t = xanatoo::selected_text(doc_of(F()), fsel);
           size_t words = 0, chars = 0;
           bool in_word = false;
           for (unsigned char c : t) {
@@ -2587,7 +2587,7 @@ int main(int argc, char** argv) {
           stats = std::to_string(words) + " sel words · " +
                   std::to_string(chars) + " sel chars";
         } else {
-          auto st = glyphtoo::document_stats(doc_of(F()));
+          auto st = xanatoo::document_stats(doc_of(F()));
           stats = std::to_string(st.words) + " words · " +
                   std::to_string(st.chars) + " chars";
           if (st.headings > 0)
@@ -2694,7 +2694,7 @@ int main(int argc, char** argv) {
                          help_x + help_w, help_y + help_title_h);
       SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
 
-      const char* title_txt = "Help — glyphtoo";
+      const char* title_txt = "Help — xanatoo";
       renderer.draw_text(body_font, static_cast<float>(help_x + 10),
                          static_cast<float>(help_y + 6 + body_font.ascender()),
                          title_txt, 46, 52, 54);

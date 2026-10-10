@@ -6,7 +6,7 @@
 #include <string>
 #include <unordered_map>
 
-namespace glyphtoo {
+namespace xanatoo {
 
 // Commands requested by the ImGui menu / toolbar. Applied by the main loop.
 enum class UiCommand {
@@ -110,4 +110,4 @@ private:
   std::unordered_map<std::string, Icon> icons_;
 };
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

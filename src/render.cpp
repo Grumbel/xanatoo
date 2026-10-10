@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
-#include "glyphtoo/render.hpp"
+#include "xanatoo/render.hpp"
 #include <cmath>
 
-namespace glyphtoo {
+namespace xanatoo {
 
 Renderer::Renderer(SDL_Renderer* sdl, FontSet& fonts, ImageCache* images)
     : sdl_(sdl), fonts_(fonts), images_(images) {}
@@ -222,4 +222,4 @@ void Renderer::present() {
   SDL_RenderPresent(sdl_);
 }
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

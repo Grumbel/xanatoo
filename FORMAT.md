@@ -1,6 +1,6 @@
-# glyphtoo semantic document format (S-expression)
+# xanatoo semantic document format (S-expression)
 
-This is the **canonical** digital form for glyphtoo: a tree of *meaning*, not a
+This is the **canonical** digital form for xanatoo: a tree of *meaning*, not a
 page description. Layout (columns, fonts, margins) is a view over this tree and
 must not be required to understand or exchange a document.
 

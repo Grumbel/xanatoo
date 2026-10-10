@@ -2,12 +2,12 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 #pragma once
 
-#include "glyphtoo/types.hpp"
+#include "xanatoo/types.hpp"
 #include <string>
 #include <string_view>
 #include <vector>
 
-namespace glyphtoo {
+namespace xanatoo {
 
 // ASCII-only lowercasing (anchors, extensions, comparisons).
 std::string ascii_lower(std::string s);
@@ -31,4 +31,4 @@ bool is_raster_image_path(std::string_view path);
 // Case-insensitive suffix check (e.g. ".sexp").
 bool path_ends_with_ci(std::string_view path, std::string_view suffix);
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
-#include "glyphtoo/ui.hpp"
-#include "glyphtoo/font.hpp"
+#include "xanatoo/ui.hpp"
+#include "xanatoo/font.hpp"
 
 #include "imgui.h"
 #include "backends/imgui_impl_sdl2.h"
@@ -17,7 +17,7 @@
 
 namespace fs = std::filesystem;
 
-namespace glyphtoo {
+namespace xanatoo {
 
 Ui::~Ui() { shutdown(); }
 
@@ -115,11 +115,11 @@ void Ui::load_icons(SDL_Renderer* renderer) {
   renderer_ = renderer;
 
   std::vector<fs::path> roots;
-#ifdef GLYPHTOO_ICON_DIR
-  roots.emplace_back(GLYPHTOO_ICON_DIR);
+#ifdef XANATOO_ICON_DIR
+  roots.emplace_back(XANATOO_ICON_DIR);
 #endif
   roots.emplace_back("icons");
-  roots.emplace_back("share/glyphtoo/icons");
+  roots.emplace_back("share/xanatoo/icons");
   // Relative to cwd build trees
   roots.emplace_back("../icons");
   roots.emplace_back("build/icons");
@@ -137,7 +137,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
     }
   }
   if (found_dir.empty()) {
-    std::cerr << "glyphtoo: toolbar icons not found (built PNGs next to binary)\n";
+    std::cerr << "xanatoo: toolbar icons not found (built PNGs next to binary)\n";
     return;
   }
 
@@ -476,4 +476,4 @@ void Ui::end_frame(SDL_Renderer* renderer) {
   ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
 }
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

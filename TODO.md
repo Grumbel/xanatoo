@@ -1,10 +1,12 @@
-# TODO — glyphtoo
+# TODO — xanatoo
+
+> **Rename (2026-10-10):** project moved from `glyphtoo` to **xanatoo** (`https://github.com/Grumbel/xanatoo.git`). Namespace, includes, binary, env vars (`XANATOO_FONT`), and docs updated. Historical bundle names below still use the `glyphtoo-NNN` prefix from before the rename.
 
 ## Current tip
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **075** (this delivery is **074**)
+Next bundle number: **076** (this delivery is **075**)
 
 ## Status (2026-10-10)
 
@@ -27,7 +29,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Build fix: qualify NodeId in main.cpp
 - [x] Open document from CLI (`file.md` / `--open`)
 - [x] Save with Ctrl+S via `serialize_markup`
-- [x] Default font via `GLYPHTOO_FONT` + flake wrapper (DejaVu)
+- [x] Default font via `XANATOO_FONT` + flake wrapper (DejaVu)
 - [x] Image loading (stb_image: PNG/JPEG/BMP/GIF) + layout/render
 - [x] Dirty flag / asterisk in window title
 - [x] Side-by-side `:::columns` / `:::column` layout
@@ -40,7 +42,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] On-screen leap query status bar
 - [x] Scroll-to-match after search
 - [x] Untitled Ctrl+S → auto `untitled.md` (or untitled-N.md)
-- [x] Build fix: serialize_markup inside namespace glyphtoo
+- [x] Build fix: serialize_markup inside namespace xanatoo
 - [x] Link underlines + click-to-follow `#anchor`
 - [x] Ctrl+←/→ word movement
 - [x] Scroll caret into view on arrow navigation
@@ -120,6 +122,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Semantic format: cite + biblio; typed links (:rel)
 - [x] Semantic format: include :excerpt ranges; semantic tables
 - [x] Editor: insert note / code block / table / definition list
+- [x] Project renamed glyphtoo → **xanatoo** (namespace, paths, binary, env)
 
 ## Open work / next steps
 
@@ -170,77 +173,78 @@ LCS structural diff marks; cross-document `:::include`.
 
 ## Bundle history
 
-- `glyphtoo-001.*` — stage 01 scaffold
-- `glyphtoo-002.*` — markup, caret, basic edit
-- `glyphtoo-003.*-selection-stretch-…` — selection, stretchtext
-- `glyphtoo-004.*-font-cli-…` — `--font` CLI
-- `glyphtoo-005.*-clipboard-undo-…` — clipboard, undo, blink + NodeId fix
-- `glyphtoo-006.*-open-save-font-…` — open/save + default font
-- `glyphtoo-007.*-images-dirty-…` — images + dirty flag
-- `glyphtoo-008.*-columns-multisel-…` — columns + multi-sel
-- `glyphtoo-009.*-dual-pane-…` — dual-pane multi-view
-- `glyphtoo-010.*-two-docs-divider-…` — two docs + divider
-- `glyphtoo-011.*-undo-leap-…` — per-doc undo + leap search
-- `glyphtoo-012.*-search-ui-save-…` — search UI + untitled save + ns fix
-- `glyphtoo-013.*-links-words-…` — links + word move + scroll fix
-- `glyphtoo-014.*-image-resize-…` — image resize + Home/End
-- `glyphtoo-015.*-scale-persist-…` — scale persist + dblclick
-- `glyphtoo-016.*-status-bar-…` — shortcuts status bar
-- `glyphtoo-017.*-style-saveas-…` — styles + save as
-- `glyphtoo-018.*-link-edit-…` — link href edit + wheel + select-all
-- `glyphtoo-019.*-external-stretch-…` — external/ + Ctrl+E stretch
-- `glyphtoo-020.*-multistyle-quit-…` — multi-node style + quit safety
-- `glyphtoo-021.*-merge-zoom-…` — merge + zoom
-- `glyphtoo-022.*-scroll-replace-…` — scrollbar + replace + code style
-- `glyphtoo-023.*-scroll-drag-docs-…` — scroll drag + README
-- `glyphtoo-024.*-heading-stretch-…` — heading levels + expand-all
-- `glyphtoo-025.*-stretch-edit-…` — stretch summary + unwrap
-- `glyphtoo-026.*-block-move-…` — block reorder + duplicate
-- `glyphtoo-027.*-external-links-…` — external links + hover
-- `glyphtoo-028.*-lists-…` — list parse/layout/serialize
-- `glyphtoo-029.*-list-edit-…` — list Enter/exit/renumber
-- `glyphtoo-030.*-link-preview-…` — anchor hover preview
-- `glyphtoo-031.*-blockquote-…` — block quotes
-- `glyphtoo-032.*-hr-list-toggle-…` — HR + list toggle
-- `glyphtoo-033.*-transclude-…` — :::include transclusion
-- `glyphtoo-034.*-block-drag-…` — block drag reorder
-- `glyphtoo-035.*-column-width-…` — column width drag
-- `glyphtoo-036.*-cross-parent-drag-…` — cross-parent block drag
-- `glyphtoo-037.*-nested-lists-…` — nested lists
-- `glyphtoo-038.*-f1-help-…` — F1 help overlay
-- `glyphtoo-039.*-example-doc-…` — examples/welcome.md + images
-- `glyphtoo-040.*-pane-links-…` — dual-pane visual links
-- `glyphtoo-041.*-diff-marks-…` — dual-pane diff marks
-- `glyphtoo-042.*-outline-…` — heading outline
-- `glyphtoo-043.*-insert-blocks-…` — Ctrl+Enter / HR insert
-- `glyphtoo-044.*-doc-stats-…` — status-bar document stats
-- `glyphtoo-045.*-page-nav-…` — page / document navigation
-- `glyphtoo-046.*-paste-paras-…` — structured multiline paste
-- `glyphtoo-047.*-insert-image-…` — insert image by path
-- `glyphtoo-048.*-fontconfig-…` — FontConfig styled faces
-- `glyphtoo-049.*-find-prev-code-bg-…` — find prev + code background
-- `glyphtoo-050.*-reload-…` — Ctrl+R reload from disk
-- `glyphtoo-051.*-rebased-…` — rebased onto origin/master
-- `glyphtoo-052.*-sel-stats-…` — selection status stats
-- `glyphtoo-053.*-imgui-…` — Dear ImGui menu/toolbar
-- `glyphtoo-054.*-imgui-no-x11-…` — ImGui without X11 syswm
-- `glyphtoo-055.*-lcs-diff-xdoc-…` — LCS diff + cross-doc include
-- `glyphtoo-056.*-sexpr-…` — S-expression format
-- `glyphtoo-057.*-sexpr-polish-…` — sexpr polish
-- `glyphtoo-058.*-dnd-image-…` — drag-and-drop images
-- `glyphtoo-059.*-refactor-cleanup-…` — util refactor
-- `glyphtoo-060.*-cli-delete-cleanup-…` — CLI extract + delete husks
-- `glyphtoo-061.*-search-highlight-…` — search highlight
-- `glyphtoo-062.*-mouse-select-…` — mouse offset + selection
-- `glyphtoo-063.*-classic-ui-icons-…` — classic theme + icons
-- `glyphtoo-064.*-help-window-…` — ImGui help window
-- `glyphtoo-065.*-help-document-…` — help as real document
-- `glyphtoo-066.*-help-window-fix-…` — help non-modal + Y fix
-- `glyphtoo-067.*-help-resize-…` — help resize
-- `glyphtoo-068.*-help-stretch-icons-…` — help stretch + icons
-- `glyphtoo-069.*-ui-font-…` — UI font
-- `glyphtoo-070.*-semantic-format-…` — meta/label/note/code
-- `glyphtoo-071.*-deflist-figure-…` — deflist + figure
-- `glyphtoo-072.*-cite-rel-…` — cite + :rel
-- `glyphtoo-073.*-excerpt-table-…` — excerpt + table
-- `glyphtoo-074.*-insert-semantic-…` — this delivery
+- `xanatoo-001.*` — stage 01 scaffold
+- `xanatoo-002.*` — markup, caret, basic edit
+- `xanatoo-003.*-selection-stretch-…` — selection, stretchtext
+- `xanatoo-004.*-font-cli-…` — `--font` CLI
+- `xanatoo-005.*-clipboard-undo-…` — clipboard, undo, blink + NodeId fix
+- `xanatoo-006.*-open-save-font-…` — open/save + default font
+- `xanatoo-007.*-images-dirty-…` — images + dirty flag
+- `xanatoo-008.*-columns-multisel-…` — columns + multi-sel
+- `xanatoo-009.*-dual-pane-…` — dual-pane multi-view
+- `xanatoo-010.*-two-docs-divider-…` — two docs + divider
+- `xanatoo-011.*-undo-leap-…` — per-doc undo + leap search
+- `xanatoo-012.*-search-ui-save-…` — search UI + untitled save + ns fix
+- `xanatoo-013.*-links-words-…` — links + word move + scroll fix
+- `xanatoo-014.*-image-resize-…` — image resize + Home/End
+- `xanatoo-015.*-scale-persist-…` — scale persist + dblclick
+- `xanatoo-016.*-status-bar-…` — shortcuts status bar
+- `xanatoo-017.*-style-saveas-…` — styles + save as
+- `xanatoo-018.*-link-edit-…` — link href edit + wheel + select-all
+- `xanatoo-019.*-external-stretch-…` — external/ + Ctrl+E stretch
+- `xanatoo-020.*-multistyle-quit-…` — multi-node style + quit safety
+- `xanatoo-021.*-merge-zoom-…` — merge + zoom
+- `xanatoo-022.*-scroll-replace-…` — scrollbar + replace + code style
+- `xanatoo-023.*-scroll-drag-docs-…` — scroll drag + README
+- `xanatoo-024.*-heading-stretch-…` — heading levels + expand-all
+- `xanatoo-025.*-stretch-edit-…` — stretch summary + unwrap
+- `xanatoo-026.*-block-move-…` — block reorder + duplicate
+- `xanatoo-027.*-external-links-…` — external links + hover
+- `xanatoo-028.*-lists-…` — list parse/layout/serialize
+- `xanatoo-029.*-list-edit-…` — list Enter/exit/renumber
+- `xanatoo-030.*-link-preview-…` — anchor hover preview
+- `xanatoo-031.*-blockquote-…` — block quotes
+- `xanatoo-032.*-hr-list-toggle-…` — HR + list toggle
+- `xanatoo-033.*-transclude-…` — :::include transclusion
+- `xanatoo-034.*-block-drag-…` — block drag reorder
+- `xanatoo-035.*-column-width-…` — column width drag
+- `xanatoo-036.*-cross-parent-drag-…` — cross-parent block drag
+- `xanatoo-037.*-nested-lists-…` — nested lists
+- `xanatoo-038.*-f1-help-…` — F1 help overlay
+- `xanatoo-039.*-example-doc-…` — examples/welcome.md + images
+- `xanatoo-040.*-pane-links-…` — dual-pane visual links
+- `xanatoo-041.*-diff-marks-…` — dual-pane diff marks
+- `xanatoo-042.*-outline-…` — heading outline
+- `xanatoo-043.*-insert-blocks-…` — Ctrl+Enter / HR insert
+- `xanatoo-044.*-doc-stats-…` — status-bar document stats
+- `xanatoo-045.*-page-nav-…` — page / document navigation
+- `xanatoo-046.*-paste-paras-…` — structured multiline paste
+- `xanatoo-047.*-insert-image-…` — insert image by path
+- `xanatoo-048.*-fontconfig-…` — FontConfig styled faces
+- `xanatoo-049.*-find-prev-code-bg-…` — find prev + code background
+- `xanatoo-050.*-reload-…` — Ctrl+R reload from disk
+- `xanatoo-051.*-rebased-…` — rebased onto origin/master
+- `xanatoo-052.*-sel-stats-…` — selection status stats
+- `xanatoo-053.*-imgui-…` — Dear ImGui menu/toolbar
+- `xanatoo-054.*-imgui-no-x11-…` — ImGui without X11 syswm
+- `xanatoo-055.*-lcs-diff-xdoc-…` — LCS diff + cross-doc include
+- `xanatoo-056.*-sexpr-…` — S-expression format
+- `xanatoo-057.*-sexpr-polish-…` — sexpr polish
+- `xanatoo-058.*-dnd-image-…` — drag-and-drop images
+- `xanatoo-059.*-refactor-cleanup-…` — util refactor
+- `xanatoo-060.*-cli-delete-cleanup-…` — CLI extract + delete husks
+- `xanatoo-061.*-search-highlight-…` — search highlight
+- `xanatoo-062.*-mouse-select-…` — mouse offset + selection
+- `xanatoo-063.*-classic-ui-icons-…` — classic theme + icons
+- `xanatoo-064.*-help-window-…` — ImGui help window
+- `xanatoo-065.*-help-document-…` — help as real document
+- `xanatoo-066.*-help-window-fix-…` — help non-modal + Y fix
+- `xanatoo-067.*-help-resize-…` — help resize
+- `xanatoo-068.*-help-stretch-icons-…` — help stretch + icons
+- `xanatoo-069.*-ui-font-…` — UI font
+- `xanatoo-070.*-semantic-format-…` — meta/label/note/code
+- `xanatoo-071.*-deflist-figure-…` — deflist + figure
+- `xanatoo-072.*-cite-rel-…` — cite + :rel
+- `xanatoo-073.*-excerpt-table-…` — excerpt + table
+- `xanatoo-074.*-insert-semantic-…` — insert semantic (as glyphtoo tip before rename)
+- `xanatoo-075.*-rename-…` — this delivery (glyphtoo → xanatoo)

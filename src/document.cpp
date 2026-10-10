@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
-#include "glyphtoo/types.hpp"
+#include "xanatoo/types.hpp"
 #include <stdexcept>
 #include <cassert>
 #include <algorithm>
 
-namespace glyphtoo {
+namespace xanatoo {
 
 NodeId Document::create(NodeKind kind, NodeId parent) {
   NodeId id = next_id++;
@@ -66,4 +66,4 @@ bool Document::insert_after(NodeId after, NodeId child) {
   return true;
 }
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

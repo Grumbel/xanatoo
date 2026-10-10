@@ -1,5 +1,5 @@
-; glyphtoo experimental S-expression document
-; Open with: glyphtoo examples/sample.sexp
+; xanatoo experimental S-expression document
+; Open with: xanatoo examples/sample.sexp
 ; Save as .sexp / .glyph / .ss to keep this form.
 
 (doc

@@ -2,13 +2,13 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 #pragma once
 
-#include "glyphtoo/types.hpp"
-#include "glyphtoo/layout.hpp"
+#include "xanatoo/types.hpp"
+#include "xanatoo/layout.hpp"
 #include <string>
 #include <optional>
 #include <vector>
 
-namespace glyphtoo {
+namespace xanatoo {
 
 // Caret is pure document data — never stores pixels.
 struct Caret {
@@ -255,4 +255,4 @@ private:
   std::vector<EditorSnapshot> redo_;
 };
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

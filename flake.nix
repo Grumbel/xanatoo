@@ -1,5 +1,5 @@
 {
-  description = "glyphtoo — interactive document composition engine";
+  description = "xanatoo — interactive document composition engine";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -14,8 +14,8 @@
       packages = forAllSystems (system:
         let
           pkgs = import nixpkgs { inherit system; };
-          glyphtoo = pkgs.stdenv.mkDerivation {
-            pname = "glyphtoo";
+          xanatoo = pkgs.stdenv.mkDerivation {
+            pname = "xanatoo";
             version = "0.1.0";
             src = ./.;
 
@@ -39,26 +39,26 @@
               description = "Interactive document composition engine";
               license = licenses.gpl3Plus;
               platforms = platforms.linux ++ platforms.darwin;
-              mainProgram = "glyphtoo";
+              mainProgram = "xanatoo";
             };
           };
         in
         {
           # Default package wraps the binary so a DejaVu font is always available.
           default = pkgs.symlinkJoin {
-            name = "glyphtoo";
-            paths = [ glyphtoo ];
+            name = "xanatoo";
+            paths = [ xanatoo ];
             nativeBuildInputs = [ pkgs.makeWrapper ];
             postBuild = ''
-              wrapProgram $out/bin/glyphtoo \
-                --set-default GLYPHTOO_FONT \
+              wrapProgram $out/bin/xanatoo \
+                --set-default XANATOO_FONT \
                   "${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSans.ttf"
             '';
-            meta = glyphtoo.meta;
+            meta = xanatoo.meta;
           };
 
           # Unwrapped binary for packaging / debugging
-          glyphtoo-unwrapped = glyphtoo;
+          xanatoo-unwrapped = xanatoo;
         });
 
       devShells = forAllSystems (system:
@@ -78,7 +78,7 @@
               clang-tools
             ];
             shellHook = ''
-              export GLYPHTOO_FONT="${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSans.ttf"
+              export XANATOO_FONT="${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSans.ttf"
             '';
           };
         });

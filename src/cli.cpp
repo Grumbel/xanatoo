@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
-#include "glyphtoo/cli.hpp"
+#include "xanatoo/cli.hpp"
 
 #include <cstdlib>
 #include <filesystem>
@@ -12,12 +12,12 @@
 #include <unistd.h>
 #endif
 
-namespace glyphtoo {
+namespace xanatoo {
 namespace fs = std::filesystem;
 
 const char* fallback_document() {
   return "# Untitled\n\n"
-         "Open a document with `glyphtoo file.md`, or place "
+         "Open a document with `xanatoo file.md`, or place "
          "`examples/welcome.md` next to the binary.\n\n"
          "Press **F1** for the keyboard reference.\n";
 }
@@ -40,8 +40,8 @@ std::string find_default_document() {
     const fs::path near[] = {
         dir / "examples" / "welcome.md",
         dir / ".." / "examples" / "welcome.md",
-        dir / ".." / "share" / "glyphtoo" / "welcome.md",
-        dir / ".." / "share" / "glyphtoo" / "examples" / "welcome.md",
+        dir / ".." / "share" / "xanatoo" / "welcome.md",
+        dir / ".." / "share" / "xanatoo" / "examples" / "welcome.md",
     };
     for (const auto& c : near) {
       std::error_code ec;
@@ -69,7 +69,7 @@ void print_usage(const char* argv0) {
       << "Ctrl+S saves the focused pane's document.\n"
       << "Ctrl+\\ toggles split; drag the gutter to resize panes.\n"
       << "\n"
-      << "Font resolution: --font / GLYPHTOO_FONT, then FontConfig\n"
+      << "Font resolution: --font / XANATOO_FONT, then FontConfig\n"
       << "(regular/bold/italic/mono faces for styled text).\n";
 }
 
@@ -159,4 +159,4 @@ void open_external_url(const std::string& url) {
 #endif
 }
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

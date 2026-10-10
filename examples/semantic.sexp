@@ -1,7 +1,7 @@
 (doc
   :title "Semantic hypertext sketch"
   :lang "en"
-  :author "glyphtoo"
+  :author "xanatoo"
 
   (h 1 :label "top" "Semantic form, not page geometry")
 

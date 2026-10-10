@@ -2,11 +2,11 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 #pragma once
 
-#include "glyphtoo/types.hpp"
+#include "xanatoo/types.hpp"
 #include <string>
 #include <string_view>
 
-namespace glyphtoo {
+namespace xanatoo {
 
 // Minimal Markdown-ish parser for the proposal sample syntax.
 // Supports:
@@ -68,4 +68,4 @@ std::string serialize_sexpr(const Document& doc);
 Document parse_document(std::string_view source, std::string_view path = {});
 std::string serialize_document(const Document& doc, std::string_view path = {});
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

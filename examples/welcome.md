@@ -47,7 +47,7 @@ Jef Raskin's *Canon Cat* — a keyboard-driven work processor that treated
 text as a continuous, searchable stream.
 
 > "A document is not just something you render and read. It is a live
-> workspace." — the glyphtoo proposal
+> workspace." — the xanatoo proposal
 
 ---
 

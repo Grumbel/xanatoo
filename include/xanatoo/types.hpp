@@ -7,7 +7,7 @@
 #include <vector>
 #include <optional>
 
-namespace glyphtoo {
+namespace xanatoo {
 
 using NodeId = uint64_t;
 constexpr NodeId INVALID_NODE = 0;
@@ -100,4 +100,4 @@ struct Document {
   bool insert_after(NodeId after, NodeId child);
 };
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

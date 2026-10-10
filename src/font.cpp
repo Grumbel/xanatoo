@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
-#include "glyphtoo/font.hpp"
+#include "xanatoo/font.hpp"
 #include <fontconfig/fontconfig.h>
 #include <iostream>
 #include <cstring>
 
-namespace glyphtoo {
+namespace xanatoo {
 
 Font::~Font() {
   for (auto& [cp, g] : cache_) {
@@ -310,4 +310,4 @@ const Font& FontSet::pick(FontRole role) const {
   return const_cast<FontSet*>(this)->pick(role);
 }
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

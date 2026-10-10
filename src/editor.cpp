@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
-#include "glyphtoo/editor.hpp"
-#include "glyphtoo/util.hpp"
+#include "xanatoo/editor.hpp"
+#include "xanatoo/util.hpp"
 #include <cmath>
 #include <algorithm>
 #include <limits>
 
-namespace glyphtoo {
+namespace xanatoo {
 
 static std::pair<uint32_t, size_t> decode_cp(const std::string& s, size_t byte_i) {
   if (byte_i >= s.size()) return {0, 0};
@@ -2157,4 +2157,4 @@ bool History::redo(Document& doc, Selection& sel) {
   return true;
 }
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

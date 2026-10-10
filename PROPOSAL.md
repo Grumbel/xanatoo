@@ -1,4 +1,4 @@
-# glyphtoo: Interactive document composition engine
+# xanatoo: Interactive document composition engine
 
 A lightweight, realtime, editable document system for OpenGL, inspired by Markdown, typesetting, and Ted Nelson's hypertext ideas.
 
@@ -136,9 +136,9 @@ The web connects documents, but
 
 The exact syntax is open for experimentation. The key requirement is that the same document can be edited through either its source representation or its rendered interactive representation, without losing structure.
 
-## 6. What makes glyphtoo different
+## 6. What makes xanatoo different
 
-| Conventional text renderer               | glyphtoo                                             |
+| Conventional text renderer               | xanatoo                                             |
 | ---------------------------------------- | ---------------------------------------------------- |
 | Displays formatted text                  | Displays and edits live content                      |
 | Links navigate elsewhere                 | Links can expose relationships in place              |
@@ -148,6 +148,6 @@ The exact syntax is open for experimentation. The key requirement is that the sa
 | Documents are viewed individually        | Related passages can be composed into parallel views |
 | Editing and reading are separate modes   | Reading and editing coexist                          |
 
-The scope should remain deliberately modest: glyphtoo is not a web browser, word processor, or full Xanadu implementation. It is a realtime composition engine for interactive documents, where layout and navigation are part of the content experience.
+The scope should remain deliberately modest: xanatoo is not a web browser, word processor, or full Xanadu implementation. It is a realtime composition engine for interactive documents, where layout and navigation are part of the content experience.
 
 The defining design principle: content should be addressable, editable, and rearrangeable, and changes to its presentation should be reflected immediately without destroying the relationships between its parts.

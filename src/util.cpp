@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
-#include "glyphtoo/util.hpp"
+#include "xanatoo/util.hpp"
 
-namespace glyphtoo {
+namespace xanatoo {
 
 std::string ascii_lower(std::string s) {
   for (char& c : s)
@@ -77,4 +77,4 @@ bool is_raster_image_path(std::string_view path) {
          path_ends_with_ci(path, ".bmp");
 }
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

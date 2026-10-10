@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <cstdint>
 
-namespace glyphtoo {
+namespace xanatoo {
 
 struct Image {
   SDL_Texture* texture = nullptr;
@@ -43,4 +43,4 @@ private:
   Image load(const std::string& resolved_path);
 };
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

@@ -10,7 +10,7 @@
 #include <vector>
 #include <cstdint>
 
-namespace glyphtoo {
+namespace xanatoo {
 
 struct Glyph {
   SDL_Texture* texture = nullptr;
@@ -94,4 +94,4 @@ public:
   const Font& pick(FontRole role) const;
 };
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

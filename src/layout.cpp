@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
-#include "glyphtoo/layout.hpp"
-#include "glyphtoo/parse.hpp"
-#include "glyphtoo/util.hpp"
+#include "xanatoo/layout.hpp"
+#include "xanatoo/parse.hpp"
+#include "xanatoo/util.hpp"
 
 #include <fstream>
 #include <map>
 #include <filesystem>
 
-namespace glyphtoo {
+namespace xanatoo {
 
 namespace {
 
@@ -766,4 +766,4 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
   y = baseline - metrics.ascender() + metrics.line_height() * 0.2f;
 }
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

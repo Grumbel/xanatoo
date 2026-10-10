@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace glyphtoo {
+namespace xanatoo {
 
 struct CliOptions {
   std::string font_path;
@@ -26,4 +26,4 @@ const char* fallback_document();
 // Open http(s)/mailto via the platform handler (non-blocking best-effort).
 void open_external_url(const std::string& url);
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

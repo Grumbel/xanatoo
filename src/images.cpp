@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
-#include "glyphtoo/images.hpp"
+#include "xanatoo/images.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
@@ -15,7 +15,7 @@
 
 namespace fs = std::filesystem;
 
-namespace glyphtoo {
+namespace xanatoo {
 
 ImageCache::ImageCache(SDL_Renderer* renderer) : renderer_(renderer) {}
 
@@ -81,4 +81,4 @@ const Image& ImageCache::get(const std::string& path, const std::string& base) {
   return ins->second;
 }
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

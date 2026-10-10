@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
-#include "glyphtoo/parse.hpp"
-#include "glyphtoo/util.hpp"
+#include "xanatoo/parse.hpp"
+#include "xanatoo/util.hpp"
 #include <cctype>
 #include <algorithm>
 #include <vector>
 #include <cstdio>
 
-namespace glyphtoo {
+namespace xanatoo {
 
 namespace {
 
@@ -1796,4 +1796,4 @@ std::string serialize_document(const Document& doc, std::string_view path) {
   return serialize_markup(doc);
 }
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

@@ -2,14 +2,14 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 #pragma once
 
-#include "glyphtoo/layout.hpp"
-#include "glyphtoo/font.hpp"
-#include "glyphtoo/editor.hpp"
-#include "glyphtoo/images.hpp"
+#include "xanatoo/layout.hpp"
+#include "xanatoo/font.hpp"
+#include "xanatoo/editor.hpp"
+#include "xanatoo/images.hpp"
 #include <SDL.h>
 #include <vector>
 
-namespace glyphtoo {
+namespace xanatoo {
 
 class Renderer {
 public:
@@ -37,4 +37,4 @@ private:
   ImageCache* images_;
 };
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

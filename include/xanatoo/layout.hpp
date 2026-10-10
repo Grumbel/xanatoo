@@ -2,13 +2,13 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 #pragma once
 
-#include "glyphtoo/types.hpp"
-#include "glyphtoo/font.hpp"
-#include "glyphtoo/images.hpp"
+#include "xanatoo/types.hpp"
+#include "xanatoo/font.hpp"
+#include "xanatoo/images.hpp"
 #include <vector>
 #include <string>
 
-namespace glyphtoo {
+namespace xanatoo {
 
 struct PositionedGlyph {
   uint32_t codepoint = 0;
@@ -86,4 +86,4 @@ private:
                         LayoutResult& out, FontRole base_role);
 };
 
-}  // namespace glyphtoo
+}  // namespace xanatoo

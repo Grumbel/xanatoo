@@ -1,6 +1,6 @@
-# glyphtoo help
+# xanatoo help
 
-glyphtoo is a **visual hypertext** editor — stretchtext, transclusion, dual-pane
+xanatoo is a **visual hypertext** editor — stretchtext, transclusion, dual-pane
 views, and living links. This page is an ordinary markup document shown in an
 in-app window.
 
@@ -69,7 +69,7 @@ expand or collapse. Use **Ctrl+E** to wrap the current block.
 
 ## Concepts
 
-glyphtoo treats structure as data: headings, lists, columns, includes, and
+xanatoo treats structure as data: headings, lists, columns, includes, and
 images are nodes in a tree, not only visual decorations.
 
 - **Transclusion** — `:::include #Target` or a path embeds another passage live
