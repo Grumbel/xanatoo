@@ -231,7 +231,18 @@ int main(int argc, char** argv) {
   bool summary_edit_mode = false;
   std::string summary_edit_text;
   glyphtoo::NodeId summary_edit_node = glyphtoo::INVALID_NODE;
-  bool help_mode = false;  // F1 keyboard reference overlay
+  bool help_mode = false;  // F1 help as a real document in a software window
+  glyphtoo::Document help_doc;
+  glyphtoo::LayoutResult help_layout;
+  float help_scroll = 0.f;
+  bool help_needs_layout = true;
+  bool help_loaded = false;
+  // Software window geometry (window coordinates)
+  int help_x = 80, help_y = 60, help_w = 560, help_h = 480;
+  bool help_dragging = false;
+  int help_drag_dx = 0, help_drag_dy = 0;
+  const int help_title_h = 28;
+  const int help_pad = 12;
   bool outline_mode = false;  // Ctrl+Shift+O heading outline
   std::vector<glyphtoo::OutlineEntry> outline;
   int outline_sel = 0;
@@ -317,6 +328,70 @@ int main(int argc, char** argv) {
     } else if (doc_y - p.scroll_y > view_h - margin) {
       p.scroll_y = doc_y - (view_h - margin);
     }
+  };
+
+
+  auto find_help_path = [&]() -> std::string {
+    const char* candidates[] = {
+        "examples/help.md",
+        "../examples/help.md",
+        "../../examples/help.md",
+        nullptr,
+    };
+    for (const char** c = candidates; *c; ++c) {
+      if (fs::exists(*c)) return fs::absolute(*c).string();
+    }
+#ifdef __linux__
+    try {
+      fs::path exe = fs::read_symlink("/proc/self/exe");
+      fs::path dir = exe.parent_path();
+      for (const auto& c : {
+               dir / "examples" / "help.md",
+               dir / ".." / "examples" / "help.md",
+               dir / ".." / "share" / "glyphtoo" / "examples" / "help.md",
+           }) {
+        std::error_code ec;
+        auto canon = fs::weakly_canonical(c, ec);
+        if (!ec && fs::exists(canon)) return canon.string();
+      }
+    } catch (...) {
+    }
+#endif
+    return {};
+  };
+
+  auto ensure_help_doc = [&]() {
+    if (help_loaded) return;
+    std::string hp = find_help_path();
+    if (!hp.empty()) {
+      help_doc = load_doc(hp);
+      std::cout << "Help document: " << hp << "\n";
+    } else {
+      // Minimal built-in so F1 always works offline
+      help_doc = glyphtoo::parse_document(
+          "# glyphtoo help\n\n"
+          "Place `examples/help.md` next to the binary for the full reference.\n\n"
+          "Press **F1** or **Esc** to close.\n",
+          {});
+      std::cerr << "examples/help.md not found; using short built-in help.\n";
+    }
+    help_loaded = true;
+    help_needs_layout = true;
+    help_scroll = 0.f;
+  };
+
+  auto layout_help = [&]() {
+    if (!help_loaded) return;
+    float mw = static_cast<float>(std::max(120, help_w - help_pad * 2));
+    help_layout = layout_engine.layout(help_doc, mw);
+    help_needs_layout = false;
+  };
+
+  auto help_client_rect = [&]() {
+    // x,y,w,h of document client area in window coords
+    return std::tuple{help_x + help_pad, help_y + help_title_h + 4,
+                      help_w - help_pad * 2,
+                      help_h - help_title_h - help_pad - 4};
   };
 
   auto jump_outline_sel = [&]() {
@@ -436,6 +511,12 @@ int main(int argc, char** argv) {
           if (imgui_mouse) break;
           int mx = 0, my = 0;
           SDL_GetMouseState(&mx, &my);
+          if (help_mode && mx >= help_x && mx < help_x + help_w &&
+              my >= help_y && my < help_y + help_h) {
+            help_scroll -= ev.wheel.y * 48.f;
+            if (help_scroll < 0.f) help_scroll = 0.f;
+            break;
+          }
           int pi = pane_at(static_cast<float>(mx));
           Pane& p = panes[pi];
           p.scroll_y -= ev.wheel.y * 48.f;
@@ -448,6 +529,44 @@ int main(int argc, char** argv) {
             break;
 
           if (ev.button.button == SDL_BUTTON_LEFT) {
+            // Help document software window (window coordinates)
+            if (help_mode) {
+              int mxw = ev.button.x, myw = ev.button.y;
+              if (mxw >= help_x && mxw < help_x + help_w &&
+                  myw >= help_y && myw < help_y + help_h) {
+                if (myw < help_y + help_title_h) {
+                  if (mxw >= help_x + help_w - 28) {
+                    help_mode = false;
+                    help_dragging = false;
+                  } else {
+                    help_dragging = true;
+                    help_drag_dx = mxw - help_x;
+                    help_drag_dy = myw - help_y;
+                  }
+                  break;
+                }
+                auto [cx, cy, cw, ch] = help_client_rect();
+                float lx = static_cast<float>(mxw - cx);
+                float ly = static_cast<float>(myw - cy);
+                if (lx >= 0 && ly >= 0 && lx <= cw && ly <= ch) {
+                  if (auto href = glyphtoo::hit_test_link(
+                          help_doc, help_layout, lx, ly, help_scroll)) {
+                    if (!href->empty() && (*href)[0] == '#') {
+                      if (auto dest =
+                              glyphtoo::jump_to_href(help_doc, *href)) {
+                        auto cpos = glyphtoo::caret_screen_pos(
+                            help_layout, *dest, 0.f,
+                            static_cast<float>(body_font.line_height()));
+                        if (cpos.valid)
+                          help_scroll = std::max(0.f, cpos.y - 24.f);
+                      }
+                    }
+                  }
+                }
+                break;
+              }
+            }
+
             float mx = static_cast<float>(ev.button.x);
             float my = content_y(static_cast<float>(ev.button.y));
 
@@ -673,6 +792,7 @@ int main(int argc, char** argv) {
 
         case SDL_MOUSEBUTTONUP:
           if (ev.button.button == SDL_BUTTON_LEFT) {
+            help_dragging = false;
             if (dragging_block && drag_block_id != glyphtoo::INVALID_NODE &&
                 drop_target_id != glyphtoo::INVALID_NODE &&
                 drop_target_id != drag_block_id) {
@@ -707,6 +827,13 @@ int main(int argc, char** argv) {
 
           mouse_x = static_cast<float>(ev.motion.x);
           mouse_y = static_cast<float>(ev.motion.y);
+          if (help_dragging) {
+            help_x = ev.motion.x - help_drag_dx;
+            help_y = ev.motion.y - help_drag_dy;
+            if (help_x < 0) help_x = 0;
+            if (help_y < static_cast<int>(ui_top)) help_y = static_cast<int>(ui_top);
+            break;
+          }
           if (dragging_scroll) {
             float my = content_y(static_cast<float>(ev.motion.y));
             Pane& sp = panes[scroll_drag_pane];
@@ -960,6 +1087,10 @@ int main(int argc, char** argv) {
 
             case SDLK_F1:
               help_mode = !help_mode;
+              if (help_mode) {
+                ensure_help_doc();
+                help_needs_layout = true;
+              }
               break;
 
             case SDLK_EQUALS:
@@ -2020,6 +2151,10 @@ int main(int argc, char** argv) {
           break;
         case C::ToggleHelp:
           help_mode = !help_mode;
+          if (help_mode) {
+            ensure_help_doc();
+            help_needs_layout = true;
+          }
           break;
         case C::ZoomIn:
           body_px = std::min(48, body_px + 1);
@@ -2416,7 +2551,54 @@ int main(int argc, char** argv) {
       }
     }
 
-    // Help is an ImGui software window (see Ui::begin_frame).
+    // Help as a real document in a software window
+    if (help_mode) {
+      ensure_help_doc();
+      if (help_w < 280) help_w = 280;
+      if (help_h < 200) help_h = 200;
+      if (help_needs_layout) layout_help();
+
+      // Clamp scroll
+      {
+        auto [cx, cy, cw, ch] = help_client_rect();
+        float max_s = std::max(0.f, help_layout.content_height - static_cast<float>(ch) + 40.f);
+        if (help_scroll > max_s) help_scroll = max_s;
+      }
+
+      // Frame + title bar
+      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+      SDL_SetRenderDrawColor(sdl, 0, 0, 0, 40);
+      SDL_Rect shadow{help_x + 3, help_y + 3, help_w, help_h};
+      SDL_RenderFillRect(sdl, &shadow);
+      SDL_SetRenderDrawColor(sdl, 246, 245, 244, 255);
+      SDL_Rect frame{help_x, help_y, help_w, help_h};
+      SDL_RenderFillRect(sdl, &frame);
+      SDL_SetRenderDrawColor(sdl, 156, 154, 151, 255);
+      SDL_RenderDrawRect(sdl, &frame);
+      // Title bar (Clearlooks-ish blue-grey)
+      SDL_SetRenderDrawColor(sdl, 200, 212, 232, 255);
+      SDL_Rect title{help_x + 1, help_y + 1, help_w - 2, help_title_h};
+      SDL_RenderFillRect(sdl, &title);
+      SDL_SetRenderDrawColor(sdl, 156, 154, 151, 255);
+      SDL_RenderDrawLine(sdl, help_x, help_y + help_title_h,
+                         help_x + help_w, help_y + help_title_h);
+      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+
+      const char* title_txt = "Help — glyphtoo";
+      renderer.draw_text(body_font, static_cast<float>(help_x + 10),
+                         static_cast<float>(help_y + 6 + body_font.ascender()),
+                         title_txt, 46, 52, 54);
+      // Close affordance
+      renderer.draw_text(body_font, static_cast<float>(help_x + help_w - 22),
+                         static_cast<float>(help_y + 6 + body_font.ascender()),
+                         "×", 80, 40, 40);
+
+      auto [cx, cy, cw, ch] = help_client_rect();
+      SDL_Rect clip{cx, cy, cw, ch};
+      SDL_RenderSetClipRect(sdl, &clip);
+      renderer.draw(help_layout, help_scroll, static_cast<float>(cx));
+      SDL_RenderSetClipRect(sdl, nullptr);
+    }
 
     // Hover preview tooltip for internal #anchor links
     if (!hovered_preview.empty() && !search_mode && !save_as_mode &&

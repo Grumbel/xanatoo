@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **065** (this delivery is **064**)
+Next bundle number: **066** (this delivery is **065**)
 
 ## Status (2026-10-10)
 
@@ -111,6 +111,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Scrollbar / page / scroll-into-view account for toolbar height
 - [x] Classic Gtk2/Clearlooks-ish ImGui theme + SVG→PNG toolbar icons
 - [x] Help as ImGui software window (draggable/resizable, not OS window)
+- [x] Help is a **real document** (`examples/help.md`) rendered in a software window
 
 ## Open work / next steps
 
@@ -118,6 +119,9 @@ LCS structural diff marks; cross-document `:::include`.
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Editable transclusion mirror (edits on embed write through to source)
 4. Word-level / intra-block diff highlighting
+5. **Tables** (layout + markup) — denser key/command reference docs, comparison grids
+6. **General document software windows** — open any doc in a floating frame (help is the first case); optional docking
+7. Definition lists / two-column “key → description” blocks if tables are overkill for help-style pages
 
 ## Design notes
 
@@ -221,4 +225,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `glyphtoo-061.*-search-highlight-…` — search highlight
 - `glyphtoo-062.*-mouse-select-…` — mouse offset + selection
 - `glyphtoo-063.*-classic-ui-icons-…` — classic theme + icons
-- `glyphtoo-064.*-help-window-…` — this delivery
+- `glyphtoo-064.*-help-window-…` — ImGui help window
+- `glyphtoo-065.*-help-document-…` — this delivery
