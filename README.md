@@ -59,6 +59,8 @@ Supported dialect (intentionally small):
 | **Ctrl+Z** / **Ctrl+Y** | Undo / redo |
 | **Ctrl+C** / **X** / **V** | Clipboard |
 | **Ctrl+B** / **I** / **\`** / **K** | Bold / italic / code / link |
+| **Ctrl+D** | Duplicate current block |
+| **Alt+↑ / Alt+↓** | Move block among siblings |
 | **Ctrl+E** | Wrap block in stretchtext |
 | **Ctrl+Shift+E** | Edit stretch summary |
 | **Ctrl+Shift+U** | Unwrap stretchtext |

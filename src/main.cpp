@@ -964,21 +964,37 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_UP:
-              move_and_sel([&] {
-                if (!glyphtoo::move_up(p.layout, p.sel.focus, p.preferred_x))
-                  glyphtoo::move_to_prev_node(d, p.sel.focus);
-              });
-              scroll_caret_into_view(p);
-              reset_blink();
+              if ((ev.key.keysym.mod & KMOD_ALT) != 0) {
+                edit();
+                if (glyphtoo::move_block_up(d, p.sel.focus.node)) {
+                  needs_layout = true;
+                  reset_blink();
+                }
+              } else {
+                move_and_sel([&] {
+                  if (!glyphtoo::move_up(p.layout, p.sel.focus, p.preferred_x))
+                    glyphtoo::move_to_prev_node(d, p.sel.focus);
+                });
+                scroll_caret_into_view(p);
+                reset_blink();
+              }
               break;
 
             case SDLK_DOWN:
-              move_and_sel([&] {
-                if (!glyphtoo::move_down(p.layout, p.sel.focus, p.preferred_x))
-                  glyphtoo::move_to_next_node(d, p.sel.focus);
-              });
-              scroll_caret_into_view(p);
-              reset_blink();
+              if ((ev.key.keysym.mod & KMOD_ALT) != 0) {
+                edit();
+                if (glyphtoo::move_block_down(d, p.sel.focus.node)) {
+                  needs_layout = true;
+                  reset_blink();
+                }
+              } else {
+                move_and_sel([&] {
+                  if (!glyphtoo::move_down(p.layout, p.sel.focus, p.preferred_x))
+                    glyphtoo::move_to_next_node(d, p.sel.focus);
+                });
+                scroll_caret_into_view(p);
+                reset_blink();
+              }
               break;
 
             case SDLK_PAGEUP:
@@ -1140,6 +1156,20 @@ int main(int argc, char** argv) {
                     dirty_flags[p.doc_index] = false;
                     update_title();
                   }
+                }
+              }
+              break;
+
+            case SDLK_d:
+              if (ctrl) {
+                edit();
+                if (auto nid = glyphtoo::duplicate_block(d, p.sel.focus.node)) {
+                  p.sel.focus.node = *nid;
+                  p.sel.focus.span_index = 0;
+                  p.sel.focus.char_index = 0;
+                  p.sel.anchor = p.sel.focus;
+                  needs_layout = true;
+                  reset_blink();
                 }
               }
               break;

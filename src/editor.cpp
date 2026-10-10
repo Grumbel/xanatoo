@@ -503,6 +503,80 @@ void delete_forward(Document& doc, Caret& caret) {
 
 
 
+
+bool move_block_up(Document& doc, NodeId block) {
+  if (block == INVALID_NODE) return false;
+  Node& n = doc.get(block);
+  if (n.parent == INVALID_NODE) return false;
+  Node& parent = doc.get(n.parent);
+  auto it = std::find(parent.children.begin(), parent.children.end(), block);
+  if (it == parent.children.begin() || it == parent.children.end()) return false;
+  std::iter_swap(it, it - 1);
+  return true;
+}
+
+bool move_block_down(Document& doc, NodeId block) {
+  if (block == INVALID_NODE) return false;
+  Node& n = doc.get(block);
+  if (n.parent == INVALID_NODE) return false;
+  Node& parent = doc.get(n.parent);
+  auto it = std::find(parent.children.begin(), parent.children.end(), block);
+  if (it == parent.children.end() || (it + 1) == parent.children.end()) return false;
+  std::iter_swap(it, it + 1);
+  return true;
+}
+
+static void copy_node_deep(Document& doc, NodeId src_id, NodeId new_parent,
+                           NodeId& out_id);
+
+std::optional<NodeId> duplicate_block(Document& doc, NodeId block) {
+  if (block == INVALID_NODE) return std::nullopt;
+  Node& src = doc.get(block);
+  if (src.parent == INVALID_NODE) return std::nullopt;
+
+  NodeId nid = doc.create(src.kind, INVALID_NODE);
+  Node& dst = doc.get(nid);
+  dst.kind = src.kind;
+  dst.level = src.level;
+  dst.alt = src.alt;
+  dst.src = src.src;
+  dst.expanded = src.expanded;
+  dst.summary = src.summary;
+  dst.display_scale = src.display_scale;
+  dst.spans = src.spans;  // copy spans
+  dst.parent = src.parent;
+
+  // Deep-copy children
+  for (NodeId cid : src.children) {
+    NodeId child_copy = INVALID_NODE;
+    copy_node_deep(doc, cid, nid, child_copy);
+  }
+
+  if (!doc.insert_after(block, nid)) {
+    // fallback: append under parent
+    doc.add_child(src.parent, nid);
+  }
+  return nid;
+}
+
+static void copy_node_deep(Document& doc, NodeId src_id, NodeId new_parent,
+                           NodeId& out_id) {
+  const Node& src = doc.get(src_id);
+  out_id = doc.create(src.kind, new_parent);
+  Node& dst = doc.get(out_id);
+  dst.level = src.level;
+  dst.alt = src.alt;
+  dst.src = src.src;
+  dst.expanded = src.expanded;
+  dst.summary = src.summary;
+  dst.display_scale = src.display_scale;
+  dst.spans = src.spans;
+  for (NodeId cid : src.children) {
+    NodeId child_copy = INVALID_NODE;
+    copy_node_deep(doc, cid, out_id, child_copy);
+  }
+}
+
 NodeId enclosing_stretch(const Document& doc, NodeId id) {
   while (id != INVALID_NODE) {
     const Node& n = doc.get(id);

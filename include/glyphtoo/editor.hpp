@@ -92,6 +92,13 @@ std::optional<NodeId> unwrap_stretch(Document& doc, NodeId block_or_stretch);
 // Walk parents to find enclosing Stretch node (or INVALID_NODE).
 NodeId enclosing_stretch(const Document& doc, NodeId id);
 
+// Reorder a block among its siblings. Returns false if already at edge.
+bool move_block_up(Document& doc, NodeId block);
+bool move_block_down(Document& doc, NodeId block);
+
+// Duplicate a block as the next sibling; returns the new node id.
+std::optional<NodeId> duplicate_block(Document& doc, NodeId block);
+
 // Delete the current selection (or nothing if empty). Caret becomes the start.
 void delete_selection(Document& doc, Selection& sel);
 
