@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **045** (this delivery is **044**)
+Next bundle number: **046** (this delivery is **045**)
 
 ## Status (2026-10-10)
 
-Stage **01**–**04** core features in place; status-bar document stats.
+Stage **01**–**04** core features in place; improved page / doc navigation.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -90,6 +90,7 @@ Stage **01**–**04** core features in place; status-bar document stats.
 - [x] Heading outline (Ctrl+Shift+O) — jump via Enter / 1-9 / click
 - [x] Ctrl+Enter new paragraph after block; Ctrl+Shift+- insert HR
 - [x] Status-bar document stats (words, chars, headings)
+- [x] Page Up/Down move caret; Ctrl+Home/End document extremes
 
 ## Open work / next steps
 
@@ -173,4 +174,5 @@ Stage **01**–**04** core features in place; status-bar document stats.
 - `glyphtoo-041.*-diff-marks-…` — dual-pane diff marks
 - `glyphtoo-042.*-outline-…` — heading outline
 - `glyphtoo-043.*-insert-blocks-…` — Ctrl+Enter / HR insert
-- `glyphtoo-044.*-doc-stats-…` — this delivery
+- `glyphtoo-044.*-doc-stats-…` — status-bar document stats
+- `glyphtoo-045.*-page-nav-…` — this delivery

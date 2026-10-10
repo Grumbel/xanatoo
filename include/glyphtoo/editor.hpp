@@ -153,6 +153,10 @@ bool move_down(const LayoutResult& layout, Caret& caret, float preferred_x);
 bool move_to_prev_node(Document& doc, Caret& caret);
 bool move_to_next_node(Document& doc, Caret& caret);
 
+// Document extremes (first / last text node).
+bool move_to_document_start(Document& doc, Caret& caret);
+bool move_to_document_end(Document& doc, Caret& caret);
+
 void ensure_valid_caret(Document& doc, Caret& caret);
 
 // Document-order comparison of two carets (-1, 0, +1).

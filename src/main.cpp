@@ -1409,20 +1409,39 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_PAGEUP:
-              p.scroll_y = std::max(0.f, p.scroll_y - win_h * 0.8f);
+            case SDLK_PAGEDOWN: {
+              const bool up = (ev.key.keysym.sym == SDLK_PAGEUP);
+              const float view_h = static_cast<float>(win_h - 28);
+              const float step = view_h * 0.85f;
+              float max_s = std::max(
+                  0.f, p.layout.content_height - view_h + 40.f);
+              if (up)
+                p.scroll_y = std::max(0.f, p.scroll_y - step);
+              else
+                p.scroll_y = std::min(max_s, p.scroll_y + step);
+              // Move caret to a glyph near the top of the new viewport
+              move_and_sel([&] {
+                if (p.layout.glyphs.empty()) return;
+                float target_y = p.scroll_y + view_h * 0.15f;
+                float best = 1e9f;
+                glyphtoo::Caret best_c = p.sel.focus;
+                for (const auto& g : p.layout.glyphs) {
+                  float dy = std::abs(g.y - target_y);
+                  if (dy < best) {
+                    best = dy;
+                    best_c = {g.node, g.span_index, g.char_index};
+                  }
+                }
+                p.sel.focus = best_c;
+              });
+              reset_blink();
               break;
-            case SDLK_PAGEDOWN:
-              p.scroll_y += win_h * 0.8f;
-              break;
+            }
 
             case SDLK_HOME:
               move_and_sel([&] {
                 if (ctrl) {
-                  // Document start
-                  glyphtoo::ensure_valid_caret(d, p.sel.focus);
-                  // walk to first text node
-                  p.sel.focus.span_index = 0;
-                  p.sel.focus.char_index = 0;
+                  glyphtoo::move_to_document_start(d, p.sel.focus);
                 } else {
                   // Line start via layout: find leftmost glyph on same baseline
                   auto cpos = glyphtoo::caret_screen_pos(
@@ -1452,21 +1471,25 @@ int main(int argc, char** argv) {
 
             case SDLK_END:
               move_and_sel([&] {
-                auto cpos = glyphtoo::caret_screen_pos(
-                    p.layout, p.sel.focus, p.scroll_y,
-                    static_cast<float>(body_font.line_height()));
-                if (cpos.valid) {
-                  float best_x = -1e9f;
-                  glyphtoo::Caret best = p.sel.focus;
-                  for (const auto& g : p.layout.glyphs) {
-                    if (g.node != p.sel.focus.node) continue;
-                    if (std::abs(g.y - (cpos.y + p.scroll_y)) > 2.f) continue;
-                    if (g.x >= best_x) {
-                      best_x = g.x;
-                      best = {g.node, g.span_index, g.char_index + 1};
+                if (ctrl) {
+                  glyphtoo::move_to_document_end(d, p.sel.focus);
+                } else {
+                  auto cpos = glyphtoo::caret_screen_pos(
+                      p.layout, p.sel.focus, p.scroll_y,
+                      static_cast<float>(body_font.line_height()));
+                  if (cpos.valid) {
+                    float best_x = -1e9f;
+                    glyphtoo::Caret best = p.sel.focus;
+                    for (const auto& g : p.layout.glyphs) {
+                      if (g.node != p.sel.focus.node) continue;
+                      if (std::abs(g.y - (cpos.y + p.scroll_y)) > 2.f) continue;
+                      if (g.x >= best_x) {
+                        best_x = g.x;
+                        best = {g.node, g.span_index, g.char_index + 1};
+                      }
                     }
+                    p.sel.focus = best;
                   }
-                  p.sel.focus = best;
                 }
               });
               scroll_caret_into_view(p);
@@ -2204,6 +2227,8 @@ int main(int argc, char** argv) {
           "",
           "Navigate",
           "  Arrows / Home/End   Move caret",
+          "  Ctrl+Home / End     Document start / end",
+          "  Page Up / Down      Scroll + move caret",
           "  Ctrl+Left/Right     Word motion",
           "  Ctrl+A / Shift+A    Select block / whole document",
           "  Ctrl+F / F3         Leap search / next match",

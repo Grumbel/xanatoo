@@ -1506,6 +1506,32 @@ bool move_to_next_node(Document& doc, Caret& caret) {
   return true;
 }
 
+bool move_to_document_start(Document& doc, Caret& caret) {
+  std::vector<NodeId> nodes;
+  if (doc.root != INVALID_NODE) collect_text_nodes(doc, doc.root, nodes);
+  if (nodes.empty()) return false;
+  caret.node = nodes.front();
+  caret.span_index = 0;
+  caret.char_index = 0;
+  return true;
+}
+
+bool move_to_document_end(Document& doc, Caret& caret) {
+  std::vector<NodeId> nodes;
+  if (doc.root != INVALID_NODE) collect_text_nodes(doc, doc.root, nodes);
+  if (nodes.empty()) return false;
+  caret.node = nodes.back();
+  const Node& n = doc.get(caret.node);
+  if (n.spans.empty()) {
+    caret.span_index = 0;
+    caret.char_index = 0;
+  } else {
+    caret.span_index = n.spans.size() - 1;
+    caret.char_index = utf8_char_count(n.spans.back().text);
+  }
+  return true;
+}
+
 void ensure_valid_caret(Document& doc, Caret& caret) {
   if (caret.node != INVALID_NODE) {
     const Node& n = doc.get(caret.node);

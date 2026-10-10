@@ -94,6 +94,8 @@ Supported dialect (intentionally small):
 | Arrows | Move caret (scrolls into view) |
 | **Ctrl+←/→** | Word motion |
 | **Home** / **End** | Line start / end |
+| **Ctrl+Home** / **Ctrl+End** | Document start / end |
+| **Page Up** / **Page Down** | Scroll view and move caret |
 | **Ctrl+A** | Select current block |
 | **Ctrl+Shift+A** | Select whole document |
 | Click blue link | Follow `#anchor` or open external `http(s)` / `mailto:` |
