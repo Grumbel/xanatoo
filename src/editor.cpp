@@ -1514,6 +1514,29 @@ void compute_diff_marks(const Document& a, const Document& b,
   for (size_t i = n; i < nodes_b.size(); ++i) changed_b.push_back(nodes_b[i]);
 }
 
+void collect_outline(const Document& doc, std::vector<OutlineEntry>& out) {
+  out.clear();
+  if (doc.root == INVALID_NODE) return;
+  std::vector<NodeId> stack;
+  stack.push_back(doc.root);
+  while (!stack.empty()) {
+    NodeId id = stack.back();
+    stack.pop_back();
+    const Node& n = doc.get(id);
+    if (n.kind == NodeKind::Heading) {
+      OutlineEntry e;
+      e.node = id;
+      e.level = std::max(1, std::min(6, n.level));
+      e.text = node_text(doc, id);
+      if (e.text.empty()) e.text = "(empty heading)";
+      out.push_back(std::move(e));
+    }
+    // Push children in reverse so they process left-to-right
+    for (auto it = n.children.rbegin(); it != n.children.rend(); ++it)
+      stack.push_back(*it);
+  }
+}
+
 static std::string slice_node_text(const Node& n, size_t from_span, size_t from_ch,
                                    size_t to_span, size_t to_ch) {
   if (n.spans.empty()) return {};

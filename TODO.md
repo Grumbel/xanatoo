@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **042** (this delivery is **041**)
+Next bundle number: **043** (this delivery is **042**)
 
 ## Status (2026-10-10)
 
-Stage **01**–**04** core features in place; dual-pane diff marks.
+Stage **01**–**04** core features in place; heading outline navigation.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -87,6 +87,7 @@ Stage **01**–**04** core features in place; dual-pane diff marks.
 - [x] Sample document moved to `examples/welcome.md` + PNG images
 - [x] Dual-pane visual links: sync jump, Ctrl+Click other pane, connector line
 - [x] Side-by-side diff marks (Ctrl+Shift+D, two independent files)
+- [x] Heading outline (Ctrl+Shift+O) — jump via Enter / 1-9 / click
 
 ## Open work / next steps
 
@@ -167,4 +168,5 @@ Stage **01**–**04** core features in place; dual-pane diff marks.
 - `glyphtoo-038.*-f1-help-…` — F1 help overlay
 - `glyphtoo-039.*-example-doc-…` — examples/welcome.md + images
 - `glyphtoo-040.*-pane-links-…` — dual-pane visual links
-- `glyphtoo-041.*-diff-marks-…` — this delivery
+- `glyphtoo-041.*-diff-marks-…` — dual-pane diff marks
+- `glyphtoo-042.*-outline-…` — this delivery

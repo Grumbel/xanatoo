@@ -99,6 +99,7 @@ Supported dialect (intentionally small):
 | Hover `#anchor` link | Preview tooltip of the target passage |
 | Click transclusion | Jump to the source passage |
 | **Ctrl+F** | Leap search |
+| **Ctrl+Shift+O** | Heading outline (jump to section) |
 | **Ctrl+H** | Leap replace (Tab switches fields) |
 | **F3** / **Ctrl+G** | Next match |
 | **Esc** | Cancel mode / clear selection |

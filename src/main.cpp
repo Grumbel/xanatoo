@@ -409,6 +409,9 @@ int main(int argc, char** argv) {
   std::string summary_edit_text;
   glyphtoo::NodeId summary_edit_node = glyphtoo::INVALID_NODE;
   bool help_mode = false;  // F1 keyboard reference overlay
+  bool outline_mode = false;  // Ctrl+Shift+O heading outline
+  std::vector<glyphtoo::OutlineEntry> outline;
+  int outline_sel = 0;
   // Side-by-side version marks (two independent documents)
   bool diff_mode = false;
   std::vector<glyphtoo::NodeId> diff_marks[2];
@@ -421,6 +424,12 @@ int main(int argc, char** argv) {
   auto reset_blink = [&]() { caret_blink_start = SDL_GetTicks(); };
 
   auto F = [&]() -> Pane& { return panes[focus]; };
+
+  auto refresh_outline = [&]() {
+    glyphtoo::collect_outline(doc_of(F()), outline);
+    if (outline_sel >= static_cast<int>(outline.size()))
+      outline_sel = std::max(0, static_cast<int>(outline.size()) - 1);
+  };
 
   auto refresh_diff = [&]() {
     diff_marks[0].clear();
@@ -484,6 +493,17 @@ int main(int argc, char** argv) {
     }
   };
 
+  auto jump_outline_sel = [&]() {
+    if (outline.empty() || outline_sel < 0 ||
+        outline_sel >= static_cast<int>(outline.size()))
+      return;
+    Pane& p = F();
+    p.sel.focus = {outline[static_cast<size_t>(outline_sel)].node, 0, 0};
+    p.sel.anchor = p.sel.focus;
+    scroll_caret_into_view(p);
+    reset_blink();
+  };
+
   auto pane_at = [&](float mx) -> int {
     if (!split) return 0;
     return (mx >= static_cast<float>(panes[1].x)) ? 1 : 0;
@@ -492,6 +512,11 @@ int main(int argc, char** argv) {
   auto local_x = [&](float mx, int pi) {
     return mx - static_cast<float>(panes[pi].x);
   };
+
+  // Outline panel geometry (updated each frame when open; used for clicks)
+  int ol_px = 0, ol_py = 0, ol_pw = 0, ol_ph = 0;
+  float ol_step = 20.f;
+  int ol_header = 36;
 
   while (running) {
     SDL_Event ev;
@@ -523,6 +548,22 @@ int main(int argc, char** argv) {
           if (ev.button.button == SDL_BUTTON_LEFT) {
             float mx = static_cast<float>(ev.button.x);
             float my = static_cast<float>(ev.button.y);
+
+            // Outline panel click → jump to heading
+            if (outline_mode && ol_pw > 0) {
+              if (mx >= ol_px && mx < ol_px + ol_pw && my >= ol_py &&
+                  my < ol_py + ol_ph) {
+                int row = static_cast<int>((my - ol_py - ol_header) / ol_step);
+                if (row >= 0 && row < static_cast<int>(outline.size())) {
+                  outline_sel = row;
+                  jump_outline_sel();
+                  outline_mode = false;
+                }
+              } else {
+                outline_mode = false;  // click outside closes
+              }
+              break;
+            }
 
             // Drag scrollbar (right edge of a pane)?
             {
@@ -862,7 +903,7 @@ int main(int argc, char** argv) {
           break;
 
         case SDL_TEXTINPUT: {
-          if (help_mode) break;
+          if (help_mode || outline_mode) break;
           if (save_as_mode) {
             save_as_path += ev.text.text;
             break;
@@ -924,6 +965,47 @@ int main(int argc, char** argv) {
             break;
           }
 
+          // Outline: navigate headings, Enter/click jumps, Esc closes
+          if (outline_mode) {
+            if (ev.key.keysym.sym == SDLK_ESCAPE ||
+                (ev.key.keysym.sym == SDLK_o && ctrl && shift)) {
+              outline_mode = false;
+              break;
+            }
+            switch (ev.key.keysym.sym) {
+              case SDLK_UP:
+                if (outline_sel > 0) --outline_sel;
+                break;
+              case SDLK_DOWN:
+                if (outline_sel + 1 < static_cast<int>(outline.size()))
+                  ++outline_sel;
+                break;
+              case SDLK_HOME:
+                outline_sel = 0;
+                break;
+              case SDLK_END:
+                if (!outline.empty())
+                  outline_sel = static_cast<int>(outline.size()) - 1;
+                break;
+              case SDLK_RETURN:
+              case SDLK_KP_ENTER:
+                jump_outline_sel();
+                outline_mode = false;
+                break;
+              default:
+                if (ev.key.keysym.sym >= SDLK_1 && ev.key.keysym.sym <= SDLK_9) {
+                  int idx = static_cast<int>(ev.key.keysym.sym - SDLK_1);
+                  if (idx < static_cast<int>(outline.size())) {
+                    outline_sel = idx;
+                    jump_outline_sel();
+                    outline_mode = false;
+                  }
+                }
+                break;
+            }
+            break;
+          }
+
           auto clear_sel = [&]() { p.sel.anchor = p.sel.focus; };
           auto move_and_sel = [&](auto mover) {
             if (!shift) clear_sel();
@@ -933,7 +1015,9 @@ int main(int argc, char** argv) {
 
           switch (ev.key.keysym.sym) {
             case SDLK_ESCAPE:
-              if (save_as_mode) {
+              if (outline_mode) {
+                outline_mode = false;
+              } else if (save_as_mode) {
                 save_as_mode = false;
                 save_as_path.clear();
               } else if (link_edit_mode) {
@@ -1465,6 +1549,25 @@ int main(int argc, char** argv) {
               }
               break;
 
+            case SDLK_o:
+              if (ctrl && shift) {
+                outline_mode = !outline_mode;
+                if (outline_mode) {
+                  help_mode = false;
+                  refresh_outline();
+                  outline_sel = 0;
+                  // Prefer selecting the heading nearest the caret
+                  for (int i = 0; i < static_cast<int>(outline.size()); ++i) {
+                    if (outline[static_cast<size_t>(i)].node ==
+                        p.sel.focus.node) {
+                      outline_sel = i;
+                      break;
+                    }
+                  }
+                }
+              }
+              break;
+
             case SDLK_d:
               if (ctrl && shift) {
                 // Side-by-side version marks (needs two independent docs)
@@ -1935,6 +2038,9 @@ int main(int argc, char** argv) {
       } else if (diff_mode) {
         label = "Diff marks on — orange bars mark passages that differ · Ctrl+Shift+D toggles";
         tr = 160; tg = 90; tb = 30;
+      } else if (outline_mode) {
+        label = "Outline — ↑/↓ select · Enter jump · 1-9 quick jump · Esc close";
+        tr = 40; tg = 90; tb = 160;
       } else if (!hovered_href.empty()) {
         label = "Link: ";
         label += hovered_href;
@@ -1951,6 +2057,67 @@ int main(int argc, char** argv) {
       }
       float baseline = static_cast<float>(win_h - 8);
       renderer.draw_text(body_font, 10.f, baseline, label, tr, tg, tb);
+    }
+
+    // Heading outline overlay (Ctrl+Shift+O)
+    if (outline_mode) {
+      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+      SDL_SetRenderDrawColor(sdl, 20, 22, 28, 180);
+      SDL_Rect dim{0, 0, win_w, win_h};
+      SDL_RenderFillRect(sdl, &dim);
+
+      ol_pw = std::min(480, win_w - 48);
+      ol_ph = std::min(win_h - 48, std::max(120, static_cast<int>(outline.size()) * 22 + 56));
+      ol_px = (win_w - ol_pw) / 2;
+      ol_py = (win_h - ol_ph) / 2;
+      ol_header = 40;
+      ol_step = static_cast<float>(
+          std::max(16, body_font.line_height() + 4));
+
+      SDL_SetRenderDrawColor(sdl, 248, 246, 240, 250);
+      SDL_Rect panel{ol_px, ol_py, ol_pw, ol_ph};
+      SDL_RenderFillRect(sdl, &panel);
+      SDL_SetRenderDrawColor(sdl, 25, 90, 170, 255);
+      SDL_RenderDrawRect(sdl, &panel);
+      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+
+      renderer.draw_text(body_font, static_cast<float>(ol_px + 16),
+                         static_cast<float>(ol_py + 12 + body_font.ascender()),
+                         "Outline — Enter jump · Esc close", 25, 90, 170);
+
+      float ty = static_cast<float>(ol_py + ol_header + body_font.ascender());
+      for (int i = 0; i < static_cast<int>(outline.size()); ++i) {
+        if (ty > ol_py + ol_ph - 8) break;
+        const auto& e = outline[static_cast<size_t>(i)];
+        std::string line;
+        if (i < 9) {
+          line += static_cast<char>('1' + i);
+          line += "  ";
+        } else {
+          line += "   ";
+        }
+        for (int ind = 1; ind < e.level; ++ind) line += "  ";
+        line += e.text;
+        if (i == outline_sel) {
+          SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+          SDL_SetRenderDrawColor(sdl, 25, 90, 170, 40);
+          SDL_Rect hi{ol_px + 4,
+                      static_cast<int>(ty - body_font.ascender() - 2),
+                      ol_pw - 8, static_cast<int>(ol_step)};
+          SDL_RenderFillRect(sdl, &hi);
+          SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+          renderer.draw_text(body_font, static_cast<float>(ol_px + 16), ty, line,
+                             25, 90, 170);
+        } else {
+          renderer.draw_text(body_font, static_cast<float>(ol_px + 16), ty, line,
+                             50, 48, 42);
+        }
+        ty += ol_step;
+      }
+      if (outline.empty()) {
+        renderer.draw_text(body_font, static_cast<float>(ol_px + 16), ty,
+                           "(no headings in this document)", 120, 118, 110);
+      }
     }
 
     // F1 help overlay
@@ -2003,6 +2170,7 @@ int main(int argc, char** argv) {
           "  Ctrl+A / Shift+A    Select block / whole document",
           "  Ctrl+F / F3         Leap search / next match",
           "  Ctrl+H              Leap replace",
+          "  Ctrl+Shift+O        Heading outline",
           "  Click link          Follow #anchor or open URL",
           "  Ctrl+Click link     Open #anchor in other pane",
           "  Click transclusion  Jump to source passage",

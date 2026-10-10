@@ -168,6 +168,14 @@ void compute_diff_marks(const Document& a, const Document& b,
                         std::vector<NodeId>& changed_a,
                         std::vector<NodeId>& changed_b);
 
+// Heading outline for navigation (document order).
+struct OutlineEntry {
+  NodeId node = INVALID_NODE;
+  int level = 1;
+  std::string text;
+};
+void collect_outline(const Document& doc, std::vector<OutlineEntry>& out);
+
 // ---------------------------------------------------------------------------
 // Undo / redo via document snapshots (simple, correct at current scale).
 // ---------------------------------------------------------------------------
