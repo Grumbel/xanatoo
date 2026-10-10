@@ -113,6 +113,10 @@ text as a continuous, searchable stream.
 
 ---
 
+A live embedding of another passage (click to jump to the source):
+
+:::include #Living documents
+
 
 Design pillars:
 
@@ -594,6 +598,28 @@ int main(int argc, char** argv) {
                 open_external_url(*href);
                 break;
               }
+            }
+
+            // Click a transclusion → jump to its source passage
+            {
+              bool followed = false;
+              float adj_y = my + p.scroll_y;
+              for (const auto& box : p.layout.boxes) {
+                if (adj_y < box.y || adj_y > box.y + box.height) continue;
+                if (lx < box.x || lx > box.x + box.width) continue;
+                const auto& bn = doc_of(p).get(box.node);
+                if (bn.kind != glyphtoo::NodeKind::Transclude) continue;
+                if (auto dest = glyphtoo::jump_to_href(doc_of(p), bn.src)) {
+                  p.sel.focus = *dest;
+                  p.sel.anchor = p.sel.focus;
+                  scroll_caret_into_view(p);
+                  reset_blink();
+                  std::cout << "Followed transclusion: " << bn.src << "\n";
+                  followed = true;
+                }
+                break;
+              }
+              if (followed) break;
             }
 
             if (auto hit = glyphtoo::hit_test(p.layout, lx, my, p.scroll_y)) {

@@ -277,6 +277,102 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       break;
     }
 
+    case NodeKind::Transclude: {
+      // Live embedding: resolve src as #anchor and layout a snapshot of
+      // the target's text (glyphs tagged with this Transclude node).
+      float start_y = y;
+      const float indent = 12.f;
+      const float bar_w = 3.f;
+
+      std::string href = node.src;
+      if (!href.empty() && href[0] != '#') href = "#" + href;
+
+      // Resolve target (same rules as jump_to_href, local to avoid editor dep)
+      NodeId target_id = INVALID_NODE;
+      if (!href.empty() && href[0] == '#') {
+        auto lower = [](std::string s) {
+          for (char& c : s)
+            if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+          return s;
+        };
+        std::string tlow = lower(href.substr(1));
+        // Collect text-bearing nodes
+        std::vector<NodeId> stack = {doc.root};
+        std::vector<NodeId> text_nodes;
+        while (!stack.empty()) {
+          NodeId cur = stack.back();
+          stack.pop_back();
+          if (cur == INVALID_NODE) continue;
+          const Node& cn = doc.get(cur);
+          if (cn.kind == NodeKind::Paragraph || cn.kind == NodeKind::Heading ||
+              cn.kind == NodeKind::ListItem || cn.kind == NodeKind::BlockQuote) {
+            text_nodes.push_back(cur);
+          }
+          for (auto it = cn.children.rbegin(); it != cn.children.rend(); ++it)
+            stack.push_back(*it);
+        }
+        for (NodeId tid : text_nodes) {
+          const Node& tn = doc.get(tid);
+          std::string text;
+          for (const auto& sp : tn.spans) text += sp.text;
+          if (lower(text) == tlow) {
+            target_id = tid;
+            break;
+          }
+        }
+        if (target_id == INVALID_NODE) {
+          for (NodeId tid : text_nodes) {
+            const Node& tn = doc.get(tid);
+            if (tn.kind != NodeKind::Heading) continue;
+            std::string text;
+            for (const auto& sp : tn.spans) text += sp.text;
+            if (lower(text).find(tlow) != std::string::npos) {
+              target_id = tid;
+              break;
+            }
+          }
+        }
+      }
+
+      // Label line
+      {
+        Node label;
+        label.id = id;
+        label.kind = NodeKind::Paragraph;
+        InlineSpan s;
+        s.kind = InlineKind::Emphasis;
+        s.text = "↗ ";
+        s.text += href.empty() ? std::string{"(no target)"} : href;
+        label.spans.push_back(std::move(s));
+        layout_paragraph(doc, label, x + bar_w + indent, y,
+                         max_width - bar_w - indent, out, body_,
+                         FontRole::Body);
+        y += 4.f;
+      }
+
+      // Body: copy of target spans, or a missing marker
+      {
+        Node body;
+        body.id = id;
+        body.kind = NodeKind::Paragraph;
+        if (target_id != INVALID_NODE) {
+          body.spans = doc.get(target_id).spans;
+        } else {
+          InlineSpan s;
+          s.kind = InlineKind::Emphasis;
+          s.text = "[missing transclusion]";
+          body.spans.push_back(std::move(s));
+        }
+        layout_paragraph(doc, body, x + bar_w + indent, y,
+                         max_width - bar_w - indent, out, body_,
+                         FontRole::Body);
+      }
+      y += 10.f;
+      out.quote_bars.push_back({id, x, start_y, bar_w, y - start_y});
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
     default:
       break;
   }

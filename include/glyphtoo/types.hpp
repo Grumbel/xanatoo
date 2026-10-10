@@ -24,6 +24,7 @@ enum class NodeKind : uint8_t {
   Column,
   BlockQuote,      // Markdown "> …" indented quotation
   HorizontalRule,  // Markdown "---" thematic break
+  Transclude,      // :::include #Target — live embedding of a passage
 };
 
 enum class InlineKind : uint8_t {

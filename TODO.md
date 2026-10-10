@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **033** (this delivery is **032**)
+Next bundle number: **034** (this delivery is **033**)
 
 ## Status (2026-10-10)
 
-Stage **01** complete (lists, quotes, HR). Stage **02** largely working. Stage **03** links + hover previews.
+Stage **01** complete (lists, quotes, HR). Stage **02** largely working. Stage **03** links, previews, basic transclusion.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -78,12 +78,13 @@ Stage **01** complete (lists, quotes, HR). Stage **02** largely working. Stage *
 - [x] Block quotes (`> …`) — parse, layout bar, serialize; Ctrl+Shift+Q toggle
 - [x] Horizontal rules (`---`/`***`/`___`) — parse, layout line, serialize
 - [x] Ctrl+Shift+8 / Ctrl+Shift+7 toggle unordered / ordered list on block
+- [x] Inline transclusion: `:::include #Target` live embed + click-to-source
 
 ## Open work / next steps
 
 1. Optional: HarfBuzz for complex scripts
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
-3. Inline transclusion (stage 03 remainder)
+3. Richer transclusion (editable mirror, cross-document includes)
 4. Drag-and-drop layout editing (stage 04)
 
 ## Design notes
@@ -104,6 +105,8 @@ Stage **01** complete (lists, quotes, HR). Stage **02** largely working. Stage *
   Ctrl+Shift+Q toggles; Ctrl+0 demotes to paragraph.
 - HorizontalRule: non-text node; `hr_lines` in layout. Toggle list wraps
   a text block in a List or unwraps a ListItem back to Paragraph.
+- Transclude: `src` holds `#anchor`. Layout snapshots the target's spans
+  (glyphs tagged with the Transclude node). Click jumps to the source.
 
 ## Bundle history
 
@@ -138,4 +141,5 @@ Stage **01** complete (lists, quotes, HR). Stage **02** largely working. Stage *
 - `glyphtoo-029.*-list-edit-…` — list Enter/exit/renumber
 - `glyphtoo-030.*-link-preview-…` — anchor hover preview
 - `glyphtoo-031.*-blockquote-…` — block quotes
-- `glyphtoo-032.*-hr-list-toggle-…` — this delivery
+- `glyphtoo-032.*-hr-list-toggle-…` — HR + list toggle
+- `glyphtoo-033.*-transclude-…` — this delivery

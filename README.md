@@ -44,6 +44,7 @@ Supported dialect (intentionally small):
 | `![alt](path.png){scale=1.2}` | Images (PNG/JPEG/BMP/GIF) |
 | `:::stretch summary="…"` … `:::` | Collapsed stretchtext |
 | `:::columns` / `:::column` | Side-by-side columns |
+| `:::include #Heading` | Transclude (live embed of a passage) |
 
 ## Keybindings
 
@@ -86,6 +87,7 @@ Supported dialect (intentionally small):
 | **Ctrl+Shift+A** | Select whole document |
 | Click blue link | Follow `#anchor` or open external `http(s)` / `mailto:` |
 | Hover `#anchor` link | Preview tooltip of the target passage |
+| Click transclusion | Jump to the source passage |
 | **Ctrl+F** | Leap search |
 | **Ctrl+H** | Leap replace (Tab switches fields) |
 | **F3** / **Ctrl+G** | Next match |

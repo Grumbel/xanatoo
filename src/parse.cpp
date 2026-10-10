@@ -219,6 +219,27 @@ Document parse_markup(std::string_view source) {
       ++i;
       continue;
     }
+    // Self-closing include: :::include #Target  or  :::include Target
+    if (trimmed.starts_with(":::include")) {
+      NodeId n = doc.create(NodeKind::Transclude, current_parent());
+      std::string_view rest = trimmed.substr(10);  // after :::include
+      while (!rest.empty() && (rest[0] == ' ' || rest[0] == '\t'))
+        rest.remove_prefix(1);
+      if (!rest.empty() && (rest[0] == '"' || rest[0] == '\'')) {
+        char q = rest[0];
+        rest.remove_prefix(1);
+        size_t end = rest.find(q);
+        if (end != std::string_view::npos) rest = rest.substr(0, end);
+      }
+      std::string target(rest);
+      while (!target.empty() &&
+             (target.back() == ' ' || target.back() == '\t'))
+        target.pop_back();
+      if (!target.empty() && target[0] != '#') target = "#" + target;
+      doc.get(n).src = target;
+      ++i;
+      continue;
+    }
 
     // Image ![alt](src) optional {scale=1.5}
     if (trimmed.starts_with("![")) {
@@ -439,6 +460,14 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
     case NodeKind::HorizontalRule: {
       out += pad;
       out += "---\n\n";
+      break;
+    }
+
+    case NodeKind::Transclude: {
+      out += pad;
+      out += ":::include ";
+      out += node.src;
+      out += "\n\n";
       break;
     }
 
