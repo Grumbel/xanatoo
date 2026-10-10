@@ -4,7 +4,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **006** (this delivery is **005**)
+Next bundle number: **006** (this delivery is **005.2**)
 
 ## Status (2026-10-10)
 
@@ -23,6 +23,7 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - [x] Clipboard (Ctrl+C / Ctrl+V / Ctrl+X)
 - [x] Undo / redo via document snapshots (Ctrl+Z / Ctrl+Y)
 - [x] Caret blink
+- [x] Build fix: qualify NodeId in main.cpp
 
 ## Open work / next steps
 
@@ -48,4 +49,4 @@ Stage **01** complete. Stage **02** largely working. Early stretchtext.
 - `glyphtoo-002.*` — markup, caret, basic edit
 - `glyphtoo-003.*-selection-stretch-…` — selection, stretchtext
 - `glyphtoo-004.*-font-cli-…` — `--font` CLI
-- `glyphtoo-005.*-clipboard-undo-…` — this delivery
+- `glyphtoo-005.*-clipboard-undo-…` — clipboard, undo, blink + NodeId fix

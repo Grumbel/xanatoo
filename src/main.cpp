@@ -225,7 +225,7 @@ int main(int argc, char** argv) {
 
             // Stretchtext toggle?
             if (auto sid = glyphtoo::hit_test_stretch(layout, mx, my, scroll_y)) {
-              NodeId id = *sid;
+              glyphtoo::NodeId id = *sid;
               if (doc.get(id).kind == glyphtoo::NodeKind::Stretch) {
                 checkpoint();
                 doc.get(id).expanded = !doc.get(id).expanded;
