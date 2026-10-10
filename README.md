@@ -54,6 +54,7 @@ Supported dialect (intentionally small):
 | **Ctrl+S** | Save (untitled → `untitled.md`) |
 | **Ctrl+Shift+S** | Save As (path in status bar) |
 | **Ctrl+Q** | Quit (warns once if dirty) |
+| **F1** | Keyboard reference overlay |
 
 ### Edit
 | Key | Action |

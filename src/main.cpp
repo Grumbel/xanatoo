@@ -434,6 +434,7 @@ int main(int argc, char** argv) {
   bool summary_edit_mode = false;
   std::string summary_edit_text;
   glyphtoo::NodeId summary_edit_node = glyphtoo::INVALID_NODE;
+  bool help_mode = false;  // F1 keyboard reference overlay
   // Hovered link href (shown in status bar when not in a modal mode)
   std::string hovered_href;
   std::string hovered_preview;  // internal #anchor target snippet
@@ -848,6 +849,7 @@ int main(int argc, char** argv) {
           break;
 
         case SDL_TEXTINPUT: {
+          if (help_mode) break;
           if (save_as_mode) {
             save_as_path += ev.text.text;
             break;
@@ -900,6 +902,15 @@ int main(int argc, char** argv) {
           Pane& p = F();
           glyphtoo::Document& d = doc_of(p);
 
+          // Help overlay: only F1 (toggle) and Esc (close)
+          if (help_mode) {
+            if (ev.key.keysym.sym == SDLK_ESCAPE ||
+                ev.key.keysym.sym == SDLK_F1) {
+              help_mode = false;
+            }
+            break;
+          }
+
           auto clear_sel = [&]() { p.sel.anchor = p.sel.focus; };
           auto move_and_sel = [&](auto mover) {
             if (!shift) clear_sel();
@@ -930,6 +941,10 @@ int main(int argc, char** argv) {
                 reset_blink();
               }
               // Esc no longer quits — use Ctrl+Q
+              break;
+
+            case SDLK_F1:
+              help_mode = !help_mode;
               break;
 
             case SDLK_EQUALS:
@@ -1835,17 +1850,107 @@ int main(int argc, char** argv) {
         tr = 40; tg = 90; tb = 160;
       } else {
         label =
-            "Ctrl+S save · Ctrl+Shift+S save as · Ctrl+Z/Y undo · "
-            "Ctrl+Q quit · Ctrl++/- zoom · Ctrl+B/I/` style · Ctrl+H replace · Ctrl+F leap";
+            "F1 help · Ctrl+S save · Ctrl+Z/Y undo · Ctrl+Q quit · "
+            "Ctrl++/- zoom · Ctrl+B/I/` style · Ctrl+F leap · Ctrl+H replace";
         tr = 70; tg = 68; tb = 62;
       }
       float baseline = static_cast<float>(win_h - 8);
       renderer.draw_text(body_font, 10.f, baseline, label, tr, tg, tb);
     }
 
+    // F1 help overlay
+    if (help_mode) {
+      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+      SDL_SetRenderDrawColor(sdl, 20, 22, 28, 210);
+      SDL_Rect dim{0, 0, win_w, win_h};
+      SDL_RenderFillRect(sdl, &dim);
+
+      const int margin = 28;
+      const int panel_w = std::min(720, win_w - margin * 2);
+      const int panel_h = std::min(win_h - margin * 2 - 10, win_h - 40);
+      const int px = (win_w - panel_w) / 2;
+      const int py = (win_h - panel_h) / 2;
+      SDL_SetRenderDrawColor(sdl, 248, 246, 240, 250);
+      SDL_Rect panel{px, py, panel_w, panel_h};
+      SDL_RenderFillRect(sdl, &panel);
+      SDL_SetRenderDrawColor(sdl, 25, 90, 170, 255);
+      SDL_RenderDrawRect(sdl, &panel);
+      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+
+      static const char* lines[] = {
+          "glyphtoo — keyboard reference",
+          "",
+          "Files",
+          "  Ctrl+S              Save",
+          "  Ctrl+Shift+S        Save As",
+          "  Ctrl+Q              Quit",
+          "",
+          "Edit",
+          "  Enter               Split paragraph / list item",
+          "  Backspace / Delete  Delete (merge at block start)",
+          "  Ctrl+Z / Ctrl+Y     Undo / Redo",
+          "  Ctrl+C / X / V      Copy / Cut / Paste",
+          "  Ctrl+B / I / ` / K  Bold / Italic / Code / Link",
+          "  Ctrl+D              Duplicate block",
+          "  Alt+Up / Alt+Down   Move block among siblings",
+          "  Ctrl+E              Wrap in stretchtext",
+          "  Ctrl+Shift+E        Edit stretch summary",
+          "  Ctrl+Shift+U        Unwrap stretchtext",
+          "  Ctrl+0 … Ctrl+6     Paragraph / heading level",
+          "  Ctrl+Shift+Q        Toggle block quote",
+          "  Ctrl+Shift+8 / 7    Toggle unordered / ordered list",
+          "  Tab / Shift+Tab     Indent / outdent list item",
+          "  Ctrl+Shift+[ / ]    Collapse / expand all stretch",
+          "",
+          "Navigate",
+          "  Arrows / Home/End   Move caret",
+          "  Ctrl+Left/Right     Word motion",
+          "  Ctrl+A / Shift+A    Select block / whole document",
+          "  Ctrl+F / F3         Leap search / next match",
+          "  Ctrl+H              Leap replace",
+          "  Click link          Follow #anchor or open URL",
+          "  Click transclusion  Jump to source passage",
+          "",
+          "View & layout",
+          "  Ctrl+\\              Toggle dual pane",
+          "  Tab (not on list)   Focus other pane",
+          "  Drag left margin    Reorder / reparent block",
+          "  Drag column gutter  Resize column widths",
+          "  Drag image corner   Resize image",
+          "  Ctrl++ / Ctrl+-     Zoom text",
+          "  Click ▸/▾           Expand / collapse stretchtext",
+          "",
+          "F1 or Esc — close this help",
+      };
+      const int nlines = static_cast<int>(sizeof(lines) / sizeof(lines[0]));
+      float line_h = static_cast<float>(body_font.line_height());
+      // Fit text: if too tall, use a slightly tighter step
+      float step = line_h;
+      if (nlines * step > panel_h - 24.f)
+        step = std::max(12.f, (panel_h - 24.f) / static_cast<float>(nlines));
+
+      float ty = static_cast<float>(py + 14 + body_font.ascender());
+      for (int i = 0; i < nlines; ++i) {
+        const char* s = lines[i];
+        bool heading = (s[0] != '\0' && s[0] != ' ');
+        bool title = (i == 0);
+        if (title)
+          renderer.draw_text(body_font, static_cast<float>(px + 18), ty, s,
+                             25, 90, 170);
+        else if (heading && s[0] != '\0')
+          renderer.draw_text(body_font, static_cast<float>(px + 18), ty, s,
+                             40, 50, 70);
+        else
+          renderer.draw_text(body_font, static_cast<float>(px + 18), ty, s,
+                             50, 48, 42);
+        ty += step;
+        if (ty > py + panel_h - 8) break;
+      }
+    }
+
     // Hover preview tooltip for internal #anchor links
     if (!hovered_preview.empty() && !search_mode && !save_as_mode &&
-        !link_edit_mode && !summary_edit_mode) {
+        !link_edit_mode && !summary_edit_mode && !help_mode) {
       const std::string tip = hovered_preview;
       int tw = body_font.measure(tip);
       const int pad_x = 10, pad_y = 6;

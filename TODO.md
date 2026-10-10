@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **038** (this delivery is **037**)
+Next bundle number: **039** (this delivery is **038**)
 
 ## Status (2026-10-10)
 
-Stage **01**–**04** core features in place, including nested lists.
+Stage **01**–**04** core features in place; F1 help overlay.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -83,6 +83,7 @@ Stage **01**–**04** core features in place, including nested lists.
 - [x] Adjustable column widths by dragging gutters (`Column.display_scale` weights)
 - [x] Cross-parent block drag (into/out of columns & lists; ListItem↔Paragraph)
 - [x] Nested lists: Tab/Shift+Tab indent/outdent; indented markup parse/serialize
+- [x] F1 keyboard reference overlay (Esc/F1 to close)
 
 ## Open work / next steps
 
@@ -159,4 +160,5 @@ Stage **01**–**04** core features in place, including nested lists.
 - `glyphtoo-034.*-block-drag-…` — block drag reorder
 - `glyphtoo-035.*-column-width-…` — column width drag
 - `glyphtoo-036.*-cross-parent-drag-…` — cross-parent block drag
-- `glyphtoo-037.*-nested-lists-…` — this delivery
+- `glyphtoo-037.*-nested-lists-…` — nested lists
+- `glyphtoo-038.*-f1-help-…` — this delivery
