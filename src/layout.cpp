@@ -245,6 +245,13 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         text_w = max_width - 16.f;
       }
       layout_paragraph(doc, node, text_x, y, text_w, out, body_, FontRole::Body);
+      // Nested lists under this item
+      for (NodeId child : node.children) {
+        if (doc.get(child).kind == NodeKind::List) {
+          layout_node(doc, child, x + bullet_slot, y,
+                      max_width - bullet_slot, out);
+        }
+      }
       y += 8.f;  // tighter spacing between list items
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;

@@ -110,6 +110,11 @@ std::optional<NodeId> duplicate_block(Document& doc, NodeId block);
 // `ordered` selects ul vs ol when creating a list.
 bool toggle_list(Document& doc, Caret& caret, bool ordered);
 
+// Nest the current ListItem under the previous sibling (Tab).
+bool indent_list_item(Document& doc, Caret& caret);
+// Promote the current ListItem out of a nested list (Shift+Tab).
+bool outdent_list_item(Document& doc, Caret& caret);
+
 // Delete the current selection (or nothing if empty). Caret becomes the start.
 void delete_selection(Document& doc, Selection& sel);
 

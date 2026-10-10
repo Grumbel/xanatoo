@@ -76,6 +76,7 @@ Supported dialect (intentionally small):
 | **Ctrl+Shift+Q** | Toggle block quote |
 | **Ctrl+Shift+8** | Toggle unordered list |
 | **Ctrl+Shift+7** | Toggle ordered list |
+| **Tab** / **Shift+Tab** | Indent / outdent list item (nested lists) |
 | **Ctrl+Shift+[** / **]** | Collapse / expand all stretchtext |
 | Double-click | Select word |
 
@@ -99,7 +100,7 @@ Supported dialect (intentionally small):
 | Key | Action |
 |-----|--------|
 | **Ctrl+\\** | Toggle dual pane |
-| **Tab** | Focus other pane (or switch replace field) |
+| **Tab** | List indent, else focus other pane (or replace field) |
 | Drag gutter | Resize panes |
 | Drag scrollbar | Scroll |
 | Drag image corner | Resize image |

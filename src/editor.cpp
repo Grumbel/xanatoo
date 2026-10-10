@@ -743,6 +743,89 @@ bool toggle_list(Document& doc, Caret& caret, bool ordered) {
   return true;
 }
 
+bool indent_list_item(Document& doc, Caret& caret) {
+  if (caret.node == INVALID_NODE) return false;
+  Node& item = doc.get(caret.node);
+  if (item.kind != NodeKind::ListItem) return false;
+  NodeId list_id = item.parent;
+  if (list_id == INVALID_NODE) return false;
+  Node& list = doc.get(list_id);
+  if (list.kind != NodeKind::List) return false;
+
+  auto it = std::find(list.children.begin(), list.children.end(), caret.node);
+  if (it == list.children.begin() || it == list.children.end()) return false;
+  NodeId prev_id = *(it - 1);
+  Node& prev = doc.get(prev_id);
+  if (prev.kind != NodeKind::ListItem) return false;
+
+  // Prefer an existing nested List under the previous item
+  NodeId nested = INVALID_NODE;
+  for (NodeId c : prev.children) {
+    if (doc.get(c).kind == NodeKind::List) {
+      nested = c;
+      break;
+    }
+  }
+  if (nested == INVALID_NODE) {
+    nested = doc.create(NodeKind::List, prev_id);
+    Node& nl = doc.get(nested);
+    nl.level = list.level;  // same ordered/unordered as outer
+    nl.parent = prev_id;
+  }
+
+  list.children.erase(it);
+  item.parent = nested;
+  doc.get(nested).children.push_back(caret.node);
+
+  // Renumber both lists
+  renumber_ordered_list(doc, list_id);
+  renumber_ordered_list(doc, nested);
+  return true;
+}
+
+bool outdent_list_item(Document& doc, Caret& caret) {
+  if (caret.node == INVALID_NODE) return false;
+  Node& item = doc.get(caret.node);
+  if (item.kind != NodeKind::ListItem) return false;
+  NodeId nested_id = item.parent;
+  if (nested_id == INVALID_NODE) return false;
+  Node& nested = doc.get(nested_id);
+  if (nested.kind != NodeKind::List) return false;
+  NodeId host_item_id = nested.parent;
+  if (host_item_id == INVALID_NODE) return false;
+  Node& host_item = doc.get(host_item_id);
+  if (host_item.kind != NodeKind::ListItem) return false;
+  NodeId outer_id = host_item.parent;
+  if (outer_id == INVALID_NODE) return false;
+  Node& outer = doc.get(outer_id);
+  if (outer.kind != NodeKind::List) return false;
+
+  auto nit =
+      std::find(nested.children.begin(), nested.children.end(), caret.node);
+  if (nit == nested.children.end()) return false;
+  nested.children.erase(nit);
+
+  auto oit =
+      std::find(outer.children.begin(), outer.children.end(), host_item_id);
+  if (oit == outer.children.end()) return false;
+  size_t insert_at = static_cast<size_t>(oit - outer.children.begin()) + 1;
+  item.parent = outer_id;
+  outer.children.insert(
+      outer.children.begin() + static_cast<std::ptrdiff_t>(insert_at),
+      caret.node);
+
+  if (nested.children.empty()) {
+    auto hit = std::find(host_item.children.begin(), host_item.children.end(),
+                         nested_id);
+    if (hit != host_item.children.end()) host_item.children.erase(hit);
+    nested.parent = INVALID_NODE;
+  } else {
+    renumber_ordered_list(doc, nested_id);
+  }
+  renumber_ordered_list(doc, outer_id);
+  return true;
+}
+
 static void copy_node_deep(Document& doc, NodeId src_id, NodeId new_parent,
                            NodeId& out_id) {
   const Node& src = doc.get(src_id);

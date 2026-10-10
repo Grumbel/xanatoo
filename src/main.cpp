@@ -122,6 +122,8 @@ Design pillars:
 
 - Addressable passages and stable node IDs
 - Stretchtext that reflows the living layout
+  - Expand and collapse without losing place
+  - Summary markers (▸ / ▾) stay interactive
 - Side-by-side views of related material
 - Direct manipulation of images and blocks
 
@@ -1033,6 +1035,24 @@ int main(int argc, char** argv) {
               if (replace_mode) {
                 replace_focus = !replace_focus;
                 break;
+              }
+              // Tab / Shift+Tab: nest or promote list items
+              {
+                auto& d = doc_of(F());
+                auto& p = F();
+                if (p.sel.focus.node != glyphtoo::INVALID_NODE &&
+                    d.get(p.sel.focus.node).kind ==
+                        glyphtoo::NodeKind::ListItem) {
+                  edit();
+                  bool ok = shift ? glyphtoo::outdent_list_item(d, p.sel.focus)
+                                  : glyphtoo::indent_list_item(d, p.sel.focus);
+                  if (ok) {
+                    p.sel.anchor = p.sel.focus;
+                    needs_layout = true;
+                    reset_blink();
+                  }
+                  break;
+                }
               }
               if (split) {
                 focus = 1 - focus;

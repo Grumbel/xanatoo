@@ -4,11 +4,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **037** (this delivery is **036**)
+Next bundle number: **038** (this delivery is **037**)
 
 ## Status (2026-10-10)
 
-Stage **01**–**04** core features largely in place (drag, columns, transclude).
+Stage **01**–**04** core features in place, including nested lists.
 
 - [x] Document model, layout, FreeType + SDL2
 - [x] Minimal markup parser
@@ -82,6 +82,7 @@ Stage **01**–**04** core features largely in place (drag, columns, transclude)
 - [x] Drag-and-drop block reorder (left-margin grab, sibling relocate)
 - [x] Adjustable column widths by dragging gutters (`Column.display_scale` weights)
 - [x] Cross-parent block drag (into/out of columns & lists; ListItem↔Paragraph)
+- [x] Nested lists: Tab/Shift+Tab indent/outdent; indented markup parse/serialize
 
 ## Open work / next steps
 
@@ -89,7 +90,6 @@ Stage **01**–**04** core features largely in place (drag, columns, transclude)
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Richer transclusion (editable mirror, cross-document includes)
 4. Version comparison / visual links between panes
-5. Nested list indentation (Tab / Shift+Tab)
 
 ## Design notes
 
@@ -118,6 +118,8 @@ Stage **01**–**04** core features largely in place (drag, columns, transclude)
   Markup: `:::column weight=1.5`.
 - Cross-parent `relocate_block`: reparents across Columns/Lists; converts
   ListItem↔Paragraph when crossing a List; drops emptied lists.
+- Nested lists: ListItem may own a child List. Tab nests under the previous
+  sibling; Shift+Tab promotes. Markup uses 2-space indent per level.
 
 ## Bundle history
 
@@ -156,4 +158,5 @@ Stage **01**–**04** core features largely in place (drag, columns, transclude)
 - `glyphtoo-033.*-transclude-…` — :::include transclusion
 - `glyphtoo-034.*-block-drag-…` — block drag reorder
 - `glyphtoo-035.*-column-width-…` — column width drag
-- `glyphtoo-036.*-cross-parent-drag-…` — this delivery
+- `glyphtoo-036.*-cross-parent-drag-…` — cross-parent block drag
+- `glyphtoo-037.*-nested-lists-…` — this delivery

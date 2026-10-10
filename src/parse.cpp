@@ -317,15 +317,31 @@ Document parse_markup(std::string_view source) {
       continue;
     }
 
-    // Unordered / ordered list: consecutive lines with -/*/+/N. markers
+    // Unordered / ordered list (supports nested items via leading indent)
     {
       int ord = 0;
       size_t mlen = list_marker_len(trimmed, &ord);
       if (mlen > 0) {
-        NodeId list = doc.create(NodeKind::List, current_parent());
-        // level 0 = unordered, 1 = ordered (first marker decides)
-        doc.get(list).level = (ord > 0) ? 1 : 0;
+        // Stack of (list_id, indent of items in that list)
+        struct Frame {
+          NodeId list;
+          int indent;
+        };
+        std::vector<Frame> frames;
+        int base_indent = static_cast<int>(lines[i].text.size() - trimmed.size());
+        // recomputed properly:
+        {
+          std::string_view raw = lines[i].text;
+          size_t lead = 0;
+          while (lead < raw.size() && (raw[lead] == ' ' || raw[lead] == '\t'))
+            ++lead;
+          base_indent = static_cast<int>(lead);
+        }
+        NodeId top = doc.create(NodeKind::List, current_parent());
+        doc.get(top).level = (ord > 0) ? 1 : 0;
+        frames.push_back({top, base_indent});
         int item_index = 0;
+
         while (i < lines.size() && !lines[i].blank) {
           std::string_view lt = lines[i].text;
           size_t llead = 0;
@@ -335,20 +351,47 @@ Document parse_markup(std::string_view source) {
           int item_ord = 0;
           size_t imlen = list_marker_len(ltrim, &item_ord);
           if (imlen == 0) break;
-          // Stay within the same list kind (ul vs ol)
-          bool item_ordered = item_ord > 0;
+          int ind = static_cast<int>(llead);
+
+          // Pop to a frame whose indent is strictly less than this line's
+          // when this line is less-or-equally indented than the current frame
+          while (frames.size() > 1 && ind <= frames.back().indent)
+            frames.pop_back();
+
+          // Deeper indent → nest under the previous item of the current list
+          if (ind > frames.back().indent) {
+            Node& cur_list = doc.get(frames.back().list);
+            if (cur_list.children.empty()) {
+              // No host item yet; treat as same level
+            } else {
+              NodeId host = cur_list.children.back();
+              if (doc.get(host).kind == NodeKind::ListItem) {
+                NodeId nested = doc.create(NodeKind::List, host);
+                // Inherit ordered/unordered from the marker on this line
+                doc.get(nested).level = (item_ord > 0) ? 1 : 0;
+                frames.push_back({nested, ind});
+              }
+            }
+          }
+
+          NodeId list = frames.back().list;
           bool list_ordered = doc.get(list).level == 1;
-          if (item_ordered != list_ordered) break;
+          bool item_ordered = item_ord > 0;
+          // Kind mismatch at this level: close the list run
+          if (item_ordered != list_ordered && frames.size() == 1) break;
+          // If nested and kind differs, still accept (nested can differ)
 
           NodeId item = doc.create(NodeKind::ListItem, list);
           ++item_index;
-          // For ordered lists, store the display number in level
           doc.get(item).level = list_ordered
                                     ? (item_ord > 0 ? item_ord : item_index)
                                     : 0;
           parse_inlines(doc.get(item), ltrim.substr(imlen));
           ++i;
         }
+        // Renumber every list we created
+        for (const auto& f : frames)
+          ;  // renumber happens via display numbers already set
         continue;
       }
     }
@@ -496,6 +539,11 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
       }
       serialize_inlines(node, out);
       out += "\n";
+      // Nested lists under this item
+      for (NodeId c : node.children) {
+        if (doc.get(c).kind == NodeKind::List)
+          serialize_node(doc, c, out, indent + 2);
+      }
       break;
     }
 
