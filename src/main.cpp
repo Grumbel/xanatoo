@@ -1162,14 +1162,60 @@ int main(int argc, char** argv) {
 
             case SDLK_e:
               if (ctrl) {
-                // Wrap current block in collapsed stretchtext
                 edit();
                 std::string summary = glyphtoo::selected_text(d, p.sel);
                 if (glyphtoo::wrap_block_in_stretch(d, p.sel.focus.node, summary)) {
-                  // Caret stays on the (now nested) block; layout shows ▸ marker
                   needs_layout = true;
                   reset_blink();
                 }
+              }
+              break;
+
+            case SDLK_0:
+            case SDLK_1:
+            case SDLK_2:
+            case SDLK_3:
+            case SDLK_4:
+            case SDLK_5:
+            case SDLK_6:
+              if (ctrl && !shift) {
+                int level = static_cast<int>(ev.key.keysym.sym - SDLK_0);
+                edit();
+                auto& node = d.get(p.sel.focus.node);
+                if (level == 0) {
+                  if (node.kind == glyphtoo::NodeKind::Heading)
+                    node.kind = glyphtoo::NodeKind::Paragraph;
+                  node.level = 0;
+                } else {
+                  node.kind = glyphtoo::NodeKind::Heading;
+                  node.level = level;
+                }
+                needs_layout = true;
+                reset_blink();
+              }
+              break;
+
+            case SDLK_LEFTBRACKET:
+              if (ctrl && shift) {
+                // Collapse all stretch nodes
+                edit();
+                for (auto& node : d.nodes) {
+                  if (node.kind == glyphtoo::NodeKind::Stretch)
+                    node.expanded = false;
+                }
+                needs_layout = true;
+              }
+              break;
+
+            case SDLK_RIGHTBRACKET:
+              if (ctrl && shift) {
+                // Expand all stretch nodes
+                edit();
+                for (auto& node : d.nodes) {
+                  if (node.kind == glyphtoo::NodeKind::Stretch)
+                    node.expanded = true;
+                }
+                needs_layout = true;
               }
               break;
 

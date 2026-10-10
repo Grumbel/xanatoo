@@ -60,6 +60,9 @@ Supported dialect (intentionally small):
 | **Ctrl+C** / **X** / **V** | Clipboard |
 | **Ctrl+B** / **I** / **\`** / **K** | Bold / italic / code / link |
 | **Ctrl+E** | Wrap block in stretchtext |
+| **Ctrl+0** | Demote to paragraph |
+| **Ctrl+1…6** | Set heading level |
+| **Ctrl+Shift+[** / **]** | Collapse / expand all stretchtext |
 | Double-click | Select word |
 
 ### Navigate
