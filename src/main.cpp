@@ -371,6 +371,19 @@ int main(int argc, char** argv) {
     needs_layout = false;
   };
 
+  auto scroll_caret_into_view = [&](Pane& p) {
+    auto cpos = glyphtoo::caret_screen_pos(
+        p.layout, p.sel.focus, 0.f,
+        static_cast<float>(body_font.line_height()));
+    if (!cpos.valid) return;
+    float doc_y = cpos.y;
+    float margin = 40.f;
+    if (doc_y - p.scroll_y < margin) {
+      p.scroll_y = std::max(0.f, doc_y - margin);
+    } else if (doc_y - p.scroll_y > win_h - margin - 30.f) {
+      p.scroll_y = doc_y - (win_h - margin - 30.f);
+    }
+  };
 
   auto pane_at = [&](float mx) -> int {
     if (!split) return 0;
