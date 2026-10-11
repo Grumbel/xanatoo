@@ -296,6 +296,8 @@ int main(int argc, char** argv) {
   std::vector<xanatoo::DiffWordMark> diff_words[2];
   // Hovered link href (shown in status bar when not in a modal mode)
   std::string hovered_href;
+  std::string hovered_rel;      // typed :rel when present
+  bool hovered_is_cite = false;
   std::string hovered_preview;  // internal #anchor target snippet
   float mouse_x = 0.f, mouse_y = 0.f;
 
@@ -1484,16 +1486,21 @@ int main(int argc, char** argv) {
             int hover_pane = pane_at(mx);
             Pane& hp = panes[hover_pane];
             float lx = local_x(mx, hover_pane);
-            if (auto href = xanatoo::hit_test_link(doc_of(hp), hp.layout, lx, my,
-                                                    hp.scroll_y)) {
-              hovered_href = *href;
-              if (auto prev = xanatoo::link_preview_text(doc_of(hp), *href)) {
+            if (auto hit = xanatoo::hit_test_link_ex(doc_of(hp), hp.layout, lx,
+                                                     my, hp.scroll_y)) {
+              hovered_href = hit->href;
+              hovered_rel = hit->rel;
+              hovered_is_cite = (hit->kind == xanatoo::InlineKind::Cite);
+              if (auto prev =
+                      xanatoo::link_preview_text(doc_of(hp), hit->href)) {
                 hovered_preview = *prev;
               } else {
                 hovered_preview.clear();
               }
             } else {
               hovered_href.clear();
+              hovered_rel.clear();
+              hovered_is_cite = false;
               hovered_preview.clear();
             }
           }
@@ -1961,9 +1968,39 @@ int main(int argc, char** argv) {
                       sp.kind = xanatoo::InlineKind::Cite;
                       std::cout << "Citation key: " << key << "\n";
                     } else {
-                      sp.href = link_edit_href;
+                      // Accept "href rel=glossary" or "href {rel=glossary}"
+                      std::string raw = link_edit_href;
+                      std::string rel;
+                      auto strip_rel = [&](std::string& s) {
+                        auto rpos = s.find("rel=");
+                        if (rpos == std::string::npos) return;
+                        size_t after = rpos + 4;
+                        while (after < s.size() &&
+                               (s[after] == ' ' || s[after] == '\t'))
+                          ++after;
+                        size_t end = after;
+                        while (end < s.size() && s[end] != ' ' &&
+                               s[end] != '\t' && s[end] != '}')
+                          ++end;
+                        rel = s.substr(after, end - after);
+                        // Remove the rel clause (and optional braces) from href
+                        size_t cut = rpos;
+                        while (cut > 0 &&
+                               (s[cut - 1] == ' ' || s[cut - 1] == '\t' ||
+                                s[cut - 1] == '{'))
+                          --cut;
+                        s = s.substr(0, cut);
+                        while (!s.empty() &&
+                               (s.back() == ' ' || s.back() == '\t'))
+                          s.pop_back();
+                      };
+                      strip_rel(raw);
+                      sp.href = raw;
+                      if (!rel.empty()) sp.rel = rel;
                       sp.kind = xanatoo::InlineKind::Link;
-                      std::cout << "Link href: " << link_edit_href << "\n";
+                      std::cout << "Link href: " << sp.href;
+                      if (!sp.rel.empty()) std::cout << " rel=" << sp.rel;
+                      std::cout << "\n";
                     }
                     mark_dirty();
                     needs_layout = true;
@@ -3207,8 +3244,14 @@ int main(int argc, char** argv) {
         label += "    Enter insert · Esc cancel";
         tr = 220; tg = 230; tb = 245;
       } else if (link_edit_mode) {
-        label = link_edit_is_cite ? "Citation key: " : "Link href: ";
-        label += link_edit_href.empty() ? "…" : link_edit_href;
+        if (link_edit_is_cite) {
+          label = "Citation key: ";
+          label += link_edit_href.empty() ? "…" : link_edit_href;
+        } else {
+          label = "Link: ";
+          label += link_edit_href.empty() ? "…" : link_edit_href;
+          label += "    (optional: href rel=glossary)";
+        }
         label += "    Enter confirm · Esc cancel";
         tr = 220; tg = 230; tb = 245;
       } else if (summary_edit_mode) {
@@ -3242,8 +3285,12 @@ int main(int argc, char** argv) {
         label = "Outline — ↑/↓ select · Enter jump · 1-9 quick jump · Esc close";
         tr = 40; tg = 90; tb = 160;
       } else if (!hovered_href.empty()) {
-        label = "Link: ";
+        label = hovered_is_cite ? "Cite: " : "Link: ";
         label += hovered_href;
+        if (!hovered_rel.empty()) {
+          label += "  rel=";
+          label += hovered_rel;
+        }
         if (hovered_href[0] == '#')
           label += "    click to jump";
         else

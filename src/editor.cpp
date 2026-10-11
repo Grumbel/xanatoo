@@ -1545,9 +1545,9 @@ std::optional<std::string> link_preview_text(const Document& doc,
   return compact;
 }
 
-std::optional<std::string> hit_test_link(const Document& doc,
-                                         const LayoutResult& layout,
-                                         float mx, float my, float scroll_y) {
+std::optional<LinkHit> hit_test_link_ex(const Document& doc,
+                                        const LayoutResult& layout,
+                                        float mx, float my, float scroll_y) {
   const float adj_y = my + scroll_y;
   for (size_t i = 0; i < layout.glyphs.size(); ++i) {
     const auto& g = layout.glyphs[i];
@@ -1568,17 +1568,33 @@ std::optional<std::string> hit_test_link(const Document& doc,
       const Node& n = doc.get(g.node);
       if (g.span_index < n.spans.size()) {
         const auto& sp = n.spans[g.span_index];
+        LinkHit hit;
+        hit.kind = sp.kind;
+        hit.rel = sp.rel;
+        hit.node = g.node;
+        hit.span_index = g.span_index;
         if (sp.kind == InlineKind::Cite) {
-          // Resolve via bibliography :key / :label
-          if (!sp.href.empty() && sp.href[0] == '#') return sp.href;
-          return std::string("#") + sp.href;
+          if (!sp.href.empty() && sp.href[0] == '#')
+            hit.href = sp.href;
+          else
+            hit.href = std::string("#") + sp.href;
+        } else {
+          hit.href = sp.href;
         }
-        return sp.href;
+        return hit;
       }
     }
     i = j;
   }
   return std::nullopt;
+}
+
+std::optional<std::string> hit_test_link(const Document& doc,
+                                         const LayoutResult& layout,
+                                         float mx, float my, float scroll_y) {
+  auto hit = hit_test_link_ex(doc, layout, mx, my, scroll_y);
+  if (!hit) return std::nullopt;
+  return hit->href;
 }
 
 bool move_up(const LayoutResult& layout, Caret& caret, float preferred_x) {

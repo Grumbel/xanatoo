@@ -206,7 +206,18 @@ std::optional<Caret> jump_to_href(const Document& doc, const std::string& href);
 std::optional<std::string> link_preview_text(const Document& doc,
                                             const std::string& href);
 
-// Link under pointer; returns href from the document span.
+// Link/cite under pointer.
+struct LinkHit {
+  std::string href;
+  std::string rel;   // typed relation (glossary, source, …); empty if none
+  InlineKind kind = InlineKind::Link;
+  NodeId node = INVALID_NODE;
+  size_t span_index = 0;
+};
+std::optional<LinkHit> hit_test_link_ex(const Document& doc,
+                                        const LayoutResult& layout,
+                                        float mx, float my, float scroll_y);
+// Convenience: href only (Cite keys returned as "#key").
 std::optional<std::string> hit_test_link(const Document& doc,
                                          const LayoutResult& layout,
                                          float mx, float my, float scroll_y);

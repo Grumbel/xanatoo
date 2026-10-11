@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **088** (this delivery is **087**)
+Next bundle number: **089** (this delivery is **088**)
 
 ## Status (2026-10-11)
 
@@ -147,6 +147,8 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Citation insert/edit (Ctrl+Shift+C / Format → Citation)
 - [x] Bibliography entry insert (Format → Bibliography Entry)
 - [x] Status bar prompts for citation key vs link href
+- [x] Typed link `:rel` — edit via `href rel=name`, hover shows relation
+- [x] `hit_test_link_ex` returns kind/rel/node for richer status UI
 
 ## Open work / next steps
 
@@ -156,7 +158,7 @@ LCS structural diff marks; cross-document `:::include`.
 4. Word-level / intra-block diff highlighting (basic pairing in)
 5. **Tables** — semantic grid + basic grid presentation in; column weights / nested blocks still open
 6. **Docking** — tile/split zones (edge snap + maximize is in)
-7. **Citations** / typed link relations / range transclusion (insert+jump in; :rel UI still open)
+7. **Citations** / typed link relations / range transclusion (insert+jump+:rel edit/hover in)
 
 ## Design notes
 
@@ -283,4 +285,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-084.*-table-present-…` — table grid presentation
 - `xanatoo-085.*-newline-table-enter-…` — newlines + table Enter
 - `xanatoo-086.*-word-diff-table-tab-…` — word diff + table Tab
-- `xanatoo-087.*-cite-biblio-…` — this delivery
+- `xanatoo-087.*-cite-biblio-…` — citation + biblio insert
+- `xanatoo-088.*-link-rel-…` — this delivery
