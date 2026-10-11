@@ -696,15 +696,12 @@ int main(int argc, char** argv) {
         gdoc = xanatoo::parse_gemtext(resp->body);
       } else {
         // Binary or unknown — show a short notice instead of mojibake.
-        std::string notice = "# Unsupported media
-
-"
-                             "Gemini returned MIME type `" +
-                             resp->meta +
-                             "` (" + std::to_string(resp->body.size()) +
-                             " bytes). Only text/gemini, text/plain, and "
-                             "text/markdown are rendered in-pane.
-";
+        std::string notice =
+            "# Unsupported media\n\n"
+            "Gemini returned MIME type `" + resp->meta + "` (" +
+            std::to_string(resp->body.size()) +
+            " bytes). Only text/gemini, text/plain, and "
+            "text/markdown are rendered in-pane.\n";
         gdoc = xanatoo::parse_gemtext(notice);
       }
       gemini_current_url = resp->final_url;
