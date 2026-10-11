@@ -99,3 +99,29 @@ Prefer nested **section** / **article** containers over ranked headings.
 A **header** is the title of the enclosing unit. Outline depth follows
 nesting. **Enter** on a header starts a body paragraph (not another title).
 See **Examples → Article / section / header**.
+
+## Browse mode and gamepad
+
+**F2** toggles **Browse mode** (read-only). Typing and edits are blocked; the
+status bar turns green. Use this for reading and navigating.
+
+### Keyboard (browse)
+- Arrows / Page / Home / End — move and scroll
+- **Space** or **Enter** — expand/collapse stretch or follow link under caret
+- **Ctrl+[** / **Ctrl+]** — collapse / expand all stretches
+- **F2** — return to edit mode
+
+### Gamepad
+| Control | Action |
+|---------|--------|
+| D-pad | Move by line; Left/Right toggles stretch under caret |
+| **A** | Activate (stretch or link) |
+| **B** | Collapse stretch (or collapse all) |
+| **X** | Toggle outline |
+| **Y** | Toggle structure highlight |
+| **LB / RB** | Previous / next header |
+| **LT / RT** | Page up / page down |
+| Left stick | Scroll |
+| Stick click L/R | Collapse all / expand all |
+| **Back** | Toggle browse mode |
+| **Start** | Help |

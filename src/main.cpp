@@ -33,10 +33,12 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
+  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER) !=
+      0) {
     std::cerr << "SDL_Init: " << SDL_GetError() << "\n";
     return 1;
   }
+  SDL_GameControllerEventState(SDL_ENABLE);
   SDL_StartTextInput();
 
   SDL_Window* window = SDL_CreateWindow(
@@ -310,6 +312,23 @@ int main(int argc, char** argv) {
   std::vector<xanatoo::DiffWordMark> diff_words[2];
   // Colour-code layout boxes by NodeKind (logical structure overlay)
   bool structure_mode = false;
+  // Read-only navigation: no typing / edits; gamepad-friendly browsing
+  bool browse_mode = false;
+  SDL_GameController* gamepad = nullptr;
+  auto open_first_gamepad = [&]() {
+    if (gamepad) return;
+    for (int i = 0; i < SDL_NumJoysticks(); ++i) {
+      if (SDL_IsGameController(i)) {
+        gamepad = SDL_GameControllerOpen(i);
+        if (gamepad) {
+          const char* name = SDL_GameControllerName(gamepad);
+          std::cout << "Gamepad: " << (name ? name : "(unknown)") << "\n";
+          break;
+        }
+      }
+    }
+  };
+  open_first_gamepad();
   // Hovered link href (shown in status bar when not in a modal mode)
   std::string hovered_href;
   std::string hovered_rel;      // typed :rel when present
@@ -413,6 +432,127 @@ int main(int argc, char** argv) {
     }
   };
 
+
+
+  // ---- Browse / gamepad navigation (no text entry) ----
+  auto nav_page = [&](bool up) {
+    Pane& p = F();
+    const float view_h = static_cast<float>(win_h - status_bar_h) - ui_top;
+    const float step = view_h * 0.85f;
+    float max_s = std::max(0.f, p.layout.content_height - view_h + 40.f);
+    if (up)
+      p.scroll_y = std::max(0.f, p.scroll_y - step);
+    else
+      p.scroll_y = std::min(max_s, p.scroll_y + step);
+  };
+
+  auto nav_move_block = [&](bool prev) {
+    Pane& p = F();
+    auto& d = doc_of(p);
+    if (prev)
+      xanatoo::move_to_prev_node(d, p.sel.focus);
+    else
+      xanatoo::move_to_next_node(d, p.sel.focus);
+    p.sel.anchor = p.sel.focus;
+    scroll_caret_into_view(p);
+    reset_blink();
+  };
+
+  auto nav_move_line = [&](bool up) {
+    Pane& p = F();
+    auto& d = doc_of(p);
+    if (up) {
+      if (!xanatoo::move_up(p.layout, p.sel.focus, p.preferred_x))
+        xanatoo::move_to_prev_node(d, p.sel.focus);
+    } else {
+      if (!xanatoo::move_down(p.layout, p.sel.focus, p.preferred_x))
+        xanatoo::move_to_next_node(d, p.sel.focus);
+    }
+    p.sel.anchor = p.sel.focus;
+    scroll_caret_into_view(p);
+    reset_blink();
+  };
+
+  auto nav_header = [&](bool prev) {
+    refresh_outline();
+    if (outline.empty()) return;
+    if (prev) {
+      if (outline_sel > 0) --outline_sel;
+    } else {
+      if (outline_sel + 1 < static_cast<int>(outline.size())) ++outline_sel;
+    }
+    Pane& p = F();
+    p.sel.focus.node = outline[static_cast<size_t>(outline_sel)].node;
+    p.sel.focus.span_index = 0;
+    p.sel.focus.char_index = 0;
+    p.sel.anchor = p.sel.focus;
+    scroll_caret_into_view(p);
+    reset_blink();
+  };
+
+  auto toggle_stretch_at_caret = [&]() -> bool {
+    Pane& p = F();
+    auto& d = doc_of(p);
+    for (xanatoo::NodeId id = p.sel.focus.node; id != xanatoo::INVALID_NODE;
+         id = d.get(id).parent) {
+      if (d.get(id).kind == xanatoo::NodeKind::Stretch) {
+        d.get(id).expanded = !d.get(id).expanded;
+        needs_layout = true;
+        flash_status(d.get(id).expanded ? "Expanded" : "Collapsed");
+        return true;
+      }
+    }
+    // Also toggle Stretch under the caret's layout box.
+    auto cpos = xanatoo::caret_screen_pos(
+        p.layout, p.sel.focus, p.scroll_y,
+        static_cast<float>(body_font.line_height()));
+    if (cpos.valid) {
+      for (const auto& box : p.layout.boxes) {
+        if (box.node == xanatoo::INVALID_NODE) continue;
+        if (d.get(box.node).kind != xanatoo::NodeKind::Stretch) continue;
+        if (cpos.y + p.scroll_y < box.y || cpos.y + p.scroll_y > box.y + box.height)
+          continue;
+        d.get(box.node).expanded = !d.get(box.node).expanded;
+        needs_layout = true;
+        flash_status(d.get(box.node).expanded ? "Expanded" : "Collapsed");
+        return true;
+      }
+    }
+    return false;
+  };
+
+  auto collapse_or_expand_all = [&](bool expand) {
+    auto& d = doc_of(F());
+    for (auto& node : d.nodes) {
+      if (node.kind == xanatoo::NodeKind::Stretch) node.expanded = expand;
+    }
+    needs_layout = true;
+    flash_status(expand ? "Expanded all" : "Collapsed all");
+  };
+
+  auto activate_at_caret = [&]() {
+    // Prefer stretch toggle; else try internal link under caret glyph.
+    if (toggle_stretch_at_caret()) return;
+    Pane& p = F();
+    auto& d = doc_of(p);
+    auto cpos = xanatoo::caret_screen_pos(
+        p.layout, p.sel.focus, p.scroll_y,
+        static_cast<float>(body_font.line_height()));
+    if (!cpos.valid) return;
+    if (auto href = xanatoo::hit_test_link(d, p.layout, cpos.x, cpos.y,
+                                           p.scroll_y)) {
+      if (auto dest = xanatoo::jump_to_href(d, *href)) {
+        p.sel.focus = *dest;
+        p.sel.anchor = p.sel.focus;
+        scroll_caret_into_view(p);
+        flash_status("Followed " + *href);
+        reset_blink();
+      } else if (!href->empty() && (*href)[0] != '#') {
+        xanatoo::open_external_url(*href);
+        flash_status("Opening " + *href);
+      }
+    }
+  };
 
   auto find_help_path = [&]() -> std::string {
     const char* candidates[] = {
@@ -1891,6 +2031,7 @@ int main(int argc, char** argv) {
             reset_blink();
             break;
           }
+          if (browse_mode) break;  // read-only: no typing into the document
           if (imgui_keys) break;
           edit();
           Pane& p = F();
@@ -1903,6 +2044,81 @@ int main(int argc, char** argv) {
           p.sel.anchor = p.sel.focus;
           needs_layout = true;
           reset_blink();
+          break;
+        }
+
+        case SDL_CONTROLLERDEVICEADDED:
+          if (!gamepad) open_first_gamepad();
+          break;
+        case SDL_CONTROLLERDEVICEREMOVED:
+          if (gamepad &&
+              ev.cdevice.which ==
+                  SDL_JoystickInstanceID(
+                      SDL_GameControllerGetJoystick(gamepad))) {
+            SDL_GameControllerClose(gamepad);
+            gamepad = nullptr;
+          }
+          break;
+        case SDL_CONTROLLERBUTTONDOWN: {
+          // Gamepad is always for navigation (never text entry).
+          switch (ev.cbutton.button) {
+            case SDL_CONTROLLER_BUTTON_DPAD_UP:
+              nav_move_line(true);
+              break;
+            case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
+              nav_move_line(false);
+              break;
+            case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
+              // Collapse stretch under caret, else previous block
+              if (!toggle_stretch_at_caret()) nav_move_block(true);
+              break;
+            case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
+              if (!toggle_stretch_at_caret()) nav_move_block(false);
+              break;
+            case SDL_CONTROLLER_BUTTON_A:
+              activate_at_caret();
+              break;
+            case SDL_CONTROLLER_BUTTON_B:
+              // Collapse current stretch, else collapse all
+              if (!toggle_stretch_at_caret()) collapse_or_expand_all(false);
+              break;
+            case SDL_CONTROLLER_BUTTON_X:
+              outline_mode = !outline_mode;
+              if (outline_mode) {
+                refresh_outline();
+                outline_sel = 0;
+              }
+              break;
+            case SDL_CONTROLLER_BUTTON_Y:
+              structure_mode = !structure_mode;
+              break;
+            case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
+              nav_header(true);
+              break;
+            case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:
+              nav_header(false);
+              break;
+            case SDL_CONTROLLER_BUTTON_LEFTSTICK:
+              collapse_or_expand_all(false);
+              break;
+            case SDL_CONTROLLER_BUTTON_RIGHTSTICK:
+              collapse_or_expand_all(true);
+              break;
+            case SDL_CONTROLLER_BUTTON_BACK:
+              browse_mode = !browse_mode;
+              flash_status(browse_mode ? "Browse mode (read-only)"
+                                       : "Edit mode");
+              break;
+            case SDL_CONTROLLER_BUTTON_START:
+              help_mode = !help_mode;
+              if (help_mode) {
+                ensure_help_doc();
+                help_needs_layout = true;
+              }
+              break;
+            default:
+              break;
+          }
           break;
         }
 
@@ -1952,8 +2168,36 @@ int main(int argc, char** argv) {
                 (search_mode && replace_mode && k == SDLK_TAB);
             if (!prompt_key) break;
           } else if (imgui_keys && ev.key.keysym.sym != SDLK_ESCAPE &&
-                     ev.key.keysym.sym != SDLK_F1) {
+                     ev.key.keysym.sym != SDLK_F1 &&
+                     ev.key.keysym.sym != SDLK_F2) {
             break;
+          }
+
+          // Browse mode: navigation and view toggles only (no document edits).
+          if (browse_mode) {
+            const SDL_Keycode k = ev.key.keysym.sym;
+            const bool browse_ok =
+                k == SDLK_ESCAPE || k == SDLK_F1 || k == SDLK_F2 ||
+                k == SDLK_LEFT || k == SDLK_RIGHT || k == SDLK_UP ||
+                k == SDLK_DOWN || k == SDLK_PAGEUP || k == SDLK_PAGEDOWN ||
+                k == SDLK_HOME || k == SDLK_END || k == SDLK_TAB ||
+                k == SDLK_RETURN || k == SDLK_KP_ENTER || k == SDLK_SPACE ||
+                k == SDLK_LEFTBRACKET || k == SDLK_RIGHTBRACKET ||
+                (ctrl && (k == SDLK_q || k == SDLK_o || k == SDLK_f ||
+                          k == SDLK_g || k == SDLK_BACKSLASH || k == SDLK_l ||
+                          k == SDLK_EQUALS || k == SDLK_MINUS ||
+                          k == SDLK_PLUS || k == SDLK_KP_PLUS ||
+                          k == SDLK_KP_MINUS)) ||
+                (ctrl && shift &&
+                 (k == SDLK_o || k == SDLK_l || k == SDLK_d || k == SDLK_LEFTBRACKET ||
+                  k == SDLK_RIGHTBRACKET));
+            if (!browse_ok) break;
+            // Space / Enter activate stretch or link
+            if (k == SDLK_SPACE ||
+                ((k == SDLK_RETURN || k == SDLK_KP_ENTER) && !ctrl)) {
+              activate_at_caret();
+              break;
+            }
           }
 
           // Help window is non-modal: Esc/F1 close it; other keys edit the document.
@@ -2072,6 +2316,20 @@ int main(int argc, char** argv) {
               if (help_mode) {
                 ensure_help_doc();
                 help_needs_layout = true;
+              }
+              break;
+
+            case SDLK_F2:
+              browse_mode = !browse_mode;
+              if (browse_mode) {
+                search_mode = false;
+                save_as_mode = false;
+                open_file_mode = false;
+                link_edit_mode = false;
+                flash_status(
+                    "Browse mode — read-only · gamepad navigate · F2 edits");
+              } else {
+                flash_status("Edit mode");
               }
               break;
 
@@ -3310,6 +3568,7 @@ int main(int argc, char** argv) {
       ui_state.diff = diff_mode;
       ui_state.can_diff = !shared_doc && !paths[1].empty();
       ui_state.structure = structure_mode;
+      ui_state.browse = browse_mode;
       ui_state.help = help_mode;
       ui_state.selection = !F().sel.empty();
       {
@@ -3827,6 +4086,21 @@ int main(int argc, char** argv) {
           flash_status(structure_mode ? "Structure highlight on"
                                       : "Structure highlight off");
           break;
+        case C::ToggleBrowse:
+          browse_mode = !browse_mode;
+          if (browse_mode) {
+            // Clear any status prompts so they do not trap keys
+            search_mode = false;
+            save_as_mode = false;
+            open_file_mode = false;
+            link_edit_mode = false;
+            flash_status(
+                "Browse mode — read-only · F2 exits · gamepad: D-pad move, "
+                "A open, B collapse, LB/RB headers, LT/RT page");
+          } else {
+            flash_status("Edit mode");
+          }
+          break;
         case C::ToggleHelp:
           help_mode = !help_mode;
           if (help_mode) {
@@ -3939,7 +4213,45 @@ int main(int argc, char** argv) {
         ui.release_input_capture();
     }
 
-    renderer.clear(248, 246, 240);
+
+    // Gamepad stick / trigger continuous navigation (poll each frame).
+    if (gamepad) {
+      auto axis = [&](SDL_GameControllerAxis a) -> float {
+        Sint16 v = SDL_GameControllerGetAxis(gamepad, a);
+        const float dead = 8000.f;
+        if (v > -dead && v < dead) return 0.f;
+        return static_cast<float>(v) / 32767.f;
+      };
+      float ly = axis(SDL_CONTROLLER_AXIS_LEFTY);
+      if (ly != 0.f) {
+        Pane& p = F();
+        float view_h = static_cast<float>(win_h - status_bar_h) - ui_top;
+        float max_s = std::max(0.f, p.layout.content_height - view_h + 40.f);
+        p.scroll_y = std::max(0.f, std::min(max_s, p.scroll_y + ly * 18.f));
+      }
+      // Triggers as page up/down (edge-ish: fire when held past threshold)
+      static bool lt_held = false, rt_held = false;
+      float lt = axis(SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+      float rt = axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+      if (lt > 0.5f) {
+        if (!lt_held) {
+          nav_page(true);
+          lt_held = true;
+        }
+      } else {
+        lt_held = false;
+      }
+      if (rt > 0.5f) {
+        if (!rt_held) {
+          nav_page(false);
+          rt_held = true;
+        }
+      } else {
+        rt_held = false;
+      }
+    }
+
+        renderer.clear(248, 246, 240);
 
     int pane_count = split ? 2 : 1;
     for (int i = 0; i < pane_count; ++i) {
@@ -4449,6 +4761,10 @@ int main(int argc, char** argv) {
       } else if (diff_mode) {
         label = "Diff marks on — orange bars mark passages that differ · Ctrl+Shift+D toggles";
         tr = 160; tg = 90; tb = 30;
+      } else if (browse_mode) {
+        label = "Browse (read-only) · arrows / gamepad navigate · A/Space open · "
+                "LB/RB headers · F2 edit";
+        tr = 40; tg = 120; tb = 90;
       } else if (structure_mode) {
         label = "Structure highlight — colour bars + kind tags on the right · Ctrl+Shift+L toggles";
         tr = 40; tg = 80; tb = 140;
@@ -4842,6 +5158,10 @@ int main(int argc, char** argv) {
 
   SDL_StopTextInput();
   ui.shutdown();
+  if (gamepad) {
+    SDL_GameControllerClose(gamepad);
+    gamepad = nullptr;
+  }
   SDL_DestroyRenderer(sdl);
   SDL_DestroyWindow(window);
   SDL_Quit();

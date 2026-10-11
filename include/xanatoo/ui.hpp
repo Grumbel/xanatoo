@@ -81,6 +81,7 @@ enum class UiCommand {
   ToggleOutline,
   ToggleDiff,
   ToggleStructure,
+  ToggleBrowse,  // read-only navigation mode
   ToggleHelp,
   OpenInWindow,
   OpenFormatDoc,
@@ -99,6 +100,7 @@ struct UiState {
   bool diff = false;
   bool can_diff = false;  // two independent documents loaded
   bool structure = false;
+  bool browse = false;  // read-only navigation
   bool help = false;
   bool selection = false;
   // True when caret is on a ListItem (enables indent/outdent menu items).

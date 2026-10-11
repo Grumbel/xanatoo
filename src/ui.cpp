@@ -523,6 +523,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleDiff;
       if (ImGui::MenuItem("Structure Highlight", "Ctrl+Shift+L", state.structure))
         cmd = UiCommand::ToggleStructure;
+      if (ImGui::MenuItem("Browse Mode (read-only)", "F2", state.browse))
+        cmd = UiCommand::ToggleBrowse;
       ImGui::Separator();
       menu_item_cmd("Zoom In", UiCommand::ZoomIn, cmd, true, "Ctrl++");
       menu_item_cmd("Zoom Out", UiCommand::ZoomOut, cmd, true, "Ctrl+-");
