@@ -30,6 +30,7 @@ enum class UiCommand {
   SelectBlock,
   Find,
   Replace,
+  ReplaceAll,
   // Format / inline
   Bold,
   Italic,

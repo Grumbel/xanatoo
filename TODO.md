@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **096** (this delivery is **095**)
+Next bundle number: **097** (this delivery is **096**)
 
 ## Status (2026-10-11)
 
@@ -161,6 +161,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Insert Figure (image + caption) via GUI
 - [x] Heading levels 1–6 / demote in Format menu (`set_heading_level`)
 - [x] Caption layout uses italic face
+- [x] Replace All (leap/replace mode + Edit menu)
 
 ## Open work / next steps
 
@@ -305,4 +306,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-092.*-nested-cells-…` — nested table cells
 - `xanatoo-093.*-transclude-edit-…` — same-doc write-through
 - `xanatoo-094.*-insert-include-…` — insert include GUI
-- `xanatoo-095.*-figure-headings-…` — this delivery
+- `xanatoo-095.*-figure-headings-…` — figure + heading menu
+- `xanatoo-096.*-replace-all-…` — this delivery

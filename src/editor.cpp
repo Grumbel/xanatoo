@@ -2570,6 +2570,65 @@ std::optional<Caret> find_prev(const Document& doc, const std::string& query,
   return std::nullopt;
 }
 
+size_t replace_all(Document& doc, const std::string& query,
+                   const std::string& replacement) {
+  if (query.empty() || doc.root == INVALID_NODE) return 0;
+  size_t count = 0;
+  std::vector<NodeId> nodes;
+  collect_text_nodes(doc, doc.root, nodes);
+  std::string q = ascii_lower(query);
+  const size_t qlen = q.size();
+  if (qlen == 0) return 0;
+
+  for (NodeId nid : nodes) {
+    size_t search_from = 0;  // index into lower map for this node
+    for (;;) {
+      Node& n = doc.get(nid);
+      struct Map {
+        size_t span;
+        size_t ch;
+      };
+      std::string lower;
+      std::vector<Map> map;
+      for (size_t si = 0; si < n.spans.size(); ++si) {
+        size_t ci = 0, bi = 0;
+        const std::string& t = n.spans[si].text;
+        while (bi < t.size()) {
+          auto [cp, len] = decode_cp(t, bi);
+          if (len == 0) break;
+          char ascii = (cp < 128) ? static_cast<char>(cp) : '?';
+          if (ascii >= 'A' && ascii <= 'Z')
+            ascii = static_cast<char>(ascii - 'A' + 'a');
+          lower.push_back(ascii);
+          map.push_back({si, ci});
+          bi += len;
+          ++ci;
+        }
+      }
+      if (search_from >= lower.size()) break;
+      auto pos = lower.find(q, search_from);
+      if (pos == std::string::npos || pos >= map.size()) break;
+      Caret a{nid, map[pos].span, map[pos].ch};
+      Caret b = a;
+      advance_caret(doc, b, qlen);
+      Selection sel;
+      sel.anchor = a;
+      sel.focus = b;
+      delete_selection(doc, sel);
+      size_t repl_chars = 0;
+      if (!replacement.empty()) {
+        insert_text(doc, sel.focus, replacement);
+        repl_chars = utf8_char_count(replacement);
+      }
+      ++count;
+      // Skip past the just-written replacement so we do not loop when
+      // replacement contains the query (e.g. "a" → "aa").
+      search_from = pos + std::max(size_t{1}, repl_chars);
+    }
+  }
+  return count;
+}
+
 // ---- History ----
 
 History::History(size_t max_depth) : max_depth_(max_depth) {}

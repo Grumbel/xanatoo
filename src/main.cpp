@@ -2069,6 +2069,16 @@ int main(int argc, char** argv) {
               if (replace_mode && search_mode && !search_query.empty()) {
                 Pane& pp = F();
                 xanatoo::Document& dd = doc_of(pp);
+                if (ctrl && shift) {
+                  // Replace all occurrences
+                  edit();
+                  size_t n =
+                      xanatoo::replace_all(dd, search_query, replace_text);
+                  needs_layout = true;
+                  std::cout << "Replace all: " << n << " substitution(s)\n";
+                  reset_blink();
+                  break;
+                }
                 if (!pp.sel.empty()) {
                   edit();
                   xanatoo::delete_selection(dd, pp.sel);
@@ -2939,6 +2949,17 @@ int main(int argc, char** argv) {
           search_mode = true;
           replace_mode = true;
           break;
+        case C::ReplaceAll:
+          if (!search_query.empty()) {
+            edit();
+            size_t n = xanatoo::replace_all(d, search_query, replace_text);
+            needs_layout = true;
+            std::cout << "Replace all: " << n << " substitution(s)\n";
+          } else {
+            search_mode = true;
+            replace_mode = true;
+          }
+          break;
         case C::Bold:
           if (!p.sel.empty()) {
             edit();
@@ -3613,7 +3634,7 @@ int main(int argc, char** argv) {
         label += "  →  Replace: ";
         label += replace_text.empty() ? "…" : replace_text;
         label += replace_focus ? "  [repl] " : "  [find] ";
-        label += " Tab switch · Enter replace · Esc cancel";
+        label += " Tab switch · Enter replace · Ctrl+Shift+Enter all · Esc";
         tr = 220; tg = 230; tb = 245;
       } else if (search_mode) {
         label = "Leap: ";

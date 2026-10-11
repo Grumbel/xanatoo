@@ -215,6 +215,10 @@ std::optional<Caret> find_next(const Document& doc, const std::string& query,
 // Case-insensitive search starting before `from` (wraps around).
 std::optional<Caret> find_prev(const Document& doc, const std::string& query,
                                const Caret& from, size_t& match_len);
+// Replace every case-insensitive match of `query` with `replacement`.
+// Returns the number of substitutions performed.
+size_t replace_all(Document& doc, const std::string& query,
+                   const std::string& replacement);
 
 // Internal link: href "#Title" → caret at matching heading/paragraph.
 std::optional<Caret> jump_to_href(const Document& doc, const std::string& href);

@@ -424,6 +424,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::Separator();
       menu_item_cmd("Find…", UiCommand::Find, cmd, true, "Ctrl+F");
       menu_item_cmd("Replace…", UiCommand::Replace, cmd, true, "Ctrl+H");
+      menu_item_cmd("Replace All", UiCommand::ReplaceAll, cmd, true,
+                    "Ctrl+Shift+Enter");
       ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Format")) {
