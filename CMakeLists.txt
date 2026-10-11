@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 project(xanatoo VERSION 0.1.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
+if(NOT DEFINED CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 20)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -11,8 +13,11 @@ add_compile_options(-Wall -Wextra -Wno-unused-parameter)
 
 find_package(SDL2 REQUIRED)
 find_package(Freetype REQUIRED)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(FONTCONFIG REQUIRED fontconfig)
+# Cross builds (R36S) may pass FONTCONFIG_* explicitly; otherwise pkg-config.
+if(NOT FONTCONFIG_LIBRARIES)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(FONTCONFIG REQUIRED fontconfig)
+endif()
 
 # Gemini protocol (TLS client). Parser for .gmi is always built.
 option(XANATOO_GEMINI "Enable gemini:// network client (OpenSSL)" ON)
@@ -112,4 +117,5 @@ install(DIRECTORY examples/
           PATTERN "*.gif"
           PATTERN "*.sexp"
           PATTERN "*.gmi"
-          PATTERN "*.gemini")
+          PATTERN "*.gemini"
+          PATTERN "*.org")

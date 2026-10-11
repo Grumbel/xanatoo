@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "name": "xanatoo.zip",
+  "items": ["Xanatoo.sh", "xanatoo"],
+  "items_opt": null,
+  "attr": {
+    "title": "xanatoo",
+    "desc": "Interactive visual hypertext editor: stretchtext, transclusion, dual-pane views, Markdown/Org/Gemtext.",
+    "inst": "Ready to run. Version @version@. Example documents live under xanatoo/examples/.",
+    "genres": ["utilities", "education"],
+    "porter": ["Ingo Ruhnke"],
+    "image": {},
+    "rtr": true,
+    "runtime": null,
+    "reqs": [],
+    "arch": ["aarch64"]
+  }
+}

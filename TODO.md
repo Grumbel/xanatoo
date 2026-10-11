@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **160** (this delivery is **159**)
+Next bundle number: **161** (this delivery is **160**)
 
 ## Status (2026-10-11)
 
@@ -258,6 +258,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Fix tab bar flicker; icon text fallbacks + lists icon
 - [x] Multi-dir icon load; drawn fallbacks for browse/menu icons
 - [x] Diff demo crash: relayout after UI; clear soft/hover on buffer replace
+- [x] R36S / PortMaster flake outputs; XANATOO_DATA_DIR for examples
 
 ## Open work / next steps
 
@@ -468,4 +469,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-156.*-compact-edit-toolbar-…` — compact edit toolbar
 - `xanatoo-157.*-tabs-icons-…` — tab flicker + icon fallbacks
 - `xanatoo-158.*-icon-load-fallbacks-…` — icon load
-- `xanatoo-159.*-diff-demo-crash-…` — this delivery
+- `xanatoo-159.*-diff-demo-crash-…` — diff demo crash
+- `xanatoo-160.*-r36s-portmaster-…` — this delivery

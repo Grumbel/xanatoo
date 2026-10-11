@@ -163,3 +163,18 @@ Disable the network client (parser remains):
 ```bash
 cmake -DXANATOO_GEMINI=OFF ..
 ```
+
+
+## R36S / PortMaster (ArkOS)
+
+Cross-built aarch64 packages against an Ubuntu 19.10 (eoan) sysroot:
+
+```bash
+nix build .#xanatoo-r36s                 # binary only
+nix build .#xanatoo-r36s-portmaster      # folder for /roms/ports/
+nix build .#xanatoo-r36s-portmaster-zip  # zip for PortMaster autoinstall
+```
+
+The port ships `examples/`, toolbar icons, and DejaVu Sans. The launcher sets
+`XANATOO_DATA_DIR`, `XANATOO_ICON_DIR`, and `XANATOO_FONT` so welcome/help and
+the Examples menu resolve on device. See `mk/r36s/README.md`.

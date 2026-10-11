@@ -769,10 +769,25 @@ int main(int argc, char** argv) {
 
   auto find_repo_file = [&](const char* name) -> std::string {
     // try relative paths with common prefixes
-    const char* prefixes[] = {"", "examples/", "../", "../examples/", "../../", "../../examples/", nullptr};
+    const char* prefixes[] = {"", "examples/", "../", "../examples/", "../../",
+                              "../../examples/", nullptr};
     for (const char** pre = prefixes; *pre; ++pre) {
       std::string pth = std::string(*pre) + name;
       if (fs::exists(pth)) return fs::absolute(pth).string();
+    }
+    // PortMaster / installed layout: XANATOO_DATA_DIR points at the port
+    // folder that holds examples/, icons/, fonts/.
+    if (const char* data = std::getenv("XANATOO_DATA_DIR")) {
+      if (data[0] != '\0') {
+        for (const auto& c : {
+                 fs::path(data) / name,
+                 fs::path(data) / "examples" / name,
+             }) {
+          std::error_code ec;
+          auto canon = fs::weakly_canonical(c, ec);
+          if (!ec && fs::exists(canon)) return canon.string();
+        }
+      }
     }
 #ifdef __linux__
     try {

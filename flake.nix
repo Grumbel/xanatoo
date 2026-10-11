@@ -65,7 +65,21 @@
 
           # Unwrapped binary for packaging / debugging
           xanatoo-unwrapped = xanatoo;
-        });
+        } // (
+          # R36S / ArkOS PortMaster packages (Linux hosts only: cross to aarch64).
+          if pkgs.stdenv.isLinux then
+            let
+              version = "0.1.0";
+              date = "1970-01-01";
+              r36s = import ./nix/r36s.nix { inherit pkgs version date; };
+            in {
+              arkos-sysroot = r36s.sysroot;
+              xanatoo-r36s = r36s.r36s;
+              xanatoo-r36s-portmaster = r36s.portmaster;
+              xanatoo-r36s-portmaster-zip = r36s.portmasterZip;
+            }
+          else { }
+        ));
 
       devShells = forAllSystems (system:
         let
