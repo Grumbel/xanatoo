@@ -2107,6 +2107,10 @@ void ensure_valid_caret(Document& doc, Caret& caret) {
       if (caret.span_index >= n.spans.size()) {
         caret.span_index = n.spans.size() - 1;
         caret.char_index = utf8_char_count(n.spans.back().text);
+      } else {
+        const size_t max_ch =
+            utf8_char_count(n.spans[caret.span_index].text);
+        if (caret.char_index > max_ch) caret.char_index = max_ch;
       }
       return;
     }
@@ -2495,6 +2499,7 @@ void collect_outline(const Document& doc, std::vector<OutlineEntry>& out) {
     Frame fr = stack.back();
     stack.pop_back();
     const Node& n = doc.get(fr.id);
+    if (n.id != fr.id) continue;  // stale child id — skip
     int depth = fr.depth;
     if (n.kind == NodeKind::Section || n.kind == NodeKind::Article)
       depth = fr.depth + 1;

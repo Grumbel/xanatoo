@@ -66,8 +66,11 @@ Image ImageCache::load(const std::string& resolved_path) {
 
 const Image& ImageCache::get(const std::string& path, const std::string& base) {
   const std::string& root = !base.empty() ? base : base_dir_;
-  // Cache key includes root so the same relative name from two docs does not clash
-  std::string key = root + "\0" + path;
+  // Cache key includes root so the same relative name from two docs does not clash.
+  // Separator must be a real NUL: root + "\0" is a no-op (C string stops at NUL).
+  std::string key = root;
+  key.push_back('\0');
+  key += path;
   auto it = cache_.find(key);
   if (it != cache_.end()) return it->second;
 

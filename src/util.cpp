@@ -32,6 +32,8 @@ void collect_text_nodes(const Document& doc, NodeId id,
                         std::vector<NodeId>& out) {
   if (id == INVALID_NODE) return;
   const Node& n = doc.get(id);
+  // n.id != id means get() returned the invalid-node sentinel (stale id).
+  if (n.id != id) return;
   if (is_text_node_kind(n.kind)) out.push_back(id);
   for (NodeId c : n.children) collect_text_nodes(doc, c, out);
 }
