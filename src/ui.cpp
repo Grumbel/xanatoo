@@ -437,6 +437,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     if (ImGui::BeginMenu("Format")) {
       menu_item_cmd("Bold", UiCommand::Bold, cmd, state.selection, "Ctrl+B");
       menu_item_cmd("Italic", UiCommand::Italic, cmd, state.selection, "Ctrl+I");
+      menu_item_cmd("Strikethrough", UiCommand::Strike, cmd, state.selection,
+                    "Ctrl+Shift+X");
       menu_item_cmd("Code", UiCommand::Code, cmd, state.selection, "Ctrl+`");
       menu_item_cmd("Link…", UiCommand::Link, cmd, state.selection, "Ctrl+K");
       menu_item_cmd("Citation…", UiCommand::Cite, cmd, state.selection,
@@ -569,6 +571,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     ImGui::Separator();
     menu_item_cmd("Bold", UiCommand::Bold, cmd, state.selection, "Ctrl+B");
     menu_item_cmd("Italic", UiCommand::Italic, cmd, state.selection, "Ctrl+I");
+    menu_item_cmd("Strikethrough", UiCommand::Strike, cmd, state.selection,
+                  "Ctrl+Shift+X");
     menu_item_cmd("Code", UiCommand::Code, cmd, state.selection, "Ctrl+`");
     menu_item_cmd("Link…", UiCommand::Link, cmd, state.selection, "Ctrl+K");
     menu_item_cmd("Citation…", UiCommand::Cite, cmd, state.selection,

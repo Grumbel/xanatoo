@@ -37,6 +37,7 @@ enum class UiCommand {
   // Format / inline
   Bold,
   Italic,
+  Strike,
   Code,
   Link,
   Cite,

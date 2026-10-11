@@ -95,6 +95,19 @@ void parse_inlines(Node& node, std::string_view text) {
         continue;
       }
     }
+    // ~~strikethrough~~ (GFM)
+    if (i + 1 < text.size() && text[i] == '~' && text[i + 1] == '~') {
+      size_t end = text.find("~~", i + 2);
+      if (end != std::string_view::npos) {
+        flush_plain();
+        InlineSpan s;
+        s.kind = InlineKind::Strike;
+        s.text = std::string(text.substr(i + 2, end - (i + 2)));
+        node.spans.push_back(std::move(s));
+        i = end + 2;
+        continue;
+      }
+    }
     // *emphasis*
     if (text[i] == '*') {
       size_t end = text.find('*', i + 1);
@@ -801,6 +814,11 @@ void serialize_inlines(const Node& node, std::string& out) {
         out += sp.text;
         out += "*";
         break;
+      case InlineKind::Strike:
+        out += "~~";
+        out += sp.text;
+        out += "~~";
+        break;
       case InlineKind::Code:
         out += "`";
         out += sp.text;
@@ -1309,6 +1327,7 @@ void append_inline_from_sexpr(Node& node, const SExpr& e) {
   if (e.kind != SExpr::Kind::List || e.kids.empty()) return;
   const SExpr& head = e.kids[0];
   if (!is_atom(head, "em") && !is_atom(head, "strong") &&
+      !is_atom(head, "strike") && !is_atom(head, "s") &&
       !is_atom(head, "code") && !is_atom(head, "a") &&
       !is_atom(head, "cite") && !is_atom(head, "text"))
     return;
@@ -1374,6 +1393,8 @@ void append_inline_from_sexpr(Node& node, const SExpr& e) {
     kind = InlineKind::Emphasis;
   else if (is_atom(head, "strong"))
     kind = InlineKind::Strong;
+  else if (is_atom(head, "strike") || is_atom(head, "s"))
+    kind = InlineKind::Strike;
   else if (is_atom(head, "code"))
     kind = InlineKind::Code;
   InlineSpan sp;
@@ -1575,8 +1596,8 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
       if (c.kind == SExpr::Kind::List && !c.kids.empty() &&
           c.kids[0].kind == SExpr::Kind::Atom) {
         const std::string& ht = c.kids[0].text;
-        if (ht != "em" && ht != "strong" && ht != "code" && ht != "a" &&
-            ht != "text") {
+        if (ht != "em" && ht != "strong" && ht != "strike" && ht != "s" &&
+            ht != "code" && ht != "a" && ht != "text") {
           has_block = true;
           break;
         }
@@ -1893,6 +1914,11 @@ void serialize_sexpr_inlines(const Node& node, std::string& out) {
         break;
       case InlineKind::Emphasis:
         out += "(em ";
+        escape_sexpr_string(sp.text, out);
+        out += ")";
+        break;
+      case InlineKind::Strike:
+        out += "(strike ";
         escape_sexpr_string(sp.text, out);
         out += ")";
         break;

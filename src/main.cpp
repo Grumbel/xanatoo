@@ -2514,7 +2514,15 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_x:
-              if (ctrl) {
+              if (ctrl && shift) {
+                if (!p.sel.empty()) {
+                  edit();
+                  xanatoo::apply_style_to_selection(
+                      d, p.sel, xanatoo::InlineKind::Strike);
+                  needs_layout = true;
+                  reset_blink();
+                }
+              } else if (ctrl) {
                 std::string text = xanatoo::selected_text(d, p.sel);
                 if (!text.empty()) {
                   SDL_SetClipboardText(text.c_str());
@@ -3057,6 +3065,13 @@ int main(int argc, char** argv) {
           if (!p.sel.empty()) {
             edit();
             xanatoo::apply_style_to_selection(d, p.sel, xanatoo::InlineKind::Emphasis);
+            needs_layout = true;
+          }
+          break;
+        case C::Strike:
+          if (!p.sel.empty()) {
+            edit();
+            xanatoo::apply_style_to_selection(d, p.sel, xanatoo::InlineKind::Strike);
             needs_layout = true;
           }
           break;

@@ -43,6 +43,7 @@ enum class InlineKind : uint8_t {
   Text,
   Emphasis,
   Strong,
+  Strike,  // GFM ~~strikethrough~~
   Link,
   Code,
   Cite,  // citation pointer; href holds bibliography key

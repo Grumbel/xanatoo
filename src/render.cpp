@@ -190,6 +190,9 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
       case InlineKind::Code:
         SDL_SetTextureColorMod(g.texture, 130, 55, 30);
         break;
+      case InlineKind::Strike:
+        SDL_SetTextureColorMod(g.texture, 90, 90, 95);
+        break;
       case InlineKind::Strong:
       case InlineKind::Emphasis:
       default:
@@ -206,6 +209,15 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
       int ux = static_cast<int>(pg.x + origin_x);
       int uw = static_cast<int>((g.advance >> 6) > 0 ? (g.advance >> 6) : (g.width + 1));
       SDL_RenderDrawLine(sdl_, ux, uy, ux + uw, uy);
+    }
+    if (pg.kind == InlineKind::Strike) {
+      SDL_SetRenderDrawColor(sdl_, 90, 90, 95, 255);
+      int mid = static_cast<int>(pg.y - static_cast<float>(g.bearing_y) * 0.35f -
+                                 scroll_y);
+      int ux = static_cast<int>(pg.x + origin_x);
+      int uw = static_cast<int>((g.advance >> 6) > 0 ? (g.advance >> 6)
+                                                    : (g.width + 1));
+      SDL_RenderDrawLine(sdl_, ux, mid, ux + uw, mid);
     }
   }
 }
