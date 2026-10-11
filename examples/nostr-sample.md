@@ -26,9 +26,12 @@ over time — replace with any `note1` from a client):
 ## Scope (v1)
 
 - **Read-only** view of kind-1 text notes and replies
+- Authors resolved via kind-0 profiles when relays provide them
+- Multiple relays merged (hints from `nevent` preferred)
 - No posting, no NIP-07 extension, no local key storage
 - Signatures are not verified yet (display only)
-- Relays: Damus, nos.lol, nostr.band, plus any `nevent` hints
+- Relays: Damus, nos.lol, nostr.band, nostr.wine, plus `nevent` hints
+- **Reload** (Ctrl+R) re-fetches the same note
 
 ## Why Thread / Message?
 

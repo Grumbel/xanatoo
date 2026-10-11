@@ -44,6 +44,7 @@ Open any of these from this page (links load in the same pane and join session h
 
 - [Thread / RFC discussion](thread-rfc.md) — Thread and Message nodes
 - [Gemini gemtext sample](gemini-sample.gmi) — native gemtext layout
+- [Nostr discussions](nostr-sample.md) — open `note1`/`nevent1` threads (Ctrl+L)
 - [Org-mode sample](sample.org) — headings, TODO, tags, source blocks
 - [Semantic format (S-expression)](semantic.sexp) — experimental sexpr form
 - [Sample (S-expression)](sample.sexp) — compact sexpr demo

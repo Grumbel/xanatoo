@@ -293,31 +293,38 @@ int64_t json_int_field(std::string_view json, std::string_view key) {
   return std::strtoll(std::string(json.substr(p, 24)).c_str(), nullptr, 10);
 }
 
-// Pull "e" tag values from tags array (best-effort scan).
+// Pull "e" tag values from tags array (NIP-10 aware).
 void parse_e_tags(std::string_view json, NostrEvent& ev) {
   size_t tags = json.find("\"tags\"");
   if (tags == std::string_view::npos) return;
   size_t arr = json.find('[', tags);
   if (arr == std::string_view::npos) return;
-  // Walk for ["e","<64hex>"
   size_t p = arr;
+  std::string marked_reply;
   while ((p = json.find("\"e\"", p)) != std::string_view::npos) {
     size_t q = json.find('"', p + 3);
     if (q == std::string_view::npos) break;
-    // next string after "e"
     size_t s0 = json.find('"', q + 1);
     if (s0 == std::string_view::npos) break;
     size_t s1 = json.find('"', s0 + 1);
     if (s1 == std::string_view::npos) break;
     std::string_view id = json.substr(s0 + 1, s1 - s0 - 1);
+    size_t tag_end = json.find(']', s1);
+    bool is_reply_marker = false;
+    if (tag_end != std::string_view::npos) {
+      std::string_view tag_body = json.substr(s1, tag_end - s1);
+      if (tag_body.find("\"reply\"") != std::string_view::npos)
+        is_reply_marker = true;
+    }
     if (is_hex64(id)) {
       std::string hex = ascii_lower_copy(id);
       ev.e_tags.push_back(hex);
-      // NIP-10: first e often root, last e often reply parent — prefer last
+      if (is_reply_marker) marked_reply = hex;
       ev.reply_to = hex;
     }
     p = s1 + 1;
   }
+  if (!marked_reply.empty()) ev.reply_to = marked_reply;
 }
 
 bool parse_event_json(std::string_view json, NostrEvent& ev) {
@@ -330,8 +337,6 @@ bool parse_event_json(std::string_view json, NostrEvent& ev) {
   parse_e_tags(json, ev);
   return true;
 }
-
-// ---- Minimal WebSocket over TLS -------------------------------------------
 
 struct WsConn {
   SSL_CTX* ctx = nullptr;
@@ -370,11 +375,11 @@ struct WsConn {
     char tmp[4096];
     size_t got = 0;
     while (got < max_add) {
-      int r = SSL_read(ssl, tmp, static_cast<int>(std::min(sizeof(tmp), max_add - got)));
+      int r = SSL_read(ssl, tmp,
+                       static_cast<int>(std::min(sizeof(tmp), max_add - got)));
       if (r <= 0) return got > 0;
       buf.append(tmp, static_cast<size_t>(r));
       got += static_cast<size_t>(r);
-      // Non-blocking-ish: if would block, stop
       if (SSL_pending(ssl) == 0) break;
     }
     return true;
@@ -389,8 +394,6 @@ bool parse_wss_url(std::string_view url, std::string& host, std::string& path,
   std::string u(url);
   if (u.rfind("wss://", 0) == 0)
     u = u.substr(6);
-  else if (u.rfind("ws://", 0) == 0)
-    return false;  // TLS-only for simplicity
   else
     return false;
   size_t slash = u.find('/');
@@ -411,7 +414,7 @@ bool ws_connect(WsConn& c, const std::string& url, std::string* err) {
   std::string host, path;
   int port = 443;
   if (!parse_wss_url(url, host, path, port)) {
-    if (err) *err = "bad relay URL";
+    if (err) *err = "bad relay URL (need wss://)";
     return false;
   }
 
@@ -464,8 +467,7 @@ bool ws_connect(WsConn& c, const std::string& url, std::string* err) {
     return false;
   }
 
-  // WebSocket handshake
-  std::string key = "dGhlIHNhbXBsZSBub25jZQ==";  // RFC6455 example (16 bytes)
+  std::string key = "dGhlIHNhbXBsZSBub25jZQ==";
   std::ostringstream req;
   req << "GET " << path << " HTTP/1.1\r\n"
       << "Host: " << host << "\r\n"
@@ -491,9 +493,8 @@ bool ws_connect(WsConn& c, const std::string& url, std::string* err) {
 }
 
 bool ws_send_text(WsConn& c, std::string_view text) {
-  // Client frames must be masked
   std::vector<uint8_t> frame;
-  frame.push_back(0x81);  // FIN + text
+  frame.push_back(0x81);
   size_t n = text.size();
   if (n < 126) {
     frame.push_back(static_cast<uint8_t>(0x80 | n));
@@ -511,7 +512,6 @@ bool ws_send_text(WsConn& c, std::string_view text) {
   return c.write_all(frame.data(), frame.size());
 }
 
-// Read one complete WS text frame (ignores ping/pong/close simply).
 bool ws_read_text(WsConn& c, std::string& out, std::string& carry) {
   out.clear();
   for (int attempts = 0; attempts < 64; ++attempts) {
@@ -535,7 +535,7 @@ bool ws_read_text(WsConn& c, std::string& out, std::string& carry) {
              static_cast<uint8_t>(carry[3]);
       hdr = 4;
     } else if (plen == 127) {
-      return false;  // too large
+      return false;
     }
     size_t need = hdr + (masked ? 4 : 0) + static_cast<size_t>(plen);
     while (carry.size() < need) {
@@ -555,24 +555,61 @@ bool ws_read_text(WsConn& c, std::string& out, std::string& carry) {
     }
     carry.erase(0, need);
 
-    if (opcode == 0x8) return false;  // close
-    if (opcode == 0x9) {              // ping → pong
-      // ignore
-      continue;
-    }
+    if (opcode == 0x8) return false;
+    if (opcode == 0x9) continue;
     if (opcode == 0x1 || opcode == 0x0) {
       out += payload;
-      if (fin && opcode == 0x1) return true;
-      if (fin && opcode == 0x0) return true;
+      if (fin) return true;
       continue;
     }
   }
   return false;
 }
 
+std::string bech32_encode(std::string_view hrp, const std::vector<uint8_t>& data5) {
+  auto values = bech32_hrp_expand(hrp);
+  values.insert(values.end(), data5.begin(), data5.end());
+  for (int i = 0; i < 6; ++i) values.push_back(0);
+  uint32_t mod = bech32_polymod(values) ^ 1;
+  std::string out(hrp);
+  out.push_back('1');
+  for (uint8_t d : data5) out.push_back(kBech32Charset[d]);
+  for (int i = 0; i < 6; ++i)
+    out.push_back(kBech32Charset[(mod >> (5 * (5 - i))) & 31]);
+  return out;
+}
+
+std::string pubkey_to_npub(const std::string& pubkey_hex) {
+  if (!is_hex64(pubkey_hex)) return pubkey_hex;
+  std::vector<uint8_t> raw(32);
+  auto hexv = [](char c) -> int {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return 0;
+  };
+  for (size_t i = 0; i < 32; ++i)
+    raw[i] = static_cast<uint8_t>((hexv(pubkey_hex[i * 2]) << 4) |
+                                  hexv(pubkey_hex[i * 2 + 1]));
+  std::vector<uint8_t> data5;
+  if (!convert_bits(raw, 8, 5, true, data5))
+    return pubkey_hex.substr(0, 8) + "…";
+  return bech32_encode("npub", data5);
+}
+
 std::string short_npub(const std::string& pubkey_hex) {
-  if (pubkey_hex.size() < 8) return pubkey_hex;
-  return pubkey_hex.substr(0, 8) + "…";
+  std::string npub = pubkey_to_npub(pubkey_hex);
+  if (npub.size() > 16) return npub.substr(0, 12) + "…";
+  return npub;
+}
+
+std::string profile_display_name(std::string_view content,
+                                 const std::string& pubkey_hex) {
+  std::string name = json_str_field(content, "display_name");
+  if (name.empty()) name = json_str_field(content, "displayName");
+  if (name.empty()) name = json_str_field(content, "name");
+  if (!name.empty()) return name;
+  return short_npub(pubkey_hex);
 }
 
 std::string format_time(int64_t ts) {
@@ -591,22 +628,21 @@ std::string format_time(int64_t ts) {
 }
 
 Document events_to_document(const std::string& root_id,
-                            std::vector<NostrEvent>& events) {
+                            std::vector<NostrEvent>& events,
+                            const std::map<std::string, std::string>& profiles) {
   Document doc;
   NodeId root = doc.create(NodeKind::Document);
   NodeId thread = doc.create(NodeKind::Thread, root);
   doc.get(thread).label = root_id.substr(0, 12);
   doc.get(thread).summary = "Nostr discussion";
 
-  // Prefer root event for subject
   for (const auto& e : events) {
-    if (e.id == root_id) {
+    if (e.id == root_id && e.kind == 1) {
       std::string sub = e.content;
       if (sub.size() > 72) {
         sub.resize(72);
         sub += "…";
       }
-      // single line
       for (char& c : sub)
         if (c == '\n' || c == '\r') c = ' ';
       doc.get(thread).summary = sub.empty() ? "Nostr note" : sub;
@@ -622,27 +658,31 @@ Document events_to_document(const std::string& root_id,
             });
 
   for (const auto& e : events) {
-    if (e.kind != 1 && e.kind != 0) continue;  // text notes (+ rare)
+    if (e.kind != 1) continue;
     NodeId msg = doc.create(NodeKind::Message, thread);
     Node& n = doc.get(msg);
     n.label = e.id;
-    n.src = short_npub(e.pubkey);
+    auto pit = profiles.find(e.pubkey);
+    n.src = (pit != profiles.end()) ? pit->second : short_npub(e.pubkey);
     n.summary = format_time(e.created_at);
     if (e.id != root_id && !e.reply_to.empty())
       n.alt = e.reply_to;
     else if (e.id != root_id)
       n.alt = root_id;
-    // Body
     doc.append_text(msg, e.content.empty() ? "(empty)" : e.content);
   }
 
   if (doc.get(thread).children.empty()) {
     NodeId msg = doc.create(NodeKind::Message, thread);
     doc.get(msg).src = "xanatoo";
-    doc.get(msg).summary = "";
-    doc.append_text(msg, "No events returned from relays for this id.\n"
-                         "The note may be rare, or relays may be unreachable.");
+    doc.append_text(msg,
+                    "No events returned from relays for this id.\n"
+                    "The note may be rare, or relays may be unreachable.");
   }
+
+  NodeId foot = doc.create(NodeKind::Paragraph, root);
+  doc.append_text(foot,
+                  "Nostr · read-only · Ctrl+L to open another note1/nevent1");
   return doc;
 }
 
@@ -655,6 +695,26 @@ std::vector<std::string> default_relays() {
   };
 }
 
+void collect_ws_events(WsConn& c, std::map<std::string, NostrEvent>& by_id,
+                       int timeout_sec) {
+  std::string carry;
+  auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::seconds(timeout_sec);
+  while (std::chrono::steady_clock::now() < deadline) {
+    std::string msg;
+    if (!ws_read_text(c, msg, carry)) break;
+    if (msg.find("\"EOSE\"") != std::string::npos) break;
+    if (msg.find("\"EVENT\"") == std::string::npos) continue;
+    size_t brace = msg.find('{');
+    if (brace == std::string::npos) continue;
+    size_t endb = msg.rfind('}');
+    if (endb == std::string::npos || endb <= brace) continue;
+    NostrEvent ev;
+    if (!parse_event_json(msg.substr(brace, endb - brace + 1), ev)) continue;
+    by_id.insert_or_assign(ev.id, std::move(ev));
+  }
+}
+
 void query_relay(const std::string& relay, const std::string& event_id,
                  std::map<std::string, NostrEvent>& by_id, std::string* last_err) {
   WsConn c;
@@ -663,7 +723,6 @@ void query_relay(const std::string& relay, const std::string& event_id,
     if (last_err) *last_err = err;
     return;
   }
-  // Root by id + replies referencing it
   std::string sub = "xanatoo";
   std::string req =
       std::string("[\"REQ\",\"") + sub + "\"," +
@@ -673,27 +732,39 @@ void query_relay(const std::string& relay, const std::string& event_id,
     if (last_err) *last_err = "WS send failed";
     return;
   }
-
-  std::string carry;
-  auto deadline =
-      std::chrono::steady_clock::now() + std::chrono::seconds(6);
-  while (std::chrono::steady_clock::now() < deadline) {
-    std::string msg;
-    if (!ws_read_text(c, msg, carry)) break;
-    if (msg.find("\"EOSE\"") != std::string::npos) break;
-    // ["EVENT","sub",{...}]
-    if (msg.find("\"EVENT\"") == std::string::npos) continue;
-    size_t brace = msg.find('{');
-    if (brace == std::string::npos) continue;
-    // find matching end roughly: last }
-    size_t end = msg.rfind('}');
-    if (end == std::string::npos || end <= brace) continue;
-    NostrEvent ev;
-    if (!parse_event_json(msg.substr(brace, end - brace + 1), ev)) continue;
-    by_id.emplace(ev.id, std::move(ev));
-  }
-  // CLOSE
+  collect_ws_events(c, by_id, 5);
   ws_send_text(c, std::string("[\"CLOSE\",\"") + sub + "\"]");
+}
+
+void query_profiles(const std::string& relay,
+                    const std::vector<std::string>& pubkeys,
+                    std::map<std::string, std::string>& profiles,
+                    std::string* last_err) {
+  if (pubkeys.empty()) return;
+  WsConn c;
+  std::string err;
+  if (!ws_connect(c, relay, &err)) {
+    if (last_err) *last_err = err;
+    return;
+  }
+  std::string authors;
+  for (size_t i = 0; i < pubkeys.size() && i < 40; ++i) {
+    if (i) authors += ",";
+    authors += "\"" + pubkeys[i] + "\"";
+  }
+  std::string sub = "prof";
+  std::string req = std::string("[\"REQ\",\"") + sub +
+                    "\",{\"kinds\":[0],\"authors\":[" + authors +
+                    "],\"limit\":40}]";
+  if (!ws_send_text(c, req)) return;
+  std::map<std::string, NostrEvent> tmp;
+  collect_ws_events(c, tmp, 4);
+  ws_send_text(c, std::string("[\"CLOSE\",\"") + sub + "\"]");
+  for (auto& kv : tmp) {
+    if (kv.second.kind != 0) continue;
+    profiles[kv.second.pubkey] =
+        profile_display_name(kv.second.content, kv.second.pubkey);
+  }
 }
 
 }  // namespace
@@ -715,14 +786,12 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
 
   std::map<std::string, NostrEvent> by_id;
   std::string last_err = "no relays answered";
-  // Query up to 3 relays to keep latency bounded
   int tried = 0;
   for (const auto& r : relays) {
     if (tried >= 3) break;
     if (r.rfind("wss://", 0) != 0) continue;
     ++tried;
     query_relay(r, *id, by_id, &last_err);
-    if (by_id.count(*id)) break;  // got root — enough for first paint
   }
 
   if (by_id.empty()) {
@@ -730,13 +799,24 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
     return std::nullopt;
   }
 
-  // If we have root, optionally one more pass already done via #e filter.
+  std::vector<std::string> pubkeys;
+  std::set<std::string> seen_pk;
+  for (const auto& kv : by_id) {
+    if (seen_pk.insert(kv.second.pubkey).second)
+      pubkeys.push_back(kv.second.pubkey);
+  }
+  std::map<std::string, std::string> profiles;
+  for (const auto& r : relays) {
+    if (r.rfind("wss://", 0) != 0) continue;
+    query_profiles(r, pubkeys, profiles, &last_err);
+    if (profiles.size() >= pubkeys.size()) break;
+  }
+
   std::vector<NostrEvent> events;
   events.reserve(by_id.size());
   for (auto& kv : by_id) events.push_back(std::move(kv.second));
 
-  Document doc = events_to_document(*id, events);
-  return doc;
+  return events_to_document(*id, events, profiles);
 }
 
 #endif  // XANATOO_NOSTR

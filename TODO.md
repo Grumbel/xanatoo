@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **191** (this delivery is **190**)
+Next bundle number: **192** (this delivery is **191**)
 
 ## Status (2026-10-11)
 
@@ -516,4 +516,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-187.*-doc-mutate-outline-…` — doc mutate/outline
 - `xanatoo-188.*-clamp-windows-under-chrome-…` — clamp windows under chrome
 - `xanatoo-189.*-block-grip-left-gutter-…` — block grip gutter
-- `xanatoo-190.*-nostr-threads-…` — this delivery
+- `xanatoo-190.*-nostr-threads-…` — Nostr v1 threads
+- `xanatoo-191.*-nostr-profiles-multirelay-…` — this delivery

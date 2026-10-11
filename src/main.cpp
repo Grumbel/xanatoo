@@ -5198,7 +5198,7 @@ int main(int argc, char** argv) {
             flash_status("Unsaved changes — use Force Reload");
             break;
           }
-          if (xanatoo::is_gemini_url(rpath)) {
+          if (xanatoo::is_gemini_url(rpath) || xanatoo::is_nostr_ref(rpath)) {
             navigate_to_url(rpath, /*record_history=*/false);
             break;
           }
