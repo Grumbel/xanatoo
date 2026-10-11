@@ -616,9 +616,16 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
     case NodeKind::ListItem: {
       float start_y = y;
       const float bullet_slot = 28.f;
-      // Marker: "•" for unordered, "N." for ordered (level holds the number)
-      std::string marker =
-          (node.level > 0) ? (std::to_string(node.level) + ".") : "•";
+      // Marker: task checkbox, ordered "N.", or unordered "•"
+      std::string marker;
+      if (node.label == "task-done")
+        marker = "☑";
+      else if (node.label == "task")
+        marker = "☐";
+      else if (node.level > 0)
+        marker = std::to_string(node.level) + ".";
+      else
+        marker = "•";
       std::vector<uint32_t> m_cps;
       decode_utf8(marker, m_cps);
       float mx = x;

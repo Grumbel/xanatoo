@@ -604,7 +604,19 @@ Document parse_markup(std::string_view source) {
           doc.get(item).level = list_ordered
                                     ? (item_ord > 0 ? item_ord : item_index)
                                     : 0;
-          parse_inlines(doc.get(item), ltrim.substr(imlen));
+          std::string_view body = ltrim.substr(imlen);
+          // GFM task list: "- [ ] text" / "- [x] text"
+          if (body.size() >= 3 && body[0] == '[') {
+            char mid = body[1];
+            if ((mid == ' ' || mid == 'x' || mid == 'X') && body[2] == ']') {
+              doc.get(item).label =
+                  (mid == 'x' || mid == 'X') ? "task-done" : "task";
+              body.remove_prefix(3);
+              while (!body.empty() && (body[0] == ' ' || body[0] == '\t'))
+                body.remove_prefix(1);
+            }
+          }
+          parse_inlines(doc.get(item), body);
           ++i;
         }
         // Ordered item numbers were set while scanning; no second pass.
@@ -1016,6 +1028,9 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
         out += ". ";
       } else {
         out += "- ";
+      }
+      if (node.label == "task" || node.label == "task-done") {
+        out += (node.label == "task-done") ? "[x] " : "[ ] ";
       }
       serialize_inlines(node, out);
       out += "\n";
@@ -1784,7 +1799,18 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
         const SExpr& part = item.kids[j];
         if (part.kind == SExpr::Kind::Atom && !part.text.empty() &&
             part.text[0] == ':') {
-          if (j + 1 < item.kids.size()) ++j;  // skip :id value
+          const std::string& key = part.text;
+          if (key == ":task") {
+            doc.get(li).label = "task";
+            if (j + 1 < item.kids.size()) ++j;  // consume #t
+            continue;
+          }
+          if (key == ":done") {
+            doc.get(li).label = "task-done";
+            if (j + 1 < item.kids.size()) ++j;
+            continue;
+          }
+          if (j + 1 < item.kids.size()) ++j;  // skip other kwargs (:id …)
           continue;
         }
         if (part.kind == SExpr::Kind::List && !part.kids.empty() &&
@@ -2220,6 +2246,10 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
         out += std::to_string(node.level);
       }
       emit_node_id(node, out);
+      if (node.label == "task")
+        out += " :task #t";
+      else if (node.label == "task-done")
+        out += " :done #t";
       serialize_sexpr_inlines(node, out);
       for (NodeId c : node.children) {
         if (doc.get(c).kind == NodeKind::List) {

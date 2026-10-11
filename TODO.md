@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **101** (this delivery is **100**)
+Next bundle number: **102** (this delivery is **101**)
 
 ## Status (2026-10-11)
 
@@ -167,6 +167,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] duplicate_block copies label + climbs to Figure/Table; menu + context items
 - [x] Drag-and-drop opens .md/.sexp/.txt in soft window (images still insert)
 - [x] GFM ``` / ~~~ fenced code blocks (parse + markdown serialize)
+- [x] GFM task list items (`- [ ]` / `- [x]`) parse/serialize + click toggle
 
 ## Open work / next steps
 
@@ -317,3 +318,4 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-098.*-duplicate-gui-…` — this delivery
 - `xanatoo-099.*-drop-docs-…` — this delivery
 - `xanatoo-100.*-gfm-fences-…` — this delivery
+- `xanatoo-101.*-task-lists-…` — this delivery
