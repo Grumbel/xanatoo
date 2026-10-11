@@ -270,6 +270,7 @@ void insert_styled(Document& doc, Caret& caret, const std::string& utf8,
                    InlineKind kind, const std::string& href) {
   if (caret.node == INVALID_NODE || utf8.empty()) return;
   Node& n = doc.get(caret.node);
+  if (n.id != caret.node) return;
   if (n.spans.empty()) {
     InlineSpan s;
     s.kind = kind;
@@ -404,6 +405,7 @@ void apply_style_to_selection(Document& doc, Selection& sel, InlineKind kind,
 bool redirect_transclude_caret(Document& doc, Caret& caret) {
   if (caret.node == INVALID_NODE) return false;
   const Node& n = doc.get(caret.node);
+  if (n.id != caret.node) return false;
   if (n.kind != NodeKind::Transclude) return false;
   // path.md#anchor → external (no write-through in this process)
   const std::string& src = n.src;
@@ -439,6 +441,7 @@ void insert_text(Document& doc, Caret& caret, const std::string& utf8) {
   // External transclusion body is a read-only mirror — refuse mutation
   if (doc.get(caret.node).kind == NodeKind::Transclude) return;
   Node& n = doc.get(caret.node);
+  if (n.id != caret.node) return;  // stale caret → invalid-node sentinel
   if (n.spans.empty()) {
     InlineSpan s;
     s.kind = InlineKind::Text;
@@ -465,6 +468,7 @@ void delete_backward(Document& doc, Caret& caret) {
   redirect_transclude_caret(doc, caret);
   if (doc.get(caret.node).kind == NodeKind::Transclude) return;
   Node& n = doc.get(caret.node);
+  if (n.id != caret.node) return;
 
   if (caret.char_index == 0 && caret.span_index == 0) {
     // At start of block: merge with previous text-bearing node
@@ -539,6 +543,7 @@ void delete_forward(Document& doc, Caret& caret) {
   redirect_transclude_caret(doc, caret);
   if (doc.get(caret.node).kind == NodeKind::Transclude) return;
   Node& n = doc.get(caret.node);
+  if (n.id != caret.node) return;
   if (n.spans.empty() || caret.span_index >= n.spans.size()) return;
 
   InlineSpan& span = n.spans[caret.span_index];
@@ -1443,6 +1448,7 @@ static bool detach_from_parent(Document& doc, NodeId id) {
 bool split_block(Document& doc, Caret& caret) {
   if (caret.node == INVALID_NODE) return false;
   Node& n = doc.get(caret.node);
+  if (n.id != caret.node) return false;
   if (!is_text_node_kind(n.kind)) return false;
 
   // Enter on an empty list item exits the list: drop the item and place a
@@ -1658,6 +1664,7 @@ void delete_selection(Document& doc, Selection& sel) {
 
   if (a.node == b.node) {
     Node& n = doc.get(a.node);
+    if (n.id != a.node) return;
     erase_range_in_node(n, a.span_index, a.char_index, b.span_index, b.char_index);
     compact_spans(n);
     sel.anchor = sel.focus = a;
