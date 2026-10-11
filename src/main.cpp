@@ -356,7 +356,7 @@ int main(int argc, char** argv) {
   bool help_needs_layout = true;
   bool help_loaded = false;
   // Software window geometry (window coordinates)
-  int help_x = 80, help_y = 60, help_w = 560, help_h = 480;
+  int help_x = 80, help_y = 100, help_w = 560, help_h = 480;
   bool help_dragging = false;
   int help_drag_dx = 0, help_drag_dy = 0;
   // Resize: bit flags 1=right, 2=bottom (corner = both)
@@ -371,7 +371,7 @@ int main(int argc, char** argv) {
   bool outline_mode = false;
   std::vector<xanatoo::OutlineEntry> outline;
   int outline_sel = 0;
-  int ol_x = 40, ol_y = 90, ol_w = 320, ol_h = 420;
+  int ol_x = 40, ol_y = 100, ol_w = 320, ol_h = 420;
   bool ol_dragging = false;
   int ol_drag_dx = 0, ol_drag_dy = 0;
   int ol_resize = 0;  // 1=right, 2=bottom
@@ -1136,10 +1136,22 @@ int main(int argc, char** argv) {
                       sw.h - help_title_h - help_pad - 4};
   };
 
-  // Edge-snap into the client area (below menu/toolbar, above status bar).
+  // Keep floating windows fully in the client area (below menu/toolbar/tabs,
+  // above status bar). Title bar must stay reachable to move/close.
   auto snap_soft_geom = [&](int& x, int& y, int w, int h) {
     const int top = static_cast<int>(ui_top);
     const int bottom = win_h - status_bar_h;
+    // Title bar (help_title_h) must remain below the chrome.
+    if (y < top) y = top;
+    if (x < 0) x = 0;
+    if (w > win_w) w = win_w;  // caller may not use w out-param; size clamped elsewhere
+    if (x + w > win_w) x = std::max(0, win_w - w);
+    // Prefer keeping the title bar on-screen even if the body is tall.
+    if (y + help_title_h > bottom)
+      y = std::max(top, bottom - help_title_h);
+    else if (y + h > bottom)
+      y = std::max(top, bottom - h);
+    // Edge snap (optional stickiness near edges)
     if (x < soft_snap_px) x = 0;
     if (y < top + soft_snap_px) y = top;
     if (x + w > win_w - soft_snap_px) x = std::max(0, win_w - w);
@@ -1238,7 +1250,35 @@ int main(int argc, char** argv) {
       sw.maximized = false;
       sw.dock = SoftDock::None;
       sw.needs_layout = true;
+      snap_soft_geom(sw.x, sw.y, sw.w, sw.h);
     }
+  };
+
+  // Re-clamp every frame so windows cannot sit under menu/toolbar/tabs when
+  // ui_top grows (e.g. tab bar appears) or after undock/restore.
+  auto clamp_all_floating = [&]() {
+    const int top = static_cast<int>(ui_top);
+    for (auto& sw : soft_wins) {
+      if (sw.dock != SoftDock::None || sw.maximized) {
+        SoftDock d = sw.maximized ? SoftDock::Max : sw.dock;
+        auto [x, y, w, h] = dock_rect(d);
+        // Only rewrite geometry when chrome/size changed (avoids needs_layout spam).
+        if (sw.x != x || sw.y != y || sw.w != w || sw.h != h) {
+          sw.x = x;
+          sw.y = y;
+          sw.w = w;
+          sw.h = h;
+          sw.needs_layout = true;
+        }
+        continue;
+      }
+      snap_soft_geom(sw.x, sw.y, sw.w, sw.h);
+      if (sw.y < top) sw.y = top;
+    }
+    snap_soft_geom(help_x, help_y, help_w, help_h);
+    if (help_y < top) help_y = top;
+    snap_soft_geom(ol_x, ol_y, ol_w, ol_h);
+    if (ol_y < top) ol_y = top;
   };
 
   auto soft_doc = [&](SoftWindow& sw) -> xanatoo::Document& {
@@ -1349,11 +1389,14 @@ int main(int argc, char** argv) {
     sw.scroll = p.scroll_y;
     sw.needs_layout = true;
     const int cascade = static_cast<int>(soft_wins.size()) * 28;
+    const int top = static_cast<int>(ui_top);
     sw.x = help_x + 30 + cascade;
-    sw.y = help_y + 30 + cascade;
+    sw.y = std::max(help_y, top) + 30 + cascade;
     if (sw.x + sw.w > win_w - 20) sw.x = 40 + (cascade % 60);
+    if (sw.y < top) sw.y = top + 20 + (cascade % 40);
     if (sw.y + sw.h > win_h - 40)
-      sw.y = static_cast<int>(ui_top) + 20 + (cascade % 40);
+      sw.y = top + 20 + (cascade % 40);
+    snap_soft_geom(sw.x, sw.y, sw.w, sw.h);
     soft_wins.push_back(std::move(sw));
     flash_status("Popped out to window");
   };
@@ -1400,11 +1443,14 @@ int main(int argc, char** argv) {
     xanatoo::ensure_valid_caret(buffers[static_cast<size_t>(bi)].doc, sw.sel.focus);
     sw.sel.anchor = sw.sel.focus;
     const int cascade = static_cast<int>(soft_wins.size()) * 28;
+    const int top = static_cast<int>(ui_top);
     sw.x = help_x + 30 + cascade;
-    sw.y = help_y + 30 + cascade;
+    sw.y = std::max(help_y, top) + 30 + cascade;
     if (sw.x + sw.w > win_w - 20) sw.x = 40 + (cascade % 60);
+    if (sw.y < top) sw.y = top + 20 + (cascade % 40);
     if (sw.y + sw.h > win_h - 40)
-      sw.y = static_cast<int>(ui_top) + 20 + (cascade % 40);
+      sw.y = top + 20 + (cascade % 40);
+    snap_soft_geom(sw.x, sw.y, sw.w, sw.h);
     soft_wins.push_back(std::move(sw));
     std::cout << "Software window: " << path << "\n";
   };
@@ -6866,6 +6912,8 @@ int main(int argc, char** argv) {
       }
     }
 
+
+        clamp_all_floating();
 
     // Drop soft windows whose buffer was removed / is out of range.
     soft_wins.erase(
