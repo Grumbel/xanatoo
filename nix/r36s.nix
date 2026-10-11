@@ -54,6 +54,9 @@ let
     { file = "pool/main/u/util-linux/uuid-dev_2.34-0.1ubuntu2_arm64.deb"; sha256 = "d30984212486096a8f499354dfeae0a45d7754ccee6c4e1183de1997fc44bcd8"; }
     { file = "pool/main/b/brotli/libbrotli1_1.0.7-2_arm64.deb"; sha256 = "f180a18ae74016c5db89a1ed438e2fa45cd7d64c2abcec6a32e4316724b1b85a"; }
     { file = "pool/main/b/brotli/libbrotli-dev_1.0.7-2_arm64.deb"; sha256 = "861312067f81e664925243294070dcb31e4478c21f9a237a95d9cec7ebde7155"; }
+    # OpenSSL 1.1 for gemini:// (ArkOS/device typically already has libssl1.1).
+    { file = "pool/main/o/openssl/libssl1.1_1.1.1c-1ubuntu4_arm64.deb"; sha256 = "ec2aca230fa845c96c90afc5a4bb9b41ea10e0135a70eb5898d3d2597a3d0c3d"; }
+    { file = "pool/main/o/openssl/libssl-dev_1.1.1c-1ubuntu4_arm64.deb"; sha256 = "275f730b1867066b841f3d66289bfd87d10d98c1358d611d687b1311c974fbab"; }
   ];
   fetchDeb = d: pkgs.fetchurl {
     url = "http://old-releases.ubuntu.com/ubuntu/${d.file}";
@@ -158,7 +161,7 @@ let
       "-DCMAKE_BUILD_TYPE=Release"
       "-DCMAKE_SKIP_RPATH=ON"
       "-DCMAKE_CXX_STANDARD=17"
-      "-DXANATOO_GEMINI=OFF"
+      "-DXANATOO_GEMINI=ON"
       "-DSDL2_INCLUDE_DIRS=${sysroot}/usr/include/SDL2"
       "-DSDL2_LIBRARIES=${sdlStub}/lib/libSDL2.so"
       "-DFREETYPE_INCLUDE_DIRS=${sysroot}/usr/include/freetype2"
@@ -167,6 +170,10 @@ let
       "-DFREETYPE_LIBRARY=${sysroot}/usr/lib/${multiarch}/libfreetype.so"
       "-DFONTCONFIG_INCLUDE_DIRS=${sysroot}/usr/include"
       "-DFONTCONFIG_LIBRARIES=${sysroot}/usr/lib/${multiarch}/libfontconfig.so"
+      "-DOPENSSL_ROOT_DIR=${sysroot}/usr"
+      "-DOPENSSL_INCLUDE_DIR=${sysroot}/usr/include"
+      "-DOPENSSL_SSL_LIBRARY=${sysroot}/usr/lib/${multiarch}/libssl.so"
+      "-DOPENSSL_CRYPTO_LIBRARY=${sysroot}/usr/lib/${multiarch}/libcrypto.so"
     ];
     dontPatchELF = true;
     dontPatchShebangs = true;

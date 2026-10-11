@@ -24,8 +24,12 @@ zip into `ports/PortMaster/autoinstall/` and start PortMaster once.
 /roms/ports/xanatoo/conf/            # created at runtime (bookmarks, …)
 ```
 
-Menus use ImGui’s built-in ProggyClean bitmap font (sharp on 640×480).
-Optional: `XANATOO_UI_FONT=/path/to.ttf` to force a TTF instead.
+UI menus use DejaVu Sans when available (same as the body font).
+
+## Network
+
+Local `.gmi` / `.org` examples work offline. `gemini://` links need OpenSSL
+(enabled in current R36S builds; the device must provide `libssl.so.1.1`).
 
 ## Controls
 

@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **177** (this delivery is **176**)
+Next bundle number: **178** (this delivery is **177**)
 
 ## Status (2026-10-11)
 
@@ -501,4 +501,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-173.*-dual-cursor-fixed-font-…` — dual cursor + fixed font
 - `xanatoo-174.*-proggyclean-ui-font-…` — proggyclean attempt
 - `xanatoo-175.*-restore-pre-r36s-ui-font-…` — restore attempt
-- `xanatoo-176.*-font-atlas-surface-geom-cursor-…` — this delivery
+- `xanatoo-176.*-font-atlas-surface-geom-cursor-…` — font atlas + geom cursor
+- `xanatoo-177.*-r36s-org-gemini-examples-…` — this delivery

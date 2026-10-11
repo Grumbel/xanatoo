@@ -1003,12 +1003,23 @@ int main(int argc, char** argv) {
                    resp->final_url);
       return true;
 #else
-      flash_status("Gemini client disabled (build with -DXANATOO_GEMINI=ON)");
-      return false;
+      // No TLS client in this build — still offer the local gemtext sample.
+      flash_status("gemini:// needs TLS (build with -DXANATOO_GEMINI=ON)");
+      {
+        std::string sample = find_repo_file("gemini-sample.gmi");
+        if (sample.empty())
+          sample = find_repo_file("examples/gemini-sample.gmi");
+        if (!sample.empty() && fs::exists(sample)) {
+          // Fall through to local open of the sample after the message.
+          target = sample;
+        } else {
+          return false;
+        }
+      }
 #endif
     }
 
-    // Local path
+    // Local path (or offline fallback for gemini:// when TLS is disabled)
     std::string path = target;
     if (!fs::exists(path)) {
       std::string found = find_repo_file(path.c_str());
@@ -5589,23 +5600,30 @@ int main(int argc, char** argv) {
         case C::OpenExample: {
           std::string name = ui_frame.arg;
           if (name.empty()) break;
+          // Prefer examples/<name> under data dir / cwd (PortMaster layout).
           std::string path = find_repo_file(name.c_str());
-          if (path.empty()) {
-            std::string tried = std::string("examples/") + name;
-            path = find_repo_file(tried.c_str());
-          }
+          if (path.empty())
+            path = find_repo_file((std::string("examples/") + name).c_str());
           if (path.empty() || !fs::exists(path)) {
             flash_status("Example not found: " + name);
-            std::cerr << "Example not found: " << name << "\n";
+            std::cerr << "Example not found: " << name
+                      << " (set XANATOO_DATA_DIR to the port folder)\n";
             break;
           }
-          std::string title = name;
-          try {
-            title = fs::path(path).filename().string();
-          } catch (...) {
+          // Load into the focused pane (not a soft window). On R36S 640×480
+          // floating windows are too tight for org tables / gemtext samples.
+          if (!navigate_to_url(path, /*record_history=*/true)) {
+            flash_status("Failed to open: " + name);
+            break;
           }
-          open_browse(path, title);
-          flash_status("Opened example: " + title);
+          {
+            std::string title = name;
+            try {
+              title = fs::path(path).filename().string();
+            } catch (...) {
+            }
+            flash_status("Opened example: " + title);
+          }
           break;
         }
         case C::LoadDiffDemo: {
