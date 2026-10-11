@@ -347,12 +347,36 @@ int main(int argc, char** argv) {
     }
   };
   open_first_gamepad();
-  // Hovered link href (shown in status bar when not in a modal mode)
+  // Hovered interactive element (status bar, tooltip, highlight, cursor)
   std::string hovered_href;
   std::string hovered_rel;      // typed :rel when present
   bool hovered_is_cite = false;
   std::string hovered_preview;  // internal #anchor target snippet
+  xanatoo::NodeId hovered_link_node = xanatoo::INVALID_NODE;
+  size_t hovered_link_span = 0;
+  int hovered_link_pane = -1;
+  xanatoo::NodeId hovered_stretch = xanatoo::INVALID_NODE;
+  int hovered_stretch_pane = -1;
+  xanatoo::NodeId hovered_image = xanatoo::INVALID_NODE;
+  int hovered_image_pane = -1;
+  bool hovered_image_handle = false;
+  bool hovered_col_gap = false;
+  int hovered_col_gap_pane = -1;
   float mouse_x = 0.f, mouse_y = 0.f;
+
+  SDL_Cursor* cursor_arrow = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
+  SDL_Cursor* cursor_hand = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
+  SDL_Cursor* cursor_sizewe = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE);
+  SDL_Cursor* cursor_sizenwse =
+      SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENWSE);
+  SDL_Cursor* cursor_current = cursor_arrow;
+  auto set_cursor = [&](SDL_Cursor* c) {
+    if (!c) c = cursor_arrow;
+    if (c != cursor_current) {
+      SDL_SetCursor(c);
+      cursor_current = c;
+    }
+  };
 
   Uint32 caret_blink_start = SDL_GetTicks();
   auto reset_blink = [&]() { caret_blink_start = SDL_GetTicks(); };
@@ -2213,7 +2237,8 @@ int main(int argc, char** argv) {
               p.preferred_x = lx;
             }
           } else {
-            // Track link under cursor for status-bar + tooltip hover feedback
+            // Track interactive elements under the cursor for status, tooltip,
+            // highlight, and pointer shape.
             float mx = static_cast<float>(ev.motion.x);
             float my = content_y(static_cast<float>(ev.motion.y));
             mouse_x = mx;
@@ -2221,22 +2246,85 @@ int main(int argc, char** argv) {
             int hover_pane = pane_at(mx);
             Pane& hp = panes[hover_pane];
             float lx = local_x(mx, hover_pane);
-            if (auto hit = xanatoo::hit_test_link_ex(doc_of(hp), hp.layout, lx,
-                                                     my, hp.scroll_y)) {
-              hovered_href = hit->href;
-              hovered_rel = hit->rel;
-              hovered_is_cite = (hit->kind == xanatoo::InlineKind::Cite);
-              if (auto prev =
-                      xanatoo::link_preview_text(doc_of(hp), hit->href)) {
-                hovered_preview = *prev;
-              } else {
-                hovered_preview.clear();
+            auto& hd = doc_of(hp);
+
+            hovered_href.clear();
+            hovered_rel.clear();
+            hovered_is_cite = false;
+            hovered_preview.clear();
+            hovered_link_node = xanatoo::INVALID_NODE;
+            hovered_link_span = 0;
+            hovered_link_pane = -1;
+            hovered_stretch = xanatoo::INVALID_NODE;
+            hovered_stretch_pane = -1;
+            hovered_image = xanatoo::INVALID_NODE;
+            hovered_image_pane = -1;
+            hovered_image_handle = false;
+            hovered_col_gap = false;
+            hovered_col_gap_pane = -1;
+
+            // Column gutters
+            for (const auto& gap : hp.layout.column_gaps) {
+              float gx = gap.x;
+              float gy0 = gap.y - hp.scroll_y;
+              float gy1 = gy0 + gap.height;
+              if (lx >= gx - 5.f && lx <= gx + 5.f && my >= gy0 && my <= gy1) {
+                hovered_col_gap = true;
+                hovered_col_gap_pane = hover_pane;
+                break;
               }
-            } else {
-              hovered_href.clear();
-              hovered_rel.clear();
-              hovered_is_cite = false;
-              hovered_preview.clear();
+            }
+
+            // Image body / resize handle (bottom-right 12px)
+            if (!hovered_col_gap) {
+              for (const auto& pi : hp.layout.images) {
+                float ix0 = pi.x, iy0 = pi.y - hp.scroll_y;
+                float ix1 = ix0 + pi.width, iy1 = iy0 + pi.height;
+                if (lx >= ix0 && lx <= ix1 && my >= iy0 && my <= iy1) {
+                  hovered_image = pi.node;
+                  hovered_image_pane = hover_pane;
+                  const float hs = 12.f;
+                  if (lx >= ix1 - hs && my >= iy1 - hs)
+                    hovered_image_handle = true;
+                  break;
+                }
+              }
+            }
+
+            // Stretch marker (collapsed line or expanded header)
+            if (!hovered_col_gap &&
+                hovered_image == xanatoo::INVALID_NODE) {
+              if (auto sid =
+                      xanatoo::hit_test_stretch(hp.layout, lx, my, hp.scroll_y)) {
+                if (hd.get(*sid).kind == xanatoo::NodeKind::Stretch) {
+                  hovered_stretch = *sid;
+                  hovered_stretch_pane = hover_pane;
+                }
+              }
+            }
+
+            // Links / cites (skip stretch-marker glyphs — those are stretch)
+            if (!hovered_col_gap && hovered_stretch == xanatoo::INVALID_NODE &&
+                hovered_image == xanatoo::INVALID_NODE) {
+              if (auto hit = xanatoo::hit_test_link_ex(hd, hp.layout, lx, my,
+                                                       hp.scroll_y)) {
+                // Stretch summaries are laid out as Link-styled glyphs on a
+                // Stretch node; treat them as stretch, not as hyperlinks.
+                if (hd.get(hit->node).kind == xanatoo::NodeKind::Stretch) {
+                  hovered_stretch = hit->node;
+                  hovered_stretch_pane = hover_pane;
+                } else if (!hit->href.empty()) {
+                  hovered_href = hit->href;
+                  hovered_rel = hit->rel;
+                  hovered_is_cite = (hit->kind == xanatoo::InlineKind::Cite);
+                  hovered_link_node = hit->node;
+                  hovered_link_span = hit->span_index;
+                  hovered_link_pane = hover_pane;
+                  if (auto prev = xanatoo::link_preview_text(hd, hit->href)) {
+                    hovered_preview = *prev;
+                  }
+                }
+              }
             }
           }
           break;
@@ -4743,6 +4831,135 @@ int main(int argc, char** argv) {
 
       renderer.draw(pane.layout, draw_scroll, ox);
 
+      // Hover affordances for interactive elements in this pane
+      {
+        SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+        // Link / cite run: soft wash + thicker underline
+        if (hovered_link_pane == i &&
+            hovered_link_node != xanatoo::INVALID_NODE &&
+            !hovered_href.empty()) {
+          float run_x0 = 0.f, run_x1 = 0.f, run_top = 0.f, run_base = 0.f;
+          bool in_run = false;
+          auto flush = [&]() {
+            if (!in_run) return;
+            int x = static_cast<int>(run_x0 + ox) - 2;
+            int y = static_cast<int>(run_top - draw_scroll) - 2;
+            int w = static_cast<int>(run_x1 - run_x0) + 4;
+            int h = body_font.line_height() + 4;
+            SDL_SetRenderDrawColor(sdl, 40, 110, 220, 45);
+            SDL_Rect r{x, y, w, h};
+            SDL_RenderFillRect(sdl, &r);
+            int uy = static_cast<int>(run_base + 3.f - draw_scroll);
+            SDL_SetRenderDrawColor(sdl, 20, 80, 190, 255);
+            SDL_RenderDrawLine(sdl, x + 1, uy, x + w - 2, uy);
+            SDL_RenderDrawLine(sdl, x + 1, uy + 1, x + w - 2, uy + 1);
+            in_run = false;
+          };
+          for (const auto& pg : pane.layout.glyphs) {
+            if (pg.node != hovered_link_node ||
+                pg.span_index != hovered_link_span ||
+                (pg.kind != xanatoo::InlineKind::Link &&
+                 pg.kind != xanatoo::InlineKind::Cite)) {
+              flush();
+              continue;
+            }
+            xanatoo::Font& font = fonts.pick(pg.font);
+            const xanatoo::Glyph& g = font.glyph(pg.codepoint);
+            float adv = static_cast<float>(
+                (g.advance >> 6) > 0 ? (g.advance >> 6) : (g.width + 1));
+            float top = pg.y - static_cast<float>(font.ascender());
+            if (!in_run) {
+              run_x0 = pg.x;
+              run_x1 = pg.x + adv;
+              run_top = top;
+              run_base = pg.y;
+              in_run = true;
+            } else if (std::abs(top - run_top) < 0.5f &&
+                       pg.x <= run_x1 + 2.f) {
+              run_x1 = pg.x + adv;
+            } else {
+              flush();
+              run_x0 = pg.x;
+              run_x1 = pg.x + adv;
+              run_top = top;
+              run_base = pg.y;
+              in_run = true;
+            }
+          }
+          flush();
+        }
+        // Stretch marker wash
+        if (hovered_stretch_pane == i &&
+            hovered_stretch != xanatoo::INVALID_NODE) {
+          for (const auto& box : pane.layout.boxes) {
+            if (box.node != hovered_stretch) continue;
+            // Only the header line for expanded stretches is interactive;
+            // wash the first line-height of the box when expanded.
+            float h = box.height;
+            auto& sn = docs[pane.doc_index].get(hovered_stretch);
+            if (sn.expanded && h > static_cast<float>(body_font.line_height()) + 8.f)
+              h = static_cast<float>(body_font.line_height()) + 6.f;
+            SDL_SetRenderDrawColor(sdl, 40, 130, 90, 50);
+            SDL_Rect r{pane.x + static_cast<int>(box.x),
+                       static_cast<int>(box.y - pane.scroll_y + ui_top),
+                       static_cast<int>(box.width), static_cast<int>(h)};
+            SDL_RenderFillRect(sdl, &r);
+            SDL_SetRenderDrawColor(sdl, 30, 120, 80, 200);
+            SDL_RenderDrawRect(sdl, &r);
+            break;
+          }
+        }
+        // Image outline + emphasized resize handle
+        if (hovered_image_pane == i &&
+            hovered_image != xanatoo::INVALID_NODE) {
+          for (const auto& pi : pane.layout.images) {
+            if (pi.node != hovered_image) continue;
+            int ix = pane.x + static_cast<int>(pi.x);
+            int iy = static_cast<int>(pi.y - pane.scroll_y + ui_top);
+            int iw = static_cast<int>(pi.width);
+            int ih = static_cast<int>(pi.height);
+            SDL_SetRenderDrawColor(sdl, 25, 90, 170, 180);
+            SDL_Rect outline{ix, iy, iw, ih};
+            SDL_RenderDrawRect(sdl, &outline);
+            const int hs = hovered_image_handle ? 14 : 10;
+            SDL_Rect handle{ix + iw - hs, iy + ih - hs, hs, hs};
+            SDL_SetRenderDrawColor(sdl,
+                                   hovered_image_handle ? 15 : 25,
+                                   hovered_image_handle ? 70 : 90,
+                                   hovered_image_handle ? 200 : 170, 255);
+            SDL_RenderFillRect(sdl, &handle);
+            if (hovered_image_handle) {
+              SDL_SetRenderDrawColor(sdl, 255, 255, 255, 220);
+              SDL_RenderDrawRect(sdl, &handle);
+            }
+            break;
+          }
+        }
+        // Column gutter highlight
+        if (hovered_col_gap_pane == i && hovered_col_gap) {
+          float mx = mouse_x - static_cast<float>(pane.x);
+          float my = content_y(mouse_y);
+          for (const auto& gap : pane.layout.column_gaps) {
+            float gx = gap.x;
+            float gy0 = gap.y - pane.scroll_y;
+            float gy1 = gy0 + gap.height;
+            if (mx >= gx - 5.f && mx <= gx + 5.f && my >= gy0 && my <= gy1) {
+              int gx_i = pane.x + static_cast<int>(gx);
+              int gy_i = static_cast<int>(gy0 + ui_top);
+              int gh = static_cast<int>(gap.height);
+              SDL_SetRenderDrawColor(sdl, 25, 90, 170, 90);
+              SDL_Rect wide{gx_i - 4, gy_i, 9, gh};
+              SDL_RenderFillRect(sdl, &wide);
+              SDL_SetRenderDrawColor(sdl, 25, 90, 170, 255);
+              SDL_Rect bar{gx_i - 1, gy_i, 3, gh};
+              SDL_RenderFillRect(sdl, &bar);
+              break;
+            }
+          }
+        }
+        SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+      }
+
       // Logical structure overlay: colour bars + wash by NodeKind + right labels
       if (structure_mode) {
         SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
@@ -5261,8 +5478,38 @@ int main(int argc, char** argv) {
       } else if (outline_mode) {
         label = "Outline — ↑/↓ select · Enter jump · 1-9 quick jump · Esc close";
         tr = 40; tg = 90; tb = 160;
+      } else if (hovered_col_gap) {
+        label = "Column gutter — drag to adjust relative widths";
+        tr = 40; tg = 100; tb = 150;
+      } else if (hovered_image != xanatoo::INVALID_NODE) {
+        if (hovered_image_handle)
+          label = "Image resize handle — drag corner to scale";
+        else
+          label = "Image — drag corner handle to resize · scale saved in markup";
+        tr = 40; tg = 100; tb = 150;
+      } else if (hovered_stretch != xanatoo::INVALID_NODE) {
+        bool expanded = false;
+        if (hovered_stretch_pane >= 0 && hovered_stretch_pane < 2) {
+          auto& sd = doc_of(panes[hovered_stretch_pane]);
+          expanded = sd.get(hovered_stretch).expanded;
+        }
+        label = expanded ? "Stretchtext — click ▾ to collapse"
+                         : "Stretchtext — click ▸ to expand";
+        tr = 40; tg = 100; tb = 150;
       } else if (!hovered_href.empty()) {
-        label = hovered_is_cite ? "Cite: " : "Link: ";
+        if (hovered_is_cite)
+          label = "Cite: ";
+        else if (hovered_href[0] == '#')
+          label = "Anchor: ";
+        else if (xanatoo::is_gemini_url(hovered_href))
+          label = "Gemini: ";
+        else if (hovered_href.rfind("http://", 0) == 0 ||
+                 hovered_href.rfind("https://", 0) == 0)
+          label = "Web: ";
+        else if (hovered_href.rfind("mailto:", 0) == 0)
+          label = "Mail: ";
+        else
+          label = "Document: ";
         label += hovered_href;
         if (!hovered_rel.empty()) {
           label += "  rel=";
@@ -5270,9 +5517,13 @@ int main(int argc, char** argv) {
         }
         if (hovered_href[0] == '#')
           label += "    click to jump";
+        else if (hovered_href.rfind("http://", 0) == 0 ||
+                 hovered_href.rfind("https://", 0) == 0 ||
+                 hovered_href.rfind("mailto:", 0) == 0)
+          label += "    click to open externally";
         else
           label += "    click to open";
-        tr = 40; tg = 90; tb = 160;
+        tr = 30; tg = 80; tb = 170;
       } else {
         label =
             "F1 help · Ctrl+S save · Ctrl+A block · Ctrl+Shift+A all · "
@@ -5613,34 +5864,76 @@ int main(int argc, char** argv) {
       }
     }
 
-    // Hover preview tooltip for internal #anchor links
-    if (!hovered_preview.empty() && !search_mode && !save_as_mode &&
-        !link_edit_mode && !summary_edit_mode && !help_mode) {
-      const std::string tip = hovered_preview;
-      int tw = body_font.measure(tip);
-      const int pad_x = 10, pad_y = 6;
-      int box_w = tw + pad_x * 2;
-      int box_h = body_font.line_height() + pad_y * 2;
-      int bx = static_cast<int>(mouse_x) + 12;
-      int by = static_cast<int>(mouse_y) - box_h - 8;
-      // Clamp to window (above status bar)
-      if (bx + box_w > win_w - 4) bx = win_w - box_w - 4;
-      if (bx < 4) bx = 4;
-      if (by < 4) by = static_cast<int>(mouse_y) + 16;
-      if (by + box_h > win_h - 32) by = win_h - 32 - box_h;
+    // Hover tooltip near the pointer: link target / stretch hint
+    {
+      const bool prompt =
+          search_mode || save_as_mode || link_edit_mode || summary_edit_mode ||
+          help_mode || url_bar_mode || open_file_mode || path_in_window_mode ||
+          image_insert_mode || include_insert_mode;
+      std::string tip;
+      if (!prompt) {
+        if (hovered_stretch != xanatoo::INVALID_NODE) {
+          tip = "Click to expand / collapse";
+        } else if (!hovered_href.empty()) {
+          tip = hovered_href;
+          if (!hovered_preview.empty() && hovered_href[0] == '#') {
+            tip += "  —  ";
+            tip += hovered_preview;
+          }
+          if (!hovered_rel.empty()) {
+            tip += "  ·  rel=";
+            tip += hovered_rel;
+          }
+        } else if (hovered_image_handle) {
+          tip = "Drag to resize image";
+        } else if (hovered_col_gap) {
+          tip = "Drag to resize columns";
+        }
+      }
+      if (!tip.empty()) {
+        if (tip.size() > 96) tip = tip.substr(0, 93) + "…";
+        int tw = body_font.measure(tip);
+        const int pad_x = 10, pad_y = 6;
+        int box_w = tw + pad_x * 2;
+        int box_h = body_font.line_height() + pad_y * 2;
+        int bx = static_cast<int>(mouse_x) + 14;
+        int by = static_cast<int>(mouse_y) - box_h - 10;
+        if (bx + box_w > win_w - 4) bx = win_w - box_w - 4;
+        if (bx < 4) bx = 4;
+        if (by < static_cast<int>(ui_top) + 4)
+          by = static_cast<int>(mouse_y) + 18;
+        if (by + box_h > win_h - 32) by = win_h - 32 - box_h;
 
-      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
-      SDL_SetRenderDrawColor(sdl, 30, 40, 55, 230);
-      SDL_Rect box{bx, by, box_w, box_h};
-      SDL_RenderFillRect(sdl, &box);
-      SDL_SetRenderDrawColor(sdl, 90, 140, 210, 255);
-      SDL_RenderDrawRect(sdl, &box);
-      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
-      float tip_baseline =
-          static_cast<float>(by + pad_y + body_font.ascender());
-      renderer.draw_text(body_font, static_cast<float>(bx + pad_x), tip_baseline,
-                         tip, 230, 235, 245);
+        SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(sdl, 28, 36, 50, 235);
+        SDL_Rect box{bx, by, box_w, box_h};
+        SDL_RenderFillRect(sdl, &box);
+        // Accent by kind
+        if (hovered_stretch != xanatoo::INVALID_NODE)
+          SDL_SetRenderDrawColor(sdl, 40, 140, 90, 255);
+        else if (hovered_col_gap || hovered_image_handle)
+          SDL_SetRenderDrawColor(sdl, 40, 100, 180, 255);
+        else
+          SDL_SetRenderDrawColor(sdl, 90, 150, 220, 255);
+        SDL_RenderDrawRect(sdl, &box);
+        SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+        float tip_baseline =
+            static_cast<float>(by + pad_y + body_font.ascender());
+        renderer.draw_text(body_font, static_cast<float>(bx + pad_x),
+                           tip_baseline, tip, 235, 240, 250);
+      }
     }
+
+    // Pointer shape for interactive targets
+    if (hovered_col_gap)
+      set_cursor(cursor_sizewe);
+    else if (hovered_image_handle)
+      set_cursor(cursor_sizenwse);
+    else if (!hovered_href.empty() || hovered_stretch != xanatoo::INVALID_NODE ||
+             hovered_image != xanatoo::INVALID_NODE)
+      set_cursor(cursor_hand);
+    else
+      set_cursor(cursor_arrow);
 
     ui.end_frame(sdl);
     renderer.present();
@@ -5652,6 +5945,10 @@ int main(int argc, char** argv) {
     SDL_GameControllerClose(gamepad);
     gamepad = nullptr;
   }
+  if (cursor_arrow) SDL_FreeCursor(cursor_arrow);
+  if (cursor_hand) SDL_FreeCursor(cursor_hand);
+  if (cursor_sizewe) SDL_FreeCursor(cursor_sizewe);
+  if (cursor_sizenwse) SDL_FreeCursor(cursor_sizenwse);
   SDL_DestroyRenderer(sdl);
   SDL_DestroyWindow(window);
   SDL_Quit();
