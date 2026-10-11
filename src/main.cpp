@@ -761,12 +761,13 @@ int main(int argc, char** argv) {
     return true;
   };
 
-  // Resolve a relative path against the focused pane's document directory.
-  auto resolve_doc_href = [&](const std::string& href) -> std::string {
+  // Resolve a relative path against a document path (or the focused pane).
+  auto resolve_doc_href = [&](const std::string& href,
+                              const std::string& base_path = {}) -> std::string {
     if (href.empty()) return {};
     fs::path hp(href);
     if (hp.is_absolute()) return href;
-    std::string base = path_of(F());
+    std::string base = base_path.empty() ? path_of(F()) : base_path;
     if (!base.empty() && !xanatoo::is_gemini_url(base)) {
       fs::path parent = fs::path(base).parent_path();
       if (!parent.empty()) {
@@ -1152,16 +1153,11 @@ int main(int argc, char** argv) {
   auto pop_out_focused = [&]() {
     Pane& p = F();
     int bi = p.buf;
-    for (auto& sw : soft_wins) {
-      if (sw.buf == bi) {
-        // Already floating — raise it.
-        for (size_t i = 0; i < soft_wins.size(); ++i) {
-          if (soft_wins[i].buf == bi) {
-            raise_soft(i);
-            flash_status("Already in a window");
-            return;
-          }
-        }
+    for (size_t i = 0; i < soft_wins.size(); ++i) {
+      if (soft_wins[i].buf == bi) {
+        raise_soft(i);
+        flash_status("Already in a window");
+        return;
       }
     }
     SoftWindow sw;
@@ -1652,11 +1648,18 @@ int main(int argc, char** argv) {
                       } else if (!href->empty()) {
                         // Follow file / gemini / external from soft window.
                         std::string abs = *href;
-                        if (xanatoo::is_gemini_url(abs) ||
-                            is_inapp_doc_href(abs)) {
-                          navigate_to_url(
-                              is_inapp_doc_href(abs) ? resolve_doc_href(abs)
-                                                    : abs);
+                        if (xanatoo::is_gemini_url(abs)) {
+                          navigate_to_url(abs);
+                        } else if (is_inapp_doc_href(abs)) {
+                          std::string resolved =
+                              resolve_doc_href(abs, soft_path(top));
+                          if (!resolved.empty() && fs::exists(resolved)) {
+                            // Prefer another floating view so the current
+                            // window is not replaced out from under the user.
+                            open_browse(resolved, {});
+                          } else {
+                            navigate_to_url(resolved.empty() ? abs : resolved);
+                          }
                         } else if (abs[0] != '#') {
                           xanatoo::open_external_url(abs);
                           flash_status("Opening " + abs);
@@ -3063,11 +3066,6 @@ int main(int argc, char** argv) {
                     // Reuse CloseTab logic via command path is heavy; inline.
                     int bi = tab_order[static_cast<size_t>(tab_i)];
                     if (allow_discard_dirty(bi)) {
-                      soft_wins.erase(
-                          std::remove_if(
-                              soft_wins.begin(), soft_wins.end(),
-                              [bi](const SoftWindow& s) { return s.buf == bi; }),
-                          soft_wins.end());
                       tab_order.erase(tab_order.begin() + tab_i);
                       if (tab_order.empty()) {
                         DocBuffer b;
@@ -4565,11 +4563,7 @@ int main(int argc, char** argv) {
           if (tab_i < 0 || tab_order.empty()) break;
           int bi = tab_order[static_cast<size_t>(tab_i)];
           if (!allow_discard_dirty(bi)) break;
-          // Remove floating windows on this buffer
-          soft_wins.erase(
-              std::remove_if(soft_wins.begin(), soft_wins.end(),
-                             [bi](const SoftWindow& sw) { return sw.buf == bi; }),
-              soft_wins.end());
+          // Keep floating windows that still show this buffer (MDI).
           tab_order.erase(tab_order.begin() + tab_i);
           // If no tabs left, create empty one
           if (tab_order.empty()) {

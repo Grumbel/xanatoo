@@ -185,7 +185,7 @@ bool parse_heading_line(const Line& L, HeadingParts& out) {
   out.tags.clear();
   out.title = std::string(rest);
   if (!out.title.empty() && out.title.back() == ':') {
-    size_t tag_start = out.title.rfind(':');
+    /* tag block is the last whitespace-separated token */
     // find start of tag block: last space before a colon-run
     size_t i = out.title.size();
     while (i > 0 && out.title[i - 1] != ' ' && out.title[i - 1] != '\t') --i;

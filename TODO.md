@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **150** (this delivery is **149**)
+Next bundle number: **151** (this delivery is **150**)
 
 ## Status (2026-10-11)
 
@@ -248,6 +248,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Multi-doc redo: shared buffers, tab strip, pop-out/pop-in windows
 - [x] Bugfix: dirty checks, TAB cases, soft layout base, tab UI, open-switch
 - [x] Bugfix: soft-window doc access, stretch undo, reload/new soft sync
+- [x] Build fix: org unused var; soft relative links; tab close keeps floats
 
 ## Open work / next steps
 
@@ -446,4 +447,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-146.*-org-mode-…` — org-mode subset
 - `xanatoo-147.*-tabs-mdi-…` — tabs + MDI shared buffers
 - `xanatoo-148.*-bugfix-mdi-…` — first MDI bugfix pass
-- `xanatoo-149.*-bugfix-soft-…` — this delivery
+- `xanatoo-149.*-bugfix-soft-…` — soft-window shared-buffer fixes
+- `xanatoo-150.*-build-soft-links-…` — this delivery

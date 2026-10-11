@@ -821,9 +821,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4.f, 2.f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.f, 0.f));
     if (ImGui::Begin("##tabs", nullptr, tab_flags)) {
+      // Reorderable left off until tab_order is updated on drag.
       if (ImGui::BeginTabBar("##doctabs",
-                             ImGuiTabBarFlags_FittingPolicyScroll |
-                                 ImGuiTabBarFlags_Reorderable)) {
+                             ImGuiTabBarFlags_FittingPolicyScroll)) {
         for (int i = 0; i < static_cast<int>(state.tab_labels.size()); ++i) {
           const bool was_active = (i == state.active_tab);
           ImGuiTabItemFlags flags =
