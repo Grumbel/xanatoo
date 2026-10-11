@@ -697,6 +697,11 @@ int main(int argc, char** argv) {
           if (ev.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
             win_w = ev.window.data1;
             win_h = ev.window.data2;
+            // Keep tiled/maximized soft windows filling the new client area.
+            for (auto& sw : soft_wins) {
+              if (sw.dock != SoftDock::None || sw.maximized)
+                apply_soft_dock(sw, sw.maximized ? SoftDock::Max : sw.dock);
+            }
             needs_layout = true;
           }
           break;
