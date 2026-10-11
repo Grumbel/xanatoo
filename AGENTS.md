@@ -61,3 +61,11 @@ Bundle names: `xanatoo-NNN.description-BASE.bundle` (formerly `glyphtoo-NNN…`)
 - Maps posts/comments to Thread + Message nodes.
 - Optional OAuth: `XANATOO_REDDIT_CLIENT_ID` + `XANATOO_REDDIT_CLIENT_SECRET` (script app) when anonymous `.json` returns 403.
 - Optional UA override: `XANATOO_REDDIT_USER_AGENT`.
+
+## Lemmy
+
+- Read-only client via Lemmy **API v3** JSON (`/api/v3/post/list`, `/api/v3/post`).
+- Gated by `XANATOO_LEMMY` (default ON; needs OpenSSL).
+- Ctrl+L accepts `https://<instance>/c/<community>` and `/post/<id>`.
+- Maps posts/comments to Thread + Message nodes.
+- Optional UA override: `XANATOO_LEMMY_USER_AGENT`.

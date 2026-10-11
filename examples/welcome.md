@@ -48,6 +48,8 @@ Open any of these from this page (links load in the same pane and join session h
 - [Recent Nostr notes](nostr:recent) — live firehose sample from public relays
 - [r/GameDeals on Reddit](https://www.reddit.com/r/GameDeals/.json) — subreddit listing via `.json`
 - [r/linux on Reddit](https://www.reddit.com/r/linux) — another public listing
+- [Ask Lemmy](https://lemmy.world/c/asklemmy) — Lemmy community via API v3
+- [programming.dev /c/rust](https://programming.dev/c/rust) — federated Lemmy community
 - [Org-mode sample](sample.org) — headings, TODO, tags, source blocks
 - [Semantic format (S-expression)](semantic.sexp) — experimental sexpr form
 - [Sample (S-expression)](sample.sexp) — compact sexpr demo
@@ -91,6 +93,14 @@ If requests return **HTTP 403**, Reddit is blocking the client/IP. Set a script 
 
 (create at https://www.reddit.com/prefs/apps — type **script**).
 
+
+## Lemmy
+
+Community listings and posts open in-pane via **Lemmy API v3** (Thread/Message layout). **Ctrl+L** accepts any instance URL:
+
+- [lemmy.world/c/asklemmy](https://lemmy.world/c/asklemmy)
+- [programming.dev/c/rust](https://programming.dev/c/rust)
+- Or paste `https://<instance>/c/<name>` or `/post/<id>`
 
 ## Nostr
 

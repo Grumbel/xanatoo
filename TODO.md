@@ -6,12 +6,12 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **202** (this delivery is **201**)
+Next bundle number: **203** (this delivery is **202**)
 
 ## Status (2026-10-11)
 
-Compile fix for reddit.cpp (OAuth access_token parse + children literal).
-Reddit 403 hardening + optional OAuth already in prior tip.
+Lemmy read-only via API v3 (community listings + posts/comments → Thread/Message).
+Reddit compile fix already on origin (201).
 
 Reddit read-only via public `.json` HTTPS API (listings + post/comments → Thread/Message).
 Nostr Message body fix already on origin (197).
@@ -533,4 +533,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-198.*-reddit-json-…` — prior (Reddit .json listings/posts)
 - `xanatoo-199.*-reddit-welcome-warn-…` — on origin (welcome links + unused-var warning)
 - `xanatoo-200.*-reddit-403-oauth-…` — prior (403 hardening + optional OAuth)
-- `xanatoo-201.*-fix-reddit-compile-…` — this delivery (oauth parse + children literal)
+- `xanatoo-201.*-fix-reddit-compile-…` — on origin (oauth parse + children literal)
+- `xanatoo-202.*-lemmy-api-…` — this delivery (Lemmy API v3)
