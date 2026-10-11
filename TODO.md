@@ -6,9 +6,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **199** (this delivery is **198**)
+Next bundle number: **200** (this delivery is **199**)
 
 ## Status (2026-10-11)
+
+Reddit demo links on welcome; drop unused `listing_idx` warning in reddit.cpp.
 
 Reddit read-only via public `.json` HTTPS API (listings + post/comments → Thread/Message).
 Nostr Message body fix already on origin (197).
@@ -527,4 +529,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-195.*-nostr-recent-firehose-…` — nostr:recent firehose
 - `xanatoo-196.*-fix-query-recent-…` — on origin (add missing query_recent + seed WS carry)
 - `xanatoo-197.*-nostr-message-body-…` — on origin (Message body as child Paragraph; real reply-to only)
-- `xanatoo-198.*-reddit-json-…` — this delivery (Reddit .json listings/posts)
+- `xanatoo-198.*-reddit-json-…` — prior (Reddit .json listings/posts)
+- `xanatoo-199.*-reddit-welcome-warn-…` — this delivery (welcome links + unused-var warning)

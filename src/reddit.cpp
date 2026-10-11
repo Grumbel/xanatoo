@@ -732,7 +732,6 @@ std::optional<Document> reddit_fetch(std::string_view url_in, std::string* err) 
     // Post page: [ listing(post), listing(comments) ]
     // Split top-level array elements with brace depth.
     size_t p = start + 1;
-    int listing_idx = 0;
     while (p < body.size()) {
       while (p < body.size() &&
              (std::isspace(static_cast<unsigned char>(body[p])) ||
@@ -762,7 +761,6 @@ std::optional<Document> reddit_fetch(std::string_view url_in, std::string* err) 
           if (depth == 0) {
             std::string_view slice(body.data() + s0, i - s0 + 1);
             collect_from_listing(slice, posts, comments);
-            ++listing_idx;
             p = i + 1;
             break;
           }

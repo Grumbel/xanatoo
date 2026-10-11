@@ -46,6 +46,8 @@ Open any of these from this page (links load in the same pane and join session h
 - [Gemini gemtext sample](gemini-sample.gmi) — native gemtext layout
 - [Nostr discussions](nostr-sample.md) — relay-backed Thread/Message view
 - [Recent Nostr notes](nostr:recent) — live firehose sample from public relays
+- [r/GameDeals on Reddit](https://www.reddit.com/r/GameDeals/.json) — subreddit listing via `.json`
+- [r/linux on Reddit](https://www.reddit.com/r/linux) — another public listing
 - [Org-mode sample](sample.org) — headings, TODO, tags, source blocks
 - [Semantic format (S-expression)](semantic.sexp) — experimental sexpr form
 - [Sample (S-expression)](sample.sexp) — compact sexpr demo
@@ -76,10 +78,11 @@ Drag column gutters to reweight widths. Drag an image’s blue corner to resize 
 
 ## Reddit
 
-Open a subreddit listing via the public `.json` API (Ctrl+L):
+Subreddit listings and post pages open in-pane via the public `.json` API (same Thread/Message layout as Nostr). **Ctrl+L** accepts URLs with or without `.json`:
 
 - [r/GameDeals](https://www.reddit.com/r/GameDeals/.json)
 - [r/linux](https://www.reddit.com/r/linux)
+- Or paste any `https://www.reddit.com/r/…` or post URL
 
 ## Nostr
 
