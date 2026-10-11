@@ -97,6 +97,9 @@ std::optional<Caret> hit_test(const LayoutResult& layout,
 
   for (size_t i = 0; i < layout.glyphs.size(); ++i) {
     const auto& g = layout.glyphs[i];
+    // Org TODO/tag decorations are laid out with node = INVALID_NODE — not
+    // a valid caret target.
+    if (g.node == INVALID_NODE) continue;
     float gy = g.y - scroll_y;
     // Glyphs are laid out top-to-bottom overall; skip lines far from the pointer
     // so 10MB documents are not O(all glyphs) on every motion event.
@@ -1422,11 +1425,12 @@ static bool node_content_empty(const Node& n) {
 static void renumber_ordered_list(Document& doc, NodeId list_id) {
   if (list_id == INVALID_NODE) return;
   Node& list = doc.get(list_id);
-  if (list.kind != NodeKind::List || list.level != 1) return;
+  if (list.id != list_id || list.kind != NodeKind::List || list.level != 1)
+    return;
   int num = 1;
   for (NodeId c : list.children) {
     Node& item = doc.get(c);
-    if (item.kind == NodeKind::ListItem) {
+    if (item.id == c && item.kind == NodeKind::ListItem) {
       item.level = num++;
     }
   }
@@ -1992,6 +1996,7 @@ bool move_up(const LayoutResult& layout, Caret& caret, float preferred_x) {
   Caret best = caret;
   bool found = false;
   for (const auto& g : layout.glyphs) {
+    if (g.node == INVALID_NODE) continue;
     if (std::abs(g.y - target_y) > 0.5f) continue;
     float dx = std::abs(g.x - preferred_x);
     if (dx < best_dx) {
@@ -2040,6 +2045,7 @@ bool move_down(const LayoutResult& layout, Caret& caret, float preferred_x) {
   Caret best = caret;
   bool found = false;
   for (const auto& g : layout.glyphs) {
+    if (g.node == INVALID_NODE) continue;
     if (std::abs(g.y - target_y) > 0.5f) continue;
     float dx = std::abs(g.x - preferred_x);
     if (dx < best_dx) {

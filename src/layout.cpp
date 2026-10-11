@@ -112,7 +112,9 @@ LayoutResult LayoutEngine::layout(const Document& doc, float max_width,
 void LayoutEngine::layout_node(const Document& doc, NodeId id,
                                float x, float& y, float max_width,
                                LayoutResult& out) {
+  if (id == INVALID_NODE) return;
   const Node& node = doc.get(id);
+  if (node.id != id) return;  // stale child id → invalid-node sentinel
 
   switch (node.kind) {
     case NodeKind::Document:
