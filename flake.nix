@@ -7,7 +7,7 @@
 
   outputs = { self, nixpkgs }:
     let
-      systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
+      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
     in
     {
@@ -67,7 +67,7 @@
           xanatoo-unwrapped = xanatoo;
         } // (
           # R36S / ArkOS PortMaster packages (Linux hosts only: cross to aarch64).
-          if pkgs.stdenv.isLinux then
+          if pkgs.stdenv.hostPlatform.isLinux then
             let
               version = "0.1.0";
               date = "1970-01-01";

@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **161** (this delivery is **160**)
+Next bundle number: **162** (this delivery is **161**)
 
 ## Status (2026-10-11)
 
@@ -259,6 +259,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Multi-dir icon load; drawn fallbacks for browse/menu icons
 - [x] Diff demo crash: relayout after UI; clear soft/hover on buffer replace
 - [x] R36S / PortMaster flake outputs; XANATOO_DATA_DIR for examples
+- [x] Flake: hostPlatform.isLinux; drop x86_64-darwin (nixpkgs 26.11+)
 
 ## Open work / next steps
 
@@ -470,4 +471,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-157.*-tabs-icons-…` — tab flicker + icon fallbacks
 - `xanatoo-158.*-icon-load-fallbacks-…` — icon load
 - `xanatoo-159.*-diff-demo-crash-…` — diff demo crash
-- `xanatoo-160.*-r36s-portmaster-…` — this delivery
+- `xanatoo-160.*-r36s-portmaster-…` — R36S port
+- `xanatoo-161.*-flake-platforms-…` — this delivery
