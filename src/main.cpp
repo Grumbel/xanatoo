@@ -925,18 +925,26 @@ int main(int argc, char** argv) {
       buffers[static_cast<size_t>(p.buf)].doc = std::move(doc);
       path_of(p) = label;
       buffers[static_cast<size_t>(p.buf)].dirty = false;
-      xanatoo::ensure_valid_caret(buffers[static_cast<size_t>(p.buf)].doc, p.sel.focus);
+      xanatoo::Document& nd = buffers[static_cast<size_t>(p.buf)].doc;
+      xanatoo::ensure_valid_caret(nd, p.sel.focus);
       p.sel.anchor = p.sel.focus;
       p.scroll_y = 0.f;
-      buffers[static_cast<size_t>(p.buf)].history.reset(buffers[static_cast<size_t>(p.buf)].doc, p.sel);
+      // Drop stale layout boxes that still reference the previous tree —
+      // otherwise the next frame can call doc.get() with dead node ids.
+      p.layout = {};
+      buffers[static_cast<size_t>(p.buf)].history.reset(nd, p.sel);
       if (panes[0].buf == panes[1].buf) {
         panes[1 - focus].sel = p.sel;
         panes[1 - focus].scroll_y = 0.f;
+        panes[1 - focus].layout = {};
       }
       for (auto& sw : soft_wins)
         if (sw.buf == p.buf) {
           sw.needs_layout = true;
           sw.scroll = 0.f;
+          sw.layout = {};
+          xanatoo::ensure_valid_caret(nd, sw.sel.focus);
+          sw.sel.anchor = sw.sel.focus;
         }
       needs_layout = true;
       update_title();
@@ -1257,7 +1265,15 @@ int main(int argc, char** argv) {
   auto layout_soft = [&](SoftWindow& sw) {
     float mw = static_cast<float>(std::max(120, sw.w - help_pad * 2));
     std::string base = parent_dir(soft_path(sw));
-    sw.layout = layout_engine.layout(soft_doc(sw), mw, base);
+    try {
+      xanatoo::Document& d = soft_doc(sw);
+      xanatoo::ensure_valid_caret(d, sw.sel.focus);
+      sw.sel.anchor = sw.sel.focus;
+      sw.layout = layout_engine.layout(d, mw, base);
+    } catch (const std::exception& e) {
+      std::cerr << "soft layout failed: " << e.what() << "\n";
+      sw.layout = {};
+    }
     sw.needs_layout = false;
   };
 
@@ -1809,19 +1825,16 @@ int main(int argc, char** argv) {
                         }
                       } else if (!href->empty()) {
                         // Follow file / gemini / external from soft window.
+                        // Always load into the focused pane (same as main-pane
+                        // clicks). open_browse here left stale soft layouts and
+                        // carets that later threw "invalid node id".
                         std::string abs = *href;
                         if (xanatoo::is_gemini_url(abs)) {
                           navigate_to_url(abs);
                         } else if (is_inapp_doc_href(abs)) {
                           std::string resolved =
                               resolve_doc_href(abs, soft_path(top));
-                          if (!resolved.empty() && fs::exists(resolved)) {
-                            // Prefer another floating view so the current
-                            // window is not replaced out from under the user.
-                            open_browse(resolved, {});
-                          } else {
-                            navigate_to_url(resolved.empty() ? abs : resolved);
-                          }
+                          navigate_to_url(resolved.empty() ? abs : resolved);
                         } else if (abs[0] != '#') {
                           xanatoo::open_external_url(abs);
                           flash_status("Opening " + abs);
@@ -4685,11 +4698,28 @@ int main(int argc, char** argv) {
       {
         auto& fd = doc_of(F());
         auto nid = F().sel.focus.node;
+        // Guard: caret can briefly point at a node from a replaced tree.
+        bool nid_ok = false;
+        if (nid != xanatoo::INVALID_NODE) {
+          try {
+            (void)fd.get(nid);
+            nid_ok = true;
+          } catch (...) {
+            xanatoo::ensure_valid_caret(fd, F().sel.focus);
+            F().sel.anchor = F().sel.focus;
+            nid = F().sel.focus.node;
+            try {
+              (void)fd.get(nid);
+              nid_ok = nid != xanatoo::INVALID_NODE;
+            } catch (...) {
+              nid_ok = false;
+            }
+          }
+        }
         ui_state.on_list_item =
-            nid != xanatoo::INVALID_NODE &&
-            fd.get(nid).kind == xanatoo::NodeKind::ListItem;
+            nid_ok && fd.get(nid).kind == xanatoo::NodeKind::ListItem;
         ui_state.in_stretch =
-            nid != xanatoo::INVALID_NODE &&
+            nid_ok &&
             xanatoo::enclosing_stretch(fd, nid) != xanatoo::INVALID_NODE;
       }
       ui_state.doc_label = path_of(F()).empty() ? std::string("untitled")
