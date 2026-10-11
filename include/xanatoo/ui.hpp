@@ -16,6 +16,8 @@ enum class UiCommand {
   NewDocument,
   OpenDocument,
   OpenUrlBar,  // Ctrl+L — gemini:// or path
+  NavBack,     // Alt+Left capsule history
+  NavForward,  // Alt+Right
   Save,
   SaveAs,
   ExportSexpr,

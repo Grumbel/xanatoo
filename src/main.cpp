@@ -3839,7 +3839,7 @@ int main(int argc, char** argv) {
         const C c = ui_frame.cmd;
         const bool allowed =
             c == C::Quit || c == C::OpenDocument || c == C::OpenUrlBar ||
-            c == C::Save ||
+            c == C::NavBack || c == C::NavForward || c == C::Save ||
             c == C::SaveAs || c == C::ExportSexpr || c == C::ExportMarkdown ||
             c == C::Reload || c == C::ForceReload || c == C::Copy ||
             c == C::CopyPageUrl ||
@@ -3903,6 +3903,24 @@ int main(int argc, char** argv) {
           save_as_mode = false;
           open_file_mode = false;
           path_in_window_mode = false;
+          break;
+        case C::NavBack:
+          if (nav_hist_pos > 0) {
+            --nav_hist_pos;
+            navigate_to_url(nav_history[static_cast<size_t>(nav_hist_pos)],
+                            /*record_history=*/false);
+          } else {
+            flash_status("No previous page");
+          }
+          break;
+        case C::NavForward:
+          if (nav_hist_pos + 1 < static_cast<int>(nav_history.size())) {
+            ++nav_hist_pos;
+            navigate_to_url(nav_history[static_cast<size_t>(nav_hist_pos)],
+                            /*record_history=*/false);
+          } else {
+            flash_status("No next page");
+          }
           break;
         case C::Save: {
           std::string& spath = path_of(p);
@@ -5061,9 +5079,31 @@ int main(int argc, char** argv) {
         label = "Diff marks on — orange bars mark passages that differ · Ctrl+Shift+D toggles";
         tr = 160; tg = 90; tb = 30;
       } else if (browse_mode) {
-        label = "Browse (read-only) · arrows / gamepad navigate · A/Space open · "
-                "LB/RB headers · F2 edit";
+        std::string page = path_of(F());
+        if (page.empty()) page = gemini_current_url;
+        if (!page.empty() && xanatoo::is_gemini_url(page)) {
+          label = page;
+          if (nav_hist_pos >= 0 && !nav_history.empty()) {
+            label += "  ·  ";
+            label += std::to_string(nav_hist_pos + 1);
+            label += "/";
+            label += std::to_string(static_cast<int>(nav_history.size()));
+          }
+          label += "  ·  browse · F2 edit";
+        } else {
+          label = "Browse (read-only) · arrows / gamepad · A/Space open · F2 edit";
+        }
         tr = 40; tg = 120; tb = 90;
+      } else if (!path_of(F()).empty() &&
+                 xanatoo::is_gemini_url(path_of(F()))) {
+        label = path_of(F());
+        if (nav_hist_pos >= 0 && !nav_history.empty()) {
+          label += "  ·  ";
+          label += std::to_string(nav_hist_pos + 1);
+          label += "/";
+          label += std::to_string(static_cast<int>(nav_history.size()));
+        }
+        tr = 50; tg = 90; tb = 70;
       } else if (structure_mode) {
         label = "Structure highlight — colour bars + kind tags on the right · Ctrl+Shift+L toggles";
         tr = 40; tg = 80; tb = 140;

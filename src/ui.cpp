@@ -456,6 +456,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("New", UiCommand::NewDocument, cmd, true, "Ctrl+N");
       menu_item_cmd("Open…", UiCommand::OpenDocument, cmd, true, "Ctrl+O");
       menu_item_cmd("Open URL…", UiCommand::OpenUrlBar, cmd, true, "Ctrl+L");
+      menu_item_cmd("Back", UiCommand::NavBack, cmd, true, "Alt+Left");
+      menu_item_cmd("Forward", UiCommand::NavForward, cmd, true, "Alt+Right");
       ImGui::Separator();
       menu_item_cmd("Save", UiCommand::Save, cmd, true, "Ctrl+S");
       menu_item_cmd("Save As…", UiCommand::SaveAs, cmd, true, "Ctrl+Shift+S");
