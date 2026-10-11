@@ -951,6 +951,46 @@ std::optional<NodeId> insert_image(Document& doc, Caret& caret,
   return nid;
 }
 
+std::optional<NodeId> insert_figure(Document& doc, Caret& caret,
+                                    const std::string& path,
+                                    const std::string& alt,
+                                    const std::string& caption) {
+  if (path.empty()) return std::nullopt;
+  auto fig_id = insert_sibling_after(doc, caret, NodeKind::Figure);
+  if (!fig_id) return std::nullopt;
+  NodeId fig = *fig_id;
+  NodeId img = doc.create(NodeKind::Image, fig);
+  doc.get(img).src = path;
+  doc.get(img).alt = alt.empty() ? path : alt;
+  doc.get(img).display_scale = 1.f;
+  NodeId cap = doc.create(NodeKind::Caption, fig);
+  doc.append_text(cap, caption.empty() ? "Caption" : caption);
+  caret.node = cap;
+  caret.span_index = 0;
+  caret.char_index = 0;
+  return fig;
+}
+
+bool set_heading_level(Document& doc, Caret& caret, int level) {
+  if (caret.node == INVALID_NODE) return false;
+  Node& n = doc.get(caret.node);
+  if (level <= 0) {
+    if (n.kind != NodeKind::Heading && n.kind != NodeKind::BlockQuote)
+      return false;
+    n.kind = NodeKind::Paragraph;
+    n.level = 0;
+    return true;
+  }
+  if (level > 6) level = 6;
+  if (n.kind != NodeKind::Paragraph && n.kind != NodeKind::Heading &&
+      n.kind != NodeKind::BlockQuote && n.kind != NodeKind::ListItem &&
+      n.kind != NodeKind::Note)
+    return false;
+  n.kind = NodeKind::Heading;
+  n.level = level;
+  return true;
+}
+
 bool toggle_list(Document& doc, Caret& caret, bool ordered) {
   if (caret.node == INVALID_NODE) return false;
   Node& n = doc.get(caret.node);

@@ -379,7 +379,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       float start_y = y;
       const float pad = 4.f;
       layout_paragraph(doc, node, x + pad, y, max_width - pad * 2.f, out,
-                       FontRole::Body);
+                       FontRole::BodyItalic);
       y += 6.f;
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;

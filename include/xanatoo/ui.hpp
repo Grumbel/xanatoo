@@ -47,6 +47,7 @@ enum class UiCommand {
   InsertBiblioEntry,
   InsertColumns,
   InsertTransclude,
+  InsertFigure,
   // Structure / lists
   ToggleUnorderedList,
   ToggleOrderedList,
@@ -55,6 +56,13 @@ enum class UiCommand {
   OutdentList,
   WrapStretch,
   EditStretchSummary,
+  Heading1,
+  Heading2,
+  Heading3,
+  Heading4,
+  Heading5,
+  Heading6,
+  ParagraphLevel,
   // View
   ToggleSplit,
   ToggleOutline,

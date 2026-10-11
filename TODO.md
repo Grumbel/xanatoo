@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **095** (this delivery is **094**)
+Next bundle number: **096** (this delivery is **095**)
 
 ## Status (2026-10-11)
 
@@ -158,6 +158,9 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Same-document transclusion write-through (embed body glyphs → source node)
 - [x] Insert Include/Transclude via GUI + status prompt
 - [x] Click external include opens source file in soft window
+- [x] Insert Figure (image + caption) via GUI
+- [x] Heading levels 1–6 / demote in Format menu (`set_heading_level`)
+- [x] Caption layout uses italic face
 
 ## Open work / next steps
 
@@ -301,4 +304,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-091.*-dock-tiles-…` — soft-window tile zones
 - `xanatoo-092.*-nested-cells-…` — nested table cells
 - `xanatoo-093.*-transclude-edit-…` — same-doc write-through
-- `xanatoo-094.*-insert-include-…` — this delivery
+- `xanatoo-094.*-insert-include-…` — insert include GUI
+- `xanatoo-095.*-figure-headings-…` — this delivery

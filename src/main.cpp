@@ -224,6 +224,7 @@ int main(int argc, char** argv) {
   bool save_as_mode = false;
   std::string save_as_path;
   bool image_insert_mode = false;
+  bool image_insert_as_figure = false;
   std::string image_insert_path;
   bool include_insert_mode = false;
   std::string include_insert_src;
@@ -1770,6 +1771,7 @@ int main(int argc, char** argv) {
                 save_as_path.clear();
               } else if (image_insert_mode) {
                 image_insert_mode = false;
+                image_insert_as_figure = false;
                 image_insert_path.clear();
               } else if (include_insert_mode) {
                 include_insert_mode = false;
@@ -2199,14 +2201,28 @@ int main(int argc, char** argv) {
               if (image_insert_mode) {
                 if (!image_insert_path.empty()) {
                   edit();
-                  if (xanatoo::insert_image(d, p.sel.focus, image_insert_path)) {
+                  bool ok = false;
+                  if (image_insert_as_figure) {
+                    ok = static_cast<bool>(xanatoo::insert_figure(
+                        d, p.sel.focus, image_insert_path));
+                    if (ok)
+                      std::cout << "Inserted figure: " << image_insert_path
+                                << "\n";
+                  } else {
+                    ok = static_cast<bool>(xanatoo::insert_image(
+                        d, p.sel.focus, image_insert_path));
+                    if (ok)
+                      std::cout << "Inserted image: " << image_insert_path
+                                << "\n";
+                  }
+                  if (ok) {
                     p.sel.anchor = p.sel.focus;
                     needs_layout = true;
                     reset_blink();
-                    std::cout << "Inserted image: " << image_insert_path << "\n";
                   }
                 }
                 image_insert_mode = false;
+                image_insert_as_figure = false;
                 image_insert_path.clear();
                 break;
               }
@@ -2732,18 +2748,10 @@ int main(int argc, char** argv) {
               if (ctrl && !shift) {
                 int level = static_cast<int>(ev.key.keysym.sym - SDLK_0);
                 edit();
-                auto& node = d.get(p.sel.focus.node);
-                if (level == 0) {
-                  if (node.kind == xanatoo::NodeKind::Heading ||
-                      node.kind == xanatoo::NodeKind::BlockQuote)
-                    node.kind = xanatoo::NodeKind::Paragraph;
-                  node.level = 0;
-                } else {
-                  node.kind = xanatoo::NodeKind::Heading;
-                  node.level = level;
+                if (xanatoo::set_heading_level(d, p.sel.focus, level)) {
+                  needs_layout = true;
+                  reset_blink();
                 }
-                needs_layout = true;
-                reset_blink();
               }
               break;
 
@@ -3072,7 +3080,41 @@ int main(int argc, char** argv) {
         }
         case C::InsertImage:
           image_insert_mode = true;
+          image_insert_as_figure = false;
           image_insert_path.clear();
+          break;
+        case C::InsertFigure:
+          image_insert_mode = true;
+          image_insert_as_figure = true;
+          image_insert_path.clear();
+          break;
+        case C::Heading1:
+          edit();
+          if (xanatoo::set_heading_level(d, p.sel.focus, 1)) needs_layout = true;
+          break;
+        case C::Heading2:
+          edit();
+          if (xanatoo::set_heading_level(d, p.sel.focus, 2)) needs_layout = true;
+          break;
+        case C::Heading3:
+          edit();
+          if (xanatoo::set_heading_level(d, p.sel.focus, 3)) needs_layout = true;
+          break;
+        case C::Heading4:
+          edit();
+          if (xanatoo::set_heading_level(d, p.sel.focus, 4)) needs_layout = true;
+          break;
+        case C::Heading5:
+          edit();
+          if (xanatoo::set_heading_level(d, p.sel.focus, 5)) needs_layout = true;
+          break;
+        case C::Heading6:
+          edit();
+          if (xanatoo::set_heading_level(d, p.sel.focus, 6)) needs_layout = true;
+          break;
+        case C::ParagraphLevel:
+          edit();
+          if (xanatoo::set_heading_level(d, p.sel.focus, 0)) needs_layout = true;
           break;
         case C::ToggleUnorderedList:
           edit();
@@ -3540,7 +3582,7 @@ int main(int argc, char** argv) {
         label += "    Enter confirm · Esc cancel";
         tr = 220; tg = 230; tb = 245;
       } else if (image_insert_mode) {
-        label = "Image path: ";
+        label = image_insert_as_figure ? "Figure image path: " : "Image path: ";
         label += image_insert_path.empty() ? "…" : image_insert_path;
         label += "    Enter insert · Esc cancel";
         tr = 220; tg = 230; tb = 245;

@@ -133,6 +133,13 @@ std::optional<NodeId> insert_transclude(Document& doc, Caret& caret,
 std::optional<NodeId> insert_image(Document& doc, Caret& caret,
                                    const std::string& path,
                                    const std::string& alt = {});
+// Figure containing an Image + Caption; caret lands in the caption.
+std::optional<NodeId> insert_figure(Document& doc, Caret& caret,
+                                    const std::string& path,
+                                    const std::string& alt = {},
+                                    const std::string& caption = "Caption");
+// Set heading level 1–6, or 0 to demote to paragraph.
+bool set_heading_level(Document& doc, Caret& caret, int level);
 
 // Toggle list membership of the caret's text block.
 // - Paragraph/Heading/BlockQuote → become a ListItem under a new List

@@ -352,6 +352,7 @@ static void menu_insert_items(UiCommand& cmd) {
   menu_item_cmd("Paragraph", UiCommand::InsertParagraph, cmd);
   menu_item_cmd("Horizontal Rule", UiCommand::InsertHr, cmd);
   menu_item_cmd("Image…", UiCommand::InsertImage, cmd, true, "Ctrl+Shift+I");
+  menu_item_cmd("Figure…", UiCommand::InsertFigure, cmd);
   menu_item_cmd("Note", UiCommand::InsertNote, cmd);
   menu_item_cmd("Code Block", UiCommand::InsertCodeBlock, cmd);
   menu_item_cmd("Table", UiCommand::InsertTable, cmd);
@@ -375,6 +376,15 @@ static void menu_structure_items(const UiState& state, UiCommand& cmd) {
   menu_item_cmd("Wrap in Stretch", UiCommand::WrapStretch, cmd, true, "Ctrl+E");
   menu_item_cmd("Edit Stretch Summary…", UiCommand::EditStretchSummary, cmd,
                 state.in_stretch, "Ctrl+Shift+E");
+  ImGui::Separator();
+  menu_item_cmd("Heading 1", UiCommand::Heading1, cmd, true, "Ctrl+1");
+  menu_item_cmd("Heading 2", UiCommand::Heading2, cmd, true, "Ctrl+2");
+  menu_item_cmd("Heading 3", UiCommand::Heading3, cmd, true, "Ctrl+3");
+  menu_item_cmd("Heading 4", UiCommand::Heading4, cmd, true, "Ctrl+4");
+  menu_item_cmd("Heading 5", UiCommand::Heading5, cmd, true, "Ctrl+5");
+  menu_item_cmd("Heading 6", UiCommand::Heading6, cmd, true, "Ctrl+6");
+  menu_item_cmd("Paragraph (demote)", UiCommand::ParagraphLevel, cmd, true,
+                "Ctrl+0");
 }
 
 UiFrameResult Ui::begin_frame(const UiState& state) {
