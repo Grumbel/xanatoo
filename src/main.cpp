@@ -3798,7 +3798,8 @@ int main(int argc, char** argv) {
       // Document / selection stats on the right (idle status only)
       if (!search_mode && !save_as_mode && !link_edit_mode &&
           !summary_edit_mode && !help_mode && !outline_mode &&
-          !image_insert_mode) {
+          !image_insert_mode && !include_insert_mode &&
+          !path_in_window_mode) {
         std::string stats;
         const auto& fsel = F().sel;
         if (!fsel.empty()) {

@@ -170,6 +170,67 @@ void parse_inlines(Node& node, std::string_view text) {
         continue;
       }
     }
+    // <http://…> / <https://…> / <mailto:…> autolinks
+    if (text[i] == '<') {
+      size_t end = text.find('>', i + 1);
+      if (end != std::string_view::npos && end > i + 1) {
+        std::string_view inner = text.substr(i + 1, end - (i + 1));
+        bool is_url =
+            inner.starts_with("http://") || inner.starts_with("https://") ||
+            inner.starts_with("mailto:");
+        if (is_url) {
+          flush_plain();
+          InlineSpan s;
+          s.kind = InlineKind::Link;
+          s.href = std::string(inner);
+          s.text = std::string(inner);
+          node.spans.push_back(std::move(s));
+          i = end + 1;
+          continue;
+        }
+      }
+    }
+    // Bare http(s):// URLs (GFM-style autolink)
+    if ((text[i] == 'h' || text[i] == 'H') && i + 7 < text.size()) {
+      std::string_view rest = text.substr(i);
+      size_t scheme = 0;
+      if (rest.size() >= 8 &&
+          (rest.substr(0, 8) == "https://" || rest.substr(0, 8) == "HTTPS://"))
+        scheme = 8;
+      else if (rest.size() >= 7 &&
+               (rest.substr(0, 7) == "http://" || rest.substr(0, 7) == "HTTP://"))
+        scheme = 7;
+      if (scheme > 0) {
+        size_t end = scheme;
+        while (end < rest.size()) {
+          unsigned char c = static_cast<unsigned char>(rest[end]);
+          if (c <= 32 || c == '<' || c == '>' || c == '"' || c == '\'' ||
+              c == '`' || c == ')' || c == '(' || c == '[' || c == ']' ||
+              c == '{' || c == '}')
+            break;
+          ++end;
+        }
+        // Trim trailing punctuation commonly not part of the URL
+        while (end > scheme) {
+          char t = rest[end - 1];
+          if (t == '.' || t == ',' || t == ';' || t == ':' || t == '!' ||
+              t == '?' || t == '"')
+            --end;
+          else
+            break;
+        }
+        if (end > scheme) {
+          flush_plain();
+          InlineSpan s;
+          s.kind = InlineKind::Link;
+          s.href = std::string(rest.substr(0, end));
+          s.text = s.href;
+          node.spans.push_back(std::move(s));
+          i += end;
+          continue;
+        }
+      }
+    }
 
     plain.push_back(text[i]);
     ++i;

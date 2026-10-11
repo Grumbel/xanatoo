@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **104** (this delivery is **103**)
+Next bundle number: **105** (this delivery is **104**)
 
 ## Status (2026-10-11)
 
@@ -171,6 +171,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] GFM strikethrough (`~~text~~` / InlineKind::Strike)
 - [x] Empty-doc caret recovery (seed paragraph so typing works)
 - [x] Toggle Task Item (menu + Ctrl+Shift+T)
+- [x] GFM autolinks (`http(s)://…` and `<url>`)
 
 ## Open work / next steps
 
@@ -324,3 +325,4 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-101.*-task-lists-…` — this delivery
 - `xanatoo-102.*-strikethrough-…` — this delivery
 - `xanatoo-103.*-empty-caret-task-…` — this delivery
+- `xanatoo-104.*-autolink-…` — this delivery
