@@ -19,6 +19,7 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <sys/time.h>
 #endif
 
 namespace xanatoo {
@@ -182,6 +183,11 @@ static int tcp_connect(const std::string& host, int port, std::string* err) {
   for (addrinfo* p = res; p; p = p->ai_next) {
     fd = ::socket(p->ai_family, p->ai_socktype, p->ai_protocol);
     if (fd < 0) continue;
+    timeval tv{};
+    tv.tv_sec = 20;
+    tv.tv_usec = 0;
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
     if (::connect(fd, p->ai_addr, p->ai_addrlen) == 0) break;
     ::close(fd);
     fd = -1;

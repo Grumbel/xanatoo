@@ -40,3 +40,9 @@ Dear ImGui is allowed for chrome (menus/toolbars). No Qt/GTK/KDE.
 Read `TODO.md` first. Record plans and outcomes there.
 Handover is via cumulative git bundles only.
 Bundle names: `xanatoo-NNN.description-BASE.bundle` (formerly `glyphtoo-NNN…`).
+
+## Gemini
+
+- Gemtext parser is always built (`.gmi` / `.gemini`).
+- Network client is gated by `XANATOO_GEMINI` (default ON; needs OpenSSL).
+- URL entry is Ctrl+L / `UiCommand::OpenUrlBar` → `navigate_to_url`.

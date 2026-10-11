@@ -671,12 +671,31 @@ int main(int argc, char** argv) {
       std::string meta = resp->meta;
       for (char& c : meta)
         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      // Drop parameters: "text/gemini; charset=utf-8"
+      std::string mime = meta;
+      size_t semi = mime.find(';');
+      if (semi != std::string::npos) mime.resize(semi);
+      while (!mime.empty() && mime.back() == ' ') mime.pop_back();
+
       xanatoo::Document gdoc;
-      if (meta.find("text/markdown") != std::string::npos ||
-          meta.find("text/x-markdown") != std::string::npos) {
+      if (mime.find("text/markdown") != std::string::npos ||
+          mime.find("text/x-markdown") != std::string::npos) {
         gdoc = xanatoo::parse_document(resp->body, "remote.md");
-      } else {
+      } else if (mime.empty() || mime.find("text/gemini") != std::string::npos ||
+                 mime.find("text/plain") != std::string::npos) {
         gdoc = xanatoo::parse_gemtext(resp->body);
+      } else {
+        // Binary or unknown — show a short notice instead of mojibake.
+        std::string notice = "# Unsupported media
+
+"
+                             "Gemini returned MIME type `" +
+                             resp->meta +
+                             "` (" + std::to_string(resp->body.size()) +
+                             " bytes). Only text/gemini, text/plain, and "
+                             "text/markdown are rendered in-pane.
+";
+        gdoc = xanatoo::parse_gemtext(notice);
       }
       gemini_current_url = resp->final_url;
       load_into_pane(std::move(gdoc), resp->final_url);

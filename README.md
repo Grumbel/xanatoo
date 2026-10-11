@@ -148,3 +148,18 @@ A **Dear ImGui** menu bar and toolbar sit above the document (File / Edit / Form
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).
+
+## Gemini
+
+Xanatoo can open **gemtext** (`.gmi` / `.gemini`) and fetch **`gemini://`** URLs
+when built with OpenSSL (`-DXANATOO_GEMINI=ON`, the default).
+
+- **Ctrl+L** / **File → Open URL…** — enter a capsule URL or local path
+- Successful fetches open in **browse mode** (read-only navigation)
+- Relative `=>` links resolve against the current capsule
+
+Disable the network client (parser remains):
+
+```bash
+cmake -DXANATOO_GEMINI=OFF ..
+```
