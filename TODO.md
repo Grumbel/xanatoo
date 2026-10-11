@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **112** (this delivery is **111**)
+Next bundle number: **113** (this delivery is **112**)
 
 ## Status (2026-10-11)
 
@@ -182,6 +182,11 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Fix path-in-window TEXTINPUT (was typing into the document)
 - [x] Underscore `_emphasis_` (word-boundary aware)
 - [x] Markdown nested table cells via :::row / :::cell / :::th
+- [x] UI: missing toolbar icons (strike/cite/h1–h3/para/task/table/figure/note/replace/outline/copy/paste/new/open)
+- [x] UI: File → New / Open… (Ctrl+N / Ctrl+O); Insert + Help menus
+- [x] UI: toolbar New/Open/Copy/Paste buttons
+- [x] Event routing: status-bar prompts no longer blocked by ImGui WantCaptureKeyboard
+- [x] Event routing: smarter want_capture_keyboard (text/popup/active only)
 
 ## Open work / next steps
 
@@ -342,4 +347,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-108.*-hard-breaks-…` — this delivery
 - `xanatoo-109.*-esc-soft-…` — this delivery
 - `xanatoo-110.*-path-input-em-…` — this delivery
-- `xanatoo-111.*-nested-table-md-…` — this delivery
+- `xanatoo-111.*-nested-table-md-…` — nested table markdown
+- `xanatoo-112.*-ui-icons-events-…` — this delivery
