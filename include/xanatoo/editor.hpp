@@ -212,9 +212,23 @@ std::optional<std::string> hit_test_link(const Document& doc,
 // marks nodes that are not part of the common subsequence (insertions,
 // deletions, or content changes). Survives mid-document inserts without
 // cascading false positives from a pure index-aligned scan.
+//
+// When optional word_a / word_b are provided, pairs of "modified" blocks
+// (similar but not identical text) also get intra-block word-range marks
+// so the view can highlight only the changed runs.
+struct DiffWordMark {
+  NodeId node = INVALID_NODE;
+  size_t char_begin = 0;  // inclusive, UTF-8 character index in node plain text
+  size_t char_end = 0;    // exclusive
+};
 void compute_diff_marks(const Document& a, const Document& b,
                         std::vector<NodeId>& changed_a,
-                        std::vector<NodeId>& changed_b);
+                        std::vector<NodeId>& changed_b,
+                        std::vector<DiffWordMark>* word_a = nullptr,
+                        std::vector<DiffWordMark>* word_b = nullptr);
+
+// Tab / Shift+Tab inside a table: move to next / previous cell (wraps by row).
+bool table_move_cell(Document& doc, Caret& caret, bool forward);
 
 // Heading outline for navigation (document order).
 struct OutlineEntry {

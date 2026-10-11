@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **086** (this delivery is **085**)
+Next bundle number: **087** (this delivery is **086**)
 
 ## Status (2026-10-11)
 
@@ -142,13 +142,15 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Layout respects hard newlines (`\n`) in paragraphs/code blocks
 - [x] Enter in CodeBlock inserts newline (does not split the block)
 - [x] Enter in TableCell inserts a new row (same column count)
+- [x] Tab / Shift+Tab moves between table cells
+- [x] Word-level intra-block diff marks for similar modified blocks
 
 ## Open work / next steps
 
 1. Optional: HarfBuzz for complex scripts
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Editable transclusion mirror (edits on embed write through to source)
-4. Word-level / intra-block diff highlighting
+4. Word-level / intra-block diff highlighting (basic pairing in)
 5. **Tables** — semantic grid + basic grid presentation in; column weights / nested blocks still open
 6. **Docking** — tile/split zones (edge snap + maximize is in)
 7. **Citations** / typed link relations / range transclusion (see FORMAT.md)
@@ -276,4 +278,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-082.*-softwin-dock-…` — soft-window docking
 - `xanatoo-083.*-md-semantic-…` — markdown semantic round-trip
 - `xanatoo-084.*-table-present-…` — table grid presentation
-- `xanatoo-085.*-newline-table-enter-…` — this delivery
+- `xanatoo-085.*-newline-table-enter-…` — newlines + table Enter
+- `xanatoo-086.*-word-diff-table-tab-…` — this delivery

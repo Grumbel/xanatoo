@@ -292,6 +292,7 @@ int main(int argc, char** argv) {
   // Side-by-side version marks (two independent documents)
   bool diff_mode = false;
   std::vector<xanatoo::NodeId> diff_marks[2];
+  std::vector<xanatoo::DiffWordMark> diff_words[2];
   // Hovered link href (shown in status bar when not in a modal mode)
   std::string hovered_href;
   std::string hovered_preview;  // internal #anchor target snippet
@@ -311,8 +312,11 @@ int main(int argc, char** argv) {
   auto refresh_diff = [&]() {
     diff_marks[0].clear();
     diff_marks[1].clear();
+    diff_words[0].clear();
+    diff_words[1].clear();
     if (!diff_mode || shared_doc || paths[1].empty()) return;
-    xanatoo::compute_diff_marks(docs[0], docs[1], diff_marks[0], diff_marks[1]);
+    xanatoo::compute_diff_marks(docs[0], docs[1], diff_marks[0], diff_marks[1],
+                                &diff_words[0], &diff_words[1]);
   };
 
   auto checkpoint = [&]() {
@@ -1773,7 +1777,7 @@ int main(int argc, char** argv) {
                 replace_focus = !replace_focus;
                 break;
               }
-              // Tab / Shift+Tab: nest or promote list items
+              // Tab / Shift+Tab: nest or promote list items; move table cells
               {
                 auto& d = doc_of(F());
                 auto& p = F();
@@ -1784,6 +1788,16 @@ int main(int argc, char** argv) {
                   bool ok = shift ? xanatoo::outdent_list_item(d, p.sel.focus)
                                   : xanatoo::indent_list_item(d, p.sel.focus);
                   if (ok) {
+                    p.sel.anchor = p.sel.focus;
+                    needs_layout = true;
+                    reset_blink();
+                  }
+                  break;
+                }
+                if (p.sel.focus.node != xanatoo::INVALID_NODE &&
+                    d.get(p.sel.focus.node).kind ==
+                        xanatoo::NodeKind::TableCell) {
+                  if (xanatoo::table_move_cell(d, p.sel.focus, !shift)) {
                     p.sel.anchor = p.sel.focus;
                     needs_layout = true;
                     reset_blink();
@@ -2883,6 +2897,57 @@ int main(int argc, char** argv) {
             SDL_SetRenderDrawColor(sdl, 200, 120, 40, 40);
             SDL_Rect wash{pane.x, by, pane.w - 6, bh};
             SDL_RenderFillRect(sdl, &wash);
+          }
+          SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+        }
+        // Intra-block word-level highlights for modified (similar) blocks
+        const auto& words = diff_words[di];
+        if (!words.empty()) {
+          SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+          const auto& ddoc = docs[di];
+          for (const auto& g : pane.layout.glyphs) {
+            if (g.node == xanatoo::INVALID_NODE) continue;
+            // Map glyph to plain-text character index within its node
+            size_t gch = 0;
+            {
+              const auto& gn = ddoc.get(g.node);
+              for (size_t si = 0; si < g.span_index && si < gn.spans.size();
+                   ++si) {
+                for (size_t ci = 0; ci < gn.spans[si].text.size();) {
+                  unsigned char c =
+                      static_cast<unsigned char>(gn.spans[si].text[ci]);
+                  if (c < 0x80)
+                    ++ci;
+                  else if ((c & 0xe0) == 0xc0)
+                    ci += 2;
+                  else if ((c & 0xf0) == 0xe0)
+                    ci += 3;
+                  else if ((c & 0xf8) == 0xf0)
+                    ci += 4;
+                  else
+                    ++ci;
+                  ++gch;
+                }
+              }
+              gch += g.char_index;
+            }
+            bool hit = false;
+            for (const auto& wm : words) {
+              if (wm.node == g.node && gch >= wm.char_begin &&
+                  gch < wm.char_end) {
+                hit = true;
+                break;
+              }
+            }
+            if (!hit) continue;
+            int gx = pane.x + static_cast<int>(g.x);
+            int gy = static_cast<int>(g.y - pane.scroll_y - lh * 0.85f);
+            int gw = 8;
+            // Approximate advance from next glyph on same baseline
+            // (best-effort; highlight remains readable either way)
+            SDL_SetRenderDrawColor(sdl, 220, 160, 40, 110);
+            SDL_Rect r{gx, gy, gw, static_cast<int>(lh)};
+            SDL_RenderFillRect(sdl, &r);
           }
           SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
         }

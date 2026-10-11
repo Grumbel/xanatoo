@@ -3,6 +3,7 @@
 
 #include "xanatoo/editor.hpp"
 #include "xanatoo/util.hpp"
+#include <cctype>
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -1826,11 +1827,130 @@ DocStats document_stats(const Document& doc) {
   return s;
 }
 
+namespace {
+
+// Split plain text into words with [begin,end) character indices.
+struct WordTok {
+  std::string text;
+  size_t begin = 0;
+  size_t end = 0;
+};
+
+std::vector<WordTok> tokenize_words(const std::string& s) {
+  std::vector<WordTok> out;
+  size_t i = 0;
+  const size_t n = s.size();
+  auto is_word = [](unsigned char c) {
+    return std::isalnum(c) || c == '_' || c >= 0x80;
+  };
+  while (i < n) {
+    while (i < n && !is_word(static_cast<unsigned char>(s[i]))) ++i;
+    if (i >= n) break;
+    size_t start = i;
+    while (i < n && is_word(static_cast<unsigned char>(s[i]))) ++i;
+    WordTok t;
+    t.text = s.substr(start, i - start);
+    // Character indices: for ASCII-heavy text byte offset ≈ char index;
+    // use utf8_char_count on prefixes for correctness.
+    t.begin = utf8_char_count(s.substr(0, start));
+    t.end = utf8_char_count(s.substr(0, i));
+    out.push_back(std::move(t));
+  }
+  return out;
+}
+
+// Jaccard-ish similarity on word sets (0..1).
+float word_similarity(const std::vector<WordTok>& wa,
+                      const std::vector<WordTok>& wb) {
+  if (wa.empty() && wb.empty()) return 1.f;
+  if (wa.empty() || wb.empty()) return 0.f;
+  std::vector<std::string> sa, sb;
+  sa.reserve(wa.size());
+  sb.reserve(wb.size());
+  for (const auto& w : wa) sa.push_back(ascii_lower(w.text));
+  for (const auto& w : wb) sb.push_back(ascii_lower(w.text));
+  std::sort(sa.begin(), sa.end());
+  std::sort(sb.begin(), sb.end());
+  size_t inter = 0;
+  size_t i = 0, j = 0;
+  while (i < sa.size() && j < sb.size()) {
+    if (sa[i] == sb[j]) {
+      ++inter;
+      ++i;
+      ++j;
+    } else if (sa[i] < sb[j]) {
+      ++i;
+    } else {
+      ++j;
+    }
+  }
+  size_t uni = sa.size() + sb.size() - inter;
+  if (uni == 0) return 1.f;
+  return static_cast<float>(inter) / static_cast<float>(uni);
+}
+
+void word_lcs_marks(const std::vector<WordTok>& wa,
+                    const std::vector<WordTok>& wb,
+                    NodeId node_a, NodeId node_b,
+                    std::vector<DiffWordMark>& out_a,
+                    std::vector<DiffWordMark>& out_b) {
+  const size_t na = wa.size(), nb = wb.size();
+  if (na == 0 && nb == 0) return;
+  const size_t cols = nb + 1;
+  std::vector<size_t> dp((na + 1) * cols, 0);
+  auto at = [&](size_t i, size_t j) -> size_t& { return dp[i * cols + j]; };
+  for (size_t i = 1; i <= na; ++i) {
+    for (size_t j = 1; j <= nb; ++j) {
+      if (ascii_lower(wa[i - 1].text) == ascii_lower(wb[j - 1].text))
+        at(i, j) = at(i - 1, j - 1) + 1;
+      else
+        at(i, j) = std::max(at(i - 1, j), at(i, j - 1));
+    }
+  }
+  std::vector<char> keep_a(na, 0), keep_b(nb, 0);
+  size_t i = na, j = nb;
+  while (i > 0 && j > 0) {
+    if (ascii_lower(wa[i - 1].text) == ascii_lower(wb[j - 1].text) &&
+        at(i, j) == at(i - 1, j - 1) + 1) {
+      keep_a[i - 1] = 1;
+      keep_b[j - 1] = 1;
+      --i;
+      --j;
+    } else if (at(i - 1, j) >= at(i, j - 1)) {
+      --i;
+    } else {
+      --j;
+    }
+  }
+  for (size_t k = 0; k < na; ++k) {
+    if (keep_a[k]) continue;
+    DiffWordMark m;
+    m.node = node_a;
+    m.char_begin = wa[k].begin;
+    m.char_end = wa[k].end;
+    out_a.push_back(m);
+  }
+  for (size_t k = 0; k < nb; ++k) {
+    if (keep_b[k]) continue;
+    DiffWordMark m;
+    m.node = node_b;
+    m.char_begin = wb[k].begin;
+    m.char_end = wb[k].end;
+    out_b.push_back(m);
+  }
+}
+
+}  // namespace
+
 void compute_diff_marks(const Document& a, const Document& b,
                         std::vector<NodeId>& changed_a,
-                        std::vector<NodeId>& changed_b) {
+                        std::vector<NodeId>& changed_b,
+                        std::vector<DiffWordMark>* word_a,
+                        std::vector<DiffWordMark>* word_b) {
   changed_a.clear();
   changed_b.clear();
+  if (word_a) word_a->clear();
+  if (word_b) word_b->clear();
   std::vector<NodeId> nodes_a, nodes_b;
   if (a.root != INVALID_NODE) collect_text_nodes(a, a.root, nodes_a);
   if (b.root != INVALID_NODE) collect_text_nodes(b, b.root, nodes_b);
@@ -1877,10 +1997,81 @@ void compute_diff_marks(const Document& a, const Document& b,
     }
   }
 
+  std::vector<size_t> rest_a, rest_b;
+  for (size_t k = 0; k < na; ++k)
+    if (!keep_a[k]) rest_a.push_back(k);
+  for (size_t k = 0; k < nb; ++k)
+    if (!keep_b[k]) rest_b.push_back(k);
+
+  // Pair similar remaining blocks as "modified" for word-level marks.
+  std::vector<char> paired_a(rest_a.size(), 0), paired_b(rest_b.size(), 0);
+  if (word_a && word_b) {
+    for (size_t ia = 0; ia < rest_a.size(); ++ia) {
+      if (paired_a[ia]) continue;
+      float best = 0.f;
+      size_t best_ib = rest_b.size();
+      auto wa = tokenize_words(ta[rest_a[ia]]);
+      for (size_t ib = 0; ib < rest_b.size(); ++ib) {
+        if (paired_b[ib]) continue;
+        auto wb = tokenize_words(tb[rest_b[ib]]);
+        float sim = word_similarity(wa, wb);
+        if (sim > best) {
+          best = sim;
+          best_ib = ib;
+        }
+      }
+      // Require meaningful overlap to treat as a modification, not
+      // unrelated insert+delete.
+      if (best_ib < rest_b.size() && best >= 0.35f) {
+        paired_a[ia] = 1;
+        paired_b[best_ib] = 1;
+        auto wb = tokenize_words(tb[rest_b[best_ib]]);
+        word_lcs_marks(wa, wb, nodes_a[rest_a[ia]], nodes_b[rest_b[best_ib]],
+                       *word_a, *word_b);
+      }
+    }
+  }
+
   for (size_t k = 0; k < na; ++k)
     if (!keep_a[k]) changed_a.push_back(nodes_a[k]);
   for (size_t k = 0; k < nb; ++k)
     if (!keep_b[k]) changed_b.push_back(nodes_b[k]);
+}
+
+bool table_move_cell(Document& doc, Caret& caret, bool forward) {
+  if (caret.node == INVALID_NODE) return false;
+  const Node& cell = doc.get(caret.node);
+  if (cell.kind != NodeKind::TableCell) return false;
+  NodeId row_id = cell.parent;
+  if (row_id == INVALID_NODE || doc.get(row_id).kind != NodeKind::TableRow)
+    return false;
+  NodeId table_id = doc.get(row_id).parent;
+  if (table_id == INVALID_NODE || doc.get(table_id).kind != NodeKind::Table)
+    return false;
+
+  // Flatten all cells in document order within the table.
+  std::vector<NodeId> cells;
+  for (NodeId rid : doc.get(table_id).children) {
+    if (doc.get(rid).kind != NodeKind::TableRow) continue;
+    for (NodeId cid : doc.get(rid).children) {
+      if (doc.get(cid).kind == NodeKind::TableCell) cells.push_back(cid);
+    }
+  }
+  if (cells.size() < 2) return false;
+  auto it = std::find(cells.begin(), cells.end(), caret.node);
+  if (it == cells.end()) return false;
+  size_t idx = static_cast<size_t>(it - cells.begin());
+  if (forward) {
+    if (idx + 1 >= cells.size()) return false;
+    ++idx;
+  } else {
+    if (idx == 0) return false;
+    --idx;
+  }
+  caret.node = cells[idx];
+  caret.span_index = 0;
+  caret.char_index = 0;
+  return true;
 }
 
 void collect_outline(const Document& doc, std::vector<OutlineEntry>& out) {
