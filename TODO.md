@@ -6,9 +6,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **208** (this delivery is **207**)
+Next bundle number: **209** (this delivery is **208**)
 
 ## Status (2026-10-11)
+
+Continue refactor: Gemini uses shared TLS/TCP; main is_in_app_remote_url helper.
 
 Refactor: shared https.cpp + json_min.hpp; slim reddit/lemmy clients.
 
@@ -548,4 +550,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-204.*-lemmy-comment-list-…` — prior (comment/list API)
 - `xanatoo-205.*-lemmy-comment-thread-…` — prior (path → alt indent)
 - `xanatoo-206.*-readme-screenshot-…` — prior (welcome PNG in README)
-- `xanatoo-207.*-shared-https-json-…` — this delivery (extract https + json_min)
+- `xanatoo-207.*-shared-https-json-…` — prior (extract https + json_min)
+- `xanatoo-208.*-gemini-shared-tls-…` — this delivery (Gemini TLS + main URL helper)

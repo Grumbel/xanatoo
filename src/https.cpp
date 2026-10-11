@@ -21,15 +21,6 @@
 namespace xanatoo {
 namespace {
 
-void ssl_once_init() {
-  static bool done = false;
-  if (done) return;
-  SSL_library_init();
-  SSL_load_error_strings();
-  OpenSSL_add_all_algorithms();
-  done = true;
-}
-
 int tcp_connect(const std::string& host, int port, std::string* err) {
   addrinfo hints {};
   hints.ai_socktype = SOCK_STREAM;
@@ -78,6 +69,19 @@ std::string ascii_lower_copy(std::string_view s) {
 
 }  // namespace
 
+void ssl_library_init_once() {
+  static bool done = false;
+  if (done) return;
+  SSL_library_init();
+  SSL_load_error_strings();
+  OpenSSL_add_all_algorithms();
+  done = true;
+}
+
+int tcp_connect_host(const std::string& host, int port, std::string* err) {
+  return tcp_connect(host, port, err);
+}
+
 std::optional<HttpResult> https_request(std::string_view method,
                                         std::string_view url,
                                         std::string_view user_agent,
@@ -102,7 +106,7 @@ std::optional<HttpResult> https_request(std::string_view method,
     host = host.substr(0, colon);
   }
 
-  ssl_once_init();
+  ssl_library_init_once();
   int fd = tcp_connect(host, port, err);
   if (fd < 0) return std::nullopt;
 

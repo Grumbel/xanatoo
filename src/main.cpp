@@ -126,9 +126,14 @@ int main(int argc, char** argv) {
   };
   std::vector<DocBuffer> buffers;
 
+  // Gemini / Reddit / Lemmy / Nostr — opened in-pane (not the system browser).
+  auto is_in_app_remote_url = [](std::string_view s) {
+    return xanatoo::is_gemini_url(s) || xanatoo::is_reddit_url(s) ||
+           xanatoo::is_lemmy_url(s) || xanatoo::is_nostr_ref(s);
+  };
+
   auto load_doc_or_placeholder = [&](const std::string& path) {
-    if (xanatoo::is_gemini_url(path) || xanatoo::is_reddit_url(path) ||
-        xanatoo::is_lemmy_url(path) || xanatoo::is_nostr_ref(path)) {
+    if (is_in_app_remote_url(path)) {
       // Real fetch happens after navigate_to_url is defined.
       return xanatoo::parse_document("# Loading…\n", {});
     }
@@ -1197,7 +1202,7 @@ int main(int argc, char** argv) {
               xanatoo::resolve_gemini_url(gemini_current_url, abs);
           if (!resolved.empty()) abs = resolved;
         }
-        if (xanatoo::is_gemini_url(abs) || xanatoo::is_nostr_ref(abs) || xanatoo::is_reddit_url(abs) || xanatoo::is_lemmy_url(abs)) {
+        if (is_in_app_remote_url(abs)) {
           navigate_to_url(std::move(abs));
         } else if (is_inapp_doc_href(abs)) {
           navigate_to_url(resolve_doc_href(abs));
@@ -1212,8 +1217,7 @@ int main(int argc, char** argv) {
 
   // CLI / argv may pass gemini:// / reddit / nostr — fetch after helpers exist
   auto is_network_startup = [](const std::string& p) {
-    return xanatoo::is_gemini_url(p) || xanatoo::is_reddit_url(p) ||
-           xanatoo::is_lemmy_url(p) || xanatoo::is_nostr_ref(p);
+    return is_in_app_remote_url(p);
   };
   if (!buffers.empty() && is_network_startup(buffers[0].path)) {
     std::string u = buffers[0].path;
@@ -1992,10 +1996,7 @@ int main(int argc, char** argv) {
                         // clicks). open_browse here left stale soft layouts and
                         // carets that later threw "invalid node id".
                         std::string abs = *href;
-                        if (xanatoo::is_gemini_url(abs) ||
-                            xanatoo::is_nostr_ref(abs) ||
-                            xanatoo::is_reddit_url(abs) ||
-                            xanatoo::is_lemmy_url(abs)) {
+                        if (is_in_app_remote_url(abs)) {
                           navigate_to_url(abs);
                         } else if (is_inapp_doc_href(abs)) {
                           std::string resolved =
@@ -2284,7 +2285,7 @@ int main(int argc, char** argv) {
                       xanatoo::resolve_gemini_url(gemini_current_url, abs);
                   if (!resolved.empty()) abs = resolved;
                 }
-                if (xanatoo::is_gemini_url(abs) || xanatoo::is_nostr_ref(abs) || xanatoo::is_reddit_url(abs) || xanatoo::is_lemmy_url(abs)) {
+                if (is_in_app_remote_url(abs)) {
                   navigate_to_url(std::move(abs));
                   break;
                 }
@@ -4496,8 +4497,7 @@ int main(int argc, char** argv) {
                       "Unsaved changes — Ctrl+Shift+R to discard and reload");
                   break;
                 }
-                if (xanatoo::is_gemini_url(rpath) || xanatoo::is_nostr_ref(rpath) ||
-                    xanatoo::is_reddit_url(rpath) || xanatoo::is_lemmy_url(rpath)) {
+                if (is_in_app_remote_url(rpath)) {
                   navigate_to_url(rpath, /*record_history=*/false);
                   break;
                 }
@@ -5266,7 +5266,7 @@ int main(int argc, char** argv) {
             flash_status("Unsaved changes — use Force Reload");
             break;
           }
-          if (xanatoo::is_gemini_url(rpath) || xanatoo::is_nostr_ref(rpath) || xanatoo::is_reddit_url(rpath) || xanatoo::is_lemmy_url(rpath)) {
+          if (is_in_app_remote_url(rpath)) {
             navigate_to_url(rpath, /*record_history=*/false);
             break;
           }

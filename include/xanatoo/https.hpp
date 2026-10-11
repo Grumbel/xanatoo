@@ -32,4 +32,10 @@ std::optional<HttpResult> https_get(std::string_view url,
                                     std::string_view user_agent,
                                     std::string* err = nullptr);
 
+// Shared OpenSSL / TCP helpers (Gemini protocol, etc.).
+void ssl_library_init_once();
+// Returns a connected socket fd, or -1. Caller owns the fd.
+int tcp_connect_host(const std::string& host, int port,
+                     std::string* err = nullptr);
+
 }  // namespace xanatoo

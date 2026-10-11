@@ -3,6 +3,8 @@
 
 #include "xanatoo/gemini.hpp"
 
+#include "xanatoo/https.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <cstring>
@@ -164,48 +166,10 @@ std::string resolve_gemini_url(std::string_view base, std::string_view ref) {
 
 #if defined(XANATOO_GEMINI) && XANATOO_GEMINI
 
-static bool ssl_inited = false;
-static void ensure_ssl() {
-  if (ssl_inited) return;
-  SSL_library_init();
-  SSL_load_error_strings();
-  OpenSSL_add_all_algorithms();
-  ssl_inited = true;
-}
-
-static int tcp_connect(const std::string& host, int port, std::string* err) {
-  addrinfo hints{};
-  hints.ai_socktype = SOCK_STREAM;
-  hints.ai_family = AF_UNSPEC;
-  addrinfo* res = nullptr;
-  std::string port_s = std::to_string(port);
-  int ga = getaddrinfo(host.c_str(), port_s.c_str(), &hints, &res);
-  if (ga != 0) {
-    if (err) *err = std::string("DNS: ") + gai_strerror(ga);
-    return -1;
-  }
-  int fd = -1;
-  for (addrinfo* p = res; p; p = p->ai_next) {
-    fd = ::socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-    if (fd < 0) continue;
-    timeval tv{};
-    tv.tv_sec = 20;
-    tv.tv_usec = 0;
-    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-    if (::connect(fd, p->ai_addr, p->ai_addrlen) == 0) break;
-    ::close(fd);
-    fd = -1;
-  }
-  freeaddrinfo(res);
-  if (fd < 0 && err) *err = "connect failed";
-  return fd;
-}
-
 static std::optional<GeminiResponse> gemini_fetch_once(const GeminiUrl& u,
                                                        std::string* err) {
-  ensure_ssl();
-  int fd = tcp_connect(u.host, u.port, err);
+  ssl_library_init_once();
+  int fd = tcp_connect_host(u.host, u.port, err);
   if (fd < 0) return std::nullopt;
 
   SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());

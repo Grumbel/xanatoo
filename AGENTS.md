@@ -29,7 +29,7 @@ Dear ImGui is allowed for chrome (menus/toolbars). No Qt/GTK/KDE.
 
 ## Shared network helpers
 
-- `include/xanatoo/https.hpp` + `src/https.cpp` — OpenSSL HTTPS GET/POST (Reddit, Lemmy; linked when any OpenSSL feature is ON).
+- `include/xanatoo/https.hpp` + `src/https.cpp` — OpenSSL HTTPS GET/POST plus `ssl_library_init_once` / `tcp_connect_host` for Gemini TLS (linked when any OpenSSL feature is ON).
 - `include/xanatoo/json_min.hpp` — tiny JSON field/object helpers for read-only API clients (header-only).
 
 ## Coding rules
