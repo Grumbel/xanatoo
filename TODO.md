@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **085** (this delivery is **084**)
+Next bundle number: **086** (this delivery is **085**)
 
 ## Status (2026-10-11)
 
@@ -139,6 +139,9 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Code-block soft background + border
 - [x] Note bar distinct (amber) from block-quote bar
 - [x] Table cell layout merges images/quote/note/code decorations
+- [x] Layout respects hard newlines (`\n`) in paragraphs/code blocks
+- [x] Enter in CodeBlock inserts newline (does not split the block)
+- [x] Enter in TableCell inserts a new row (same column count)
 
 ## Open work / next steps
 
@@ -272,4 +275,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-081.*-multi-softwin-…` — multiple document software windows
 - `xanatoo-082.*-softwin-dock-…` — soft-window docking
 - `xanatoo-083.*-md-semantic-…` — markdown semantic round-trip
-- `xanatoo-084.*-table-present-…` — this delivery
+- `xanatoo-084.*-table-present-…` — table grid presentation
+- `xanatoo-085.*-newline-table-enter-…` — this delivery

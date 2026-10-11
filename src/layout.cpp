@@ -841,11 +841,36 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
   };
 
   for (size_t i = 0; i < chars.size(); ++i) {
+    // Explicit newline (code blocks, pasted multi-line text)
+    if (chars[i].cp == '\n' || chars[i].cp == '\r') {
+      break_line(i);  // flush without drawing the control character
+      if (chars[i].cp == '\r' && i + 1 < chars.size() &&
+          chars[i + 1].cp == '\n')
+        ++i;  // CRLF
+      // Zero-width glyph at the start of the next line so the caret can
+      // sit on the newline's char_index (and arrow keys can land here).
+      {
+        PositionedGlyph pg;
+        pg.codepoint = ' ';  // invisible placeholder; advance unused
+        pg.x = x;
+        pg.y = baseline;
+        pg.node = node.id;
+        pg.span_index = chars[i].span_idx;
+        pg.char_index = chars[i].char_idx;
+        pg.kind = chars[i].kind;
+        pg.font = chars[i].role;
+        out.glyphs.push_back(pg);
+      }
+      line_start_idx = i + 1;
+      continue;
+    }
+
     Font& font = fonts_.pick(chars[i].role);
     const Glyph& g = font.glyph(chars[i].cp);
     float adv = static_cast<float>(g.advance >> 6);
 
-    if (pen_x + adv > x + max_width && chars[i].cp != ' ' && i > line_start_idx) {
+    if (pen_x + adv > x + max_width && chars[i].cp != ' ' &&
+        i > line_start_idx) {
       size_t break_at = i;
       for (size_t j = i; j > line_start_idx; --j) {
         if (chars[j - 1].cp == ' ') {

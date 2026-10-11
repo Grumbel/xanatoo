@@ -1140,6 +1140,54 @@ bool split_block(Document& doc, Caret& caret) {
     return true;
   }
 
+  // Code blocks: Enter inserts a hard newline inside the block (layout
+  // respects '\n'). Splitting into two CodeBlock siblings is rarely wanted.
+  if (n.kind == NodeKind::CodeBlock) {
+    insert_text(doc, caret, "\n");
+    return true;
+  }
+
+  // Table cells: Enter inserts a new row after the current one, with the
+  // same column count. Caret moves to the cell in the same column.
+  // (Splitting into a sibling cell would skew the column grid.)
+  if (n.kind == NodeKind::TableCell) {
+    NodeId cell_id = caret.node;
+    NodeId row_id = n.parent;
+    if (row_id == INVALID_NODE || doc.get(row_id).kind != NodeKind::TableRow)
+      return false;
+    Node& row = doc.get(row_id);
+    NodeId table_id = row.parent;
+    if (table_id == INVALID_NODE || doc.get(table_id).kind != NodeKind::Table)
+      return false;
+
+    // Column index of the current cell among TableCell siblings
+    size_t col = 0;
+    size_t n_cols = 0;
+    for (NodeId c : row.children) {
+      if (doc.get(c).kind != NodeKind::TableCell) continue;
+      if (c == cell_id) col = n_cols;
+      ++n_cols;
+    }
+    if (n_cols == 0) return false;
+
+    NodeId new_row = doc.create(NodeKind::TableRow, INVALID_NODE);
+    if (!doc.insert_after(row_id, new_row)) {
+      doc.add_child(table_id, new_row);
+    }
+    NodeId focus_cell = INVALID_NODE;
+    for (size_t i = 0; i < n_cols; ++i) {
+      NodeId nc = doc.create(NodeKind::TableCell, new_row);
+      // Preserve header-ness only for the first body? New rows are body cells.
+      doc.append_text(nc, "");
+      if (i == col) focus_cell = nc;
+    }
+    if (focus_cell == INVALID_NODE) return false;
+    caret.node = focus_cell;
+    caret.span_index = 0;
+    caret.char_index = 0;
+    return true;
+  }
+
   // Create a new sibling of the same kind (ListItem stays a ListItem).
   NodeId new_id = doc.create(n.kind, INVALID_NODE);  // parent set by insert_after
   Node& neu = doc.get(new_id);
