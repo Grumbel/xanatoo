@@ -264,7 +264,14 @@ int main(int argc, char** argv) {
     buffers[1].history.reset(buffers[1].doc, panes[1].sel);
 
   int win_w = 1024, win_h = 768;  // match SDL_CreateWindow defaults
-  SDL_GetWindowSize(window, &win_w, &win_h);
+  {
+    int nw = 0, nh = 0;
+    SDL_GetWindowSize(window, &nw, &nh);
+    if (nw >= 64 && nh >= 64) {
+      win_w = nw;
+      win_h = nh;
+    }
+  }
   bool running = true;
   bool needs_layout = true;
   int last_layout_w = 0, last_layout_h = 0;
@@ -546,17 +553,18 @@ int main(int argc, char** argv) {
   };
 
   auto layout_panes = [&]() {
+    const int ww = std::max(64, win_w);
     const int gutter = split ? 6 : 0;
     if (split) {
-      int left_w = static_cast<int>(split_ratio * (win_w - gutter));
-      left_w = std::max(120, std::min(win_w - gutter - 120, left_w));
+      int left_w = static_cast<int>(split_ratio * (ww - gutter));
+      left_w = std::max(120, std::min(ww - gutter - 120, left_w));
       panes[0].x = 0;
       panes[0].w = left_w;
       panes[1].x = left_w + gutter;
-      panes[1].w = win_w - panes[1].x;
+      panes[1].w = ww - panes[1].x;
     } else {
       panes[0].x = 0;
-      panes[0].w = win_w;
+      panes[0].w = ww;
       panes[1].x = 0;
       panes[1].w = 0;
     }
@@ -1305,14 +1313,18 @@ int main(int argc, char** argv) {
         case SDL_WINDOWEVENT:
           if (ev.window.event == SDL_WINDOWEVENT_SIZE_CHANGED ||
               ev.window.event == SDL_WINDOWEVENT_RESIZED) {
-            win_w = ev.window.data1;
-            win_h = ev.window.data2;
-            // Keep tiled/maximized soft windows filling the new client area.
-            for (auto& sw : soft_wins) {
-              if (sw.dock != SoftDock::None || sw.maximized)
-                apply_soft_dock(sw, sw.maximized ? SoftDock::Max : sw.dock);
+            const int nw = ev.window.data1;
+            const int nh = ev.window.data2;
+            if (nw >= 64 && nh >= 64) {
+              win_w = nw;
+              win_h = nh;
+              // Keep tiled/maximized soft windows filling the new client area.
+              for (auto& sw : soft_wins) {
+                if (sw.dock != SoftDock::None || sw.maximized)
+                  apply_soft_dock(sw, sw.maximized ? SoftDock::Max : sw.dock);
+              }
+              needs_layout = true;
             }
-            needs_layout = true;
           }
           break;
 
@@ -4375,10 +4387,12 @@ int main(int argc, char** argv) {
 
     // Keep layout width in sync with the real client area (not only on
     // SIZE_CHANGED — first map / HiDPI / tiling WMs often skip that event).
+    // Ignore 0×0 (minimize / not mapped): accepting it set last_layout_w=0 and
+    // forced a full relayout every frame → flicker then crash.
     {
-      int nw = win_w, nh = win_h;
+      int nw = 0, nh = 0;
       SDL_GetWindowSize(window, &nw, &nh);
-      if (nw != win_w || nh != win_h || last_layout_w == 0) {
+      if (nw >= 64 && nh >= 64 && (nw != win_w || nh != win_h)) {
         win_w = nw;
         win_h = nh;
         needs_layout = true;
@@ -4389,7 +4403,7 @@ int main(int argc, char** argv) {
       }
     }
 
-    if (needs_layout) {
+    if (needs_layout && win_w >= 64 && win_h >= 64) {
       layout_panes();
       if (outline_mode) refresh_outline();
     }

@@ -177,7 +177,9 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
       for (size_t i = 0; i < cols.size(); ++i) {
         float col_w = usable * (weights[i] / weight_sum);
-        if (col_w < 40.f) col_w = 40.f;
+        // Keep columns inside the usable width (never force min 40 past usable).
+        if (col_w < 1.f) col_w = 1.f;
+        if (col_w > usable) col_w = usable;
         float cy = start_y;
 
         LayoutResult col_out;

@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **153** (this delivery is **152**)
+Next bundle number: **154** (this delivery is **153**)
 
 ## Status (2026-10-11)
 
@@ -251,6 +251,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Build fix: org unused var; soft relative links; tab close keeps floats
 - [x] Perf: large-doc render cull, history depth, org parse, outline, hit_test
 - [x] Initial layout uses real window size (was stuck at 920 until resize)
+- [x] Fix endless relayout when window size reports 0; column width clamp; tags copy
 
 ## Open work / next steps
 
@@ -454,4 +455,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-149.*-bugfix-soft-…` — soft-window shared-buffer fixes
 - `xanatoo-150.*-build-soft-links-…` — soft links / tab close
 - `xanatoo-151.*-large-doc-perf-…` — large-doc performance
-- `xanatoo-152.*-initial-layout-size-…` — this delivery
+- `xanatoo-152.*-initial-layout-size-…` — initial layout width
+- `xanatoo-153.*-layout-loop-guard-…` — this delivery
