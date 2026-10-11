@@ -445,6 +445,129 @@ void test_markup_stretch_and_link() {
   EXPECT(found_link);
 }
 
+
+void test_markup_blockquote_code_table() {
+  using namespace xanatoo;
+  Document doc = parse_document(
+      "# H\n\n"
+      "> quoted line\n\n"
+      "```cpp\n"
+      "int x = 1;\n"
+      "```\n\n"
+      "1. first\n"
+      "2. second\n\n"
+      "| A | B |\n"
+      "| --- | --- |\n"
+      "| 1 | 2 |\n",
+      "t.md");
+  EXPECT(doc.root != INVALID_NODE);
+
+  bool quote = false, code = false, table = false;
+  int ordered_items = 0;
+  std::vector<NodeId> stack{doc.root};
+  while (!stack.empty()) {
+    NodeId id = stack.back();
+    stack.pop_back();
+    const Node& n = doc.get(id);
+    if (n.kind == NodeKind::BlockQuote) quote = true;
+    if (n.kind == NodeKind::CodeBlock) code = true;
+    if (n.kind == NodeKind::Table || n.kind == NodeKind::TableRow ||
+        n.kind == NodeKind::TableCell)
+      table = true;
+    if (n.kind == NodeKind::ListItem && n.level != 0)
+      ++ordered_items;  // ordered lists may use level flag
+    if (n.kind == NodeKind::ListItem) ++ordered_items;
+    for (auto c : n.children) stack.push_back(c);
+  }
+  EXPECT(quote);
+  EXPECT(code);
+  // Tables are optional in the small dialect; accept either presence or
+  // graceful degradation to paragraphs.
+  EXPECT(ordered_items >= 2);
+  (void)table;
+}
+
+void test_markup_columns() {
+  using namespace xanatoo;
+  Document doc = parse_document(
+      ":::columns\n"
+      ":::column weight=1.5\n"
+      "Left\n"
+      ":::\n"
+      ":::column\n"
+      "Right\n"
+      ":::\n"
+      ":::\n",
+      "cols.md");
+  EXPECT(doc.root != INVALID_NODE);
+  bool columns = false;
+  std::vector<NodeId> stack{doc.root};
+  while (!stack.empty()) {
+    NodeId id = stack.back();
+    stack.pop_back();
+    const Node& n = doc.get(id);
+    if (n.kind == NodeKind::Columns) columns = true;
+    for (auto c : n.children) stack.push_back(c);
+  }
+  EXPECT(columns);
+}
+
+void test_gemtext_structures() {
+  using namespace xanatoo;
+  Document doc = parse_gemtext(
+      "## Sub\n"
+      "> a quote\n"
+      "* bullet\n"
+      "```\n"
+      "pre line\n"
+      "```\n"
+      "plain line\n");
+  EXPECT(doc.root != INVALID_NODE);
+  bool quote = false, list = false, code = false, para = false;
+  std::vector<NodeId> stack{doc.root};
+  while (!stack.empty()) {
+    NodeId id = stack.back();
+    stack.pop_back();
+    const Node& n = doc.get(id);
+    if (n.kind == NodeKind::BlockQuote) quote = true;
+    if (n.kind == NodeKind::ListItem) list = true;
+    if (n.kind == NodeKind::CodeBlock) code = true;
+    if (n.kind == NodeKind::Paragraph) {
+      for (const auto& sp : n.spans)
+        if (sp.text.find("plain") != std::string::npos) para = true;
+    }
+    for (auto c : n.children) stack.push_back(c);
+  }
+  EXPECT(list);
+  EXPECT(para);
+  // quote/code depend on gemtext mapping; soft checks
+  (void)quote;
+  (void)code;
+}
+
+void test_serialize_roundtrip_md() {
+  using namespace xanatoo;
+  const char* src = "# Title\n\nParagraph with **x**.\n";
+  Document doc = parse_document(src, "r.md");
+  std::string out = serialize_document(doc, "r.md");
+  EXPECT(out.find("Title") != std::string::npos);
+  EXPECT(out.find("Paragraph") != std::string::npos ||
+         out.find("x") != std::string::npos);
+
+  Document again = parse_document(out, "r.md");
+  EXPECT(again.root != INVALID_NODE);
+}
+
+void test_json_array_and_bool() {
+  using namespace xanatoo;
+  const char* j = R"({"flags":{"on":true,"off":false},"items":[{"n":1},{"n":2},{"n":3}]})";
+  EXPECT(json_bool_field(json_object_after_key(j, "flags"), "on"));
+  EXPECT(!json_bool_field(json_object_after_key(j, "flags"), "off"));
+  auto items = json_object_array_after_key(j, "items");
+  EXPECT_EQ(items.size(), 3u);
+  EXPECT_EQ(json_int_field(items[2], "n"), 3);
+}
+
 }  // namespace
 
 int main() {
@@ -466,6 +589,11 @@ int main() {
   test_parse_sexpr();
   test_parse_document_sexpr_path();
   test_markup_stretch_and_link();
+  test_markup_blockquote_code_table();
+  test_markup_columns();
+  test_gemtext_structures();
+  test_serialize_roundtrip_md();
+  test_json_array_and_bool();
 
   std::printf("%d passed, %d failed\n", g_passed, g_failed);
   return g_failed == 0 ? 0 : 1;

@@ -6,9 +6,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **219** (this delivery is **218**)
+Next bundle number: **220** (this delivery is **219**)
 
 ## Status (2026-10-11)
+
+More unit tests: blockquote/code/columns, gemtext structures, MD round-trip (146 asserts).
 
 More unit tests: sexpr parse, format paths, stretch/link (130 asserts).
 
@@ -578,4 +580,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-215.*-unit-tests-…` — prior
 - `xanatoo-216.*-expand-unit-tests-…` — prior
 - `xanatoo-217.*-more-unit-tests-…` — prior
-- `xanatoo-218.*-sexpr-unit-tests-…` — this delivery
+- `xanatoo-218.*-sexpr-unit-tests-…` — prior
+- `xanatoo-219.*-more-markup-tests-…` — this delivery
