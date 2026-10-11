@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **111** (this delivery is **110**)
+Next bundle number: **112** (this delivery is **111**)
 
 ## Status (2026-10-11)
 
@@ -181,6 +181,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Esc closes path-in-window prompt, help, and top soft window
 - [x] Fix path-in-window TEXTINPUT (was typing into the document)
 - [x] Underscore `_emphasis_` (word-boundary aware)
+- [x] Markdown nested table cells via :::row / :::cell / :::th
 
 ## Open work / next steps
 
@@ -188,7 +189,7 @@ LCS structural diff marks; cross-document `:::include`.
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Editable transclusion mirror (same-doc write-through in; external still read-only)
 4. Word-level / intra-block diff highlighting (basic pairing in)
-5. **Tables** — grid + column weights + nested block cells in (markdown nested still limited)
+5. **Tables** — grid + column weights + nested block cells (markdown :::row/:::cell in)
 6. **Docking** — edge snap + maximize + tile zones in
 7. **Citations** / typed link relations / range transclusion (insert+jump+:rel edit/hover in)
 
@@ -341,3 +342,4 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-108.*-hard-breaks-…` — this delivery
 - `xanatoo-109.*-esc-soft-…` — this delivery
 - `xanatoo-110.*-path-input-em-…` — this delivery
+- `xanatoo-111.*-nested-table-md-…` — this delivery

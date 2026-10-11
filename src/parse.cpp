@@ -507,6 +507,39 @@ Document parse_markup(std::string_view source) {
       ++i;
       continue;
     }
+    // Nested table structure (for cells with block children)
+    if (trimmed.starts_with(":::row")) {
+      NodeId parent = current_parent();
+      if (doc.get(parent).kind != NodeKind::Table)
+        parent = doc.create(NodeKind::Table, parent);
+      NodeId n = doc.create(NodeKind::TableRow, parent);
+      stack.push_back(n);
+      ++i;
+      continue;
+    }
+    if (trimmed.starts_with(":::cell") || trimmed.starts_with(":::th")) {
+      NodeId parent = current_parent();
+      if (doc.get(parent).kind != NodeKind::TableRow) {
+        NodeId table = parent;
+        if (doc.get(table).kind != NodeKind::Table)
+          table = doc.create(NodeKind::Table, parent);
+        parent = doc.create(NodeKind::TableRow, table);
+      }
+      NodeId n = doc.create(NodeKind::TableCell, parent);
+      if (trimmed.starts_with(":::th")) doc.get(n).level = 1;
+      // Optional weight=N on the fence line
+      auto wpos = trimmed.find("weight=");
+      if (wpos != std::string_view::npos) {
+        try {
+          float w = std::stof(std::string(trimmed.substr(wpos + 7)));
+          if (w > 0.05f) doc.get(n).display_scale = w;
+        } catch (...) {
+        }
+      }
+      stack.push_back(n);
+      ++i;
+      continue;
+    }
     // Self-closing include:
     //   :::include #LocalHeading
     //   :::include LocalHeading          → #LocalHeading
@@ -1166,34 +1199,87 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
     }
 
     case NodeKind::Table: {
-      out += pad;
-      out += ":::table\n";
+      // Prefer GFM pipes when every cell is inline-only; otherwise use
+      // :::row / :::cell so nested blocks round-trip.
+      bool needs_blocks = false;
       for (NodeId row_id : node.children) {
         const Node& row = doc.get(row_id);
-        if (row.kind != NodeKind::TableRow) {
-          serialize_node(doc, row_id, out, indent);
-          continue;
-        }
-        out += pad;
-        out += "|";
-        bool any_header = false;
+        if (row.kind != NodeKind::TableRow) continue;
         for (NodeId cell_id : row.children) {
           const Node& cell = doc.get(cell_id);
-          if (cell.kind != NodeKind::TableCell) continue;
-          if (cell.level > 0) any_header = true;
-          out += " ";
-          serialize_inlines(cell, out);
-          out += " |";
+          if (cell.kind == NodeKind::TableCell && !cell.children.empty()) {
+            needs_blocks = true;
+            break;
+          }
         }
-        out += "\n";
-        if (any_header) {
+        if (needs_blocks) break;
+      }
+      out += pad;
+      out += ":::table\n";
+      if (needs_blocks) {
+        for (NodeId row_id : node.children) {
+          const Node& row = doc.get(row_id);
+          if (row.kind != NodeKind::TableRow) {
+            serialize_node(doc, row_id, out, indent + 2);
+            continue;
+          }
+          out += pad;
+          out += ":::row\n";
+          for (NodeId cell_id : row.children) {
+            const Node& cell = doc.get(cell_id);
+            if (cell.kind != NodeKind::TableCell) continue;
+            out += pad;
+            out += (cell.level > 0) ? ":::th" : ":::cell";
+            if (cell.display_scale > 0.15f &&
+                (cell.display_scale < 0.99f || cell.display_scale > 1.01f)) {
+              out += " weight=";
+              char buf[32];
+              std::snprintf(buf, sizeof(buf), "%.3g", cell.display_scale);
+              out += buf;
+            }
+            out += "\n";
+            if (!cell.spans.empty()) {
+              out += pad;
+              out += "  ";
+              serialize_inlines(cell, out);
+              out += "\n";
+            }
+            for (NodeId c : cell.children)
+              serialize_node(doc, c, out, indent + 2);
+            out += pad;
+            out += ":::\n";
+          }
+          out += pad;
+          out += ":::\n";
+        }
+      } else {
+        for (NodeId row_id : node.children) {
+          const Node& row = doc.get(row_id);
+          if (row.kind != NodeKind::TableRow) {
+            serialize_node(doc, row_id, out, indent);
+            continue;
+          }
           out += pad;
           out += "|";
+          bool any_header = false;
           for (NodeId cell_id : row.children) {
-            if (doc.get(cell_id).kind != NodeKind::TableCell) continue;
-            out += " --- |";
+            const Node& cell = doc.get(cell_id);
+            if (cell.kind != NodeKind::TableCell) continue;
+            if (cell.level > 0) any_header = true;
+            out += " ";
+            serialize_inlines(cell, out);
+            out += " |";
           }
           out += "\n";
+          if (any_header) {
+            out += pad;
+            out += "|";
+            for (NodeId cell_id : row.children) {
+              if (doc.get(cell_id).kind != NodeKind::TableCell) continue;
+              out += " --- |";
+            }
+            out += "\n";
+          }
         }
       }
       out += pad;
