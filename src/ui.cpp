@@ -498,7 +498,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     ImGui::EndMainMenuBar();
   }
 
-  // ---- Toolbar under the menu (icon strip; wraps via SameLine chain) ----
+  // ---- Toolbar under the menu (horizontal scroll when narrow) ----
   const float toolbar_h = 36.f;
   ImGuiViewport* vp = ImGui::GetMainViewport();
   ImGui::SetNextWindowPos(ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
@@ -506,11 +506,15 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   ImGuiWindowFlags tb_flags =
       ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
-      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse;
+      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse |
+      ImGuiWindowFlags_NoScrollWithMouse;
 
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.f, 4.f));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.f);
   if (ImGui::Begin("##toolbar", nullptr, tb_flags)) {
+    // Child fills the bar and scrolls horizontally when buttons overflow.
+    ImGui::BeginChild("##toolbar_scroll", ImVec2(0.f, 0.f), false,
+                      ImGuiWindowFlags_HorizontalScrollbar);
     tool_button("tb_save", "save", "Save (Ctrl+S)", UiCommand::Save, cmd);
     tool_button("tb_undo", "undo", "Undo (Ctrl+Z)", UiCommand::Undo, cmd);
     tool_button("tb_redo", "redo", "Redo (Ctrl+Y)", UiCommand::Redo, cmd);
@@ -604,6 +608,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     tool_button("tb_zoomout", "zoomout", "Zoom out (Ctrl+-)", UiCommand::ZoomOut,
                 cmd);
     tool_button("tb_help", "help", "Help (F1)", UiCommand::ToggleHelp, cmd);
+    ImGui::EndChild();
   }
   ImGui::End();
   ImGui::PopStyleVar(2);
