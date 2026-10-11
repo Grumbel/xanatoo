@@ -968,6 +968,27 @@ int main(int argc, char** argv) {
       update_title();
     };
 
+    // Shared post-fetch path for Nostr / Reddit / Lemmy documents.
+    auto finish_remote_open =
+        [&](std::optional<xanatoo::Document> doc, const std::string& err,
+            const char* service, std::string label, size_t label_max,
+            const std::string& history_url) -> bool {
+      if (!doc) {
+        flash_status(std::string(service) + " failed: " + err);
+        std::cerr << service << ": " << err << "\n";
+        return false;
+      }
+      if (!allow_discard_dirty(p.buf)) return false;
+      if (label.size() > label_max) label = label.substr(0, label_max) + "…";
+      load_into_pane(std::move(*doc), label);
+      if (std::find(tab_order.begin(), tab_order.end(), p.buf) ==
+          tab_order.end())
+        tab_order.push_back(p.buf);
+      if (record_history) push_nav_history(history_url);
+      flash_status(std::string("Opened ") + service);
+      return true;
+    };
+
     if (xanatoo::is_gemini_url(target)) {
 #if defined(XANATOO_GEMINI) && XANATOO_GEMINI
       flash_status("Fetching " + target + "…");
@@ -1052,23 +1073,8 @@ int main(int argc, char** argv) {
       flash_status("Fetching Nostr " + target.substr(0, 24) + "…");
       std::string err;
       auto doc = xanatoo::nostr_fetch_thread(target, &err);
-      if (!doc) {
-        flash_status("Nostr failed: " + err);
-        std::cerr << "Nostr: " << err << "\n";
-        return false;
-      }
-      if (!allow_discard_dirty(p.buf)) return false;
-      std::string label = target;
-      if (label.size() > 64) label = label.substr(0, 64) + "…";
-      load_into_pane(std::move(*doc), label);
-      if (std::find(tab_order.begin(), tab_order.end(), p.buf) ==
-          tab_order.end())
-        tab_order.push_back(p.buf);
-      if (record_history) push_nav_history(target);
-      flash_status("Opened Nostr thread");
-      needs_layout = true;
-      update_title();
-      return true;
+      return finish_remote_open(std::move(doc), err, "Nostr", target, 64,
+                                target);
 #else
       flash_status("Nostr needs build with -DXANATOO_NOSTR=ON");
       return false;
@@ -1081,23 +1087,8 @@ int main(int argc, char** argv) {
       flash_status("Fetching Reddit…");
       std::string err;
       auto doc = xanatoo::reddit_fetch(target, &err);
-      if (!doc) {
-        flash_status("Reddit failed: " + err);
-        std::cerr << "Reddit: " << err << "\n";
-        return false;
-      }
-      if (!allow_discard_dirty(p.buf)) return false;
-      std::string label = target;
-      if (label.size() > 72) label = label.substr(0, 72) + "…";
-      load_into_pane(std::move(*doc), label);
-      if (std::find(tab_order.begin(), tab_order.end(), p.buf) ==
-          tab_order.end())
-        tab_order.push_back(p.buf);
-      if (record_history) push_nav_history(target);
-      flash_status("Opened Reddit");
-      needs_layout = true;
-      update_title();
-      return true;
+      return finish_remote_open(std::move(doc), err, "Reddit", target, 72,
+                                target);
 #else
       flash_status("Reddit needs build with -DXANATOO_REDDIT=ON");
       return false;
@@ -1110,23 +1101,8 @@ int main(int argc, char** argv) {
       flash_status("Fetching Lemmy…");
       std::string err;
       auto doc = xanatoo::lemmy_fetch(target, &err);
-      if (!doc) {
-        flash_status("Lemmy failed: " + err);
-        std::cerr << "Lemmy: " << err << "\n";
-        return false;
-      }
-      if (!allow_discard_dirty(p.buf)) return false;
-      std::string label = target;
-      if (label.size() > 72) label = label.substr(0, 72) + "…";
-      load_into_pane(std::move(*doc), label);
-      if (std::find(tab_order.begin(), tab_order.end(), p.buf) ==
-          tab_order.end())
-        tab_order.push_back(p.buf);
-      if (record_history) push_nav_history(target);
-      flash_status("Opened Lemmy");
-      needs_layout = true;
-      update_title();
-      return true;
+      return finish_remote_open(std::move(doc), err, "Lemmy", target, 72,
+                                target);
 #else
       flash_status("Lemmy needs build with -DXANATOO_LEMMY=ON");
       return false;

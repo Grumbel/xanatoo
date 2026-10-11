@@ -6,9 +6,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **214** (this delivery is **213**)
+Next bundle number: **215** (this delivery is **214**)
 
 ## Status (2026-10-11)
+
+navigate_to_url: shared finish_remote_open for Nostr/Reddit/Lemmy.
 
 Nostr: use shared json_min.hpp (drop local JSON helpers).
 
@@ -563,4 +565,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-209.*-nostr-shared-ssl-…` — prior (Nostr SSL init + small cleanups)
 - `xanatoo-211.*-fix-remote-url-capture-…` — prior
 - `xanatoo-212.*-shared-string-helpers-…` — prior
-- `xanatoo-213.*-nostr-json-min-…` — this delivery
+- `xanatoo-213.*-nostr-json-min-…` — prior
+- `xanatoo-214.*-finish-remote-open-…` — this delivery
