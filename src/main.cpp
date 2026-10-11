@@ -1266,6 +1266,34 @@ int main(int argc, char** argv) {
               }
             }
 
+            // Click list-item marker column → toggle GFM task checkbox
+            {
+              bool toggled = false;
+              float adj_y = my + p.scroll_y;
+              for (const auto& box : p.layout.boxes) {
+                if (adj_y < box.y || adj_y > box.y + box.height) continue;
+                if (lx < box.x || lx > box.x + 26.f) continue;
+                auto& bn = doc_of(p).get(box.node);
+                if (bn.kind != xanatoo::NodeKind::ListItem) continue;
+                // Ordered items keep numbers unless already a task.
+                if (bn.level > 0 && bn.label != "task" &&
+                    bn.label != "task-done")
+                  continue;
+                edit();
+                if (bn.label == "task")
+                  bn.label = "task-done";
+                else if (bn.label == "task-done")
+                  bn.label = "task";
+                else
+                  bn.label = "task";  // bullet → unchecked task
+                needs_layout = true;
+                reset_blink();
+                toggled = true;
+                break;
+              }
+              if (toggled) break;
+            }
+
             // Click a transclusion → jump to local source, or open external file
             {
               bool followed = false;
