@@ -677,6 +677,35 @@ static void copy_node_deep(Document& doc, NodeId src_id, NodeId new_parent,
 
 std::optional<NodeId> duplicate_block(Document& doc, NodeId block) {
   if (block == INVALID_NODE) return std::nullopt;
+  // Prefer a structural unit: Caption/Image inside Figure → whole Figure;
+  // TableCell/TableRow → whole Table.
+  {
+    NodeId walk = block;
+    for (int guard = 0; guard < 8 && walk != INVALID_NODE; ++guard) {
+      const Node& n = doc.get(walk);
+      if (n.kind == NodeKind::Caption || n.kind == NodeKind::Image) {
+        if (n.parent != INVALID_NODE &&
+            doc.get(n.parent).kind == NodeKind::Figure) {
+          walk = n.parent;
+          continue;
+        }
+      }
+      if (n.kind == NodeKind::TableCell || n.kind == NodeKind::TableRow) {
+        if (n.parent != INVALID_NODE) {
+          walk = n.parent;
+          continue;
+        }
+      }
+      break;
+    }
+    // Climb to Table if we stopped on a TableRow
+    if (walk != INVALID_NODE && doc.get(walk).kind == NodeKind::TableRow &&
+        doc.get(walk).parent != INVALID_NODE &&
+        doc.get(doc.get(walk).parent).kind == NodeKind::Table) {
+      walk = doc.get(walk).parent;
+    }
+    block = walk;
+  }
   Node& src = doc.get(block);
   if (src.parent == INVALID_NODE) return std::nullopt;
 
@@ -686,6 +715,7 @@ std::optional<NodeId> duplicate_block(Document& doc, NodeId block) {
   dst.level = src.level;
   dst.alt = src.alt;
   dst.src = src.src;
+  dst.label = src.label;
   dst.expanded = src.expanded;
   dst.summary = src.summary;
   dst.display_scale = src.display_scale;
@@ -702,6 +732,8 @@ std::optional<NodeId> duplicate_block(Document& doc, NodeId block) {
     // fallback: append under parent
     doc.add_child(src.parent, nid);
   }
+  if (src.parent != INVALID_NODE && doc.get(src.parent).kind == NodeKind::List)
+    renumber_ordered_list(doc, src.parent);
   return nid;
 }
 
@@ -1156,6 +1188,7 @@ static void copy_node_deep(Document& doc, NodeId src_id, NodeId new_parent,
   dst.level = src.level;
   dst.alt = src.alt;
   dst.src = src.src;
+  dst.label = src.label;
   dst.expanded = src.expanded;
   dst.summary = src.summary;
   dst.display_scale = src.display_scale;

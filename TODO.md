@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **098** (this delivery is **097**)
+Next bundle number: **099** (this delivery is **098**)
 
 ## Status (2026-10-11)
 
@@ -164,6 +164,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Replace All (leap/replace mode + Edit menu)
 - [x] Paste into code blocks preserves newlines
 - [x] Soft-window docks reflow on window resize
+- [x] duplicate_block copies label + climbs to Figure/Table; menu + context items
 
 ## Open work / next steps
 
@@ -310,4 +311,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-094.*-insert-include-…` — insert include GUI
 - `xanatoo-095.*-figure-headings-…` — figure + heading menu
 - `xanatoo-096.*-replace-all-…` — replace all
-- `xanatoo-097.*-paste-dock-…` — this delivery
+- `xanatoo-097.*-paste-dock-…` — code paste + dock resize
+- `xanatoo-098.*-duplicate-gui-…` — this delivery

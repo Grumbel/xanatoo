@@ -2946,6 +2946,31 @@ int main(int argc, char** argv) {
           if (p.sel.focus.node != xanatoo::INVALID_NODE)
             xanatoo::select_node(d, p.sel, p.sel.focus.node);
           break;
+        case C::DuplicateBlock:
+          edit();
+          if (auto nid = xanatoo::duplicate_block(d, p.sel.focus.node)) {
+            p.sel.focus.node = *nid;
+            p.sel.focus.span_index = 0;
+            p.sel.focus.char_index = 0;
+            p.sel.anchor = p.sel.focus;
+            needs_layout = true;
+            reset_blink();
+          }
+          break;
+        case C::MoveBlockUp:
+          edit();
+          if (xanatoo::move_block_up(d, p.sel.focus.node)) {
+            needs_layout = true;
+            reset_blink();
+          }
+          break;
+        case C::MoveBlockDown:
+          edit();
+          if (xanatoo::move_block_down(d, p.sel.focus.node)) {
+            needs_layout = true;
+            reset_blink();
+          }
+          break;
         case C::Find:
           search_mode = true;
           replace_mode = false;

@@ -421,6 +421,12 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Paste", UiCommand::Paste, cmd, true, "Ctrl+V");
       menu_item_cmd("Select Block", UiCommand::SelectBlock, cmd, true, "Ctrl+A");
       menu_item_cmd("Select All", UiCommand::SelectAll, cmd, true, "Ctrl+Shift+A");
+      menu_item_cmd("Duplicate Block", UiCommand::DuplicateBlock, cmd, true,
+                    "Ctrl+D");
+      menu_item_cmd("Move Block Up", UiCommand::MoveBlockUp, cmd, true,
+                    "Alt+Up");
+      menu_item_cmd("Move Block Down", UiCommand::MoveBlockDown, cmd, true,
+                    "Alt+Down");
       ImGui::Separator();
       menu_item_cmd("Find…", UiCommand::Find, cmd, true, "Ctrl+F");
       menu_item_cmd("Replace…", UiCommand::Replace, cmd, true, "Ctrl+H");
@@ -578,6 +584,11 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     }
     ImGui::Separator();
     menu_item_cmd("Select Block", UiCommand::SelectBlock, cmd, true, "Ctrl+A");
+    menu_item_cmd("Duplicate Block", UiCommand::DuplicateBlock, cmd, true,
+                  "Ctrl+D");
+    menu_item_cmd("Move Block Up", UiCommand::MoveBlockUp, cmd, true, "Alt+Up");
+    menu_item_cmd("Move Block Down", UiCommand::MoveBlockDown, cmd, true,
+                  "Alt+Down");
     if (ImGui::MenuItem("Structure Highlight", "Ctrl+Shift+L", state.structure))
       cmd = UiCommand::ToggleStructure;
     ImGui::EndPopup();
