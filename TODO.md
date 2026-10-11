@@ -6,9 +6,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **218** (this delivery is **217**)
+Next bundle number: **219** (this delivery is **218**)
 
 ## Status (2026-10-11)
+
+More unit tests: sexpr parse, format paths, stretch/link (130 asserts).
 
 More unit tests: org parse, path helpers, parse_document dispatch (109 asserts).
 
@@ -575,4 +577,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-214.*-finish-remote-open-…` — prior
 - `xanatoo-215.*-unit-tests-…` — prior
 - `xanatoo-216.*-expand-unit-tests-…` — prior
-- `xanatoo-217.*-more-unit-tests-…` — this delivery
+- `xanatoo-217.*-more-unit-tests-…` — prior
+- `xanatoo-218.*-sexpr-unit-tests-…` — this delivery

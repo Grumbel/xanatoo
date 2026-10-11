@@ -348,6 +348,103 @@ void test_reddit_json_url_shapes() {
   EXPECT(c.find(".json") != std::string::npos);
 }
 
+
+void test_path_format_dispatch() {
+  using namespace xanatoo;
+  EXPECT(path_uses_sexpr("doc.sexp"));
+  EXPECT(path_uses_sexpr("x.glyph"));
+  EXPECT(path_uses_sexpr("y.ss"));
+  EXPECT(!path_uses_sexpr("doc.md"));
+  EXPECT(path_uses_gemtext("page.gmi"));
+  EXPECT(path_uses_gemtext("page.gemini"));
+  EXPECT(!path_uses_gemtext("page.md"));
+  EXPECT(looks_like_sexpr("  ; comment\n(doc (p \"x\"))"));
+  EXPECT(!looks_like_sexpr("# Markdown title\n"));
+}
+
+void test_parse_sexpr() {
+  using namespace xanatoo;
+  Document doc = parse_sexpr(
+      "(doc\n"
+      "  (h 1 \"Title\")\n"
+      "  (p \"Hello \" (em \"world\") \"!\")\n"
+      "  (ul (li \"a\") (li \"b\"))\n"
+      "  (hr))\n");
+  EXPECT(doc.root != INVALID_NODE);
+
+  int headings = 0, paragraphs = 0, list_items = 0, hrs = 0;
+  bool found_em = false;
+  std::vector<NodeId> stack{doc.root};
+  while (!stack.empty()) {
+    NodeId id = stack.back();
+    stack.pop_back();
+    const Node& n = doc.get(id);
+    if (n.kind == NodeKind::Heading || n.kind == NodeKind::Header)
+      ++headings;
+    if (n.kind == NodeKind::Paragraph) ++paragraphs;
+    if (n.kind == NodeKind::ListItem) ++list_items;
+    if (n.kind == NodeKind::HorizontalRule) ++hrs;
+    for (const auto& sp : n.spans) {
+      if (sp.kind == InlineKind::Emphasis ||
+          sp.text.find("world") != std::string::npos)
+        found_em = true;
+    }
+    for (auto c : n.children) stack.push_back(c);
+  }
+  EXPECT(headings >= 1);
+  EXPECT(paragraphs >= 1);
+  EXPECT(list_items >= 2);
+  EXPECT(hrs >= 1);
+  EXPECT(found_em);
+
+  std::string out = serialize_sexpr(doc);
+  EXPECT(out.find("(doc") != std::string::npos ||
+         out.find("doc") != std::string::npos);
+}
+
+void test_parse_document_sexpr_path() {
+  using namespace xanatoo;
+  Document doc = parse_document("(doc (h 1 \"X\"))\n", "note.sexp");
+  EXPECT(doc.root != INVALID_NODE);
+  int headings = 0;
+  std::vector<NodeId> stack{doc.root};
+  while (!stack.empty()) {
+    NodeId id = stack.back();
+    stack.pop_back();
+    const Node& n = doc.get(id);
+    if (n.kind == NodeKind::Heading || n.kind == NodeKind::Header)
+      ++headings;
+    for (auto c : n.children) stack.push_back(c);
+  }
+  EXPECT(headings >= 1);
+}
+
+void test_markup_stretch_and_link() {
+  using namespace xanatoo;
+  Document doc = parse_document(
+      "# H\n\n"
+      ":::stretch summary=\"More\"\n"
+      "Hidden body\n"
+      ":::\n\n"
+      "See [here](https://example.com).\n",
+      "t.md");
+  EXPECT(doc.root != INVALID_NODE);
+  bool found_stretch = false, found_link = false;
+  std::vector<NodeId> stack{doc.root};
+  while (!stack.empty()) {
+    NodeId id = stack.back();
+    stack.pop_back();
+    const Node& n = doc.get(id);
+    if (n.kind == NodeKind::Stretch) found_stretch = true;
+    for (const auto& sp : n.spans) {
+      if (sp.kind == InlineKind::Link) found_link = true;
+    }
+    for (auto c : n.children) stack.push_back(c);
+  }
+  EXPECT(found_stretch);
+  EXPECT(found_link);
+}
+
 }  // namespace
 
 int main() {
@@ -365,6 +462,10 @@ int main() {
   test_parse_org();
   test_parse_document_dispatch();
   test_reddit_json_url_shapes();
+  test_path_format_dispatch();
+  test_parse_sexpr();
+  test_parse_document_sexpr_path();
+  test_markup_stretch_and_link();
 
   std::printf("%d passed, %d failed\n", g_passed, g_failed);
   return g_failed == 0 ? 0 : 1;
