@@ -177,3 +177,18 @@ Outline depth is the nesting count of `section`/`article` ancestors (legacy
 ATX `#` headers may still carry a soft depth hint). Commands: **Header**
 (`Ctrl+1`), **Wrap in Section** (`Ctrl+Shift+1`), **Wrap in Article**
 (`Ctrl+Shift+2`), **Unwrap Section/Article**.
+
+## Gemtext (Gemini)
+
+Line-oriented `text/gemini` (extensions `.gmi`, `.gemini`):
+
+| Line | Mapping |
+|------|---------|
+| `#` / `##` / `###` | Header |
+| `* item` | List / ListItem |
+| `> quote` | BlockQuote |
+| `=> url [label]` | Paragraph with Link span |
+| ` ``` ` fence | CodeBlock |
+| other non-empty | Paragraph |
+
+Network: `gemini://` via optional OpenSSL client (`XANATOO_GEMINI`).

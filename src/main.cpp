@@ -8,6 +8,7 @@
 #include "xanatoo/layout.hpp"
 #include "xanatoo/render.hpp"
 #include "xanatoo/parse.hpp"
+#include "xanatoo/gemini.hpp"
 #include "xanatoo/editor.hpp"
 #include "xanatoo/images.hpp"
 #include "xanatoo/ui.hpp"
@@ -20,6 +21,7 @@
 #include <filesystem>
 #include <algorithm>
 #include <fstream>
+#include <cctype>
 #include <cstdlib>
 #include <cmath>
 #include <cstring>
@@ -271,6 +273,9 @@ int main(int argc, char** argv) {
   bool path_in_window_mode = false;
   std::string path_in_window_buf;
   bool open_file_mode = false;  // File→Open into focused pane (status-bar path)
+  bool url_bar_mode = false;    // Ctrl+L — open gemini:// or file path
+  std::string url_bar_buf;
+  std::string gemini_current_url;  // base for relative gemini links
   std::string open_file_buf;
   std::string status_notice;
   Uint32 status_notice_until = 0;
@@ -1286,14 +1291,16 @@ int main(int argc, char** argv) {
 
             // Clicking the document dismisses status-bar prompts (Esc also works).
             if (save_as_mode || path_in_window_mode || open_file_mode ||
-                image_insert_mode || include_insert_mode || link_edit_mode ||
-                summary_edit_mode) {
+                url_bar_mode || image_insert_mode || include_insert_mode ||
+                link_edit_mode || summary_edit_mode) {
               save_as_mode = false;
               save_as_path.clear();
               path_in_window_mode = false;
               path_in_window_buf.clear();
               open_file_mode = false;
               open_file_buf.clear();
+              url_bar_mode = false;
+              url_bar_buf.clear();
               image_insert_mode = false;
               image_insert_path.clear();
               image_insert_as_figure = false;
@@ -1455,6 +1462,59 @@ int main(int argc, char** argv) {
                 reset_blink();
                 break;
               } else if (!href->empty() && (*href)[0] != '#') {
+                std::string abs = *href;
+                if (!xanatoo::is_gemini_url(abs) && !gemini_current_url.empty()) {
+                  std::string resolved =
+                      xanatoo::resolve_gemini_url(gemini_current_url, abs);
+                  if (!resolved.empty()) abs = resolved;
+                }
+                if (xanatoo::is_gemini_url(abs)) {
+                  // Queue via URL bar path: set buffer and synthesise load
+                  url_bar_buf = abs;
+                  url_bar_mode = true;
+                  // Fall through: inject by reusing Enter logic is heavy;
+                  // set mode and let user press Enter, or fetch immediately.
+                  url_bar_mode = false;
+                  // Immediate fetch: store and use a one-shot by setting
+                  // open via same mechanism as Ctrl+L Enter.
+                  // Simplest: put URL in buffer and process as Enter would.
+                  {
+                    std::string target = abs;
+#if defined(XANATOO_GEMINI) && XANATOO_GEMINI
+                    flash_status("Fetching " + target + "…");
+                    std::string err;
+                    auto resp = xanatoo::gemini_fetch(target, &err);
+                    if (!resp) {
+                      flash_status("Gemini failed: " + err);
+                    } else if (resp->status >= 20 && resp->status < 30) {
+                      auto gdoc = xanatoo::parse_gemtext(resp->body);
+                      if (allow_discard_dirty(p.doc_index)) {
+                        docs[p.doc_index] = std::move(gdoc);
+                        path_of(p) = resp->final_url;
+                        gemini_current_url = resp->final_url;
+                        dirty_flags[p.doc_index] = false;
+                        xanatoo::ensure_valid_caret(docs[p.doc_index],
+                                                    p.sel.focus);
+                        p.sel.anchor = p.sel.focus;
+                        p.scroll_y = 0.f;
+                        histories[p.doc_index].reset(docs[p.doc_index], p.sel);
+                        needs_layout = true;
+                        update_title();
+                        browse_mode = true;
+                        flash_status("Gemini " + resp->final_url);
+                      }
+                    } else {
+                      flash_status("Gemini status " +
+                                   std::to_string(resp->status) + " " +
+                                   resp->meta);
+                    }
+#else
+                    flash_status("Gemini client disabled at build time");
+                    (void)target;
+#endif
+                  }
+                  break;
+                }
                 flash_status("Opening " + *href);
                 std::cout << "Opening external link: " << *href << "\n";
                 xanatoo::open_external_url(*href);
@@ -2000,6 +2060,10 @@ int main(int argc, char** argv) {
             open_file_buf += ev.text.text;
             break;
           }
+          if (url_bar_mode) {
+            url_bar_buf += ev.text.text;
+            break;
+          }
           if (image_insert_mode) {
             image_insert_path += ev.text.text;
             break;
@@ -2157,8 +2221,8 @@ int main(int argc, char** argv) {
           // arrows do not move the caret while typing a path or query.
           const bool status_prompt =
               save_as_mode || path_in_window_mode || open_file_mode ||
-              image_insert_mode || include_insert_mode || link_edit_mode ||
-              summary_edit_mode || search_mode;
+              url_bar_mode || image_insert_mode || include_insert_mode ||
+              link_edit_mode || summary_edit_mode || search_mode;
           if (status_prompt) {
             const SDL_Keycode k = ev.key.keysym.sym;
             const bool prompt_key =
@@ -2189,6 +2253,7 @@ int main(int argc, char** argv) {
                 k == SDLK_LEFTBRACKET || k == SDLK_RIGHTBRACKET ||
                 (ctrl && (k == SDLK_q || k == SDLK_o || k == SDLK_f ||
                           k == SDLK_g || k == SDLK_BACKSLASH || k == SDLK_l ||
+                          k == SDLK_l ||
                           k == SDLK_EQUALS || k == SDLK_MINUS ||
                           k == SDLK_PLUS || k == SDLK_KP_PLUS ||
                           k == SDLK_KP_MINUS)) ||
@@ -2283,6 +2348,9 @@ int main(int argc, char** argv) {
               } else if (open_file_mode) {
                 open_file_mode = false;
                 open_file_buf.clear();
+              } else if (url_bar_mode) {
+                url_bar_mode = false;
+                url_bar_buf.clear();
               } else if (image_insert_mode) {
                 image_insert_mode = false;
                 image_insert_as_figure = false;
@@ -2542,6 +2610,16 @@ int main(int argc, char** argv) {
                 }
                 break;
               }
+              if (url_bar_mode) {
+                if (!url_bar_buf.empty()) {
+                  while (!url_bar_buf.empty() &&
+                         (static_cast<unsigned char>(url_bar_buf.back()) & 0xc0) ==
+                             0x80)
+                    url_bar_buf.pop_back();
+                  if (!url_bar_buf.empty()) url_bar_buf.pop_back();
+                }
+                break;
+              }
               if (save_as_mode) {
                 if (!save_as_path.empty()) {
                   while (!save_as_path.empty() &&
@@ -2747,6 +2825,98 @@ int main(int argc, char** argv) {
                 }
                 path_in_window_mode = false;
                 path_in_window_buf.clear();
+                break;
+              }
+              if (url_bar_mode) {
+                std::string target = url_bar_buf;
+                while (!target.empty() &&
+                       (target.back() == ' ' || target.back() == '\t'))
+                  target.pop_back();
+                url_bar_mode = false;
+                url_bar_buf.clear();
+                if (target.empty()) break;
+
+                auto load_into_pane = [&](xanatoo::Document doc,
+                                         const std::string& label) {
+                  if (!allow_discard_dirty(p.doc_index)) {
+                    flash_status(
+                        "Unsaved changes — save or discard before loading");
+                    return;
+                  }
+                  docs[p.doc_index] = std::move(doc);
+                  path_of(p) = label;
+                  dirty_flags[p.doc_index] = false;
+                  xanatoo::ensure_valid_caret(docs[p.doc_index], p.sel.focus);
+                  p.sel.anchor = p.sel.focus;
+                  p.scroll_y = 0.f;
+                  histories[p.doc_index].reset(docs[p.doc_index], p.sel);
+                  if (panes[0].doc_index == panes[1].doc_index) {
+                    panes[1 - focus].sel = p.sel;
+                    panes[1 - focus].scroll_y = 0.f;
+                  }
+                  needs_layout = true;
+                  update_title();
+                };
+
+                if (xanatoo::is_gemini_url(target)) {
+#if defined(XANATOO_GEMINI) && XANATOO_GEMINI
+                  flash_status("Fetching " + target + "…");
+                  std::string err;
+                  auto resp = xanatoo::gemini_fetch(target, &err);
+                  if (!resp) {
+                    flash_status("Gemini failed: " + err);
+                    std::cerr << "Gemini: " << err << "\n";
+                    break;
+                  }
+                  if (resp->status == 10 || resp->status == 11) {
+                    flash_status("Gemini input required: " + resp->meta);
+                    break;
+                  }
+                  if (resp->status < 20 || resp->status >= 30) {
+                    flash_status("Gemini status " + std::to_string(resp->status) +
+                                " " + resp->meta);
+                    break;
+                  }
+                  // 20 success — body is gemtext unless meta says otherwise
+                  std::string meta = resp->meta;
+                  for (char& c : meta)
+                    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                  xanatoo::Document gdoc;
+                  if (meta.find("text/gemini") != std::string::npos ||
+                      meta.empty() || meta.find("text/plain") != std::string::npos) {
+                    gdoc = xanatoo::parse_gemtext(resp->body);
+                  } else if (meta.find("text/markdown") != std::string::npos ||
+                             meta.find("text/x-markdown") != std::string::npos) {
+                    gdoc = xanatoo::parse_document(resp->body, "remote.md");
+                  } else {
+                    // Treat as plain text paragraphs
+                    gdoc = xanatoo::parse_gemtext(resp->body);
+                  }
+                  gemini_current_url = resp->final_url;
+                  load_into_pane(std::move(gdoc), resp->final_url);
+                  browse_mode = true;
+                  flash_status("Gemini " + std::to_string(resp->status) + " " +
+                               resp->final_url);
+#else
+                  flash_status(
+                      "Gemini client disabled (build with -DXANATOO_GEMINI=ON)");
+#endif
+                  break;
+                }
+
+                // Local path
+                std::string path = target;
+                if (!fs::exists(path)) {
+                  std::string found = find_repo_file(path.c_str());
+                  if (!found.empty()) path = found;
+                }
+                if (!fs::exists(path)) {
+                  flash_status("Not found: " + target);
+                  break;
+                }
+                gemini_current_url.clear();
+                load_into_pane(load_doc(path), path);
+                flash_status("Opened " + path);
                 break;
               }
               if (open_file_mode) {
@@ -3137,6 +3307,8 @@ int main(int argc, char** argv) {
                       append_clip(path_in_window_buf);
                     } else if (open_file_mode) {
                       append_clip(open_file_buf);
+                    } else if (url_bar_mode) {
+                      append_clip(url_bar_buf);
                     } else if (image_insert_mode) {
                       append_clip(image_insert_path);
                     } else if (include_insert_mode) {
@@ -3348,6 +3520,15 @@ int main(int argc, char** argv) {
                                             : "Structure highlight off");
                 std::cout << (structure_mode ? "Structure highlight on\n"
                                              : "Structure highlight off\n");
+              } else if (ctrl && !shift) {
+                // URL bar — gemini:// or local path
+                url_bar_mode = true;
+                url_bar_buf = gemini_current_url.empty() ? "gemini://"
+                                                        : gemini_current_url;
+                search_mode = false;
+                save_as_mode = false;
+                open_file_mode = false;
+                path_in_window_mode = false;
               }
               break;
 
@@ -4699,8 +4880,8 @@ int main(int argc, char** argv) {
       const int bar_h = 28;
       SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
       if (search_mode || save_as_mode || path_in_window_mode || open_file_mode ||
-          link_edit_mode || summary_edit_mode || image_insert_mode ||
-          include_insert_mode) {
+          url_bar_mode || link_edit_mode || summary_edit_mode ||
+          image_insert_mode || include_insert_mode) {
         SDL_SetRenderDrawColor(sdl, 30, 30, 40, 240);
       } else {
         SDL_SetRenderDrawColor(sdl, 236, 234, 228, 245);
@@ -4709,8 +4890,8 @@ int main(int argc, char** argv) {
       SDL_RenderFillRect(sdl, &bar);
       // Top edge line
       if (search_mode || save_as_mode || path_in_window_mode || open_file_mode ||
-          link_edit_mode || summary_edit_mode || image_insert_mode ||
-          include_insert_mode) {
+          url_bar_mode || link_edit_mode || summary_edit_mode ||
+          image_insert_mode || include_insert_mode) {
         SDL_SetRenderDrawColor(sdl, 80, 160, 255, 255);
       } else {
         SDL_SetRenderDrawColor(sdl, 200, 198, 190, 255);
@@ -4729,6 +4910,11 @@ int main(int argc, char** argv) {
         label = "Open file: ";
         label += open_file_buf.empty() ? "…" : open_file_buf;
         label += "    Enter open · Esc cancel";
+        tr = 220; tg = 230; tb = 245;
+      } else if (url_bar_mode) {
+        label = "URL: ";
+        label += url_bar_buf.empty() ? "…" : url_bar_buf;
+        label += "    Enter go · Esc cancel · gemini:// or path";
         tr = 220; tg = 230; tb = 245;
       } else if (save_as_mode) {
         label = "Save as: ";

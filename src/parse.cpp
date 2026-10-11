@@ -2927,6 +2927,266 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
 
 }  // namespace
 
+
+bool path_uses_gemtext(std::string_view path) {
+  return path_ends_with_ci(path, ".gmi") || path_ends_with_ci(path, ".gemini");
+}
+
+bool looks_like_gemtext(std::string_view source) {
+  // Weak heuristic: several gemtext-only line leaders and few markdown tables.
+  int gem_lines = 0, lines = 0;
+  size_t i = 0;
+  while (i < source.size() && lines < 40) {
+    size_t eol = source.find('\n', i);
+    if (eol == std::string_view::npos) eol = source.size();
+    std::string_view line = source.substr(i, eol - i);
+    if (!line.empty() && line.back() == '\r') line.remove_suffix(1);
+    ++lines;
+    if (line.starts_with("=>") || line.starts_with("```") ||
+        (line.size() >= 2 && line[0] == '*' && line[1] == ' ') ||
+        (line.size() >= 2 && line[0] == '>' && line[1] == ' '))
+      ++gem_lines;
+    i = (eol < source.size()) ? eol + 1 : source.size();
+  }
+  return gem_lines >= 3;
+}
+
+static std::string_view gem_trim(std::string_view s) {
+  while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) s.remove_prefix(1);
+  while (!s.empty() && (s.back() == ' ' || s.back() == '\t' || s.back() == '\r'))
+    s.remove_suffix(1);
+  return s;
+}
+
+Document parse_gemtext(std::string_view source) {
+  Document doc;
+  NodeId root = doc.create(NodeKind::Document);
+  std::vector<std::string_view> lines;
+  {
+    size_t i = 0;
+    while (i < source.size()) {
+      size_t eol = source.find('\n', i);
+      if (eol == std::string_view::npos) {
+        lines.push_back(source.substr(i));
+        break;
+      }
+      std::string_view line = source.substr(i, eol - i);
+      if (!line.empty() && line.back() == '\r') line.remove_suffix(1);
+      lines.push_back(line);
+      i = eol + 1;
+    }
+  }
+
+  bool pre = false;
+  std::string pre_lang;
+  std::string pre_body;
+  NodeId list_id = INVALID_NODE;
+
+  auto flush_pre = [&]() {
+    if (!pre && pre_body.empty()) return;
+    NodeId n = doc.create(NodeKind::CodeBlock, root);
+    if (!pre_lang.empty()) doc.get(n).label = pre_lang;
+    doc.append_text(n, pre_body);
+    pre_body.clear();
+    pre_lang.clear();
+  };
+
+  auto end_list = [&]() { list_id = INVALID_NODE; };
+
+  for (size_t li = 0; li < lines.size(); ++li) {
+    std::string_view raw = lines[li];
+
+    if (pre) {
+      if (raw.starts_with("```")) {
+        pre = false;
+        flush_pre();
+        end_list();
+      } else {
+        if (!pre_body.empty()) pre_body.push_back('\n');
+        pre_body.append(raw);
+      }
+      continue;
+    }
+
+    if (raw.starts_with("```")) {
+      end_list();
+      pre = true;
+      pre_lang = std::string(gem_trim(raw.substr(3)));
+      pre_body.clear();
+      continue;
+    }
+
+    // Link: => URL [label]
+    if (raw.starts_with("=>")) {
+      end_list();
+      std::string_view rest = gem_trim(raw.substr(2));
+      size_t sp = 0;
+      while (sp < rest.size() && rest[sp] != ' ' && rest[sp] != '\t') ++sp;
+      std::string url(rest.substr(0, sp));
+      std::string_view label = gem_trim(rest.substr(sp));
+      NodeId n = doc.create(NodeKind::Paragraph, root);
+      InlineSpan span;
+      span.kind = InlineKind::Link;
+      span.href = url;
+      span.text = label.empty() ? url : std::string(label);
+      doc.get(n).spans.push_back(std::move(span));
+      continue;
+    }
+
+    // Headings: # ## ### (gemtext only defines three levels)
+    if (!raw.empty() && raw[0] == '#') {
+      end_list();
+      int level = 0;
+      while (level < static_cast<int>(raw.size()) && raw[static_cast<size_t>(level)] == '#')
+        ++level;
+      if (level > 3) level = 3;
+      size_t skip = static_cast<size_t>(level);
+      if (skip < raw.size() && (raw[skip] == ' ' || raw[skip] == '\t')) ++skip;
+      NodeId n = doc.create(NodeKind::Header, root);
+      doc.get(n).level = level;  // soft depth hint only
+      std::string_view title = gem_trim(raw.substr(skip));
+      if (!title.empty()) doc.append_text(n, std::string(title));
+      continue;
+    }
+
+    // List item
+    if (raw.size() >= 2 && raw[0] == '*' && (raw[1] == ' ' || raw[1] == '\t')) {
+      if (list_id == INVALID_NODE) {
+        list_id = doc.create(NodeKind::List, root);
+        doc.get(list_id).level = 0;
+      }
+      NodeId item = doc.create(NodeKind::ListItem, list_id);
+      doc.get(item).level = 0;
+      std::string_view body = gem_trim(raw.substr(2));
+      if (!body.empty()) doc.append_text(item, std::string(body));
+      continue;
+    }
+
+    // Quote
+    if (!raw.empty() && raw[0] == '>') {
+      end_list();
+      size_t skip = 1;
+      if (skip < raw.size() && (raw[skip] == ' ' || raw[skip] == '\t')) ++skip;
+      NodeId n = doc.create(NodeKind::BlockQuote, root);
+      std::string_view body = gem_trim(raw.substr(skip));
+      if (!body.empty()) doc.append_text(n, std::string(body));
+      continue;
+    }
+
+    // Blank line ends a list
+    if (gem_trim(raw).empty()) {
+      end_list();
+      continue;
+    }
+
+    // Text line → paragraph
+    end_list();
+    NodeId n = doc.create(NodeKind::Paragraph, root);
+    doc.append_text(n, std::string(raw));
+  }
+
+  if (pre) flush_pre();
+  return doc;
+}
+
+static void gemtext_escape_line(std::string& out, std::string_view text) {
+  // Gemtext has no inline escapes; strip control chars only.
+  for (char ch : text) {
+    if (ch == '\n' || ch == '\r')
+      out.push_back(' ');
+    else if (static_cast<unsigned char>(ch) >= 32 || ch == '\t')
+      out.push_back(ch);
+  }
+}
+
+static std::string gemtext_plain(const Node& n) {
+  std::string s;
+  for (const auto& sp : n.spans) s += sp.text;
+  return s;
+}
+
+static void serialize_gemtext_node(const Document& doc, NodeId id, std::string& out) {
+  if (id == INVALID_NODE) return;
+  const Node& n = doc.get(id);
+  switch (n.kind) {
+    case NodeKind::Document:
+      for (NodeId c : n.children) serialize_gemtext_node(doc, c, out);
+      break;
+    case NodeKind::Header:
+    case NodeKind::Heading: {
+      int lv = n.level > 0 ? std::min(3, n.level) : 1;
+      out.append(static_cast<size_t>(lv), '#');
+      out.push_back(' ');
+      gemtext_escape_line(out, gemtext_plain(n));
+      out.push_back('\n');
+      break;
+    }
+    case NodeKind::Paragraph: {
+      // If a single link span, emit => form
+      if (n.spans.size() == 1 && n.spans[0].kind == InlineKind::Link &&
+          !n.spans[0].href.empty()) {
+        out += "=> ";
+        out += n.spans[0].href;
+        if (!n.spans[0].text.empty() && n.spans[0].text != n.spans[0].href) {
+          out.push_back(' ');
+          gemtext_escape_line(out, n.spans[0].text);
+        }
+        out.push_back('\n');
+      } else {
+        gemtext_escape_line(out, gemtext_plain(n));
+        out.push_back('\n');
+      }
+      break;
+    }
+    case NodeKind::List:
+      for (NodeId c : n.children) serialize_gemtext_node(doc, c, out);
+      out.push_back('\n');
+      break;
+    case NodeKind::ListItem: {
+      out += "* ";
+      gemtext_escape_line(out, gemtext_plain(n));
+      out.push_back('\n');
+      for (NodeId c : n.children) serialize_gemtext_node(doc, c, out);
+      break;
+    }
+    case NodeKind::BlockQuote: {
+      out += "> ";
+      gemtext_escape_line(out, gemtext_plain(n));
+      out.push_back('\n');
+      break;
+    }
+    case NodeKind::CodeBlock: {
+      out += "```";
+      if (!n.label.empty()) out += n.label;
+      out.push_back('\n');
+      out += gemtext_plain(n);
+      if (!out.empty() && out.back() != '\n') out.push_back('\n');
+      out += "```\n";
+      break;
+    }
+    case NodeKind::Section:
+    case NodeKind::Article:
+      for (NodeId c : n.children) serialize_gemtext_node(doc, c, out);
+      break;
+    case NodeKind::HorizontalRule:
+      out += "\n";
+      break;
+    default:
+      for (NodeId c : n.children) serialize_gemtext_node(doc, c, out);
+      if (!n.spans.empty()) {
+        gemtext_escape_line(out, gemtext_plain(n));
+        out.push_back('\n');
+      }
+      break;
+  }
+}
+
+std::string serialize_gemtext(const Document& doc) {
+  std::string out;
+  if (doc.root != INVALID_NODE) serialize_gemtext_node(doc, doc.root, out);
+  return out;
+}
+
 bool path_uses_sexpr(std::string_view path) {
   return path_ends_with_ci(path, ".sexp") || path_ends_with_ci(path, ".glyph") ||
          path_ends_with_ci(path, ".ss");
@@ -2975,11 +3235,14 @@ std::string serialize_sexpr(const Document& doc) {
 Document parse_document(std::string_view source, std::string_view path) {
   if (path_uses_sexpr(path) || looks_like_sexpr(source))
     return parse_sexpr(source);
+  if (path_uses_gemtext(path))
+    return parse_gemtext(source);
   return parse_markup(source);
 }
 
 std::string serialize_document(const Document& doc, std::string_view path) {
   if (path_uses_sexpr(path)) return serialize_sexpr(doc);
+  if (path_uses_gemtext(path)) return serialize_gemtext(doc);
   return serialize_markup(doc);
 }
 

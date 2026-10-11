@@ -126,3 +126,11 @@ green. Use this for reading and navigating.
 | Stick click L/R | Collapse all / expand all |
 | **Back** | Toggle browse mode |
 | **Start** | Help |
+
+## Gemini (gemtext + gemini://)
+
+- **`.gmi` / `.gemini`** files parse as gemtext (headers, `=>` links, lists, quotes, pre).
+- **Ctrl+L** opens the URL bar: enter a `gemini://` address or a local path.
+- With **XANATOO_GEMINI** (default ON), the client fetches over TLS (port 1965) and
+  shows the page in **browse mode**. Relative `=>` links resolve against the
+  current capsule URL. Build without the client: `-DXANATOO_GEMINI=OFF`.

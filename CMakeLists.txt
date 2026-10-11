@@ -14,6 +14,9 @@ find_package(Freetype REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(FONTCONFIG REQUIRED fontconfig)
 
+# Gemini protocol (TLS client). Parser for .gmi is always built.
+option(XANATOO_GEMINI "Enable gemini:// network client (OpenSSL)" ON)
+
 add_executable(xanatoo
   src/main.cpp
   src/font.cpp
@@ -26,6 +29,7 @@ add_executable(xanatoo
   src/ui.cpp
   src/util.cpp
   src/cli.cpp
+  src/gemini.cpp
   # Vendored Dear ImGui (MIT) — menu bar / toolbar shell
   external/imgui/imgui.cpp
   external/imgui/imgui_draw.cpp
@@ -50,6 +54,16 @@ target_link_libraries(xanatoo PRIVATE
   Freetype::Freetype
   ${FONTCONFIG_LIBRARIES}
 )
+
+if(XANATOO_GEMINI)
+  find_package(OpenSSL REQUIRED)
+  target_compile_definitions(xanatoo PRIVATE XANATOO_GEMINI=1)
+  target_link_libraries(xanatoo PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+  message(STATUS "Gemini protocol client: ON (OpenSSL)")
+else()
+  target_compile_definitions(xanatoo PRIVATE XANATOO_GEMINI=0)
+  message(STATUS "Gemini protocol client: OFF")
+endif()
 
 if(UNIX AND NOT APPLE)
   target_link_libraries(xanatoo PRIVATE m)
@@ -95,4 +109,6 @@ install(DIRECTORY examples/
           PATTERN "*.jpg"
           PATTERN "*.jpeg"
           PATTERN "*.gif"
-          PATTERN "*.sexp")
+          PATTERN "*.sexp"
+          PATTERN "*.gmi"
+          PATTERN "*.gemini")

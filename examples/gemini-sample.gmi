@@ -1,0 +1,29 @@
+# Gemini sample
+
+This is a local gemtext file (text/gemini). Xanatoo maps it to headers,
+paragraphs, lists, quotes, pre blocks, and link lines.
+
+## Lists
+
+* First item
+* Second item
+* Third item
+
+## Quote
+
+> Gemtext is line-oriented and intentionally simple.
+
+## Link lines
+
+=> gemini://gemini.circumlunar.space/ Project Gemini home
+=> gemini://geminiprotocol.net/ Gemini protocol
+
+## Preformatted
+
+```
+void hello() {
+  puts("hello, capsule");
+}
+```
+
+Plain line after the fence.

@@ -63,8 +63,27 @@ bool looks_like_sexpr(std::string_view source);
 Document parse_sexpr(std::string_view source);
 std::string serialize_sexpr(const Document& doc);
 
-// Dispatch: sexpr if path extension says so, else if source looks like
-// sexpr, else Markdown-ish markup.
+// --- Gemini gemtext -------------------------------------------------------
+//
+// Line-oriented text/gemini format (projectgemini.io):
+//   # / ## / ###  headings
+//   * item         unordered list
+//   > quote
+//   => url [label] link line
+//   ```            preformatted toggle (optional alt text on opener)
+//   plain lines    each non-empty line → paragraph
+//
+// Extensions .gmi / .gemini prefer gemtext. Content-type text/gemini from
+// a Gemini response should call parse_gemtext directly.
+
+bool path_uses_gemtext(std::string_view path);
+bool looks_like_gemtext(std::string_view source);  // heuristic only
+
+Document parse_gemtext(std::string_view source);
+// Best-effort export (lossy vs full Markdown model).
+std::string serialize_gemtext(const Document& doc);
+
+// Dispatch: sexpr / gemtext by path (or look), else Markdown-ish markup.
 Document parse_document(std::string_view source, std::string_view path = {});
 std::string serialize_document(const Document& doc, std::string_view path = {});
 
