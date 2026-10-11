@@ -357,11 +357,12 @@ void Ui::release_input_capture() {
   if (!ready_) return;
   // Drop the active widget (menu item / toolbar button) and clear keyboard
   // nav focus so the next keystroke is not eaten by ImGui chrome.
+  // Field names match Dear ImGui 1.91+ (HoveredId, NavCursorVisible).
   if (GImGui->ActiveId != 0) ImGui::ClearActiveID();
-  if (GImGui->HoverId != 0) GImGui->HoverId = 0;
+  if (GImGui->HoveredId != 0) GImGui->HoveredId = 0;
   ImGui::FocusWindow(nullptr);
   GImGui->NavId = 0;
-  GImGui->NavDisableHighlight = true;
+  GImGui->NavCursorVisible = false;
 }
 
 void Ui::request_menu(const char* name) {
