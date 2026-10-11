@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **189** (this delivery is **188**)
+Next bundle number: **190** (this delivery is **189**)
 
 ## Status (2026-10-11)
 
@@ -513,4 +513,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-185.*-hit-test-invalid-glyph-…` — hit-test invalid glyph
 - `xanatoo-186.*-move-serialize-bounds-…` — move/serialize bounds
 - `xanatoo-187.*-doc-mutate-outline-…` — doc mutate/outline
-- `xanatoo-188.*-clamp-windows-under-chrome-…` — this delivery
+- `xanatoo-188.*-clamp-windows-under-chrome-…` — clamp windows under chrome
+- `xanatoo-189.*-block-grip-left-gutter-…` — this delivery

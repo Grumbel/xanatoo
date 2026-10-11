@@ -229,7 +229,9 @@ int main(int argc, char** argv) {
   xanatoo::NodeId resize_image = xanatoo::INVALID_NODE;
   float resize_start_x = 0.f;
   float resize_start_scale = 1.f;
-  // Block drag-reorder (grab left margin of a layout box)
+  // Block drag-reorder: grip lives in the left gutter *before* the text
+  // (box.x - grip_w .. box.x), so it does not steal text selection.
+  constexpr float kBlockGripW = 18.f;
   bool dragging_block = false;
   xanatoo::NodeId drag_block_id = xanatoo::INVALID_NODE;
   xanatoo::NodeId drop_target_id = xanatoo::INVALID_NODE;
@@ -2107,12 +2109,12 @@ int main(int argc, char** argv) {
               if (dragging_col_gap) break;
             }
 
-            // Block drag: grab left margin (16px) of a layout box
+            // Block drag: grab gutter immediately left of the block text
             {
               float adj_y = my + p.scroll_y;
               for (const auto& box : p.layout.boxes) {
                 if (adj_y < box.y || adj_y > box.y + box.height) continue;
-                if (lx < box.x || lx > box.x + 16.f) continue;
+                if (lx < box.x - kBlockGripW || lx >= box.x) continue;
                 const auto& bn = doc_of(p).get(box.node);
                 // Only reorder movable siblings (not structural containers)
                 if (bn.kind == xanatoo::NodeKind::Document ||
@@ -2807,7 +2809,7 @@ int main(int argc, char** argv) {
               }
             }
 
-            // Block drag grip (left ~16px of a movable block)
+            // Block drag grip (gutter left of the block text)
             if (!hovered_col_gap && hovered_task == xanatoo::INVALID_NODE &&
                 hovered_stretch == xanatoo::INVALID_NODE &&
                 hovered_link_node == xanatoo::INVALID_NODE &&
@@ -2815,7 +2817,7 @@ int main(int argc, char** argv) {
               float adj_y = my + hp.scroll_y;
               for (const auto& box : hp.layout.boxes) {
                 if (adj_y < box.y || adj_y > box.y + box.height) continue;
-                if (lx < box.x || lx > box.x + 16.f) continue;
+                if (lx < box.x - kBlockGripW || lx >= box.x) continue;
                 const auto& bn = hd.get(box.node);
                 if (bn.kind == xanatoo::NodeKind::Document ||
                     bn.kind == xanatoo::NodeKind::Columns ||
@@ -6034,19 +6036,20 @@ int main(int argc, char** argv) {
             break;
           }
         }
-        // Block drag grip zone
+        // Block drag grip zone (drawn in the left gutter, not over text)
         if (hovered_grip_pane == i &&
             hovered_grip != xanatoo::INVALID_NODE) {
           for (const auto& box : pane.layout.boxes) {
             if (box.node != hovered_grip) continue;
-            int x = pane.x + static_cast<int>(box.x);
+            int gw = static_cast<int>(kBlockGripW);
+            int x = pane.x + static_cast<int>(box.x) - gw;
             int y = static_cast<int>(box.y - pane.scroll_y + ui_top);
             int h = static_cast<int>(box.height);
             SDL_SetRenderDrawColor(sdl, 80, 120, 180, 50);
-            SDL_Rect r{x, y, 16, h};
+            SDL_Rect r{x, y, gw, h};
             SDL_RenderFillRect(sdl, &r);
-            // Stronger grip dots
-            int gx = x + 4;
+            // Stronger grip dots centered in the gutter
+            int gx = x + gw / 2 - 2;
             int gy = y + h / 2;
             SDL_SetRenderDrawColor(sdl, 40, 90, 160, 255);
             for (int d = -6; d <= 6; d += 6) {
@@ -6371,20 +6374,21 @@ int main(int argc, char** argv) {
           SDL_RenderFillRect(sdl, &line);
         }
       } else if (i == focus && !dragging_block) {
-        // Subtle grip dots on left margin of the box under the cursor
+        // Subtle grip dots in the left gutter (not over the text)
         // mouse_y is window space; boxes are content space.
         float adj_y = content_y(mouse_y) + pane.scroll_y;
         float lx = mouse_x - static_cast<float>(pane.x);
         for (const auto& box : pane.layout.boxes) {
           if (adj_y < box.y || adj_y > box.y + box.height) continue;
-          if (lx < box.x || lx > box.x + 20.f) continue;
+          if (lx < box.x - kBlockGripW || lx >= box.x) continue;
           const auto& bn = doc_of(pane).get(box.node);
           if (bn.kind == xanatoo::NodeKind::Document ||
               bn.kind == xanatoo::NodeKind::Columns ||
               bn.kind == xanatoo::NodeKind::Column ||
               bn.kind == xanatoo::NodeKind::List)
             continue;
-          int gx = pane.x + static_cast<int>(box.x) + 4;
+          int gx = pane.x + static_cast<int>(box.x) -
+                   static_cast<int>(kBlockGripW) / 2 - 1;
           int gy = static_cast<int>(box.y - pane.scroll_y + ui_top +
                                    box.height * 0.5f);
           SDL_SetRenderDrawColor(sdl, 160, 158, 150, 255);
