@@ -108,7 +108,7 @@ void parse_inlines(Node& node, std::string_view text) {
         continue;
       }
     }
-    // [text](url) or [text](#id)
+    // [text](url) or [text](#id) or [text](cite:key); optional {rel=…}
     if (text[i] == '[') {
       size_t mid = text.find("](", i + 1);
       if (mid != std::string_view::npos) {
@@ -116,11 +116,30 @@ void parse_inlines(Node& node, std::string_view text) {
         if (end != std::string_view::npos) {
           flush_plain();
           InlineSpan s;
-          s.kind = InlineKind::Link;
           s.text = std::string(text.substr(i + 1, mid - (i + 1)));
-          s.href = std::string(text.substr(mid + 2, end - (mid + 2)));
+          std::string href(text.substr(mid + 2, end - (mid + 2)));
+          // Citations: [Nelson 1965](cite:nelson65)
+          if (href.rfind("cite:", 0) == 0) {
+            s.kind = InlineKind::Cite;
+            s.href = href.substr(5);
+          } else {
+            s.kind = InlineKind::Link;
+            s.href = std::move(href);
+          }
+          size_t next = end + 1;
+          // Optional {rel=glossary} after the closing paren
+          if (next < text.size() && text[next] == '{') {
+            size_t rpos = text.find("rel=", next);
+            size_t bend = text.find('}', next);
+            if (rpos != std::string_view::npos && bend != std::string_view::npos &&
+                rpos < bend) {
+              rpos += 4;
+              s.rel = std::string(text.substr(rpos, bend - rpos));
+              next = bend + 1;
+            }
+          }
           node.spans.push_back(std::move(s));
-          i = end + 1;
+          i = next;
           continue;
         }
       }
@@ -228,9 +247,94 @@ Document parse_markup(std::string_view source) {
       continue;
     }
     if (trimmed.starts_with(":::note")) {
-      // Treat note as a nested paragraph-like container for now
-      NodeId n = doc.create(NodeKind::Paragraph, current_parent());
-      // just open; content follows until :::
+      NodeId n = doc.create(NodeKind::Note, current_parent());
+      // Optional subtype: :::note kind=tip  (stored in src)
+      auto kpos = trimmed.find("kind=");
+      if (kpos != std::string_view::npos) {
+        kpos += 5;
+        size_t kend = kpos;
+        while (kend < trimmed.size() &&
+               (std::isalnum(static_cast<unsigned char>(trimmed[kend])) ||
+                trimmed[kend] == '-' || trimmed[kend] == '_'))
+          ++kend;
+        if (kend > kpos)
+          doc.get(n).src = std::string(trimmed.substr(kpos, kend - kpos));
+      }
+      // Note is a leaf with spans (same as BlockQuote); gather body until :::
+      ++i;
+      std::string body;
+      while (i < lines.size()) {
+        std::string_view lt = lines[i].text;
+        size_t llead = 0;
+        while (llead < lt.size() && (lt[llead] == ' ' || lt[llead] == '\t'))
+          ++llead;
+        std::string_view ltrim = lt.substr(llead);
+        if (ltrim == ":::" || ltrim.starts_with("::: ")) {
+          ++i;
+          break;
+        }
+        if (!body.empty()) body.push_back(' ');
+        body.append(ltrim);
+        ++i;
+      }
+      if (!body.empty()) parse_inlines(doc.get(n), body);
+      continue;
+    }
+    // :::code / :::codeblock [lang=cpp] … :::
+    if (trimmed.starts_with(":::codeblock") || trimmed.starts_with(":::code")) {
+      NodeId n = doc.create(NodeKind::CodeBlock, current_parent());
+      auto lpos = trimmed.find("lang=");
+      if (lpos != std::string_view::npos) {
+        lpos += 5;
+        size_t lend = lpos;
+        while (lend < trimmed.size() &&
+               (std::isalnum(static_cast<unsigned char>(trimmed[lend])) ||
+                trimmed[lend] == '+' || trimmed[lend] == '-' ||
+                trimmed[lend] == '_' || trimmed[lend] == '#'))
+          ++lend;
+        if (lend > lpos)
+          doc.get(n).src = std::string(trimmed.substr(lpos, lend - lpos));
+      }
+      ++i;
+      std::string body;
+      while (i < lines.size()) {
+        std::string_view lt = lines[i].text;
+        size_t llead = 0;
+        while (llead < lt.size() && (lt[llead] == ' ' || lt[llead] == '\t'))
+          ++llead;
+        std::string_view ltrim = lt.substr(llead);
+        if (ltrim == ":::" || ltrim.starts_with("::: ")) {
+          ++i;
+          break;
+        }
+        if (!body.empty()) body.push_back('\n');
+        body.append(lt);
+        ++i;
+      }
+      if (!body.empty()) doc.append_text(n, body);
+      continue;
+    }
+    if (trimmed.starts_with(":::deflist")) {
+      NodeId n = doc.create(NodeKind::DefList, current_parent());
+      stack.push_back(n);
+      ++i;
+      continue;
+    }
+    if (trimmed.starts_with(":::figure")) {
+      NodeId n = doc.create(NodeKind::Figure, current_parent());
+      stack.push_back(n);
+      ++i;
+      continue;
+    }
+    if (trimmed.starts_with(":::biblio") ||
+        trimmed.starts_with(":::bibliography")) {
+      NodeId n = doc.create(NodeKind::Biblio, current_parent());
+      stack.push_back(n);
+      ++i;
+      continue;
+    }
+    if (trimmed.starts_with(":::table")) {
+      NodeId n = doc.create(NodeKind::Table, current_parent());
       stack.push_back(n);
       ++i;
       continue;
@@ -241,34 +345,75 @@ Document parse_markup(std::string_view source) {
     //   :::include other.md#Section      → cross-document (path kept)
     //   :::include other.md              → whole external document body
     //   :::include "path with spaces.md#H"
+    //   :::include #H excerpt="phrase"   → range within target
     if (trimmed.starts_with(":::include")) {
       NodeId n = doc.create(NodeKind::Transclude, current_parent());
       std::string_view rest = trimmed.substr(10);  // after :::include
       while (!rest.empty() && (rest[0] == ' ' || rest[0] == '\t'))
         rest.remove_prefix(1);
-      if (!rest.empty() && (rest[0] == '"' || rest[0] == '\'')) {
-        char q = rest[0];
-        rest.remove_prefix(1);
-        size_t end = rest.find(q);
-        if (end != std::string_view::npos) rest = rest.substr(0, end);
-      }
-      std::string target(rest);
-      while (!target.empty() &&
-             (target.back() == ' ' || target.back() == '\t'))
-        target.pop_back();
-      // Local anchors get a leading '#'; paths (file.md, dir/x, …) stay raw.
+
       auto looks_like_path = [](const std::string& s) {
         if (s.empty() || s[0] == '#') return false;
         size_t hash = s.find('#');
-        std::string path_part = hash == std::string::npos ? s : s.substr(0, hash);
+        std::string path_part =
+            hash == std::string::npos ? s : s.substr(0, hash);
         if (path_part.empty()) return false;
         return path_part.find('/') != std::string::npos ||
                path_part.find('\\') != std::string::npos ||
                path_part.find('.') != std::string::npos;
       };
+
+      std::string excerpt;
+      std::string rest_owned(rest);
+      {
+        auto epos = rest_owned.find("excerpt=");
+        if (epos != std::string::npos) {
+          size_t after = epos + 8;
+          while (after < rest_owned.size() &&
+                 (rest_owned[after] == ' ' || rest_owned[after] == '\t'))
+            ++after;
+          if (after < rest_owned.size() &&
+              (rest_owned[after] == '"' || rest_owned[after] == '\'')) {
+            char eq = rest_owned[after];
+            ++after;
+            size_t eend = rest_owned.find(eq, after);
+            if (eend != std::string::npos) {
+              excerpt = rest_owned.substr(after, eend - after);
+              std::string cleaned = rest_owned.substr(0, epos);
+              if (eend + 1 < rest_owned.size())
+                cleaned += rest_owned.substr(eend + 1);
+              while (!cleaned.empty() &&
+                     (cleaned.front() == ' ' || cleaned.front() == '\t'))
+                cleaned.erase(cleaned.begin());
+              while (!cleaned.empty() &&
+                     (cleaned.back() == ' ' || cleaned.back() == '\t'))
+                cleaned.pop_back();
+              rest_owned = std::move(cleaned);
+            }
+          }
+        }
+      }
+
+      std::string target;
+      if (!rest_owned.empty() &&
+          (rest_owned[0] == '"' || rest_owned[0] == '\'')) {
+        char q = rest_owned[0];
+        size_t qend = rest_owned.find(q, 1);
+        if (qend != std::string::npos)
+          target = rest_owned.substr(1, qend - 1);
+        else
+          target = rest_owned.substr(1);
+      } else {
+        target = rest_owned;
+        while (!target.empty() &&
+               (target.back() == ' ' || target.back() == '\t'))
+          target.pop_back();
+      }
+
       if (!target.empty() && target[0] != '#' && !looks_like_path(target))
         target = "#" + target;
       doc.get(n).src = target;
+      if (!excerpt.empty()) doc.get(n).summary = excerpt;
       ++i;
       continue;
     }
@@ -433,6 +578,119 @@ Document parse_markup(std::string_view source) {
       continue;
     }
 
+    // GFM-style pipe table (standalone or inside :::table)
+    if (trimmed.size() >= 2 && trimmed[0] == '|' &&
+        trimmed.find('|', 1) != std::string_view::npos) {
+      NodeId parent = current_parent();
+      NodeId table = parent;
+      if (doc.get(parent).kind != NodeKind::Table)
+        table = doc.create(NodeKind::Table, parent);
+
+      auto split_cells = [](std::string_view row) {
+        std::vector<std::string> cells;
+        if (!row.empty() && row.front() == '|') row.remove_prefix(1);
+        if (!row.empty() && row.back() == '|') row.remove_suffix(1);
+        size_t start = 0;
+        for (size_t p = 0; p <= row.size(); ++p) {
+          if (p == row.size() || row[p] == '|') {
+            std::string_view cell = row.substr(start, p - start);
+            while (!cell.empty() &&
+                   (cell.front() == ' ' || cell.front() == '\t'))
+              cell.remove_prefix(1);
+            while (!cell.empty() &&
+                   (cell.back() == ' ' || cell.back() == '\t'))
+              cell.remove_suffix(1);
+            cells.emplace_back(cell);
+            start = p + 1;
+          }
+        }
+        return cells;
+      };
+      auto is_sep_row = [](std::string_view row) {
+        for (char c : row) {
+          if (c != '|' && c != '-' && c != ':' && c != ' ' && c != '\t')
+            return false;
+        }
+        return row.find('-') != std::string_view::npos;
+      };
+
+      bool first_row = true;
+      while (i < lines.size() && !lines[i].blank) {
+        std::string_view lt = lines[i].text;
+        size_t llead = 0;
+        while (llead < lt.size() && (lt[llead] == ' ' || lt[llead] == '\t'))
+          ++llead;
+        std::string_view ltrim = lt.substr(llead);
+        if (ltrim.empty() || ltrim[0] != '|') break;
+        if (is_sep_row(ltrim)) {
+          ++i;
+          continue;
+        }
+        auto cells = split_cells(ltrim);
+        NodeId row = doc.create(NodeKind::TableRow, table);
+        bool make_header = false;
+        if (first_row && i + 1 < lines.size()) {
+          std::string_view nt = lines[i + 1].text;
+          size_t nlead = 0;
+          while (nlead < nt.size() &&
+                 (nt[nlead] == ' ' || nt[nlead] == '\t'))
+            ++nlead;
+          if (is_sep_row(nt.substr(nlead))) make_header = true;
+        }
+        for (const auto& cell_text : cells) {
+          NodeId cell = doc.create(NodeKind::TableCell, row);
+          if (make_header) doc.get(cell).level = 1;
+          if (!cell_text.empty()) parse_inlines(doc.get(cell), cell_text);
+        }
+        first_row = false;
+        ++i;
+      }
+      continue;
+    }
+
+    // Definition list body (inside :::deflist): term lines + ": definition"
+    if (doc.get(current_parent()).kind == NodeKind::DefList) {
+      if (trimmed.starts_with(": ")) {
+        NodeId def = doc.create(NodeKind::Definition, current_parent());
+        parse_inlines(doc.get(def), trimmed.substr(2));
+        ++i;
+        continue;
+      }
+      if (!trimmed.starts_with(":::")) {
+        NodeId term = doc.create(NodeKind::Term, current_parent());
+        parse_inlines(doc.get(term), trimmed);
+        ++i;
+        continue;
+      }
+    }
+
+    // Bibliography entry: [^key]: text
+    if (trimmed.starts_with("[^")) {
+      size_t close = trimmed.find("]:");
+      if (close != std::string_view::npos && close > 2) {
+        NodeId parent = current_parent();
+        if (doc.get(parent).kind != NodeKind::Biblio)
+          parent = doc.create(NodeKind::Biblio, parent);
+        NodeId entry = doc.create(NodeKind::BiblioEntry, parent);
+        doc.get(entry).label = std::string(trimmed.substr(2, close - 2));
+        std::string_view body = trimmed.substr(close + 2);
+        while (!body.empty() && (body.front() == ' ' || body.front() == '\t'))
+          body.remove_prefix(1);
+        if (!body.empty()) parse_inlines(doc.get(entry), body);
+        ++i;
+        continue;
+      }
+    }
+
+    // Caption under a figure: non-image text line becomes Caption
+    if (doc.get(current_parent()).kind == NodeKind::Figure &&
+        !trimmed.starts_with("![") && !trimmed.starts_with(":::")) {
+      NodeId cap = doc.create(NodeKind::Caption, current_parent());
+      parse_inlines(doc.get(cap), trimmed);
+      ++i;
+      continue;
+    }
+
     // Paragraph: gather consecutive non-blank, non-fence lines
     std::string para;
     while (i < lines.size() && !lines[i].blank) {
@@ -442,7 +700,8 @@ Document parse_markup(std::string_view source) {
       std::string_view ltrim = lt.substr(llead);
       if (ltrim.starts_with(":::") || ltrim.starts_with("# ") ||
           ltrim.starts_with("## ") || ltrim.starts_with("![") ||
-          ltrim.starts_with("> ") ||
+          ltrim.starts_with("> ") || ltrim.starts_with("|") ||
+          ltrim.starts_with("[^") ||
           list_marker_len(ltrim, nullptr) > 0) {
         break;
       }
@@ -484,6 +743,18 @@ void serialize_inlines(const Node& node, std::string& out) {
         out += "[";
         out += sp.text;
         out += "](";
+        out += sp.href;
+        out += ")";
+        if (!sp.rel.empty()) {
+          out += "{rel=";
+          out += sp.rel;
+          out += "}";
+        }
+        break;
+      case InlineKind::Cite:
+        out += "[";
+        out += sp.text;
+        out += "](cite:";
         out += sp.href;
         out += ")";
         break;
@@ -540,9 +811,149 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
       out += pad;
       out += ":::include ";
       out += node.src;
+      if (!node.summary.empty()) {
+        out += " excerpt=\"";
+        out += node.summary;
+        out += "\"";
+      }
       out += "\n\n";
       break;
     }
+
+    case NodeKind::Note: {
+      out += pad;
+      out += ":::note";
+      if (!node.src.empty()) {
+        out += " kind=";
+        out += node.src;
+      }
+      out += "\n";
+      out += pad;
+      serialize_inlines(node, out);
+      out += "\n";
+      out += pad;
+      out += ":::\n\n";
+      break;
+    }
+
+    case NodeKind::CodeBlock: {
+      out += pad;
+      out += ":::code";
+      if (!node.src.empty()) {
+        out += " lang=";
+        out += node.src;
+      }
+      out += "\n";
+      for (const auto& sp : node.spans) out += sp.text;
+      if (out.empty() || out.back() != '\n') out += "\n";
+      out += pad;
+      out += ":::\n\n";
+      break;
+    }
+
+    case NodeKind::DefList: {
+      out += pad;
+      out += ":::deflist\n";
+      for (NodeId c : node.children)
+        serialize_node(doc, c, out, indent);
+      out += pad;
+      out += ":::\n\n";
+      break;
+    }
+
+    case NodeKind::Term: {
+      out += pad;
+      serialize_inlines(node, out);
+      out += "\n";
+      break;
+    }
+
+    case NodeKind::Definition: {
+      out += pad;
+      out += ": ";
+      serialize_inlines(node, out);
+      out += "\n";
+      break;
+    }
+
+    case NodeKind::Figure: {
+      out += pad;
+      out += ":::figure\n";
+      for (NodeId c : node.children)
+        serialize_node(doc, c, out, indent);
+      out += pad;
+      out += ":::\n\n";
+      break;
+    }
+
+    case NodeKind::Caption: {
+      out += pad;
+      serialize_inlines(node, out);
+      out += "\n\n";
+      break;
+    }
+
+    case NodeKind::Biblio: {
+      out += pad;
+      out += ":::biblio\n";
+      for (NodeId c : node.children)
+        serialize_node(doc, c, out, indent);
+      out += pad;
+      out += ":::\n\n";
+      break;
+    }
+
+    case NodeKind::BiblioEntry: {
+      out += pad;
+      out += "[^";
+      out += node.label.empty() ? node.src : node.label;
+      out += "]: ";
+      serialize_inlines(node, out);
+      out += "\n";
+      break;
+    }
+
+    case NodeKind::Table: {
+      out += pad;
+      out += ":::table\n";
+      for (NodeId row_id : node.children) {
+        const Node& row = doc.get(row_id);
+        if (row.kind != NodeKind::TableRow) {
+          serialize_node(doc, row_id, out, indent);
+          continue;
+        }
+        out += pad;
+        out += "|";
+        bool any_header = false;
+        for (NodeId cell_id : row.children) {
+          const Node& cell = doc.get(cell_id);
+          if (cell.kind != NodeKind::TableCell) continue;
+          if (cell.level > 0) any_header = true;
+          out += " ";
+          serialize_inlines(cell, out);
+          out += " |";
+        }
+        out += "\n";
+        if (any_header) {
+          out += pad;
+          out += "|";
+          for (NodeId cell_id : row.children) {
+            if (doc.get(cell_id).kind != NodeKind::TableCell) continue;
+            out += " --- |";
+          }
+          out += "\n";
+        }
+      }
+      out += pad;
+      out += ":::\n\n";
+      break;
+    }
+
+    case NodeKind::TableRow:
+    case NodeKind::TableCell:
+      for (NodeId c : node.children)
+        serialize_node(doc, c, out, indent);
+      break;
 
     case NodeKind::ListItem: {
       out += pad;

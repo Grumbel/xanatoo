@@ -6,9 +6,9 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **083** (this delivery is **082**)
+Next bundle number: **084** (this delivery is **083**)
 
-## Status (2026-10-10)
+## Status (2026-10-11)
 
 Stage **01**–**04** core features in place; ImGui without X11 syswm dependency.
 LCS structural diff marks; cross-document `:::include`.
@@ -130,6 +130,11 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Outline as software window (drag/resize/scroll; non-modal; stays open on jump)
 - [x] Multiple document software windows (stack; raise on click; cascade open)
 - [x] Soft-window docking: edge snap + double-click title maximize/restore
+- [x] Markdown semantic round-trip: Note/CodeBlock/DefList/Figure/Biblio/Table
+- [x] Fix `:::note` creating Paragraph instead of Note
+- [x] Markup `:::include … excerpt="…"` + serialize excerpt
+- [x] Inline Cite as `[text](cite:key)` and link `{rel=…}` in markup
+- [x] GFM pipe tables parse/serialize under `:::table` or standalone
 
 ## Open work / next steps
 
@@ -261,4 +266,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-079.*-softwin-mouse-…` — soft-window mouse hit-testing
 - `xanatoo-080.*-outline-window-…` — outline software window
 - `xanatoo-081.*-multi-softwin-…` — multiple document software windows
-- `xanatoo-082.*-softwin-dock-…` — this delivery
+- `xanatoo-082.*-softwin-dock-…` — soft-window docking
+- `xanatoo-083.*-md-semantic-…` — this delivery
