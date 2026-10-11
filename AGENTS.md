@@ -52,3 +52,10 @@ Bundle names: `xanatoo-NNN.description-BASE.bundle` (formerly `glyphtoo-NNN…`)
 - Gemtext parser is always built (`.gmi` / `.gemini`).
 - Network client is gated by `XANATOO_GEMINI` (default ON; needs OpenSSL).
 - URL entry is Ctrl+L / `UiCommand::OpenUrlBar` → `navigate_to_url`.
+
+## Reddit
+
+- Read-only client via public `https://www.reddit.com/…/.json` (OpenSSL HTTPS).
+- Gated by `XANATOO_REDDIT` (default ON; needs OpenSSL).
+- Ctrl+L accepts listing or post URLs with or without `.json`.
+- Maps posts/comments to Thread + Message nodes.

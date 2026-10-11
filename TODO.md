@@ -6,11 +6,12 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **198** (this delivery is **197**)
+Next bundle number: **199** (this delivery is **198**)
 
 ## Status (2026-10-11)
 
-Nostr firehose: Message body is a child Paragraph (layout/serialize only walk children, so spans on the Message itself were invisible). Independent notes no longer get a fake in-reply-to root. (`query_recent` + WS carry seed already on origin as 196.)
+Reddit read-only via public `.json` HTTPS API (listings + post/comments → Thread/Message).
+Nostr Message body fix already on origin (197).
 
 Stage **01**–**04** core features in place; ImGui without X11 syswm dependency.
 LCS structural diff marks; cross-document `:::include`.
@@ -525,4 +526,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-194.*-fix-nostr-string-literals-…` — fix string literals
 - `xanatoo-195.*-nostr-recent-firehose-…` — nostr:recent firehose
 - `xanatoo-196.*-fix-query-recent-…` — on origin (add missing query_recent + seed WS carry)
-- `xanatoo-197.*-nostr-message-body-…` — this delivery (Message body as child Paragraph; real reply-to only)
+- `xanatoo-197.*-nostr-message-body-…` — on origin (Message body as child Paragraph; real reply-to only)
+- `xanatoo-198.*-reddit-json-…` — this delivery (Reddit .json listings/posts)

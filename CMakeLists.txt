@@ -33,6 +33,7 @@ endif()
 option(XANATOO_GEMINI "Enable gemini:// network client (OpenSSL)" ON)
 # Nostr read-only client (WSS + OpenSSL). Maps notes to Thread/Message nodes.
 option(XANATOO_NOSTR "Enable Nostr note/thread fetch (OpenSSL WebSocket)" ON)
+option(XANATOO_REDDIT "Enable Reddit .json fetch (OpenSSL HTTPS)" ON)
 
 add_executable(xanatoo
   src/main.cpp
@@ -49,6 +50,7 @@ add_executable(xanatoo
   src/cli.cpp
   src/gemini.cpp
   src/nostr.cpp
+  src/reddit.cpp
   # Vendored Dear ImGui (MIT) — menu bar / toolbar shell
   external/imgui/imgui.cpp
   external/imgui/imgui_draw.cpp
@@ -75,7 +77,7 @@ target_link_libraries(xanatoo PRIVATE
 )
 
 set(XANATOO_NEED_OPENSSL OFF)
-if(XANATOO_GEMINI OR XANATOO_NOSTR)
+if(XANATOO_GEMINI OR XANATOO_NOSTR OR XANATOO_REDDIT)
   set(XANATOO_NEED_OPENSSL ON)
 endif()
 
@@ -98,6 +100,14 @@ if(XANATOO_NOSTR)
 else()
   target_compile_definitions(xanatoo PRIVATE XANATOO_NOSTR=0)
   message(STATUS "Nostr client: OFF")
+endif()
+
+if(XANATOO_REDDIT)
+  target_compile_definitions(xanatoo PRIVATE XANATOO_REDDIT=1)
+  message(STATUS "Reddit .json client: ON (OpenSSL HTTPS)")
+else()
+  target_compile_definitions(xanatoo PRIVATE XANATOO_REDDIT=0)
+  message(STATUS "Reddit .json client: OFF")
 endif()
 
 if(UNIX AND NOT APPLE)

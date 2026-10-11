@@ -10,6 +10,7 @@
 #include "xanatoo/parse.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/nostr.hpp"
+#include "xanatoo/reddit.hpp"
 #include "xanatoo/editor.hpp"
 #include "xanatoo/images.hpp"
 #include "xanatoo/ui.hpp"
@@ -125,7 +126,8 @@ int main(int argc, char** argv) {
   std::vector<DocBuffer> buffers;
 
   auto load_doc_or_placeholder = [&](const std::string& path) {
-    if (xanatoo::is_gemini_url(path)) {
+    if (xanatoo::is_gemini_url(path) || xanatoo::is_reddit_url(path) ||
+        xanatoo::is_nostr_ref(path)) {
       // Real fetch happens after navigate_to_url is defined.
       return xanatoo::parse_document("# Loading…\n", {});
     }
@@ -1068,6 +1070,35 @@ int main(int argc, char** argv) {
 #endif
     }
 
+    // Reddit listing / post via public .json API
+    if (xanatoo::is_reddit_url(target)) {
+#if defined(XANATOO_REDDIT) && XANATOO_REDDIT
+      flash_status("Fetching Reddit…");
+      std::string err;
+      auto doc = xanatoo::reddit_fetch(target, &err);
+      if (!doc) {
+        flash_status("Reddit failed: " + err);
+        std::cerr << "Reddit: " << err << "\n";
+        return false;
+      }
+      if (!allow_discard_dirty(p.buf)) return false;
+      std::string label = target;
+      if (label.size() > 72) label = label.substr(0, 72) + "…";
+      load_into_pane(std::move(*doc), label);
+      if (std::find(tab_order.begin(), tab_order.end(), p.buf) ==
+          tab_order.end())
+        tab_order.push_back(p.buf);
+      if (record_history) push_nav_history(target);
+      flash_status("Opened Reddit");
+      needs_layout = true;
+      update_title();
+      return true;
+#else
+      flash_status("Reddit needs build with -DXANATOO_REDDIT=ON");
+      return false;
+#endif
+    }
+
     // Local path (or offline fallback for gemini:// when TLS is disabled)
     std::string path = target;
     if (!fs::exists(path)) {
@@ -1136,7 +1167,7 @@ int main(int argc, char** argv) {
               xanatoo::resolve_gemini_url(gemini_current_url, abs);
           if (!resolved.empty()) abs = resolved;
         }
-        if (xanatoo::is_gemini_url(abs) || xanatoo::is_nostr_ref(abs)) {
+        if (xanatoo::is_gemini_url(abs) || xanatoo::is_nostr_ref(abs) || xanatoo::is_reddit_url(abs)) {
           navigate_to_url(std::move(abs));
         } else if (is_inapp_doc_href(abs)) {
           navigate_to_url(resolve_doc_href(abs));
@@ -1149,12 +1180,16 @@ int main(int argc, char** argv) {
   };
 
 
-  // CLI / argv may pass gemini:// — fetch after helpers exist
-  if (!buffers.empty() && xanatoo::is_gemini_url(buffers[0].path)) {
+  // CLI / argv may pass gemini:// / reddit / nostr — fetch after helpers exist
+  auto is_network_startup = [](const std::string& p) {
+    return xanatoo::is_gemini_url(p) || xanatoo::is_reddit_url(p) ||
+           xanatoo::is_nostr_ref(p);
+  };
+  if (!buffers.empty() && is_network_startup(buffers[0].path)) {
     std::string u = buffers[0].path;
     buffers[0].path.clear();
     navigate_to_url(std::move(u));
-  } else if (buffers.size() > 1 && xanatoo::is_gemini_url(buffers[1].path)) {
+  } else if (buffers.size() > 1 && is_network_startup(buffers[1].path)) {
     std::string u = buffers[1].path;
     buffers[1].path.clear();
     focus = 1;
@@ -1928,7 +1963,8 @@ int main(int argc, char** argv) {
                         // carets that later threw "invalid node id".
                         std::string abs = *href;
                         if (xanatoo::is_gemini_url(abs) ||
-                            xanatoo::is_nostr_ref(abs)) {
+                            xanatoo::is_nostr_ref(abs) ||
+                            xanatoo::is_reddit_url(abs)) {
                           navigate_to_url(abs);
                         } else if (is_inapp_doc_href(abs)) {
                           std::string resolved =
@@ -2217,7 +2253,7 @@ int main(int argc, char** argv) {
                       xanatoo::resolve_gemini_url(gemini_current_url, abs);
                   if (!resolved.empty()) abs = resolved;
                 }
-                if (xanatoo::is_gemini_url(abs) || xanatoo::is_nostr_ref(abs)) {
+                if (xanatoo::is_gemini_url(abs) || xanatoo::is_nostr_ref(abs) || xanatoo::is_reddit_url(abs)) {
                   navigate_to_url(std::move(abs));
                   break;
                 }
@@ -4429,7 +4465,8 @@ int main(int argc, char** argv) {
                       "Unsaved changes — Ctrl+Shift+R to discard and reload");
                   break;
                 }
-                if (xanatoo::is_gemini_url(rpath)) {
+                if (xanatoo::is_gemini_url(rpath) || xanatoo::is_nostr_ref(rpath) ||
+                    xanatoo::is_reddit_url(rpath)) {
                   navigate_to_url(rpath, /*record_history=*/false);
                   break;
                 }
@@ -5198,7 +5235,7 @@ int main(int argc, char** argv) {
             flash_status("Unsaved changes — use Force Reload");
             break;
           }
-          if (xanatoo::is_gemini_url(rpath) || xanatoo::is_nostr_ref(rpath)) {
+          if (xanatoo::is_gemini_url(rpath) || xanatoo::is_nostr_ref(rpath) || xanatoo::is_reddit_url(rpath)) {
             navigate_to_url(rpath, /*record_history=*/false);
             break;
           }
@@ -6679,6 +6716,10 @@ int main(int argc, char** argv) {
           label = "Anchor: ";
         else if (xanatoo::is_gemini_url(hovered_href))
           label = "Gemini: ";
+        else if (xanatoo::is_reddit_url(hovered_href))
+          label = "Reddit: ";
+        else if (xanatoo::is_nostr_ref(hovered_href))
+          label = "Nostr: ";
         else if (hovered_href.rfind("http://", 0) == 0 ||
                  hovered_href.rfind("https://", 0) == 0)
           label = "Web: ";

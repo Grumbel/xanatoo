@@ -74,6 +74,13 @@ Drag column gutters to reweight widths. Drag an image’s blue corner to resize 
 :::
 :::
 
+## Reddit
+
+Open a subreddit listing via the public `.json` API (Ctrl+L):
+
+- [r/GameDeals](https://www.reddit.com/r/GameDeals/.json)
+- [r/linux](https://www.reddit.com/r/linux)
+
 ## Nostr
 
 Open [Recent Nostr notes](nostr:recent) or [Nostr discussions](nostr-sample.md).
