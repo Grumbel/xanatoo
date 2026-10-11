@@ -52,6 +52,12 @@ Dear ImGui is allowed for chrome (menus/toolbars). No Qt/GTK/KDE.
 - Build target: `xanatoo_tests` (`ctest` or run the binary).
 - Does not exercise live network fetches.
 
+## Develop shell (`nix develop`)
+
+- PATH scripts: `xanatoo-configure`, `xanatoo-build`, `xanatoo-run`, `xanatoo-run-gdb`, `xanatoo-test`.
+- Requires `XANATOO_SOURCE` (set in shellHook). Default build dir `/tmp/xanatoo-build`.
+- See `docs/ENVIRONMENT.md`.
+
 ## Continuity
 
 Read `TODO.md` first. Record plans and outcomes there.
