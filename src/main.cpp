@@ -235,6 +235,9 @@ int main(int argc, char** argv) {
   xanatoo::NodeId summary_edit_node = xanatoo::INVALID_NODE;
 
   // Floating software windows for arbitrary documents (stack; back = topmost).
+  // Soft-window tile zones (drag title bar to screen edge).
+  enum class SoftDock { None = 0, Left, Right, Top, Bottom, Max };
+
   struct SoftWindow {
     std::string title;
     std::string path;
@@ -251,11 +254,14 @@ int main(int argc, char** argv) {
     int resize_start_w = 0, resize_start_h = 0;
     // Docking / maximize
     bool maximized = false;
+    SoftDock dock = SoftDock::None;
     int restore_x = 120, restore_y = 70, restore_w = 540, restore_h = 440;
     Uint32 last_title_click = 0;
   };
   std::vector<SoftWindow> soft_wins;
+  SoftDock dock_preview = SoftDock::None;  // live zone while dragging
   const int soft_snap_px = 16;
+  const int soft_dock_zone = 36;  // edge thickness that triggers tiling
   const int status_bar_h = 28;
   bool path_in_window_mode = false;
   std::string path_in_window_buf;
@@ -457,24 +463,97 @@ int main(int argc, char** argv) {
     if (y + h > bottom - soft_snap_px) y = std::max(top, bottom - h);
   };
 
-  auto maximize_soft = [&](SoftWindow& sw) {
-    if (!sw.maximized) {
+  auto soft_client_bounds = [&]() {
+    const int top = static_cast<int>(ui_top);
+    const int bottom = win_h - status_bar_h;
+    return std::tuple{top, bottom, std::max(160, bottom - top)};
+  };
+
+  // Which tile zone is under the pointer (title-bar drag).
+  auto compute_dock_zone = [&](int mx, int my) -> SoftDock {
+    auto [top, bottom, ch] = soft_client_bounds();
+    (void)ch;
+    if (my < top || my > bottom) return SoftDock::None;
+    // Corners prefer left/right over top/bottom for split layouts.
+    if (mx < soft_dock_zone) return SoftDock::Left;
+    if (mx > win_w - soft_dock_zone) return SoftDock::Right;
+    // Top-center → maximize; top sides already handled as L/R
+    if (my < top + soft_dock_zone) {
+      if (mx > win_w / 4 && mx < (win_w * 3) / 4) return SoftDock::Max;
+      return SoftDock::Top;
+    }
+    if (my > bottom - soft_dock_zone) return SoftDock::Bottom;
+    return SoftDock::None;
+  };
+
+  auto dock_rect = [&](SoftDock d) -> std::tuple<int, int, int, int> {
+    auto [top, bottom, ch] = soft_client_bounds();
+    switch (d) {
+      case SoftDock::Left:
+        return {0, top, std::max(200, win_w / 2), ch};
+      case SoftDock::Right: {
+        int x = win_w / 2;
+        return {x, top, win_w - x, ch};
+      }
+      case SoftDock::Top:
+        return {0, top, win_w, std::max(120, ch / 2)};
+      case SoftDock::Bottom: {
+        int h = std::max(120, ch / 2);
+        return {0, bottom - h, win_w, h};
+      }
+      case SoftDock::Max:
+        return {0, top, win_w, ch};
+      default:
+        return {0, top, 0, 0};
+    }
+  };
+
+  auto apply_soft_dock = [&](SoftWindow& sw, SoftDock d) {
+    if (d == SoftDock::None) return;
+    // Save floating geometry once when leaving free placement
+    if (sw.dock == SoftDock::None && !sw.maximized) {
       sw.restore_x = sw.x;
       sw.restore_y = sw.y;
       sw.restore_w = sw.w;
       sw.restore_h = sw.h;
-      sw.x = 0;
-      sw.y = static_cast<int>(ui_top);
-      sw.w = win_w;
-      sw.h = std::max(160, win_h - status_bar_h - static_cast<int>(ui_top));
-      sw.maximized = true;
-      sw.needs_layout = true;
-    } else {
+    }
+    auto [x, y, w, h] = dock_rect(d);
+    sw.x = x;
+    sw.y = y;
+    sw.w = w;
+    sw.h = h;
+    sw.dock = d;
+    sw.maximized = (d == SoftDock::Max);
+    sw.needs_layout = true;
+  };
+
+  auto restore_soft_float = [&](SoftWindow& sw, int mx, int my) {
+    if (sw.dock == SoftDock::None && !sw.maximized) return;
+    sw.w = sw.restore_w;
+    sw.h = sw.restore_h;
+    sw.x = mx - sw.w / 2;
+    sw.y = my - help_title_h / 2;
+    if (sw.x < 0) sw.x = 0;
+    if (sw.y < static_cast<int>(ui_top)) sw.y = static_cast<int>(ui_top);
+    sw.dock = SoftDock::None;
+    sw.maximized = false;
+    sw.needs_layout = true;
+  };
+
+  auto maximize_soft = [&](SoftWindow& sw) {
+    if (!sw.maximized && sw.dock == SoftDock::None) {
+      sw.restore_x = sw.x;
+      sw.restore_y = sw.y;
+      sw.restore_w = sw.w;
+      sw.restore_h = sw.h;
+      apply_soft_dock(sw, SoftDock::Max);
+    } else if (sw.maximized || sw.dock != SoftDock::None) {
       sw.x = sw.restore_x;
       sw.y = sw.restore_y;
       sw.w = sw.restore_w;
       sw.h = sw.restore_h;
       sw.maximized = false;
+      sw.dock = SoftDock::None;
       sw.needs_layout = true;
     }
   };
@@ -850,21 +929,13 @@ int main(int argc, char** argv) {
                       top.dragging = false;
                     } else {
                       top.last_title_click = now;
-                      // Dragging a maximized window restores first.
-                      if (top.maximized) {
-                        top.maximized = false;
-                        top.w = top.restore_w;
-                        top.h = top.restore_h;
-                        top.x = mxw - top.w / 2;
-                        top.y = myw - help_title_h / 2;
-                        if (top.x < 0) top.x = 0;
-                        if (top.y < static_cast<int>(ui_top))
-                          top.y = static_cast<int>(ui_top);
-                        top.needs_layout = true;
-                      }
+                      // Dragging a tiled/maximized window restores float first.
+                      if (top.maximized || top.dock != SoftDock::None)
+                        restore_soft_float(top, mxw, myw);
                       top.dragging = true;
                       top.drag_dx = mxw - top.x;
                       top.drag_dy = myw - top.y;
+                      dock_preview = SoftDock::None;
                     }
                   }
                   soft_hit = true;
@@ -1239,14 +1310,23 @@ int main(int argc, char** argv) {
         case SDL_MOUSEBUTTONUP:
           if (ev.button.button == SDL_BUTTON_LEFT) {
             for (auto& sw : soft_wins) {
-              if (sw.dragging || sw.resize) {
+              if (sw.dragging) {
+                SoftDock zone =
+                    compute_dock_zone(ev.button.x, ev.button.y);
+                if (zone != SoftDock::None) {
+                  apply_soft_dock(sw, zone);
+                } else {
+                  snap_soft_geom(sw.x, sw.y, sw.w, sw.h);
+                }
+              } else if (sw.resize) {
                 snap_soft_geom(sw.x, sw.y, sw.w, sw.h);
-                if (sw.resize) sw.needs_layout = true;
+                sw.needs_layout = true;
               }
               sw.dragging = false;
               sw.resize = 0;
               sw.scroll_dragging = false;
             }
+            dock_preview = SoftDock::None;
             if (help_dragging || help_resize) {
               snap_soft_geom(help_x, help_y, help_w, help_h);
               if (help_resize) help_needs_layout = true;
@@ -1340,6 +1420,8 @@ int main(int argc, char** argv) {
                 if (sw.x < 0) sw.x = 0;
                 if (sw.y < static_cast<int>(ui_top))
                   sw.y = static_cast<int>(ui_top);
+                dock_preview =
+                    compute_dock_zone(ev.motion.x, ev.motion.y);
                 soft_motion = true;
                 break;
               }
@@ -3756,6 +3838,35 @@ int main(int argc, char** argv) {
         SDL_SetRenderDrawColor(sdl, 100, 130, 80, 255);
         for (int i = 0; i < 3; ++i)
           SDL_RenderDrawLine(sdl, gx - i * 3, gy, gx, gy - i * 3);
+      }
+    }
+
+    // Live dock-zone preview while dragging a soft window title bar
+    if (dock_preview != SoftDock::None) {
+      auto [dx, dy, dw, dh] = dock_rect(dock_preview);
+      if (dw > 0 && dh > 0) {
+        SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(sdl, 40, 100, 180, 70);
+        SDL_Rect zone{dx, dy, dw, dh};
+        SDL_RenderFillRect(sdl, &zone);
+        SDL_SetRenderDrawColor(sdl, 40, 100, 180, 180);
+        SDL_RenderDrawRect(sdl, &zone);
+        SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+        const char* label = "";
+        switch (dock_preview) {
+          case SoftDock::Left: label = "Tile left"; break;
+          case SoftDock::Right: label = "Tile right"; break;
+          case SoftDock::Top: label = "Tile top"; break;
+          case SoftDock::Bottom: label = "Tile bottom"; break;
+          case SoftDock::Max: label = "Maximize"; break;
+          default: break;
+        }
+        if (label[0]) {
+          int tw = body_font.measure(label);
+          float lx = static_cast<float>(dx + (dw - tw) / 2);
+          float ly = static_cast<float>(dy + dh / 2);
+          renderer.draw_text(body_font, lx, ly, label, 30, 60, 120);
+        }
       }
     }
 
