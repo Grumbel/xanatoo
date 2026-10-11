@@ -544,8 +544,8 @@ int main(int argc, char** argv) {
     }
   }
   auto set_cursor = [&](SDL_Cursor* c) {
-    // Stick mode draws its own sprite; system cursor is hidden and unused.
-    if (stick_cursor_on) return;
+    // Real system cursor always tracks the hardware mouse (shapes included).
+    // The stick sprite is drawn separately and does not own this.
     if (!c) c = cursor_arrow;
     if (c != cursor_current) {
       SDL_SetCursor(c);
@@ -2387,17 +2387,10 @@ int main(int argc, char** argv) {
           break;
 
         case SDL_MOUSEMOTION:
-          // Hardware mouse and stick pointer are independent. Stick mode
-          // owns mouse_x/y (set each frame from stick_cx/cy); ignore
-          // hardware motion so WarpMouse is never needed and the OS cursor
-          // is not dragged around.
-          if (stick_cursor_on) {
-            mouse_x = stick_cx;
-            mouse_y = stick_cy;
-          } else {
-            mouse_x = static_cast<float>(ev.motion.x);
-            mouse_y = static_cast<float>(ev.motion.y);
-          }
+          // Event coordinates: hardware mouse OR synthetic stick inject.
+          // Real OS cursor is never warped; stick is an extra sprite.
+          mouse_x = static_cast<float>(ev.motion.x);
+          mouse_y = static_cast<float>(ev.motion.y);
           {
             const int mx_i = static_cast<int>(mouse_x);
             const int my_i = static_cast<int>(mouse_y);
@@ -4735,8 +4728,8 @@ int main(int argc, char** argv) {
         if (bi == panes[focus].buf) ui_state.active_tab = ti;
       }
       ui_state.has_floating = !soft_wins.empty();
-      // Right-stick software cursor (before ImGui frame).
-      // Fully independent of the hardware mouse: never WarpMouse / SetCursor.
+      // Right-stick software cursor (extra pointer; never touches OS mouse).
+      bool stick_active = false;
       if (gamepad) {
         auto axis_e = [&](SDL_GameControllerAxis a) -> float {
           Sint16 v = SDL_GameControllerGetAxis(gamepad, a);
@@ -4749,11 +4742,9 @@ int main(int argc, char** argv) {
           stick_cy = static_cast<float>(win_h) * 0.5f;
           stick_cursor_init = true;
         }
-        // Always show the pointer while a controller is connected.
         stick_cursor_on = true;
         float rx = axis_e(SDL_CONTROLLER_AXIS_RIGHTX);
         float ry = axis_e(SDL_CONTROLLER_AXIS_RIGHTY);
-        bool stick_moved = false;
         if (rx != 0.f || ry != 0.f) {
           // Non-linear response: fine aim near centre, faster at full tilt.
           auto curve = [](float v) {
@@ -4772,19 +4763,17 @@ int main(int argc, char** argv) {
             stick_cx = static_cast<float>(win_w - 1);
           if (stick_cy > static_cast<float>(win_h - 1))
             stick_cy = static_cast<float>(win_h - 1);
-          stick_moved = true;
+          stick_active = true;
         }
-        // Stick owns the logical pointer used for hit-testing / ImGui.
-        mouse_x = stick_cx;
-        mouse_y = stick_cy;
-        if (stick_moved) {
+        if (stick_lmb || stick_rmb) stick_active = true;
+        if (stick_active) {
           const int ix = static_cast<int>(stick_cx);
           const int iy = static_cast<int>(stick_cy);
           static int last_ix = -1, last_iy = -1;
-          if (ix != last_ix || iy != last_iy) {
+          if (ix != last_ix || iy != last_iy || stick_lmb || stick_rmb) {
             last_ix = ix;
             last_iy = iy;
-            // Synthetic motion only — does not move the OS/hardware cursor.
+            // Synthetic events at stick position — OS cursor stays put.
             SDL_Event me{};
             me.type = SDL_MOUSEMOTION;
             me.motion.x = ix;
@@ -4800,6 +4789,7 @@ int main(int argc, char** argv) {
         }
       }
       ui_state.stick_cursor = stick_cursor_on;
+      ui_state.stick_active = stick_active;
       ui_state.stick_cx = stick_cx;
       ui_state.stick_cy = stick_cy;
       ui_state.stick_lmb = stick_lmb;
@@ -6988,7 +6978,7 @@ int main(int argc, char** argv) {
       }
     }
 
-    // Pointer shape for interactive targets (system cursor; skipped in stick mode)
+    // Hardware mouse pointer shape (always; independent of stick sprite).
     if (hovered_col_gap)
       set_cursor(cursor_sizewe);
     else if (hovered_image_handle)
@@ -7005,28 +6995,23 @@ int main(int argc, char** argv) {
 
     ui.end_frame(sdl);
 
-    // Drawn sprite cursor for gamepad stick pointer (visible on KMS/DRM / R36S).
+    // Extra stick sprite on top of the scene. Does not hide the system cursor.
     if (stick_cursor_on && stick_cursor_tex) {
-      SDL_ShowCursor(SDL_DISABLE);
       const int cx = static_cast<int>(stick_cx);
       const int cy = static_cast<int>(stick_cy);
       SDL_Rect dst{cx, cy, stick_cursor_tw, stick_cursor_th};
       SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
-      // Dim slightly while a button is held so click feedback is obvious.
       if (stick_lmb || stick_rmb)
         SDL_SetTextureColorMod(stick_cursor_tex, 180, 200, 255);
       else
         SDL_SetTextureColorMod(stick_cursor_tex, 255, 255, 255);
       SDL_SetTextureAlphaMod(stick_cursor_tex, 255);
       SDL_RenderCopy(sdl, stick_cursor_tex, nullptr, &dst);
-      // Small hotspot ring when clicking.
       if (stick_lmb || stick_rmb) {
         SDL_SetRenderDrawColor(sdl, 80, 140, 255, 200);
         SDL_Rect ring{cx - 3, cy - 3, 7, 7};
         SDL_RenderDrawRect(sdl, &ring);
       }
-    } else {
-      SDL_ShowCursor(SDL_ENABLE);
     }
 
     renderer.present();

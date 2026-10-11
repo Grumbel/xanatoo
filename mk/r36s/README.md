@@ -24,8 +24,8 @@ zip into `ports/PortMaster/autoinstall/` and start PortMaster once.
 /roms/ports/xanatoo/conf/            # created at runtime (bookmarks, …)
 ```
 
-Override UI face with `XANATOO_UI_FONT=/path/to.ttf` or scale with
-`XANATOO_UI_SCALE` (default 1.35 on the launcher).
+Override UI face with `XANATOO_UI_FONT=/path/to.ttf`. Optional chrome
+scale: `XANATOO_UI_SCALE` (font size stays fixed at 14px).
 
 ## Controls
 

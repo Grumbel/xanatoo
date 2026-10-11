@@ -30,7 +30,7 @@ export XDG_STATE_HOME="$GAMEDIR/conf"
 # Data next to the binary (examples, icons, font)
 export XANATOO_DATA_DIR="$GAMEDIR"
 export XANATOO_ICON_DIR="$GAMEDIR/icons"
-export XANATOO_UI_SCALE="${XANATOO_UI_SCALE:-1.35}"
+# UI font is fixed 14px DejaVu (pre-R36S). Optional chrome scale via env only.
 if [ -f "$GAMEDIR/fonts/DejaVuSans.ttf" ]; then
   export XANATOO_FONT="$GAMEDIR/fonts/DejaVuSans.ttf"
   export XANATOO_UI_FONT="$GAMEDIR/fonts/DejaVuSans.ttf"

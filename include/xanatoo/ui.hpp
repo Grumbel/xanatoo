@@ -123,8 +123,9 @@ struct UiState {
   bool structure = false;
   bool browse = false;  // read-only navigation
   bool virtual_keyboard = false;
-  // Gamepad right-stick software pointer
+  // Gamepad right-stick software pointer (extra; real mouse stays separate)
   bool stick_cursor = false;
+  bool stick_active = false;  // axis moved or A/B held this frame
   float stick_cx = 0.f, stick_cy = 0.f;
   bool stick_lmb = false, stick_rmb = false;
   bool help = false;

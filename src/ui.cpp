@@ -324,14 +324,12 @@ void Ui::tool_menu_end() {
   ImGui::PopID();
 }
 
-// GNOME 2–era UI faces: Bitstream Vera → DejaVu Sans was the usual desktop
-// default. Prefer these over “modern” UI faces — on R36S the larger Noto/
-// Roboto paths + 1.5 scale produced unreadable menus.
+// Pre-R36S UI face: DejaVu / Vera at a fixed 14px. Scaling the TTF size with
+// UI scale made menus muddy on handheld LCDs; keep the raster size constant.
 static std::string resolve_ui_font_path() {
   if (const char* env = std::getenv("XANATOO_UI_FONT")) {
     if (env[0] != '\0' && fs::exists(env)) return env;
   }
-  // PortMaster ships DejaVu under XANATOO_DATA_DIR/fonts/.
   if (const char* data = std::getenv("XANATOO_DATA_DIR")) {
     if (data[0] != '\0') {
       fs::path p = fs::path(data) / "fonts" / "DejaVuSans.ttf";
@@ -365,13 +363,14 @@ static std::string resolve_ui_font_path() {
   return {};
 }
 
-static void load_ui_fonts(ImGuiIO& io, float size_px) {
-  // Desktop ~14px; handhelds pass a larger size for readability.
+static void load_ui_fonts(ImGuiIO& io) {
+  // ~10–11 pt at 96 dpi — GNOME 2 menu/toolbar size (pre-R36S).
+  const float size_px = 14.0f;
   std::string path = resolve_ui_font_path();
   ImFontConfig cfg;
   cfg.OversampleH = 2;
   cfg.OversampleV = 1;
-  cfg.PixelSnapH = true;  // crisper menus on integer positions
+  cfg.PixelSnapH = true;
   if (!path.empty()) {
     ImFont* font = io.Fonts->AddFontFromFileTTF(path.c_str(), size_px, &cfg,
                                                 io.Fonts->GetGlyphRangesDefault());
@@ -383,6 +382,7 @@ static void load_ui_fonts(ImGuiIO& io, float size_px) {
   } else {
     std::cerr << "No DejaVu/Vera/Liberation Sans found — using ImGui default\n";
   }
+  // ProggyClean: bitmap-style, readable at tiny sizes when no TTF is present.
   io.Fonts->AddFontDefault();
 }
 
@@ -396,26 +396,19 @@ bool Ui::init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale) {
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
   io.IniFilename = nullptr;
 
-  // Resolve UI scale: explicit arg → env → auto from window width.
+  // Optional chrome scale only (padding/widgets). Font size stays fixed at 14px.
   float scale = ui_scale;
   if (scale <= 0.f) {
     if (const char* e = std::getenv("XANATOO_UI_SCALE")) {
       if (e[0] != '\0') scale = std::strtof(e, nullptr);
     }
   }
-  if (scale <= 0.f && window) {
-    int ww = 0, wh = 0;
-    SDL_GetWindowSize(window, &ww, &wh);
-    if (ww > 0 && ww <= 720)
-      scale = 1.35f;  // R36S / similar handhelds
-    else
-      scale = 1.f;
-  }
+  // No auto-upscale on small screens — that was the unreadable R36S path.
+  if (scale <= 0.f) scale = 1.f;
   if (scale < 0.75f) scale = 0.75f;
   if (scale > 2.5f) scale = 2.5f;
 
-  const float font_px = 14.0f * (scale > 1.f ? scale : 1.f);
-  load_ui_fonts(io, font_px);
+  load_ui_fonts(io);
   apply_classic_theme();
   {
     ImGuiStyle& s = ImGui::GetStyle();
@@ -425,7 +418,7 @@ bool Ui::init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale) {
     if (scale != 1.f) s.ScaleAllSizes(scale);
   }
   if (scale != 1.f)
-    std::cout << "UI scale: " << scale << " (font " << font_px << "px)\n";
+    std::cout << "UI scale: " << scale << " (font fixed 14px)\n";
   load_icons(renderer);
 
   if (!ImGui_ImplSDL2_InitForSDLRenderer(window, renderer)) return false;
@@ -554,8 +547,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   ImGui_ImplSDLRenderer2_NewFrame();
   ImGui_ImplSDL2_NewFrame();
   ImGui::NewFrame();
-  // Stick cursor overrides SDL mouse (R36S has no mouse; warp may no-op).
-  if (state.stick_cursor) {
+  // Stick is an *extra* pointer. Only drive ImGui from it while the stick is
+  // actively used (axis motion or A/B held); otherwise leave the real mouse.
+  if (state.stick_cursor && state.stick_active) {
     ImGuiIO& io = ImGui::GetIO();
     io.MousePos = ImVec2(state.stick_cx, state.stick_cy);
     io.MouseDown[0] = state.stick_lmb;
