@@ -362,6 +362,13 @@ int main(int argc, char** argv) {
   bool hovered_image_handle = false;
   bool hovered_col_gap = false;
   int hovered_col_gap_pane = -1;
+  xanatoo::NodeId hovered_task = xanatoo::INVALID_NODE;
+  int hovered_task_pane = -1;
+  xanatoo::NodeId hovered_grip = xanatoo::INVALID_NODE;
+  int hovered_grip_pane = -1;
+  xanatoo::NodeId hovered_transclude = xanatoo::INVALID_NODE;
+  int hovered_transclude_pane = -1;
+  std::string hovered_transclude_src;
   float mouse_x = 0.f, mouse_y = 0.f;
 
   SDL_Cursor* cursor_arrow = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
@@ -369,6 +376,8 @@ int main(int argc, char** argv) {
   SDL_Cursor* cursor_sizewe = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE);
   SDL_Cursor* cursor_sizenwse =
       SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENWSE);
+  SDL_Cursor* cursor_sizeall =
+      SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEALL);
   SDL_Cursor* cursor_current = cursor_arrow;
   auto set_cursor = [&](SDL_Cursor* c) {
     if (!c) c = cursor_arrow;
@@ -2262,6 +2271,13 @@ int main(int argc, char** argv) {
             hovered_image_handle = false;
             hovered_col_gap = false;
             hovered_col_gap_pane = -1;
+            hovered_task = xanatoo::INVALID_NODE;
+            hovered_task_pane = -1;
+            hovered_grip = xanatoo::INVALID_NODE;
+            hovered_grip_pane = -1;
+            hovered_transclude = xanatoo::INVALID_NODE;
+            hovered_transclude_pane = -1;
+            hovered_transclude_src.clear();
 
             // Column gutters
             for (const auto& gap : hp.layout.column_gaps) {
@@ -2324,6 +2340,65 @@ int main(int argc, char** argv) {
                     hovered_preview = *prev;
                   }
                 }
+              }
+            }
+
+            // Task checkbox column (left ~26px of a ListItem)
+            if (!hovered_col_gap && hovered_stretch == xanatoo::INVALID_NODE &&
+                hovered_image == xanatoo::INVALID_NODE &&
+                hovered_link_node == xanatoo::INVALID_NODE) {
+              float adj_y = my + hp.scroll_y;
+              for (const auto& box : hp.layout.boxes) {
+                if (adj_y < box.y || adj_y > box.y + box.height) continue;
+                if (lx < box.x || lx > box.x + 26.f) continue;
+                const auto& bn = hd.get(box.node);
+                if (bn.kind != xanatoo::NodeKind::ListItem) continue;
+                if (bn.level > 0 && bn.label != "task" &&
+                    bn.label != "task-done")
+                  continue;
+                hovered_task = box.node;
+                hovered_task_pane = hover_pane;
+                break;
+              }
+            }
+
+            // Block drag grip (left ~16px of a movable block)
+            if (!hovered_col_gap && hovered_task == xanatoo::INVALID_NODE &&
+                hovered_stretch == xanatoo::INVALID_NODE &&
+                hovered_link_node == xanatoo::INVALID_NODE &&
+                hovered_image == xanatoo::INVALID_NODE) {
+              float adj_y = my + hp.scroll_y;
+              for (const auto& box : hp.layout.boxes) {
+                if (adj_y < box.y || adj_y > box.y + box.height) continue;
+                if (lx < box.x || lx > box.x + 16.f) continue;
+                const auto& bn = hd.get(box.node);
+                if (bn.kind == xanatoo::NodeKind::Document ||
+                    bn.kind == xanatoo::NodeKind::Columns ||
+                    bn.kind == xanatoo::NodeKind::Column ||
+                    bn.kind == xanatoo::NodeKind::List)
+                  continue;
+                hovered_grip = box.node;
+                hovered_grip_pane = hover_pane;
+                break;
+              }
+            }
+
+            // Transclude / include region
+            if (!hovered_col_gap && hovered_task == xanatoo::INVALID_NODE &&
+                hovered_grip == xanatoo::INVALID_NODE &&
+                hovered_stretch == xanatoo::INVALID_NODE &&
+                hovered_link_node == xanatoo::INVALID_NODE &&
+                hovered_image == xanatoo::INVALID_NODE) {
+              float adj_y = my + hp.scroll_y;
+              for (const auto& box : hp.layout.boxes) {
+                if (adj_y < box.y || adj_y > box.y + box.height) continue;
+                if (lx < box.x || lx > box.x + box.width) continue;
+                const auto& bn = hd.get(box.node);
+                if (bn.kind != xanatoo::NodeKind::Transclude) continue;
+                hovered_transclude = box.node;
+                hovered_transclude_pane = hover_pane;
+                hovered_transclude_src = bn.src;
+                break;
               }
             }
           }
@@ -4957,6 +5032,61 @@ int main(int argc, char** argv) {
             }
           }
         }
+        // Task checkbox zone
+        if (hovered_task_pane == i &&
+            hovered_task != xanatoo::INVALID_NODE) {
+          for (const auto& box : pane.layout.boxes) {
+            if (box.node != hovered_task) continue;
+            int x = pane.x + static_cast<int>(box.x);
+            int y = static_cast<int>(box.y - pane.scroll_y + ui_top);
+            int h = static_cast<int>(box.height);
+            SDL_SetRenderDrawColor(sdl, 40, 140, 80, 55);
+            SDL_Rect r{x, y, 26, h};
+            SDL_RenderFillRect(sdl, &r);
+            SDL_SetRenderDrawColor(sdl, 30, 120, 70, 220);
+            SDL_RenderDrawRect(sdl, &r);
+            break;
+          }
+        }
+        // Block drag grip zone
+        if (hovered_grip_pane == i &&
+            hovered_grip != xanatoo::INVALID_NODE) {
+          for (const auto& box : pane.layout.boxes) {
+            if (box.node != hovered_grip) continue;
+            int x = pane.x + static_cast<int>(box.x);
+            int y = static_cast<int>(box.y - pane.scroll_y + ui_top);
+            int h = static_cast<int>(box.height);
+            SDL_SetRenderDrawColor(sdl, 80, 120, 180, 50);
+            SDL_Rect r{x, y, 16, h};
+            SDL_RenderFillRect(sdl, &r);
+            // Stronger grip dots
+            int gx = x + 4;
+            int gy = y + h / 2;
+            SDL_SetRenderDrawColor(sdl, 40, 90, 160, 255);
+            for (int d = -6; d <= 6; d += 6) {
+              SDL_Rect dot{gx, gy + d, 4, 4};
+              SDL_RenderFillRect(sdl, &dot);
+            }
+            break;
+          }
+        }
+        // Transclude region
+        if (hovered_transclude_pane == i &&
+            hovered_transclude != xanatoo::INVALID_NODE) {
+          for (const auto& box : pane.layout.boxes) {
+            if (box.node != hovered_transclude) continue;
+            int x = pane.x + static_cast<int>(box.x);
+            int y = static_cast<int>(box.y - pane.scroll_y + ui_top);
+            int w = static_cast<int>(box.width);
+            int h = static_cast<int>(box.height);
+            SDL_SetRenderDrawColor(sdl, 180, 120, 40, 40);
+            SDL_Rect r{x, y, w, h};
+            SDL_RenderFillRect(sdl, &r);
+            SDL_SetRenderDrawColor(sdl, 180, 120, 40, 200);
+            SDL_RenderDrawRect(sdl, &r);
+            break;
+          }
+        }
         SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
       }
 
@@ -5481,6 +5611,29 @@ int main(int argc, char** argv) {
       } else if (hovered_col_gap) {
         label = "Column gutter — drag to adjust relative widths";
         tr = 40; tg = 100; tb = 150;
+      } else if (hovered_task != xanatoo::INVALID_NODE) {
+        std::string st = "task";
+        if (hovered_task_pane >= 0 && hovered_task_pane < 2) {
+          const auto& tn =
+              doc_of(panes[hovered_task_pane]).get(hovered_task);
+          st = tn.label.empty() ? "bullet" : tn.label;
+        }
+        if (st == "task-done")
+          label = "Task — click to mark unchecked";
+        else if (st == "task")
+          label = "Task — click to mark done";
+        else
+          label = "List marker — click to convert to task checkbox";
+        tr = 40; tg = 120; tb = 80;
+      } else if (hovered_grip != xanatoo::INVALID_NODE) {
+        label = "Drag block — drop before/after another block (columns & lists OK)";
+        tr = 40; tg = 100; tb = 150;
+      } else if (hovered_transclude != xanatoo::INVALID_NODE) {
+        label = "Include: ";
+        label += hovered_transclude_src.empty() ? "(empty)"
+                                                : hovered_transclude_src;
+        label += "    click to jump to source";
+        tr = 30; tg = 80; tb = 170;
       } else if (hovered_image != xanatoo::INVALID_NODE) {
         if (hovered_image_handle)
           label = "Image resize handle — drag corner to scale";
@@ -5888,6 +6041,14 @@ int main(int argc, char** argv) {
           tip = "Drag to resize image";
         } else if (hovered_col_gap) {
           tip = "Drag to resize columns";
+        } else if (hovered_task != xanatoo::INVALID_NODE) {
+          tip = "Click to toggle task";
+        } else if (hovered_grip != xanatoo::INVALID_NODE) {
+          tip = "Drag to move block";
+        } else if (hovered_transclude != xanatoo::INVALID_NODE) {
+          tip = hovered_transclude_src.empty()
+                    ? "Include"
+                    : ("Include: " + hovered_transclude_src);
         }
       }
       if (!tip.empty()) {
@@ -5929,8 +6090,12 @@ int main(int argc, char** argv) {
       set_cursor(cursor_sizewe);
     else if (hovered_image_handle)
       set_cursor(cursor_sizenwse);
+    else if (hovered_grip != xanatoo::INVALID_NODE)
+      set_cursor(cursor_sizeall);
     else if (!hovered_href.empty() || hovered_stretch != xanatoo::INVALID_NODE ||
-             hovered_image != xanatoo::INVALID_NODE)
+             hovered_image != xanatoo::INVALID_NODE ||
+             hovered_task != xanatoo::INVALID_NODE ||
+             hovered_transclude != xanatoo::INVALID_NODE)
       set_cursor(cursor_hand);
     else
       set_cursor(cursor_arrow);
@@ -5949,6 +6114,7 @@ int main(int argc, char** argv) {
   if (cursor_hand) SDL_FreeCursor(cursor_hand);
   if (cursor_sizewe) SDL_FreeCursor(cursor_sizewe);
   if (cursor_sizenwse) SDL_FreeCursor(cursor_sizenwse);
+  if (cursor_sizeall) SDL_FreeCursor(cursor_sizeall);
   SDL_DestroyRenderer(sdl);
   SDL_DestroyWindow(window);
   SDL_Quit();

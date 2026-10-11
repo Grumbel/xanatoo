@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **145** (this delivery is **144**)
+Next bundle number: **146** (this delivery is **145**)
 
 ## Status (2026-10-11)
 
@@ -243,6 +243,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Bookmarks menu + manager; persist ~/.config/xanatoo/bookmarks; Ctrl+Shift+B
 - [x] Welcome hub links to all examples; in-app open for local doc links
 - [x] Hover affordances: link wash/underline, stretch/image/gutter, hand cursor, target tooltip
+- [x] Hover: task checkbox, block grip, transclude region (status/tooltip/cursor)
 
 ## Open work / next steps
 
@@ -436,4 +437,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-141.*-fix-gemini-mime-string-…` — fix Gemini MIME notice string
 - `xanatoo-142.*-history-bookmarks-…` — history + bookmarks
 - `xanatoo-143.*-welcome-hub-…` — welcome hub + in-app doc links
-- `xanatoo-144.*-hover-affordances-…` — this delivery
+- `xanatoo-144.*-hover-affordances-…` — link/stretch/image/gutter hover
+- `xanatoo-145.*-hover-task-grip-include-…` — this delivery
