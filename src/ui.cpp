@@ -10,6 +10,7 @@
 #include "backends/imgui_impl_sdlrenderer2.h"
 
 #include <cstdlib>
+#include <algorithm>
 #include <cstdio>
 #include <filesystem>
 #include <iostream>
@@ -966,6 +967,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Zoom out", UiCommand::ZoomOut, cmd, true, "Ctrl+-");
       ImGui::Separator();
       menu_item_cmd("Help", UiCommand::ToggleHelp, cmd, true, "F1");
+      if (ImGui::MenuItem("Virtual keyboard", "F3", state.virtual_keyboard))
+        cmd = UiCommand::ToggleVirtualKeyboard;
       tool_menu_end();
     }
 
@@ -1164,6 +1167,105 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   }
 
   result.cmd = cmd;
+
+  // ---- On-screen keyboard (handheld / no physical keyboard) ----
+  if (state.virtual_keyboard) {
+    ImGuiViewport* vk_vp = ImGui::GetMainViewport();
+    const float vk_h = vk_vp->Size.y < 500.f ? 200.f : 220.f;
+    ImGui::SetNextWindowPos(
+        ImVec2(vk_vp->Pos.x, vk_vp->Pos.y + vk_vp->Size.y - vk_h));
+    ImGui::SetNextWindowSize(ImVec2(vk_vp->Size.x, vk_h));
+    ImGuiWindowFlags vk_flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing;
+    if (ImGui::Begin("##vkeyboard", nullptr, vk_flags)) {
+      auto keybtn = [&](const char* label, const char* payload, float w) {
+        if (ImGui::Button(label, ImVec2(w, 34.f))) {
+          if (cmd == UiCommand::None) {
+            cmd = UiCommand::VirtualKey;
+            result.arg = payload;
+          }
+        }
+        ImGui::SameLine(0.f, 2.f);
+      };
+      static bool shift = false;
+      const float kw = std::max(26.f, (vk_vp->Size.x - 40.f) / 11.f);
+      const char* row1 = shift ? "QWERTYUIOP" : "qwertyuiop";
+      const char* row2 = shift ? "ASDFGHJKL" : "asdfghjkl";
+      const char* row3 = shift ? "ZXCVBNM" : "zxcvbnm";
+      ImGui::SetCursorPosX(4.f);
+      for (const char* c = row1; *c; ++c) {
+        char lab[2] = {*c, 0};
+        char pay[2] = {*c, 0};
+        keybtn(lab, pay, kw);
+      }
+      ImGui::NewLine();
+      ImGui::SetCursorPosX(4.f + kw * 0.5f);
+      for (const char* c = row2; *c; ++c) {
+        char lab[2] = {*c, 0};
+        char pay[2] = {*c, 0};
+        keybtn(lab, pay, kw);
+      }
+      ImGui::NewLine();
+      if (ImGui::Button(shift ? "SHIFT" : "Shift", ImVec2(kw * 1.6f, 34.f)))
+        shift = !shift;
+      ImGui::SameLine(0.f, 2.f);
+      for (const char* c = row3; *c; ++c) {
+        char lab[2] = {*c, 0};
+        char pay[2] = {*c, 0};
+        keybtn(lab, pay, kw);
+      }
+      if (ImGui::Button("Bksp", ImVec2(kw * 1.8f, 34.f))) {
+        if (cmd == UiCommand::None) {
+          cmd = UiCommand::VirtualKey;
+          result.arg = "\b";
+        }
+      }
+      ImGui::NewLine();
+      ImGui::SetCursorPosX(4.f);
+      for (const char* d = "1234567890"; *d; ++d) {
+        char lab[2] = {*d, 0};
+        char pay[2] = {*d, 0};
+        keybtn(lab, pay, kw * 0.95f);
+      }
+      ImGui::NewLine();
+      if (ImGui::Button(",", ImVec2(kw, 34.f))) {
+        if (cmd == UiCommand::None) {
+          cmd = UiCommand::VirtualKey;
+          result.arg = ",";
+        }
+      }
+      ImGui::SameLine(0.f, 2.f);
+      const float space_w = std::max(100.f, vk_vp->Size.x - kw * 6.f);
+      if (ImGui::Button("Space", ImVec2(space_w, 34.f))) {
+        if (cmd == UiCommand::None) {
+          cmd = UiCommand::VirtualKey;
+          result.arg = " ";
+        }
+      }
+      ImGui::SameLine(0.f, 2.f);
+      if (ImGui::Button(".", ImVec2(kw, 34.f))) {
+        if (cmd == UiCommand::None) {
+          cmd = UiCommand::VirtualKey;
+          result.arg = ".";
+        }
+      }
+      ImGui::SameLine(0.f, 2.f);
+      if (ImGui::Button("Enter", ImVec2(kw * 2.f, 34.f))) {
+        if (cmd == UiCommand::None) {
+          cmd = UiCommand::VirtualKey;
+          result.arg = "\n";
+        }
+      }
+      ImGui::SameLine(0.f, 2.f);
+      if (ImGui::Button("Hide", ImVec2(kw * 1.6f, 34.f)))
+        cmd = UiCommand::ToggleVirtualKeyboard;
+    }
+    ImGui::End();
+    result.bottom_reserved = vk_h;
+  }
+
   return result;
 }
 

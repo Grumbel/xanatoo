@@ -102,6 +102,8 @@ enum class UiCommand {
   ToggleStructure,
   ToggleBrowse,  // read-only navigation mode
   ToggleHelp,
+  ToggleVirtualKeyboard,  // F3 / View — on-screen keyboard
+  VirtualKey,             // arg = UTF-8 key ("a", "\n", "\b", " ")
   OpenInWindow,
   OpenFormatDoc,
   OpenSemanticDoc,
@@ -120,6 +122,7 @@ struct UiState {
   bool can_diff = false;  // two independent documents loaded
   bool structure = false;
   bool browse = false;  // read-only navigation
+  bool virtual_keyboard = false;
   bool help = false;
   bool selection = false;
   // True when caret is on a ListItem (enables indent/outdent menu items).
@@ -148,6 +151,7 @@ struct UiFrameResult {
   UiCommand cmd = UiCommand::None;
   // Pixels reserved at the top of the window for menu + toolbar.
   float top_reserved = 0.f;
+  float bottom_reserved = 0.f;  // virtual keyboard, etc.
   // Optional payload (e.g. example filename for OpenExample).
   std::string arg;
 };

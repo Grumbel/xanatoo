@@ -197,6 +197,7 @@ int main(int argc, char** argv) {
     std::cerr << "Warning: ImGui UI failed to init; continuing without menus\n";
   }
   float ui_top = 0.f;  // menu + toolbar height (updated each frame)
+  float ui_bottom = 0.f;  // virtual keyboard (updated each frame)
 
   struct Pane {
     int buf = 0;  // index into buffers
@@ -386,6 +387,7 @@ int main(int argc, char** argv) {
   bool structure_mode = false;
   // Read-only navigation: no typing / edits; gamepad-friendly browsing
   bool browse_mode = false;
+  bool virtual_keyboard = false;
   SDL_GameController* gamepad = nullptr;
   auto open_first_gamepad = [&]() {
     if (gamepad) return;
@@ -634,7 +636,7 @@ int main(int argc, char** argv) {
     float doc_y = cpos.y;
     float margin = 40.f;
     // Visible content height excludes menu/toolbar and status bar.
-    float view_h = static_cast<float>(win_h - status_bar_h) - ui_top;
+    float view_h = static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
     if (view_h < 80.f) view_h = 80.f;
     if (doc_y - p.scroll_y < margin) {
       p.scroll_y = std::max(0.f, doc_y - margin);
@@ -648,7 +650,7 @@ int main(int argc, char** argv) {
   // ---- Browse / gamepad navigation (no text entry) ----
   auto nav_page = [&](bool up) {
     Pane& p = F();
-    const float view_h = static_cast<float>(win_h - status_bar_h) - ui_top;
+    const float view_h = static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
     const float step = view_h * 0.85f;
     float max_s = std::max(0.f, p.layout.content_height - view_h + 40.f);
     if (up)
@@ -1884,7 +1886,7 @@ int main(int argc, char** argv) {
               int sx = panes[pi].x + panes[pi].w - 8;
               // `my` is content Y (0 at top of viewport). Usable height excludes
               // the menu/toolbar and the status bar.
-              float view_h = static_cast<float>(win_h - status_bar_h) - ui_top;
+              float view_h = static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
               if (mx >= sx && my >= 0.f && my < view_h) {
                 focus = pi;
                 dragging_scroll = true;
@@ -2461,7 +2463,7 @@ int main(int argc, char** argv) {
           if (dragging_scroll) {
             float my = content_y(static_cast<float>(ev.motion.y));
             Pane& sp = panes[scroll_drag_pane];
-            float view_h = static_cast<float>(win_h - status_bar_h) - ui_top;
+            float view_h = static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
             float content_h = std::max(view_h, sp.layout.content_height);
             float max_s = std::max(0.f, content_h - view_h + 40.f);
             float ratio = (view_h > 0.f) ? (my / view_h) : 0.f;
@@ -2858,6 +2860,16 @@ int main(int argc, char** argv) {
               if (help_mode) {
                 ensure_help_doc();
                 help_needs_layout = true;
+              }
+              break;
+            case SDL_CONTROLLER_BUTTON_GUIDE:
+              virtual_keyboard = !virtual_keyboard;
+              if (virtual_keyboard && browse_mode) {
+                browse_mode = false;
+                flash_status("Virtual keyboard — edit mode");
+              } else {
+                flash_status(virtual_keyboard ? "Virtual keyboard on"
+                                             : "Virtual keyboard off");
               }
               break;
             default:
@@ -3830,7 +3842,7 @@ int main(int argc, char** argv) {
                 break;
               }
               const float view_h =
-                  static_cast<float>(win_h - status_bar_h) - ui_top;
+                  static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
               const float step = view_h * 0.85f;
               float max_s = std::max(
                   0.f, p.layout.content_height - view_h + 40.f);
@@ -4507,6 +4519,7 @@ int main(int argc, char** argv) {
                           panes[0].buf >= 0 && panes[1].buf >= 0;
       ui_state.structure = structure_mode;
       ui_state.browse = browse_mode;
+    ui_state.virtual_keyboard = virtual_keyboard;
       ui_state.help = help_mode;
       ui_state.selection = !F().sel.empty();
       {
@@ -4543,6 +4556,7 @@ int main(int argc, char** argv) {
       ui_state.has_floating = !soft_wins.empty();
       auto ui_frame = ui.begin_frame(ui_state);
       ui_top = ui_frame.top_reserved;
+    ui_bottom = ui_frame.bottom_reserved;
 
       using C = xanatoo::UiCommand;
       auto& p = F();
@@ -4566,7 +4580,8 @@ int main(int argc, char** argv) {
             c == C::SelectAll || c == C::SelectBlock || c == C::Find ||
             c == C::ToggleSplit || c == C::ToggleOutline || c == C::ToggleDiff ||
             c == C::ToggleStructure || c == C::ToggleBrowse ||
-            c == C::ToggleHelp || c == C::OpenFormatDoc ||
+            c == C::ToggleHelp || c == C::ToggleVirtualKeyboard ||
+            c == C::OpenFormatDoc ||
             c == C::OpenSemanticDoc || c == C::OpenInWindow ||
             c == C::OpenExample || c == C::LoadDiffDemo || c == C::ZoomIn ||
             c == C::ZoomOut;
@@ -5290,6 +5305,50 @@ int main(int argc, char** argv) {
             help_needs_layout = true;
           }
           break;
+        case C::ToggleVirtualKeyboard:
+          virtual_keyboard = !virtual_keyboard;
+          flash_status(virtual_keyboard ? "Virtual keyboard on (F3)"
+                                        : "Virtual keyboard off");
+          break;
+        case C::VirtualKey: {
+          if (browse_mode) {
+            flash_status("Browse mode — F2 to edit");
+            break;
+          }
+          if (ui_frame.arg.empty()) break;
+          Pane& vp = F();
+          xanatoo::Document& vd = doc_of(vp);
+          if (ui_frame.arg == "\b") {
+            edit();
+            if (!vp.sel.empty())
+              xanatoo::delete_selection(vd, vp.sel);
+            else
+              xanatoo::delete_backward(vd, vp.sel.focus);
+            vp.sel.anchor = vp.sel.focus;
+            needs_layout = true;
+            scroll_caret_into_view(vp);
+            reset_blink();
+          } else if (ui_frame.arg == "\n") {
+            edit();
+            if (!vp.sel.empty())
+              xanatoo::delete_selection(vd, vp.sel);
+            xanatoo::split_block(vd, vp.sel.focus);
+            vp.sel.anchor = vp.sel.focus;
+            needs_layout = true;
+            scroll_caret_into_view(vp);
+            reset_blink();
+          } else {
+            edit();
+            if (!vp.sel.empty())
+              xanatoo::delete_selection(vd, vp.sel);
+            xanatoo::insert_text(vd, vp.sel.focus, ui_frame.arg);
+            vp.sel.anchor = vp.sel.focus;
+            needs_layout = true;
+            scroll_caret_into_view(vp);
+            reset_blink();
+          }
+          break;
+        }
         case C::OpenFormatDoc: {
           std::string path = find_repo_file("FORMAT.md");
           if (path.empty()) path = find_repo_file("FORMAT.md");
@@ -5423,7 +5482,7 @@ int main(int argc, char** argv) {
       float ly = axis(SDL_CONTROLLER_AXIS_LEFTY);
       if (ly != 0.f) {
         Pane& p = F();
-        float view_h = static_cast<float>(win_h - status_bar_h) - ui_top;
+        float view_h = static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
         float max_s = std::max(0.f, p.layout.content_height - view_h + 40.f);
         p.scroll_y = std::max(0.f, std::min(max_s, p.scroll_y + ly * 18.f));
       }
@@ -5454,13 +5513,13 @@ int main(int argc, char** argv) {
     int pane_count = split ? 2 : 1;
     for (int i = 0; i < pane_count; ++i) {
       Pane& pane = panes[i];
-      float view_h_pane = static_cast<float>(win_h - status_bar_h) - ui_top;
+      float view_h_pane = static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
       float max_scroll =
           std::max(0.f, pane.layout.content_height - view_h_pane + 40.f);
       if (pane.scroll_y > max_scroll) pane.scroll_y = max_scroll;
 
       const int clip_y = static_cast<int>(ui_top);
-      SDL_Rect clip{pane.x, clip_y, pane.w, win_h - status_bar_h - clip_y};
+      SDL_Rect clip{pane.x, clip_y, pane.w, win_h - status_bar_h - clip_y - static_cast<int>(ui_bottom)};
       SDL_RenderSetClipRect(sdl, &clip);
 
       float ox = static_cast<float>(pane.x);
@@ -5990,7 +6049,7 @@ int main(int argc, char** argv) {
 
       // Scrollbar thumb (in the content band below the toolbar)
       {
-        float view_h = static_cast<float>(win_h - status_bar_h) - ui_top;
+        float view_h = static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
         if (view_h < 1.f) view_h = 1.f;
         float content_h = std::max(view_h, pane.layout.content_height);
         float thumb_h = std::max(24.f, view_h * (view_h / content_h));
@@ -6014,7 +6073,7 @@ int main(int argc, char** argv) {
       int mid = panes[1].x - 3;
       SDL_SetRenderDrawColor(sdl, 210, 208, 200, 255);
       SDL_Rect div{mid, static_cast<int>(ui_top), 6,
-                 win_h - status_bar_h - static_cast<int>(ui_top)};
+                 win_h - status_bar_h - static_cast<int>(ui_top) - static_cast<int>(ui_bottom)};
       SDL_RenderFillRect(sdl, &div);
     }
 
@@ -6267,7 +6326,7 @@ int main(int argc, char** argv) {
             "Ctrl+F leap · Ctrl+B/I style · drag to select";
         tr = 70; tg = 68; tb = 62;
       }
-      float baseline = static_cast<float>(win_h - 8);
+      float baseline = static_cast<float>(win_h - 8) - ui_bottom;
       renderer.draw_text(body_font, 10.f, baseline, label, tr, tg, tb);
 
       // Document / selection stats on the right (idle status only)
