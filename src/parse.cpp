@@ -133,6 +133,33 @@ void parse_inlines(Node& node, std::string_view text) {
         continue;
       }
     }
+    // _emphasis_ (underscore form; avoid mid-word matches like foo_bar_baz)
+    if (text[i] == '_') {
+      bool left_ok = (i == 0 || text[i - 1] == ' ' || text[i - 1] == '\t' ||
+                      text[i - 1] == '\n' || text[i - 1] == '(' ||
+                      text[i - 1] == '[');
+      if (left_ok) {
+        size_t end = text.find('_', i + 1);
+        if (end != std::string_view::npos && end > i + 1) {
+          bool right_ok =
+              (end + 1 >= text.size() || text[end + 1] == ' ' ||
+               text[end + 1] == '\t' || text[end + 1] == '\n' ||
+               text[end + 1] == ')' || text[end + 1] == ']' ||
+               text[end + 1] == '.' || text[end + 1] == ',' ||
+               text[end + 1] == ';' || text[end + 1] == ':' ||
+               text[end + 1] == '!' || text[end + 1] == '?');
+          if (right_ok) {
+            flush_plain();
+            InlineSpan s;
+            s.kind = InlineKind::Emphasis;
+            s.text = std::string(text.substr(i + 1, end - (i + 1)));
+            node.spans.push_back(std::move(s));
+            i = end + 1;
+            continue;
+          }
+        }
+      }
+    }
     // [text](url) or [text](#id) or [text](cite:key); optional {rel=…}
     if (text[i] == '[') {
       size_t mid = text.find("](", i + 1);
