@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **116** (this delivery is **115**)
+Next bundle number: **117** (this delivery is **116**)
 
 ## Status (2026-10-11)
 
@@ -200,6 +200,10 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Dirty-buffer protection for New / Open / Quit (repeat to confirm discard)
 - [x] Status-bar flash notices for warnings and open/new feedback
 - [x] File→Quit uses the same unsaved-changes warn as Ctrl+Q
+- [x] Status bar excluded from document mouse hit-tests and wheel scroll
+- [x] Save success flashes status bar; clears discard-armed state
+- [x] Menu/toolbar commands release ImGui input capture for the document
+- [x] help.md documents Ctrl+N / Ctrl+O / middle-click / drag-open
 
 ## Open work / next steps
 
@@ -364,4 +368,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-112.*-ui-icons-events-…` — icons, New/Open, capture fix
 - `xanatoo-113.*-events-icons-…` — prompt keys, soft right-click
 - `xanatoo-114.*-menus-paste-…` — menus, prompt paste, middle-click
-- `xanatoo-115.*-dirty-status-…` — this delivery
+- `xanatoo-115.*-dirty-status-…` — dirty New/Open/Quit notices
+- `xanatoo-116.*-status-focus-…` — this delivery

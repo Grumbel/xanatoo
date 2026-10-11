@@ -124,6 +124,10 @@ public:
   bool want_capture_keyboard() const;
   bool want_capture_mouse() const;
 
+  // After a menu/toolbar command, drop ImGui's active widget so the next
+  // keystroke goes to the document instead of the chrome.
+  void release_input_capture();
+
   // Request a context menu at window coordinates (call from main on right-click).
   void open_context_menu(float x, float y);
 

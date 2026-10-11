@@ -10,10 +10,14 @@ Jump to: [Files](#Files) · [Edit](#Edit) · [Navigate](#Navigate) · [View](#Vi
 
 ## Files
 
+- **Ctrl+N** — New document (warns if unsaved; repeat to discard)
+- **Ctrl+O** — Open file… (type a path in the status bar)
 - **Ctrl+S** — Save
 - **Ctrl+Shift+S** — Save As…
 - **Ctrl+R** / **Ctrl+Shift+R** — Reload / force reload
-- **Ctrl+Q** — Quit
+- **Ctrl+Q** — Quit (warns if unsaved; repeat to exit)
+- **Middle-click** — Paste at caret
+- **Drag .md / .sexp** — Open in a software window
 
 Export via *File → Export as S-expression…* or *Export as Markdown…*.
 

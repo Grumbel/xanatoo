@@ -851,6 +851,7 @@ int main(int argc, char** argv) {
             break;
           }
           if (imgui_mouse) break;
+          if (myw >= win_h - status_bar_h) break;
           int pi = pane_at(static_cast<float>(mxw));
           Pane& p = panes[pi];
           p.scroll_y -= static_cast<float>(ev.wheel.y) * 48.f;
@@ -859,8 +860,9 @@ int main(int argc, char** argv) {
         }
 
         case SDL_MOUSEBUTTONDOWN:
-          // Menu/toolbar strip belongs to ImGui.
+          // Menu/toolbar strip belongs to ImGui; status bar is not document area.
           if (static_cast<float>(ev.button.y) < ui_top) break;
+          if (ev.button.y >= win_h - status_bar_h) break;
 
           if (ev.button.button == SDL_BUTTON_LEFT) {
             const int mxw = ev.button.x, myw = ev.button.y;
@@ -2478,7 +2480,9 @@ int main(int argc, char** argv) {
                     out << text;
                     path_of(p) = save_as_path;
                     dirty_flags[p.doc_index] = false;
+                    discard_armed = false;
                     update_title();
+                    flash_status("Saved as " + save_as_path);
                     std::cout << "Saved as: " << save_as_path << "\n";
                   }
                 }
@@ -2873,7 +2877,9 @@ int main(int argc, char** argv) {
                     out << text;
                     std::cout << "Saved: " << spath << "\n";
                     dirty_flags[p.doc_index] = false;
+                    discard_armed = false;
                     update_title();
+                    flash_status("Saved " + spath);
                   }
                 }
               }
@@ -3243,7 +3249,9 @@ int main(int argc, char** argv) {
             if (out) {
               out << text;
               dirty_flags[p.doc_index] = false;
+              discard_armed = false;
               update_title();
+              flash_status("Saved " + spath);
               std::cout << "Saved: " << spath << "\n";
             }
           }
@@ -3695,6 +3703,8 @@ int main(int argc, char** argv) {
         default:
           break;
       }
+      if (ui_frame.cmd != C::None)
+        ui.release_input_capture();
     }
 
     renderer.clear(248, 246, 240);

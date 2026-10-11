@@ -5,6 +5,7 @@
 #include "xanatoo/font.hpp"
 
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "backends/imgui_impl_sdl2.h"
 #include "backends/imgui_impl_sdlrenderer2.h"
 
@@ -350,6 +351,16 @@ bool Ui::want_capture_keyboard() const {
 bool Ui::want_capture_mouse() const {
   if (!ready_) return false;
   return ImGui::GetIO().WantCaptureMouse;
+}
+
+void Ui::release_input_capture() {
+  if (!ready_) return;
+  ImGuiContext& g = *GImGui;
+  if (g.ActiveId != 0) ImGui::ClearActiveID();
+  // Close menus so WantCaptureKeyboard drops on the next frame.
+  if (g.OpenPopupStack.Size > 0)
+    ImGui::ClosePopupsOverWindow(nullptr, false);
+  ImGui::FocusWindow(nullptr);
 }
 
 void Ui::open_context_menu(float x, float y) {
