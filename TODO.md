@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **127** (this delivery is **126**)
+Next bundle number: **128** (this delivery is **127**)
 
 ## Status (2026-10-11)
 
@@ -221,6 +221,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Fix overlay screen Y (+ ui_top) for diff bars, word marks, gutters, drag
 - [x] Grip-dot hit-test uses content_y; dual-pane caret connector aligned
 - [x] Scrollbar click uses content view height (ui_top + status bar)
+- [x] Structure tags skip paragraphs; status flash on link follow
 
 ## Open work / next steps
 
@@ -396,4 +397,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-123.*-diff-feedback-…` — diff menu feedback
 - `xanatoo-124.*-overlay-y-…` — overlay Y alignment
 - `xanatoo-125.*-grip-connector-…` — grip dots + connector Y
-- `xanatoo-126.*-scrollbar-click-…` — this delivery
+- `xanatoo-126.*-scrollbar-click-…` — scrollbar click jump
+- `xanatoo-127.*-structure-links-…` — this delivery

@@ -1293,6 +1293,7 @@ int main(int argc, char** argv) {
                   panes[other].sel.focus = *dest;
                   panes[other].sel.anchor = *dest;
                   scroll_caret_into_view(panes[other]);
+                  flash_status("Link in other pane: " + *href);
                   std::cout << "Opened link in other pane: " << *href << "\n";
                 } else {
                   p.sel.focus = *dest;
@@ -1305,11 +1306,13 @@ int main(int argc, char** argv) {
                     panes[other].sel.anchor = *dest;
                     scroll_caret_into_view(panes[other]);
                   }
+                  flash_status("Followed " + *href);
                   std::cout << "Followed link: " << *href << "\n";
                 }
                 reset_blink();
                 break;
               } else if (!href->empty() && (*href)[0] != '#') {
+                flash_status("Opening " + *href);
                 std::cout << "Opening external link: " << *href << "\n";
                 xanatoo::open_external_url(*href);
                 break;
@@ -1364,6 +1367,7 @@ int main(int argc, char** argv) {
                     scroll_caret_into_view(panes[other]);
                   }
                   reset_blink();
+                  flash_status("Followed include " + bn.src);
                   std::cout << "Followed transclusion: " << bn.src << "\n";
                   followed = true;
                 } else {
@@ -3987,9 +3991,11 @@ int main(int argc, char** argv) {
           SDL_RenderFillRect(sdl, &wash);
 
           // Small kind label on the right edge of the region.
-          // Skip pure table-row shells — tags on cells/table are enough.
+          // Skip pure table-row shells and plain paragraphs — the wash is
+          // enough for para; tags stay for structural kinds.
           const char* tag = kind_label(node);
-          if (tag && kind != xanatoo::NodeKind::TableRow && bh >= 10 &&
+          if (tag && kind != xanatoo::NodeKind::TableRow &&
+              kind != xanatoo::NodeKind::Paragraph && bh >= 10 &&
               tag_font.loaded()) {
             int tw = tag_font.measure(tag);
             int tx = pane.x + pane.w - tw - 8;
