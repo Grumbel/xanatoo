@@ -147,6 +147,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
       "olist", "quote", "image", "split", "find", "help", "cut",
       "strike", "cite", "h1", "h2", "h3", "para", "task", "table",
       "figure", "note", "replace", "outline", "paste", "copy", "new", "open",
+      "zoomin", "zoomout", "structure", "diff",
   };
 
   fs::path found_dir;
@@ -396,6 +397,8 @@ static void menu_structure_items(const UiState& state, UiCommand& cmd) {
   menu_item_cmd("Wrap in Stretch", UiCommand::WrapStretch, cmd, true, "Ctrl+E");
   menu_item_cmd("Edit Stretch Summary…", UiCommand::EditStretchSummary, cmd,
                 state.in_stretch, "Ctrl+Shift+E");
+  menu_item_cmd("Unwrap Stretch", UiCommand::UnwrapStretch, cmd, state.in_stretch,
+                "Ctrl+Shift+U");
   ImGui::Separator();
   menu_item_cmd("Heading 1", UiCommand::Heading1, cmd, true, "Ctrl+1");
   menu_item_cmd("Heading 2", UiCommand::Heading2, cmd, true, "Ctrl+2");
@@ -598,34 +601,25 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                 cmd);
     tool_button("tb_outline", "outline", "Heading outline (Ctrl+Shift+O)",
                 UiCommand::ToggleOutline, cmd);
-    // Structure highlight toggle — pressed look when active
     {
-      bool pressed = false;
       if (state.structure) {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
                               ImVec4(0.4f, 0.5f, 0.75f, 1.f));
       }
-      if (ImGui::SmallButton("Struct##tb_struct")) pressed = true;
+      tool_button("tb_struct", "structure", "Structure highlight (Ctrl+Shift+L)",
+                  UiCommand::ToggleStructure, cmd);
       if (state.structure) ImGui::PopStyleColor(2);
-      if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Structure highlight (Ctrl+Shift+L)");
-      if (pressed) cmd = UiCommand::ToggleStructure;
-      ImGui::SameLine(0.f, 4.f);
     }
     {
-      bool pressed = false;
       if (state.diff) {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.4f, 0.2f, 1.f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
                               ImVec4(0.7f, 0.45f, 0.25f, 1.f));
       }
-      if (ImGui::SmallButton("Diff##tb_diff")) pressed = true;
+      tool_button("tb_diff", "diff", "Diff marks (Ctrl+Shift+D)",
+                  UiCommand::ToggleDiff, cmd);
       if (state.diff) ImGui::PopStyleColor(2);
-      if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Diff marks (Ctrl+Shift+D)");
-      if (pressed) cmd = UiCommand::ToggleDiff;
-      ImGui::SameLine(0.f, 4.f);
     }
     tool_button("tb_zoomin", "zoomin", "Zoom in (Ctrl++)", UiCommand::ZoomIn,
                 cmd);

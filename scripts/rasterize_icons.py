@@ -233,6 +233,22 @@ def draw_icon(name: str, size: int = 20) -> bytes:
         line(buf, size, size, S(3), S(6), S(8), S(6), INK, 1)
         line(buf, size, size, S(8), S(6), S(10), S(4), INK, 1)
         line(buf, size, size, S(10), S(4), S(17), S(4), INK, 1)
+    elif name == "zoomin":
+        circle(buf, size, size, S(9), S(9), S(5), INK, SOFT)
+        line(buf, size, size, S(13), S(13), S(17), S(17), INK, 2)
+        line(buf, size, size, S(9), S(6), S(9), S(12), ACCENT, 2)
+        line(buf, size, size, S(6), S(9), S(12), S(9), ACCENT, 2)
+    elif name == "zoomout":
+        circle(buf, size, size, S(9), S(9), S(5), INK, SOFT)
+        line(buf, size, size, S(13), S(13), S(17), S(17), INK, 2)
+        line(buf, size, size, S(6), S(9), S(12), S(9), ACCENT, 2)
+    elif name == "structure":
+        rect(buf, size, size, S(4), S(4), S(12), S(3), INK, ACCENT)
+        rect(buf, size, size, S(4), S(9), S(10), S(2), INK, SOFT)
+        rect(buf, size, size, S(4), S(13), S(11), S(2), INK, SOFT)
+    elif name == "diff":
+        rect(buf, size, size, S(2), S(3), S(7), S(14), INK, SOFT)
+        rect(buf, size, size, S(11), S(3), S(7), S(14), INK, ACCENT)
     else:
         rect(buf, size, size, S(4), S(4), S(12), S(12), INK, ACCENT)
     return bytes(buf)

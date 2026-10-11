@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **113** (this delivery is **112**)
+Next bundle number: **114** (this delivery is **113**)
 
 ## Status (2026-10-11)
 
@@ -187,6 +187,11 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] UI: toolbar New/Open/Copy/Paste buttons
 - [x] Event routing: status-bar prompts no longer blocked by ImGui WantCaptureKeyboard
 - [x] Event routing: smarter want_capture_keyboard (text/popup/active only)
+- [x] Event routing: status prompts absorb non-prompt keys (no caret drift)
+- [x] Event routing: right-click on soft windows does not open doc context menu
+- [x] Event routing: document click dismisses status-bar prompts
+- [x] UI: zoomin/zoomout/structure/diff toolbar icons
+- [x] UI: Unwrap Stretch menu item (Ctrl+Shift+U)
 
 ## Open work / next steps
 
@@ -348,4 +353,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-109.*-esc-soft-…` — this delivery
 - `xanatoo-110.*-path-input-em-…` — this delivery
 - `xanatoo-111.*-nested-table-md-…` — nested table markdown
-- `xanatoo-112.*-ui-icons-events-…` — this delivery
+- `xanatoo-112.*-ui-icons-events-…` — icons, New/Open, capture fix
+- `xanatoo-113.*-events-icons-…` — this delivery

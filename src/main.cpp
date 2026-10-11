@@ -1121,6 +1121,27 @@ int main(int argc, char** argv) {
             // Below soft windows: let ImGui keep the event if it wants it.
             if (imgui_mouse) break;
 
+            // Clicking the document dismisses status-bar prompts (Esc also works).
+            if (save_as_mode || path_in_window_mode || open_file_mode ||
+                image_insert_mode || include_insert_mode || link_edit_mode ||
+                summary_edit_mode) {
+              save_as_mode = false;
+              save_as_path.clear();
+              path_in_window_mode = false;
+              path_in_window_buf.clear();
+              open_file_mode = false;
+              open_file_buf.clear();
+              image_insert_mode = false;
+              image_insert_path.clear();
+              image_insert_as_figure = false;
+              include_insert_mode = false;
+              include_insert_src.clear();
+              link_edit_mode = false;
+              link_edit_href.clear();
+              summary_edit_mode = false;
+              summary_edit_text.clear();
+            }
+
             float mx = static_cast<float>(ev.button.x);
             float my = content_y(static_cast<float>(ev.button.y));
 
@@ -1378,8 +1399,27 @@ int main(int argc, char** argv) {
               reset_blink();
             }
           } else if (ev.button.button == SDL_BUTTON_RIGHT) {
+            // Soft windows / outline / help absorb right-clicks (no doc menu under them).
+            const int rx = ev.button.x, ry = ev.button.y;
+            bool over_soft = false;
+            if (outline_mode && rx >= ol_x && rx < ol_x + ol_w &&
+                ry >= ol_y && ry < ol_y + ol_h)
+              over_soft = true;
+            if (!over_soft && help_mode && rx >= help_x && rx < help_x + help_w &&
+                ry >= help_y && ry < help_y + help_h)
+              over_soft = true;
+            if (!over_soft) {
+              for (int i = static_cast<int>(soft_wins.size()) - 1; i >= 0; --i) {
+                const SoftWindow& sw = soft_wins[static_cast<size_t>(i)];
+                if (rx >= sw.x && rx < sw.x + sw.w && ry >= sw.y &&
+                    ry < sw.y + sw.h) {
+                  over_soft = true;
+                  break;
+                }
+              }
+            }
             // Document context menu (ImGui popup).
-            if (!imgui_mouse) {
+            if (!over_soft && !imgui_mouse) {
               float mx = static_cast<float>(ev.button.x);
               float my = content_y(static_cast<float>(ev.button.y));
               focus = pane_at(mx);
@@ -1768,14 +1808,24 @@ int main(int argc, char** argv) {
           Pane& p = F();
           xanatoo::Document& d = doc_of(p);
 
-          // Status prompts (and Esc) must work even if ImGui still wants keys.
+          // Status prompts own Esc / Backspace / Enter; block document keys so
+          // arrows do not move the caret while typing a path or query.
           const bool status_prompt =
               save_as_mode || path_in_window_mode || open_file_mode ||
               image_insert_mode || include_insert_mode || link_edit_mode ||
               summary_edit_mode || search_mode;
-          if (imgui_keys && !status_prompt &&
-              ev.key.keysym.sym != SDLK_ESCAPE &&
-              ev.key.keysym.sym != SDLK_F1) {
+          if (status_prompt) {
+            const SDL_Keycode k = ev.key.keysym.sym;
+            const bool prompt_key =
+                k == SDLK_ESCAPE || k == SDLK_BACKSPACE || k == SDLK_RETURN ||
+                k == SDLK_KP_ENTER ||
+                // Search: F3 / Shift+F3 still jump matches while the query is open
+                (search_mode && (k == SDLK_F3 || k == SDLK_g)) ||
+                // Allow Tab to switch replace-field focus when replace is open
+                (search_mode && replace_mode && k == SDLK_TAB);
+            if (!prompt_key) break;
+          } else if (imgui_keys && ev.key.keysym.sym != SDLK_ESCAPE &&
+                     ev.key.keysym.sym != SDLK_F1) {
             break;
           }
 
@@ -3432,6 +3482,18 @@ int main(int argc, char** argv) {
             search_mode = false;
             save_as_mode = false;
             link_edit_mode = false;
+          }
+          break;
+        }
+        case C::UnwrapStretch: {
+          edit();
+          if (auto first = xanatoo::unwrap_stretch(d, p.sel.focus.node)) {
+            p.sel.focus.node = *first;
+            p.sel.focus.span_index = 0;
+            p.sel.focus.char_index = 0;
+            p.sel.anchor = p.sel.focus;
+            needs_layout = true;
+            reset_blink();
           }
           break;
         }

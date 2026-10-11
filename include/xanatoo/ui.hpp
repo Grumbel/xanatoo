@@ -64,6 +64,7 @@ enum class UiCommand {
   OutdentList,
   WrapStretch,
   EditStretchSummary,
+  UnwrapStretch,
   Heading1,
   Heading2,
   Heading3,
