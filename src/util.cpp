@@ -3,6 +3,13 @@
 
 #include "xanatoo/util.hpp"
 
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+
+namespace fs = std::filesystem;
+
 namespace xanatoo {
 
 std::string ascii_lower(std::string s) {
@@ -78,6 +85,66 @@ bool is_raster_image_path(std::string_view path) {
   return path_ends_with_ci(path, ".png") || path_ends_with_ci(path, ".jpg") ||
          path_ends_with_ci(path, ".jpeg") || path_ends_with_ci(path, ".gif") ||
          path_ends_with_ci(path, ".bmp");
+}
+
+std::string config_dir() {
+  const char* xdg = std::getenv("XDG_CONFIG_HOME");
+  fs::path base;
+  if (xdg && xdg[0]) {
+    base = fs::path(xdg) / "xanatoo";
+  } else {
+    const char* home = std::getenv("HOME");
+    if (!home || !home[0]) return {};
+    base = fs::path(home) / ".config" / "xanatoo";
+  }
+  std::error_code ec;
+  fs::create_directories(base, ec);
+  if (ec) {
+    std::cerr << "xanatoo: cannot create config dir " << base << ": "
+              << ec.message() << "\n";
+    return {};
+  }
+  return base.string();
+}
+
+std::string bookmarks_path() {
+  std::string dir = config_dir();
+  if (dir.empty()) return {};
+  return (fs::path(dir) / "bookmarks").string();
+}
+
+std::vector<std::string> load_bookmarks() {
+  std::vector<std::string> out;
+  std::string path = bookmarks_path();
+  if (path.empty()) return out;
+  std::ifstream in(path);
+  if (!in) return out;
+  std::string line;
+  while (std::getline(in, line)) {
+    while (!line.empty() &&
+           (line.back() == '\r' || line.back() == ' ' || line.back() == '\t'))
+      line.pop_back();
+    size_t i = 0;
+    while (i < line.size() && (line[i] == ' ' || line[i] == '\t')) ++i;
+    if (i >= line.size() || line[i] == '#') continue;
+    out.push_back(line.substr(i));
+  }
+  return out;
+}
+
+bool save_bookmarks(const std::vector<std::string>& entries) {
+  std::string path = bookmarks_path();
+  if (path.empty()) return false;
+  std::ofstream out(path, std::ios::trunc);
+  if (!out) {
+    std::cerr << "xanatoo: cannot write bookmarks to " << path << "\n";
+    return false;
+  }
+  out << "# xanatoo bookmarks — one URL or path per line\n";
+  for (const auto& e : entries) {
+    if (!e.empty()) out << e << '\n';
+  }
+  return static_cast<bool>(out);
 }
 
 }  // namespace xanatoo

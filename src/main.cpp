@@ -285,6 +285,10 @@ int main(int argc, char** argv) {
   std::string gemini_current_url;  // base for relative gemini links
   std::vector<std::string> nav_history;
   int nav_hist_pos = -1;  // index into nav_history
+  constexpr int kMaxNavHistory = 100;
+  std::vector<std::string> bookmarks = xanatoo::load_bookmarks();
+  bool history_panel_open = false;
+  bool bookmarks_panel_open = false;
   std::string open_file_buf;
   std::string status_notice;
   Uint32 status_notice_until = 0;
@@ -387,6 +391,56 @@ int main(int argc, char** argv) {
     status_notice = msg;
     status_notice_until = SDL_GetTicks() + 4000;
   };
+
+  auto push_nav_history = [&](const std::string& url) {
+    if (url.empty()) return;
+    if (nav_hist_pos >= 0 &&
+        nav_hist_pos < static_cast<int>(nav_history.size()) &&
+        nav_history[static_cast<size_t>(nav_hist_pos)] == url)
+      return;
+    if (nav_hist_pos + 1 < static_cast<int>(nav_history.size()))
+      nav_history.resize(static_cast<size_t>(nav_hist_pos + 1));
+    nav_history.push_back(url);
+    while (static_cast<int>(nav_history.size()) > kMaxNavHistory)
+      nav_history.erase(nav_history.begin());
+    nav_hist_pos = static_cast<int>(nav_history.size()) - 1;
+  };
+
+  auto is_bookmarked = [&](const std::string& url) -> bool {
+    if (url.empty()) return false;
+    return std::find(bookmarks.begin(), bookmarks.end(), url) != bookmarks.end();
+  };
+
+  auto add_bookmark = [&](const std::string& url) {
+    if (url.empty()) {
+      flash_status("Nothing to bookmark (no path/URL)");
+      return;
+    }
+    if (is_bookmarked(url)) {
+      flash_status("Already bookmarked");
+      return;
+    }
+    bookmarks.push_back(url);
+    if (xanatoo::save_bookmarks(bookmarks))
+      flash_status("Bookmarked " + url);
+    else
+      flash_status("Bookmark added (could not persist to disk)");
+  };
+
+  auto remove_bookmark = [&](const std::string& url) {
+    if (url.empty()) return;
+    auto it = std::find(bookmarks.begin(), bookmarks.end(), url);
+    if (it == bookmarks.end()) {
+      flash_status("Not in bookmarks");
+      return;
+    }
+    bookmarks.erase(it);
+    if (xanatoo::save_bookmarks(bookmarks))
+      flash_status("Removed bookmark");
+    else
+      flash_status("Bookmark removed (could not persist to disk)");
+  };
+
   auto allow_discard_dirty = [&](int di) -> bool {
     if (di < 0 || di > 1) di = 0;
     if (!dirty_flags[di]) return true;
@@ -707,12 +761,7 @@ int main(int argc, char** argv) {
       gemini_current_url = resp->final_url;
       load_into_pane(std::move(gdoc), resp->final_url);
       browse_mode = true;
-      if (record_history) {
-        if (nav_hist_pos + 1 < static_cast<int>(nav_history.size()))
-          nav_history.resize(static_cast<size_t>(nav_hist_pos + 1));
-        nav_history.push_back(resp->final_url);
-        nav_hist_pos = static_cast<int>(nav_history.size()) - 1;
-      }
+      if (record_history) push_nav_history(resp->final_url);
       flash_status("Gemini " + std::to_string(resp->status) + " " +
                    resp->final_url);
       return true;
@@ -735,6 +784,7 @@ int main(int argc, char** argv) {
     if (!allow_discard_dirty(p.doc_index)) return false;
     gemini_current_url.clear();
     load_into_pane(load_doc(path), path);
+    if (record_history) push_nav_history(path);
     flash_status("Opened " + path);
     return true;
   };
@@ -2310,6 +2360,7 @@ int main(int argc, char** argv) {
               case SDLK_o: menu = "Format"; break;  // classic "fOrmat"
               case SDLK_i: menu = "Insert"; break;
               case SDLK_v: menu = "View"; break;
+              case SDLK_b: menu = "Bookmarks"; break;
               case SDLK_h: menu = "Help"; break;
               default: break;
             }
@@ -2597,6 +2648,10 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_h:
+              if (ctrl && shift) {
+                history_panel_open = !history_panel_open;
+                break;
+              }
               if (ctrl) {
                 // Leap replace: find with current query (or enter search), then type replacement
                 search_mode = true;
@@ -2965,6 +3020,7 @@ int main(int argc, char** argv) {
                     }
                     needs_layout = true;
                     update_title();
+                    push_nav_history(path);
                     flash_status("Opened " + path);
                     std::cout << "Opened: " << path << "\n";
                     open_file_mode = false;
@@ -3612,6 +3668,15 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_b:
+              if (ctrl && shift) {
+                std::string url = path_of(p);
+                if (url.empty()) url = gemini_current_url;
+                if (is_bookmarked(url))
+                  remove_bookmark(url);
+                else
+                  add_bookmark(url);
+                break;
+              }
               if (ctrl && !p.sel.empty()) {
                 edit();
                 xanatoo::apply_style_to_selection(d, p.sel, xanatoo::InlineKind::Strong);
@@ -3823,6 +3888,18 @@ int main(int argc, char** argv) {
       }
       ui_state.doc_label = path_of(F()).empty() ? std::string("untitled")
                                                 : path_of(F());
+      ui_state.can_nav_back = nav_hist_pos > 0;
+      ui_state.can_nav_forward =
+          nav_hist_pos + 1 < static_cast<int>(nav_history.size());
+      ui_state.history_open = history_panel_open;
+      ui_state.bookmarks_open = bookmarks_panel_open;
+      ui_state.history_entries = nav_history;
+      ui_state.history_pos = nav_hist_pos;
+      ui_state.bookmarks = bookmarks;
+      {
+        const std::string& cur = path_of(F());
+        ui_state.current_bookmarked = is_bookmarked(cur);
+      }
       auto ui_frame = ui.begin_frame(ui_state);
       ui_top = ui_frame.top_reserved;
 
@@ -3836,6 +3913,8 @@ int main(int argc, char** argv) {
         const bool allowed =
             c == C::Quit || c == C::OpenDocument || c == C::OpenUrlBar ||
             c == C::NavigateUrl || c == C::NavBack || c == C::NavForward ||
+            c == C::ToggleHistory || c == C::ToggleBookmarks ||
+            c == C::AddBookmark || c == C::RemoveBookmark ||
             c == C::Save ||
             c == C::SaveAs || c == C::ExportSexpr || c == C::ExportMarkdown ||
             c == C::Reload || c == C::ForceReload || c == C::Copy ||
@@ -3922,6 +4001,27 @@ int main(int argc, char** argv) {
             flash_status("No next page");
           }
           break;
+        case C::ToggleHistory:
+          history_panel_open = !history_panel_open;
+          break;
+        case C::ToggleBookmarks:
+          bookmarks_panel_open = !bookmarks_panel_open;
+          break;
+        case C::AddBookmark: {
+          std::string url = path_of(p);
+          if (url.empty()) url = gemini_current_url;
+          add_bookmark(url);
+          break;
+        }
+        case C::RemoveBookmark: {
+          std::string url = ui_frame.arg;
+          if (url.empty()) {
+            url = path_of(p);
+            if (url.empty()) url = gemini_current_url;
+          }
+          remove_bookmark(url);
+          break;
+        }
         case C::Save: {
           std::string& spath = path_of(p);
           if (spath.empty()) {

@@ -17,7 +17,7 @@ Jump to: [Files](#Files) · [Edit](#Edit) · [Navigate](#Navigate) · [View](#Vi
 - **Ctrl+R** / **Ctrl+Shift+R** — Reload / force reload
 - **Ctrl+Q** — Quit (warns if unsaved; repeat to exit)
 - **Ctrl+W** — Close top soft window / help / outline
-- **Alt+F / E / O / I / V / H** — File / Edit / Format / Insert / View / Help menu
+- **Alt+F / E / O / I / V / B / H** — File / Edit / Format / Insert / View / Bookmarks / Help menu
 - **Middle-click** — Paste at caret
 - **Drag .md / .sexp** — Open in a software window
 
@@ -126,6 +126,15 @@ green. Use this for reading and navigating.
 | Stick click L/R | Collapse all / expand all |
 | **Back** | Toggle browse mode |
 | **Start** | Help |
+
+## Navigation (history & bookmarks)
+
+- **Alt+Left** / **Alt+Right** — Back / Forward in session history
+- **Ctrl+Shift+H** / **View → History** — session history panel (click to open)
+- **Ctrl+Shift+B** — Bookmark or un-bookmark the current page
+- **Bookmarks** menu — add/remove, list, open; **Show Bookmarks…** for the manager
+- Bookmarks persist in `~/.config/xanatoo/bookmarks` (one URL or path per line)
+- Local files and `gemini://` pages share the same session history
 
 ## Gemini (gemtext + gemini://)
 

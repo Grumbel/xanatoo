@@ -459,8 +459,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("New", UiCommand::NewDocument, cmd, true, "Ctrl+N");
       menu_item_cmd("Open…", UiCommand::OpenDocument, cmd, true, "Ctrl+O");
       menu_item_cmd("Open URL…", UiCommand::OpenUrlBar, cmd, true, "Ctrl+L");
-      menu_item_cmd("Back", UiCommand::NavBack, cmd, true, "Alt+Left");
-      menu_item_cmd("Forward", UiCommand::NavForward, cmd, true, "Alt+Right");
+      menu_item_cmd("Back", UiCommand::NavBack, cmd, state.can_nav_back, "Alt+Left");
+      menu_item_cmd("Forward", UiCommand::NavForward, cmd, state.can_nav_forward,
+                    "Alt+Right");
       ImGui::Separator();
       menu_item_cmd("Save", UiCommand::Save, cmd, true, "Ctrl+S");
       menu_item_cmd("Save As…", UiCommand::SaveAs, cmd, true, "Ctrl+Shift+S");
@@ -533,6 +534,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleStructure;
       if (ImGui::MenuItem("Browse Mode (read-only)", "F2", state.browse))
         cmd = UiCommand::ToggleBrowse;
+      if (ImGui::MenuItem("History", "Ctrl+Shift+H", state.history_open))
+        cmd = UiCommand::ToggleHistory;
       ImGui::Separator();
       menu_item_cmd("Zoom In", UiCommand::ZoomIn, cmd, true, "Ctrl++");
       menu_item_cmd("Zoom Out", UiCommand::ZoomOut, cmd, true, "Ctrl+-");
@@ -561,6 +564,36 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         if (ImGui::MenuItem("Diff demo (v1 | v2, marks on)"))
           cmd = UiCommand::LoadDiffDemo;
         ImGui::EndMenu();
+      }
+      ImGui::EndMenu();
+    }
+    force_menu("Bookmarks");
+    if (ImGui::BeginMenu("Bookmarks")) {
+      const char* add_label =
+          state.current_bookmarked ? "Remove Bookmark" : "Bookmark This Page";
+      if (ImGui::MenuItem(add_label, "Ctrl+Shift+B", false, state.has_path)) {
+        cmd = state.current_bookmarked ? UiCommand::RemoveBookmark
+                                       : UiCommand::AddBookmark;
+      }
+      if (ImGui::MenuItem("Show Bookmarks…", nullptr, state.bookmarks_open))
+        cmd = UiCommand::ToggleBookmarks;
+      if (!state.bookmarks.empty()) {
+        ImGui::Separator();
+        // Newest bookmarks last; show up to 30 in the menu.
+        const int n = static_cast<int>(state.bookmarks.size());
+        const int start = n > 30 ? n - 30 : 0;
+        for (int i = start; i < n; ++i) {
+          const std::string& b = state.bookmarks[static_cast<size_t>(i)];
+          // Truncate long labels for the menu.
+          std::string label = b;
+          if (label.size() > 64) {
+            label = label.substr(0, 28) + "…" + label.substr(label.size() - 28);
+          }
+          if (ImGui::MenuItem(label.c_str())) {
+            cmd = UiCommand::NavigateUrl;
+            result.arg = b;
+          }
+        }
       }
       ImGui::EndMenu();
     }
@@ -811,6 +844,89 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     menu_item_cmd("Find…", UiCommand::Find, cmd, true, "Ctrl+F");
     menu_item_cmd("Replace…", UiCommand::Replace, cmd, true, "Ctrl+H");
     ImGui::EndPopup();
+  }
+
+  // ---- Session History panel ----
+  if (state.history_open) {
+    bool open = true;
+    ImGui::SetNextWindowSize(ImVec2(480.f, 360.f), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("History", &open)) {
+      ImGui::TextDisabled("Session navigation history · click to open");
+      ImGui::Separator();
+      if (state.history_entries.empty()) {
+        ImGui::TextWrapped("No pages yet. Open a file or gemini:// URL to start.");
+      } else {
+        // Show newest first.
+        for (int i = static_cast<int>(state.history_entries.size()) - 1; i >= 0;
+             --i) {
+          const std::string& e = state.history_entries[static_cast<size_t>(i)];
+          bool current = (i == state.history_pos);
+          if (current) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 0.35f, 0.7f, 1.f));
+          std::string label = e;
+          if (current) label = "▸ " + label;
+          if (ImGui::Selectable(label.c_str(), current)) {
+            cmd = UiCommand::NavigateUrl;
+            result.arg = e;
+          }
+          if (current) ImGui::PopStyleColor();
+        }
+      }
+    }
+    ImGui::End();
+    if (!open) cmd = UiCommand::ToggleHistory;
+  }
+
+  // ---- Bookmarks manager panel ----
+  if (state.bookmarks_open) {
+    bool open = true;
+    ImGui::SetNextWindowSize(ImVec2(480.f, 360.f), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Bookmarks", &open)) {
+      ImGui::TextDisabled("Persistent bookmarks (~/.config/xanatoo/bookmarks)");
+      ImGui::Separator();
+      if (ImGui::Button(state.current_bookmarked ? "Remove current page"
+                                                : "Bookmark current page")) {
+        cmd = state.current_bookmarked ? UiCommand::RemoveBookmark
+                                       : UiCommand::AddBookmark;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Close")) {
+        open = false;
+      }
+      ImGui::Separator();
+      if (state.bookmarks.empty()) {
+        ImGui::TextWrapped("No bookmarks yet.");
+      } else {
+        for (int i = 0; i < static_cast<int>(state.bookmarks.size()); ++i) {
+          const std::string& b = state.bookmarks[static_cast<size_t>(i)];
+          ImGui::PushID(i);
+          if (ImGui::Selectable(b.c_str(), false,
+                                ImGuiSelectableFlags_AllowDoubleClick)) {
+            if (ImGui::IsMouseDoubleClicked(0)) {
+              cmd = UiCommand::NavigateUrl;
+              result.arg = b;
+            }
+          }
+          if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(1)) {
+            ImGui::OpenPopup("##bm_ctx");
+          }
+          if (ImGui::BeginPopup("##bm_ctx")) {
+            if (ImGui::MenuItem("Open")) {
+              cmd = UiCommand::NavigateUrl;
+              result.arg = b;
+            }
+            if (ImGui::MenuItem("Remove")) {
+              cmd = UiCommand::RemoveBookmark;
+              result.arg = b;
+            }
+            ImGui::EndPopup();
+          }
+          ImGui::PopID();
+        }
+        ImGui::TextDisabled("Double-click to open · right-click for menu");
+      }
+    }
+    ImGui::End();
+    if (!open) cmd = UiCommand::ToggleBookmarks;
   }
 
   result.cmd = cmd;

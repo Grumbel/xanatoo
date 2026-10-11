@@ -4,6 +4,7 @@
 
 #include <SDL.h>
 #include <string>
+#include <vector>
 #include <unordered_map>
 
 namespace xanatoo {
@@ -17,9 +18,14 @@ enum class UiCommand {
   OpenDocument,
   OpenUrlBar,  // Ctrl+L — focus URL bar / status fallback
   NavigateUrl,  // toolbar/menu URL field committed (arg = URL or path)
-  NavBack,     // Alt+Left capsule history
+  NavBack,     // Alt+Left session history
   NavForward,  // Alt+Right
+  ToggleHistory,   // View → History panel
+  AddBookmark,     // bookmark current page URL/path
+  RemoveBookmark,  // remove current (or arg) from bookmarks
+  ToggleBookmarks, // Bookmarks manager panel
   Save,
+
   SaveAs,
   ExportSexpr,
   ExportMarkdown,
@@ -112,6 +118,16 @@ struct UiState {
   bool on_list_item = false;
   // True when caret is inside a Stretch (enables edit summary).
   bool in_stretch = false;
+  bool can_nav_back = false;
+  bool can_nav_forward = false;
+  bool history_open = false;
+  bool bookmarks_open = false;
+  bool current_bookmarked = false;
+  // Session history (oldest → newest) for the History panel.
+  std::vector<std::string> history_entries;
+  int history_pos = -1;  // current index, or -1
+  // Persistent bookmarks for the Bookmarks menu / panel.
+  std::vector<std::string> bookmarks;
   std::string status_left;
   std::string doc_label;
 };

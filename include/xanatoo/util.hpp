@@ -31,4 +31,18 @@ bool is_raster_image_path(std::string_view path);
 // Case-insensitive suffix check (e.g. ".sexp").
 bool path_ends_with_ci(std::string_view path, std::string_view suffix);
 
+
+// XDG config directory for xanatoo (~/.config/xanatoo). Created if missing.
+// Returns empty string if the home directory cannot be resolved.
+std::string config_dir();
+
+// Full path to the bookmarks file under config_dir().
+std::string bookmarks_path();
+
+// Load bookmarks (one URL/path per line; blank lines and # comments ignored).
+std::vector<std::string> load_bookmarks();
+
+// Save bookmarks (creates config dir as needed). Returns false on I/O error.
+bool save_bookmarks(const std::vector<std::string>& entries);
+
 }  // namespace xanatoo
