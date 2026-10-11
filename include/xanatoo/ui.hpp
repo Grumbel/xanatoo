@@ -15,7 +15,8 @@ enum class UiCommand {
   // File
   NewDocument,
   OpenDocument,
-  OpenUrlBar,  // Ctrl+L — gemini:// or path
+  OpenUrlBar,  // Ctrl+L — focus URL bar / status fallback
+  NavigateUrl,  // toolbar/menu URL field committed (arg = URL or path)
   NavBack,     // Alt+Left capsule history
   NavForward,  // Alt+Right
   Save,
@@ -146,6 +147,9 @@ public:
   // Open a top-level menu by name ("File", "Edit", …) for Alt+letter mnemonics.
   void request_menu(const char* name);
 
+  // Focus the toolbar location / URL field (Ctrl+L).
+  void focus_url_bar();
+
   // Request a context menu at window coordinates (call from main on right-click).
   void open_context_menu(float x, float y);
 
@@ -177,6 +181,12 @@ private:
 
   // Pending Alt+letter menu to open on the next begin_frame().
   std::string menu_request_;
+
+  // Interactive location / URL field (toolbar).
+  char url_input_[2048] = {};
+  std::string url_synced_from_;  // last doc_label pushed into url_input_
+  bool focus_url_bar_ = false;   // Ctrl+L / Open URL menu
+  bool url_bar_editing_ = false;
 };
 
 }  // namespace xanatoo

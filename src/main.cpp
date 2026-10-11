@@ -46,7 +46,7 @@ int main(int argc, char** argv) {
   SDL_Window* window = SDL_CreateWindow(
       "xanatoo",
       SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-      920, 720,
+      1024, 768,
       SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN);
   if (!window) {
     std::cerr << "SDL_CreateWindow: " << SDL_GetError() << "\n";
@@ -3568,14 +3568,13 @@ int main(int argc, char** argv) {
                 std::cout << (structure_mode ? "Structure highlight on\n"
                                              : "Structure highlight off\n");
               } else if (ctrl && !shift) {
-                // URL bar — gemini:// or local path
-                url_bar_mode = true;
-                url_bar_buf = gemini_current_url.empty() ? "gemini://"
-                                                        : gemini_current_url;
+                // Focus interactive toolbar URL bar
                 search_mode = false;
                 save_as_mode = false;
                 open_file_mode = false;
                 path_in_window_mode = false;
+                url_bar_mode = false;
+                ui.focus_url_bar();
               }
               break;
 
@@ -3839,7 +3838,8 @@ int main(int argc, char** argv) {
         const C c = ui_frame.cmd;
         const bool allowed =
             c == C::Quit || c == C::OpenDocument || c == C::OpenUrlBar ||
-            c == C::NavBack || c == C::NavForward || c == C::Save ||
+            c == C::NavigateUrl || c == C::NavBack || c == C::NavForward ||
+            c == C::Save ||
             c == C::SaveAs || c == C::ExportSexpr || c == C::ExportMarkdown ||
             c == C::Reload || c == C::ForceReload || c == C::Copy ||
             c == C::CopyPageUrl ||
@@ -3896,13 +3896,16 @@ int main(int argc, char** argv) {
           url_bar_mode = false;
           break;
         case C::OpenUrlBar:
-          url_bar_mode = true;
-          url_bar_buf = gemini_current_url.empty() ? "gemini://"
-                                                  : gemini_current_url;
           search_mode = false;
           save_as_mode = false;
           open_file_mode = false;
           path_in_window_mode = false;
+          url_bar_mode = false;
+          ui.focus_url_bar();
+          break;
+        case C::NavigateUrl:
+          if (!ui_frame.arg.empty())
+            navigate_to_url(ui_frame.arg);
           break;
         case C::NavBack:
           if (nav_hist_pos > 0) {

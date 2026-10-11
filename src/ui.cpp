@@ -10,6 +10,7 @@
 #include "backends/imgui_impl_sdlrenderer2.h"
 
 #include <cstdlib>
+#include <cstdio>
 #include <filesystem>
 #include <iostream>
 #include <string>
@@ -369,6 +370,8 @@ void Ui::request_menu(const char* name) {
   if (name && name[0]) menu_request_ = name;
 }
 
+void Ui::focus_url_bar() { focus_url_bar_ = true; }
+
 void Ui::open_context_menu(float x, float y) {
   context_open_ = true;
   context_x_ = x;
@@ -593,15 +596,51 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::EndMenu();
     }
 
-    // Document label on the right of the menu bar
-    if (!state.doc_label.empty()) {
-      std::string right = state.doc_label;
-      if (state.dirty) right = "*" + right;
-      float w = ImGui::CalcTextSize(right.c_str()).x;
-      float avail = ImGui::GetWindowWidth();
-      if (avail > w + 24.f) {
-        ImGui::SameLine(avail - w - 12.f);
-        ImGui::TextDisabled("%s", right.c_str());
+    // Interactive location / URL field (right side of the menu bar).
+    {
+      std::string want = state.doc_label.empty() ? "untitled" : state.doc_label;
+      float avail = ImGui::GetContentRegionAvail().x;
+      if (avail > 28.f) {
+        ImGui::SameLine(0.f, 12.f);
+        if (state.dirty) {
+          ImGui::TextDisabled("*");
+          ImGui::SameLine(0.f, 2.f);
+        }
+        float field_w = ImGui::GetContentRegionAvail().x - 8.f;
+        if (field_w < 80.f) field_w = 80.f;
+        ImGui::SetNextItemWidth(field_w);
+
+        if (focus_url_bar_) {
+          ImGui::SetKeyboardFocusHere();
+          std::snprintf(url_input_, sizeof(url_input_), "%s", want.c_str());
+          url_synced_from_ = want;
+          focus_url_bar_ = false;
+        } else if (want != url_synced_from_ && !url_bar_editing_) {
+          std::snprintf(url_input_, sizeof(url_input_), "%s", want.c_str());
+          url_synced_from_ = want;
+        }
+
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.95f, 0.95f, 0.97f, 1.f));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,
+                              ImVec4(0.98f, 0.98f, 1.f, 1.f));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgActive,
+                              ImVec4(1.f, 1.f, 1.f, 1.f));
+        bool enter = ImGui::InputText(
+            "##urlbar", url_input_, sizeof(url_input_),
+            ImGuiInputTextFlags_EnterReturnsTrue |
+                ImGuiInputTextFlags_AutoSelectAll);
+        ImGui::PopStyleColor(3);
+        url_bar_editing_ = ImGui::IsItemActive();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+          ImGui::SetTooltip(
+              "Location — path or gemini:// URL · Enter to open · Ctrl+L focuses");
+        if (enter) {
+          result.cmd = UiCommand::NavigateUrl;
+          result.arg = url_input_;
+          url_synced_from_ = result.arg;
+          url_bar_editing_ = false;
+          ImGui::ClearActiveID();
+        }
       }
     }
 

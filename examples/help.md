@@ -130,7 +130,8 @@ green. Use this for reading and navigating.
 ## Gemini (gemtext + gemini://)
 
 - **`.gmi` / `.gemini`** files parse as gemtext (headers, `=>` links, lists, quotes, pre).
-- **Ctrl+L** / **File → Open URL…** — URL bar for `gemini://` or a local path.
+- **Ctrl+L** / **File → Open URL…** — focuses the **location field** in the menu bar
+  (path or `gemini://`); press **Enter** to open.
 - With **XANATOO_GEMINI** (default ON), the client fetches over TLS (port 1965) and
   shows the page in **browse mode**. Relative `=>` links resolve against the
   current capsule URL. Status **10/11** input requests reopen the URL bar with a

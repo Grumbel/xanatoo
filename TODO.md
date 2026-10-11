@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **140** (this delivery is **139**)
+Next bundle number: **141** (this delivery is **140**)
 
 ## Status (2026-10-11)
 
@@ -237,6 +237,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Gemini history (Alt+Left/Right), reload, CLI gemini:// startup
 - [x] Copy page URL; quiet gemini startup; gamepad history back
 - [x] File Back/Forward; status bar shows capsule URL + history index
+- [x] Interactive menu-bar URL field; default window 1024×768
 
 ## Open work / next steps
 
@@ -425,4 +426,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-136.*-gemini-timeout-…` — timeouts + MIME
 - `xanatoo-137.*-gemini-history-…` — history + reload
 - `xanatoo-138.*-gemini-copy-url-…` — copy URL
-- `xanatoo-139.*-gemini-status-nav-…` — this delivery
+- `xanatoo-139.*-gemini-status-nav-…` — status + nav menu
+- `xanatoo-140.*-url-bar-interactive-…` — this delivery
