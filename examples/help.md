@@ -60,6 +60,10 @@ Export via *File → Export as S-expression…* or *Export as Markdown…*.
 
 ## View & layout
 
+- **View → Examples** / **Help → Examples** — open sample documents in soft windows
+- **Examples → Diff demo (v1 | v2)** — dual-pane load of `diff-v1.md` and `diff-v2.md` with diff marks on
+- **Ctrl+Shift+D** — toggle diff marks (needs two independent files)
+
 - **Ctrl+\\** — Toggle dual pane
 - **Ctrl+Shift+D** — Diff marks (two independent files)
 - **Drag left margin** — Reorder or reparent a block

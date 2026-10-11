@@ -3736,6 +3736,64 @@ int main(int argc, char** argv) {
           path_in_window_mode = true;
           path_in_window_buf.clear();
           break;
+        case C::OpenExample: {
+          std::string name = ui_frame.arg;
+          if (name.empty()) break;
+          std::string path = find_repo_file(name.c_str());
+          if (path.empty()) {
+            std::string tried = std::string("examples/") + name;
+            path = find_repo_file(tried.c_str());
+          }
+          if (path.empty() || !fs::exists(path)) {
+            flash_status("Example not found: " + name);
+            std::cerr << "Example not found: " << name << "\n";
+            break;
+          }
+          std::string title = name;
+          try {
+            title = fs::path(path).filename().string();
+          } catch (...) {
+          }
+          open_browse(path, title);
+          flash_status("Opened example: " + title);
+          break;
+        }
+        case C::LoadDiffDemo: {
+          std::string p0 = find_repo_file("diff-v1.md");
+          std::string p1 = find_repo_file("diff-v2.md");
+          if (p0.empty()) p0 = find_repo_file("examples/diff-v1.md");
+          if (p1.empty()) p1 = find_repo_file("examples/diff-v2.md");
+          if (p0.empty() || p1.empty() || !fs::exists(p0) || !fs::exists(p1)) {
+            flash_status("Diff demo files not found (diff-v1.md / diff-v2.md)");
+            std::cerr << "Diff demo: examples/diff-v1.md and diff-v2.md required\n";
+            break;
+          }
+          docs[0] = load_doc(p0);
+          docs[1] = load_doc(p1);
+          paths[0] = p0;
+          paths[1] = p1;
+          shared_doc = false;
+          panes[0].doc_index = 0;
+          panes[1].doc_index = 1;
+          split = true;
+          focus = 0;
+          dirty_flags[0] = dirty_flags[1] = false;
+          xanatoo::ensure_valid_caret(docs[0], panes[0].sel.focus);
+          panes[0].sel.anchor = panes[0].sel.focus;
+          panes[0].scroll_y = 0.f;
+          xanatoo::ensure_valid_caret(docs[1], panes[1].sel.focus);
+          panes[1].sel.anchor = panes[1].sel.focus;
+          panes[1].scroll_y = 0.f;
+          histories[0].reset(docs[0], panes[0].sel);
+          histories[1].reset(docs[1], panes[1].sel);
+          diff_mode = true;
+          refresh_diff();
+          needs_layout = true;
+          update_title();
+          flash_status("Diff demo — orange bars mark changed blocks");
+          std::cout << "Diff demo: " << p0 << " | " << p1 << "\n";
+          break;
+        }
         case C::ZoomIn:
           body_px = std::min(48, body_px + 1);
           heading_px = std::min(64, heading_px + 2);

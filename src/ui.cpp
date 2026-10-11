@@ -526,6 +526,26 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("FORMAT.md in window", UiCommand::OpenFormatDoc, cmd);
       menu_item_cmd("semantic.sexp in window", UiCommand::OpenSemanticDoc, cmd);
       menu_item_cmd("Open path in window…", UiCommand::OpenInWindow, cmd);
+      ImGui::Separator();
+      if (ImGui::BeginMenu("Examples")) {
+        auto ex = [&](const char* label, const char* file) {
+          if (ImGui::MenuItem(label)) {
+            cmd = UiCommand::OpenExample;
+            result.arg = file;
+          }
+        };
+        ex("Welcome", "welcome.md");
+        ex("Keyboard help", "help.md");
+        ex("Thread / RFC discussion", "thread-rfc.md");
+        ex("Semantic format (sexpr)", "semantic.sexp");
+        ex("Sample (sexpr)", "sample.sexp");
+        ex("Diff demo — left (v1)", "diff-v1.md");
+        ex("Diff demo — right (v2)", "diff-v2.md");
+        ImGui::Separator();
+        if (ImGui::MenuItem("Diff demo (v1 | v2, marks on)"))
+          cmd = UiCommand::LoadDiffDemo;
+        ImGui::EndMenu();
+      }
       ImGui::EndMenu();
     }
     force_menu("Help");
@@ -535,6 +555,26 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::Separator();
       menu_item_cmd("FORMAT.md", UiCommand::OpenFormatDoc, cmd);
       menu_item_cmd("Semantic format demo", UiCommand::OpenSemanticDoc, cmd);
+      ImGui::Separator();
+      if (ImGui::BeginMenu("Examples")) {
+        auto ex = [&](const char* label, const char* file) {
+          if (ImGui::MenuItem(label)) {
+            cmd = UiCommand::OpenExample;
+            result.arg = file;
+          }
+        };
+        ex("Welcome", "welcome.md");
+        ex("Keyboard help", "help.md");
+        ex("Thread / RFC discussion", "thread-rfc.md");
+        ex("Semantic format (sexpr)", "semantic.sexp");
+        ex("Sample (sexpr)", "sample.sexp");
+        ex("Diff demo — left (v1)", "diff-v1.md");
+        ex("Diff demo — right (v2)", "diff-v2.md");
+        ImGui::Separator();
+        if (ImGui::MenuItem("Diff demo (v1 | v2, marks on)"))
+          cmd = UiCommand::LoadDiffDemo;
+        ImGui::EndMenu();
+      }
       ImGui::EndMenu();
     }
 

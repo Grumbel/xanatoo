@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **120** (this delivery is **119**)
+Next bundle number: **121** (this delivery is **120**)
 
 ## Status (2026-10-11)
 
@@ -211,6 +211,8 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Alt+F/E/O/I/V/H opens File/Edit/Format/Insert/View/Help menus
 - [x] Thread / Message nodes (mailing-list & forum threading, about= comments)
 - [x] examples/thread-rfc.md lengthy RFC discussion example
+- [x] Diff demo pair (examples/diff-v1.md + diff-v2.md)
+- [x] Examples menu (View + Help); LoadDiffDemo dual-pane with marks
 
 ## Open work / next steps
 
@@ -379,4 +381,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-116.*-status-focus-…` — status hits, ImGui release, help
 - `xanatoo-117.*-ctrlw-statusbar-…` — Ctrl+W, status bar routing
 - `xanatoo-118.*-alt-menus-…` — Alt+letter menus
-- `xanatoo-119.*-thread-messages-…` — this delivery
+- `xanatoo-119.*-thread-messages-…` — Thread/Message markup
+- `xanatoo-120.*-diff-examples-…` — this delivery

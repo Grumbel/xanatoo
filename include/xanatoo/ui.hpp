@@ -81,6 +81,8 @@ enum class UiCommand {
   OpenInWindow,
   OpenFormatDoc,
   OpenSemanticDoc,
+  OpenExample,       // arg = filename under examples/ (or repo root)
+  LoadDiffDemo,      // dual-pane diff-v1 | diff-v2 + diff marks on
   ZoomIn,
   ZoomOut,
 };
@@ -106,6 +108,8 @@ struct UiFrameResult {
   UiCommand cmd = UiCommand::None;
   // Pixels reserved at the top of the window for menu + toolbar.
   float top_reserved = 0.f;
+  // Optional payload (e.g. example filename for OpenExample).
+  std::string arg;
 };
 
 class Ui {
