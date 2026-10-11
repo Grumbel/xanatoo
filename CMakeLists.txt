@@ -169,3 +169,29 @@ install(DIRECTORY examples/
           PATTERN "*.gmi"
           PATTERN "*.gemini"
           PATTERN "*.org")
+
+
+# ---------------------------------------------------------------------------
+# Unit tests (no network; URL/string/JSON helpers only)
+# ---------------------------------------------------------------------------
+add_executable(xanatoo_tests
+  tests/unit_tests.cpp
+  src/util.cpp
+  src/document.cpp
+  src/reddit.cpp
+  src/lemmy.cpp
+  src/nostr.cpp
+  src/gemini.cpp
+)
+target_include_directories(xanatoo_tests PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+# Detection/parse APIs compile without OpenSSL clients.
+target_compile_definitions(xanatoo_tests PRIVATE
+  XANATOO_GEMINI=0
+  XANATOO_NOSTR=0
+  XANATOO_REDDIT=0
+  XANATOO_LEMMY=0
+)
+enable_testing()
+add_test(NAME unit_tests COMMAND xanatoo_tests)

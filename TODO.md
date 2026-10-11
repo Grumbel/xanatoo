@@ -6,9 +6,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **215** (this delivery is **214**)
+Next bundle number: **216** (this delivery is **215**)
 
 ## Status (2026-10-11)
+
+Unit tests: tests/unit_tests.cpp + xanatoo_tests CMake target (59 assertions).
 
 navigate_to_url: shared finish_remote_open for Nostr/Reddit/Lemmy.
 
@@ -566,4 +568,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-211.*-fix-remote-url-capture-…` — prior
 - `xanatoo-212.*-shared-string-helpers-…` — prior
 - `xanatoo-213.*-nostr-json-min-…` — prior
-- `xanatoo-214.*-finish-remote-open-…` — this delivery
+- `xanatoo-214.*-finish-remote-open-…` — prior
+- `xanatoo-215.*-unit-tests-…` — this delivery

@@ -46,6 +46,12 @@ Dear ImGui is allowed for chrome (menus/toolbars). No Qt/GTK/KDE.
 - Prefer clear data layouts over clever abstractions.
 - No drive-by feature removal; discuss first.
 
+## Tests
+
+- `tests/unit_tests.cpp` — offline unit tests (string helpers, json_min, URL detection for Reddit/Lemmy/Gemini/Nostr).
+- Build target: `xanatoo_tests` (`ctest` or run the binary).
+- Does not exercise live network fetches.
+
 ## Continuity
 
 Read `TODO.md` first. Record plans and outcomes there.
