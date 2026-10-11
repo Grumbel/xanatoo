@@ -178,6 +178,8 @@ add_executable(xanatoo_tests
   tests/unit_tests.cpp
   src/util.cpp
   src/document.cpp
+  src/parse.cpp
+  src/org.cpp
   src/reddit.cpp
   src/lemmy.cpp
   src/nostr.cpp

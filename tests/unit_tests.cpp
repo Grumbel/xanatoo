@@ -9,6 +9,8 @@
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/util.hpp"
+#include "xanatoo/parse.hpp"
+#include "xanatoo/types.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -150,6 +152,117 @@ void test_nostr_refs() {
               "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 }
 
+
+void test_parse_markup() {
+  using namespace xanatoo;
+  Document doc = parse_document(
+      "# Title\n\n"
+      "Hello *world* and **bold**.\n\n"
+      "- one\n"
+      "- two\n\n"
+      "[link](#Title)\n",
+      "t.md");
+
+  EXPECT(doc.root != INVALID_NODE);
+  // Collect headings / paragraphs via tree walk
+  int headings = 0, paragraphs = 0, list_items = 0;
+  std::vector<NodeId> stack;
+  stack.push_back(doc.root);
+  while (!stack.empty()) {
+    NodeId id = stack.back();
+    stack.pop_back();
+    const Node& n = doc.get(id);
+    if (n.kind == NodeKind::Heading || n.kind == NodeKind::Header)
+      ++headings;
+    if (n.kind == NodeKind::Paragraph) ++paragraphs;
+    if (n.kind == NodeKind::ListItem) ++list_items;
+    for (auto it = n.children.rbegin(); it != n.children.rend(); ++it)
+      stack.push_back(*it);
+  }
+  EXPECT(headings >= 1);
+  EXPECT(paragraphs >= 1);
+  EXPECT(list_items >= 2);
+
+  std::string plain = plain_text(doc, doc.root);
+  // Title may appear; at least body words should show up somewhere in tree
+  bool found_hello = false;
+  stack.push_back(doc.root);
+  while (!stack.empty()) {
+    NodeId id = stack.back();
+    stack.pop_back();
+    const Node& n = doc.get(id);
+    for (const auto& sp : n.spans) {
+      if (sp.text.find("Hello") != std::string::npos ||
+          sp.text.find("world") != std::string::npos)
+        found_hello = true;
+    }
+    for (auto c : n.children) stack.push_back(c);
+  }
+  EXPECT(found_hello);
+
+  // Round-trip serialize preserves a heading marker
+  std::string out = serialize_markup(doc);
+  EXPECT(out.find("#") != std::string::npos);
+}
+
+void test_parse_gemtext() {
+  using namespace xanatoo;
+  Document doc = parse_gemtext(
+      "# Capsule\n"
+      "Hello gemini\n"
+      "=> gemini://example.org/ Follow\n"
+      "* item\n");
+  EXPECT(doc.root != INVALID_NODE);
+
+  bool found_link = false;
+  bool found_heading = false;
+  std::vector<NodeId> stack{doc.root};
+  while (!stack.empty()) {
+    NodeId id = stack.back();
+    stack.pop_back();
+    const Node& n = doc.get(id);
+    if (n.kind == NodeKind::Heading || n.kind == NodeKind::Header)
+      found_heading = true;
+    for (const auto& sp : n.spans) {
+      if (sp.kind == InlineKind::Link ||
+          sp.text.find("Follow") != std::string::npos)
+        found_link = true;
+    }
+    for (auto c : n.children) stack.push_back(c);
+  }
+  EXPECT(found_heading);
+  EXPECT(found_link);
+}
+
+void test_json_edge_cases() {
+  using namespace xanatoo;
+  EXPECT(json_str_field("{}", "x").empty());
+  EXPECT_EQ(json_int_field("{}", "x"), 0);
+  EXPECT(json_str_field(R"({"a":null})", "a").empty());
+  EXPECT_EQ(json_str_field(R"({"t":"a\"b"})", "t"), "a\"b");
+  // Prefer key at object boundary (not mid-string) — basic smoke
+  EXPECT_EQ(json_str_field(R"({"k":"v","k2":"w"})", "k2"), "w");
+}
+
+void test_url_edge_cases() {
+  using namespace xanatoo;
+  EXPECT(is_reddit_url("  https://www.reddit.com/r/x  "));
+  EXPECT(is_reddit_url("https://np.reddit.com/r/x"));
+  EXPECT(!is_reddit_url("https://notreddit.com/r/x"));
+
+  EXPECT(is_lemmy_url("https://lemmy.ml/c/foo"));
+  EXPECT(is_lemmy_url("https://lemmy.ml/post/1"));
+  EXPECT(!is_lemmy_url("https://lemmy.ml/u/someone"));
+
+  EXPECT(is_gemini_url("gemini://a"));
+  EXPECT(!is_gemini_url("gemeni://a"));  // typo
+
+  EXPECT(is_nostr_ref(" nostr:recent "));
+  EXPECT(is_nostr_ref("recent"));  // bare firehose aliases accepted
+  EXPECT(is_nostr_ref("firehose"));
+  EXPECT(!is_nostr_ref("not-a-nostr-thing"));
+}
+
 }  // namespace
 
 int main() {
@@ -159,6 +272,10 @@ int main() {
   test_lemmy_urls();
   test_gemini_urls();
   test_nostr_refs();
+  test_parse_markup();
+  test_parse_gemtext();
+  test_json_edge_cases();
+  test_url_edge_cases();
 
   std::printf("%d passed, %d failed\n", g_passed, g_failed);
   return g_failed == 0 ? 0 : 1;

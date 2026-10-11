@@ -6,9 +6,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **216** (this delivery is **215**)
+Next bundle number: **217** (this delivery is **216**)
 
 ## Status (2026-10-11)
+
+Expanded unit tests: markup/gemtext parse + more URL/JSON edges (85 asserts).
 
 Unit tests: tests/unit_tests.cpp + xanatoo_tests CMake target (59 assertions).
 
@@ -569,4 +571,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-212.*-shared-string-helpers-…` — prior
 - `xanatoo-213.*-nostr-json-min-…` — prior
 - `xanatoo-214.*-finish-remote-open-…` — prior
-- `xanatoo-215.*-unit-tests-…` — this delivery
+- `xanatoo-215.*-unit-tests-…` — prior
+- `xanatoo-216.*-expand-unit-tests-…` — this delivery
