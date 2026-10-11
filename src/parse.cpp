@@ -82,6 +82,18 @@ void parse_inlines(Node& node, std::string_view text) {
   };
 
   while (i < text.size()) {
+    // Backslash-escaped punctuation (CommonMark / GFM)
+    if (text[i] == '\\' && i + 1 < text.size()) {
+      char n = text[i + 1];
+      if (n == '\\' || n == '`' || n == '*' || n == '_' || n == '{' ||
+          n == '}' || n == '[' || n == ']' || n == '(' || n == ')' ||
+          n == '#' || n == '+' || n == '-' || n == '.' || n == '!' ||
+          n == '|' || n == '~' || n == '>') {
+        plain.push_back(n);
+        i += 2;
+        continue;
+      }
+    }
     // **strong**
     if (i + 1 < text.size() && text[i] == '*' && text[i + 1] == '*') {
       size_t end = text.find("**", i + 2);
@@ -893,6 +905,17 @@ Document parse_markup(std::string_view source) {
 
 namespace {
 
+void escape_md_plain(const std::string& text, std::string& out) {
+  for (char c : text) {
+    if (c == '\\' || c == '`' || c == '*' || c == '_' || c == '[' || c == ']' ||
+        c == '(' || c == ')' || c == '#' || c == '!' || c == '|' || c == '~' ||
+        c == '<' || c == '>') {
+      out.push_back('\\');
+    }
+    out.push_back(c);
+  }
+}
+
 void serialize_inlines(const Node& node, std::string& out) {
   for (const auto& sp : node.spans) {
     switch (sp.kind) {
@@ -936,7 +959,7 @@ void serialize_inlines(const Node& node, std::string& out) {
         out += ")";
         break;
       default:
-        out += sp.text;
+        escape_md_plain(sp.text, out);
         break;
     }
   }

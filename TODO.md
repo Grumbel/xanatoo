@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **107** (this delivery is **106**)
+Next bundle number: **108** (this delivery is **107**)
 
 ## Status (2026-10-11)
 
@@ -176,6 +176,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Context menu: outline/diff/find/replace; iconless toolbar uses tip labels
 - [x] Horizontally scrollable toolbar on narrow windows
 - [x] Setext headings (`===` / `---`) in markdown parse
+- [x] Markdown backslash escapes (parse + plain-text serialize)
 
 ## Open work / next steps
 
@@ -332,3 +333,4 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-104.*-autolink-…` — this delivery
 - `xanatoo-105.*-gui-toolbar-…` — this delivery
 - `xanatoo-106.*-toolbar-setext-…` — this delivery
+- `xanatoo-107.*-md-escapes-…` — this delivery
