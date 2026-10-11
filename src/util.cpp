@@ -13,7 +13,8 @@ std::string ascii_lower(std::string s) {
 
 bool is_text_node_kind(NodeKind k) {
   return k == NodeKind::Paragraph || k == NodeKind::Heading ||
-         k == NodeKind::ListItem || k == NodeKind::BlockQuote ||
+         k == NodeKind::Header || k == NodeKind::ListItem ||
+         k == NodeKind::BlockQuote ||
          k == NodeKind::Note || k == NodeKind::CodeBlock ||
          k == NodeKind::Term || k == NodeKind::Definition ||
          k == NodeKind::Caption || k == NodeKind::BiblioEntry ||
@@ -57,7 +58,9 @@ NodeId find_anchor_node(const Document& doc, std::string_view href) {
     if (ascii_lower(plain_text(doc, id)) == tlow) return id;
   }
   for (NodeId id : nodes) {
-    if (doc.get(id).kind != NodeKind::Heading) continue;
+    if (doc.get(id).kind != NodeKind::Heading &&
+        doc.get(id).kind != NodeKind::Header)
+      continue;
     if (ascii_lower(plain_text(doc, id)).find(tlow) != std::string::npos)
       return id;
   }

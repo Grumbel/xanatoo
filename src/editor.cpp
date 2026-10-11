@@ -754,6 +754,7 @@ std::optional<NodeId> insert_sibling_after(Document& doc, Caret& caret,
   // sibling cell, which would skew the grid.
   const bool blockish =
       kind == NodeKind::Paragraph || kind == NodeKind::Heading ||
+      kind == NodeKind::Header ||
       kind == NodeKind::BlockQuote || kind == NodeKind::Note ||
       kind == NodeKind::CodeBlock || kind == NodeKind::List ||
       kind == NodeKind::HorizontalRule;
@@ -1007,7 +1008,8 @@ bool set_heading_level(Document& doc, Caret& caret, int level) {
   if (caret.node == INVALID_NODE) return false;
   Node& n = doc.get(caret.node);
   if (level <= 0) {
-    if (n.kind != NodeKind::Heading && n.kind != NodeKind::BlockQuote)
+    if (n.kind != NodeKind::Heading && n.kind != NodeKind::Header &&
+        n.kind != NodeKind::BlockQuote)
       return false;
     n.kind = NodeKind::Paragraph;
     n.level = 0;
@@ -1015,11 +1017,118 @@ bool set_heading_level(Document& doc, Caret& caret, int level) {
   }
   if (level > 6) level = 6;
   if (n.kind != NodeKind::Paragraph && n.kind != NodeKind::Heading &&
-      n.kind != NodeKind::BlockQuote && n.kind != NodeKind::ListItem &&
-      n.kind != NodeKind::Note)
+      n.kind != NodeKind::Header && n.kind != NodeKind::BlockQuote &&
+      n.kind != NodeKind::ListItem && n.kind != NodeKind::Note)
     return false;
-  n.kind = NodeKind::Heading;
+  // Prefer semantic Header; keep level only for legacy outline/export hints.
+  n.kind = NodeKind::Header;
   n.level = level;
+  return true;
+}
+
+bool make_header(Document& doc, Caret& caret) {
+  if (caret.node == INVALID_NODE) return false;
+  Node& n = doc.get(caret.node);
+  if (n.kind != NodeKind::Paragraph && n.kind != NodeKind::Heading &&
+      n.kind != NodeKind::Header && n.kind != NodeKind::BlockQuote &&
+      n.kind != NodeKind::ListItem && n.kind != NodeKind::Note)
+    return false;
+  n.kind = NodeKind::Header;
+  n.level = 0;
+  return true;
+}
+
+static bool is_sectioning_boundary(NodeKind k) {
+  return k == NodeKind::Section || k == NodeKind::Article ||
+         k == NodeKind::Header || k == NodeKind::Heading ||
+         k == NodeKind::HorizontalRule || k == NodeKind::Thread;
+}
+
+static bool wrap_in_sectioning(Document& doc, Caret& caret, NodeKind kind) {
+  if (caret.node == INVALID_NODE) return false;
+  if (kind != NodeKind::Section && kind != NodeKind::Article) return false;
+  Node& n = doc.get(caret.node);
+  if (n.parent == INVALID_NODE) return false;
+  Node& parent = doc.get(n.parent);
+  std::vector<NodeId> siblings = parent.children;
+  size_t idx = 0;
+  bool found = false;
+  for (; idx < siblings.size(); ++idx) {
+    if (siblings[idx] == caret.node) {
+      found = true;
+      break;
+    }
+  }
+  if (!found) return false;
+
+  std::vector<NodeId> take;
+  for (size_t i = idx; i < siblings.size(); ++i) {
+    NodeId cid = siblings[i];
+    const Node& c = doc.get(cid);
+    if (i > idx && is_sectioning_boundary(c.kind)) break;
+    if (c.kind == NodeKind::Section || c.kind == NodeKind::Article) break;
+    take.push_back(cid);
+  }
+  if (take.empty()) return false;
+
+  NodeId sec = doc.create(kind, INVALID_NODE);
+  doc.get(sec).parent = parent.id;
+
+  std::vector<NodeId> rebuilt;
+  rebuilt.reserve(siblings.size() - take.size() + 1);
+  for (size_t i = 0; i < idx; ++i) rebuilt.push_back(siblings[i]);
+  rebuilt.push_back(sec);
+  for (size_t i = idx + take.size(); i < siblings.size(); ++i)
+    rebuilt.push_back(siblings[i]);
+  parent.children = std::move(rebuilt);
+
+  for (NodeId id : take) {
+    Node& ch = doc.get(id);
+    ch.parent = sec;
+    doc.get(sec).children.push_back(id);
+  }
+  return true;
+}
+
+bool wrap_in_section(Document& doc, Caret& caret) {
+  return wrap_in_sectioning(doc, caret, NodeKind::Section);
+}
+
+bool wrap_in_article(Document& doc, Caret& caret) {
+  return wrap_in_sectioning(doc, caret, NodeKind::Article);
+}
+
+bool unwrap_sectioning(Document& doc, Caret& caret) {
+  if (caret.node == INVALID_NODE) return false;
+  NodeId cur = caret.node;
+  // Walk up to nearest Section/Article
+  NodeId sec = INVALID_NODE;
+  for (NodeId id = cur; id != INVALID_NODE; id = doc.get(id).parent) {
+    NodeKind k = doc.get(id).kind;
+    if (k == NodeKind::Section || k == NodeKind::Article) {
+      sec = id;
+      break;
+    }
+  }
+  if (sec == INVALID_NODE) return false;
+  Node& s = doc.get(sec);
+  if (s.parent == INVALID_NODE) return false;
+  Node& parent = doc.get(s.parent);
+  size_t idx = 0;
+  for (; idx < parent.children.size(); ++idx)
+    if (parent.children[idx] == sec) break;
+  if (idx >= parent.children.size()) return false;
+
+  std::vector<NodeId> kids = s.children;
+  s.children.clear();
+  parent.children.erase(parent.children.begin() +
+                        static_cast<std::ptrdiff_t>(idx));
+  for (size_t i = 0; i < kids.size(); ++i) {
+    doc.get(kids[i]).parent = parent.id;
+    parent.children.insert(parent.children.begin() +
+                               static_cast<std::ptrdiff_t>(idx + i),
+                           kids[i]);
+  }
   return true;
 }
 
@@ -2357,23 +2466,33 @@ bool table_move_cell(Document& doc, Caret& caret, bool forward) {
 void collect_outline(const Document& doc, std::vector<OutlineEntry>& out) {
   out.clear();
   if (doc.root == INVALID_NODE) return;
-  std::vector<NodeId> stack;
-  stack.push_back(doc.root);
+  // DFS with section depth: Article/Section increase depth for nested headers.
+  struct Frame {
+    NodeId id;
+    int depth;
+  };
+  std::vector<Frame> stack;
+  stack.push_back({doc.root, 0});
   while (!stack.empty()) {
-    NodeId id = stack.back();
+    Frame fr = stack.back();
     stack.pop_back();
-    const Node& n = doc.get(id);
-    if (n.kind == NodeKind::Heading) {
+    const Node& n = doc.get(fr.id);
+    int depth = fr.depth;
+    if (n.kind == NodeKind::Section || n.kind == NodeKind::Article)
+      depth = fr.depth + 1;
+    if (n.kind == NodeKind::Heading || n.kind == NodeKind::Header) {
       OutlineEntry e;
-      e.node = id;
-      e.level = std::max(1, std::min(6, n.level));
-      e.text = node_text(doc, id);
-      if (e.text.empty()) e.text = "(empty heading)";
+      e.node = fr.id;
+      if (n.kind == NodeKind::Heading && n.level > 0)
+        e.level = std::max(1, std::min(6, n.level));
+      else
+        e.level = std::max(1, std::min(8, depth > 0 ? depth : 1));
+      e.text = node_text(doc, fr.id);
+      if (e.text.empty()) e.text = "(empty header)";
       out.push_back(std::move(e));
     }
-    // Push children in reverse so they process left-to-right
     for (auto it = n.children.rbegin(); it != n.children.rend(); ++it)
-      stack.push_back(*it);
+      stack.push_back({*it, depth});
   }
 }
 

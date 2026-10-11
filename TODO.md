@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **129** (this delivery is **128**)
+Next bundle number: **130** (this delivery is **129**)
 
 ## Status (2026-10-11)
 
@@ -224,6 +224,8 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Structure tags skip paragraphs; status flash on link follow
 - [x] PageUp/Down scrolls soft window / help / outline under cursor
 - [x] Context menu Diff Marks respects can_diff
+- [x] Semantic Header / Section / Article (HTML-like sectioning)
+- [x] examples/sectioning.md + Format structure commands
 
 ## Open work / next steps
 
@@ -401,4 +403,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-125.*-grip-connector-…` — grip dots + connector Y
 - `xanatoo-126.*-scrollbar-click-…` — scrollbar click jump
 - `xanatoo-127.*-structure-links-…` — structure tags + link flash
-- `xanatoo-128.*-page-soft-…` — this delivery
+- `xanatoo-128.*-page-soft-…` — PageUp soft chrome
+- `xanatoo-129.*-sectioning-…` — this delivery

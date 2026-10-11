@@ -2116,6 +2116,7 @@ int main(int argc, char** argv) {
                   node.kind = xanatoo::NodeKind::Paragraph;
                 } else if (node.kind == xanatoo::NodeKind::Paragraph ||
                            node.kind == xanatoo::NodeKind::Heading ||
+                           node.kind == xanatoo::NodeKind::Header ||
                            node.kind == xanatoo::NodeKind::ListItem) {
                   node.kind = xanatoo::NodeKind::BlockQuote;
                   node.level = 0;
@@ -3671,6 +3672,22 @@ int main(int argc, char** argv) {
           edit();
           if (xanatoo::set_heading_level(d, p.sel.focus, 6)) needs_layout = true;
           break;
+        case C::MakeHeader:
+          edit();
+          if (xanatoo::make_header(d, p.sel.focus)) needs_layout = true;
+          break;
+        case C::WrapSection:
+          edit();
+          if (xanatoo::wrap_in_section(d, p.sel.focus)) needs_layout = true;
+          break;
+        case C::WrapArticle:
+          edit();
+          if (xanatoo::wrap_in_article(d, p.sel.focus)) needs_layout = true;
+          break;
+        case C::UnwrapSectioning:
+          edit();
+          if (xanatoo::unwrap_sectioning(d, p.sel.focus)) needs_layout = true;
+          break;
         case C::ParagraphLevel:
           edit();
           if (xanatoo::set_heading_level(d, p.sel.focus, 0)) needs_layout = true;
@@ -3936,6 +3953,9 @@ int main(int argc, char** argv) {
               buf[2] = 0;
               return buf;
             }
+            case K::Header: return "header";
+            case K::Article: return "article";
+            case K::Section: return "section";
             case K::Paragraph: return "para";
             case K::List: return n.level == 1 ? "ol" : "ul";
             case K::ListItem:
@@ -3978,7 +3998,12 @@ int main(int argc, char** argv) {
           uint8_t r = 120, g = 120, b = 130, a_bar = 200, a_wash = 28;
           switch (kind) {
             case xanatoo::NodeKind::Heading:
+            case xanatoo::NodeKind::Header:
               r = 40; g = 90; b = 180; a_wash = 36; break;
+            case xanatoo::NodeKind::Article:
+              r = 60; g = 100; b = 160; a_wash = 30; break;
+            case xanatoo::NodeKind::Section:
+              r = 70; g = 110; b = 170; a_wash = 26; break;
             case xanatoo::NodeKind::Paragraph:
               r = 100; g = 110; b = 120; a_wash = 18; break;
             case xanatoo::NodeKind::List:

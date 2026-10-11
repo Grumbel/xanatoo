@@ -140,3 +140,40 @@ Counter-proposal…
 | `subject` (thread) | `summary` | Thread title |
 
 `:::comment` is an alias for `:::message`. Depth in the layout is derived by walking the `in-reply-to` chain within the document.
+
+## Article, section, and header
+
+Prefer HTML-like sectioning over ranked `h1`–`h6`:
+
+| Node | Role |
+|------|------|
+| `header` | Title for the enclosing section/article (no rank) |
+| `section` | Thematic group of blocks; may nest |
+| `article` | Self-contained composition |
+
+Markdown:
+
+```
+:::article
+:::header
+Title
+:::
+
+Body paragraph…
+
+:::section
+:::header
+Subsection
+:::
+
+More body…
+:::
+:::
+```
+
+S-expression: `(article (header "Title") (p "…") (section (header "…") …))`.
+
+Outline depth is the nesting count of `section`/`article` ancestors (legacy
+ATX `#` headers may still carry a soft depth hint). Commands: **Header**
+(`Ctrl+1`), **Wrap in Section** (`Ctrl+Shift+1`), **Wrap in Article**
+(`Ctrl+Shift+2`), **Unwrap Section/Article**.

@@ -14,7 +14,10 @@ constexpr NodeId INVALID_NODE = 0;
 
 enum class NodeKind : uint8_t {
   Document,
-  Heading,
+  Heading,           // legacy ATX depth (prefer Header + Section)
+  Header,            // generic title (HTML <header> role; no h1–h6 rank)
+  Article,           // self-contained composition (HTML <article>)
+  Section,           // thematic grouping of blocks (HTML <section>)
   Paragraph,
   List,
   ListItem,
@@ -65,7 +68,7 @@ struct Node {
   NodeId parent = INVALID_NODE;
   std::vector<NodeId> children;
   std::vector<InlineSpan> spans;  // leaf text content
-  int level = 0;                  // heading level 1-6
+  int level = 0;                  // legacy Heading 1-6; List ordered flag; TableCell header
   std::string alt;                // image alt text
   std::string src;                // image path
   bool expanded = true;           // for Stretch
@@ -78,6 +81,7 @@ struct Node {
   // Thread: label = thread id; summary = subject
   // Message: label = message-id; src = from/author; summary = date (ISO);
   //          alt = in-reply-to id, or "about:#anchor" for passage comments
+  // Header: text title (no rank). Article/Section: containers grouping blocks.
 };
 
 // Document-level semantic metadata (not layout).

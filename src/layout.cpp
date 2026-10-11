@@ -276,6 +276,28 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       break;
     }
 
+    case NodeKind::Header: {
+      float start_y = y;
+      y += 10.f;
+      layout_paragraph(doc, node, x, y, max_width, out, FontRole::Heading);
+      y += 12.f;
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
+    case NodeKind::Article:
+    case NodeKind::Section: {
+      float start_y = y;
+      // Nested sections indent slightly; articles keep full width.
+      float inset = (node.kind == NodeKind::Section) ? 8.f : 0.f;
+      y += 6.f;
+      for (NodeId child : node.children)
+        layout_node(doc, child, x + inset, y, max_width - inset, out);
+      y += 8.f;
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
     case NodeKind::Paragraph: {
       float start_y = y;
       layout_paragraph(doc, node, x, y, max_width, out, FontRole::Body);
@@ -888,6 +910,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
             if (cur == INVALID_NODE) continue;
             const Node& cn = src_doc->get(cur);
             if (cn.kind == NodeKind::Paragraph || cn.kind == NodeKind::Heading ||
+                cn.kind == NodeKind::Header ||
                 cn.kind == NodeKind::ListItem || cn.kind == NodeKind::BlockQuote) {
               if (!body_spans.empty()) {
                 InlineSpan gap;

@@ -65,12 +65,16 @@ enum class UiCommand {
   WrapStretch,
   EditStretchSummary,
   UnwrapStretch,
-  Heading1,
+  Heading1,  // legacy → Header with depth hint
   Heading2,
   Heading3,
   Heading4,
   Heading5,
   Heading6,
+  MakeHeader,
+  WrapSection,
+  WrapArticle,
+  UnwrapSectioning,
   ParagraphLevel,
   // View
   ToggleSplit,

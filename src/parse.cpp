@@ -340,6 +340,49 @@ Document parse_markup(std::string_view source) {
     }
 
     // Opening fences
+    if (trimmed.starts_with(":::article")) {
+      NodeId n = doc.create(NodeKind::Article, current_parent());
+      std::string id = fence_attr(trimmed, "id");
+      if (id.empty()) id = fence_attr(trimmed, "label");
+      if (!id.empty()) doc.get(n).label = id;
+      stack.push_back(n);
+      ++i;
+      continue;
+    }
+    if (trimmed.starts_with(":::section")) {
+      NodeId n = doc.create(NodeKind::Section, current_parent());
+      std::string id = fence_attr(trimmed, "id");
+      if (id.empty()) id = fence_attr(trimmed, "label");
+      if (!id.empty()) doc.get(n).label = id;
+      stack.push_back(n);
+      ++i;
+      continue;
+    }
+    if (trimmed.starts_with(":::header")) {
+      // Header is a leaf title line (body until :::).
+      NodeId n = doc.create(NodeKind::Header, current_parent());
+      std::string id = fence_attr(trimmed, "id");
+      if (id.empty()) id = fence_attr(trimmed, "label");
+      if (!id.empty()) doc.get(n).label = id;
+      ++i;
+      std::string body;
+      while (i < lines.size()) {
+        std::string_view lt = lines[i].text;
+        size_t llead = 0;
+        while (llead < lt.size() && (lt[llead] == ' ' || lt[llead] == '\t'))
+          ++llead;
+        std::string_view ltrim = lt.substr(llead);
+        if (ltrim == ":::" || ltrim.starts_with("::: ")) {
+          ++i;
+          break;
+        }
+        if (!body.empty()) body.push_back(' ');
+        body.append(ltrim);
+        ++i;
+      }
+      if (!body.empty()) parse_inlines(doc.get(n), body);
+      continue;
+    }
     if (trimmed.starts_with(":::stretch")) {
       NodeId n = doc.create(NodeKind::Stretch, current_parent());
       // Parse summary="..." if present
@@ -743,7 +786,8 @@ Document parse_markup(std::string_view source) {
 
     if (heading_level > 0) {
       size_t skip = heading_level + 1;
-      NodeId n = doc.create(NodeKind::Heading, current_parent());
+      NodeId n = doc.create(NodeKind::Header, current_parent());
+      // level is only a soft depth hint for outline/export, not a rank.
       doc.get(n).level = heading_level;
       parse_inlines(doc.get(n), trimmed.substr(skip));
       ++i;
@@ -771,7 +815,7 @@ Document parse_markup(std::string_view source) {
               !trimmed.starts_with("```") && !trimmed.starts_with("~~~") &&
               !trimmed.starts_with("|") && !trimmed.starts_with(":::")) {
             int setext_level = (uc == '=') ? 1 : 2;
-            NodeId n = doc.create(NodeKind::Heading, current_parent());
+            NodeId n = doc.create(NodeKind::Header, current_parent());
             doc.get(n).level = setext_level;
             parse_inlines(doc.get(n), trimmed);
             i += 2;
@@ -1127,6 +1171,55 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
       out += ' ';
       serialize_inlines(node, out);
       out += "\n\n";
+      break;
+    }
+
+    case NodeKind::Header: {
+      out += pad;
+      out += ":::header";
+      if (!node.label.empty()) {
+        out += " id=\"";
+        out += node.label;
+        out += "\"";
+      }
+      out += "\n";
+      out += pad;
+      serialize_inlines(node, out);
+      out += "\n";
+      out += pad;
+      out += ":::\n\n";
+      break;
+    }
+
+    case NodeKind::Article: {
+      out += pad;
+      out += ":::article";
+      if (!node.label.empty()) {
+        out += " id=\"";
+        out += node.label;
+        out += "\"";
+      }
+      out += "\n";
+      for (NodeId c : node.children)
+        serialize_node(doc, c, out, indent);
+      out += pad;
+      out += ":::\n\n";
+      break;
+    }
+
+    case NodeKind::Section: {
+      out += pad;
+      out += ":::section";
+      if (!node.label.empty()) {
+        out += " id=\"";
+        out += node.label;
+        out += "\"";
+      }
+      out += "\n";
+      for (NodeId c : node.children)
+        serialize_node(doc, c, out, indent);
+      out += pad;
+      out += ":::\n\n";
       break;
     }
 
@@ -1834,8 +1927,38 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
     return;
   }
 
+  if (tag == "header") {
+    NodeId n = doc.create(NodeKind::Header, parent);
+    std::string label;
+    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           &label);
+    if (!label.empty()) doc.get(n).label = label;
+    fill_inlines(doc.get(n), e.kids, i);
+    return;
+  }
+
+  if (tag == "article") {
+    NodeId n = doc.create(NodeKind::Article, parent);
+    std::string label;
+    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           &label);
+    if (!label.empty()) doc.get(n).label = label;
+    parse_sexpr_children(doc, n, e.kids, i);
+    return;
+  }
+
+  if (tag == "section") {
+    NodeId n = doc.create(NodeKind::Section, parent);
+    std::string label;
+    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           &label);
+    if (!label.empty()) doc.get(n).label = label;
+    parse_sexpr_children(doc, n, e.kids, i);
+    return;
+  }
+
   if (tag == "h" || tag == "heading") {
-    NodeId n = doc.create(NodeKind::Heading, parent);
+    NodeId n = doc.create(NodeKind::Header, parent);
     size_t i = 1;
     int level = 1;
     std::string label;
@@ -2423,12 +2546,42 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
       break;
 
     case NodeKind::Heading: {
+      // Legacy path: emit as header with optional depth hint.
       out += pad;
-      out += "(h ";
-      out += std::to_string(std::max(1, std::min(6, node.level)));
+      out += "(header";
       emit_node_id(node, out);
       emit_label(node, out);
       serialize_sexpr_inlines(node, out);
+      out += ")";
+      break;
+    }
+
+    case NodeKind::Header: {
+      out += pad;
+      out += "(header";
+      emit_node_id(node, out);
+      emit_label(node, out);
+      serialize_sexpr_inlines(node, out);
+      out += ")";
+      break;
+    }
+
+    case NodeKind::Article: {
+      out += pad;
+      out += "(article";
+      emit_node_id(node, out);
+      emit_label(node, out);
+      serialize_sexpr_children(doc, node, out, indent + 2);
+      out += ")";
+      break;
+    }
+
+    case NodeKind::Section: {
+      out += pad;
+      out += "(section";
+      emit_node_id(node, out);
+      emit_label(node, out);
+      serialize_sexpr_children(doc, node, out, indent + 2);
       out += ")";
       break;
     }

@@ -138,8 +138,18 @@ std::optional<NodeId> insert_figure(Document& doc, Caret& caret,
                                     const std::string& path,
                                     const std::string& alt = {},
                                     const std::string& caption = "Caption");
-// Set heading level 1–6, or 0 to demote to paragraph.
+// Set heading level 1–6 (legacy), or 0 to demote to paragraph.
 bool set_heading_level(Document& doc, Caret& caret, int level);
+
+// Semantic title (no rank) — preferred over numbered headings.
+bool make_header(Document& doc, Caret& caret);
+
+// Wrap the caret block (and following body siblings until a boundary) in a
+// Section or Article so multiple paragraphs stay one unit.
+bool wrap_in_section(Document& doc, Caret& caret);
+bool wrap_in_article(Document& doc, Caret& caret);
+// If caret is inside a Section/Article, lift children to the parent.
+bool unwrap_sectioning(Document& doc, Caret& caret);
 
 // Toggle list membership of the caret's text block.
 // - Paragraph/Heading/BlockQuote → become a ListItem under a new List
@@ -273,7 +283,7 @@ bool table_move_cell(Document& doc, Caret& caret, bool forward);
 // Heading outline for navigation (document order).
 struct OutlineEntry {
   NodeId node = INVALID_NODE;
-  int level = 1;
+  int level = 1;  // section nesting depth (1 = top), or legacy heading level
   std::string text;
 };
 void collect_outline(const Document& doc, std::vector<OutlineEntry>& out);

@@ -417,12 +417,15 @@ static void menu_structure_items(const UiState& state, UiCommand& cmd) {
   menu_item_cmd("Unwrap Stretch", UiCommand::UnwrapStretch, cmd, state.in_stretch,
                 "Ctrl+Shift+U");
   ImGui::Separator();
-  menu_item_cmd("Heading 1", UiCommand::Heading1, cmd, true, "Ctrl+1");
-  menu_item_cmd("Heading 2", UiCommand::Heading2, cmd, true, "Ctrl+2");
-  menu_item_cmd("Heading 3", UiCommand::Heading3, cmd, true, "Ctrl+3");
-  menu_item_cmd("Heading 4", UiCommand::Heading4, cmd, true, "Ctrl+4");
-  menu_item_cmd("Heading 5", UiCommand::Heading5, cmd, true, "Ctrl+5");
-  menu_item_cmd("Heading 6", UiCommand::Heading6, cmd, true, "Ctrl+6");
+  menu_item_cmd("Header", UiCommand::MakeHeader, cmd, true, "Ctrl+1");
+  menu_item_cmd("Wrap in Section", UiCommand::WrapSection, cmd, true,
+                "Ctrl+Shift+1");
+  menu_item_cmd("Wrap in Article", UiCommand::WrapArticle, cmd, true,
+                "Ctrl+Shift+2");
+  menu_item_cmd("Unwrap Section/Article", UiCommand::UnwrapSectioning, cmd);
+  ImGui::Separator();
+  menu_item_cmd("Header (depth 2)", UiCommand::Heading2, cmd, true, "Ctrl+2");
+  menu_item_cmd("Header (depth 3)", UiCommand::Heading3, cmd, true, "Ctrl+3");
   menu_item_cmd("Paragraph (demote)", UiCommand::ParagraphLevel, cmd, true,
                 "Ctrl+0");
 }
@@ -538,6 +541,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ex("Welcome", "welcome.md");
         ex("Keyboard help", "help.md");
         ex("Thread / RFC discussion", "thread-rfc.md");
+        ex("Article / section / header", "sectioning.md");
         ex("Semantic format (sexpr)", "semantic.sexp");
         ex("Sample (sexpr)", "sample.sexp");
         ex("Diff demo — left (v1)", "diff-v1.md");
@@ -567,6 +571,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ex("Welcome", "welcome.md");
         ex("Keyboard help", "help.md");
         ex("Thread / RFC discussion", "thread-rfc.md");
+        ex("Article / section / header", "sectioning.md");
         ex("Semantic format (sexpr)", "semantic.sexp");
         ex("Sample (sexpr)", "sample.sexp");
         ex("Diff demo — left (v1)", "diff-v1.md");
@@ -645,9 +650,11 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     ImGui::TextDisabled("|");
     ImGui::SameLine(0.f, 4.f);
 
-    tool_button("tb_h1", "h1", "Heading 1 (Ctrl+1)", UiCommand::Heading1, cmd);
-    tool_button("tb_h2", "h2", "Heading 2 (Ctrl+2)", UiCommand::Heading2, cmd);
-    tool_button("tb_h3", "h3", "Heading 3 (Ctrl+3)", UiCommand::Heading3, cmd);
+    tool_button("tb_h1", "h1", "Header (Ctrl+1)", UiCommand::MakeHeader, cmd);
+    tool_button("tb_h2", "h2", "Wrap Section (Ctrl+Shift+1)", UiCommand::WrapSection,
+                cmd);
+    tool_button("tb_h3", "h3", "Wrap Article (Ctrl+Shift+2)", UiCommand::WrapArticle,
+                cmd);
     tool_button("tb_para", "para", "Paragraph (Ctrl+0)", UiCommand::ParagraphLevel,
                 cmd);
 
