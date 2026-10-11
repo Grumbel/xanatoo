@@ -386,19 +386,14 @@ std::string reddit_oauth_token(std::string* err) {
              std::to_string(resp ? resp->status : 0) + ")";
     return {};
   }
-  // "access_token": "..."
-  std::string tok = json_str_field(resp->body, "access_token");
-  // json_str_field is defined below — forward issue!
-  // We'll parse simply here instead.
+  // "access_token":"..."
   {
     const std::string key = "\"access_token\"";
     size_t p = resp->body.find(key);
     if (p != std::string::npos) {
-      p = resp->body.find('"', p + key.size());
+      p = resp->body.find(':', p + key.size());
       if (p != std::string::npos) {
-        size_t p2 = resp->body.find('"', p + 1);
-        // skip until value quote
-        p = resp->body.find('"', resp->body.find(':', p));
+        p = resp->body.find('"', p + 1);
         if (p != std::string::npos) {
           size_t endq = resp->body.find('"', p + 1);
           if (endq != std::string::npos)
@@ -856,7 +851,7 @@ std::optional<Document> reddit_fetch(std::string_view url_in, std::string* err) 
       break;
     }
     if (resp && resp->status == 200 && !resp->body.empty() &&
-        resp->body.find(""children"") != std::string::npos)
+        resp->body.find("\"children\"") != std::string::npos)
       break;
     if (resp && resp->status == 200 && !resp->body.empty() &&
         (resp->body[0] == '{' || resp->body[0] == '['))
