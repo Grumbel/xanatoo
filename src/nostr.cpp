@@ -6,6 +6,8 @@
 
 #include "xanatoo/nostr.hpp"
 
+#include "xanatoo/https.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -504,8 +506,7 @@ bool ws_connect(WsConn& c, const std::string& url, std::string* err) {
   }
   c.fd = fd;
 
-  SSL_library_init();
-  SSL_load_error_strings();
+  ssl_library_init_once();
   c.ctx = SSL_CTX_new(TLS_client_method());
   if (!c.ctx) {
     if (err) *err = "SSL_CTX_new failed";

@@ -48,6 +48,7 @@ Bundle names: `xanatoo-NNN.description-BASE.bundle` (formerly `glyphtoo-NNN…`)
 
 ## Nostr
 
+- Uses shared `ssl_library_init_once` from `https.cpp` for WSS TLS.
 - Read-only note/thread fetch gated by `XANATOO_NOSTR` (default ON; needs OpenSSL).
 - Opens `note1` / `nevent1` / `nostr:…` / 64-hex via Ctrl+L → Thread+Message layout.
 - No posting or key management in v1.

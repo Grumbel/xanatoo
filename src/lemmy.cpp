@@ -13,7 +13,6 @@
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
-#include <ctime>
 #include <iostream>
 #include <optional>
 #include <sstream>

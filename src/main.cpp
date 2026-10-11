@@ -899,8 +899,7 @@ int main(int argc, char** argv) {
   // (not http(s)/mailto/gemini schemes).
   auto is_inapp_doc_href = [&](const std::string& href) -> bool {
     if (href.empty() || href[0] == '#') return false;
-    if (xanatoo::is_gemini_url(href)) return false;
-    if (xanatoo::is_nostr_ref(href)) return false;
+    if (is_in_app_remote_url(href)) return false;
     if (href.rfind("http://", 0) == 0 || href.rfind("https://", 0) == 0 ||
         href.rfind("mailto:", 0) == 0)
       return false;
