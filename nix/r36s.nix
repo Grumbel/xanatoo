@@ -25,7 +25,7 @@ let
   lib = pkgs.lib;
 
   # eoan arm64 packages: glibc, the kernel headers, GCC 9's runtime and
-  # libstdc++ headers, SDL2 2.0.10 (headers and library to link against).
+  # libstdc++ headers, SDL2 2.0.20 headers (jammy) for ImGui; runtime uses the device SDL2.
   debs = [
     { file = "pool/main/g/glibc/libc6_2.30-0ubuntu2_arm64.deb"; sha256 = "4853da1e3c9eae109708b30dc5df00b7ced888c09f0e77bf6731015a97fb859a"; }
     { file = "pool/main/g/glibc/libc6-dev_2.30-0ubuntu2_arm64.deb"; sha256 = "a0b1860c16c50934a5fe3206ac386267d24b015b0ab677005d38e60ac1d27823"; }
@@ -34,8 +34,10 @@ let
     { file = "pool/main/g/gcc-9/libstdc++6_9.2.1-9ubuntu2_arm64.deb"; sha256 = "5af692b4ecf237979411acf74b7319785e09dd3450a917a94f3ea65cd260436e"; }
     { file = "pool/main/g/gcc-9/libstdc++-9-dev_9.2.1-9ubuntu2_arm64.deb"; sha256 = "aa0efe55ba5002e2d3572271b6c0106dfb59f7a6c61be0a0c406c4836e12472b"; }
     { file = "pool/main/g/gcc-9/libgcc-9-dev_9.2.1-9ubuntu2_arm64.deb"; sha256 = "4e4a83c4d83471eff726fd819b4e5d266fd01c0fbb66f1376718b78bfd4ae116"; }
-    { file = "pool/universe/libs/libsdl2/libsdl2-2.0-0_2.0.10+dfsg1-1ubuntu1_arm64.deb"; sha256 = "34f06694f13bbee317b89be868768e8fd5b030287431a630881f45ff99dc9264"; }
-    { file = "pool/universe/libs/libsdl2/libsdl2-dev_2.0.10+dfsg1-1ubuntu1_arm64.deb"; sha256 = "9eb97797c392b68449045d814f8763ca984853abefff94ababdc72270b7d65ea"; }
+    # ImGui SDL_Renderer backend needs SDL 2.0.17+ (RenderGeometry).
+    # Headers/libs from jammy for compile + stub symbols; device SDL at runtime.
+    { file = "pool/universe/libs/libsdl2/libsdl2-2.0-0_2.0.20+dfsg-2build1_arm64.deb"; sha256 = "1ea070ae1c98a3eabd98d53db8d5d958b73f6bab844ba7d66e03ce4ec51da94d"; mirror = "http://ports.ubuntu.com/ubuntu-ports"; }
+    { file = "pool/universe/libs/libsdl2/libsdl2-dev_2.0.20+dfsg-2build1_arm64.deb"; sha256 = "af3746b4c3a6980916ca9e9ec6c6acbf651783752a371014509c01226c2dada7"; mirror = "http://ports.ubuntu.com/ubuntu-ports"; }
     # FreeType / Fontconfig (xanatoo text rendering) and link deps
     { file = "pool/main/f/freetype/libfreetype6_2.9.1-4_arm64.deb"; sha256 = "e1a18bdec319ab92e02912b6721846907ea13e420123c7225834180ba94360f1"; }
     { file = "pool/main/f/freetype/libfreetype6-dev_2.9.1-4_arm64.deb"; sha256 = "8f4b3f018e6ef26aac15cf378856dde03b8d2a7fd69e3c41c9b8b0467f483c74"; }
@@ -53,7 +55,7 @@ let
     { file = "pool/main/b/brotli/libbrotli-dev_1.0.7-2_arm64.deb"; sha256 = "861312067f81e664925243294070dcb31e4478c21f9a237a95d9cec7ebde7155"; }
   ];
   fetchDeb = d: pkgs.fetchurl {
-    url = "http://old-releases.ubuntu.com/ubuntu/${d.file}";
+    url = "${d.mirror or "http://old-releases.ubuntu.com/ubuntu"}/${d.file}";
     inherit (d) sha256;
   };
 
