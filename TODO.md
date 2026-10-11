@@ -6,9 +6,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **205** (this delivery is **204**)
+Next bundle number: **206** (this delivery is **205**)
 
 ## Status (2026-10-11)
+
+Lemmy comments threaded via Message.alt from Lemmy path (indent in layout).
 
 Lemmy post pages: fetch comments via /api/v3/comment/list (no longer embedded in /post).
 Post titles / “N comments” / c/name link in-pane.
@@ -539,4 +541,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-201.*-fix-reddit-compile-…` — on origin (oauth parse + children literal)
 - `xanatoo-202.*-lemmy-api-…` — prior (Lemmy API v3)
 - `xanatoo-203.*-lemmy-post-links-…` — on origin (title/comments/community hyperlinks)
-- `xanatoo-204.*-lemmy-comment-list-…` — this delivery (comment/list API)
+- `xanatoo-204.*-lemmy-comment-list-…` — prior (comment/list API)
+- `xanatoo-205.*-lemmy-comment-thread-…` — this delivery (path → alt indent)

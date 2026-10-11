@@ -444,7 +444,8 @@ struct LemmyPost {
   int64_t score = 0;
   int64_t comments = 0;
   bool is_comment = false;
-  int64_t parent_id = 0;  // for comments: path depth / parent
+  int64_t parent_id = 0;  // parent comment id (0 = under post)
+  std::string path;      // Lemmy comment path for sort/order
 };
 
 LemmyPost parse_post_view(std::string_view view_json) {
@@ -481,14 +482,26 @@ LemmyPost parse_comment_view(std::string_view view_json) {
   p.published = json_str_field(comment, "published");
   p.author = json_str_field(creator, "name");
   p.score = json_int_field(counts, "score");
-  // path like "0.123.456" — last segment before id is parent
-  std::string path = json_str_field(comment, "path");
-  if (!path.empty()) {
-    // count dots for depth proxy stored in parent_id as depth
-    int depth = 0;
-    for (char c : path)
-      if (c == '.') ++depth;
-    p.parent_id = depth > 0 ? depth - 1 : 0;
+  // Lemmy path: "0.<id>" (top-level) or "0.<parent>.….<id>" (nested).
+  // parent_id = immediate parent comment id, or 0 if top-level under the post.
+  p.path = json_str_field(comment, "path");
+  if (!p.path.empty()) {
+    std::vector<int64_t> segs;
+    size_t i = 0;
+    while (i < p.path.size()) {
+      while (i < p.path.size() && p.path[i] == '.') ++i;
+      if (i >= p.path.size()) break;
+      char* end = nullptr;
+      long long v = std::strtoll(p.path.c_str() + i, &end, 10);
+      if (end == p.path.c_str() + i) break;
+      segs.push_back(static_cast<int64_t>(v));
+      i = static_cast<size_t>(end - p.path.c_str());
+    }
+    // segs[0] is usually 0 (root); last is this comment id.
+    if (segs.size() >= 3)
+      p.parent_id = segs[segs.size() - 2];
+    else
+      p.parent_id = 0;
   }
   return p;
 }
@@ -503,7 +516,7 @@ std::string post_permalink(const LemmyPost& post, const std::string& origin) {
 }
 
 void append_message(Document& doc, NodeId thread, const LemmyPost& post,
-                    const std::string& origin) {
+                    const std::string& origin, int64_t root_post_id = 0) {
   NodeId msg = doc.create(NodeKind::Message, thread);
   Node& n = doc.get(msg);
   n.label = std::to_string(post.id);
@@ -515,6 +528,14 @@ void append_message(Document& doc, NodeId thread, const LemmyPost& post,
     meta += std::to_string(post.score) + " pts";
   }
   n.summary = meta;
+
+  // Threading: Message layout walks alt → parent Message.label for indent.
+  if (post.is_comment) {
+    if (post.parent_id > 0)
+      n.alt = std::to_string(post.parent_id);
+    else if (root_post_id > 0)
+      n.alt = std::to_string(root_post_id);
+  }
 
   const std::string permalink = post_permalink(post, origin);
 
@@ -584,7 +605,7 @@ void append_message(Document& doc, NodeId thread, const LemmyPost& post,
 
 Document build_document(const std::string& title,
                         const std::vector<LemmyPost>& posts,
-                        const std::vector<LemmyPost>& comments,
+                        std::vector<LemmyPost> comments,
                         const std::string& origin) {
   Document doc;
   NodeId root = doc.create(NodeKind::Document);
@@ -592,8 +613,18 @@ Document build_document(const std::string& title,
   doc.get(thread).summary = title.empty() ? "Lemmy" : title;
   doc.get(thread).label = "lemmy";
 
-  for (const auto& p : posts) append_message(doc, thread, p, origin);
-  for (const auto& c : comments) append_message(doc, thread, c, origin);
+  int64_t root_post_id = posts.empty() ? 0 : posts.front().id;
+
+  for (const auto& p : posts) append_message(doc, thread, p, origin, 0);
+
+  // Tree order: Lemmy path sorts parents before children.
+  std::sort(comments.begin(), comments.end(),
+            [](const LemmyPost& a, const LemmyPost& b) {
+              if (a.path != b.path) return a.path < b.path;
+              return a.id < b.id;
+            });
+  for (const auto& c : comments)
+    append_message(doc, thread, c, origin, root_post_id);
 
   if (doc.get(thread).children.empty()) {
     NodeId msg = doc.create(NodeKind::Message, thread);
