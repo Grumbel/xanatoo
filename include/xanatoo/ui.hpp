@@ -123,6 +123,10 @@ struct UiState {
   bool structure = false;
   bool browse = false;  // read-only navigation
   bool virtual_keyboard = false;
+  // Gamepad right-stick software pointer
+  bool stick_cursor = false;
+  float stick_cx = 0.f, stick_cy = 0.f;
+  bool stick_lmb = false, stick_rmb = false;
   bool help = false;
   bool selection = false;
   // True when caret is on a ListItem (enables indent/outdent menu items).

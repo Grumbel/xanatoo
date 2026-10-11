@@ -542,6 +542,13 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   ImGui_ImplSDLRenderer2_NewFrame();
   ImGui_ImplSDL2_NewFrame();
   ImGui::NewFrame();
+  // Stick cursor overrides SDL mouse (R36S has no mouse; warp may no-op).
+  if (state.stick_cursor) {
+    ImGuiIO& io = ImGui::GetIO();
+    io.MousePos = ImVec2(state.stick_cx, state.stick_cy);
+    io.MouseDown[0] = state.stick_lmb;
+    io.MouseDown[1] = state.stick_rmb;
+  }
 
   UiCommand cmd = UiCommand::None;
 

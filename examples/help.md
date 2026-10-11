@@ -165,6 +165,7 @@ TODO keywords use `Header.src`; `:CUSTOM_ID:` becomes the stable label.
 
 - `--fullscreen` / `-F` — borderless fullscreen (R36S launcher uses this)
 - `--ui-scale N` or `XANATOO_UI_SCALE` — enlarge ImGui chrome (auto 1.35 when width ≤720)
-- **D-pad** move · **A** activate · **B** collapse · **Back** history/browse · **Y** forward · **Start** help
+- **Right stick** software cursor · **A** click · **B** right-click
+- **D-pad** move · **Left stick** scroll · **Back** history/browse · **Y** forward · **Start** help
 
 - **F3** — toggle on-screen virtual keyboard

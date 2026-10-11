@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **168** (this delivery is **167**)
+Next bundle number: **169** (this delivery is **168**)
 
 ## Status (2026-10-11)
 
@@ -267,6 +267,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] UI scale: auto 1.35 when width ≤720 / XANATOO_UI_SCALE / --ui-scale; larger body font
 - [x] Gamepad: connect hint, Y=history forward, browse-mode status hints; ImGui NavEnableGamepad
 - [x] On-screen virtual keyboard (F3 / Guide / View menu)
+- [x] Right-stick software cursor (A/B click) for R36S
 - [x] --fullscreen + R36S launcher uses it
 
 ## Open work / next steps
@@ -486,4 +487,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-164.*-r36s-eoan-imgui-…` — eoan SDL + ImGui legacy
 - `xanatoo-165.*-r36s-polish-notes-…` — polish notes
 - `xanatoo-166.*-ui-scale-gamepad-…` — UI scale / gamepad
-- `xanatoo-167.*-virtual-keyboard-…` — this delivery
+- `xanatoo-167.*-virtual-keyboard-…` — virtual keyboard
+- `xanatoo-168.*-stick-cursor-…` — this delivery

@@ -27,10 +27,13 @@ zip into `ports/PortMaster/autoinstall/` and start PortMaster once.
 
 | Input | Action |
 |-------|--------|
-| D-pad / left stick | Move caret / scroll |
-| A / South | Activate (link, stretch, …) |
-| B / East | Browse mode toggle (when mapped) |
+| Right stick | Software mouse cursor |
+| A / South | Left click at cursor |
+| B / East | Right click at cursor |
+| D-pad | Move caret / navigate |
+| Left stick | Scroll document |
 | Start | Help |
+| Guide | Virtual keyboard |
 | Select+Start | Quit (gptokeyb) |
 
 Touch and the on-screen keyboard vary by CFW. File → Examples in the menu

@@ -389,6 +389,12 @@ int main(int argc, char** argv) {
   bool browse_mode = false;
   bool virtual_keyboard = false;
   SDL_GameController* gamepad = nullptr;
+  // Analog-stick software pointer (R36S / no mouse). Right stick moves it;
+  // A/B emit left/right clicks at the pointer. Drawn as an on-screen arrow.
+  bool stick_cursor_on = false;
+  float stick_cx = 0.f, stick_cy = 0.f;
+  bool stick_cursor_init = false;
+  bool stick_lmb = false, stick_rmb = false;
   auto open_first_gamepad = [&]() {
     if (gamepad) return;
     for (int i = 0; i < SDL_NumJoysticks(); ++i) {
@@ -2303,6 +2309,10 @@ int main(int argc, char** argv) {
         case SDL_MOUSEMOTION:
           mouse_x = static_cast<float>(ev.motion.x);
           mouse_y = static_cast<float>(ev.motion.y);
+          if (stick_cursor_on) {
+            stick_cx = mouse_x;
+            stick_cy = mouse_y;
+          }
 
           // Soft-window drag/resize continue even if ImGui wants the mouse
           // (capture flag can lag one frame after a title-bar grab).
@@ -2775,9 +2785,11 @@ int main(int argc, char** argv) {
           if (!gamepad) {
             open_first_gamepad();
             if (gamepad)
+              stick_cursor_on = true;
+              stick_cursor_init = false;
               flash_status(
-                  "Pad: D-pad move · A open · B collapse · "
-                  "Back hist/browse · Start help");
+                  "Pad: R-stick cursor · A click · B rclick · "
+                  "D-pad nav · L-stick scroll · Start help");
           }
           break;
         case SDL_CONTROLLERDEVICEREMOVED:
@@ -2805,13 +2817,42 @@ int main(int argc, char** argv) {
             case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
               if (!toggle_stretch_at_caret()) nav_move_block(false);
               break;
-            case SDL_CONTROLLER_BUTTON_A:
-              activate_at_caret();
+            case SDL_CONTROLLER_BUTTON_A: {
+              // Prefer pointer click when stick cursor is active (menus + hits).
+              if (stick_cursor_on) {
+                stick_lmb = true;
+                SDL_Event me{};
+                me.type = SDL_MOUSEBUTTONDOWN;
+                me.button.button = SDL_BUTTON_LEFT;
+                me.button.state = SDL_PRESSED;
+                me.button.clicks = 1;
+                me.button.x = static_cast<Sint32>(stick_cx);
+                me.button.y = static_cast<Sint32>(stick_cy);
+                me.button.windowID = SDL_GetWindowID(window);
+                SDL_PushEvent(&me);
+              } else {
+                activate_at_caret();
+              }
               break;
-            case SDL_CONTROLLER_BUTTON_B:
-              // Collapse current stretch, else collapse all
-              if (!toggle_stretch_at_caret()) collapse_or_expand_all(false);
+            }
+            case SDL_CONTROLLER_BUTTON_B: {
+              if (stick_cursor_on) {
+                stick_rmb = true;
+                SDL_Event me{};
+                me.type = SDL_MOUSEBUTTONDOWN;
+                me.button.button = SDL_BUTTON_RIGHT;
+                me.button.state = SDL_PRESSED;
+                me.button.clicks = 1;
+                me.button.x = static_cast<Sint32>(stick_cx);
+                me.button.y = static_cast<Sint32>(stick_cy);
+                me.button.windowID = SDL_GetWindowID(window);
+                SDL_PushEvent(&me);
+              } else {
+                // Collapse current stretch, else collapse all
+                if (!toggle_stretch_at_caret()) collapse_or_expand_all(false);
+              }
               break;
+            }
             case SDL_CONTROLLER_BUTTON_X:
               outline_mode = !outline_mode;
               if (outline_mode) {
@@ -2874,6 +2915,33 @@ int main(int argc, char** argv) {
               break;
             default:
               break;
+          }
+          break;
+        }
+
+        case SDL_CONTROLLERBUTTONUP: {
+          if (ev.cbutton.button == SDL_CONTROLLER_BUTTON_A && stick_lmb) {
+            stick_lmb = false;
+            SDL_Event me{};
+            me.type = SDL_MOUSEBUTTONUP;
+            me.button.button = SDL_BUTTON_LEFT;
+            me.button.state = SDL_RELEASED;
+            me.button.clicks = 1;
+            me.button.x = static_cast<Sint32>(stick_cx);
+            me.button.y = static_cast<Sint32>(stick_cy);
+            me.button.windowID = SDL_GetWindowID(window);
+            SDL_PushEvent(&me);
+          } else if (ev.cbutton.button == SDL_CONTROLLER_BUTTON_B && stick_rmb) {
+            stick_rmb = false;
+            SDL_Event me{};
+            me.type = SDL_MOUSEBUTTONUP;
+            me.button.button = SDL_BUTTON_RIGHT;
+            me.button.state = SDL_RELEASED;
+            me.button.clicks = 1;
+            me.button.x = static_cast<Sint32>(stick_cx);
+            me.button.y = static_cast<Sint32>(stick_cy);
+            me.button.windowID = SDL_GetWindowID(window);
+            SDL_PushEvent(&me);
           }
           break;
         }
@@ -4519,7 +4587,7 @@ int main(int argc, char** argv) {
                           panes[0].buf >= 0 && panes[1].buf >= 0;
       ui_state.structure = structure_mode;
       ui_state.browse = browse_mode;
-    ui_state.virtual_keyboard = virtual_keyboard;
+      ui_state.virtual_keyboard = virtual_keyboard;
       ui_state.help = help_mode;
       ui_state.selection = !F().sel.empty();
       {
@@ -4554,9 +4622,47 @@ int main(int argc, char** argv) {
         if (bi == panes[focus].buf) ui_state.active_tab = ti;
       }
       ui_state.has_floating = !soft_wins.empty();
+      // Right-stick software cursor (before ImGui frame).
+      if (gamepad) {
+        auto axis_e = [&](SDL_GameControllerAxis a) -> float {
+          Sint16 v = SDL_GameControllerGetAxis(gamepad, a);
+          const float dead = 8000.f;
+          if (v > -dead && v < dead) return 0.f;
+          return static_cast<float>(v) / 32767.f;
+        };
+        if (!stick_cursor_init) {
+          stick_cx = static_cast<float>(win_w) * 0.5f;
+          stick_cy = static_cast<float>(win_h) * 0.5f;
+          stick_cursor_init = true;
+        }
+        float rx = axis_e(SDL_CONTROLLER_AXIS_RIGHTX);
+        float ry = axis_e(SDL_CONTROLLER_AXIS_RIGHTY);
+        if (rx != 0.f || ry != 0.f) {
+          stick_cursor_on = true;
+          const float speed = 9.f + 0.012f * static_cast<float>(win_w);
+          stick_cx += rx * speed;
+          stick_cy += ry * speed;
+          if (stick_cx < 0.f) stick_cx = 0.f;
+          if (stick_cy < 0.f) stick_cy = 0.f;
+          if (stick_cx > static_cast<float>(win_w - 1))
+            stick_cx = static_cast<float>(win_w - 1);
+          if (stick_cy > static_cast<float>(win_h - 1))
+            stick_cy = static_cast<float>(win_h - 1);
+          mouse_x = stick_cx;
+          mouse_y = stick_cy;
+          SDL_WarpMouseInWindow(window, static_cast<int>(stick_cx),
+                                static_cast<int>(stick_cy));
+        }
+      }
+      ui_state.stick_cursor = stick_cursor_on;
+      ui_state.stick_cx = stick_cx;
+      ui_state.stick_cy = stick_cy;
+      ui_state.stick_lmb = stick_lmb;
+      ui_state.stick_rmb = stick_rmb;
+
       auto ui_frame = ui.begin_frame(ui_state);
       ui_top = ui_frame.top_reserved;
-    ui_bottom = ui_frame.bottom_reserved;
+      ui_bottom = ui_frame.bottom_reserved;
 
       using C = xanatoo::UiCommand;
       auto& p = F();
@@ -5471,7 +5577,7 @@ int main(int argc, char** argv) {
       if (outline_mode) refresh_outline();
     }
 
-    // Gamepad stick / trigger continuous navigation (poll each frame).
+    // Gamepad sticks / triggers (poll each frame).
     if (gamepad) {
       auto axis = [&](SDL_GameControllerAxis a) -> float {
         Sint16 v = SDL_GameControllerGetAxis(gamepad, a);
@@ -5479,14 +5585,17 @@ int main(int argc, char** argv) {
         if (v > -dead && v < dead) return 0.f;
         return static_cast<float>(v) / 32767.f;
       };
+      // Left stick Y: scroll focused pane (unchanged).
       float ly = axis(SDL_CONTROLLER_AXIS_LEFTY);
       if (ly != 0.f) {
         Pane& p = F();
-        float view_h = static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
+        float view_h =
+            static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
         float max_s = std::max(0.f, p.layout.content_height - view_h + 40.f);
-        p.scroll_y = std::max(0.f, std::min(max_s, p.scroll_y + ly * 18.f));
+        p.scroll_y =
+            std::max(0.f, std::min(max_s, p.scroll_y + ly * 18.f));
       }
-      // Triggers as page up/down (edge-ish: fire when held past threshold)
+      // Triggers as page up/down
       static bool lt_held = false, rt_held = false;
       float lt = axis(SDL_CONTROLLER_AXIS_TRIGGERLEFT);
       float rt = axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
@@ -5506,6 +5615,9 @@ int main(int argc, char** argv) {
       } else {
         rt_held = false;
       }
+    } else {
+      stick_cursor_on = false;
+      stick_cursor_init = false;
     }
 
         renderer.clear(248, 246, 240);
