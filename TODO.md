@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **084** (this delivery is **083**)
+Next bundle number: **085** (this delivery is **084**)
 
 ## Status (2026-10-11)
 
@@ -135,6 +135,10 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Markup `:::include … excerpt="…"` + serialize excerpt
 - [x] Inline Cite as `[text](cite:key)` and link `{rel=…}` in markup
 - [x] GFM pipe tables parse/serialize under `:::table` or standalone
+- [x] Table presentation: grid lines, header fills, cell padding
+- [x] Code-block soft background + border
+- [x] Note bar distinct (amber) from block-quote bar
+- [x] Table cell layout merges images/quote/note/code decorations
 
 ## Open work / next steps
 
@@ -142,7 +146,7 @@ LCS structural diff marks; cross-document `:::include`.
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Editable transclusion mirror (edits on embed write through to source)
 4. Word-level / intra-block diff highlighting
-5. **Tables** — semantic grid (cells as nodes); presentation left to the view
+5. **Tables** — semantic grid + basic grid presentation in; column weights / nested blocks still open
 6. **Docking** — tile/split zones (edge snap + maximize is in)
 7. **Citations** / typed link relations / range transclusion (see FORMAT.md)
 
@@ -267,4 +271,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-080.*-outline-window-…` — outline software window
 - `xanatoo-081.*-multi-softwin-…` — multiple document software windows
 - `xanatoo-082.*-softwin-dock-…` — soft-window docking
-- `xanatoo-083.*-md-semantic-…` — this delivery
+- `xanatoo-083.*-md-semantic-…` — markdown semantic round-trip
+- `xanatoo-084.*-table-present-…` — this delivery

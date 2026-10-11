@@ -39,6 +39,38 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
     }
   }
 
+  // Table header cell fills (drawn under text)
+  {
+    SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
+    for (const auto& fill : layout.table_header_fills) {
+      SDL_SetRenderDrawColor(sdl_, 230, 235, 245, 220);
+      SDL_Rect r{
+          static_cast<int>(fill.x + origin_x),
+          static_cast<int>(fill.y - scroll_y),
+          static_cast<int>(fill.width),
+          static_cast<int>(fill.height)};
+      SDL_RenderFillRect(sdl_, &r);
+    }
+    SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
+  }
+
+  // Fenced code-block soft background
+  {
+    SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
+    for (const auto& cb : layout.code_blocks) {
+      SDL_SetRenderDrawColor(sdl_, 245, 240, 230, 210);
+      SDL_Rect r{
+          static_cast<int>(cb.x + origin_x),
+          static_cast<int>(cb.y - scroll_y),
+          static_cast<int>(cb.width),
+          static_cast<int>(cb.height)};
+      SDL_RenderFillRect(sdl_, &r);
+      SDL_SetRenderDrawColor(sdl_, 210, 200, 180, 255);
+      SDL_RenderDrawRect(sdl_, &r);
+    }
+    SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
+  }
+
   // Block-quote left bars
   for (const auto& qb : layout.quote_bars) {
     SDL_SetRenderDrawColor(sdl_, 140, 155, 180, 255);
@@ -50,6 +82,33 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
         bw,
         static_cast<int>(qb.height)};
     SDL_RenderFillRect(sdl_, &bar);
+  }
+
+  // Note left bars (amber, distinct from quotes)
+  for (const auto& nb : layout.note_bars) {
+    SDL_SetRenderDrawColor(sdl_, 200, 140, 40, 255);
+    int bw = static_cast<int>(nb.width);
+    if (bw < 2) bw = 2;
+    SDL_Rect bar{
+        static_cast<int>(nb.x + origin_x),
+        static_cast<int>(nb.y - scroll_y),
+        bw,
+        static_cast<int>(nb.height)};
+    SDL_RenderFillRect(sdl_, &bar);
+  }
+
+  // Table grid lines
+  for (const auto& tl : layout.table_lines) {
+    SDL_SetRenderDrawColor(sdl_, 160, 165, 175, 255);
+    int w = static_cast<int>(tl.width);
+    int h = static_cast<int>(tl.height);
+    if (w < 1) w = 1;
+    if (h < 1) h = 1;
+    SDL_Rect line{
+        static_cast<int>(tl.x + origin_x),
+        static_cast<int>(tl.y - scroll_y),
+        w, h};
+    SDL_RenderFillRect(sdl_, &line);
   }
 
   // Horizontal rules

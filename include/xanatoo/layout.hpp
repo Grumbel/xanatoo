@@ -55,6 +55,14 @@ struct LayoutResult {
   std::vector<PositionedImage> images;
   // Vertical bars for block quotes (content coordinates).
   std::vector<LayoutBox> quote_bars;
+  // Vertical bars for notes (distinct colour from quotes).
+  std::vector<LayoutBox> note_bars;
+  // Soft background rectangles for fenced code blocks.
+  std::vector<LayoutBox> code_blocks;
+  // Table grid lines. height <= 2 → horizontal; width <= 2 → vertical.
+  std::vector<LayoutBox> table_lines;
+  // Soft fill under header cells (TableCell level > 0).
+  std::vector<LayoutBox> table_header_fills;
   // Horizontal rules (x, y = center line, width, height = stroke thickness).
   std::vector<LayoutBox> hr_lines;
   std::vector<ColumnGap> column_gaps;

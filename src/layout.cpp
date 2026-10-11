@@ -180,6 +180,18 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         out.quote_bars.insert(out.quote_bars.end(),
                               col_out.quote_bars.begin(),
                               col_out.quote_bars.end());
+        out.note_bars.insert(out.note_bars.end(),
+                             col_out.note_bars.begin(),
+                             col_out.note_bars.end());
+        out.code_blocks.insert(out.code_blocks.end(),
+                               col_out.code_blocks.begin(),
+                               col_out.code_blocks.end());
+        out.table_lines.insert(out.table_lines.end(),
+                               col_out.table_lines.begin(),
+                               col_out.table_lines.end());
+        out.table_header_fills.insert(out.table_header_fills.end(),
+                                      col_out.table_header_fills.begin(),
+                                      col_out.table_header_fills.end());
         out.hr_lines.insert(out.hr_lines.end(),
                             col_out.hr_lines.begin(), col_out.hr_lines.end());
         out.column_gaps.insert(out.column_gaps.end(),
@@ -272,8 +284,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       break;
     }
 
-    case NodeKind::BlockQuote:
-    case NodeKind::Note: {
+    case NodeKind::BlockQuote: {
       float start_y = y;
       const float bar_w = 3.f;
       const float indent = 14.f;
@@ -290,6 +301,23 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       break;
     }
 
+    case NodeKind::Note: {
+      float start_y = y;
+      const float bar_w = 3.f;
+      const float indent = 14.f;
+      float text_x = x + bar_w + indent;
+      float text_w = max_width - bar_w - indent;
+      if (text_w < 40.f) {
+        text_x = x + 8.f;
+        text_w = max_width - 8.f;
+      }
+      layout_paragraph(doc, node, text_x, y, text_w, out, FontRole::Body);
+      y += 12.f;
+      out.note_bars.push_back({id, x, start_y, bar_w, y - start_y});
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
     case NodeKind::CodeBlock: {
       float start_y = y;
       const float pad = 8.f;
@@ -301,6 +329,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       }
       layout_paragraph(doc, node, text_x, y, text_w, out, FontRole::Code);
       y += 10.f;
+      out.code_blocks.push_back({id, x, start_y, max_width, y - start_y});
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
@@ -378,8 +407,56 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
     case NodeKind::Table: {
       float start_y = y;
-      for (NodeId c : node.children)
-        layout_node(doc, c, x, y, max_width, out);
+      // Collect row node ids so we can draw an outer border + row separators.
+      std::vector<NodeId> rows;
+      for (NodeId c : node.children) {
+        if (doc.get(c).kind == NodeKind::TableRow) rows.push_back(c);
+      }
+      if (rows.empty()) {
+        for (NodeId c : node.children)
+          layout_node(doc, c, x, y, max_width, out);
+      } else {
+        // Lay out each row; remember per-row top/bottom for grid lines.
+        std::vector<float> row_tops;
+        std::vector<float> row_bottoms;
+        size_t n_cols = 0;
+        for (NodeId rid : rows) {
+          row_tops.push_back(y);
+          layout_node(doc, rid, x, y, max_width, out);
+          row_bottoms.push_back(y);
+          const Node& rn = doc.get(rid);
+          size_t cells = 0;
+          for (NodeId c : rn.children)
+            if (doc.get(c).kind == NodeKind::TableCell) ++cells;
+          if (cells > n_cols) n_cols = cells;
+        }
+        // Outer border
+        const float stroke = 1.f;
+        float table_h = y - start_y;
+        if (table_h < 1.f) table_h = 1.f;
+        // top
+        out.table_lines.push_back({id, x, start_y, max_width, stroke});
+        // bottom
+        out.table_lines.push_back({id, x, y - stroke, max_width, stroke});
+        // left
+        out.table_lines.push_back({id, x, start_y, stroke, table_h});
+        // right
+        out.table_lines.push_back(
+            {id, x + max_width - stroke, start_y, stroke, table_h});
+        // Horizontal separators between rows
+        for (size_t r = 0; r + 1 < row_bottoms.size(); ++r) {
+          float ly = row_bottoms[r] - stroke * 0.5f;
+          out.table_lines.push_back({id, x, ly, max_width, stroke});
+        }
+        // Vertical separators between columns (equal width, same as rows)
+        if (n_cols > 1) {
+          float col_w = max_width / static_cast<float>(n_cols);
+          for (size_t c = 1; c < n_cols; ++c) {
+            float lx = x + col_w * static_cast<float>(c) - stroke * 0.5f;
+            out.table_lines.push_back({id, lx, start_y, stroke, table_h});
+          }
+        }
+      }
       y += 10.f;
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
@@ -387,7 +464,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
     case NodeKind::TableRow: {
       float start_y = y;
-      // Semantic table row: equal-width columns (view may improve later).
+      // Equal-width columns; presentation may refine weights later.
       std::vector<NodeId> cells;
       for (NodeId c : node.children) {
         if (doc.get(c).kind == NodeKind::TableCell) cells.push_back(c);
@@ -399,18 +476,38 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         float col_w = max_width / static_cast<float>(cells.size());
         if (col_w < 40.f) col_w = 40.f;
         float max_bottom = start_y;
+        const float cell_pad = 4.f;
         for (size_t i = 0; i < cells.size(); ++i) {
-          float cx = x + col_w * static_cast<float>(i);
-          float cy = start_y;
+          float cx = x + col_w * static_cast<float>(i) + cell_pad;
+          float cy = start_y + cell_pad;
           LayoutResult cell_out;
-          layout_node(doc, cells[i], cx, cy, col_w - 6.f, cell_out);
+          layout_node(doc, cells[i], cx, cy, col_w - cell_pad * 2.f, cell_out);
           out.glyphs.insert(out.glyphs.end(), cell_out.glyphs.begin(),
                             cell_out.glyphs.end());
           out.boxes.insert(out.boxes.end(), cell_out.boxes.begin(),
                            cell_out.boxes.end());
+          out.images.insert(out.images.end(), cell_out.images.begin(),
+                            cell_out.images.end());
+          out.quote_bars.insert(out.quote_bars.end(),
+                                cell_out.quote_bars.begin(),
+                                cell_out.quote_bars.end());
+          out.note_bars.insert(out.note_bars.end(),
+                               cell_out.note_bars.begin(),
+                               cell_out.note_bars.end());
+          out.code_blocks.insert(out.code_blocks.end(),
+                                 cell_out.code_blocks.begin(),
+                                 cell_out.code_blocks.end());
+          out.table_lines.insert(out.table_lines.end(),
+                                 cell_out.table_lines.begin(),
+                                 cell_out.table_lines.end());
+          out.table_header_fills.insert(out.table_header_fills.end(),
+                                        cell_out.table_header_fills.begin(),
+                                        cell_out.table_header_fills.end());
+          out.hr_lines.insert(out.hr_lines.end(), cell_out.hr_lines.begin(),
+                              cell_out.hr_lines.end());
           if (cy > max_bottom) max_bottom = cy;
         }
-        y = max_bottom + 6.f;
+        y = max_bottom + cell_pad + 2.f;
       }
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
@@ -422,6 +519,11 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           (node.level > 0) ? FontRole::BodyBold : FontRole::Body;
       layout_paragraph(doc, node, x, y, max_width, out, role);
       y += 4.f;
+      if (node.level > 0) {
+        // Header fill covers the laid-out cell content area.
+        out.table_header_fills.push_back(
+            {id, x - 2.f, start_y - 2.f, max_width + 4.f, y - start_y + 2.f});
+      }
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
