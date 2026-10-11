@@ -213,6 +213,12 @@ static std::optional<GeminiResponse> gemini_fetch_once(const GeminiUrl& u,
   SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, nullptr);
 
   SSL* ssl = SSL_new(ctx);
+  if (!ssl) {
+    SSL_CTX_free(ctx);
+    ::close(fd);
+    if (err) *err = "SSL_new failed";
+    return std::nullopt;
+  }
   SSL_set_fd(ssl, fd);
   SSL_set_tlsext_host_name(ssl, u.host.c_str());
 

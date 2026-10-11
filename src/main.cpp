@@ -2876,12 +2876,13 @@ int main(int argc, char** argv) {
         case SDL_CONTROLLERDEVICEADDED:
           if (!gamepad) {
             open_first_gamepad();
-            if (gamepad)
+            if (gamepad) {
               stick_cursor_on = true;
               stick_cursor_init = false;
               flash_status(
                   "Pad: R-stick cursor · A click · B rclick · "
                   "D-pad nav · L-stick scroll · Start help");
+            }
           }
           break;
         case SDL_CONTROLLERDEVICEREMOVED:
@@ -3464,6 +3465,9 @@ int main(int argc, char** argv) {
                 int n = static_cast<int>(tab_order.size());
                 cur = shift ? (cur - 1 + n) % n : (cur + 1) % n;
                 p.buf = tab_order[static_cast<size_t>(cur)];
+                xanatoo::ensure_valid_caret(doc_of(p), p.sel.focus);
+                p.sel.anchor = p.sel.focus;
+                p.layout = {};
                 needs_layout = true;
                 update_title();
                 break;
@@ -5011,19 +5015,6 @@ int main(int argc, char** argv) {
           break;
         }
         case C::NextTab:
-          if (!tab_order.empty()) {
-            int cur = 0;
-            for (int ti = 0; ti < static_cast<int>(tab_order.size()); ++ti)
-              if (tab_order[static_cast<size_t>(ti)] == panes[focus].buf) {
-                cur = ti;
-                break;
-              }
-            cur = (cur + 1) % static_cast<int>(tab_order.size());
-            panes[focus].buf = tab_order[static_cast<size_t>(cur)];
-            needs_layout = true;
-            update_title();
-          }
-          break;
         case C::PrevTab:
           if (!tab_order.empty()) {
             int cur = 0;
@@ -5032,9 +5023,16 @@ int main(int argc, char** argv) {
                 cur = ti;
                 break;
               }
-            cur = (cur - 1 + static_cast<int>(tab_order.size())) %
-                  static_cast<int>(tab_order.size());
+            const int ntabs = static_cast<int>(tab_order.size());
+            if (ui_frame.cmd == C::NextTab)
+              cur = (cur + 1) % ntabs;
+            else
+              cur = (cur - 1 + ntabs) % ntabs;
             panes[focus].buf = tab_order[static_cast<size_t>(cur)];
+            xanatoo::ensure_valid_caret(doc_of(panes[focus]),
+                                       panes[focus].sel.focus);
+            panes[focus].sel.anchor = panes[focus].sel.focus;
+            panes[focus].layout = {};
             needs_layout = true;
             update_title();
           }
@@ -6868,10 +6866,17 @@ int main(int argc, char** argv) {
     }
 
 
+    // Drop soft windows whose buffer was removed / is out of range.
+    soft_wins.erase(
+        std::remove_if(soft_wins.begin(), soft_wins.end(),
+                       [&](const SoftWindow& sw) {
+                         return sw.buf < 0 ||
+                                sw.buf >= static_cast<int>(buffers.size());
+                       }),
+        soft_wins.end());
+
     // Document software windows (bottom → top so last is topmost)
     for (auto& sw : soft_wins) {
-      if (sw.buf < 0 || sw.buf >= static_cast<int>(buffers.size()))
-        continue;
       if (sw.w < 280) sw.w = 280;
       if (sw.h < 200) sw.h = 200;
       if (sw.needs_layout) layout_soft(sw);
