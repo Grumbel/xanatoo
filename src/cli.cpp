@@ -64,7 +64,7 @@ void print_usage(const char* argv0) {
       << "  -h, --help            Show this help\n"
       << "\n"
       << "With no file, opens examples/welcome.md when found.\n"
-      << "One positional path opens that document.\n"
+      << "One positional path opens that document (or gemini:// URL).\n"
       << "Two paths open dual-pane: left=file1, right=file2.\n"
       << "Ctrl+S saves the focused pane's document.\n"
       << "Ctrl+\\ toggles split; drag the gutter to resize panes.\n"

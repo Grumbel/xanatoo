@@ -276,6 +276,8 @@ int main(int argc, char** argv) {
   bool url_bar_mode = false;    // Ctrl+L — open gemini:// or file path
   std::string url_bar_buf;
   std::string gemini_current_url;  // base for relative gemini links
+  std::vector<std::string> nav_history;
+  int nav_hist_pos = -1;  // index into nav_history
   std::string open_file_buf;
   std::string status_notice;
   Uint32 status_notice_until = 0;
@@ -618,7 +620,8 @@ int main(int argc, char** argv) {
   };
 
   // Load a gemini:// URL or local path into the focused pane.
-  auto navigate_to_url = [&](std::string target) -> bool {
+  auto navigate_to_url = [&](std::string target,
+                             bool record_history = true) -> bool {
     while (!target.empty() &&
            (target.back() == ' ' || target.back() == '\t'))
       target.pop_back();
@@ -700,6 +703,12 @@ int main(int argc, char** argv) {
       gemini_current_url = resp->final_url;
       load_into_pane(std::move(gdoc), resp->final_url);
       browse_mode = true;
+      if (record_history) {
+        if (nav_hist_pos + 1 < static_cast<int>(nav_history.size()))
+          nav_history.resize(static_cast<size_t>(nav_hist_pos + 1));
+        nav_history.push_back(resp->final_url);
+        nav_hist_pos = static_cast<int>(nav_history.size()) - 1;
+      }
       flash_status("Gemini " + std::to_string(resp->status) + " " +
                    resp->final_url);
       return true;
@@ -725,6 +734,20 @@ int main(int argc, char** argv) {
     flash_status("Opened " + path);
     return true;
   };
+
+
+  // CLI / argv may pass gemini:// — fetch after helpers exist
+  if (xanatoo::is_gemini_url(paths[0])) {
+    std::string u = paths[0];
+    paths[0].clear();
+    navigate_to_url(std::move(u));
+  } else if (!paths[1].empty() && xanatoo::is_gemini_url(paths[1])) {
+    std::string u = paths[1];
+    paths[1].clear();
+    focus = 1;
+    navigate_to_url(std::move(u));
+    focus = 0;
+  }
 
 
 
@@ -3026,6 +3049,17 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_LEFT:
+              if (alt && !ctrl) {
+                // Capsule history back
+                if (nav_hist_pos > 0) {
+                  --nav_hist_pos;
+                  navigate_to_url(nav_history[static_cast<size_t>(nav_hist_pos)],
+                                  /*record_history=*/false);
+                } else {
+                  flash_status("No previous page");
+                }
+                break;
+              }
               move_and_sel([&] {
                 if (ctrl) {
                   xanatoo::move_word_left(d, p.sel.focus);
@@ -3038,6 +3072,17 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_RIGHT:
+              if (alt && !ctrl) {
+                // Capsule history forward
+                if (nav_hist_pos + 1 < static_cast<int>(nav_history.size())) {
+                  ++nav_hist_pos;
+                  navigate_to_url(nav_history[static_cast<size_t>(nav_hist_pos)],
+                                  /*record_history=*/false);
+                } else {
+                  flash_status("No next page");
+                }
+                break;
+              }
               move_and_sel([&] {
                 if (ctrl) {
                   xanatoo::move_word_right(d, p.sel.focus);
@@ -3432,15 +3477,19 @@ int main(int argc, char** argv) {
 
             case SDLK_r:
               if (ctrl) {
-                // Reload focused document from disk
+                // Reload focused document from disk or re-fetch gemini://
                 std::string& rpath = path_of(p);
                 if (rpath.empty()) {
-                  std::cerr << "Reload: buffer has no path (Save As first)\n";
+                  flash_status("Reload: no path (Save As or Open URL first)");
                   break;
                 }
                 if (dirty_flags[p.doc_index] && !shift) {
-                  std::cerr << "Reload: unsaved changes — "
-                               "Ctrl+Shift+R to discard and reload\n";
+                  flash_status(
+                      "Unsaved changes — Ctrl+Shift+R to discard and reload");
+                  break;
+                }
+                if (xanatoo::is_gemini_url(rpath)) {
+                  navigate_to_url(rpath, /*record_history=*/false);
                   break;
                 }
                 xanatoo::clear_external_doc_cache();
@@ -3457,6 +3506,7 @@ int main(int argc, char** argv) {
                 update_title();
                 needs_layout = true;
                 reset_blink();
+                flash_status("Reloaded " + rpath);
                 std::cout << "Reloaded: " << rpath << "\n";
               }
               break;
@@ -3873,7 +3923,11 @@ int main(int argc, char** argv) {
           std::string& rpath = path_of(p);
           if (rpath.empty()) break;
           if (dirty_flags[p.doc_index] && ui_frame.cmd == C::Reload) {
-            std::cerr << "Reload: unsaved changes — use Force Reload\n";
+            flash_status("Unsaved changes — use Force Reload");
+            break;
+          }
+          if (xanatoo::is_gemini_url(rpath)) {
+            navigate_to_url(rpath, /*record_history=*/false);
             break;
           }
           xanatoo::clear_external_doc_cache();
@@ -3885,6 +3939,7 @@ int main(int argc, char** argv) {
           p.scroll_y = 0.f;
           update_title();
           needs_layout = true;
+          flash_status("Reloaded " + rpath);
           break;
         }
         case C::Undo:
