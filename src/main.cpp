@@ -1702,6 +1702,10 @@ int main(int argc, char** argv) {
             save_as_path += ev.text.text;
             break;
           }
+          if (path_in_window_mode) {
+            path_in_window_buf += ev.text.text;
+            break;
+          }
           if (image_insert_mode) {
             image_insert_path += ev.text.text;
             break;
