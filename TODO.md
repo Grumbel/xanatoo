@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **105** (this delivery is **104**)
+Next bundle number: **106** (this delivery is **105**)
 
 ## Status (2026-10-11)
 
@@ -172,6 +172,8 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Empty-doc caret recovery (seed paragraph so typing works)
 - [x] Toggle Task Item (menu + Ctrl+Shift+T)
 - [x] GFM autolinks (`http(s)://…` and `<url>`)
+- [x] Toolbar expanded (strike/cite/headings/task/table/figure/view toggles)
+- [x] Context menu: outline/diff/find/replace; iconless toolbar uses tip labels
 
 ## Open work / next steps
 
@@ -326,3 +328,4 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-102.*-strikethrough-…` — this delivery
 - `xanatoo-103.*-empty-caret-task-…` — this delivery
 - `xanatoo-104.*-autolink-…` — this delivery
+- `xanatoo-105.*-gui-toolbar-…` — this delivery

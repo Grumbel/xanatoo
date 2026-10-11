@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <string>
 #include <vector>
 
 #define STBI_ONLY_PNG
@@ -214,8 +215,17 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
     ImGui::PopStyleVar();
     ImGui::PopID();
   } else {
-    // Text fallback when icons failed to load
-    if (ImGui::SmallButton(id)) {
+    // Text fallback: short label from tip (before " (" or end)
+    std::string label = id;
+    if (tip && tip[0]) {
+      label = tip;
+      size_t cut = label.find(" (");
+      if (cut != std::string::npos) label.resize(cut);
+      if (label.size() > 10) label.resize(10);
+    }
+    label += "##";
+    label += id;
+    if (ImGui::SmallButton(label.c_str())) {
       pressed = true;
       out = c;
     }
@@ -488,8 +498,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     ImGui::EndMainMenuBar();
   }
 
-  // ---- Toolbar under the menu (icon strip) ----
-  const float toolbar_h = 32.f;
+  // ---- Toolbar under the menu (icon strip; wraps via SameLine chain) ----
+  const float toolbar_h = 36.f;
   ImGuiViewport* vp = ImGui::GetMainViewport();
   ImGui::SetNextWindowPos(ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
   ImGui::SetNextWindowSize(ImVec2(vp->Size.x, toolbar_h));
@@ -514,10 +524,23 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                 state.selection);
     tool_button("tb_italic", "italic", "Italic (Ctrl+I)", UiCommand::Italic,
                 cmd, state.selection);
+    tool_button("tb_strike", "strike", "Strikethrough (Ctrl+Shift+X)",
+                UiCommand::Strike, cmd, state.selection);
     tool_button("tb_code", "code", "Code (Ctrl+`)", UiCommand::Code, cmd,
                 state.selection);
     tool_button("tb_link", "link", "Link (Ctrl+K)", UiCommand::Link, cmd,
                 state.selection);
+    tool_button("tb_cite", "cite", "Citation (Ctrl+Shift+C)", UiCommand::Cite,
+                cmd, state.selection);
+
+    ImGui::TextDisabled("|");
+    ImGui::SameLine(0.f, 4.f);
+
+    tool_button("tb_h1", "h1", "Heading 1 (Ctrl+1)", UiCommand::Heading1, cmd);
+    tool_button("tb_h2", "h2", "Heading 2 (Ctrl+2)", UiCommand::Heading2, cmd);
+    tool_button("tb_h3", "h3", "Heading 3 (Ctrl+3)", UiCommand::Heading3, cmd);
+    tool_button("tb_para", "para", "Paragraph (Ctrl+0)", UiCommand::ParagraphLevel,
+                cmd);
 
     ImGui::TextDisabled("|");
     ImGui::SameLine(0.f, 4.f);
@@ -526,10 +549,16 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                 cmd);
     tool_button("tb_olist", "olist", "Ordered list", UiCommand::ToggleOrderedList,
                 cmd);
+    tool_button("tb_task", "task", "Task item (Ctrl+Shift+T)",
+                UiCommand::ToggleTask, cmd);
     tool_button("tb_quote", "quote", "Block quote", UiCommand::ToggleBlockQuote,
                 cmd);
+    tool_button("tb_table", "table", "Insert table", UiCommand::InsertTable, cmd);
     tool_button("tb_image", "image", "Insert image (Ctrl+Shift+I)",
                 UiCommand::InsertImage, cmd);
+    tool_button("tb_figure", "figure", "Insert figure", UiCommand::InsertFigure,
+                cmd);
+    tool_button("tb_note", "note", "Insert note", UiCommand::InsertNote, cmd);
 
     ImGui::TextDisabled("|");
     ImGui::SameLine(0.f, 4.f);
@@ -537,7 +566,11 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     tool_button("tb_split", "split", "Split pane (Ctrl+\\)", UiCommand::ToggleSplit,
                 cmd);
     tool_button("tb_find", "find", "Find (Ctrl+F)", UiCommand::Find, cmd);
-    // Structure highlight toggle — label fallback if no icon
+    tool_button("tb_replace", "replace", "Replace (Ctrl+H)", UiCommand::Replace,
+                cmd);
+    tool_button("tb_outline", "outline", "Heading outline (Ctrl+Shift+O)",
+                UiCommand::ToggleOutline, cmd);
+    // Structure highlight toggle — pressed look when active
     {
       bool pressed = false;
       if (state.structure) {
@@ -545,13 +578,31 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
                               ImVec4(0.4f, 0.5f, 0.75f, 1.f));
       }
-      if (ImGui::Button("Struct##tb_struct")) pressed = true;
+      if (ImGui::SmallButton("Struct##tb_struct")) pressed = true;
       if (state.structure) ImGui::PopStyleColor(2);
       if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Structure highlight (Ctrl+Shift+L)");
       if (pressed) cmd = UiCommand::ToggleStructure;
       ImGui::SameLine(0.f, 4.f);
     }
+    {
+      bool pressed = false;
+      if (state.diff) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.4f, 0.2f, 1.f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                              ImVec4(0.7f, 0.45f, 0.25f, 1.f));
+      }
+      if (ImGui::SmallButton("Diff##tb_diff")) pressed = true;
+      if (state.diff) ImGui::PopStyleColor(2);
+      if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Diff marks (Ctrl+Shift+D)");
+      if (pressed) cmd = UiCommand::ToggleDiff;
+      ImGui::SameLine(0.f, 4.f);
+    }
+    tool_button("tb_zoomin", "zoomin", "Zoom in (Ctrl++)", UiCommand::ZoomIn,
+                cmd);
+    tool_button("tb_zoomout", "zoomout", "Zoom out (Ctrl+-)", UiCommand::ZoomOut,
+                cmd);
     tool_button("tb_help", "help", "Help (F1)", UiCommand::ToggleHelp, cmd);
   }
   ImGui::End();
@@ -594,8 +645,15 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     menu_item_cmd("Move Block Up", UiCommand::MoveBlockUp, cmd, true, "Alt+Up");
     menu_item_cmd("Move Block Down", UiCommand::MoveBlockDown, cmd, true,
                   "Alt+Down");
+    ImGui::Separator();
     if (ImGui::MenuItem("Structure Highlight", "Ctrl+Shift+L", state.structure))
       cmd = UiCommand::ToggleStructure;
+    if (ImGui::MenuItem("Heading Outline", "Ctrl+Shift+O", state.outline))
+      cmd = UiCommand::ToggleOutline;
+    if (ImGui::MenuItem("Diff Marks", "Ctrl+Shift+D", state.diff))
+      cmd = UiCommand::ToggleDiff;
+    menu_item_cmd("Find…", UiCommand::Find, cmd, true, "Ctrl+F");
+    menu_item_cmd("Replace…", UiCommand::Replace, cmd, true, "Ctrl+H");
     ImGui::EndPopup();
   }
 
