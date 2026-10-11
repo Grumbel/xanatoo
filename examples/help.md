@@ -97,4 +97,5 @@ Press **F1** or **Esc** to close this window.
 
 Prefer nested **section** / **article** containers over ranked headings.
 A **header** is the title of the enclosing unit. Outline depth follows
-nesting. See **Examples → Article / section / header**.
+nesting. **Enter** on a header starts a body paragraph (not another title).
+See **Examples → Article / section / header**.

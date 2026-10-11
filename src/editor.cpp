@@ -1544,10 +1544,19 @@ bool split_block(Document& doc, Caret& caret) {
     return true;
   }
 
+  // Header / legacy Heading: Enter starts body text (Paragraph sibling), not
+  // another title — matches article/section writing flow.
+  NodeKind sibling_kind = n.kind;
+  if (n.kind == NodeKind::Header || n.kind == NodeKind::Heading)
+    sibling_kind = NodeKind::Paragraph;
+
   // Create a new sibling of the same kind (ListItem stays a ListItem).
-  NodeId new_id = doc.create(n.kind, INVALID_NODE);  // parent set by insert_after
+  NodeId new_id = doc.create(sibling_kind, INVALID_NODE);  // parent set by insert_after
   Node& neu = doc.get(new_id);
-  neu.level = n.level;
+  if (sibling_kind == n.kind)
+    neu.level = n.level;
+  else
+    neu.level = 0;
 
   // Move spans after the caret into the new node
   if (!n.spans.empty() && caret.span_index < n.spans.size()) {

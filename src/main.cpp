@@ -3695,19 +3695,31 @@ int main(int argc, char** argv) {
           break;
         case C::MakeHeader:
           edit();
-          if (xanatoo::make_header(d, p.sel.focus)) needs_layout = true;
+          if (xanatoo::make_header(d, p.sel.focus)) {
+            needs_layout = true;
+            flash_status("Header");
+          }
           break;
         case C::WrapSection:
           edit();
-          if (xanatoo::wrap_in_section(d, p.sel.focus)) needs_layout = true;
+          if (xanatoo::wrap_in_section(d, p.sel.focus)) {
+            needs_layout = true;
+            flash_status("Wrapped in section");
+          }
           break;
         case C::WrapArticle:
           edit();
-          if (xanatoo::wrap_in_article(d, p.sel.focus)) needs_layout = true;
+          if (xanatoo::wrap_in_article(d, p.sel.focus)) {
+            needs_layout = true;
+            flash_status("Wrapped in article");
+          }
           break;
         case C::UnwrapSectioning:
           edit();
-          if (xanatoo::unwrap_sectioning(d, p.sel.focus)) needs_layout = true;
+          if (xanatoo::unwrap_sectioning(d, p.sel.focus)) {
+            needs_layout = true;
+            flash_status("Unwrapped section/article");
+          }
           break;
         case C::ParagraphLevel:
           edit();
