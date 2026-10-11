@@ -206,10 +206,24 @@ struct HttpResult {
   int status = 0;
   std::string body;
   std::string location;
+  std::string content_type;
 };
 
-std::optional<HttpResult> https_get(const std::string& url, std::string* err) {
-  // Parse https://host[:port]/path
+// Reddit's public .json endpoints often 403 datacenter / bot-scored IPs.
+// Prefer a descriptive UA; optional OAuth app credentials via env:
+//   XANATOO_REDDIT_CLIENT_ID / XANATOO_REDDIT_CLIENT_SECRET
+std::string reddit_user_agent() {
+  const char* env = std::getenv("XANATOO_REDDIT_USER_AGENT");
+  if (env && env[0]) return env;
+  // Reddit's preferred form: platform:app_id:version (by /u/name)
+  return "linux:xanatoo:0.1.0 (by /u/grumbel; read-only; +https://github.com/Grumbel/xanatoo)";
+}
+
+std::optional<HttpResult> https_request(const std::string& method,
+                                        const std::string& url,
+                                        const std::string& extra_headers,
+                                        const std::string& body_in,
+                                        std::string* err) {
   if (!starts_with_ci(url, "https://")) {
     if (err) *err = "only https supported for Reddit";
     return std::nullopt;
@@ -256,14 +270,19 @@ std::optional<HttpResult> https_get(const std::string& url, std::string* err) {
     return std::nullopt;
   }
 
-  // Reddit requires a descriptive User-Agent; generic clients get 403/429.
   std::ostringstream req;
-  req << "GET " << path << " HTTP/1.0\r\n"
+  req << method << " " << path << " HTTP/1.1\r\n"
       << "Host: " << host << "\r\n"
-      << "User-Agent: xanatoo/0.1.0 (read-only document viewer; by grumbel)\r\n"
-      << "Accept: application/json\r\n"
-      << "Connection: close\r\n"
-      << "\r\n";
+      << "User-Agent: " << reddit_user_agent() << "\r\n"
+      << "Accept: application/json, text/plain, */*\r\n"
+      << "Accept-Language: en-US,en;q=0.9\r\n"
+      << "Connection: close\r\n";
+  if (!extra_headers.empty()) req << extra_headers;
+  if (!body_in.empty()) {
+    req << "Content-Length: " << body_in.size() << "\r\n";
+  }
+  req << "\r\n";
+  if (!body_in.empty()) req << body_in;
   std::string req_s = req.str();
   if (SSL_write(ssl, req_s.data(), static_cast<int>(req_s.size())) <= 0) {
     if (err) *err = "TLS write failed";
@@ -296,7 +315,6 @@ std::optional<HttpResult> https_get(const std::string& url, std::string* err) {
   HttpResult out;
   out.body = data.substr(hdr_end + 4);
 
-  // Status line
   {
     size_t sp1 = headers.find(' ');
     if (sp1 != std::string::npos) {
@@ -307,22 +325,90 @@ std::optional<HttpResult> https_get(const std::string& url, std::string* err) {
       out.status = std::atoi(code.c_str());
     }
   }
-  // Location header (case-insensitive)
+  std::string hlow = ascii_lower_copy(headers);
+  auto header_val = [&](const char* name) -> std::string {
+    std::string key = std::string("\n") + name + ":";
+    size_t loc = hlow.find(key);
+    if (loc == std::string::npos) {
+      // first line case
+      if (hlow.rfind(std::string(name) + ":", 0) == 0) loc = 0;
+      else return {};
+    }
+    size_t v0 = headers.find(':', loc);
+    size_t v1 = headers.find("\r\n", v0);
+    if (v0 == std::string::npos || v1 == std::string::npos) return {};
+    std::string val = headers.substr(v0 + 1, v1 - v0 - 1);
+    while (!val.empty() && (val.front() == ' ' || val.front() == '\t'))
+      val.erase(val.begin());
+    return val;
+  };
+  out.location = header_val("location");
+  out.content_type = header_val("content-type");
+  return out;
+}
+
+std::optional<HttpResult> https_get(const std::string& url, std::string* err) {
+  return https_request("GET", url, {}, {}, err);
+}
+
+// App-only OAuth token (client credentials). Empty if env not set or fails.
+std::string reddit_oauth_token(std::string* err) {
+  const char* id = std::getenv("XANATOO_REDDIT_CLIENT_ID");
+  const char* sec = std::getenv("XANATOO_REDDIT_CLIENT_SECRET");
+  if (!id || !id[0] || !sec || !sec[0]) return {};
+
+  // Basic base64(id:secret) — minimal encoder
+  auto b64 = [](const std::string& in) {
+    static const char* T =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string o;
+    int val = 0, valb = -6;
+    for (unsigned char c : in) {
+      val = (val << 8) + c;
+      valb += 8;
+      while (valb >= 0) {
+        o.push_back(T[(val >> valb) & 0x3F]);
+        valb -= 6;
+      }
+    }
+    if (valb > -6) o.push_back(T[((val << 8) >> (valb + 8)) & 0x3F]);
+    while (o.size() % 4) o.push_back('=');
+    return o;
+  };
+  std::string auth = b64(std::string(id) + ":" + sec);
+  std::string extra = "Authorization: Basic " + auth + "\r\n"
+                      "Content-Type: application/x-www-form-urlencoded\r\n";
+  auto resp = https_request("POST", "https://www.reddit.com/api/v1/access_token",
+                            extra, "grant_type=client_credentials", err);
+  if (!resp || resp->status != 200) {
+    if (err && err->empty())
+      *err = "OAuth token request failed (HTTP " +
+             std::to_string(resp ? resp->status : 0) + ")";
+    return {};
+  }
+  // "access_token": "..."
+  std::string tok = json_str_field(resp->body, "access_token");
+  // json_str_field is defined below — forward issue!
+  // We'll parse simply here instead.
   {
-    std::string hlow = ascii_lower_copy(headers);
-    size_t loc = hlow.find("\nlocation:");
-    if (loc != std::string::npos) {
-      size_t v0 = headers.find(':', loc);
-      size_t v1 = headers.find("\r\n", v0);
-      if (v0 != std::string::npos && v1 != std::string::npos) {
-        std::string val = headers.substr(v0 + 1, v1 - v0 - 1);
-        while (!val.empty() && (val.front() == ' ' || val.front() == '\t'))
-          val.erase(val.begin());
-        out.location = val;
+    const std::string key = "\"access_token\"";
+    size_t p = resp->body.find(key);
+    if (p != std::string::npos) {
+      p = resp->body.find('"', p + key.size());
+      if (p != std::string::npos) {
+        size_t p2 = resp->body.find('"', p + 1);
+        // skip until value quote
+        p = resp->body.find('"', resp->body.find(':', p));
+        if (p != std::string::npos) {
+          size_t endq = resp->body.find('"', p + 1);
+          if (endq != std::string::npos)
+            return resp->body.substr(p + 1, endq - p - 1);
+        }
       }
     }
   }
-  return out;
+  if (err) *err = "OAuth response missing access_token";
+  return {};
 }
 
 // --- minimal JSON helpers (string / number / object slices) ---
@@ -685,35 +771,119 @@ std::optional<Document> reddit_fetch(std::string_view url_in, std::string* err) 
     return std::nullopt;
   }
 
-  std::string current = json_url;
-  std::optional<HttpResult> resp;
-  for (int hop = 0; hop < 5; ++hop) {
-    std::cerr << "Reddit: GET " << current << "\n";
-    resp = https_get(current, err);
-    if (!resp) return std::nullopt;
-    if (resp->status >= 300 && resp->status < 400 && !resp->location.empty()) {
-      std::string loc = resp->location;
-      if (loc.rfind("http", 0) != 0) {
-        // relative redirect
-        if (!loc.empty() && loc[0] == '/')
-          loc = "https://www.reddit.com" + loc;
-        else
-          loc = "https://www.reddit.com/" + loc;
-      }
-      // Ensure .json on redirect target
-      current = reddit_json_url(loc);
-      if (current.empty()) current = loc;
-      continue;
+  // Candidate request URLs: normalized .json, old.reddit, bare .json path.
+  std::vector<std::string> candidates;
+  auto add_cand = [&](std::string u) {
+    if (u.empty()) return;
+    if (std::find(candidates.begin(), candidates.end(), u) == candidates.end())
+      candidates.push_back(std::move(u));
+  };
+  add_cand(json_url);
+  {
+    std::string alt = json_url;
+    auto rep = [&](const char* a, const char* b) {
+      size_t p = alt.find(a);
+      if (p != std::string::npos) alt.replace(p, std::strlen(a), b);
+    };
+    rep("://www.reddit.com", "://old.reddit.com");
+    add_cand(alt);
+    alt = json_url;
+    // /r/foo/.json → /r/foo.json
+    size_t p = alt.find("/.json");
+    if (p != std::string::npos) {
+      alt.replace(p, 6, ".json");
+      add_cand(alt);
     }
-    break;
   }
-  if (!resp) return std::nullopt;
+
+  std::string oauth_err;
+  std::string token = reddit_oauth_token(&oauth_err);
+  if (!token.empty())
+    std::cerr << "Reddit: using OAuth client credentials\n";
+  else if (!oauth_err.empty())
+    std::cerr << "Reddit: OAuth skipped/failed: " << oauth_err << "\n";
+
+  std::optional<HttpResult> resp;
+  std::string last_err;
+  for (const std::string& cand : candidates) {
+    std::string current = cand;
+    // OAuth API host prefers no .json suffix on path — map listing path.
+    if (!token.empty()) {
+      // https://www.reddit.com/r/X/.json?… → https://oauth.reddit.com/r/X?…
+      std::string o = current;
+      size_t host = o.find("://");
+      if (host != std::string::npos) {
+        size_t path_start = o.find('/', host + 3);
+        std::string pathq = (path_start == std::string::npos) ? "/"
+                                                              : o.substr(path_start);
+        size_t dotjson = pathq.find(".json");
+        if (dotjson != std::string::npos) pathq.erase(dotjson, 5);
+        // collapse /r/foo/ → /r/foo
+        if (pathq.size() > 1 && pathq.back() == '/' &&
+            pathq.find('?') == std::string::npos)
+          pathq.pop_back();
+        current = "https://oauth.reddit.com" + pathq;
+      }
+    }
+
+    for (int hop = 0; hop < 4; ++hop) {
+      std::cerr << "Reddit: GET " << current << "\n";
+      std::string req_err;
+      std::optional<HttpResult> one;
+      if (!token.empty()) {
+        std::string extra = "Authorization: Bearer " + token + "\r\n";
+        one = https_request("GET", current, extra, {}, &req_err);
+      } else {
+        one = https_get(current, &req_err);
+      }
+      if (!one) {
+        last_err = req_err.empty() ? "request failed" : req_err;
+        break;
+      }
+      if (one->status >= 300 && one->status < 400 && !one->location.empty()) {
+        std::string loc = one->location;
+        if (loc.rfind("http", 0) != 0) {
+          if (!loc.empty() && loc[0] == '/')
+            loc = std::string("https://www.reddit.com") + loc;
+          else
+            loc = "https://www.reddit.com/" + loc;
+        }
+        std::string next = reddit_json_url(loc);
+        current = next.empty() ? loc : next;
+        continue;
+      }
+      resp = std::move(one);
+      break;
+    }
+    if (resp && resp->status == 200 && !resp->body.empty() &&
+        resp->body.find(""children"") != std::string::npos)
+      break;
+    if (resp && resp->status == 200 && !resp->body.empty() &&
+        (resp->body[0] == '{' || resp->body[0] == '['))
+      break;
+    if (resp) {
+      last_err = "HTTP " + std::to_string(resp->status);
+      if (resp->status == 403)
+        last_err +=
+            " (Reddit blocked this client/IP — try residential network, or set "
+            "XANATOO_REDDIT_CLIENT_ID + XANATOO_REDDIT_CLIENT_SECRET for OAuth)";
+      else if (resp->status == 429)
+        last_err += " (rate limited — wait and retry)";
+      else if (resp->body.size() > 0 && resp->body.size() < 120 &&
+               resp->body.find('<') == std::string::npos)
+        last_err += ": " + resp->body;
+      resp.reset();
+    }
+  }
+
+  if (!resp) {
+    if (err) *err = last_err.empty() ? "no response from Reddit" : last_err;
+    return std::nullopt;
+  }
   if (resp->status != 200) {
-    if (err)
-      *err = "HTTP " + std::to_string(resp->status) +
-             (resp->body.size() > 80
-                  ? (": " + resp->body.substr(0, 80))
-                  : "");
+    if (err) *err = last_err.empty()
+                        ? ("HTTP " + std::to_string(resp->status))
+                        : last_err;
     return std::nullopt;
   }
 

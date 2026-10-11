@@ -78,11 +78,19 @@ Drag column gutters to reweight widths. Drag an image’s blue corner to resize 
 
 ## Reddit
 
-Subreddit listings and post pages open in-pane via the public `.json` API (same Thread/Message layout as Nostr). **Ctrl+L** accepts URLs with or without `.json`:
+Subreddit listings and posts open in-pane via Reddit's JSON API
+(same Thread/Message layout as Nostr). **Ctrl+L** accepts URLs with or without `.json`.
 
 - [r/GameDeals](https://www.reddit.com/r/GameDeals/.json)
 - [r/linux](https://www.reddit.com/r/linux)
 - Or paste any `https://www.reddit.com/r/…` or post URL
+
+If requests return **HTTP 403**, Reddit is blocking the client/IP. Set a script app's credentials:
+
+`XANATOO_REDDIT_CLIENT_ID` / `XANATOO_REDDIT_CLIENT_SECRET`
+
+(create at https://www.reddit.com/prefs/apps — type **script**).
+
 
 ## Nostr
 

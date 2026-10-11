@@ -59,3 +59,5 @@ Bundle names: `xanatoo-NNN.description-BASE.bundle` (formerly `glyphtoo-NNN…`)
 - Gated by `XANATOO_REDDIT` (default ON; needs OpenSSL).
 - Ctrl+L accepts listing or post URLs with or without `.json`.
 - Maps posts/comments to Thread + Message nodes.
+- Optional OAuth: `XANATOO_REDDIT_CLIENT_ID` + `XANATOO_REDDIT_CLIENT_SECRET` (script app) when anonymous `.json` returns 403.
+- Optional UA override: `XANATOO_REDDIT_USER_AGENT`.
