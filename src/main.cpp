@@ -453,9 +453,15 @@ int main(int argc, char** argv) {
     diff_marks[1].clear();
     diff_words[0].clear();
     diff_words[1].clear();
-    if (!diff_mode || shared_doc() || buffers.size() < 2) return;
-    xanatoo::compute_diff_marks(buffers[0].doc, buffers[1].doc, diff_marks[0],
-                                diff_marks[1], &diff_words[0], &diff_words[1]);
+    if (!diff_mode || shared_doc()) return;
+    const int b0 = panes[0].buf, b1 = panes[1].buf;
+    if (b0 < 0 || b1 < 0 || b0 >= static_cast<int>(buffers.size()) ||
+        b1 >= static_cast<int>(buffers.size()) || b0 == b1)
+      return;
+    xanatoo::compute_diff_marks(buffers[static_cast<size_t>(b0)].doc,
+                                buffers[static_cast<size_t>(b1)].doc,
+                                diff_marks[0], diff_marks[1], &diff_words[0],
+                                &diff_words[1]);
   };
 
   auto checkpoint = [&]() {
@@ -901,9 +907,31 @@ int main(int argc, char** argv) {
       flash_status("Not found: " + target);
       return false;
     }
-    if (!allow_discard_dirty(p.buf)) return false;
     gemini_current_url.clear();
+    // Prefer an already-open buffer for this path (avoid double-load).
+    {
+      std::string canon = path;
+      try { canon = fs::weakly_canonical(path).string(); } catch (...) {}
+      for (int i = 0; i < static_cast<int>(buffers.size()); ++i) {
+        if (buffers[static_cast<size_t>(i)].path.empty()) continue;
+        std::string bp = buffers[static_cast<size_t>(i)].path;
+        try { bp = fs::weakly_canonical(bp).string(); } catch (...) {}
+        if (bp == canon) {
+          p.buf = i;
+          if (std::find(tab_order.begin(), tab_order.end(), i) == tab_order.end())
+            tab_order.push_back(i);
+          needs_layout = true;
+          update_title();
+          if (record_history) push_nav_history(path);
+          flash_status("Switched to " + path);
+          return true;
+        }
+      }
+    }
+    if (!allow_discard_dirty(p.buf)) return false;
     load_into_pane(load_doc(path), path);
+    if (std::find(tab_order.begin(), tab_order.end(), p.buf) == tab_order.end())
+      tab_order.push_back(p.buf);
     if (record_history) push_nav_history(path);
     flash_status("Opened " + path);
     return true;
@@ -1079,6 +1107,8 @@ int main(int argc, char** argv) {
       empty.doc = xanatoo::parse_document(xanatoo::fallback_document(), {});
       buffers.push_back(std::move(empty));
       tab_order.push_back(0);
+      panes[0].buf = panes[1].buf = 0;
+      buffers[0].history.reset(buffers[0].doc, panes[0].sel);
     }
     if (sw.buf < 0 || sw.buf >= static_cast<int>(buffers.size()))
       return buffers[0].doc;
@@ -4417,7 +4447,8 @@ int main(int argc, char** argv) {
       ui_state.split = split;
       ui_state.outline = outline_mode;
       ui_state.diff = diff_mode;
-      ui_state.can_diff = !shared_doc() && buffers.size() > 1;
+      ui_state.can_diff = !shared_doc() && panes[0].buf != panes[1].buf &&
+                          panes[0].buf >= 0 && panes[1].buf >= 0;
       ui_state.structure = structure_mode;
       ui_state.browse = browse_mode;
       ui_state.help = help_mode;
@@ -4641,6 +4672,7 @@ int main(int argc, char** argv) {
             cur = (cur + 1) % static_cast<int>(tab_order.size());
             panes[focus].buf = tab_order[static_cast<size_t>(cur)];
             needs_layout = true;
+            update_title();
           }
           break;
         case C::PrevTab:
@@ -4655,6 +4687,7 @@ int main(int argc, char** argv) {
                   static_cast<int>(tab_order.size());
             panes[focus].buf = tab_order[static_cast<size_t>(cur)];
             needs_layout = true;
+            update_title();
           }
           break;
         case C::PopOut:

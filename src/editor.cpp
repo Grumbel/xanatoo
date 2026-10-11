@@ -1896,6 +1896,8 @@ std::optional<LinkHit> hit_test_link_ex(const Document& doc,
   const float adj_y = my + scroll_y;
   for (size_t i = 0; i < layout.glyphs.size(); ++i) {
     const auto& g = layout.glyphs[i];
+    // Skip far-away lines (glyphs are laid out top-to-bottom overall).
+    if (g.y < adj_y - 120.f || g.y > adj_y + 80.f) continue;
     if (g.kind != InlineKind::Link && g.kind != InlineKind::Cite) continue;
     float x0 = g.x;
     float x1 = x0 + 10.f;
