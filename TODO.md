@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **164** (this delivery is **163**)
+Next bundle number: **165** (this delivery is **164**)
 
 ## Status (2026-10-11)
 
@@ -261,7 +261,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] R36S / PortMaster flake outputs; XANATOO_DATA_DIR for examples
 - [x] Flake: hostPlatform.isLinux; drop x86_64-darwin (nixpkgs 26.11+)
 - [x] R36S: SDL2 include path; C++17 starts_with polyfill
-- [x] R36S: SDL2 2.0.20 headers for ImGui RenderGeometry
+- [x] R36S: stick to kurvenrausch eoan SDL; ImGui legacy renderer path
 
 ## Open work / next steps
 
@@ -476,4 +476,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-160.*-r36s-portmaster-…` — R36S port
 - `xanatoo-161.*-flake-platforms-…` — flake platforms
 - `xanatoo-162.*-r36s-build-fixes-…` — SDL/C++17
-- `xanatoo-163.*-r36s-sdl-2.0.20-…` — this delivery
+- `xanatoo-163.*-r36s-sdl-2.0.20-…` — (reverted)
+- `xanatoo-164.*-r36s-eoan-imgui-…` — this delivery

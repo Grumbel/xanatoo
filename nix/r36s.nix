@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# xanatoo on the R36S handheld (RK3326, 640x480) running ArkOS, whose userland is
+# The R36S handheld (RK3326, 640x480) running ArkOS, whose userland is
 # Ubuntu 19.10 (eoan): glibc 2.30, libstdc++ from GCC 9, SDL2 2.0.x. A
 # binary built against nixpkgs' glibc does not run there, so this builds
 # against a sysroot made of eoan's arm64 packages, from the Ubuntu archive
@@ -12,9 +12,13 @@
 # only compiler builtins. On the device, SDL2 is ArkOS's (KMS/DRM, its own
 # build), the stable SDL2 ABI.
 #
-#   nix build .#xanatoo-r36s                aarch64 binary (ArkOS sysroot)
-#   nix build .#xanatoo-r36s-portmaster     PortMaster folder → /roms/ports/
-#   nix build .#xanatoo-r36s-portmaster-zip zip for PortMaster autoinstall
+# Same approach as kurvenrausch's nix/r36s.nix; FreeType/Fontconfig debs
+# added for xanatoo's text stack. ImGui's SDL_Renderer backend is patched
+# for SDL 2.0.10 (no RenderGeometry).
+#
+#   nix build .#xanatoo-r36s
+#   nix build .#xanatoo-r36s-portmaster
+#   nix build .#xanatoo-r36s-portmaster-zip
 
 { pkgs
 , version
@@ -24,8 +28,8 @@
 let
   lib = pkgs.lib;
 
-  # eoan arm64 packages: glibc, the kernel headers, GCC 9's runtime and
-  # libstdc++ headers, SDL2 2.0.20 headers (jammy) for ImGui; runtime uses the device SDL2.
+  # eoan arm64 packages: glibc, kernel headers, GCC 9 runtime / libstdc++,
+  # SDL2 2.0.10, FreeType, Fontconfig (+ link deps).
   debs = [
     { file = "pool/main/g/glibc/libc6_2.30-0ubuntu2_arm64.deb"; sha256 = "4853da1e3c9eae109708b30dc5df00b7ced888c09f0e77bf6731015a97fb859a"; }
     { file = "pool/main/g/glibc/libc6-dev_2.30-0ubuntu2_arm64.deb"; sha256 = "a0b1860c16c50934a5fe3206ac386267d24b015b0ab677005d38e60ac1d27823"; }
@@ -34,11 +38,8 @@ let
     { file = "pool/main/g/gcc-9/libstdc++6_9.2.1-9ubuntu2_arm64.deb"; sha256 = "5af692b4ecf237979411acf74b7319785e09dd3450a917a94f3ea65cd260436e"; }
     { file = "pool/main/g/gcc-9/libstdc++-9-dev_9.2.1-9ubuntu2_arm64.deb"; sha256 = "aa0efe55ba5002e2d3572271b6c0106dfb59f7a6c61be0a0c406c4836e12472b"; }
     { file = "pool/main/g/gcc-9/libgcc-9-dev_9.2.1-9ubuntu2_arm64.deb"; sha256 = "4e4a83c4d83471eff726fd819b4e5d266fd01c0fbb66f1376718b78bfd4ae116"; }
-    # ImGui SDL_Renderer backend needs SDL 2.0.17+ (RenderGeometry).
-    # Headers/libs from jammy for compile + stub symbols; device SDL at runtime.
-    { file = "pool/universe/libs/libsdl2/libsdl2-2.0-0_2.0.20+dfsg-2build1_arm64.deb"; sha256 = "1ea070ae1c98a3eabd98d53db8d5d958b73f6bab844ba7d66e03ce4ec51da94d"; mirror = "http://ports.ubuntu.com/ubuntu-ports"; }
-    { file = "pool/universe/libs/libsdl2/libsdl2-dev_2.0.20+dfsg-2build1_arm64.deb"; sha256 = "af3746b4c3a6980916ca9e9ec6c6acbf651783752a371014509c01226c2dada7"; mirror = "http://ports.ubuntu.com/ubuntu-ports"; }
-    # FreeType / Fontconfig (xanatoo text rendering) and link deps
+    { file = "pool/universe/libs/libsdl2/libsdl2-2.0-0_2.0.10+dfsg1-1ubuntu1_arm64.deb"; sha256 = "34f06694f13bbee317b89be868768e8fd5b030287431a630881f45ff99dc9264"; }
+    { file = "pool/universe/libs/libsdl2/libsdl2-dev_2.0.10+dfsg1-1ubuntu1_arm64.deb"; sha256 = "9eb97797c392b68449045d814f8763ca984853abefff94ababdc72270b7d65ea"; }
     { file = "pool/main/f/freetype/libfreetype6_2.9.1-4_arm64.deb"; sha256 = "e1a18bdec319ab92e02912b6721846907ea13e420123c7225834180ba94360f1"; }
     { file = "pool/main/f/freetype/libfreetype6-dev_2.9.1-4_arm64.deb"; sha256 = "8f4b3f018e6ef26aac15cf378856dde03b8d2a7fd69e3c41c9b8b0467f483c74"; }
     { file = "pool/main/f/fontconfig/libfontconfig1_2.13.1-2ubuntu3_arm64.deb"; sha256 = "7abc3c68569ebd52e7e27ba1cd1e97004bf5a1641212acd821220a020b713c2f"; }
@@ -55,7 +56,7 @@ let
     { file = "pool/main/b/brotli/libbrotli-dev_1.0.7-2_arm64.deb"; sha256 = "861312067f81e664925243294070dcb31e4478c21f9a237a95d9cec7ebde7155"; }
   ];
   fetchDeb = d: pkgs.fetchurl {
-    url = "${d.mirror or "http://old-releases.ubuntu.com/ubuntu"}/${d.file}";
+    url = "http://old-releases.ubuntu.com/ubuntu/${d.file}";
     inherit (d) sha256;
   };
 
@@ -67,30 +68,24 @@ let
     installPhase = ''
       mkdir -p $out
       ${lib.concatMapStrings (d: "dpkg-deb -x ${fetchDeb d} $out\n") debs}
-      # Absolute symlinks point into the device's root: into the sysroot.
       find $out -type l | while read -r link; do
         target=$(readlink "$link")
         case "$target" in
           /*) ln -sfn "$out$target" "$link" ;;
         esac
       done
-      # GCC 16's drivers link -lgcc_s_asneeded, a script of its own: the
-      # same here, for eoan's libgcc_s.
       echo 'INPUT ( AS_NEEDED ( -lgcc_s ) )' > $out/usr/lib/gcc/${multiarch}/9/libgcc_s_asneeded.so
     '';
-    # aarch64 files: the host's fixups must keep off.
     dontFixup = true;
   };
 
   cross = pkgs.pkgsCross.aarch64-multiplatform.stdenv.cc;
   gcc = cross.cc;
   binutils = cross.bintools.bintools;
-  tp = lib.removeSuffix "-" cross.targetPrefix; # aarch64-unknown-linux-gnu
+  tp = lib.removeSuffix "-" cross.targetPrefix;
   multiarch = "aarch64-linux-gnu";
   gccLib = "${gcc}/lib/gcc/${tp}/${gcc.version}";
 
-  # Compiler drivers that see nothing but the sysroot (and GCC's own
-  # freestanding headers and builtins).
   cflags = lib.concatStringsSep " " [
     "-nostdinc"
     "--sysroot=${sysroot}"
@@ -100,9 +95,6 @@ let
     "-isystem ${sysroot}/usr/include"
     "-isystem ${sysroot}/usr/include/SDL2"
     "-march=armv8-a -mtune=cortex-a35"
-    # GCC 10+ calls helpers for atomics (__aarch64_ldadd4_rel ...) that
-    # GCC 9's libgcc lacks; the Cortex-A35 (ARMv8.0, no LSE) would take the
-    # plain instructions anyway.
     "-mno-outline-atomics"
   ];
   cxxflags = lib.concatStringsSep " " [
@@ -117,9 +109,6 @@ let
     "-isystem ${sysroot}/usr/include"
     "-isystem ${sysroot}/usr/include/SDL2"
     "-march=armv8-a -mtune=cortex-a35"
-    # GCC 10+ calls helpers for atomics (__aarch64_ldadd4_rel ...) that
-    # GCC 9's libgcc lacks; the Cortex-A35 (ARMv8.0, no LSE) would take the
-    # plain instructions anyway.
     "-mno-outline-atomics"
   ];
   ldflags = lib.concatStringsSep " " [
@@ -131,7 +120,6 @@ let
     "-Wl,-rpath-link,${sysroot}/usr/lib/${multiarch}:${sysroot}/lib/${multiarch}"
     "-Wl,--dynamic-linker=/lib/ld-linux-aarch64.so.1"
   ];
-  # Linking C++: the sysroot's libstdc++, never GCC's own (-nostdlib++).
   driver = name: compiler: flags: linkFlags: libs: pkgs.writeShellScript name ''
     for a in "$@"; do
       case "$a" in
@@ -143,10 +131,7 @@ let
   cc = driver "arkos-gcc" "gcc" cflags ldflags "-lm";
   cxx = driver "arkos-g++" "g++" cxxflags "-nostdlib++ ${ldflags}" "-lstdc++ -lm";
 
-  # What the game links against instead of eoan's libSDL2, which needs
-  # ALSA, PulseAudio, X11, Wayland ... (not in the sysroot): a library of the
-  # same name exporting the same functions, empty. The device loads its own
-  # SDL2 by that name at run time.
+  # Link stub: same soname as device SDL2, empty symbols (kurvenrausch pattern).
   sdlStub = pkgs.runCommand "libSDL2-link-stub" { } ''
     mkdir -p $out/lib
     ${binutils}/bin/${tp}-nm -D --defined-only ${sysroot}/usr/lib/${multiarch}/libSDL2-2.0.so.0 \
@@ -159,7 +144,6 @@ let
     inherit version;
     src = lib.cleanSource ../.;
     nativeBuildInputs = [ pkgs.cmake pkgs.pkg-config pkgs.python3 ];
-    # pkg-config must see the sysroot's .pc files (fontconfig, freetype).
     PKG_CONFIG_PATH = "${sysroot}/usr/lib/${multiarch}/pkgconfig";
     PKG_CONFIG_SYSROOT_DIR = "${sysroot}";
     cmakeFlags = [
@@ -175,7 +159,6 @@ let
       "-DCMAKE_SKIP_RPATH=ON"
       "-DCMAKE_CXX_STANDARD=17"
       "-DXANATOO_GEMINI=OFF"
-      # eoan's SDL2 / FreeType: paths into the sysroot (no device RPATH).
       "-DSDL2_INCLUDE_DIRS=${sysroot}/usr/include/SDL2"
       "-DSDL2_LIBRARIES=${sdlStub}/lib/libSDL2.so"
       "-DFREETYPE_INCLUDE_DIRS=${sysroot}/usr/include/freetype2"
@@ -185,7 +168,6 @@ let
       "-DFONTCONFIG_INCLUDE_DIRS=${sysroot}/usr/include"
       "-DFONTCONFIG_LIBRARIES=${sysroot}/usr/lib/${multiarch}/libfontconfig.so"
     ];
-    # A device binary: no nix store RPATH, interpreter or shebangs.
     dontPatchELF = true;
     dontPatchShebangs = true;
     postInstall = ''
@@ -194,29 +176,19 @@ let
     dontStrip = true;
   };
 
-  # PortMaster: the launcher script, the port folder and its metadata.
-  # Layout on device (under /roms/ports/):
-  #   Xanatoo.sh
-  #   xanatoo/xanatoo          binary
-  #   xanatoo/examples/…       sample documents (welcome, help, …)
-  #   xanatoo/icons/…          toolbar PNGs
-  #   xanatoo/fonts/…          DejaVuSans.ttf (no system fontconfig needed)
   portmaster = pkgs.stdenvNoCC.mkDerivation {
     pname = "xanatoo-r36s-portmaster";
     inherit version;
     dontUnpack = true;
-    dontPatchShebangs = true; # the launcher runs with the device's bash
+    dontPatchShebangs = true;
     dontFixup = true;
     installPhase = ''
       mkdir -p $out/xanatoo/examples $out/xanatoo/icons $out/xanatoo/fonts
       install -m755 ${r36s}/bin/xanatoo $out/xanatoo/xanatoo
-      # Examples next to the binary so find_repo_file / XANATOO_DATA_DIR resolve them
       cp -r ${../examples}/. $out/xanatoo/examples/
-      # Icons from the r36s build's share tree (rasterized at build time)
       if [ -d ${r36s}/share/xanatoo/icons ]; then
         cp -r ${r36s}/share/xanatoo/icons/. $out/xanatoo/icons/
       fi
-      # Bundled UI font (ArkOS fontconfig is sparse; avoid system lookups)
       cp ${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSans.ttf \
          $out/xanatoo/fonts/DejaVuSans.ttf
       cp ${../LICENSE} $out/xanatoo/LICENSE.txt

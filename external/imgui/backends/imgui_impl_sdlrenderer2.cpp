@@ -46,8 +46,13 @@
 
 // SDL
 #include <SDL.h>
+// xanatoo R36S / ArkOS: eoan ships SDL 2.0.10. Upstream ImGui requires
+// 2.0.17+ for SDL_RenderGeometry; use a software triangle path instead.
 #if !SDL_VERSION_ATLEAST(2,0,17)
-#error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
+#define IMGUI_SDL_RENDERER_LEGACY 1
+#endif
+#ifndef IMGUI_SDL_RENDERER_LEGACY
+#define IMGUI_SDL_RENDERER_LEGACY 0
 #endif
 
 // SDL_Renderer data
@@ -114,6 +119,103 @@ void ImGui_ImplSDLRenderer2_NewFrame()
     if (!bd->FontTexture)
         ImGui_ImplSDLRenderer2_CreateDeviceObjects();
 }
+
+
+#if IMGUI_SDL_RENDERER_LEGACY
+// Minimal textured-triangle path for SDL < 2.0.17 (no RenderGeometry).
+// Adequate for ImGui menus on low-res handhelds (R36S 640x480).
+static void ImGui_ImplSDLRenderer2_RenderGeometryLegacy(
+    SDL_Renderer* renderer, SDL_Texture* texture,
+    const float* xy, int xy_stride,
+    const int* color, int color_stride,
+    const float* uv, int uv_stride,
+    int /*num_vertices*/,
+    const void* indices, int num_indices, int size_indices)
+{
+    auto idx_at = [&](int i) -> unsigned int {
+        const char* base = (const char*)indices;
+        if (size_indices == 2)
+            return (unsigned int)(*(const ImU16*)(base + i * 2));
+        return *(const unsigned int*)(base + i * 4);
+    };
+    auto vert = [&](unsigned int i, float& x, float& y, float& u, float& v, int& col) {
+        const char* pxy = (const char*)xy + i * xy_stride;
+        const char* puv = (const char*)uv + i * uv_stride;
+        const char* pcol = (const char*)color + i * color_stride;
+        x = ((const float*)pxy)[0];
+        y = ((const float*)pxy)[1];
+        u = ((const float*)puv)[0];
+        v = ((const float*)puv)[1];
+        col = *(const int*)pcol;
+    };
+
+    int tw = 1, th = 1;
+    if (texture)
+        SDL_QueryTexture(texture, nullptr, nullptr, &tw, &th);
+
+    for (int i = 0; i + 2 < num_indices; i += 3)
+    {
+        float x0, y0, u0, v0, x1, y1, u1, v1, x2, y2, u2, v2;
+        int c0, c1, c2;
+        vert(idx_at(i + 0), x0, y0, u0, v0, c0);
+        vert(idx_at(i + 1), x1, y1, u1, v1, c1);
+        vert(idx_at(i + 2), x2, y2, u2, v2, c2);
+
+        // Axis-aligned bounds → single textured rect (ImGui UI is mostly quads).
+        float minx = x0 < x1 ? (x0 < x2 ? x0 : x2) : (x1 < x2 ? x1 : x2);
+        float maxx = x0 > x1 ? (x0 > x2 ? x0 : x2) : (x1 > x2 ? x1 : x2);
+        float miny = y0 < y1 ? (y0 < y2 ? y0 : y2) : (y1 < y2 ? y1 : y2);
+        float maxy = y0 > y1 ? (y0 > y2 ? y0 : y2) : (y1 > y2 ? y1 : y2);
+        float minu = u0 < u1 ? (u0 < u2 ? u0 : u2) : (u1 < u2 ? u1 : u2);
+        float maxu = u0 > u1 ? (u0 > u2 ? u0 : u2) : (u1 > u2 ? u1 : u2);
+        float minv = v0 < v1 ? (v0 < v2 ? v0 : v2) : (v1 < v2 ? v1 : v2);
+        float maxv = v0 > v1 ? (v0 > v2 ? v0 : v2) : (v1 > v2 ? v1 : v2);
+
+        const int a = (c0 >> 24) & 0xff;
+        const int r = (c0 >> 0) & 0xff;
+        const int g = (c0 >> 8) & 0xff;
+        const int b = (c0 >> 16) & 0xff;
+        SDL_SetRenderDrawColor(renderer, r, g, b, a);
+
+        if (texture && (maxu - minu) > 1e-6f && (maxv - minv) > 1e-6f)
+        {
+            SDL_Rect src;
+            src.x = (int)(minu * tw);
+            src.y = (int)(minv * th);
+            src.w = (int)((maxu - minu) * tw);
+            src.h = (int)((maxv - minv) * th);
+            if (src.w < 1) src.w = 1;
+            if (src.h < 1) src.h = 1;
+            SDL_Rect dst;
+            dst.x = (int)minx;
+            dst.y = (int)miny;
+            dst.w = (int)(maxx - minx);
+            dst.h = (int)(maxy - miny);
+            if (dst.w < 1) dst.w = 1;
+            if (dst.h < 1) dst.h = 1;
+            SDL_SetTextureColorMod(texture, r, g, b);
+            SDL_SetTextureAlphaMod(texture, a);
+            SDL_RenderCopy(renderer, texture, &src, &dst);
+        }
+        else
+        {
+            SDL_Rect dst;
+            dst.x = (int)minx;
+            dst.y = (int)miny;
+            dst.w = (int)(maxx - minx);
+            dst.h = (int)(maxy - miny);
+            if (dst.w < 1) dst.w = 1;
+            if (dst.h < 1) dst.h = 1;
+            SDL_RenderFillRect(renderer, &dst);
+        }
+    }
+    if (texture)
+    {
+        SDL_SetTextureColorMod(texture, 255, 255, 255);
+        SDL_SetTextureAlphaMod(texture, 255);
+    }
+}
+#endif
 
 void ImGui_ImplSDLRenderer2_RenderDrawData(ImDrawData* draw_data, SDL_Renderer* renderer)
 {
@@ -200,14 +302,24 @@ void ImGui_ImplSDLRenderer2_RenderDrawData(ImDrawData* draw_data, SDL_Renderer* 
                 const int* color = (const int*)(const void*)((const char*)(vtx_buffer + pcmd->VtxOffset) + offsetof(ImDrawVert, col)); // SDL 2.0.17 and 2.0.18
 #endif
 
-                // Bind texture, Draw
+                                // Bind texture, Draw
 				SDL_Texture* tex = (SDL_Texture*)pcmd->GetTexID();
+#if IMGUI_SDL_RENDERER_LEGACY
+                ImGui_ImplSDLRenderer2_RenderGeometryLegacy(renderer, tex,
+                    xy, (int)sizeof(ImDrawVert),
+                    color, (int)sizeof(ImDrawVert),
+                    uv, (int)sizeof(ImDrawVert),
+                    draw_list->VtxBuffer.Size - pcmd->VtxOffset,
+                    idx_buffer + pcmd->IdxOffset, pcmd->ElemCount, sizeof(ImDrawIdx));
+#else
                 SDL_RenderGeometryRaw(renderer, tex,
                     xy, (int)sizeof(ImDrawVert),
                     color, (int)sizeof(ImDrawVert),
                     uv, (int)sizeof(ImDrawVert),
                     draw_list->VtxBuffer.Size - pcmd->VtxOffset,
                     idx_buffer + pcmd->IdxOffset, pcmd->ElemCount, sizeof(ImDrawIdx));
+#endif
+
             }
         }
     }
@@ -231,7 +343,13 @@ bool ImGui_ImplSDLRenderer2_CreateFontsTexture()
 
     // Upload texture to graphics system
     // (Bilinear sampling is required by default. Set 'io.Fonts->Flags |= ImFontAtlasFlags_NoBakedLines' or 'style.AntiAliasedLinesUseTex = false' to allow point/nearest sampling)
-    bd->FontTexture = SDL_CreateTexture(bd->Renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, width, height);
+    bd->FontTexture = SDL_CreateTexture(bd->Renderer,
+#if defined(SDL_PIXELFORMAT_RGBA32)
+        SDL_PIXELFORMAT_RGBA32,
+#else
+        SDL_PIXELFORMAT_RGBA8888,
+#endif
+        SDL_TEXTUREACCESS_STATIC, width, height);
     if (bd->FontTexture == nullptr)
     {
         SDL_Log("error creating texture");
@@ -239,7 +357,9 @@ bool ImGui_ImplSDLRenderer2_CreateFontsTexture()
     }
     SDL_UpdateTexture(bd->FontTexture, nullptr, pixels, 4 * width);
     SDL_SetTextureBlendMode(bd->FontTexture, SDL_BLENDMODE_BLEND);
+#if SDL_VERSION_ATLEAST(2,0,12)
     SDL_SetTextureScaleMode(bd->FontTexture, SDL_ScaleModeLinear);
+#endif
 
     // Store our identifier
     io.Fonts->SetTexID((ImTextureID)(intptr_t)bd->FontTexture);
