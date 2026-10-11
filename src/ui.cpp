@@ -150,6 +150,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
       "strike", "cite", "h1", "h2", "h3", "para", "task", "table",
       "figure", "note", "replace", "outline", "paste", "copy", "new", "open",
       "zoomin", "zoomout", "structure", "diff",
+      "back", "forward", "reload", "bookmark", "history", "browse",
   };
 
   fs::path found_dir;
@@ -461,9 +462,6 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Open URL…", UiCommand::OpenUrlBar, cmd, true, "Ctrl+L");
       menu_item_cmd("New Tab", UiCommand::NewTab, cmd, true, "Ctrl+T");
       menu_item_cmd("Close Tab", UiCommand::CloseTab, cmd, true, "Ctrl+W");
-      menu_item_cmd("Back", UiCommand::NavBack, cmd, state.can_nav_back, "Alt+Left");
-      menu_item_cmd("Forward", UiCommand::NavForward, cmd, state.can_nav_forward,
-                    "Alt+Right");
       ImGui::Separator();
       menu_item_cmd("Pop Out to Window", UiCommand::PopOut, cmd, true,
                     "Ctrl+Shift+P");
@@ -531,6 +529,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     }
     force_menu("View");
     if (ImGui::BeginMenu("View")) {
+      menu_item_cmd("Back", UiCommand::NavBack, cmd, state.can_nav_back, "Alt+Left");
+      menu_item_cmd("Forward", UiCommand::NavForward, cmd, state.can_nav_forward,
+                    "Alt+Right");
+      ImGui::Separator();
       if (ImGui::MenuItem("Split Pane", "Ctrl+\\", state.split))
         cmd = UiCommand::ToggleSplit;
       if (ImGui::MenuItem("Heading Outline", "Ctrl+Shift+O", state.outline))
@@ -638,76 +640,127 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::EndMenu();
     }
 
-    // Interactive location / URL field (right side of the menu bar).
-    {
-      std::string want = state.doc_label.empty() ? "untitled" : state.doc_label;
-      float avail = ImGui::GetContentRegionAvail().x;
-      if (avail > 28.f) {
-        ImGui::SameLine(0.f, 12.f);
-        if (state.dirty) {
-          ImGui::TextDisabled("*");
-          ImGui::SameLine(0.f, 2.f);
-        }
-        float field_w = ImGui::GetContentRegionAvail().x - 8.f;
-        if (field_w < 80.f) field_w = 80.f;
-        ImGui::SetNextItemWidth(field_w);
-
-        if (focus_url_bar_) {
-          ImGui::SetKeyboardFocusHere();
-          std::snprintf(url_input_, sizeof(url_input_), "%s", want.c_str());
-          url_synced_from_ = want;
-          focus_url_bar_ = false;
-        } else if (want != url_synced_from_ && !url_bar_editing_) {
-          std::snprintf(url_input_, sizeof(url_input_), "%s", want.c_str());
-          url_synced_from_ = want;
-        }
-
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.95f, 0.95f, 0.97f, 1.f));
-        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,
-                              ImVec4(0.98f, 0.98f, 1.f, 1.f));
-        ImGui::PushStyleColor(ImGuiCol_FrameBgActive,
-                              ImVec4(1.f, 1.f, 1.f, 1.f));
-        bool enter = ImGui::InputText(
-            "##urlbar", url_input_, sizeof(url_input_),
-            ImGuiInputTextFlags_EnterReturnsTrue |
-                ImGuiInputTextFlags_AutoSelectAll);
-        ImGui::PopStyleColor(3);
-        url_bar_editing_ = ImGui::IsItemActive();
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-          ImGui::SetTooltip(
-              "Location — path or gemini:// URL · Enter to open · Ctrl+L focuses");
-        if (enter) {
-          result.cmd = UiCommand::NavigateUrl;
-          result.arg = url_input_;
-          url_synced_from_ = result.arg;
-          url_bar_editing_ = false;
-          ImGui::ClearActiveID();
-        }
-      }
-    }
-
     // Unmatched Alt+letter request (e.g. after menus reordered) — drop it.
     menu_request_.clear();
     result.top_reserved = ImGui::GetFrameHeight();
     ImGui::EndMainMenuBar();
   }
 
-  // ---- Toolbar under the menu (horizontal scroll when narrow) ----
-  const float toolbar_h = 36.f;
+  // ---- Two toolbars: browse (navigation) then edit ----
   ImGuiViewport* vp = ImGui::GetMainViewport();
-  ImGui::SetNextWindowPos(ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
-  ImGui::SetNextWindowSize(ImVec2(vp->Size.x, toolbar_h));
   ImGuiWindowFlags tb_flags =
       ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse |
       ImGuiWindowFlags_NoScrollWithMouse;
 
+  // -- Browse / navigation row (browser chrome) --
+  const float browse_h = 34.f;
+  ImGui::SetNextWindowPos(ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
+  ImGui::SetNextWindowSize(ImVec2(vp->Size.x, browse_h));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.f, 4.f));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.f);
-  if (ImGui::Begin("##toolbar", nullptr, tb_flags)) {
-    // Child fills the bar and scrolls horizontally when buttons overflow.
-    ImGui::BeginChild("##toolbar_scroll", ImVec2(0.f, 0.f), false,
+  if (ImGui::Begin("##toolbar_browse", nullptr, tb_flags)) {
+    tool_button("tb_back", "back", "Back (Alt+Left)", UiCommand::NavBack, cmd,
+                state.can_nav_back);
+    tool_button("tb_fwd", "forward", "Forward (Alt+Right)", UiCommand::NavForward,
+                cmd, state.can_nav_forward);
+    tool_button("tb_reload", "reload", "Reload (Ctrl+R)", UiCommand::Reload, cmd,
+                state.has_path);
+
+    ImGui::TextDisabled("|");
+    ImGui::SameLine(0.f, 4.f);
+
+    // Location / URL field (path or gemini://)
+    {
+      std::string want = state.doc_label.empty() ? "untitled" : state.doc_label;
+      if (state.dirty) {
+        ImGui::TextDisabled("*");
+        ImGui::SameLine(0.f, 2.f);
+      }
+      // Leave room for bookmark / history / browse buttons on the right.
+      float right_reserve = 168.f;
+      float field_w = ImGui::GetContentRegionAvail().x - right_reserve;
+      if (field_w < 100.f) field_w = 100.f;
+      ImGui::SetNextItemWidth(field_w);
+
+      if (focus_url_bar_) {
+        ImGui::SetKeyboardFocusHere();
+        std::snprintf(url_input_, sizeof(url_input_), "%s", want.c_str());
+        url_synced_from_ = want;
+        focus_url_bar_ = false;
+      } else if (want != url_synced_from_ && !url_bar_editing_) {
+        std::snprintf(url_input_, sizeof(url_input_), "%s", want.c_str());
+        url_synced_from_ = want;
+      }
+
+      ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.95f, 0.95f, 0.97f, 1.f));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,
+                            ImVec4(0.98f, 0.98f, 1.f, 1.f));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1.f, 1.f, 1.f, 1.f));
+      bool enter = ImGui::InputText(
+          "##urlbar", url_input_, sizeof(url_input_),
+          ImGuiInputTextFlags_EnterReturnsTrue |
+              ImGuiInputTextFlags_AutoSelectAll);
+      ImGui::PopStyleColor(3);
+      url_bar_editing_ = ImGui::IsItemActive();
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+        ImGui::SetTooltip(
+            "Location — path or gemini:// URL · Enter to open · Ctrl+L focuses");
+      if (enter) {
+        cmd = UiCommand::NavigateUrl;
+        result.arg = url_input_;
+        url_synced_from_ = result.arg;
+        url_bar_editing_ = false;
+        ImGui::ClearActiveID();
+      }
+      ImGui::SameLine(0.f, 6.f);
+    }
+
+    {
+      const char* bm_tip =
+          state.current_bookmarked ? "Remove bookmark (Ctrl+Shift+B)"
+                                   : "Bookmark this page (Ctrl+Shift+B)";
+      tool_button("tb_bookmark", "bookmark", bm_tip,
+                  state.current_bookmarked ? UiCommand::RemoveBookmark
+                                           : UiCommand::AddBookmark,
+                  cmd, state.has_path || !state.doc_label.empty());
+    }
+    {
+      if (state.history_open) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                              ImVec4(0.4f, 0.5f, 0.75f, 1.f));
+      }
+      tool_button("tb_history", "history", "Session history (Ctrl+Shift+H)",
+                  UiCommand::ToggleHistory, cmd);
+      if (state.history_open) ImGui::PopStyleColor(2);
+    }
+    {
+      if (state.browse) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.55f, 0.4f, 1.f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                              ImVec4(0.35f, 0.6f, 0.45f, 1.f));
+      }
+      tool_button("tb_browse", "browse",
+                  state.browse ? "Browse mode on — F2 to edit"
+                               : "Browse mode (read-only, F2)",
+                  UiCommand::ToggleBrowse, cmd);
+      if (state.browse) ImGui::PopStyleColor(2);
+    }
+  }
+  ImGui::End();
+  ImGui::PopStyleVar(2);
+  result.top_reserved += browse_h;
+
+  // -- Edit row (document formatting tools) --
+  const float edit_h = 36.f;
+  ImGui::SetNextWindowPos(ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
+  ImGui::SetNextWindowSize(ImVec2(vp->Size.x, edit_h));
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.f, 4.f));
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.f);
+  if (ImGui::Begin("##toolbar_edit", nullptr, tb_flags)) {
+    ImGui::BeginChild("##toolbar_edit_scroll", ImVec2(0.f, 0.f), false,
                       ImGuiWindowFlags_HorizontalScrollbar);
     tool_button("tb_new", "new", "New document (Ctrl+N)", UiCommand::NewDocument,
                 cmd);
@@ -806,7 +859,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   ImGui::End();
   ImGui::PopStyleVar(2);
 
-  result.top_reserved += toolbar_h;
+  result.top_reserved += edit_h;
 
   // ---- Document tab strip (browser-style) ----
   if (!state.tab_labels.empty()) {

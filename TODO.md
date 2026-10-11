@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **155** (this delivery is **154**)
+Next bundle number: **156** (this delivery is **155**)
 
 ## Status (2026-10-11)
 
@@ -253,6 +253,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Initial layout uses real window size (was stuck at 920 until resize)
 - [x] Fix endless relayout when window size reports 0; column width clamp; tags copy
 - [x] Diff uses pane buffers; navigate switches existing tab; Next/Prev tab title
+- [x] Split browse/edit toolbars; Back/Forward/URL on browse row
 
 ## Open work / next steps
 
@@ -458,4 +459,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-151.*-large-doc-perf-…` — large-doc performance
 - `xanatoo-152.*-initial-layout-size-…` — initial layout width
 - `xanatoo-153.*-layout-loop-guard-…` — layout loop guard
-- `xanatoo-154.*-diff-nav-tabs-…` — this delivery
+- `xanatoo-154.*-diff-nav-tabs-…` — diff/nav/tabs
+- `xanatoo-155.*-browse-edit-toolbars-…` — this delivery

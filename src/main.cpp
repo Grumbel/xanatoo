@@ -500,6 +500,11 @@ int main(int argc, char** argv) {
     nav_hist_pos = static_cast<int>(nav_history.size()) - 1;
   };
 
+  // Seed session history with documents opened on the command line.
+  for (const auto& b : buffers) {
+    if (!b.path.empty()) push_nav_history(b.path);
+  }
+
   auto is_bookmarked = [&](const std::string& url) -> bool {
     if (url.empty()) return false;
     return std::find(bookmarks.begin(), bookmarks.end(), url) != bookmarks.end();
