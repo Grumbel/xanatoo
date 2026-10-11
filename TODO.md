@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **169** (this delivery is **168**)
+Next bundle number: **170** (this delivery is **169**)
 
 ## Status (2026-10-11)
 
@@ -268,6 +268,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Gamepad: connect hint, Y=history forward, browse-mode status hints; ImGui NavEnableGamepad
 - [x] On-screen virtual keyboard (F3 / Guide / View menu)
 - [x] Right-stick software cursor (A/B click) for R36S
+- [x] Stick cursor always on with pad; accel; LB+A caret; disconnect cleanup
 - [x] --fullscreen + R36S launcher uses it
 
 ## Open work / next steps
@@ -488,4 +489,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-165.*-r36s-polish-notes-…` — polish notes
 - `xanatoo-166.*-ui-scale-gamepad-…` — UI scale / gamepad
 - `xanatoo-167.*-virtual-keyboard-…` — virtual keyboard
-- `xanatoo-168.*-stick-cursor-…` — this delivery
+- `xanatoo-168.*-stick-cursor-…` — stick cursor
+- `xanatoo-169.*-stick-cursor-polish-…` — this delivery

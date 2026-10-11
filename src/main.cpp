@@ -409,6 +409,7 @@ int main(int argc, char** argv) {
     }
   };
   open_first_gamepad();
+  if (gamepad) stick_cursor_on = true;
   // Hovered interactive element (status bar, tooltip, highlight, cursor)
   std::string hovered_href;
   std::string hovered_rel;      // typed :rel when present
@@ -2797,8 +2798,29 @@ int main(int argc, char** argv) {
               ev.cdevice.which ==
                   SDL_JoystickInstanceID(
                       SDL_GameControllerGetJoystick(gamepad))) {
+            if (stick_lmb || stick_rmb) {
+              SDL_Event me{};
+              me.type = SDL_MOUSEBUTTONUP;
+              me.button.state = SDL_RELEASED;
+              me.button.clicks = 1;
+              me.button.x = static_cast<Sint32>(stick_cx);
+              me.button.y = static_cast<Sint32>(stick_cy);
+              me.button.windowID = SDL_GetWindowID(window);
+              if (stick_lmb) {
+                me.button.button = SDL_BUTTON_LEFT;
+                SDL_PushEvent(&me);
+                stick_lmb = false;
+              }
+              if (stick_rmb) {
+                me.button.button = SDL_BUTTON_RIGHT;
+                SDL_PushEvent(&me);
+                stick_rmb = false;
+              }
+            }
             SDL_GameControllerClose(gamepad);
             gamepad = nullptr;
+            stick_cursor_on = false;
+            stick_cursor_init = false;
           }
           break;
         case SDL_CONTROLLERBUTTONDOWN: {
@@ -2818,8 +2840,12 @@ int main(int argc, char** argv) {
               if (!toggle_stretch_at_caret()) nav_move_block(false);
               break;
             case SDL_CONTROLLER_BUTTON_A: {
-              // Prefer pointer click when stick cursor is active (menus + hits).
-              if (stick_cursor_on) {
+              // With a pad, A is left-click at the stick pointer (menus + hits).
+              // Hold LB to fall back to caret activate (stretch / link under caret).
+              const bool lb = SDL_GameControllerGetButton(
+                  gamepad, SDL_CONTROLLER_BUTTON_LEFTSHOULDER) != 0;
+              if (!lb) {
+                stick_cursor_on = true;
                 stick_lmb = true;
                 SDL_Event me{};
                 me.type = SDL_MOUSEBUTTONDOWN;
@@ -2836,7 +2862,11 @@ int main(int argc, char** argv) {
               break;
             }
             case SDL_CONTROLLER_BUTTON_B: {
-              if (stick_cursor_on) {
+              // Right-click at pointer; LB+B = collapse stretch under caret.
+              const bool lb = SDL_GameControllerGetButton(
+                  gamepad, SDL_CONTROLLER_BUTTON_LEFTSHOULDER) != 0;
+              if (!lb) {
+                stick_cursor_on = true;
                 stick_rmb = true;
                 SDL_Event me{};
                 me.type = SDL_MOUSEBUTTONDOWN;
@@ -2848,7 +2878,6 @@ int main(int argc, char** argv) {
                 me.button.windowID = SDL_GetWindowID(window);
                 SDL_PushEvent(&me);
               } else {
-                // Collapse current stretch, else collapse all
                 if (!toggle_stretch_at_caret()) collapse_or_expand_all(false);
               }
               break;
@@ -4635,11 +4664,20 @@ int main(int argc, char** argv) {
           stick_cy = static_cast<float>(win_h) * 0.5f;
           stick_cursor_init = true;
         }
+        // Always show the pointer while a controller is connected.
+        stick_cursor_on = true;
         float rx = axis_e(SDL_CONTROLLER_AXIS_RIGHTX);
         float ry = axis_e(SDL_CONTROLLER_AXIS_RIGHTY);
         if (rx != 0.f || ry != 0.f) {
-          stick_cursor_on = true;
-          const float speed = 9.f + 0.012f * static_cast<float>(win_w);
+          // Non-linear response: fine aim near centre, faster at full tilt.
+          auto curve = [](float v) {
+            float s = (v < 0.f) ? -1.f : 1.f;
+            float a = std::fabs(v);
+            return s * a * a;  // quadratic
+          };
+          rx = curve(rx);
+          ry = curve(ry);
+          const float speed = 11.f + 0.014f * static_cast<float>(win_w);
           stick_cx += rx * speed;
           stick_cy += ry * speed;
           if (stick_cx < 0.f) stick_cx = 0.f;
@@ -4650,8 +4688,26 @@ int main(int argc, char** argv) {
             stick_cy = static_cast<float>(win_h - 1);
           mouse_x = stick_cx;
           mouse_y = stick_cy;
-          SDL_WarpMouseInWindow(window, static_cast<int>(stick_cx),
-                                static_cast<int>(stick_cy));
+          const int ix = static_cast<int>(stick_cx);
+          const int iy = static_cast<int>(stick_cy);
+          static int last_ix = -1, last_iy = -1;
+          SDL_WarpMouseInWindow(window, ix, iy);
+          if (ix != last_ix || iy != last_iy) {
+            last_ix = ix;
+            last_iy = iy;
+            // Drive hover highlighting in the document path.
+            SDL_Event me{};
+            me.type = SDL_MOUSEMOTION;
+            me.motion.x = ix;
+            me.motion.y = iy;
+            me.motion.xrel = 0;
+            me.motion.yrel = 0;
+            me.motion.windowID = SDL_GetWindowID(window);
+            me.motion.state = SDL_GetMouseState(nullptr, nullptr);
+            if (stick_lmb) me.motion.state |= SDL_BUTTON(SDL_BUTTON_LEFT);
+            if (stick_rmb) me.motion.state |= SDL_BUTTON(SDL_BUTTON_RIGHT);
+            SDL_PushEvent(&me);
+          }
         }
       }
       ui_state.stick_cursor = stick_cursor_on;
@@ -6428,8 +6484,8 @@ int main(int argc, char** argv) {
         tr = 30; tg = 80; tb = 170;
       } else if (browse_mode) {
         label = gamepad
-                    ? "Browse · D-pad move · A open · B collapse · "
-                      "Back hist · Y forward · Start help · F2 edit"
+                    ? "Browse · R-stick pointer · A click · LB+A caret · "
+                      "D-pad nav · L-stick scroll · Start help · F2 edit"
                     : "Browse mode — arrows move · Enter open · F2 edit · F1 help";
         tr = 50; tg = 90; tb = 70;
       } else {
