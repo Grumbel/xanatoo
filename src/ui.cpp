@@ -364,6 +364,10 @@ void Ui::release_input_capture() {
   GImGui->NavDisableHighlight = true;
 }
 
+void Ui::request_menu(const char* name) {
+  if (name && name[0]) menu_request_ = name;
+}
+
 void Ui::open_context_menu(float x, float y) {
   context_open_ = true;
   context_x_ = x;
@@ -434,6 +438,16 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
 
   // ---- Main menu bar ----
   if (ImGui::BeginMainMenuBar()) {
+    // Alt+letter: OpenPopup must run inside the menu-bar window so IDs match
+    // BeginMenu()'s GetID(label). Consume the request this frame.
+    auto force_menu = [&](const char* name) {
+      if (menu_request_ == name) {
+        ImGui::OpenPopup(name);
+        menu_request_.clear();
+      }
+    };
+
+    force_menu("File");
     if (ImGui::BeginMenu("File")) {
       menu_item_cmd("New", UiCommand::NewDocument, cmd, true, "Ctrl+N");
       menu_item_cmd("Open…", UiCommand::OpenDocument, cmd, true, "Ctrl+O");
@@ -450,6 +464,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Quit", UiCommand::Quit, cmd, true, "Ctrl+Q");
       ImGui::EndMenu();
     }
+    force_menu("Edit");
     if (ImGui::BeginMenu("Edit")) {
       menu_item_cmd("Undo", UiCommand::Undo, cmd, true, "Ctrl+Z");
       menu_item_cmd("Redo", UiCommand::Redo, cmd, true, "Ctrl+Y");
@@ -472,6 +487,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                     "Ctrl+Shift+Enter");
       ImGui::EndMenu();
     }
+    force_menu("Format");
     if (ImGui::BeginMenu("Format")) {
       menu_item_cmd("Bold", UiCommand::Bold, cmd, state.selection, "Ctrl+B");
       menu_item_cmd("Italic", UiCommand::Italic, cmd, state.selection, "Ctrl+I");
@@ -488,10 +504,12 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       }
       ImGui::EndMenu();
     }
+    force_menu("Insert");
     if (ImGui::BeginMenu("Insert")) {
       menu_insert_items(cmd);
       ImGui::EndMenu();
     }
+    force_menu("View");
     if (ImGui::BeginMenu("View")) {
       if (ImGui::MenuItem("Split Pane", "Ctrl+\\", state.split))
         cmd = UiCommand::ToggleSplit;
@@ -510,6 +528,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Open path in window…", UiCommand::OpenInWindow, cmd);
       ImGui::EndMenu();
     }
+    force_menu("Help");
     if (ImGui::BeginMenu("Help")) {
       if (ImGui::MenuItem("Keyboard Reference", "F1", state.help))
         cmd = UiCommand::ToggleHelp;
@@ -531,6 +550,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       }
     }
 
+    // Unmatched Alt+letter request (e.g. after menus reordered) — drop it.
+    menu_request_.clear();
     result.top_reserved = ImGui::GetFrameHeight();
     ImGui::EndMainMenuBar();
   }

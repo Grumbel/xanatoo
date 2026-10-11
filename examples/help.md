@@ -17,6 +17,7 @@ Jump to: [Files](#Files) · [Edit](#Edit) · [Navigate](#Navigate) · [View](#Vi
 - **Ctrl+R** / **Ctrl+Shift+R** — Reload / force reload
 - **Ctrl+Q** — Quit (warns if unsaved; repeat to exit)
 - **Ctrl+W** — Close top soft window / help / outline
+- **Alt+F / E / O / I / V / H** — File / Edit / Format / Insert / View / Help menu
 - **Middle-click** — Paste at caret
 - **Drag .md / .sexp** — Open in a software window
 

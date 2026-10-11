@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **118** (this delivery is **117**)
+Next bundle number: **119** (this delivery is **118**)
 
 ## Status (2026-10-11)
 
@@ -208,6 +208,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Status bar ignored during mouse motion (non-drag) and image drops
 - [x] Open dirty-confirm status message; Ctrl+W closes soft window/help/outline
 - [x] Consistent status_bar_h instead of magic 28 for layout/hit tests
+- [x] Alt+F/E/O/I/V/H opens File/Edit/Format/Insert/View/Help menus
 
 ## Open work / next steps
 
@@ -374,4 +375,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-114.*-menus-paste-…` — menus, prompt paste, middle-click
 - `xanatoo-115.*-dirty-status-…` — dirty New/Open/Quit notices
 - `xanatoo-116.*-status-focus-…` — status hits, ImGui release, help
-- `xanatoo-117.*-ctrlw-statusbar-…` — this delivery
+- `xanatoo-117.*-ctrlw-statusbar-…` — Ctrl+W, status bar routing
+- `xanatoo-118.*-alt-menus-…` — this delivery

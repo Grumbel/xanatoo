@@ -1901,8 +1901,29 @@ int main(int argc, char** argv) {
         case SDL_KEYDOWN: {
           bool shift = (ev.key.keysym.mod & KMOD_SHIFT) != 0;
           bool ctrl = (ev.key.keysym.mod & KMOD_CTRL) != 0;
+          bool alt = (ev.key.keysym.mod & KMOD_ALT) != 0;
           Pane& p = F();
           xanatoo::Document& d = doc_of(p);
+
+          // Alt+letter opens the matching top-level menu (Windows/GNOME style).
+          // Handled before status-prompt isolation so chrome stays reachable.
+          if (alt && !ctrl && !shift) {
+            const SDL_Keycode k = ev.key.keysym.sym;
+            const char* menu = nullptr;
+            switch (k) {
+              case SDLK_f: menu = "File"; break;
+              case SDLK_e: menu = "Edit"; break;
+              case SDLK_o: menu = "Format"; break;  // classic "fOrmat"
+              case SDLK_i: menu = "Insert"; break;
+              case SDLK_v: menu = "View"; break;
+              case SDLK_h: menu = "Help"; break;
+              default: break;
+            }
+            if (menu) {
+              ui.request_menu(menu);
+              break;
+            }
+          }
 
           // Status prompts own Esc / Backspace / Enter; block document keys so
           // arrows do not move the caret while typing a path or query.

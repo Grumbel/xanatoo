@@ -128,6 +128,9 @@ public:
   // keystroke goes to the document instead of the chrome.
   void release_input_capture();
 
+  // Open a top-level menu by name ("File", "Edit", …) for Alt+letter mnemonics.
+  void request_menu(const char* name);
+
   // Request a context menu at window coordinates (call from main on right-click).
   void open_context_menu(float x, float y);
 
@@ -156,6 +159,9 @@ private:
   bool context_open_ = false;
   float context_x_ = 0.f;
   float context_y_ = 0.f;
+
+  // Pending Alt+letter menu to open on the next begin_frame().
+  std::string menu_request_;
 };
 
 }  // namespace xanatoo
