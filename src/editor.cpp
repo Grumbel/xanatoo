@@ -1023,6 +1023,27 @@ bool set_heading_level(Document& doc, Caret& caret, int level) {
   return true;
 }
 
+bool toggle_task_item(Document& doc, Caret& caret) {
+  if (caret.node == INVALID_NODE) return false;
+  Node& n = doc.get(caret.node);
+  if (n.kind == NodeKind::ListItem) {
+    if (n.label == "task") {
+      n.label = "task-done";
+    } else if (n.label == "task-done") {
+      n.label.clear();
+    } else {
+      // Ordered items stay numbered; clear number-only identity via label.
+      n.label = "task";
+    }
+    return true;
+  }
+  // Promote paragraph-like text to an unordered task item.
+  if (!toggle_list(doc, caret, false)) return false;
+  Node& item = doc.get(caret.node);
+  if (item.kind == NodeKind::ListItem) item.label = "task";
+  return true;
+}
+
 bool toggle_list(Document& doc, Caret& caret, bool ordered) {
   if (caret.node == INVALID_NODE) return false;
   Node& n = doc.get(caret.node);
@@ -1950,7 +1971,8 @@ bool move_to_document_end(Document& doc, Caret& caret) {
 void ensure_valid_caret(Document& doc, Caret& caret) {
   if (caret.node != INVALID_NODE) {
     const Node& n = doc.get(caret.node);
-    if (is_text_node_kind(n.kind)) {
+    // Reject free/deleted slots and non-text kinds
+    if (n.id == caret.node && is_text_node_kind(n.kind)) {
       if (n.spans.empty()) {
         caret.span_index = 0;
         caret.char_index = 0;
@@ -1969,9 +1991,16 @@ void ensure_valid_caret(Document& doc, Caret& caret) {
     caret.node = nodes.front();
     caret.span_index = 0;
     caret.char_index = 0;
-  } else {
-    caret = {};
+    return;
   }
+  // Empty document: seed a paragraph so typing can resume.
+  if (doc.root == INVALID_NODE) {
+    doc.root = doc.create(NodeKind::Document);
+  }
+  NodeId para = doc.create(NodeKind::Paragraph, doc.root);
+  caret.node = para;
+  caret.span_index = 0;
+  caret.char_index = 0;
 }
 
 

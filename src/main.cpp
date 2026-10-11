@@ -1743,6 +1743,7 @@ int main(int argc, char** argv) {
           if (!p.sel.empty()) {
             xanatoo::delete_selection(td, p.sel);
           }
+          xanatoo::ensure_valid_caret(td, p.sel.focus);
           xanatoo::insert_text(td, p.sel.focus, ev.text.text);
           p.sel.anchor = p.sel.focus;
           needs_layout = true;
@@ -2724,6 +2725,18 @@ int main(int argc, char** argv) {
               }
               break;
 
+            case SDLK_t:
+              // Ctrl+Shift+T — cycle task item state
+              if (ctrl && shift) {
+                edit();
+                if (xanatoo::toggle_task_item(d, p.sel.focus)) {
+                  p.sel.anchor = p.sel.focus;
+                  needs_layout = true;
+                  reset_blink();
+                }
+              }
+              break;
+
             case SDLK_b:
               if (ctrl && !p.sel.empty()) {
                 edit();
@@ -3245,6 +3258,10 @@ int main(int argc, char** argv) {
         case C::ToggleOrderedList:
           edit();
           if (xanatoo::toggle_list(d, p.sel.focus, true)) needs_layout = true;
+          break;
+        case C::ToggleTask:
+          edit();
+          if (xanatoo::toggle_task_item(d, p.sel.focus)) needs_layout = true;
           break;
         case C::ToggleBlockQuote: {
           edit();

@@ -367,6 +367,7 @@ static void menu_structure_items(const UiState& state, UiCommand& cmd) {
                 "Ctrl+Shift+8");
   menu_item_cmd("Ordered List", UiCommand::ToggleOrderedList, cmd, true,
                 "Ctrl+Shift+7");
+  menu_item_cmd("Task Item", UiCommand::ToggleTask, cmd, true, "Ctrl+Shift+T");
   menu_item_cmd("Block Quote", UiCommand::ToggleBlockQuote, cmd);
   menu_item_cmd("Indent List Item", UiCommand::IndentList, cmd,
                 state.on_list_item, "Tab");

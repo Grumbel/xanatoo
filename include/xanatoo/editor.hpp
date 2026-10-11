@@ -146,6 +146,9 @@ bool set_heading_level(Document& doc, Caret& caret, int level);
 // - ListItem → unwrap to Paragraph (list dropped if emptied)
 // `ordered` selects ul vs ol when creating a list.
 bool toggle_list(Document& doc, Caret& caret, bool ordered);
+// Cycle GFM task state on a ListItem: none → task → task-done → none.
+// Non-list items become an unordered list item marked as a task.
+bool toggle_task_item(Document& doc, Caret& caret);
 
 // Nest the current ListItem under the previous sibling (Tab).
 bool indent_list_item(Document& doc, Caret& caret);

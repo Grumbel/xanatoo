@@ -56,6 +56,7 @@ enum class UiCommand {
   // Structure / lists
   ToggleUnorderedList,
   ToggleOrderedList,
+  ToggleTask,
   ToggleBlockQuote,
   IndentList,
   OutdentList,
