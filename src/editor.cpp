@@ -757,6 +757,28 @@ std::optional<NodeId> insert_deflist(Document& doc, Caret& caret) {
   return list;
 }
 
+std::optional<NodeId> insert_columns(Document& doc, Caret& caret, int n) {
+  if (n < 2) n = 2;
+  if (n > 6) n = 6;
+  auto cols_id = insert_sibling_after(doc, caret, NodeKind::Columns);
+  if (!cols_id) return std::nullopt;
+  NodeId cols = *cols_id;
+  NodeId first_para = INVALID_NODE;
+  for (int i = 0; i < n; ++i) {
+    NodeId col = doc.create(NodeKind::Column, cols);
+    doc.get(col).display_scale = 1.f;
+    NodeId para = doc.create(NodeKind::Paragraph, col);
+    doc.append_text(para, "");
+    if (i == 0) first_para = para;
+  }
+  if (first_para != INVALID_NODE) {
+    caret.node = first_para;
+    caret.span_index = 0;
+    caret.char_index = 0;
+  }
+  return cols;
+}
+
 std::optional<NodeId> insert_biblio_entry(Document& doc, Caret& caret,
                                          const std::string& key) {
   // Prefer appending to an existing Biblio; otherwise create one after the

@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **090** (this delivery is **089**)
+Next bundle number: **091** (this delivery is **090**)
 
 ## Status (2026-10-11)
 
@@ -150,6 +150,9 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Typed link `:rel` — edit via `href rel=name`, hover shows relation
 - [x] `hit_test_link_ex` returns kind/rel/node for richer status UI
 - [x] Table column weights (`display_scale` / `:weight`) + draggable separators
+- [x] GUI: context menu (right-click), expanded Format/View menus
+- [x] GUI: structure highlight mode (Ctrl+Shift+L / View / toolbar)
+- [x] GUI: stretch wrap/summary, list indent, columns, select block reachable via menu
 
 ## Open work / next steps
 
@@ -288,4 +291,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-086.*-word-diff-table-tab-…` — word diff + table Tab
 - `xanatoo-087.*-cite-biblio-…` — citation + biblio insert
 - `xanatoo-088.*-link-rel-…` — typed link :rel
-- `xanatoo-089.*-table-weights-…` — this delivery
+- `xanatoo-089.*-table-weights-…` — table column weights
+- `xanatoo-090.*-gui-structure-…` — this delivery

@@ -294,6 +294,8 @@ int main(int argc, char** argv) {
   bool diff_mode = false;
   std::vector<xanatoo::NodeId> diff_marks[2];
   std::vector<xanatoo::DiffWordMark> diff_words[2];
+  // Colour-code layout boxes by NodeKind (logical structure overlay)
+  bool structure_mode = false;
   // Hovered link href (shown in status bar when not in a modal mode)
   std::string hovered_href;
   std::string hovered_rel;      // typed :rel when present
@@ -1213,6 +1215,23 @@ int main(int argc, char** argv) {
               }
               p.preferred_x = lx;
               reset_blink();
+            }
+          } else if (ev.button.button == SDL_BUTTON_RIGHT) {
+            // Document context menu (ImGui popup).
+            if (!imgui_mouse) {
+              float mx = static_cast<float>(ev.button.x);
+              float my = content_y(static_cast<float>(ev.button.y));
+              focus = pane_at(mx);
+              Pane& p = F();
+              float lx = local_x(mx, focus);
+              // Place caret under the click so structure/insert actions
+              // apply to the right block.
+              if (auto hit = xanatoo::hit_test(p.layout, lx, my, p.scroll_y)) {
+                p.sel.focus = *hit;
+                if (!(SDL_GetModState() & KMOD_SHIFT)) p.sel.anchor = p.sel.focus;
+              }
+              ui.open_context_menu(static_cast<float>(ev.button.x),
+                                   static_cast<float>(ev.button.y));
             }
           }
           break;
@@ -2437,6 +2456,14 @@ int main(int argc, char** argv) {
               }
               break;
 
+            case SDLK_l:
+              if (ctrl && shift) {
+                structure_mode = !structure_mode;
+                std::cout << (structure_mode ? "Structure highlight on\n"
+                                             : "Structure highlight off\n");
+              }
+              break;
+
             case SDLK_8:
               // Ctrl+Shift+8 — toggle unordered list (common editor binding)
               if (ctrl && shift) {
@@ -2631,8 +2658,19 @@ int main(int argc, char** argv) {
       ui_state.split = split;
       ui_state.outline = outline_mode;
       ui_state.diff = diff_mode;
+      ui_state.structure = structure_mode;
       ui_state.help = help_mode;
       ui_state.selection = !F().sel.empty();
+      {
+        auto& fd = doc_of(F());
+        auto nid = F().sel.focus.node;
+        ui_state.on_list_item =
+            nid != xanatoo::INVALID_NODE &&
+            fd.get(nid).kind == xanatoo::NodeKind::ListItem;
+        ui_state.in_stretch =
+            nid != xanatoo::INVALID_NODE &&
+            xanatoo::enclosing_stretch(fd, nid) != xanatoo::INVALID_NODE;
+      }
       ui_state.doc_label = path_of(F()).empty() ? std::string("untitled")
                                                 : path_of(F());
       auto ui_frame = ui.begin_frame(ui_state);
@@ -2738,8 +2776,11 @@ int main(int argc, char** argv) {
           }
           break;
         case C::SelectAll:
-          xanatoo::move_to_document_start(d, p.sel.anchor);
-          xanatoo::move_to_document_end(d, p.sel.focus);
+          xanatoo::select_all(d, p.sel);
+          break;
+        case C::SelectBlock:
+          if (p.sel.focus.node != xanatoo::INVALID_NODE)
+            xanatoo::select_node(d, p.sel, p.sel.focus.node);
           break;
         case C::Find:
           search_mode = true;
@@ -2871,6 +2912,13 @@ int main(int argc, char** argv) {
             needs_layout = true;
           }
           break;
+        case C::InsertColumns:
+          edit();
+          if (xanatoo::insert_columns(d, p.sel.focus, 2)) {
+            p.sel.anchor = p.sel.focus;
+            needs_layout = true;
+          }
+          break;
         case C::InsertImage:
           image_insert_mode = true;
           image_insert_path.clear();
@@ -2898,6 +2946,41 @@ int main(int argc, char** argv) {
           needs_layout = true;
           break;
         }
+        case C::IndentList:
+          edit();
+          if (xanatoo::indent_list_item(d, p.sel.focus)) {
+            p.sel.anchor = p.sel.focus;
+            needs_layout = true;
+          }
+          break;
+        case C::OutdentList:
+          edit();
+          if (xanatoo::outdent_list_item(d, p.sel.focus)) {
+            p.sel.anchor = p.sel.focus;
+            needs_layout = true;
+          }
+          break;
+        case C::WrapStretch: {
+          edit();
+          std::string summary = xanatoo::selected_text(d, p.sel);
+          if (xanatoo::wrap_block_in_stretch(d, p.sel.focus.node, summary)) {
+            needs_layout = true;
+          }
+          break;
+        }
+        case C::EditStretchSummary: {
+          xanatoo::NodeId sid =
+              xanatoo::enclosing_stretch(d, p.sel.focus.node);
+          if (sid != xanatoo::INVALID_NODE) {
+            summary_edit_mode = true;
+            summary_edit_node = sid;
+            summary_edit_text = d.get(sid).summary;
+            search_mode = false;
+            save_as_mode = false;
+            link_edit_mode = false;
+          }
+          break;
+        }
         case C::ToggleSplit:
           split = !split;
           needs_layout = true;
@@ -2913,6 +2996,9 @@ int main(int argc, char** argv) {
         case C::ToggleDiff:
           diff_mode = !diff_mode;
           refresh_diff();
+          break;
+        case C::ToggleStructure:
+          structure_mode = !structure_mode;
           break;
         case C::ToggleHelp:
           help_mode = !help_mode;
@@ -2988,6 +3074,70 @@ int main(int argc, char** argv) {
       }
 
       renderer.draw(pane.layout, draw_scroll, ox);
+
+      // Logical structure overlay: colour bars + wash by NodeKind
+      if (structure_mode) {
+        SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+        const auto& ddoc = docs[pane.doc_index];
+        for (const auto& box : pane.layout.boxes) {
+          if (box.node == xanatoo::INVALID_NODE) continue;
+          const auto kind = ddoc.get(box.node).kind;
+          // Skip pure container shells that span the whole doc
+          if (kind == xanatoo::NodeKind::Document) continue;
+          uint8_t r = 120, g = 120, b = 130, a_bar = 200, a_wash = 28;
+          switch (kind) {
+            case xanatoo::NodeKind::Heading:
+              r = 40; g = 90; b = 180; a_wash = 36; break;
+            case xanatoo::NodeKind::Paragraph:
+              r = 100; g = 110; b = 120; a_wash = 18; break;
+            case xanatoo::NodeKind::List:
+            case xanatoo::NodeKind::ListItem:
+              r = 50; g = 140; b = 90; break;
+            case xanatoo::NodeKind::BlockQuote:
+              r = 140; g = 155; b = 180; break;
+            case xanatoo::NodeKind::Note:
+              r = 200; g = 140; b = 40; break;
+            case xanatoo::NodeKind::CodeBlock:
+              r = 160; g = 100; b = 50; a_wash = 40; break;
+            case xanatoo::NodeKind::Table:
+            case xanatoo::NodeKind::TableRow:
+            case xanatoo::NodeKind::TableCell:
+              r = 80; g = 120; b = 160; break;
+            case xanatoo::NodeKind::DefList:
+            case xanatoo::NodeKind::Term:
+            case xanatoo::NodeKind::Definition:
+              r = 120; g = 80; b = 160; break;
+            case xanatoo::NodeKind::Stretch:
+              r = 180; g = 80; b = 120; break;
+            case xanatoo::NodeKind::Columns:
+            case xanatoo::NodeKind::Column:
+              r = 70; g = 130; b = 150; break;
+            case xanatoo::NodeKind::Image:
+            case xanatoo::NodeKind::Figure:
+            case xanatoo::NodeKind::Caption:
+              r = 150; g = 70; b = 100; break;
+            case xanatoo::NodeKind::Biblio:
+            case xanatoo::NodeKind::BiblioEntry:
+              r = 90; g = 50; b = 140; break;
+            case xanatoo::NodeKind::HorizontalRule:
+              r = 160; g = 160; b = 160; break;
+            case xanatoo::NodeKind::Transclude:
+              r = 180; g = 120; b = 40; break;
+            default:
+              break;
+          }
+          int by = static_cast<int>(box.y - pane.scroll_y + ui_top);
+          int bh = static_cast<int>(box.height);
+          if (by + bh < clip_y || by > win_h - 28) continue;
+          SDL_SetRenderDrawColor(sdl, r, g, b, a_bar);
+          SDL_Rect mark{pane.x + 1, by, 5, bh};
+          SDL_RenderFillRect(sdl, &mark);
+          SDL_SetRenderDrawColor(sdl, r, g, b, a_wash);
+          SDL_Rect wash{pane.x + 6, by, pane.w - 14, bh};
+          SDL_RenderFillRect(sdl, &wash);
+        }
+        SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+      }
 
       if (i == focus) {
         auto cpos = xanatoo::caret_screen_pos(
@@ -3281,6 +3431,9 @@ int main(int argc, char** argv) {
       } else if (diff_mode) {
         label = "Diff marks on — orange bars mark passages that differ · Ctrl+Shift+D toggles";
         tr = 160; tg = 90; tb = 30;
+      } else if (structure_mode) {
+        label = "Structure highlight — colour bars by block kind · Ctrl+Shift+L toggles · right-click for menu";
+        tr = 40; tg = 80; tb = 140;
       } else if (outline_mode) {
         label = "Outline — ↑/↓ select · Enter jump · 1-9 quick jump · Esc close";
         tr = 40; tg = 90; tb = 160;

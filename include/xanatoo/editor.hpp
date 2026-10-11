@@ -112,6 +112,8 @@ std::optional<NodeId> insert_sibling_after(Document& doc, Caret& caret,
 // Semantic structure helpers (table / deflist skeletons).
 std::optional<NodeId> insert_table(Document& doc, Caret& caret);
 std::optional<NodeId> insert_deflist(Document& doc, Caret& caret);
+// Two-column Columns block with an empty paragraph in each column.
+std::optional<NodeId> insert_columns(Document& doc, Caret& caret, int n = 2);
 // Insert a bibliography entry (creates a Biblio container if needed).
 // `key` becomes the entry label (cite target); body is placeholder text.
 std::optional<NodeId> insert_biblio_entry(Document& doc, Caret& caret,

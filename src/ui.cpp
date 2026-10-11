@@ -332,6 +332,12 @@ bool Ui::want_capture_mouse() const {
   return ImGui::GetIO().WantCaptureMouse;
 }
 
+void Ui::open_context_menu(float x, float y) {
+  context_open_ = true;
+  context_x_ = x;
+  context_y_ = y;
+}
+
 static bool menu_item_cmd(const char* label, UiCommand c, UiCommand& out,
                           bool enabled = true, const char* shortcut = nullptr) {
   if (ImGui::MenuItem(label, shortcut, false, enabled)) {
@@ -339,6 +345,35 @@ static bool menu_item_cmd(const char* label, UiCommand c, UiCommand& out,
     return true;
   }
   return false;
+}
+
+// Shared insert/format items used by Format menu and context menu.
+static void menu_insert_items(UiCommand& cmd) {
+  menu_item_cmd("Paragraph", UiCommand::InsertParagraph, cmd);
+  menu_item_cmd("Horizontal Rule", UiCommand::InsertHr, cmd);
+  menu_item_cmd("Image…", UiCommand::InsertImage, cmd, true, "Ctrl+Shift+I");
+  menu_item_cmd("Note", UiCommand::InsertNote, cmd);
+  menu_item_cmd("Code Block", UiCommand::InsertCodeBlock, cmd);
+  menu_item_cmd("Table", UiCommand::InsertTable, cmd);
+  menu_item_cmd("Definition List", UiCommand::InsertDefList, cmd);
+  menu_item_cmd("Bibliography Entry", UiCommand::InsertBiblioEntry, cmd);
+  menu_item_cmd("Columns (2)", UiCommand::InsertColumns, cmd);
+}
+
+static void menu_structure_items(const UiState& state, UiCommand& cmd) {
+  menu_item_cmd("Unordered List", UiCommand::ToggleUnorderedList, cmd, true,
+                "Ctrl+Shift+8");
+  menu_item_cmd("Ordered List", UiCommand::ToggleOrderedList, cmd, true,
+                "Ctrl+Shift+7");
+  menu_item_cmd("Block Quote", UiCommand::ToggleBlockQuote, cmd);
+  menu_item_cmd("Indent List Item", UiCommand::IndentList, cmd,
+                state.on_list_item, "Tab");
+  menu_item_cmd("Outdent List Item", UiCommand::OutdentList, cmd,
+                state.on_list_item, "Shift+Tab");
+  ImGui::Separator();
+  menu_item_cmd("Wrap in Stretch", UiCommand::WrapStretch, cmd, true, "Ctrl+E");
+  menu_item_cmd("Edit Stretch Summary…", UiCommand::EditStretchSummary, cmd,
+                state.in_stretch, "Ctrl+Shift+E");
 }
 
 UiFrameResult Ui::begin_frame(const UiState& state) {
@@ -373,6 +408,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Cut", UiCommand::Cut, cmd, state.selection, "Ctrl+X");
       menu_item_cmd("Copy", UiCommand::Copy, cmd, state.selection, "Ctrl+C");
       menu_item_cmd("Paste", UiCommand::Paste, cmd, true, "Ctrl+V");
+      menu_item_cmd("Select Block", UiCommand::SelectBlock, cmd, true, "Ctrl+A");
       menu_item_cmd("Select All", UiCommand::SelectAll, cmd, true, "Ctrl+Shift+A");
       ImGui::Separator();
       menu_item_cmd("Find…", UiCommand::Find, cmd, true, "Ctrl+F");
@@ -387,20 +423,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Citation…", UiCommand::Cite, cmd, state.selection,
                     "Ctrl+Shift+C");
       ImGui::Separator();
-      menu_item_cmd("Paragraph", UiCommand::InsertParagraph, cmd);
-      menu_item_cmd("Horizontal Rule", UiCommand::InsertHr, cmd);
-      menu_item_cmd("Image…", UiCommand::InsertImage, cmd, true, "Ctrl+Shift+I");
-      menu_item_cmd("Note", UiCommand::InsertNote, cmd);
-      menu_item_cmd("Code Block", UiCommand::InsertCodeBlock, cmd);
-      menu_item_cmd("Table", UiCommand::InsertTable, cmd);
-      menu_item_cmd("Definition List", UiCommand::InsertDefList, cmd);
-      menu_item_cmd("Bibliography Entry", UiCommand::InsertBiblioEntry, cmd);
+      menu_insert_items(cmd);
       ImGui::Separator();
-      menu_item_cmd("Unordered List", UiCommand::ToggleUnorderedList, cmd, true,
-                    "Ctrl+Shift+8");
-      menu_item_cmd("Ordered List", UiCommand::ToggleOrderedList, cmd, true,
-                    "Ctrl+Shift+7");
-      menu_item_cmd("Block Quote", UiCommand::ToggleBlockQuote, cmd);
+      menu_structure_items(state, cmd);
       ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("View")) {
@@ -410,6 +435,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleOutline;
       if (ImGui::MenuItem("Diff Marks", "Ctrl+Shift+D", state.diff))
         cmd = UiCommand::ToggleDiff;
+      if (ImGui::MenuItem("Structure Highlight", "Ctrl+Shift+L", state.structure))
+        cmd = UiCommand::ToggleStructure;
       ImGui::Separator();
       menu_item_cmd("Zoom In", UiCommand::ZoomIn, cmd, true, "Ctrl++");
       menu_item_cmd("Zoom Out", UiCommand::ZoomOut, cmd, true, "Ctrl+-");
@@ -488,12 +515,61 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     tool_button("tb_split", "split", "Split pane (Ctrl+\\)", UiCommand::ToggleSplit,
                 cmd);
     tool_button("tb_find", "find", "Find (Ctrl+F)", UiCommand::Find, cmd);
+    // Structure highlight toggle — label fallback if no icon
+    {
+      bool pressed = false;
+      if (state.structure) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                              ImVec4(0.4f, 0.5f, 0.75f, 1.f));
+      }
+      if (ImGui::Button("Struct##tb_struct")) pressed = true;
+      if (state.structure) ImGui::PopStyleColor(2);
+      if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Structure highlight (Ctrl+Shift+L)");
+      if (pressed) cmd = UiCommand::ToggleStructure;
+      ImGui::SameLine(0.f, 4.f);
+    }
     tool_button("tb_help", "help", "Help (F1)", UiCommand::ToggleHelp, cmd);
   }
   ImGui::End();
   ImGui::PopStyleVar(2);
 
   result.top_reserved += toolbar_h;
+
+  // ---- Context menu (right-click in document) ----
+  if (context_open_) {
+    ImGui::SetNextWindowPos(ImVec2(context_x_, context_y_), ImGuiCond_Appearing);
+    ImGui::OpenPopup("##doc_context");
+    context_open_ = false;
+  }
+  if (ImGui::BeginPopup("##doc_context")) {
+    menu_item_cmd("Cut", UiCommand::Cut, cmd, state.selection, "Ctrl+X");
+    menu_item_cmd("Copy", UiCommand::Copy, cmd, state.selection, "Ctrl+C");
+    menu_item_cmd("Paste", UiCommand::Paste, cmd, true, "Ctrl+V");
+    ImGui::Separator();
+    menu_item_cmd("Bold", UiCommand::Bold, cmd, state.selection, "Ctrl+B");
+    menu_item_cmd("Italic", UiCommand::Italic, cmd, state.selection, "Ctrl+I");
+    menu_item_cmd("Code", UiCommand::Code, cmd, state.selection, "Ctrl+`");
+    menu_item_cmd("Link…", UiCommand::Link, cmd, state.selection, "Ctrl+K");
+    menu_item_cmd("Citation…", UiCommand::Cite, cmd, state.selection,
+                  "Ctrl+Shift+C");
+    ImGui::Separator();
+    if (ImGui::BeginMenu("Insert")) {
+      menu_insert_items(cmd);
+      ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("Structure")) {
+      menu_structure_items(state, cmd);
+      ImGui::EndMenu();
+    }
+    ImGui::Separator();
+    menu_item_cmd("Select Block", UiCommand::SelectBlock, cmd, true, "Ctrl+A");
+    if (ImGui::MenuItem("Structure Highlight", "Ctrl+Shift+L", state.structure))
+      cmd = UiCommand::ToggleStructure;
+    ImGui::EndPopup();
+  }
+
   result.cmd = cmd;
   return result;
 }

@@ -8,7 +8,8 @@
 
 namespace xanatoo {
 
-// Commands requested by the ImGui menu / toolbar. Applied by the main loop.
+// Commands requested by the ImGui menu / toolbar / context menu.
+// Applied by the main loop.
 enum class UiCommand {
   None = 0,
   // File
@@ -26,14 +27,16 @@ enum class UiCommand {
   Copy,
   Paste,
   SelectAll,
+  SelectBlock,
   Find,
   Replace,
-  // Format
+  // Format / inline
   Bold,
   Italic,
   Code,
   Link,
   Cite,
+  // Insert blocks
   InsertParagraph,
   InsertHr,
   InsertImage,
@@ -42,13 +45,20 @@ enum class UiCommand {
   InsertTable,
   InsertDefList,
   InsertBiblioEntry,
+  InsertColumns,
+  // Structure / lists
   ToggleUnorderedList,
   ToggleOrderedList,
   ToggleBlockQuote,
+  IndentList,
+  OutdentList,
+  WrapStretch,
+  EditStretchSummary,
   // View
   ToggleSplit,
   ToggleOutline,
   ToggleDiff,
+  ToggleStructure,
   ToggleHelp,
   OpenInWindow,
   OpenFormatDoc,
@@ -63,8 +73,13 @@ struct UiState {
   bool split = false;
   bool outline = false;
   bool diff = false;
+  bool structure = false;
   bool help = false;
   bool selection = false;
+  // True when caret is on a ListItem (enables indent/outdent menu items).
+  bool on_list_item = false;
+  // True when caret is inside a Stretch (enables edit summary).
+  bool in_stretch = false;
   std::string status_left;
   std::string doc_label;
 };
@@ -91,6 +106,9 @@ public:
   bool want_capture_keyboard() const;
   bool want_capture_mouse() const;
 
+  // Request a context menu at window coordinates (call from main on right-click).
+  void open_context_menu(float x, float y);
+
   UiFrameResult begin_frame(const UiState& state);
   void end_frame(SDL_Renderer* renderer);
 
@@ -106,13 +124,16 @@ private:
   void apply_classic_theme();
   void load_icons(SDL_Renderer* renderer);
   const Icon* icon(const char* name) const;
-  // Toolbar button: icon (if loaded) + optional label; returns true if clicked.
   bool tool_button(const char* id, const char* icon_name, const char* tip,
                    UiCommand c, UiCommand& out, bool enabled = true);
 
   bool ready_ = false;
   SDL_Renderer* renderer_ = nullptr;
   std::unordered_map<std::string, Icon> icons_;
+
+  bool context_open_ = false;
+  float context_x_ = 0.f;
+  float context_y_ = 0.f;
 };
 
 }  // namespace xanatoo
