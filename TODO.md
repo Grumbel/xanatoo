@@ -6,12 +6,12 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **201** (this delivery is **200**)
+Next bundle number: **202** (this delivery is **201**)
 
 ## Status (2026-10-11)
 
-Reddit 403 hardening: HTTP/1.1, host fallbacks, optional OAuth env credentials, clearer errors.
-Welcome demo links already on origin (199 prior).
+Compile fix for reddit.cpp (OAuth access_token parse + children literal).
+Reddit 403 hardening + optional OAuth already in prior tip.
 
 Reddit read-only via public `.json` HTTPS API (listings + post/comments → Thread/Message).
 Nostr Message body fix already on origin (197).
@@ -532,4 +532,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-197.*-nostr-message-body-…` — on origin (Message body as child Paragraph; real reply-to only)
 - `xanatoo-198.*-reddit-json-…` — prior (Reddit .json listings/posts)
 - `xanatoo-199.*-reddit-welcome-warn-…` — on origin (welcome links + unused-var warning)
-- `xanatoo-200.*-reddit-403-oauth-…` — this delivery (403 hardening + optional OAuth)
+- `xanatoo-200.*-reddit-403-oauth-…` — prior (403 hardening + optional OAuth)
+- `xanatoo-201.*-fix-reddit-compile-…` — this delivery (oauth parse + children literal)
