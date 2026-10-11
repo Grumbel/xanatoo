@@ -5,7 +5,8 @@
 
 Native aarch64 build linked against an ArkOS-era (Ubuntu 19.10) userland.
 Uses the device's SDL2 (KMS/DRM). Example documents, toolbar icons, and a
-DejaVu font ship inside the port folder.
+UI/body font ship inside the port folder. The gamepad pointer is a drawn
+sprite (not the system cursor — KMS/DRM has none).
 
 ## Install
 
@@ -19,15 +20,18 @@ zip into `ports/PortMaster/autoinstall/` and start PortMaster once.
 /roms/ports/xanatoo/xanatoo          # binary
 /roms/ports/xanatoo/examples/        # welcome.md, help.md, …
 /roms/ports/xanatoo/icons/           # toolbar PNGs
-/roms/ports/xanatoo/fonts/           # DejaVuSans.ttf
+/roms/ports/xanatoo/fonts/           # DejaVuSans.ttf (or Noto/Roboto if added)
 /roms/ports/xanatoo/conf/            # created at runtime (bookmarks, …)
 ```
+
+Override UI face with `XANATOO_UI_FONT=/path/to.ttf` or scale with
+`XANATOO_UI_SCALE` (default 1.5 on the launcher).
 
 ## Controls
 
 | Input | Action |
 |-------|--------|
-| Right stick | Software mouse cursor |
+| Right stick | Drawn software mouse cursor (sprite) |
 | A / South | Left click at cursor |
 | B / East | Right click at cursor |
 | D-pad | Move caret / navigate |
