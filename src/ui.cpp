@@ -825,18 +825,23 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                              ImGuiTabBarFlags_FittingPolicyScroll |
                                  ImGuiTabBarFlags_Reorderable)) {
         for (int i = 0; i < static_cast<int>(state.tab_labels.size()); ++i) {
-          const bool selected = (i == state.active_tab);
-          ImGuiTabItemFlags flags = selected ? ImGuiTabItemFlags_SetSelected : 0;
+          const bool was_active = (i == state.active_tab);
+          ImGuiTabItemFlags flags =
+              was_active ? ImGuiTabItemFlags_SetSelected : 0;
           bool open = true;
-          if (ImGui::BeginTabItem(state.tab_labels[static_cast<size_t>(i)].c_str(),
-                                  &open, flags)) {
-            if (ImGui::IsItemClicked() && !selected) {
+          // Unique id: label alone can collide ("untitled" twice).
+          std::string id = state.tab_labels[static_cast<size_t>(i)];
+          id += "###tab";
+          id += std::to_string(i);
+          if (ImGui::BeginTabItem(id.c_str(), &open, flags)) {
+            // BeginTabItem is true for the selected tab; notify if user changed it.
+            if (!was_active && cmd == UiCommand::None) {
               cmd = UiCommand::SelectTab;
               result.arg = std::to_string(i);
             }
             ImGui::EndTabItem();
           }
-          if (!open) {
+          if (!open && cmd == UiCommand::None) {
             cmd = UiCommand::CloseTab;
             result.arg = std::to_string(i);
           }

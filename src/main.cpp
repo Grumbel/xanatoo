@@ -456,9 +456,14 @@ int main(int argc, char** argv) {
   auto mark_dirty = [&]() {
     int di = F().buf;
     discard_armed = false;  // new edits require a fresh discard warning
-    if (!buffers[static_cast<size_t>(di)].dirty) {
-      buffers[static_cast<size_t>(di)].dirty = true;
-      update_title();
+    if (di >= 0 && di < static_cast<int>(buffers.size())) {
+      if (!buffers[static_cast<size_t>(di)].dirty) {
+        buffers[static_cast<size_t>(di)].dirty = true;
+        update_title();
+      }
+      // Soft windows sharing this buffer must re-layout.
+      for (auto& sw : soft_wins)
+        if (sw.buf == di) sw.needs_layout = true;
     }
   };
   auto flash_status = [&](const std::string& msg) {
@@ -515,8 +520,14 @@ int main(int argc, char** argv) {
       flash_status("Bookmark removed (could not persist to disk)");
   };
 
+  auto any_dirty = [&]() -> bool {
+    for (const auto& b : buffers)
+      if (b.dirty) return true;
+    return false;
+  };
+
   auto allow_discard_dirty = [&](int di) -> bool {
-    if (di < 0 || di > 1) di = 0;
+    if (di < 0 || di >= static_cast<int>(buffers.size())) return true;
     if (!buffers[static_cast<size_t>(di)].dirty) return true;
     if (discard_armed) {
       discard_armed = false;
@@ -546,6 +557,13 @@ int main(int argc, char** argv) {
       panes[0].w = win_w;
       panes[1].x = 0;
       panes[1].w = 0;
+    }
+    // Clamp pane buffer indices if tabs were closed out from under them.
+    for (int pi = 0; pi < 2; ++pi) {
+      if (panes[pi].buf < 0 ||
+          panes[pi].buf >= static_cast<int>(buffers.size())) {
+        panes[pi].buf = tab_order.empty() ? 0 : tab_order.front();
+      }
     }
     panes[0].layout = layout_engine.layout(
         doc_of(panes[0]), static_cast<float>(panes[0].w), base_of(panes[0]));
@@ -785,6 +803,11 @@ int main(int argc, char** argv) {
         panes[1 - focus].sel = p.sel;
         panes[1 - focus].scroll_y = 0.f;
       }
+      for (auto& sw : soft_wins)
+        if (sw.buf == p.buf) {
+          sw.needs_layout = true;
+          sw.scroll = 0.f;
+        }
       needs_layout = true;
       update_title();
     };
@@ -1038,9 +1061,21 @@ int main(int argc, char** argv) {
   };
 
   auto soft_doc = [&](SoftWindow& sw) -> xanatoo::Document& {
+    if (buffers.empty()) {
+      DocBuffer empty;
+      empty.doc = xanatoo::parse_document(xanatoo::fallback_document(), {});
+      buffers.push_back(std::move(empty));
+      tab_order.push_back(0);
+    }
+    if (sw.buf < 0 || sw.buf >= static_cast<int>(buffers.size()))
+      return buffers[0].doc;
     return buffers[static_cast<size_t>(sw.buf)].doc;
   };
   auto soft_path = [&](const SoftWindow& sw) -> const std::string& {
+    if (sw.buf < 0 || sw.buf >= static_cast<int>(buffers.size())) {
+      static const std::string empty;
+      return empty;
+    }
     return buffers[static_cast<size_t>(sw.buf)].path;
   };
   auto soft_title = [&](const SoftWindow& sw) -> std::string {
@@ -1056,7 +1091,8 @@ int main(int argc, char** argv) {
 
   auto layout_soft = [&](SoftWindow& sw) {
     float mw = static_cast<float>(std::max(120, sw.w - help_pad * 2));
-    sw.layout = layout_engine.layout(soft_doc(sw), mw);
+    std::string base = parent_dir(soft_path(sw));
+    sw.layout = layout_engine.layout(soft_doc(sw), mw, base);
     sw.needs_layout = false;
   };
 
@@ -2957,7 +2993,7 @@ int main(int argc, char** argv) {
                 needs_layout = true;
                 reset_blink();
               } else if (ctrl) {
-                if ((buffers[0].dirty || (buffers.size() > 1 ? buffers[1].dirty : false)) && !discard_armed) {
+                if (any_dirty() && !discard_armed) {
                   discard_armed = true;
                   flash_status(
                       "Unsaved changes — Ctrl+S to save, or Ctrl+Q again to quit");
@@ -3083,6 +3119,22 @@ int main(int argc, char** argv) {
                 replace_focus = !replace_focus;
                 break;
               }
+              // Ctrl+Tab / Ctrl+Shift+Tab — cycle document tabs
+              if (ctrl && !tab_order.empty()) {
+                auto& p = F();
+                int cur = 0;
+                for (int ti = 0; ti < static_cast<int>(tab_order.size()); ++ti)
+                  if (tab_order[static_cast<size_t>(ti)] == p.buf) {
+                    cur = ti;
+                    break;
+                  }
+                int n = static_cast<int>(tab_order.size());
+                cur = shift ? (cur - 1 + n) % n : (cur + 1) % n;
+                p.buf = tab_order[static_cast<size_t>(cur)];
+                needs_layout = true;
+                update_title();
+                break;
+              }
               // Tab / Shift+Tab: nest or promote list items; move table cells
               {
                 auto& d = doc_of(F());
@@ -3121,9 +3173,8 @@ int main(int argc, char** argv) {
               if (ctrl) {
                 split = !split;
                 if (split) {
-                  if (shared_doc()) {
-                    panes[1].buf = 0;
-                  }
+                  // Second pane starts on the same buffer as the first.
+                  panes[1].buf = panes[0].buf;
                   panes[1].sel = panes[0].sel;
                   panes[1].scroll_y = panes[0].scroll_y;
                 } else {
@@ -3388,30 +3439,47 @@ int main(int argc, char** argv) {
                   if (!fs::exists(path)) {
                     flash_status("Open: file not found");
                     std::cerr << "Open: file not found: " << path << "\n";
-                  } else if (!allow_discard_dirty(p.buf)) {
-                    // keep open_file_mode so a second Enter discards and opens
-                    flash_status(
-                        "Unsaved changes — Enter again to discard and open");
-                    break;
                   } else {
-                    buffers[static_cast<size_t>(p.buf)].doc = load_doc(path);
-                    path_of(p) = path;
-                    buffers[static_cast<size_t>(p.buf)].dirty = false;
-                    xanatoo::ensure_valid_caret(buffers[static_cast<size_t>(p.buf)].doc, p.sel.focus);
-                    p.sel.anchor = p.sel.focus;
-                    p.scroll_y = 0.f;
-                    buffers[static_cast<size_t>(p.buf)].history.reset(buffers[static_cast<size_t>(p.buf)].doc, p.sel);
-                    if (panes[0].buf == panes[1].buf) {
-                      panes[1 - focus].sel = p.sel;
-                      panes[1 - focus].scroll_y = 0.f;
+                    int existing = find_buffer(path);
+                    if (existing >= 0) {
+                      // Already open — switch the focused pane to that tab.
+                      p.buf = existing;
+                      needs_layout = true;
+                      update_title();
+                      push_nav_history(path);
+                      flash_status("Switched to " + path);
+                      open_file_mode = false;
+                      open_file_buf.clear();
+                    } else if (!allow_discard_dirty(p.buf)) {
+                      flash_status(
+                          "Unsaved changes — Enter again to discard and open");
+                      break;
+                    } else {
+                      buffers[static_cast<size_t>(p.buf)].doc = load_doc(path);
+                      path_of(p) = path;
+                      buffers[static_cast<size_t>(p.buf)].dirty = false;
+                      xanatoo::ensure_valid_caret(
+                          buffers[static_cast<size_t>(p.buf)].doc, p.sel.focus);
+                      p.sel.anchor = p.sel.focus;
+                      p.scroll_y = 0.f;
+                      buffers[static_cast<size_t>(p.buf)].history.reset(
+                          buffers[static_cast<size_t>(p.buf)].doc, p.sel);
+                      if (panes[0].buf == panes[1].buf) {
+                        panes[1 - focus].sel = p.sel;
+                        panes[1 - focus].scroll_y = 0.f;
+                      }
+                      // Ensure path is on the tab strip
+                      if (std::find(tab_order.begin(), tab_order.end(),
+                                    p.buf) == tab_order.end())
+                        tab_order.push_back(p.buf);
+                      needs_layout = true;
+                      update_title();
+                      push_nav_history(path);
+                      flash_status("Opened " + path);
+                      std::cout << "Opened: " << path << "\n";
+                      open_file_mode = false;
+                      open_file_buf.clear();
                     }
-                    needs_layout = true;
-                    update_title();
-                    push_nav_history(path);
-                    flash_status("Opened " + path);
-                    std::cout << "Opened: " << path << "\n";
-                    open_file_mode = false;
-                    open_file_buf.clear();
                   }
                 } else {
                   open_file_mode = false;
@@ -4072,38 +4140,6 @@ int main(int argc, char** argv) {
               }
               break;
 
-            case SDLK_TAB:
-              if (ctrl) {
-                if (shift) {
-                  // Prev tab
-                  if (!tab_order.empty()) {
-                    int cur = 0;
-                    for (int ti = 0; ti < static_cast<int>(tab_order.size()); ++ti)
-                      if (tab_order[static_cast<size_t>(ti)] == p.buf) {
-                        cur = ti;
-                        break;
-                      }
-                    cur = (cur - 1 + static_cast<int>(tab_order.size())) %
-                          static_cast<int>(tab_order.size());
-                    p.buf = tab_order[static_cast<size_t>(cur)];
-                    needs_layout = true;
-                  }
-                } else {
-                  if (!tab_order.empty()) {
-                    int cur = 0;
-                    for (int ti = 0; ti < static_cast<int>(tab_order.size()); ++ti)
-                      if (tab_order[static_cast<size_t>(ti)] == p.buf) {
-                        cur = ti;
-                        break;
-                      }
-                    cur = (cur + 1) % static_cast<int>(tab_order.size());
-                    p.buf = tab_order[static_cast<size_t>(cur)];
-                    needs_layout = true;
-                  }
-                }
-              }
-              break;
-
             case SDLK_p:
               if (ctrl && shift) {
                 pop_out_focused();
@@ -4388,7 +4424,7 @@ int main(int argc, char** argv) {
 
       switch (ui_frame.cmd) {
         case C::Quit: {
-          if ((buffers[0].dirty || (buffers.size() > 1 ? buffers[1].dirty : false)) && !discard_armed) {
+          if (any_dirty() && !discard_armed) {
             discard_armed = true;
             flash_status(
                 "Unsaved changes — Ctrl+S to save, or Quit again to exit");
@@ -4648,10 +4684,18 @@ int main(int argc, char** argv) {
           break;
         }
         case C::Undo:
-          if (buffers[static_cast<size_t>(p.buf)].history.undo(d, p.sel)) needs_layout = true;
+          if (buffers[static_cast<size_t>(p.buf)].history.undo(d, p.sel)) {
+            needs_layout = true;
+            for (auto& sw : soft_wins)
+              if (sw.buf == p.buf) sw.needs_layout = true;
+          }
           break;
         case C::Redo:
-          if (buffers[static_cast<size_t>(p.buf)].history.redo(d, p.sel)) needs_layout = true;
+          if (buffers[static_cast<size_t>(p.buf)].history.redo(d, p.sel)) {
+            needs_layout = true;
+            for (auto& sw : soft_wins)
+              if (sw.buf == p.buf) sw.needs_layout = true;
+          }
           break;
         case C::Cut: {
           std::string text = xanatoo::selected_text(d, p.sel);
@@ -5123,7 +5167,7 @@ int main(int argc, char** argv) {
           break;
         }
         case C::LoadDiffDemo: {
-          if ((buffers[0].dirty || (buffers.size() > 1 ? buffers[1].dirty : false)) && !discard_armed) {
+          if (any_dirty() && !discard_armed) {
             discard_armed = true;
             flash_status(
                 "Unsaved changes — save first, or repeat Diff demo to discard");
@@ -6300,9 +6344,12 @@ int main(int argc, char** argv) {
       SDL_RenderDrawLine(sdl, sw.x, sw.y + help_title_h, sw.x + sw.w,
                          sw.y + help_title_h);
       SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
-      renderer.draw_text(body_font, static_cast<float>(sw.x + 10),
-                         static_cast<float>(sw.y + 6 + body_font.ascender()),
-                         soft_title(sw).c_str(), 40, 55, 35);
+      {
+        const std::string stitle = soft_title(sw);
+        renderer.draw_text(body_font, static_cast<float>(sw.x + 10),
+                           static_cast<float>(sw.y + 6 + body_font.ascender()),
+                           stitle.c_str(), 40, 55, 35);
+      }
       renderer.draw_text(body_font, static_cast<float>(sw.x + sw.w - 22),
                          static_cast<float>(sw.y + 6 + body_font.ascender()),
                          "×", 80, 40, 40);
