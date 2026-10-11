@@ -577,10 +577,33 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
     case NodeKind::TableCell: {
       float start_y = y;
-      FontRole role =
-          (node.level > 0) ? FontRole::BodyBold : FontRole::Body;
-      layout_paragraph(doc, node, x, y, max_width, out, role);
-      y += 4.f;
+      // Nested block cells: when the cell has block children, lay those out
+      // instead of (or after) the cell's own inline spans.
+      bool has_blocks = false;
+      for (NodeId c : node.children) {
+        const NodeKind ck = doc.get(c).kind;
+        if (ck != NodeKind::Document && ck != NodeKind::Column) {
+          has_blocks = true;
+          break;
+        }
+      }
+      if (has_blocks) {
+        // Optional leading inlines become a synthetic first paragraph area
+        if (!node.spans.empty()) {
+          FontRole role =
+              (node.level > 0) ? FontRole::BodyBold : FontRole::Body;
+          layout_paragraph(doc, node, x, y, max_width, out, role);
+          y += 2.f;
+        }
+        for (NodeId c : node.children)
+          layout_node(doc, c, x, y, max_width, out);
+        y += 2.f;
+      } else {
+        FontRole role =
+            (node.level > 0) ? FontRole::BodyBold : FontRole::Body;
+        layout_paragraph(doc, node, x, y, max_width, out, role);
+        y += 4.f;
+      }
       if (node.level > 0) {
         // Header fill covers the laid-out cell content area.
         out.table_header_fills.push_back(

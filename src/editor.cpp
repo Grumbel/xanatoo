@@ -679,6 +679,49 @@ std::optional<NodeId> insert_sibling_after(Document& doc, Caret& caret,
     return std::nullopt;
   }
 
+  // Nested table cells: inserting a block while the caret is on a TableCell
+  // (or inside a pure-inline cell) appends a child block rather than a
+  // sibling cell, which would skew the grid.
+  const bool blockish =
+      kind == NodeKind::Paragraph || kind == NodeKind::Heading ||
+      kind == NodeKind::BlockQuote || kind == NodeKind::Note ||
+      kind == NodeKind::CodeBlock || kind == NodeKind::List ||
+      kind == NodeKind::HorizontalRule;
+  NodeId cell_host = INVALID_NODE;
+  if (blockish && bn.kind == NodeKind::TableCell) {
+    cell_host = block;
+  } else if (blockish && bn.parent != INVALID_NODE &&
+             doc.get(bn.parent).kind == NodeKind::TableCell) {
+    // Already nested — normal sibling under the cell is fine (falls through).
+  }
+  if (cell_host != INVALID_NODE) {
+    Node& cell = doc.get(cell_host);
+    // Promote existing inlines into a paragraph so they are not lost.
+    if (!cell.spans.empty() && cell.children.empty()) {
+      NodeId para = doc.create(NodeKind::Paragraph, cell_host);
+      doc.get(para).spans = std::move(cell.spans);
+      cell.spans.clear();
+    }
+    NodeId nid = doc.create(kind, cell_host);
+    Node& nn = doc.get(nid);
+    if (kind == NodeKind::Heading) nn.level = 1;
+    if (kind == NodeKind::HorizontalRule) {
+      NodeId para = doc.create(NodeKind::Paragraph, cell_host);
+      caret.node = para;
+      caret.span_index = 0;
+      caret.char_index = 0;
+      return nid;
+    }
+    if (kind == NodeKind::Paragraph || kind == NodeKind::Heading ||
+        kind == NodeKind::BlockQuote || kind == NodeKind::Note ||
+        kind == NodeKind::CodeBlock) {
+      caret.node = nid;
+      caret.span_index = 0;
+      caret.char_index = 0;
+    }
+    return nid;
+  }
+
   NodeId nid = doc.create(kind, INVALID_NODE);
   Node& nn = doc.get(nid);
   nn.kind = kind;

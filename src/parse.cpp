@@ -1631,7 +1631,27 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
     while (i + 1 < e.kids.size() && e.kids[i].kind == SExpr::Kind::Atom &&
            !e.kids[i].text.empty() && e.kids[i].text[0] == ':')
       i += 2;
-    fill_inlines(doc.get(n), e.kids, i);
+    // Mixed content: nested block forms become children; atoms/strings are
+    // inlines. Prefer children when any List is present so nested
+    // paragraphs/lists/code blocks round-trip.
+    size_t first_list = e.kids.size();
+    for (size_t j = i; j < e.kids.size(); ++j) {
+      if (e.kids[j].kind == SExpr::Kind::List) {
+        first_list = j;
+        break;
+      }
+    }
+    if (first_list < e.kids.size()) {
+      if (first_list > i) {
+        std::vector<SExpr> prefix(
+            e.kids.begin() + static_cast<std::ptrdiff_t>(i),
+            e.kids.begin() + static_cast<std::ptrdiff_t>(first_list));
+        fill_inlines(doc.get(n), prefix, 0);
+      }
+      parse_sexpr_children(doc, n, e.kids, first_list);
+    } else {
+      fill_inlines(doc.get(n), e.kids, i);
+    }
     return;
   }
 
@@ -2059,7 +2079,13 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
         out += " :weight ";
         out += format_sexpr_float(node.display_scale);
       }
-      serialize_sexpr_inlines(node, out);
+      if (!node.children.empty()) {
+        // Nested block cell: optional residual inlines then children
+        serialize_sexpr_inlines(node, out);
+        serialize_sexpr_children(doc, node, out, indent + 2);
+      } else {
+        serialize_sexpr_inlines(node, out);
+      }
       out += ")";
       break;
     }

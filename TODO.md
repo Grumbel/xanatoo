@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **092** (this delivery is **091**)
+Next bundle number: **093** (this delivery is **092**)
 
 ## Status (2026-10-11)
 
@@ -154,6 +154,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] GUI: structure highlight mode (Ctrl+Shift+L / View / toolbar)
 - [x] GUI: stretch wrap/summary, list indent, columns, select block reachable via menu
 - [x] Soft-window tile zones (left/right/top/bottom + maximize) with drag preview
+- [x] Nested block content in table cells (layout + sexpr + insert-into-cell)
 
 ## Open work / next steps
 
@@ -161,7 +162,7 @@ LCS structural diff marks; cross-document `:::include`.
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Editable transclusion mirror (edits on embed write through to source)
 4. Word-level / intra-block diff highlighting (basic pairing in)
-5. **Tables** — grid + column weights in; nested block cells still open
+5. **Tables** — grid + column weights + nested block cells in (markdown nested still limited)
 6. **Docking** — edge snap + maximize + tile zones in
 7. **Citations** / typed link relations / range transclusion (insert+jump+:rel edit/hover in)
 
@@ -294,4 +295,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-088.*-link-rel-…` — typed link :rel
 - `xanatoo-089.*-table-weights-…` — table column weights
 - `xanatoo-090.*-gui-structure-…` — context menu + structure highlight
-- `xanatoo-091.*-dock-tiles-…` — this delivery
+- `xanatoo-091.*-dock-tiles-…` — soft-window tile zones
+- `xanatoo-092.*-nested-cells-…` — this delivery
