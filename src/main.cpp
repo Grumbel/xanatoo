@@ -263,9 +263,11 @@ int main(int argc, char** argv) {
   if (buffers.size() > 1)
     buffers[1].history.reset(buffers[1].doc, panes[1].sel);
 
-  int win_w = 920, win_h = 720;
+  int win_w = 1024, win_h = 768;  // match SDL_CreateWindow defaults
+  SDL_GetWindowSize(window, &win_w, &win_h);
   bool running = true;
   bool needs_layout = true;
+  int last_layout_w = 0, last_layout_h = 0;
 
   // Leap-style search (Canon Cat inspiration)
   bool search_mode = false;
@@ -572,6 +574,8 @@ int main(int argc, char** argv) {
           doc_of(panes[1]), static_cast<float>(panes[1].w), base_of(panes[1]));
     }
     needs_layout = false;
+    last_layout_w = win_w;
+    last_layout_h = win_h;
     refresh_diff();
   };
 
@@ -1299,7 +1303,8 @@ int main(int argc, char** argv) {
           break;
 
         case SDL_WINDOWEVENT:
-          if (ev.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+          if (ev.window.event == SDL_WINDOWEVENT_SIZE_CHANGED ||
+              ev.window.event == SDL_WINDOWEVENT_RESIZED) {
             win_w = ev.window.data1;
             win_h = ev.window.data2;
             // Keep tiled/maximized soft windows filling the new client area.
@@ -4364,6 +4369,22 @@ int main(int argc, char** argv) {
               break;
           }
           break;
+        }
+      }
+    }
+
+    // Keep layout width in sync with the real client area (not only on
+    // SIZE_CHANGED — first map / HiDPI / tiling WMs often skip that event).
+    {
+      int nw = win_w, nh = win_h;
+      SDL_GetWindowSize(window, &nw, &nh);
+      if (nw != win_w || nh != win_h || last_layout_w == 0) {
+        win_w = nw;
+        win_h = nh;
+        needs_layout = true;
+        for (auto& sw : soft_wins) {
+          if (sw.dock != SoftDock::None || sw.maximized)
+            apply_soft_dock(sw, sw.maximized ? SoftDock::Max : sw.dock);
         }
       }
     }
