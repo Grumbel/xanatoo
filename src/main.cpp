@@ -1831,6 +1831,9 @@ int main(int argc, char** argv) {
               } else if (save_as_mode) {
                 save_as_mode = false;
                 save_as_path.clear();
+              } else if (path_in_window_mode) {
+                path_in_window_mode = false;
+                path_in_window_buf.clear();
               } else if (image_insert_mode) {
                 image_insert_mode = false;
                 image_insert_as_figure = false;
@@ -1852,6 +1855,10 @@ int main(int argc, char** argv) {
                 search_query.clear();
                 replace_text.clear();
                 reset_blink();
+              } else if (help_mode) {
+                help_mode = false;
+              } else if (!soft_wins.empty()) {
+                soft_wins.pop_back();
               } else if (!p.sel.empty()) {
                 p.sel.anchor = p.sel.focus;
                 reset_blink();
