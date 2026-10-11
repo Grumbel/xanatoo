@@ -172,6 +172,67 @@ def draw_icon(name: str, size: int = 20) -> bytes:
         circle(buf, size, size, S(14), S(14), S(2), INK)
         line(buf, size, size, S(8), S(12), S(14), S(4), INK, 1)
         line(buf, size, size, S(12), S(12), S(6), S(4), INK, 1)
+    elif name == "strike":
+        line(buf, size, size, S(5), S(6), S(5), S(14), INK, 2)
+        line(buf, size, size, S(5), S(6), S(10), S(6), INK, 1)
+        line(buf, size, size, S(5), S(14), S(10), S(14), INK, 1)
+        line(buf, size, size, S(4), S(10), S(16), S(10), ACCENT, 2)
+    elif name == "cite":
+        line(buf, size, size, S(5), S(6), S(5), S(12), INK, 1)
+        line(buf, size, size, S(5), S(6), S(8), S(6), INK, 1)
+        line(buf, size, size, S(11), S(6), S(11), S(12), INK, 1)
+        line(buf, size, size, S(11), S(6), S(14), S(6), INK, 1)
+    elif name in ("h1", "h2", "h3"):
+        rect(buf, size, size, S(3), S(3), S(14), S(14), INK, SOFT)
+        line(buf, size, size, S(6), S(6), S(6), S(14), INK, 2)
+        line(buf, size, size, S(6), S(10), S(11), S(10), INK, 1)
+        line(buf, size, size, S(11), S(6), S(11), S(14), INK, 2)
+    elif name == "para":
+        for yy, x1 in ((6, 16), (10, 16), (14, 12)):
+            line(buf, size, size, S(4), S(yy), S(x1), S(yy), INK, 1)
+    elif name == "task":
+        rect(buf, size, size, S(4), S(4), S(12), S(12), INK, SOFT)
+        line(buf, size, size, S(6), S(10), S(9), S(13), ACCENT, 2)
+        line(buf, size, size, S(9), S(13), S(14), S(6), ACCENT, 2)
+    elif name == "table":
+        rect(buf, size, size, S(3), S(3), S(14), S(14), INK, SOFT)
+        line(buf, size, size, S(3), S(8), S(17), S(8), INK, 1)
+        line(buf, size, size, S(3), S(13), S(17), S(13), INK, 1)
+        line(buf, size, size, S(10), S(3), S(10), S(17), INK, 1)
+    elif name == "figure":
+        rect(buf, size, size, S(3), S(3), S(14), S(10), INK, SOFT)
+        circle(buf, size, size, S(7), S(7), S(1), ACCENT, ACCENT)
+        line(buf, size, size, S(5), S(16), S(15), S(16), INK, 1)
+    elif name == "note":
+        rect(buf, size, size, S(4), S(3), S(12), S(14), INK, (0xFF, 0xF8, 0xD0, 255))
+        line(buf, size, size, S(6), S(9), S(14), S(9), ACCENT, 1)
+        line(buf, size, size, S(6), S(12), S(12), S(12), ACCENT, 1)
+    elif name == "replace":
+        line(buf, size, size, S(5), S(7), S(13), S(7), INK, 1)
+        line(buf, size, size, S(13), S(7), S(11), S(5), INK, 1)
+        line(buf, size, size, S(13), S(7), S(11), S(9), INK, 1)
+        line(buf, size, size, S(15), S(13), S(7), S(13), ACCENT, 1)
+        line(buf, size, size, S(7), S(13), S(9), S(11), ACCENT, 1)
+        line(buf, size, size, S(7), S(13), S(9), S(15), ACCENT, 1)
+    elif name == "outline":
+        line(buf, size, size, S(4), S(5), S(16), S(5), INK, 2)
+        line(buf, size, size, S(6), S(10), S(16), S(10), INK, 1)
+        line(buf, size, size, S(6), S(14), S(13), S(14), INK, 1)
+    elif name == "paste":
+        rect(buf, size, size, S(5), S(5), S(11), S(12), INK, SOFT)
+        rect(buf, size, size, S(7), S(2), S(6), S(4), INK, ACCENT)
+    elif name == "copy":
+        rect(buf, size, size, S(6), S(5), S(10), S(12), INK, SOFT)
+        rect(buf, size, size, S(3), S(2), S(10), S(12), INK, (0xF8, 0xF6, 0xF0, 255))
+    elif name == "new":
+        rect(buf, size, size, S(4), S(2), S(12), S(16), INK, SOFT)
+        line(buf, size, size, S(10), S(8), S(10), S(14), ACCENT, 2)
+        line(buf, size, size, S(7), S(11), S(13), S(11), ACCENT, 2)
+    elif name == "open":
+        rect(buf, size, size, S(3), S(6), S(14), S(10), INK, ACCENT)
+        line(buf, size, size, S(3), S(6), S(8), S(6), INK, 1)
+        line(buf, size, size, S(8), S(6), S(10), S(4), INK, 1)
+        line(buf, size, size, S(10), S(4), S(17), S(4), INK, 1)
     else:
         rect(buf, size, size, S(4), S(4), S(12), S(12), INK, ACCENT)
     return bytes(buf)
