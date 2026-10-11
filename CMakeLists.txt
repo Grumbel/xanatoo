@@ -31,6 +31,8 @@ endif()
 
 # Gemini protocol (TLS client). Parser for .gmi is always built.
 option(XANATOO_GEMINI "Enable gemini:// network client (OpenSSL)" ON)
+# Nostr read-only client (WSS + OpenSSL). Maps notes to Thread/Message nodes.
+option(XANATOO_NOSTR "Enable Nostr note/thread fetch (OpenSSL WebSocket)" ON)
 
 add_executable(xanatoo
   src/main.cpp
@@ -46,6 +48,7 @@ add_executable(xanatoo
   src/util.cpp
   src/cli.cpp
   src/gemini.cpp
+  src/nostr.cpp
   # Vendored Dear ImGui (MIT) — menu bar / toolbar shell
   external/imgui/imgui.cpp
   external/imgui/imgui_draw.cpp
@@ -71,14 +74,30 @@ target_link_libraries(xanatoo PRIVATE
   ${FONTCONFIG_LIBRARIES}
 )
 
-if(XANATOO_GEMINI)
+set(XANATOO_NEED_OPENSSL OFF)
+if(XANATOO_GEMINI OR XANATOO_NOSTR)
+  set(XANATOO_NEED_OPENSSL ON)
+endif()
+
+if(XANATOO_NEED_OPENSSL)
   find_package(OpenSSL REQUIRED)
-  target_compile_definitions(xanatoo PRIVATE XANATOO_GEMINI=1)
   target_link_libraries(xanatoo PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+endif()
+
+if(XANATOO_GEMINI)
+  target_compile_definitions(xanatoo PRIVATE XANATOO_GEMINI=1)
   message(STATUS "Gemini protocol client: ON (OpenSSL)")
 else()
   target_compile_definitions(xanatoo PRIVATE XANATOO_GEMINI=0)
   message(STATUS "Gemini protocol client: OFF")
+endif()
+
+if(XANATOO_NOSTR)
+  target_compile_definitions(xanatoo PRIVATE XANATOO_NOSTR=1)
+  message(STATUS "Nostr client: ON (OpenSSL WSS)")
+else()
+  target_compile_definitions(xanatoo PRIVATE XANATOO_NOSTR=0)
+  message(STATUS "Nostr client: OFF")
 endif()
 
 if(UNIX AND NOT APPLE)

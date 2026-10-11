@@ -9,6 +9,7 @@
 #include "xanatoo/render.hpp"
 #include "xanatoo/parse.hpp"
 #include "xanatoo/gemini.hpp"
+#include "xanatoo/nostr.hpp"
 #include "xanatoo/editor.hpp"
 #include "xanatoo/images.hpp"
 #include "xanatoo/ui.hpp"
@@ -891,6 +892,7 @@ int main(int argc, char** argv) {
   auto is_inapp_doc_href = [&](const std::string& href) -> bool {
     if (href.empty() || href[0] == '#') return false;
     if (xanatoo::is_gemini_url(href)) return false;
+    if (xanatoo::is_nostr_ref(href)) return false;
     if (href.rfind("http://", 0) == 0 || href.rfind("https://", 0) == 0 ||
         href.rfind("mailto:", 0) == 0)
       return false;
@@ -1036,6 +1038,36 @@ int main(int argc, char** argv) {
 #endif
     }
 
+
+    // Nostr note / nevent (read-only thread view)
+    if (xanatoo::is_nostr_ref(target)) {
+#if defined(XANATOO_NOSTR) && XANATOO_NOSTR
+      flash_status("Fetching Nostr " + target.substr(0, 24) + "…");
+      std::string err;
+      auto doc = xanatoo::nostr_fetch_thread(target, &err);
+      if (!doc) {
+        flash_status("Nostr failed: " + err);
+        std::cerr << "Nostr: " << err << "\n";
+        return false;
+      }
+      if (!allow_discard_dirty(p.buf)) return false;
+      std::string label = target;
+      if (label.size() > 64) label = label.substr(0, 64) + "…";
+      load_into_pane(std::move(*doc), label);
+      if (std::find(tab_order.begin(), tab_order.end(), p.buf) ==
+          tab_order.end())
+        tab_order.push_back(p.buf);
+      if (record_history) push_nav_history(target);
+      flash_status("Opened Nostr thread");
+      needs_layout = true;
+      update_title();
+      return true;
+#else
+      flash_status("Nostr needs build with -DXANATOO_NOSTR=ON");
+      return false;
+#endif
+    }
+
     // Local path (or offline fallback for gemini:// when TLS is disabled)
     std::string path = target;
     if (!fs::exists(path)) {
@@ -1104,7 +1136,7 @@ int main(int argc, char** argv) {
               xanatoo::resolve_gemini_url(gemini_current_url, abs);
           if (!resolved.empty()) abs = resolved;
         }
-        if (xanatoo::is_gemini_url(abs)) {
+        if (xanatoo::is_gemini_url(abs) || xanatoo::is_nostr_ref(abs)) {
           navigate_to_url(std::move(abs));
         } else if (is_inapp_doc_href(abs)) {
           navigate_to_url(resolve_doc_href(abs));
@@ -1895,7 +1927,8 @@ int main(int argc, char** argv) {
                         // clicks). open_browse here left stale soft layouts and
                         // carets that later threw "invalid node id".
                         std::string abs = *href;
-                        if (xanatoo::is_gemini_url(abs)) {
+                        if (xanatoo::is_gemini_url(abs) ||
+                            xanatoo::is_nostr_ref(abs)) {
                           navigate_to_url(abs);
                         } else if (is_inapp_doc_href(abs)) {
                           std::string resolved =
@@ -2184,7 +2217,7 @@ int main(int argc, char** argv) {
                       xanatoo::resolve_gemini_url(gemini_current_url, abs);
                   if (!resolved.empty()) abs = resolved;
                 }
-                if (xanatoo::is_gemini_url(abs)) {
+                if (xanatoo::is_gemini_url(abs) || xanatoo::is_nostr_ref(abs)) {
                   navigate_to_url(std::move(abs));
                   break;
                 }

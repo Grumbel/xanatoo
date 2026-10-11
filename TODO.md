@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **190** (this delivery is **189**)
+Next bundle number: **191** (this delivery is **190**)
 
 ## Status (2026-10-11)
 
@@ -34,6 +34,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Dirty flag / asterisk in window title
 - [x] Side-by-side `:::columns` / `:::column` layout
 - [x] Multi-node selection copy and delete
+- [x] **Nostr read-only** threads (/ → Thread/Message)
 - [x] Dual-pane multi-view (Ctrl+\\ toggle, Tab focus)
 - [x] Two-file CLI opens independent docs in dual-pane
 - [x] Draggable pane divider (split_ratio)
@@ -514,4 +515,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-186.*-move-serialize-bounds-…` — move/serialize bounds
 - `xanatoo-187.*-doc-mutate-outline-…` — doc mutate/outline
 - `xanatoo-188.*-clamp-windows-under-chrome-…` — clamp windows under chrome
-- `xanatoo-189.*-block-grip-left-gutter-…` — this delivery
+- `xanatoo-189.*-block-grip-left-gutter-…` — block grip gutter
+- `xanatoo-190.*-nostr-threads-…` — this delivery

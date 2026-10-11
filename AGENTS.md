@@ -41,6 +41,12 @@ Read `TODO.md` first. Record plans and outcomes there.
 Handover is via cumulative git bundles only.
 Bundle names: `xanatoo-NNN.description-BASE.bundle` (formerly `glyphtoo-NNN…`).
 
+## Nostr
+
+- Read-only note/thread fetch gated by `XANATOO_NOSTR` (default ON; needs OpenSSL).
+- Opens `note1` / `nevent1` / `nostr:…` / 64-hex via Ctrl+L → Thread+Message layout.
+- No posting or key management in v1.
+
 ## Gemini
 
 - Gemtext parser is always built (`.gmi` / `.gemini`).
