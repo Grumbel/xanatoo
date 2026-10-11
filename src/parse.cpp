@@ -1156,7 +1156,9 @@ void serialize_inlines(const Node& node, std::string& out) {
 
 void serialize_node(const Document& doc, NodeId id, std::string& out,
                     int indent) {
+  if (id == INVALID_NODE) return;
   const Node& node = doc.get(id);
+  if (node.id != id) return;
   std::string pad(static_cast<size_t>(indent), ' ');
 
   switch (node.kind) {
@@ -2523,7 +2525,9 @@ void serialize_sexpr_children(const Document& doc, const Node& node,
 
 void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
                           int indent) {
+  if (id == INVALID_NODE) return;
   const Node& node = doc.get(id);
+  if (node.id != id) return;
   std::string pad(static_cast<size_t>(indent), ' ');
 
   switch (node.kind) {
@@ -3109,6 +3113,7 @@ static std::string gemtext_plain(const Node& n) {
 static void serialize_gemtext_node(const Document& doc, NodeId id, std::string& out) {
   if (id == INVALID_NODE) return;
   const Node& n = doc.get(id);
+  if (n.id != id) return;
   switch (n.kind) {
     case NodeKind::Document:
       for (NodeId c : n.children) serialize_gemtext_node(doc, c, out);

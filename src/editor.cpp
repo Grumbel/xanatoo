@@ -1724,11 +1724,14 @@ void delete_selection(Document& doc, Selection& sel) {
 bool move_left(Document& doc, Caret& caret) {
   if (caret.node == INVALID_NODE) return false;
   Node& n = doc.get(caret.node);
+  if (n.id != caret.node) return false;
   if (caret.char_index > 0) {
     --caret.char_index;
     return true;
   }
-  if (caret.span_index > 0) {
+  if (caret.span_index > 0 && !n.spans.empty()) {
+    if (caret.span_index > n.spans.size())
+      caret.span_index = n.spans.size();
     --caret.span_index;
     caret.char_index = utf8_char_count(n.spans[caret.span_index].text);
     return true;
@@ -1739,7 +1742,8 @@ bool move_left(Document& doc, Caret& caret) {
 bool move_right(Document& doc, Caret& caret) {
   if (caret.node == INVALID_NODE) return false;
   Node& n = doc.get(caret.node);
-  if (caret.span_index >= n.spans.size()) return false;
+  if (n.id != caret.node) return false;
+  if (n.spans.empty() || caret.span_index >= n.spans.size()) return false;
   size_t len = utf8_char_count(n.spans[caret.span_index].text);
   if (caret.char_index < len) {
     ++caret.char_index;
@@ -1779,6 +1783,7 @@ bool advance_caret(Document& doc, Caret& caret, size_t n) {
 void select_node(Document& doc, Selection& sel, NodeId node) {
   if (node == INVALID_NODE) return;
   const Node& n = doc.get(node);
+  if (n.id != node) return;
   if (!is_text_node_kind(n.kind)) return;
   sel.anchor = {node, 0, 0};
   sel.focus = {node, 0, 0};

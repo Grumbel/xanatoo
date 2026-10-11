@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **186** (this delivery is **185**)
+Next bundle number: **187** (this delivery is **186**)
 
 ## Status (2026-10-11)
 
@@ -510,4 +510,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-182.*-image-key-caret-collect-…` — image key/caret collect
 - `xanatoo-183.*-compact-gemini-font-detach-…` — compact/gemini/font
 - `xanatoo-184.*-stale-caret-mutate-guard-…` — stale caret mutate
-- `xanatoo-185.*-hit-test-invalid-glyph-…` — this delivery
+- `xanatoo-185.*-hit-test-invalid-glyph-…` — hit-test invalid glyph
+- `xanatoo-186.*-move-serialize-bounds-…` — this delivery

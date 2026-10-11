@@ -666,7 +666,9 @@ void ser_children(const Document& doc, const Node& node, std::string& out,
 
 void ser_node_org(const Document& doc, NodeId id, std::string& out,
                   int list_indent) {
+  if (id == INVALID_NODE) return;
   const Node& node = doc.get(id);
+  if (node.id != id) return;
   switch (node.kind) {
     case NodeKind::Document:
       if (!doc.meta.title.empty()) {
