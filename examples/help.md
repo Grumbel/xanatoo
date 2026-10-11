@@ -16,7 +16,11 @@ Jump to: [Files](#Files) · [Edit](#Edit) · [Navigate](#Navigate) · [View](#Vi
 - **Ctrl+Shift+S** — Save As…
 - **Ctrl+R** / **Ctrl+Shift+R** — Reload / force reload
 - **Ctrl+Q** — Quit (warns if unsaved; repeat to exit)
-- **Ctrl+W** — Close top soft window / help / outline
+- **Ctrl+T** — New tab
+- **Ctrl+W** — Close floating window, help, outline, or document tab
+- **Ctrl+Tab** / **Ctrl+Shift+Tab** — Next / previous tab
+- **Ctrl+Shift+P** — Pop focused document out to a floating window
+- **Ctrl+Shift+I** — Dock top floating window back as a tab
 - **Alt+F / E / O / I / V / B / H** — File / Edit / Format / Insert / View / Bookmarks / Help menu
 - **Middle-click** — Paste at caret
 - **Drag .md / .sexp** — Open in a software window

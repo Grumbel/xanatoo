@@ -24,6 +24,14 @@ enum class UiCommand {
   AddBookmark,     // bookmark current page URL/path
   RemoveBookmark,  // remove current (or arg) from bookmarks
   ToggleBookmarks, // Bookmarks manager panel
+  // Tabs / MDI
+  NewTab,          // new empty buffer + tab
+  CloseTab,        // close focused buffer (Ctrl+W)
+  NextTab,
+  PrevTab,
+  SelectTab,       // arg = tab index in tab_order
+  PopOut,          // focused buffer → floating window
+  PopIn,           // top floating window → tab in focused pane
   Save,
 
   SaveAs,
@@ -128,6 +136,10 @@ struct UiState {
   int history_pos = -1;  // current index, or -1
   // Persistent bookmarks for the Bookmarks menu / panel.
   std::vector<std::string> bookmarks;
+  // Tab strip (labels left→right); active_tab is index into tab_labels.
+  std::vector<std::string> tab_labels;
+  int active_tab = 0;
+  bool has_floating = false;
   std::string status_left;
   std::string doc_label;
 };

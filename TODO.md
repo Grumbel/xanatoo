@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **147** (this delivery is **146**)
+Next bundle number: **148** (this delivery is **147**)
 
 ## Status (2026-10-11)
 
@@ -245,6 +245,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Hover affordances: link wash/underline, stretch/image/gutter, hand cursor, target tooltip
 - [x] Hover: task checkbox, block grip, transclude region (status/tooltip/cursor)
 - [x] Org-mode subset parser/serialiser (.org); Node.tags; sample.org
+- [x] Multi-doc redo: shared buffers, tab strip, pop-out/pop-in windows
 
 ## Open work / next steps
 
@@ -440,4 +441,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-143.*-welcome-hub-…` — welcome hub + in-app doc links
 - `xanatoo-144.*-hover-affordances-…` — link/stretch/image/gutter hover
 - `xanatoo-145.*-hover-task-grip-include-…` — task/grip/include hover
-- `xanatoo-146.*-org-mode-…` — this delivery
+- `xanatoo-146.*-org-mode-…` — org-mode subset
+- `xanatoo-147.*-tabs-mdi-…` — this delivery

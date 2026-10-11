@@ -459,9 +459,16 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("New", UiCommand::NewDocument, cmd, true, "Ctrl+N");
       menu_item_cmd("Open…", UiCommand::OpenDocument, cmd, true, "Ctrl+O");
       menu_item_cmd("Open URL…", UiCommand::OpenUrlBar, cmd, true, "Ctrl+L");
+      menu_item_cmd("New Tab", UiCommand::NewTab, cmd, true, "Ctrl+T");
+      menu_item_cmd("Close Tab", UiCommand::CloseTab, cmd, true, "Ctrl+W");
       menu_item_cmd("Back", UiCommand::NavBack, cmd, state.can_nav_back, "Alt+Left");
       menu_item_cmd("Forward", UiCommand::NavForward, cmd, state.can_nav_forward,
                     "Alt+Right");
+      ImGui::Separator();
+      menu_item_cmd("Pop Out to Window", UiCommand::PopOut, cmd, true,
+                    "Ctrl+Shift+P");
+      menu_item_cmd("Dock Window to Tab", UiCommand::PopIn, cmd, state.has_floating,
+                    "Ctrl+Shift+I");
       ImGui::Separator();
       menu_item_cmd("Save", UiCommand::Save, cmd, true, "Ctrl+S");
       menu_item_cmd("Save As…", UiCommand::SaveAs, cmd, true, "Ctrl+Shift+S");
@@ -800,6 +807,50 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   ImGui::PopStyleVar(2);
 
   result.top_reserved += toolbar_h;
+
+  // ---- Document tab strip (browser-style) ----
+  if (!state.tab_labels.empty()) {
+    const float tab_h = 28.f;
+    ImGui::SetNextWindowPos(
+        ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
+    ImGui::SetNextWindowSize(ImVec2(vp->Size.x, tab_h));
+    ImGuiWindowFlags tab_flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4.f, 2.f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.f, 0.f));
+    if (ImGui::Begin("##tabs", nullptr, tab_flags)) {
+      if (ImGui::BeginTabBar("##doctabs",
+                             ImGuiTabBarFlags_FittingPolicyScroll |
+                                 ImGuiTabBarFlags_Reorderable)) {
+        for (int i = 0; i < static_cast<int>(state.tab_labels.size()); ++i) {
+          const bool selected = (i == state.active_tab);
+          ImGuiTabItemFlags flags = selected ? ImGuiTabItemFlags_SetSelected : 0;
+          bool open = true;
+          if (ImGui::BeginTabItem(state.tab_labels[static_cast<size_t>(i)].c_str(),
+                                  &open, flags)) {
+            if (ImGui::IsItemClicked() && !selected) {
+              cmd = UiCommand::SelectTab;
+              result.arg = std::to_string(i);
+            }
+            ImGui::EndTabItem();
+          }
+          if (!open) {
+            cmd = UiCommand::CloseTab;
+            result.arg = std::to_string(i);
+          }
+        }
+        ImGui::EndTabBar();
+      }
+      ImGui::SameLine();
+      if (ImGui::SmallButton("+")) cmd = UiCommand::NewTab;
+      if (ImGui::IsItemHovered()) ImGui::SetTooltip("New tab (Ctrl+T)");
+    }
+    ImGui::End();
+    ImGui::PopStyleVar(2);
+    result.top_reserved += tab_h;
+  }
 
   // ---- Context menu (right-click in document) ----
   if (context_open_) {

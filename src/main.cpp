@@ -112,15 +112,15 @@ int main(int argc, char** argv) {
     return {};
   };
 
-  xanatoo::Document docs[2];
-  std::string paths[2];
-  paths[0] = opt.file_path;
-  paths[1] = opt.file_path2;
-  if (paths[0].empty()) {
-    paths[0] = xanatoo::find_default_document();
-    if (paths[0].empty())
-      std::cerr << "Note: examples/welcome.md not found; starting empty.\n";
-  }
+  // Shared document buffers: tabs + floating windows all reference these.
+  struct DocBuffer {
+    xanatoo::Document doc;
+    std::string path;
+    bool dirty = false;
+    xanatoo::History history;
+  };
+  std::vector<DocBuffer> buffers;
+
   auto load_doc_or_placeholder = [&](const std::string& path) {
     if (xanatoo::is_gemini_url(path)) {
       // Real fetch happens after navigate_to_url is defined.
@@ -128,27 +128,61 @@ int main(int argc, char** argv) {
     }
     return load_doc(path);
   };
-  docs[0] = load_doc_or_placeholder(paths[0]);
-  docs[1] = paths[1].empty() ? docs[0] : load_doc_or_placeholder(paths[1]);
-  // If only one file, pane 1 shares docs[0] until a second file is used
-  bool shared_doc = paths[1].empty();
-  bool dirty_flags[2] = {false, false};
+
+  {
+    std::string p0 = opt.file_path;
+    std::string p1 = opt.file_path2;
+    if (p0.empty()) {
+      p0 = xanatoo::find_default_document();
+      if (p0.empty())
+        std::cerr << "Note: examples/welcome.md not found; starting empty.\n";
+    }
+    DocBuffer b0;
+    b0.path = p0;
+    b0.doc = load_doc_or_placeholder(p0);
+    buffers.push_back(std::move(b0));
+    if (!p1.empty()) {
+      DocBuffer b1;
+      b1.path = p1;
+      b1.doc = load_doc_or_placeholder(p1);
+      buffers.push_back(std::move(b1));
+    }
+  }
+
+  // Tab order (buffer indices left→right in the tab strip).
+  std::vector<int> tab_order;
+  for (int i = 0; i < static_cast<int>(buffers.size()); ++i)
+    tab_order.push_back(i);
+
+  auto buffer_tab_label = [&](int bi) -> std::string {
+    if (bi < 0 || bi >= static_cast<int>(buffers.size())) return "?";
+    std::string s;
+    if (buffers[static_cast<size_t>(bi)].dirty) s += "*";
+    const std::string& path = buffers[static_cast<size_t>(bi)].path;
+    if (path.empty()) {
+      s += "untitled";
+    } else {
+      try {
+        s += fs::path(path).filename().string();
+      } catch (...) {
+        s += path;
+      }
+    }
+    return s;
+  };
 
   xanatoo::ImageCache images(sdl);
 
   auto update_title = [&]() {
     std::string title = "xanatoo";
-    auto label = [&](int i) {
-      std::string s;
-      if (dirty_flags[i]) s += "*";
-      if (paths[i].empty()) s += "untitled";
-      else s += paths[i];
-      return s;
-    };
-    if (shared_doc || paths[1].empty()) {
-      title += " — " + label(0);
-    } else {
-      title += " — " + label(0) + " | " + label(1);
+    if (!buffers.empty()) {
+      title += " — ";
+      title += buffer_tab_label(0);
+      if (buffers.size() > 1) {
+        title += " (+";
+        title += std::to_string(buffers.size() - 1);
+        title += " more)";
+      }
     }
     SDL_SetWindowTitle(window, title.c_str());
   };
@@ -163,7 +197,7 @@ int main(int argc, char** argv) {
   float ui_top = 0.f;  // menu + toolbar height (updated each frame)
 
   struct Pane {
-    int doc_index = 0;  // which docs[] entry
+    int buf = 0;  // index into buffers
     xanatoo::Selection sel{};
     float scroll_y = 0.f;
     float preferred_x = 0.f;
@@ -173,15 +207,16 @@ int main(int argc, char** argv) {
   };
 
   Pane panes[2];
-  panes[0].doc_index = 0;
-  panes[1].doc_index = shared_doc ? 0 : 1;
-  xanatoo::ensure_valid_caret(docs[0], panes[0].sel.focus);
+  panes[0].buf = 0;
+  panes[1].buf = (buffers.size() > 1) ? 1 : 0;
+  xanatoo::ensure_valid_caret(buffers[0].doc, panes[0].sel.focus);
   panes[0].sel.anchor = panes[0].sel.focus;
-  xanatoo::ensure_valid_caret(docs[panes[1].doc_index], panes[1].sel.focus);
+  xanatoo::ensure_valid_caret(buffers[static_cast<size_t>(panes[1].buf)].doc,
+                              panes[1].sel.focus);
   panes[1].sel.anchor = panes[1].sel.focus;
 
   int focus = 0;
-  bool split = !paths[1].empty();  // auto-split when two files given
+  bool split = buffers.size() > 1;  // auto-split when two files given
   float split_ratio = 0.5f;        // left pane fraction
   bool dragging_sel = false;
   bool dragging_split = false;
@@ -209,18 +244,24 @@ int main(int argc, char** argv) {
   int click_count = 0;
 
   auto doc_of = [&](Pane& p) -> xanatoo::Document& {
-    return docs[p.doc_index];
+    return buffers[static_cast<size_t>(p.buf)].doc;
   };
   auto path_of = [&](Pane& p) -> std::string& {
-    return paths[p.doc_index];
+    return buffers[static_cast<size_t>(p.buf)].path;
   };
   auto base_of = [&](Pane& p) -> std::string {
-    return parent_dir(paths[p.doc_index]);
+    return parent_dir(buffers[static_cast<size_t>(p.buf)].path);
+  };
+  auto shared_doc = [&]() -> bool {
+    return panes[0].buf == panes[1].buf;
+  };
+  auto dirty_of = [&](int bi) -> bool& {
+    return buffers[static_cast<size_t>(bi)].dirty;
   };
 
-  xanatoo::History histories[2];
-  histories[0].reset(docs[0], panes[0].sel);
-  histories[1].reset(docs[panes[1].doc_index], panes[1].sel);
+  buffers[0].history.reset(buffers[0].doc, panes[0].sel);
+  if (buffers.size() > 1)
+    buffers[1].history.reset(buffers[1].doc, panes[1].sel);
 
   int win_w = 920, win_h = 720;
   bool running = true;
@@ -253,9 +294,9 @@ int main(int argc, char** argv) {
   enum class SoftDock { None = 0, Left, Right, Top, Bottom, Max };
 
   struct SoftWindow {
-    std::string title;
-    std::string path;
-    xanatoo::Document doc;
+    int buf = -1;  // index into buffers (−1 = unused)
+    std::string title;  // display override; empty → derive from path
+    xanatoo::Selection sel{};
     xanatoo::LayoutResult layout;
     float scroll = 0.f;
     bool needs_layout = true;
@@ -403,20 +444,20 @@ int main(int argc, char** argv) {
     diff_marks[1].clear();
     diff_words[0].clear();
     diff_words[1].clear();
-    if (!diff_mode || shared_doc || paths[1].empty()) return;
-    xanatoo::compute_diff_marks(docs[0], docs[1], diff_marks[0], diff_marks[1],
-                                &diff_words[0], &diff_words[1]);
+    if (!diff_mode || shared_doc() || buffers.size() < 2) return;
+    xanatoo::compute_diff_marks(buffers[0].doc, buffers[1].doc, diff_marks[0],
+                                diff_marks[1], &diff_words[0], &diff_words[1]);
   };
 
   auto checkpoint = [&]() {
     Pane& p = F();
-    histories[p.doc_index].push(doc_of(p), p.sel);
+    buffers[static_cast<size_t>(p.buf)].history.push(doc_of(p), p.sel);
   };
   auto mark_dirty = [&]() {
-    int di = F().doc_index;
+    int di = F().buf;
     discard_armed = false;  // new edits require a fresh discard warning
-    if (!dirty_flags[di]) {
-      dirty_flags[di] = true;
+    if (!buffers[static_cast<size_t>(di)].dirty) {
+      buffers[static_cast<size_t>(di)].dirty = true;
       update_title();
     }
   };
@@ -476,7 +517,7 @@ int main(int argc, char** argv) {
 
   auto allow_discard_dirty = [&](int di) -> bool {
     if (di < 0 || di > 1) di = 0;
-    if (!dirty_flags[di]) return true;
+    if (!buffers[static_cast<size_t>(di)].dirty) return true;
     if (discard_armed) {
       discard_armed = false;
       return true;
@@ -733,14 +774,14 @@ int main(int argc, char** argv) {
     Pane& p = F();
 
     auto load_into_pane = [&](xanatoo::Document doc, const std::string& label) {
-      docs[p.doc_index] = std::move(doc);
+      buffers[static_cast<size_t>(p.buf)].doc = std::move(doc);
       path_of(p) = label;
-      dirty_flags[p.doc_index] = false;
-      xanatoo::ensure_valid_caret(docs[p.doc_index], p.sel.focus);
+      buffers[static_cast<size_t>(p.buf)].dirty = false;
+      xanatoo::ensure_valid_caret(buffers[static_cast<size_t>(p.buf)].doc, p.sel.focus);
       p.sel.anchor = p.sel.focus;
       p.scroll_y = 0.f;
-      histories[p.doc_index].reset(docs[p.doc_index], p.sel);
-      if (panes[0].doc_index == panes[1].doc_index) {
+      buffers[static_cast<size_t>(p.buf)].history.reset(buffers[static_cast<size_t>(p.buf)].doc, p.sel);
+      if (panes[0].buf == panes[1].buf) {
         panes[1 - focus].sel = p.sel;
         panes[1 - focus].scroll_y = 0.f;
       }
@@ -774,7 +815,7 @@ int main(int argc, char** argv) {
                      resp->meta);
         return false;
       }
-      if (!allow_discard_dirty(p.doc_index)) return false;
+      if (!allow_discard_dirty(p.buf)) return false;
       std::string meta = resp->meta;
       for (char& c : meta)
         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
@@ -824,7 +865,7 @@ int main(int argc, char** argv) {
       flash_status("Not found: " + target);
       return false;
     }
-    if (!allow_discard_dirty(p.doc_index)) return false;
+    if (!allow_discard_dirty(p.buf)) return false;
     gemini_current_url.clear();
     load_into_pane(load_doc(path), path);
     if (record_history) push_nav_history(path);
@@ -871,13 +912,13 @@ int main(int argc, char** argv) {
 
 
   // CLI / argv may pass gemini:// — fetch after helpers exist
-  if (xanatoo::is_gemini_url(paths[0])) {
-    std::string u = paths[0];
-    paths[0].clear();
+  if (!buffers.empty() && xanatoo::is_gemini_url(buffers[0].path)) {
+    std::string u = buffers[0].path;
+    buffers[0].path.clear();
     navigate_to_url(std::move(u));
-  } else if (!paths[1].empty() && xanatoo::is_gemini_url(paths[1])) {
-    std::string u = paths[1];
-    paths[1].clear();
+  } else if (buffers.size() > 1 && xanatoo::is_gemini_url(buffers[1].path)) {
+    std::string u = buffers[1].path;
+    buffers[1].path.clear();
     focus = 1;
     navigate_to_url(std::move(u));
     focus = 0;
@@ -996,9 +1037,26 @@ int main(int argc, char** argv) {
     }
   };
 
+  auto soft_doc = [&](SoftWindow& sw) -> xanatoo::Document& {
+    return buffers[static_cast<size_t>(sw.buf)].doc;
+  };
+  auto soft_path = [&](const SoftWindow& sw) -> const std::string& {
+    return buffers[static_cast<size_t>(sw.buf)].path;
+  };
+  auto soft_title = [&](const SoftWindow& sw) -> std::string {
+    if (!sw.title.empty()) return sw.title;
+    const auto& path = soft_path(sw);
+    if (path.empty()) return "untitled";
+    try {
+      return fs::path(path).filename().string();
+    } catch (...) {
+      return path;
+    }
+  };
+
   auto layout_soft = [&](SoftWindow& sw) {
     float mw = static_cast<float>(std::max(120, sw.w - help_pad * 2));
-    sw.layout = layout_engine.layout(sw.doc, mw);
+    sw.layout = layout_engine.layout(soft_doc(sw), mw);
     sw.needs_layout = false;
   };
 
@@ -1010,41 +1068,117 @@ int main(int argc, char** argv) {
     soft_wins.push_back(std::move(sw));
   };
 
+  auto canon_path = [&](const std::string& path) -> std::string {
+    try {
+      return fs::weakly_canonical(path).string();
+    } catch (...) {
+      return path;
+    }
+  };
+
+  // Find buffer with same path, or -1.
+  auto find_buffer = [&](const std::string& path) -> int {
+    if (path.empty()) return -1;
+    std::string c = canon_path(path);
+    for (int i = 0; i < static_cast<int>(buffers.size()); ++i) {
+      if (buffers[static_cast<size_t>(i)].path.empty()) continue;
+      if (canon_path(buffers[static_cast<size_t>(i)].path) == c) return i;
+    }
+    return -1;
+  };
+
+  // Load path into a new or existing buffer; returns buffer index.
+  auto ensure_buffer = [&](const std::string& path) -> int {
+    int bi = find_buffer(path);
+    if (bi >= 0) return bi;
+    DocBuffer b;
+    b.path = path;
+    b.doc = load_doc(path);
+    bi = static_cast<int>(buffers.size());
+    buffers.push_back(std::move(b));
+    tab_order.push_back(bi);
+    update_title();
+    return bi;
+  };
+
+  // Invalidate layouts for every view of a buffer.
+  auto touch_buffer_views = [&](int bi) {
+    needs_layout = true;
+    for (auto& sw : soft_wins)
+      if (sw.buf == bi) sw.needs_layout = true;
+  };
+
+  // Pop focused pane buffer into a floating window (shared buffer).
+  auto pop_out_focused = [&]() {
+    Pane& p = F();
+    int bi = p.buf;
+    for (auto& sw : soft_wins) {
+      if (sw.buf == bi) {
+        // Already floating — raise it.
+        for (size_t i = 0; i < soft_wins.size(); ++i) {
+          if (soft_wins[i].buf == bi) {
+            raise_soft(i);
+            flash_status("Already in a window");
+            return;
+          }
+        }
+      }
+    }
+    SoftWindow sw;
+    sw.buf = bi;
+    sw.sel = p.sel;
+    sw.scroll = p.scroll_y;
+    sw.needs_layout = true;
+    const int cascade = static_cast<int>(soft_wins.size()) * 28;
+    sw.x = help_x + 30 + cascade;
+    sw.y = help_y + 30 + cascade;
+    if (sw.x + sw.w > win_w - 20) sw.x = 40 + (cascade % 60);
+    if (sw.y + sw.h > win_h - 40)
+      sw.y = static_cast<int>(ui_top) + 20 + (cascade % 40);
+    soft_wins.push_back(std::move(sw));
+    flash_status("Popped out to window");
+  };
+
+  // Dock a floating window back into the focused pane as a tab.
+  auto pop_in_soft = [&](size_t si) {
+    if (si >= soft_wins.size()) return;
+    int bi = soft_wins[si].buf;
+    panes[focus].buf = bi;
+    panes[focus].sel = soft_wins[si].sel;
+    panes[focus].scroll_y = soft_wins[si].scroll;
+    soft_wins.erase(soft_wins.begin() + static_cast<std::ptrdiff_t>(si));
+    needs_layout = true;
+    update_title();
+    flash_status("Docked to tab");
+  };
+
   auto open_browse = [&](const std::string& path, const std::string& title) {
     if (path.empty() || !fs::exists(path)) {
       std::cerr << "Cannot open in window: " << path << "\n";
       return;
     }
-    // Focus existing window for the same path.
-    std::string canon = path;
-    try {
-      canon = fs::weakly_canonical(path).string();
-    } catch (...) {
-    }
+    int bi = ensure_buffer(path);
+    // Focus existing floating window for this buffer.
     for (size_t i = 0; i < soft_wins.size(); ++i) {
-      std::string existing = soft_wins[i].path;
-      try {
-        existing = fs::weakly_canonical(existing).string();
-      } catch (...) {
-      }
-      if (existing == canon) {
+      if (soft_wins[i].buf == bi) {
         raise_soft(i);
         std::cout << "Software window (focus): " << path << "\n";
         return;
       }
     }
     SoftWindow sw;
-    sw.doc = load_doc(path);
-    sw.path = path;
-    sw.title = title.empty() ? path : title;
+    sw.buf = bi;
+    if (!title.empty()) sw.title = title;
     sw.needs_layout = true;
     sw.scroll = 0.f;
-    // Cascade so multiple windows stay visible.
+    xanatoo::ensure_valid_caret(buffers[static_cast<size_t>(bi)].doc, sw.sel.focus);
+    sw.sel.anchor = sw.sel.focus;
     const int cascade = static_cast<int>(soft_wins.size()) * 28;
     sw.x = help_x + 30 + cascade;
     sw.y = help_y + 30 + cascade;
     if (sw.x + sw.w > win_w - 20) sw.x = 40 + (cascade % 60);
-    if (sw.y + sw.h > win_h - 40) sw.y = static_cast<int>(ui_top) + 20 + (cascade % 40);
+    if (sw.y + sw.h > win_h - 40)
+      sw.y = static_cast<int>(ui_top) + 20 + (cascade % 40);
     soft_wins.push_back(std::move(sw));
     std::cout << "Software window: " << path << "\n";
   };
@@ -1720,7 +1854,7 @@ int main(int argc, char** argv) {
                   p.sel.anchor = p.sel.focus;
                   scroll_caret_into_view(p);
                   // Dual-pane shared doc: mirror target in the other view
-                  if (split && shared_doc) {
+                  if (split && shared_doc()) {
                     int other = 1 - focus;
                     panes[other].sel.focus = *dest;
                     panes[other].sel.anchor = *dest;
@@ -1794,7 +1928,7 @@ int main(int argc, char** argv) {
                   p.sel.focus = *dest;
                   p.sel.anchor = p.sel.focus;
                   scroll_caret_into_view(p);
-                  if (split && shared_doc) {
+                  if (split && shared_doc()) {
                     int other = 1 - focus;
                     panes[other].sel.focus = *dest;
                     panes[other].sel.anchor = *dest;
@@ -2823,7 +2957,7 @@ int main(int argc, char** argv) {
                 needs_layout = true;
                 reset_blink();
               } else if (ctrl) {
-                if ((dirty_flags[0] || dirty_flags[1]) && !discard_armed) {
+                if ((buffers[0].dirty || (buffers.size() > 1 ? buffers[1].dirty : false)) && !discard_armed) {
                   discard_armed = true;
                   flash_status(
                       "Unsaved changes — Ctrl+S to save, or Ctrl+Q again to quit");
@@ -2838,7 +2972,7 @@ int main(int argc, char** argv) {
 
             case SDLK_w:
               if (ctrl) {
-                // Close topmost soft chrome (browse window → help → outline).
+                // Soft window → help → outline → document tab
                 if (!soft_wins.empty()) {
                   soft_wins.pop_back();
                   flash_status("Closed window");
@@ -2849,6 +2983,43 @@ int main(int argc, char** argv) {
                   outline_mode = false;
                   ol_dragging = false;
                   ol_resize = 0;
+                } else {
+                  // Close focused tab
+                  int tab_i = -1;
+                  for (int ti = 0; ti < static_cast<int>(tab_order.size()); ++ti)
+                    if (tab_order[static_cast<size_t>(ti)] == p.buf) {
+                      tab_i = ti;
+                      break;
+                    }
+                  if (tab_i >= 0) {
+                    // Reuse CloseTab logic via command path is heavy; inline.
+                    int bi = tab_order[static_cast<size_t>(tab_i)];
+                    if (allow_discard_dirty(bi)) {
+                      soft_wins.erase(
+                          std::remove_if(
+                              soft_wins.begin(), soft_wins.end(),
+                              [bi](const SoftWindow& s) { return s.buf == bi; }),
+                          soft_wins.end());
+                      tab_order.erase(tab_order.begin() + tab_i);
+                      if (tab_order.empty()) {
+                        DocBuffer b;
+                        b.doc = xanatoo::parse_document(
+                            xanatoo::fallback_document(), {});
+                        buffers.push_back(std::move(b));
+                        int nbi = static_cast<int>(buffers.size()) - 1;
+                        tab_order.push_back(nbi);
+                        panes[0].buf = panes[1].buf = nbi;
+                      } else {
+                        int next = tab_order[static_cast<size_t>(std::min(
+                            tab_i, static_cast<int>(tab_order.size()) - 1))];
+                        if (panes[0].buf == bi) panes[0].buf = next;
+                        if (panes[1].buf == bi) panes[1].buf = next;
+                      }
+                      needs_layout = true;
+                      update_title();
+                      flash_status("Tab closed");
+                    }
+                  }
                 }
               }
               break;
@@ -2950,8 +3121,8 @@ int main(int argc, char** argv) {
               if (ctrl) {
                 split = !split;
                 if (split) {
-                  if (shared_doc) {
-                    panes[1].doc_index = 0;
+                  if (shared_doc()) {
+                    panes[1].buf = 0;
                   }
                   panes[1].sel = panes[0].sel;
                   panes[1].scroll_y = panes[0].scroll_y;
@@ -3217,20 +3388,20 @@ int main(int argc, char** argv) {
                   if (!fs::exists(path)) {
                     flash_status("Open: file not found");
                     std::cerr << "Open: file not found: " << path << "\n";
-                  } else if (!allow_discard_dirty(p.doc_index)) {
+                  } else if (!allow_discard_dirty(p.buf)) {
                     // keep open_file_mode so a second Enter discards and opens
                     flash_status(
                         "Unsaved changes — Enter again to discard and open");
                     break;
                   } else {
-                    docs[p.doc_index] = load_doc(path);
+                    buffers[static_cast<size_t>(p.buf)].doc = load_doc(path);
                     path_of(p) = path;
-                    dirty_flags[p.doc_index] = false;
-                    xanatoo::ensure_valid_caret(docs[p.doc_index], p.sel.focus);
+                    buffers[static_cast<size_t>(p.buf)].dirty = false;
+                    xanatoo::ensure_valid_caret(buffers[static_cast<size_t>(p.buf)].doc, p.sel.focus);
                     p.sel.anchor = p.sel.focus;
                     p.scroll_y = 0.f;
-                    histories[p.doc_index].reset(docs[p.doc_index], p.sel);
-                    if (panes[0].doc_index == panes[1].doc_index) {
+                    buffers[static_cast<size_t>(p.buf)].history.reset(buffers[static_cast<size_t>(p.buf)].doc, p.sel);
+                    if (panes[0].buf == panes[1].buf) {
                       panes[1 - focus].sel = p.sel;
                       panes[1 - focus].scroll_y = 0.f;
                     }
@@ -3257,7 +3428,7 @@ int main(int argc, char** argv) {
                   } else {
                     out << text;
                     path_of(p) = save_as_path;
-                    dirty_flags[p.doc_index] = false;
+                    buffers[static_cast<size_t>(p.buf)].dirty = false;
                     discard_armed = false;
                     update_title();
                     flash_status("Saved as " + save_as_path);
@@ -3649,8 +3820,8 @@ int main(int argc, char** argv) {
 
             case SDLK_z:
               if (ctrl) {
-                if (histories[p.doc_index].undo(d, p.sel)) {
-                  if (panes[0].doc_index == panes[1].doc_index) {
+                if (buffers[static_cast<size_t>(p.buf)].history.undo(d, p.sel)) {
+                  if (panes[0].buf == panes[1].buf) {
                     xanatoo::ensure_valid_caret(
                         doc_of(panes[1 - focus]), panes[1 - focus].sel.focus);
                     panes[1 - focus].sel.anchor = panes[1 - focus].sel.focus;
@@ -3663,8 +3834,8 @@ int main(int argc, char** argv) {
 
             case SDLK_y:
               if (ctrl) {
-                if (histories[p.doc_index].redo(d, p.sel)) {
-                  if (panes[0].doc_index == panes[1].doc_index) {
+                if (buffers[static_cast<size_t>(p.buf)].history.redo(d, p.sel)) {
+                  if (panes[0].buf == panes[1].buf) {
                     xanatoo::ensure_valid_caret(
                         doc_of(panes[1 - focus]), panes[1 - focus].sel.focus);
                     panes[1 - focus].sel.anchor = panes[1 - focus].sel.focus;
@@ -3677,16 +3848,16 @@ int main(int argc, char** argv) {
 
             case SDLK_n:
               if (ctrl) {
-                if (!allow_discard_dirty(p.doc_index)) break;
-                docs[p.doc_index] =
+                if (!allow_discard_dirty(p.buf)) break;
+                buffers[static_cast<size_t>(p.buf)].doc =
                     xanatoo::parse_document(xanatoo::fallback_document(), {});
                 path_of(p).clear();
-                dirty_flags[p.doc_index] = false;
-                xanatoo::ensure_valid_caret(docs[p.doc_index], p.sel.focus);
+                buffers[static_cast<size_t>(p.buf)].dirty = false;
+                xanatoo::ensure_valid_caret(buffers[static_cast<size_t>(p.buf)].doc, p.sel.focus);
                 p.sel.anchor = p.sel.focus;
                 p.scroll_y = 0.f;
-                histories[p.doc_index].reset(docs[p.doc_index], p.sel);
-                if (panes[0].doc_index == panes[1].doc_index) {
+                buffers[static_cast<size_t>(p.buf)].history.reset(buffers[static_cast<size_t>(p.buf)].doc, p.sel);
+                if (panes[0].buf == panes[1].buf) {
                   panes[1 - focus].sel = p.sel;
                   panes[1 - focus].scroll_y = 0.f;
                 }
@@ -3722,7 +3893,7 @@ int main(int argc, char** argv) {
                   } else {
                     out << text;
                     std::cout << "Saved: " << spath << "\n";
-                    dirty_flags[p.doc_index] = false;
+                    buffers[static_cast<size_t>(p.buf)].dirty = false;
                     discard_armed = false;
                     update_title();
                     flash_status("Saved " + spath);
@@ -3766,7 +3937,7 @@ int main(int argc, char** argv) {
                   flash_status("Reload: no path (Save As or Open URL first)");
                   break;
                 }
-                if (dirty_flags[p.doc_index] && !shift) {
+                if (buffers[static_cast<size_t>(p.buf)].dirty && !shift) {
                   flash_status(
                       "Unsaved changes — Ctrl+Shift+R to discard and reload");
                   break;
@@ -3776,12 +3947,12 @@ int main(int argc, char** argv) {
                   break;
                 }
                 xanatoo::clear_external_doc_cache();
-                docs[p.doc_index] = load_doc(rpath);
-                dirty_flags[p.doc_index] = false;
-                histories[p.doc_index].reset(docs[p.doc_index], p.sel);
+                buffers[static_cast<size_t>(p.buf)].doc = load_doc(rpath);
+                buffers[static_cast<size_t>(p.buf)].dirty = false;
+                buffers[static_cast<size_t>(p.buf)].history.reset(buffers[static_cast<size_t>(p.buf)].doc, p.sel);
                 for (int pi = 0; pi < 2; ++pi) {
-                  if (panes[pi].doc_index != p.doc_index) continue;
-                  xanatoo::ensure_valid_caret(docs[p.doc_index],
+                  if (panes[pi].buf != p.buf) continue;
+                  xanatoo::ensure_valid_caret(buffers[static_cast<size_t>(p.buf)].doc,
                                               panes[pi].sel.focus);
                   panes[pi].sel.anchor = panes[pi].sel.focus;
                   panes[pi].scroll_y = 0.f;
@@ -3801,7 +3972,7 @@ int main(int argc, char** argv) {
                   split = true;
                   needs_layout = true;
                 }
-                if (shared_doc || paths[1].empty()) {
+                if (shared_doc() || buffers.size() < 2) {
                   flash_status(
                       "Diff needs two files — Examples → Diff demo, or "
                       "xanatoo a.md b.md");
@@ -3872,14 +4043,70 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_t:
-              // Ctrl+Shift+T — cycle task item state
               if (ctrl && shift) {
+                // Cycle task item state
                 edit();
                 if (xanatoo::toggle_task_item(d, p.sel.focus)) {
                   p.sel.anchor = p.sel.focus;
                   needs_layout = true;
                   reset_blink();
                 }
+              } else if (ctrl) {
+                // New tab
+                DocBuffer b;
+                b.doc = xanatoo::parse_document(xanatoo::fallback_document(), {});
+                int bi = static_cast<int>(buffers.size());
+                buffers.push_back(std::move(b));
+                tab_order.push_back(bi);
+                p.buf = bi;
+                p.sel = {};
+                xanatoo::ensure_valid_caret(buffers[static_cast<size_t>(bi)].doc,
+                                            p.sel.focus);
+                p.sel.anchor = p.sel.focus;
+                p.scroll_y = 0.f;
+                buffers[static_cast<size_t>(bi)].history.reset(
+                    buffers[static_cast<size_t>(bi)].doc, p.sel);
+                needs_layout = true;
+                update_title();
+                flash_status("New tab");
+              }
+              break;
+
+            case SDLK_TAB:
+              if (ctrl) {
+                if (shift) {
+                  // Prev tab
+                  if (!tab_order.empty()) {
+                    int cur = 0;
+                    for (int ti = 0; ti < static_cast<int>(tab_order.size()); ++ti)
+                      if (tab_order[static_cast<size_t>(ti)] == p.buf) {
+                        cur = ti;
+                        break;
+                      }
+                    cur = (cur - 1 + static_cast<int>(tab_order.size())) %
+                          static_cast<int>(tab_order.size());
+                    p.buf = tab_order[static_cast<size_t>(cur)];
+                    needs_layout = true;
+                  }
+                } else {
+                  if (!tab_order.empty()) {
+                    int cur = 0;
+                    for (int ti = 0; ti < static_cast<int>(tab_order.size()); ++ti)
+                      if (tab_order[static_cast<size_t>(ti)] == p.buf) {
+                        cur = ti;
+                        break;
+                      }
+                    cur = (cur + 1) % static_cast<int>(tab_order.size());
+                    p.buf = tab_order[static_cast<size_t>(cur)];
+                    needs_layout = true;
+                  }
+                }
+              }
+              break;
+
+            case SDLK_p:
+              if (ctrl && shift) {
+                pop_out_focused();
               }
               break;
 
@@ -4082,12 +4309,12 @@ int main(int argc, char** argv) {
     // ImGui menu + toolbar
     {
       xanatoo::UiState ui_state;
-      ui_state.dirty = dirty_flags[F().doc_index];
+      ui_state.dirty = buffers[static_cast<size_t>(F().buf)].dirty;
       ui_state.has_path = !path_of(F()).empty();
       ui_state.split = split;
       ui_state.outline = outline_mode;
       ui_state.diff = diff_mode;
-      ui_state.can_diff = !shared_doc && !paths[1].empty();
+      ui_state.can_diff = !shared_doc() && buffers.size() > 1;
       ui_state.structure = structure_mode;
       ui_state.browse = browse_mode;
       ui_state.help = help_mode;
@@ -4116,6 +4343,14 @@ int main(int argc, char** argv) {
         const std::string& cur = path_of(F());
         ui_state.current_bookmarked = is_bookmarked(cur);
       }
+      ui_state.tab_labels.clear();
+      ui_state.active_tab = 0;
+      for (int ti = 0; ti < static_cast<int>(tab_order.size()); ++ti) {
+        int bi = tab_order[static_cast<size_t>(ti)];
+        ui_state.tab_labels.push_back(buffer_tab_label(bi));
+        if (bi == panes[focus].buf) ui_state.active_tab = ti;
+      }
+      ui_state.has_floating = !soft_wins.empty();
       auto ui_frame = ui.begin_frame(ui_state);
       ui_top = ui_frame.top_reserved;
 
@@ -4131,6 +4366,9 @@ int main(int argc, char** argv) {
             c == C::NavigateUrl || c == C::NavBack || c == C::NavForward ||
             c == C::ToggleHistory || c == C::ToggleBookmarks ||
             c == C::AddBookmark || c == C::RemoveBookmark ||
+            c == C::NewTab || c == C::CloseTab || c == C::NextTab ||
+            c == C::PrevTab || c == C::SelectTab || c == C::PopOut ||
+            c == C::PopIn ||
             c == C::Save ||
             c == C::SaveAs || c == C::ExportSexpr || c == C::ExportMarkdown ||
             c == C::Reload || c == C::ForceReload || c == C::Copy ||
@@ -4150,7 +4388,7 @@ int main(int argc, char** argv) {
 
       switch (ui_frame.cmd) {
         case C::Quit: {
-          if ((dirty_flags[0] || dirty_flags[1]) && !discard_armed) {
+          if ((buffers[0].dirty || (buffers.size() > 1 ? buffers[1].dirty : false)) && !discard_armed) {
             discard_armed = true;
             flash_status(
                 "Unsaved changes — Ctrl+S to save, or Quit again to exit");
@@ -4161,16 +4399,16 @@ int main(int argc, char** argv) {
           break;
         }
         case C::NewDocument: {
-          if (!allow_discard_dirty(p.doc_index)) break;
-          docs[p.doc_index] =
+          if (!allow_discard_dirty(p.buf)) break;
+          buffers[static_cast<size_t>(p.buf)].doc =
               xanatoo::parse_document(xanatoo::fallback_document(), {});
           path_of(p).clear();
-          dirty_flags[p.doc_index] = false;
-          xanatoo::ensure_valid_caret(docs[p.doc_index], p.sel.focus);
+          buffers[static_cast<size_t>(p.buf)].dirty = false;
+          xanatoo::ensure_valid_caret(buffers[static_cast<size_t>(p.buf)].doc, p.sel.focus);
           p.sel.anchor = p.sel.focus;
           p.scroll_y = 0.f;
-          histories[p.doc_index].reset(docs[p.doc_index], p.sel);
-          if (panes[0].doc_index == panes[1].doc_index) {
+          buffers[static_cast<size_t>(p.buf)].history.reset(buffers[static_cast<size_t>(p.buf)].doc, p.sel);
+          if (panes[0].buf == panes[1].buf) {
             panes[1 - focus].sel = p.sel;
             panes[1 - focus].scroll_y = 0.f;
           }
@@ -4217,6 +4455,112 @@ int main(int argc, char** argv) {
             flash_status("No next page");
           }
           break;
+        case C::NewTab: {
+          DocBuffer b;
+          b.doc = xanatoo::parse_document(xanatoo::fallback_document(), {});
+          int bi = static_cast<int>(buffers.size());
+          buffers.push_back(std::move(b));
+          tab_order.push_back(bi);
+          panes[focus].buf = bi;
+          panes[focus].sel = {};
+          xanatoo::ensure_valid_caret(buffers[static_cast<size_t>(bi)].doc,
+                                      panes[focus].sel.focus);
+          panes[focus].sel.anchor = panes[focus].sel.focus;
+          panes[focus].scroll_y = 0.f;
+          buffers[static_cast<size_t>(bi)].history.reset(
+              buffers[static_cast<size_t>(bi)].doc, panes[focus].sel);
+          needs_layout = true;
+          update_title();
+          flash_status("New tab");
+          break;
+        }
+        case C::CloseTab: {
+          int tab_i = -1;
+          if (!ui_frame.arg.empty()) {
+            try { tab_i = std::stoi(ui_frame.arg); } catch (...) { tab_i = -1; }
+          }
+          if (tab_i < 0 || tab_i >= static_cast<int>(tab_order.size())) {
+            // Close focused pane's buffer tab
+            for (int ti = 0; ti < static_cast<int>(tab_order.size()); ++ti) {
+              if (tab_order[static_cast<size_t>(ti)] == panes[focus].buf) {
+                tab_i = ti;
+                break;
+              }
+            }
+          }
+          if (tab_i < 0 || tab_order.empty()) break;
+          int bi = tab_order[static_cast<size_t>(tab_i)];
+          if (!allow_discard_dirty(bi)) break;
+          // Remove floating windows on this buffer
+          soft_wins.erase(
+              std::remove_if(soft_wins.begin(), soft_wins.end(),
+                             [bi](const SoftWindow& sw) { return sw.buf == bi; }),
+              soft_wins.end());
+          tab_order.erase(tab_order.begin() + tab_i);
+          // If no tabs left, create empty one
+          if (tab_order.empty()) {
+            DocBuffer b;
+            b.doc = xanatoo::parse_document(xanatoo::fallback_document(), {});
+            buffers.push_back(std::move(b));
+            int nbi = static_cast<int>(buffers.size()) - 1;
+            tab_order.push_back(nbi);
+            panes[0].buf = panes[1].buf = nbi;
+          } else {
+            int next = tab_order[static_cast<size_t>(
+                std::min(tab_i, static_cast<int>(tab_order.size()) - 1))];
+            if (panes[0].buf == bi) panes[0].buf = next;
+            if (panes[1].buf == bi) panes[1].buf = next;
+          }
+          needs_layout = true;
+          update_title();
+          flash_status("Tab closed");
+          break;
+        }
+        case C::SelectTab: {
+          int tab_i = 0;
+          try { tab_i = std::stoi(ui_frame.arg); } catch (...) { break; }
+          if (tab_i < 0 || tab_i >= static_cast<int>(tab_order.size())) break;
+          panes[focus].buf = tab_order[static_cast<size_t>(tab_i)];
+          needs_layout = true;
+          update_title();
+          break;
+        }
+        case C::NextTab:
+          if (!tab_order.empty()) {
+            int cur = 0;
+            for (int ti = 0; ti < static_cast<int>(tab_order.size()); ++ti)
+              if (tab_order[static_cast<size_t>(ti)] == panes[focus].buf) {
+                cur = ti;
+                break;
+              }
+            cur = (cur + 1) % static_cast<int>(tab_order.size());
+            panes[focus].buf = tab_order[static_cast<size_t>(cur)];
+            needs_layout = true;
+          }
+          break;
+        case C::PrevTab:
+          if (!tab_order.empty()) {
+            int cur = 0;
+            for (int ti = 0; ti < static_cast<int>(tab_order.size()); ++ti)
+              if (tab_order[static_cast<size_t>(ti)] == panes[focus].buf) {
+                cur = ti;
+                break;
+              }
+            cur = (cur - 1 + static_cast<int>(tab_order.size())) %
+                  static_cast<int>(tab_order.size());
+            panes[focus].buf = tab_order[static_cast<size_t>(cur)];
+            needs_layout = true;
+          }
+          break;
+        case C::PopOut:
+          pop_out_focused();
+          break;
+        case C::PopIn:
+          if (!soft_wins.empty())
+            pop_in_soft(soft_wins.size() - 1);
+          else
+            flash_status("No floating window to dock");
+          break;
         case C::ToggleHistory:
           history_panel_open = !history_panel_open;
           break;
@@ -4248,7 +4592,7 @@ int main(int argc, char** argv) {
             std::ofstream out(spath);
             if (out) {
               out << text;
-              dirty_flags[p.doc_index] = false;
+              buffers[static_cast<size_t>(p.buf)].dirty = false;
               discard_armed = false;
               update_title();
               flash_status("Saved " + spath);
@@ -4283,7 +4627,7 @@ int main(int argc, char** argv) {
         case C::ForceReload: {
           std::string& rpath = path_of(p);
           if (rpath.empty()) break;
-          if (dirty_flags[p.doc_index] && ui_frame.cmd == C::Reload) {
+          if (buffers[static_cast<size_t>(p.buf)].dirty && ui_frame.cmd == C::Reload) {
             flash_status("Unsaved changes — use Force Reload");
             break;
           }
@@ -4292,10 +4636,10 @@ int main(int argc, char** argv) {
             break;
           }
           xanatoo::clear_external_doc_cache();
-          docs[p.doc_index] = load_doc(rpath);
-          dirty_flags[p.doc_index] = false;
-          histories[p.doc_index].reset(docs[p.doc_index], p.sel);
-          xanatoo::ensure_valid_caret(docs[p.doc_index], p.sel.focus);
+          buffers[static_cast<size_t>(p.buf)].doc = load_doc(rpath);
+          buffers[static_cast<size_t>(p.buf)].dirty = false;
+          buffers[static_cast<size_t>(p.buf)].history.reset(buffers[static_cast<size_t>(p.buf)].doc, p.sel);
+          xanatoo::ensure_valid_caret(buffers[static_cast<size_t>(p.buf)].doc, p.sel.focus);
           p.sel.anchor = p.sel.focus;
           p.scroll_y = 0.f;
           update_title();
@@ -4304,10 +4648,10 @@ int main(int argc, char** argv) {
           break;
         }
         case C::Undo:
-          if (histories[p.doc_index].undo(d, p.sel)) needs_layout = true;
+          if (buffers[static_cast<size_t>(p.buf)].history.undo(d, p.sel)) needs_layout = true;
           break;
         case C::Redo:
-          if (histories[p.doc_index].redo(d, p.sel)) needs_layout = true;
+          if (buffers[static_cast<size_t>(p.buf)].history.redo(d, p.sel)) needs_layout = true;
           break;
         case C::Cut: {
           std::string text = xanatoo::selected_text(d, p.sel);
@@ -4698,7 +5042,7 @@ int main(int argc, char** argv) {
           }
           break;
         case C::ToggleDiff:
-          if (shared_doc || paths[1].empty()) {
+          if (shared_doc() || buffers.size() < 2) {
             flash_status(
                 "Diff needs two files — Examples → Diff demo, or "
                 "xanatoo a.md b.md");
@@ -4779,7 +5123,7 @@ int main(int argc, char** argv) {
           break;
         }
         case C::LoadDiffDemo: {
-          if ((dirty_flags[0] || dirty_flags[1]) && !discard_armed) {
+          if ((buffers[0].dirty || (buffers.size() > 1 ? buffers[1].dirty : false)) && !discard_armed) {
             discard_armed = true;
             flash_status(
                 "Unsaved changes — save first, or repeat Diff demo to discard");
@@ -4795,24 +5139,30 @@ int main(int argc, char** argv) {
             std::cerr << "Diff demo: examples/diff-v1.md and diff-v2.md required\n";
             break;
           }
-          docs[0] = load_doc(p0);
-          docs[1] = load_doc(p1);
-          paths[0] = p0;
-          paths[1] = p1;
-          shared_doc = false;
-          panes[0].doc_index = 0;
-          panes[1].doc_index = 1;
+          buffers.clear();
+          {
+            DocBuffer b0;
+            b0.path = p0;
+            b0.doc = load_doc(p0);
+            buffers.push_back(std::move(b0));
+            DocBuffer b1;
+            b1.path = p1;
+            b1.doc = load_doc(p1);
+            buffers.push_back(std::move(b1));
+          }
+          tab_order = {0, 1};
+          panes[0].buf = 0;
+          panes[1].buf = 1;
           split = true;
           focus = 0;
-          dirty_flags[0] = dirty_flags[1] = false;
-          xanatoo::ensure_valid_caret(docs[0], panes[0].sel.focus);
+          xanatoo::ensure_valid_caret(buffers[0].doc, panes[0].sel.focus);
           panes[0].sel.anchor = panes[0].sel.focus;
           panes[0].scroll_y = 0.f;
-          xanatoo::ensure_valid_caret(docs[1], panes[1].sel.focus);
+          xanatoo::ensure_valid_caret(buffers[1].doc, panes[1].sel.focus);
           panes[1].sel.anchor = panes[1].sel.focus;
           panes[1].scroll_y = 0.f;
-          histories[0].reset(docs[0], panes[0].sel);
-          histories[1].reset(docs[1], panes[1].sel);
+          buffers[0].history.reset(buffers[0].doc, panes[0].sel);
+          buffers[1].history.reset(buffers[1].doc, panes[1].sel);
           diff_mode = true;
           refresh_diff();
           needs_layout = true;
@@ -4973,7 +5323,7 @@ int main(int argc, char** argv) {
             // Only the header line for expanded stretches is interactive;
             // wash the first line-height of the box when expanded.
             float h = box.height;
-            auto& sn = docs[pane.doc_index].get(hovered_stretch);
+            auto& sn = buffers[static_cast<size_t>(pane.buf)].doc.get(hovered_stretch);
             if (sn.expanded && h > static_cast<float>(body_font.line_height()) + 8.f)
               h = static_cast<float>(body_font.line_height()) + 6.f;
             SDL_SetRenderDrawColor(sdl, 40, 130, 90, 50);
@@ -5095,7 +5445,7 @@ int main(int argc, char** argv) {
       // Logical structure overlay: colour bars + wash by NodeKind + right labels
       if (structure_mode) {
         SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
-        const auto& ddoc = docs[pane.doc_index];
+        const auto& ddoc = buffers[static_cast<size_t>(pane.buf)].doc;
         auto kind_label = [](const xanatoo::Node& n) -> const char* {
           using K = xanatoo::NodeKind;
           switch (n.kind) {
@@ -5262,8 +5612,8 @@ int main(int argc, char** argv) {
       }
 
       // Version-diff marks (orange bars on changed text blocks)
-      if (diff_mode && !shared_doc) {
-        int di = pane.doc_index;
+      if (diff_mode && !shared_doc()) {
+        int di = pane.buf;
         const auto& marks = diff_marks[di];
         if (!marks.empty()) {
           SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
@@ -5293,7 +5643,7 @@ int main(int argc, char** argv) {
         const auto& words = diff_words[di];
         if (!words.empty()) {
           SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
-          const auto& ddoc = docs[di];
+          const auto& ddoc = buffers[static_cast<size_t>(di)].doc;
           for (const auto& g : pane.layout.glyphs) {
             if (g.node == xanatoo::INVALID_NODE) continue;
             // Map glyph to plain-text character index within its node
@@ -5444,7 +5794,7 @@ int main(int argc, char** argv) {
 
     // Visual link between panes when both carets sit on the same node
     // (e.g. after following an internal link in dual-pane shared view).
-    if (split && shared_doc &&
+    if (split && shared_doc() &&
         panes[0].sel.focus.node != xanatoo::INVALID_NODE &&
         panes[0].sel.focus.node == panes[1].sel.focus.node) {
       float lh = static_cast<float>(body_font.line_height());
@@ -5952,7 +6302,7 @@ int main(int argc, char** argv) {
       SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
       renderer.draw_text(body_font, static_cast<float>(sw.x + 10),
                          static_cast<float>(sw.y + 6 + body_font.ascender()),
-                         sw.title.c_str(), 40, 55, 35);
+                         soft_title(sw).c_str(), 40, 55, 35);
       renderer.draw_text(body_font, static_cast<float>(sw.x + sw.w - 22),
                          static_cast<float>(sw.y + 6 + body_font.ascender()),
                          "×", 80, 40, 40);

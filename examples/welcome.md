@@ -20,6 +20,8 @@ Inspired by *Xanadu*, **HyperCard**, and the *Canon Cat*.
 | **Ctrl+O** / **Ctrl+L** | Open file / focus location bar |
 | **Ctrl+F** | Leap search (F3 next) |
 | **Ctrl+\\** | Dual-pane split |
+| **Ctrl+T** / **Ctrl+W** | New tab / close tab |
+| **Ctrl+Shift+P** | Pop out to floating window |
 | **Alt+Left** / **Alt+Right** | History back / forward |
 | **Ctrl+Shift+H** | Session history panel |
 | **Ctrl+Shift+B** | Bookmark this page |
