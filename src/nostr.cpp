@@ -5,6 +5,7 @@
 // mapped into Thread / Message document nodes.
 
 #include "xanatoo/nostr.hpp"
+#include "xanatoo/util.hpp"
 
 #include "xanatoo/https.hpp"
 
@@ -38,12 +39,6 @@
 namespace xanatoo {
 namespace {
 
-std::string ascii_lower_copy(std::string_view s) {
-  std::string o(s);
-  for (char& c : o)
-    if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
-  return o;
-}
 
 bool is_hex64(std::string_view s) {
   if (s.size() != 64) return false;
@@ -58,7 +53,7 @@ std::string strip_nostr_prefix(std::string_view s) {
     s.remove_prefix(1);
   while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back())))
     s.remove_suffix(1);
-  if (s.size() >= 6 && ascii_lower_copy(s.substr(0, 6)) == "nostr:")
+  if (s.size() >= 6 && ascii_lower(s.substr(0, 6)) == "nostr:")
     s.remove_prefix(6);
   return std::string(s);
 }
@@ -114,7 +109,7 @@ bool bech32_decode(std::string_view str, std::string& hrp,
   }
   if (lower && upper) return false;
 
-  std::string s = ascii_lower_copy(str);
+  std::string s = ascii_lower(str);
   auto pos = s.rfind('1');
   if (pos == std::string::npos || pos < 1 || pos + 7 > s.size()) return false;
   hrp = s.substr(0, pos);
@@ -189,7 +184,7 @@ bool is_nostr_ref(std::string_view s) {
   std::string t = strip_nostr_prefix(s);
   if (t.empty()) return false;
   if (is_hex64(t)) return true;
-  std::string low = ascii_lower_copy(t);
+  std::string low = ascii_lower(t);
   if (low == "recent" || low == "firehose" || low == "latest") return true;
   return low.rfind("note1", 0) == 0 || low.rfind("nevent1", 0) == 0;
 }
@@ -197,7 +192,7 @@ bool is_nostr_ref(std::string_view s) {
 std::optional<std::string> nostr_decode_event_id(
     std::string_view ref, std::vector<std::string>* relays) {
   std::string t = strip_nostr_prefix(ref);
-  if (is_hex64(t)) return ascii_lower_copy(t);
+  if (is_hex64(t)) return ascii_lower(t);
 
   std::string hrp;
   std::vector<uint8_t> data5;
@@ -322,7 +317,7 @@ void parse_e_tags(std::string_view json, NostrEvent& ev) {
         is_reply_marker = true;
     }
     if (is_hex64(id)) {
-      std::string hex = ascii_lower_copy(id);
+      std::string hex = ascii_lower(id);
       ev.e_tags.push_back(hex);
       if (is_reply_marker) marked_reply = hex;
       ev.reply_to = hex;
@@ -333,8 +328,8 @@ void parse_e_tags(std::string_view json, NostrEvent& ev) {
 }
 
 bool parse_event_json(std::string_view json, NostrEvent& ev) {
-  ev.id = ascii_lower_copy(json_str_field(json, "id"));
-  ev.pubkey = ascii_lower_copy(json_str_field(json, "pubkey"));
+  ev.id = ascii_lower(json_str_field(json, "id"));
+  ev.pubkey = ascii_lower(json_str_field(json, "pubkey"));
   ev.content = json_str_field(json, "content");
   ev.created_at = json_int_field(json, "created_at");
   ev.kind = static_cast<int>(json_int_field(json, "kind"));
@@ -875,7 +870,7 @@ void query_profiles(const std::string& relay,
 std::optional<Document> nostr_fetch_thread(std::string_view ref,
                                            std::string* err) {
   std::string stripped = strip_nostr_prefix(ref);
-  std::string low = ascii_lower_copy(stripped);
+  std::string low = ascii_lower(stripped);
   const bool recent_mode =
       (low == "recent" || low == "firehose" || low == "latest");
 

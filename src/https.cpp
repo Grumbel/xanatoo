@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/https.hpp"
+#include "xanatoo/util.hpp"
 
 #include <cctype>
 #include <cstdlib>
@@ -49,23 +50,7 @@ int tcp_connect(const std::string& host, int port, std::string* err) {
   return fd;
 }
 
-bool starts_with_ci(std::string_view s, std::string_view prefix) {
-  if (s.size() < prefix.size()) return false;
-  for (size_t i = 0; i < prefix.size(); ++i) {
-    if (std::tolower(static_cast<unsigned char>(s[i])) !=
-        std::tolower(static_cast<unsigned char>(prefix[i])))
-      return false;
-  }
-  return true;
-}
 
-std::string ascii_lower_copy(std::string_view s) {
-  std::string o;
-  o.reserve(s.size());
-  for (unsigned char c : s)
-    o.push_back(static_cast<char>(std::tolower(c)));
-  return o;
-}
 
 }  // namespace
 
@@ -189,7 +174,7 @@ std::optional<HttpResult> https_request(std::string_view method,
     }
   }
 
-  std::string hlow = ascii_lower_copy(headers);
+  std::string hlow = ascii_lower(headers);
   auto header_val = [&](const char* name) -> std::string {
     std::string key = std::string("\n") + name + ":";
     size_t loc = hlow.find(key);

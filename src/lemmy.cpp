@@ -5,6 +5,7 @@
 // Maps posts/comments into Thread + Message document nodes.
 
 #include "xanatoo/lemmy.hpp"
+#include "xanatoo/util.hpp"
 
 #include "xanatoo/https.hpp"
 #include "xanatoo/json_min.hpp"
@@ -28,28 +29,8 @@ namespace xanatoo {
 
 namespace {
 
-std::string ascii_lower_copy(std::string_view s) {
-  std::string o;
-  o.reserve(s.size());
-  for (unsigned char c : s)
-    o.push_back(static_cast<char>(std::tolower(c)));
-  return o;
-}
 
-bool starts_with_ci(std::string_view s, std::string_view prefix) {
-  if (s.size() < prefix.size()) return false;
-  for (size_t i = 0; i < prefix.size(); ++i) {
-    if (std::tolower(static_cast<unsigned char>(s[i])) !=
-        std::tolower(static_cast<unsigned char>(prefix[i])))
-      return false;
-  }
-  return true;
-}
 
-void trim_sv(std::string_view& s) {
-  while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) s.remove_prefix(1);
-  while (!s.empty() && (s.back() == ' ' || s.back() == '\t')) s.remove_suffix(1);
-}
 
 // Path looks like Lemmy UI or API.
 bool path_looks_lemmy(std::string_view path) {
@@ -59,7 +40,7 @@ bool path_looks_lemmy(std::string_view path) {
   if (q != std::string_view::npos) path = path.substr(0, q);
   size_t h = path.find('#');
   if (h != std::string_view::npos) path = path.substr(0, h);
-  std::string low = ascii_lower_copy(path);
+  std::string low = ascii_lower(path);
   if (low.rfind("/c/", 0) == 0 || low.find("/c/") != std::string::npos)
     return true;
   if (low.rfind("/post/", 0) == 0 || low.find("/post/") != std::string::npos)
@@ -72,7 +53,7 @@ bool path_looks_lemmy(std::string_view path) {
 }  // namespace
 
 bool is_lemmy_url(std::string_view s) {
-  trim_sv(s);
+  trim_ascii(s);
   if (s.empty()) return false;
   std::string_view rest = s;
   if (starts_with_ci(rest, "https://")) rest.remove_prefix(8);
@@ -323,7 +304,7 @@ struct ParsedUrl {
 
 ParsedUrl parse_lemmy_url(std::string_view s) {
   ParsedUrl out;
-  trim_sv(s);
+  trim_ascii(s);
   std::string url(s);
   if (starts_with_ci(url, "http://"))
     url = "https://" + url.substr(7);
@@ -347,7 +328,7 @@ ParsedUrl parse_lemmy_url(std::string_view s) {
     path = path.substr(0, qmark);
   }
 
-  std::string low = ascii_lower_copy(path);
+  std::string low = ascii_lower(path);
   if (low.find("/api/v3/") != std::string::npos) {
     out.api_path = path + query;
     return out;

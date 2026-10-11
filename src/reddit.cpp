@@ -30,27 +30,11 @@ namespace xanatoo {
 
 namespace {
 
-std::string ascii_lower_copy(std::string_view s) {
-  std::string o;
-  o.reserve(s.size());
-  for (unsigned char c : s)
-    o.push_back(static_cast<char>(std::tolower(c)));
-  return o;
-}
 
-bool starts_with_ci(std::string_view s, std::string_view prefix) {
-  if (s.size() < prefix.size()) return false;
-  for (size_t i = 0; i < prefix.size(); ++i) {
-    if (std::tolower(static_cast<unsigned char>(s[i])) !=
-        std::tolower(static_cast<unsigned char>(prefix[i])))
-      return false;
-  }
-  return true;
-}
 
 // Strip scheme and leading www./old. → host path for host matching.
 bool host_is_reddit(std::string_view host) {
-  std::string h = ascii_lower_copy(host);
+  std::string h = ascii_lower(host);
   if (h.rfind("www.", 0) == 0) h = h.substr(4);
   if (h.rfind("old.", 0) == 0) h = h.substr(4);
   if (h.rfind("np.", 0) == 0) h = h.substr(3);
@@ -110,7 +94,7 @@ std::string reddit_json_url(std::string_view s) {
       // drop port from host for rebuild
       size_t colon = host.rfind(':');
       if (colon != std::string::npos) host = host.substr(0, colon);
-      std::string hlow = ascii_lower_copy(host);
+      std::string hlow = ascii_lower(host);
       if (hlow == "redd.it" || hlow == "www.redd.it") {
         // short links stay; API still works via redirect sometimes — keep path
         url = "https://www.reddit.com" + path;
@@ -577,7 +561,7 @@ std::optional<Document> reddit_fetch(std::string_view url_in, std::string* err) 
   else {
     // Try path: /r/NAME/
     std::string u(url_in);
-    auto pos = ascii_lower_copy(u).find("/r/");
+    auto pos = ascii_lower(u).find("/r/");
     if (pos != std::string::npos) {
       size_t s0 = pos + 3;
       size_t s1 = s0;

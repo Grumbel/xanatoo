@@ -6,9 +6,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **210** (this delivery is **209**)
+Next bundle number: **213** (this delivery is **212**)
 
 ## Status (2026-10-11)
+
+Centralize starts_with_ci / ascii_lower(sv) / trim_ascii in util.hpp (re-applied).
 
 Fix: is_network_startup lambda capture of is_in_app_remote_url.
 
@@ -557,4 +559,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-207.*-shared-https-json-…` — prior (extract https + json_min)
 - `xanatoo-208.*-gemini-shared-tls-…` — prior (Gemini TLS + main URL helper)
 - `xanatoo-209.*-nostr-shared-ssl-…` — prior (Nostr SSL init + small cleanups)
-- `xanatoo-211.*-fix-remote-url-capture-…` — this delivery
+- `xanatoo-211.*-fix-remote-url-capture-…` — prior
+- `xanatoo-212.*-shared-string-helpers-…` — this delivery

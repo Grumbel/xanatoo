@@ -35,17 +35,6 @@ std::string to_upper(std::string s) {
   return s;
 }
 
-// Case-insensitive prefix test without allocating a full uppercased line.
-bool starts_with_ci(std::string_view s, std::string_view prefix) {
-  if (s.size() < prefix.size()) return false;
-  for (size_t i = 0; i < prefix.size(); ++i) {
-    char a = s[i], b = prefix[i];
-    if (a >= 'a' && a <= 'z') a = static_cast<char>(a - 'a' + 'A');
-    if (b >= 'a' && b <= 'z') b = static_cast<char>(b - 'a' + 'A');
-    if (a != b) return false;
-  }
-  return true;
-}
 
 bool is_todo_keyword(std::string_view w) {
   static const char* kws[] = {"TODO", "DONE", "NEXT", "WAITING", "CANCELLED",

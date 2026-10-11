@@ -22,6 +22,30 @@ inline bool ends_with(std::string_view s, std::string_view suffix) {
 // ASCII-only lowercasing (anchors, extensions, comparisons).
 std::string ascii_lower(std::string s);
 
+inline std::string ascii_lower(std::string_view s) {
+  return ascii_lower(std::string(s));
+}
+
+// Case-insensitive ASCII prefix.
+inline bool starts_with_ci(std::string_view s, std::string_view prefix) {
+  if (s.size() < prefix.size()) return false;
+  for (size_t i = 0; i < prefix.size(); ++i) {
+    char a = s[i], b = prefix[i];
+    if (a >= 'A' && a <= 'Z') a = static_cast<char>(a - 'A' + 'a');
+    if (b >= 'A' && b <= 'Z') b = static_cast<char>(b - 'A' + 'a');
+    if (a != b) return false;
+  }
+  return true;
+}
+
+// Trim ASCII space/tab from both ends (in place).
+inline void trim_ascii(std::string_view& s) {
+  while (!s.empty() && (s.front() == ' ' || s.front() == '	'))
+    s.remove_prefix(1);
+  while (!s.empty() && (s.back() == ' ' || s.back() == '	'))
+    s.remove_suffix(1);
+}
+
 bool is_text_node_kind(NodeKind k);
 
 // Depth-first list of text-bearing nodes under id (typically doc.root).
