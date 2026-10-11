@@ -314,6 +314,61 @@ Document parse_markup(std::string_view source) {
       if (!body.empty()) doc.append_text(n, body);
       continue;
     }
+    // GFM fenced code: ```lang … ```
+    if (trimmed.starts_with("```") || trimmed.starts_with("~~~")) {
+      const char fence_ch = trimmed[0];
+      size_t fence_len = 0;
+      while (fence_len < trimmed.size() && trimmed[fence_len] == fence_ch)
+        ++fence_len;
+      if (fence_len >= 3) {
+        NodeId n = doc.create(NodeKind::CodeBlock, current_parent());
+        // Optional language tag after the fence
+        size_t lang_start = fence_len;
+        while (lang_start < trimmed.size() &&
+               (trimmed[lang_start] == ' ' || trimmed[lang_start] == '\t'))
+          ++lang_start;
+        if (lang_start < trimmed.size()) {
+          size_t lang_end = lang_start;
+          while (lang_end < trimmed.size() &&
+                 (std::isalnum(static_cast<unsigned char>(trimmed[lang_end])) ||
+                  trimmed[lang_end] == '+' || trimmed[lang_end] == '-' ||
+                  trimmed[lang_end] == '_' || trimmed[lang_end] == '#' ||
+                  trimmed[lang_end] == '.'))
+            ++lang_end;
+          if (lang_end > lang_start)
+            doc.get(n).src =
+                std::string(trimmed.substr(lang_start, lang_end - lang_start));
+        }
+        ++i;
+        std::string body;
+        while (i < lines.size()) {
+          std::string_view lt = lines[i].text;
+          size_t llead = 0;
+          while (llead < lt.size() && (lt[llead] == ' ' || lt[llead] == '\t'))
+            ++llead;
+          std::string_view ltrim = lt.substr(llead);
+          // Closing fence: same character, at least as long, no other content
+          size_t close_len = 0;
+          while (close_len < ltrim.size() && ltrim[close_len] == fence_ch)
+            ++close_len;
+          if (close_len >= fence_len) {
+            size_t after = close_len;
+            while (after < ltrim.size() &&
+                   (ltrim[after] == ' ' || ltrim[after] == '\t'))
+              ++after;
+            if (after == ltrim.size()) {
+              ++i;
+              break;
+            }
+          }
+          if (!body.empty()) body.push_back('\n');
+          body.append(lt);
+          ++i;
+        }
+        if (!body.empty()) doc.append_text(n, body);
+        continue;
+      }
+    }
     if (trimmed.starts_with(":::deflist")) {
       NodeId n = doc.create(NodeKind::DefList, current_parent());
       stack.push_back(n);
@@ -837,17 +892,15 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
     }
 
     case NodeKind::CodeBlock: {
+      // Prefer GFM fences for broader interop; lang stays on node.src.
       out += pad;
-      out += ":::code";
-      if (!node.src.empty()) {
-        out += " lang=";
-        out += node.src;
-      }
+      out += "```";
+      if (!node.src.empty()) out += node.src;
       out += "\n";
       for (const auto& sp : node.spans) out += sp.text;
       if (out.empty() || out.back() != '\n') out += "\n";
       out += pad;
-      out += ":::\n\n";
+      out += "```\n\n";
       break;
     }
 
