@@ -45,8 +45,7 @@ Open any of these from this page (links load in the same pane and join session h
 - [Thread / RFC discussion](thread-rfc.md) — Thread and Message nodes
 - [Gemini gemtext sample](gemini-sample.gmi) — native gemtext layout
 - [Nostr discussions](nostr-sample.md) — relay-backed Thread/Message view
-- [Jack on Nostr (🫂)](note1gfvpkhsz0nuc3pkstuh903farnnt0mv9uyqlz4rg596h9hcct25s0dmkud) — sample note1
-- [nak sample note](note1ttnnrw78wy0hs5fa59yj03yvcu2r4y0xetg9vh7uf4em39n604vsyp37f2) — another note1
+- [Recent Nostr notes](nostr:recent) — live firehose sample from public relays
 - [Org-mode sample](sample.org) — headings, TODO, tags, source blocks
 - [Semantic format (S-expression)](semantic.sexp) — experimental sexpr form
 - [Sample (S-expression)](sample.sexp) — compact sexpr demo
@@ -77,8 +76,8 @@ Drag column gutters to reweight widths. Drag an image’s blue corner to resize 
 
 ## Nostr
 
-Click a **note1** link above, or open [Nostr discussions](nostr-sample.md) for more
-starting points. **Ctrl+L** accepts `note1…` / `nevent1…` from any client.
+Open [Recent Nostr notes](nostr:recent) or [Nostr discussions](nostr-sample.md).
+**Ctrl+L** accepts `nostr:recent`, `note1…`, or `nevent1…`.
 
 ## Living relationships
 

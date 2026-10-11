@@ -4,30 +4,34 @@ Xanatoo can open **Nostr** notes as read-only discussion threads
 (Thread / Message nodes). Network access uses public relays over WSS
 (OpenSSL; build with `-DXANATOO_NOSTR=ON`, the default when OpenSSL is available).
 
-## Starting points (click a link)
+## Try this first
 
-These are real public notes. Click to fetch the thread from relays
-(needs network). If a note is sparse on one relay, try **Reload**.
+Specific old `note1` links often **age off** public relays. For a reliable demo:
 
-- [Jack Dorsey — 🫂](note1gfvpkhsz0nuc3pkstuh903farnnt0mv9uyqlz4rg596h9hcct25s0dmkud)
-- [Jack Dorsey — parent of the above](note1j4d0fvelk2staurj3mtqmn8c8duksw3v52a02y2ufdn5242u7vfqt4vh5l)
-- [nak CLI sample note](note1ttnnrw78wy0hs5fa59yj03yvcu2r4y0xetg9vh7uf4em39n604vsyp37f2)
-- [nak “hello from the nostr army knife”](note12dzr2ph86z09twfz5gmfhq8eycq84z5236jlp803mdvluxvnxd0q867kyw)
-- [franca — “q tags” joke](note14nrd2wck8v99kwccg93hphvng0exxvkq4dt0gfqr6f5e0sph2ups9de0cf)
+- [Recent public notes (firehose)](nostr:recent) — fetches the latest kind-1 notes
 
-Or paste any `note1…` / `nevent1…` into the location bar (**Ctrl+L**).
+Or press **Ctrl+L** and type `nostr:recent`.
+
+## Specific notes
+
+Paste any `note1…` / `nevent1…` from a Nostr client into **Ctrl+L**.
+Clickable examples only work while relays still store that event:
+
+- [Example note (may expire)](note1h66lenndtaw5zjcntqxafc0254s7dgl8e7e66sty6jswczg63swq6njy8g)
+
+If you see *note not found on N relay(s)*, the id is rare or gone — use **nostr:recent** instead.
 
 ## How to open a note
 
 1. Press **Ctrl+L** (URL bar).
 2. Paste one of:
+   - `nostr:recent` — live sample of public notes
    - `note1…` (NIP-19 event id)
    - `nevent1…` (event + optional relay hints)
-   - `nostr:note1…` / `nostr:nevent1…`
-   - a 64-character hex event id
+   - `nostr:note1…` / 64-character hex event id
 
-The client asks a few public relays for the root event and kind-1
-replies tagged with that id, then lays them out as nested messages.
+The client queries several public relays (nos.lol, damus, primal, …),
+merges results, and lays out Thread / Message nodes.
 
 ## Scope (v1)
 
@@ -36,12 +40,9 @@ replies tagged with that id, then lays them out as nested messages.
 - Multiple relays merged (hints from `nevent` preferred)
 - No posting, no NIP-07 extension, no local key storage
 - Signatures are not verified yet (display only)
-- Relays: Damus, nos.lol, nostr.band, nostr.wine, plus `nevent` hints
-- **Reload** (Ctrl+R) re-fetches the same note
+- **Reload** (Ctrl+R) re-fetches the same ref
 
 ## Why Thread / Message?
-
-The document model already has discussion containers. Nostr maps cleanly:
 
 | Nostr | xanatoo node |
 |-------|----------------|

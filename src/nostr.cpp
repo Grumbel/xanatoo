@@ -188,6 +188,7 @@ bool is_nostr_ref(std::string_view s) {
   if (t.empty()) return false;
   if (is_hex64(t)) return true;
   std::string low = ascii_lower_copy(t);
+  if (low == "recent" || low == "firehose" || low == "latest") return true;
   return low.rfind("note1", 0) == 0 || low.rfind("nevent1", 0) == 0;
 }
 
@@ -344,6 +345,7 @@ struct WsConn {
   SSL_CTX* ctx = nullptr;
   SSL* ssl = nullptr;
   int fd = -1;
+  std::string carry;  // bytes after HTTP upgrade + partial WS frames
 
   ~WsConn() { close(); }
   void close() {
@@ -555,6 +557,10 @@ bool ws_connect(WsConn& c, const std::string& url, std::string* err) {
     }
     return false;
   }
+  // Keep any bytes after the HTTP headers — first WS frames may already be here.
+  size_t hdr_end = resp.find("\r\n\r\n");
+  if (hdr_end != std::string::npos && hdr_end + 4 < resp.size())
+    c.carry.assign(resp, hdr_end + 4, std::string::npos);
   return true;
 }
 
@@ -755,8 +761,8 @@ Document events_to_document(const std::string& root_id,
 std::vector<std::string> default_relays() {
   // Ordered by general reliability; flaky hosts last (or omitted).
   return {
-      "wss://relay.damus.io",
       "wss://nos.lol",
+      "wss://relay.damus.io",
       "wss://relay.primal.net",
       "wss://nostr.bitcoiner.social",
       "wss://relay.snort.social",
@@ -842,11 +848,19 @@ void query_profiles(const std::string& relay,
 
 std::optional<Document> nostr_fetch_thread(std::string_view ref,
                                            std::string* err) {
+  std::string stripped = strip_nostr_prefix(ref);
+  std::string low = ascii_lower_copy(stripped);
+  const bool recent_mode =
+      (low == "recent" || low == "firehose" || low == "latest");
+
   std::vector<std::string> hint_relays;
-  auto id = nostr_decode_event_id(ref, &hint_relays);
-  if (!id) {
-    if (err) *err = "not a valid note1/nevent1/hex event id";
-    return std::nullopt;
+  std::optional<std::string> id;
+  if (!recent_mode) {
+    id = nostr_decode_event_id(ref, &hint_relays);
+    if (!id) {
+      if (err) *err = "not a valid note1/nevent1/hex event id (or nostr:recent)";
+      return std::nullopt;
+    }
   }
 
   std::vector<std::string> relays;
@@ -862,13 +876,15 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
   std::map<std::string, NostrEvent> by_id;
   std::vector<std::string> failures;
   int tried = 0;
-  // Try several relays; stop early once we have the root + a few replies.
   for (const auto& r : relays) {
     if (tried >= 5) break;
     ++tried;
     std::string one_err;
     size_t before = by_id.size();
-    query_relay(r, *id, by_id, &one_err);
+    if (recent_mode)
+      query_recent(r, by_id, &one_err);
+    else
+      query_relay(r, *id, by_id, &one_err);
     if (by_id.size() > before) {
       std::cerr << "Nostr: got " << (by_id.size() - before)
                 << " event(s) from " << r << "\n";
@@ -876,12 +892,18 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
       failures.push_back(one_err);
       std::cerr << "Nostr: " << one_err << "\n";
     }
-    if (by_id.count(*id) && by_id.size() >= 3) break;
+    if (recent_mode && by_id.size() >= 15) break;
+    if (!recent_mode && id && by_id.count(*id) && by_id.size() >= 3) break;
   }
 
   if (by_id.empty()) {
     if (err) {
-      *err = "no events from " + std::to_string(tried) + " relay(s)";
+      if (recent_mode) {
+        *err = "no recent notes from " + std::to_string(tried) + " relay(s)";
+      } else {
+        *err = "note not found on " + std::to_string(tried) +
+               " relay(s) (id may be old or rare — try nostr:recent)";
+      }
       if (!failures.empty()) {
         *err += " — ";
         *err += failures.front();
@@ -890,6 +912,18 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
       }
     }
     return std::nullopt;
+  }
+
+  std::string root_id = recent_mode ? by_id.begin()->second.id : *id;
+  if (recent_mode) {
+    // Prefer the newest event as the "thread" root for the firehose view.
+    int64_t best_t = -1;
+    for (const auto& kv : by_id) {
+      if (kv.second.kind == 1 && kv.second.created_at >= best_t) {
+        best_t = kv.second.created_at;
+        root_id = kv.second.id;
+      }
+    }
   }
 
   std::vector<std::string> pubkeys;
@@ -910,7 +944,21 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
   events.reserve(by_id.size());
   for (auto& kv : by_id) events.push_back(std::move(kv.second));
 
-  return events_to_document(*id, events, profiles);
+  Document doc = events_to_document(root_id, events, profiles);
+  if (recent_mode) {
+    // Clarify this is a sample firehose, not a single conversation.
+    NodeId root = doc.root;
+    if (root != INVALID_NODE) {
+      for (NodeId c : doc.get(root).children) {
+        if (doc.get(c).kind == NodeKind::Thread) {
+          doc.get(c).summary = "Recent public notes (firehose sample)";
+          doc.get(c).label = "recent";
+          break;
+        }
+      }
+    }
+  }
+  return doc;
 }
 
 #endif  // XANATOO_NOSTR
