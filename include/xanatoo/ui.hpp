@@ -13,6 +13,8 @@ namespace xanatoo {
 enum class UiCommand {
   None = 0,
   // File
+  NewDocument,
+  OpenDocument,
   Save,
   SaveAs,
   ExportSexpr,

@@ -145,6 +145,8 @@ void Ui::load_icons(SDL_Renderer* renderer) {
   const char* names[] = {
       "save", "undo", "redo", "bold", "italic", "code", "link", "list",
       "olist", "quote", "image", "split", "find", "help", "cut",
+      "strike", "cite", "h1", "h2", "h3", "para", "task", "table",
+      "figure", "note", "replace", "outline", "paste", "copy", "new", "open",
   };
 
   fs::path found_dir;
@@ -334,7 +336,14 @@ void Ui::process_event(const SDL_Event& ev) {
 
 bool Ui::want_capture_keyboard() const {
   if (!ready_) return false;
-  return ImGui::GetIO().WantCaptureKeyboard;
+  // Claim keys only when ImGui has a real reason: text input, popup/menu, or
+  // an active widget. Full WantCaptureKeyboard stays true while the menu bar /
+  // toolbar holds focus and would block document shortcuts and status prompts.
+  ImGuiIO& io = ImGui::GetIO();
+  if (io.WantTextInput) return true;
+  if (ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) return true;
+  if (ImGui::IsAnyItemActive()) return true;
+  return false;
 }
 
 bool Ui::want_capture_mouse() const {
@@ -411,6 +420,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   // ---- Main menu bar ----
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("File")) {
+      menu_item_cmd("New", UiCommand::NewDocument, cmd, true, "Ctrl+N");
+      menu_item_cmd("Open…", UiCommand::OpenDocument, cmd, true, "Ctrl+O");
+      ImGui::Separator();
       menu_item_cmd("Save", UiCommand::Save, cmd, true, "Ctrl+S");
       menu_item_cmd("Save As…", UiCommand::SaveAs, cmd, true, "Ctrl+Shift+S");
       menu_item_cmd("Export as S-expression…", UiCommand::ExportSexpr, cmd, true);
@@ -460,6 +472,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_structure_items(state, cmd);
       ImGui::EndMenu();
     }
+    if (ImGui::BeginMenu("Insert")) {
+      menu_insert_items(cmd);
+      ImGui::EndMenu();
+    }
     if (ImGui::BeginMenu("View")) {
       if (ImGui::MenuItem("Split Pane", "Ctrl+\\", state.split))
         cmd = UiCommand::ToggleSplit;
@@ -473,12 +489,14 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Zoom In", UiCommand::ZoomIn, cmd, true, "Ctrl++");
       menu_item_cmd("Zoom Out", UiCommand::ZoomOut, cmd, true, "Ctrl+-");
       ImGui::Separator();
-      if (ImGui::MenuItem("Keyboard Help", "F1", state.help))
-        cmd = UiCommand::ToggleHelp;
-      ImGui::Separator();
       menu_item_cmd("FORMAT.md in window", UiCommand::OpenFormatDoc, cmd);
       menu_item_cmd("semantic.sexp in window", UiCommand::OpenSemanticDoc, cmd);
       menu_item_cmd("Open path in window…", UiCommand::OpenInWindow, cmd);
+      ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("Help")) {
+      if (ImGui::MenuItem("Keyboard Reference", "F1", state.help))
+        cmd = UiCommand::ToggleHelp;
       ImGui::EndMenu();
     }
 
@@ -515,6 +533,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     // Child fills the bar and scrolls horizontally when buttons overflow.
     ImGui::BeginChild("##toolbar_scroll", ImVec2(0.f, 0.f), false,
                       ImGuiWindowFlags_HorizontalScrollbar);
+    tool_button("tb_new", "new", "New document (Ctrl+N)", UiCommand::NewDocument,
+                cmd);
+    tool_button("tb_open", "open", "Open… (Ctrl+O)", UiCommand::OpenDocument, cmd);
     tool_button("tb_save", "save", "Save (Ctrl+S)", UiCommand::Save, cmd);
     tool_button("tb_undo", "undo", "Undo (Ctrl+Z)", UiCommand::Undo, cmd);
     tool_button("tb_redo", "redo", "Redo (Ctrl+Y)", UiCommand::Redo, cmd);
@@ -524,6 +545,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
 
     tool_button("tb_cut", "cut", "Cut (Ctrl+X)", UiCommand::Cut, cmd,
                 state.selection);
+    tool_button("tb_copy", "copy", "Copy (Ctrl+C)", UiCommand::Copy, cmd,
+                state.selection);
+    tool_button("tb_paste", "paste", "Paste (Ctrl+V)", UiCommand::Paste, cmd);
     tool_button("tb_bold", "bold", "Bold (Ctrl+B)", UiCommand::Bold, cmd,
                 state.selection);
     tool_button("tb_italic", "italic", "Italic (Ctrl+I)", UiCommand::Italic,

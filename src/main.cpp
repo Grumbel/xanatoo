@@ -268,6 +268,8 @@ int main(int argc, char** argv) {
   const int status_bar_h = 28;
   bool path_in_window_mode = false;
   std::string path_in_window_buf;
+  bool open_file_mode = false;  // File→Open into focused pane (status-bar path)
+  std::string open_file_buf;
 
   bool help_mode = false;  // F1 help as a real document in a software window
   xanatoo::Document help_doc;
@@ -1696,14 +1698,18 @@ int main(int argc, char** argv) {
           break;
 
         case SDL_TEXTINPUT: {
-          if (imgui_keys) break;
-          // Outline is a software window (non-modal): typing goes to the document.
+          // Status-bar prompts own typing even when ImGui still reports capture
+          // (menu bar / toolbar focus must not steal path or search input).
           if (save_as_mode) {
             save_as_path += ev.text.text;
             break;
           }
           if (path_in_window_mode) {
             path_in_window_buf += ev.text.text;
+            break;
+          }
+          if (open_file_mode) {
+            open_file_buf += ev.text.text;
             break;
           }
           if (image_insert_mode) {
@@ -1741,6 +1747,7 @@ int main(int argc, char** argv) {
             reset_blink();
             break;
           }
+          if (imgui_keys) break;
           edit();
           Pane& p = F();
           xanatoo::Document& td = doc_of(p);
@@ -1756,11 +1763,21 @@ int main(int argc, char** argv) {
         }
 
         case SDL_KEYDOWN: {
-          if (imgui_keys) break;
           bool shift = (ev.key.keysym.mod & KMOD_SHIFT) != 0;
           bool ctrl = (ev.key.keysym.mod & KMOD_CTRL) != 0;
           Pane& p = F();
           xanatoo::Document& d = doc_of(p);
+
+          // Status prompts (and Esc) must work even if ImGui still wants keys.
+          const bool status_prompt =
+              save_as_mode || path_in_window_mode || open_file_mode ||
+              image_insert_mode || include_insert_mode || link_edit_mode ||
+              summary_edit_mode || search_mode;
+          if (imgui_keys && !status_prompt &&
+              ev.key.keysym.sym != SDLK_ESCAPE &&
+              ev.key.keysym.sym != SDLK_F1) {
+            break;
+          }
 
           // Help window is non-modal: Esc/F1 close it; other keys edit the document.
           if (help_mode &&
@@ -1838,6 +1855,9 @@ int main(int argc, char** argv) {
               } else if (path_in_window_mode) {
                 path_in_window_mode = false;
                 path_in_window_buf.clear();
+              } else if (open_file_mode) {
+                open_file_mode = false;
+                open_file_buf.clear();
               } else if (image_insert_mode) {
                 image_insert_mode = false;
                 image_insert_as_figure = false;
@@ -2056,6 +2076,16 @@ int main(int argc, char** argv) {
                 }
                 break;
               }
+              if (open_file_mode) {
+                if (!open_file_buf.empty()) {
+                  while (!open_file_buf.empty() &&
+                         (static_cast<unsigned char>(open_file_buf.back()) & 0xc0) ==
+                             0x80)
+                    open_file_buf.pop_back();
+                  if (!open_file_buf.empty()) open_file_buf.pop_back();
+                }
+                break;
+              }
               if (save_as_mode) {
                 if (!save_as_path.empty()) {
                   while (!save_as_path.empty() &&
@@ -2261,6 +2291,36 @@ int main(int argc, char** argv) {
                 }
                 path_in_window_mode = false;
                 path_in_window_buf.clear();
+                break;
+              }
+              if (open_file_mode) {
+                if (!open_file_buf.empty()) {
+                  std::string path = open_file_buf;
+                  if (!fs::exists(path)) {
+                    std::string found = find_repo_file(path.c_str());
+                    if (!found.empty()) path = found;
+                  }
+                  if (!fs::exists(path)) {
+                    std::cerr << "Open: file not found: " << path << "\n";
+                  } else {
+                    docs[p.doc_index] = load_doc(path);
+                    path_of(p) = path;
+                    dirty_flags[p.doc_index] = false;
+                    xanatoo::ensure_valid_caret(docs[p.doc_index], p.sel.focus);
+                    p.sel.anchor = p.sel.focus;
+                    p.scroll_y = 0.f;
+                    histories[p.doc_index].reset(docs[p.doc_index], p.sel);
+                    if (panes[0].doc_index == panes[1].doc_index) {
+                      panes[1 - focus].sel = p.sel;
+                      panes[1 - focus].scroll_y = 0.f;
+                    }
+                    needs_layout = true;
+                    update_title();
+                    std::cout << "Opened: " << path << "\n";
+                  }
+                }
+                open_file_mode = false;
+                open_file_buf.clear();
                 break;
               }
               if (save_as_mode) {
@@ -2591,6 +2651,25 @@ int main(int argc, char** argv) {
               }
               break;
 
+            case SDLK_n:
+              if (ctrl) {
+                docs[p.doc_index] =
+                    xanatoo::parse_document(xanatoo::fallback_document(), {});
+                path_of(p).clear();
+                dirty_flags[p.doc_index] = false;
+                xanatoo::ensure_valid_caret(docs[p.doc_index], p.sel.focus);
+                p.sel.anchor = p.sel.focus;
+                p.scroll_y = 0.f;
+                histories[p.doc_index].reset(docs[p.doc_index], p.sel);
+                if (panes[0].doc_index == panes[1].doc_index) {
+                  panes[1 - focus].sel = p.sel;
+                  panes[1 - focus].scroll_y = 0.f;
+                }
+                needs_layout = true;
+                update_title();
+              }
+              break;
+
             case SDLK_s:
               if (ctrl && shift) {
                 save_as_mode = true;
@@ -2640,6 +2719,14 @@ int main(int argc, char** argv) {
                     }
                   }
                 }
+                break;
+              }
+              if (ctrl) {
+                open_file_mode = true;
+                open_file_buf.clear();
+                path_in_window_mode = false;
+                save_as_mode = false;
+                search_mode = false;
               }
               break;
 
@@ -2934,6 +3021,30 @@ int main(int argc, char** argv) {
       switch (ui_frame.cmd) {
         case C::Quit:
           running = false;
+          break;
+        case C::NewDocument: {
+          docs[p.doc_index] =
+              xanatoo::parse_document(xanatoo::fallback_document(), {});
+          path_of(p).clear();
+          dirty_flags[p.doc_index] = false;
+          xanatoo::ensure_valid_caret(docs[p.doc_index], p.sel.focus);
+          p.sel.anchor = p.sel.focus;
+          p.scroll_y = 0.f;
+          histories[p.doc_index].reset(docs[p.doc_index], p.sel);
+          if (panes[0].doc_index == panes[1].doc_index) {
+            panes[1 - focus].sel = p.sel;
+            panes[1 - focus].scroll_y = 0.f;
+          }
+          needs_layout = true;
+          update_title();
+          break;
+        }
+        case C::OpenDocument:
+          open_file_mode = true;
+          open_file_buf.clear();
+          path_in_window_mode = false;
+          save_as_mode = false;
+          search_mode = false;
           break;
         case C::Save: {
           std::string& spath = path_of(p);
@@ -3703,8 +3814,9 @@ int main(int argc, char** argv) {
     {
       const int bar_h = 28;
       SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
-      if (search_mode || save_as_mode || path_in_window_mode || link_edit_mode ||
-          summary_edit_mode || image_insert_mode || include_insert_mode) {
+      if (search_mode || save_as_mode || path_in_window_mode || open_file_mode ||
+          link_edit_mode || summary_edit_mode || image_insert_mode ||
+          include_insert_mode) {
         SDL_SetRenderDrawColor(sdl, 30, 30, 40, 240);
       } else {
         SDL_SetRenderDrawColor(sdl, 236, 234, 228, 245);
@@ -3712,8 +3824,9 @@ int main(int argc, char** argv) {
       SDL_Rect bar{0, win_h - bar_h, win_w, bar_h};
       SDL_RenderFillRect(sdl, &bar);
       // Top edge line
-      if (search_mode || save_as_mode || path_in_window_mode || link_edit_mode ||
-          summary_edit_mode || image_insert_mode || include_insert_mode) {
+      if (search_mode || save_as_mode || path_in_window_mode || open_file_mode ||
+          link_edit_mode || summary_edit_mode || image_insert_mode ||
+          include_insert_mode) {
         SDL_SetRenderDrawColor(sdl, 80, 160, 255, 255);
       } else {
         SDL_SetRenderDrawColor(sdl, 200, 198, 190, 255);
@@ -3726,6 +3839,9 @@ int main(int argc, char** argv) {
       if (path_in_window_mode) {
         label = "Open in window: ";
         label += path_in_window_buf.empty() ? "…" : path_in_window_buf;
+      } else if (open_file_mode) {
+        label = "Open file: ";
+        label += open_file_buf.empty() ? "…" : open_file_buf;
       } else if (save_as_mode) {
         label = "Save as: ";
         label += save_as_path.empty() ? "…" : save_as_path;
@@ -3810,7 +3926,7 @@ int main(int argc, char** argv) {
       if (!search_mode && !save_as_mode && !link_edit_mode &&
           !summary_edit_mode && !help_mode && !outline_mode &&
           !image_insert_mode && !include_insert_mode &&
-          !path_in_window_mode) {
+          !path_in_window_mode && !open_file_mode) {
         std::string stats;
         const auto& fsel = F().sel;
         if (!fsel.empty()) {
