@@ -6,9 +6,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **203** (this delivery is **202**)
+Next bundle number: **204** (this delivery is **203**)
 
 ## Status (2026-10-11)
+
+Lemmy: post titles and “N comments” link to /post/id (in-pane comments); c/name links to community listing.
 
 Lemmy read-only via API v3 (community listings + posts/comments → Thread/Message).
 Reddit compile fix already on origin (201).
@@ -534,4 +536,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-199.*-reddit-welcome-warn-…` — on origin (welcome links + unused-var warning)
 - `xanatoo-200.*-reddit-403-oauth-…` — prior (403 hardening + optional OAuth)
 - `xanatoo-201.*-fix-reddit-compile-…` — on origin (oauth parse + children literal)
-- `xanatoo-202.*-lemmy-api-…` — this delivery (Lemmy API v3)
+- `xanatoo-202.*-lemmy-api-…` — prior (Lemmy API v3)
+- `xanatoo-203.*-lemmy-post-links-…` — this delivery (title/comments/community hyperlinks)

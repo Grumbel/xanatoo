@@ -435,9 +435,11 @@ struct LemmyPost {
   int64_t id = 0;
   std::string title;
   std::string body;
-  std::string url;
+  std::string url;           // external link URL (link posts)
+  std::string ap_id;         // ActivityPub id, usually https://host/post/N
   std::string author;
   std::string community;
+  std::string community_url; // https://host/c/name when known
   std::string published;
   int64_t score = 0;
   int64_t comments = 0;
@@ -456,10 +458,12 @@ LemmyPost parse_post_view(std::string_view view_json) {
   p.title = json_str_field(post, "name");
   p.body = json_str_field(post, "body");
   p.url = json_str_field(post, "url");
+  p.ap_id = json_str_field(post, "ap_id");
   p.published = json_str_field(post, "published");
   p.author = json_str_field(creator, "name");
   p.community = json_str_field(community, "name");
   if (p.community.empty()) p.community = json_str_field(community, "title");
+  p.community_url = json_str_field(community, "actor_id");
   p.score = json_int_field(counts, "score");
   p.comments = json_int_field(counts, "comments");
   return p;
@@ -489,7 +493,17 @@ LemmyPost parse_comment_view(std::string_view view_json) {
   return p;
 }
 
-void append_message(Document& doc, NodeId thread, const LemmyPost& post) {
+// Prefer ActivityPub id; else synthesize https://host/post/id from origin.
+std::string post_permalink(const LemmyPost& post, const std::string& origin) {
+  if (!post.ap_id.empty() && post.ap_id.rfind("http", 0) == 0)
+    return post.ap_id;
+  if (post.id > 0 && !origin.empty())
+    return origin + "/post/" + std::to_string(post.id);
+  return {};
+}
+
+void append_message(Document& doc, NodeId thread, const LemmyPost& post,
+                    const std::string& origin) {
   NodeId msg = doc.create(NodeKind::Message, thread);
   Node& n = doc.get(msg);
   n.label = std::to_string(post.id);
@@ -500,29 +514,32 @@ void append_message(Document& doc, NodeId thread, const LemmyPost& post) {
     if (!meta.empty()) meta += " · ";
     meta += std::to_string(post.score) + " pts";
   }
-  if (!post.is_comment && post.comments > 0) {
-    if (!meta.empty()) meta += " · ";
-    meta += std::to_string(post.comments) + " comments";
-  }
-  if (!post.is_comment && !post.community.empty()) {
-    if (!meta.empty()) meta += " · ";
-    meta += "c/" + post.community;
-  }
   n.summary = meta;
   // Indent comments via alt chain is complex without ids; skip fake reply-to
+
+  const std::string permalink = post_permalink(post, origin);
 
   if (!post.is_comment && !post.title.empty()) {
     NodeId title = doc.create(NodeKind::Paragraph, msg);
     InlineSpan hs;
-    hs.kind = InlineKind::Strong;
-    hs.text = post.title;
+    // Title is a link to the post page so a click loads comments in-pane.
+    if (!permalink.empty()) {
+      hs.kind = InlineKind::Link;
+      hs.text = post.title;
+      hs.href = permalink;
+    } else {
+      hs.kind = InlineKind::Strong;
+      hs.text = post.title;
+    }
     doc.get(title).spans.push_back(std::move(hs));
   }
 
   if (!post.body.empty()) {
     NodeId para = doc.create(NodeKind::Paragraph, msg);
     doc.append_text(para, post.body);
-  } else if (!post.is_comment && !post.url.empty()) {
+  }
+  // Link posts: show external URL (may open in browser if not Lemmy).
+  if (!post.is_comment && !post.url.empty() && post.url != permalink) {
     NodeId para = doc.create(NodeKind::Paragraph, msg);
     InlineSpan link;
     link.kind = InlineKind::Link;
@@ -530,19 +547,55 @@ void append_message(Document& doc, NodeId thread, const LemmyPost& post) {
     link.href = post.url;
     doc.get(para).spans.push_back(std::move(link));
   }
+
+  // Footer: community + comments links (in-app Lemmy navigation).
+  if (!post.is_comment) {
+    NodeId foot = doc.create(NodeKind::Paragraph, msg);
+    bool any = false;
+    if (!post.community.empty()) {
+      InlineSpan c;
+      c.kind = InlineKind::Link;
+      c.text = "c/" + post.community;
+      if (!post.community_url.empty())
+        c.href = post.community_url;
+      else if (!origin.empty())
+        c.href = origin + "/c/" + post.community;
+      else
+        c.kind = InlineKind::Emphasis;
+      doc.get(foot).spans.push_back(std::move(c));
+      any = true;
+    }
+    if (!permalink.empty()) {
+      if (any) {
+        InlineSpan sep;
+        sep.kind = InlineKind::Text;
+        sep.text = "  ·  ";
+        doc.get(foot).spans.push_back(std::move(sep));
+      }
+      InlineSpan cl;
+      cl.kind = InlineKind::Link;
+      if (post.comments > 0)
+        cl.text = std::to_string(post.comments) + " comments";
+      else
+        cl.text = "comments";
+      cl.href = permalink;
+      doc.get(foot).spans.push_back(std::move(cl));
+    }
+  }
 }
 
 Document build_document(const std::string& title,
                         const std::vector<LemmyPost>& posts,
-                        const std::vector<LemmyPost>& comments) {
+                        const std::vector<LemmyPost>& comments,
+                        const std::string& origin) {
   Document doc;
   NodeId root = doc.create(NodeKind::Document);
   NodeId thread = doc.create(NodeKind::Thread, root);
   doc.get(thread).summary = title.empty() ? "Lemmy" : title;
   doc.get(thread).label = "lemmy";
 
-  for (const auto& p : posts) append_message(doc, thread, p);
-  for (const auto& c : comments) append_message(doc, thread, c);
+  for (const auto& p : posts) append_message(doc, thread, p, origin);
+  for (const auto& c : comments) append_message(doc, thread, c, origin);
 
   if (doc.get(thread).children.empty()) {
     NodeId msg = doc.create(NodeKind::Message, thread);
@@ -708,7 +761,7 @@ std::optional<Document> lemmy_fetch(std::string_view url_in, std::string* err) {
 
   std::cerr << "Lemmy: " << posts.size() << " post(s), " << comments.size()
             << " comment(s)\n";
-  return build_document(title, posts, comments);
+  return build_document(title, posts, comments, pu.origin);
 }
 
 #endif  // XANATOO_LEMMY
