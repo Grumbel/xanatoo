@@ -42,7 +42,11 @@ Export via *File → Export as S-expression…* or *Export as Markdown…*.
 - **Ctrl+E** — Wrap in stretchtext
 - **Ctrl+Shift+E** — Edit stretch summary
 - **Ctrl+Shift+U** — Unwrap stretchtext
-- **Ctrl+0** … **Ctrl+6** — Paragraph / heading level
+- **Ctrl+0** — Demote to paragraph
+- **Ctrl+1** — Header (no h1–h6 rank)
+- **Ctrl+2**…**Ctrl+6** — Header with soft depth hint
+- **Ctrl+Shift+1** — Wrap block(s) in a Section
+- **Ctrl+Shift+2** — Wrap block(s) in an Article
 - **Ctrl+Shift+Q** — Toggle block quote
 - **Ctrl+Shift+8** / **7** — Unordered / ordered list
 - **Tab** / **Shift+Tab** — Indent / outdent list item
@@ -55,7 +59,7 @@ Export via *File → Export as S-expression…* or *Export as Markdown…*.
 - **Ctrl+←** / **→** — Word left / right
 - **Ctrl+F** / **F3** — Leap search / next match
 - **Ctrl+H** — Find and replace
-- **Ctrl+Shift+O** — Heading outline
+- **Ctrl+Shift+O** — Outline (headers by section depth)
 - **Click a link** — Follow `#anchor` or open http(s)
 
 ## View & layout
@@ -88,3 +92,9 @@ images are nodes in a tree, not only visual decorations.
 - **S-expression format** — experimental `.sexp` serialization of the tree
 
 Press **F1** or **Esc** to close this window.
+
+## Sectioning (article / section / header)
+
+Prefer nested **section** / **article** containers over ranked headings.
+A **header** is the title of the enclosing unit. Outline depth follows
+nesting. See **Examples → Article / section / header**.

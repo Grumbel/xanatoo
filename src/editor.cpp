@@ -637,7 +637,7 @@ bool relocate_block(Document& doc, NodeId block, NodeId target, bool before) {
     } else if (old_parent.kind != NodeKind::List &&
                new_parent.kind == NodeKind::List) {
       if (bn.kind == NodeKind::Paragraph || bn.kind == NodeKind::Heading ||
-          bn.kind == NodeKind::BlockQuote) {
+          bn.kind == NodeKind::Header || bn.kind == NodeKind::BlockQuote) {
         bn.kind = NodeKind::ListItem;
         bn.level = (new_parent.level == 1) ? 1 : 0;
       }
@@ -775,7 +775,7 @@ std::optional<NodeId> insert_sibling_after(Document& doc, Caret& caret,
     }
     NodeId nid = doc.create(kind, cell_host);
     Node& nn = doc.get(nid);
-    if (kind == NodeKind::Heading) nn.level = 1;
+    if (kind == NodeKind::Heading || kind == NodeKind::Header) nn.level = 0;
     if (kind == NodeKind::HorizontalRule) {
       NodeId para = doc.create(NodeKind::Paragraph, cell_host);
       caret.node = para;
@@ -784,8 +784,8 @@ std::optional<NodeId> insert_sibling_after(Document& doc, Caret& caret,
       return nid;
     }
     if (kind == NodeKind::Paragraph || kind == NodeKind::Heading ||
-        kind == NodeKind::BlockQuote || kind == NodeKind::Note ||
-        kind == NodeKind::CodeBlock) {
+        kind == NodeKind::Header || kind == NodeKind::BlockQuote ||
+        kind == NodeKind::Note || kind == NodeKind::CodeBlock) {
       caret.node = nid;
       caret.span_index = 0;
       caret.char_index = 0;
@@ -797,7 +797,7 @@ std::optional<NodeId> insert_sibling_after(Document& doc, Caret& caret,
   Node& nn = doc.get(nid);
   nn.kind = kind;
   nn.parent = bn.parent;
-  if (kind == NodeKind::Heading) nn.level = 1;
+  if (kind == NodeKind::Heading || kind == NodeKind::Header) nn.level = 0;
   if (kind == NodeKind::ListItem) {
     Node& parent = doc.get(bn.parent);
     nn.level = (parent.kind == NodeKind::List && parent.level == 1) ? 1 : 0;
@@ -818,9 +818,10 @@ std::optional<NodeId> insert_sibling_after(Document& doc, Caret& caret,
   }
 
   if (kind == NodeKind::Paragraph || kind == NodeKind::Heading ||
-      kind == NodeKind::BlockQuote || kind == NodeKind::ListItem ||
-      kind == NodeKind::Note || kind == NodeKind::CodeBlock ||
-      kind == NodeKind::Term || kind == NodeKind::Definition) {
+      kind == NodeKind::Header || kind == NodeKind::BlockQuote ||
+      kind == NodeKind::ListItem || kind == NodeKind::Note ||
+      kind == NodeKind::CodeBlock || kind == NodeKind::Term ||
+      kind == NodeKind::Definition) {
     caret.node = nid;
     caret.span_index = 0;
     caret.char_index = 0;
@@ -1200,7 +1201,7 @@ bool toggle_list(Document& doc, Caret& caret, bool ordered) {
 
   // Wrap: Paragraph / Heading / BlockQuote → ListItem under new List
   if (n.kind != NodeKind::Paragraph && n.kind != NodeKind::Heading &&
-      n.kind != NodeKind::BlockQuote) {
+      n.kind != NodeKind::Header && n.kind != NodeKind::BlockQuote) {
     return false;
   }
   if (n.parent == INVALID_NODE) return false;
@@ -2198,7 +2199,8 @@ DocStats document_stats(const Document& doc) {
   if (doc.root != INVALID_NODE) collect_text_nodes(doc, doc.root, nodes);
   for (NodeId id : nodes) {
     const Node& n = doc.get(id);
-    if (n.kind == NodeKind::Heading) ++s.headings;
+    if (n.kind == NodeKind::Heading || n.kind == NodeKind::Header)
+      ++s.headings;
     ++s.text_blocks;
     const std::string t = node_text(doc, id);
     s.chars += t.size();

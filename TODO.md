@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **130** (this delivery is **129**)
+Next bundle number: **131** (this delivery is **130**)
 
 ## Status (2026-10-11)
 
@@ -226,6 +226,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Context menu Diff Marks respects can_diff
 - [x] Semantic Header / Section / Article (HTML-like sectioning)
 - [x] examples/sectioning.md + Format structure commands
+- [x] Sectioning polish: keys, help, Header in editor text paths
 
 ## Open work / next steps
 
@@ -404,4 +405,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-126.*-scrollbar-click-…` — scrollbar click jump
 - `xanatoo-127.*-structure-links-…` — structure tags + link flash
 - `xanatoo-128.*-page-soft-…` — PageUp soft chrome
-- `xanatoo-129.*-sectioning-…` — this delivery
+- `xanatoo-129.*-sectioning-…` — Header/Section/Article model
+- `xanatoo-130.*-sectioning-polish-…` — this delivery

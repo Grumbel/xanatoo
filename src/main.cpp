@@ -3225,10 +3225,31 @@ int main(int argc, char** argv) {
             case SDLK_4:
             case SDLK_5:
             case SDLK_6:
-              if (ctrl && !shift) {
+              if (ctrl && shift) {
+                // Ctrl+Shift+1/2 — wrap in Section / Article
+                int n = static_cast<int>(ev.key.keysym.sym - SDLK_0);
+                if (n == 1) {
+                  edit();
+                  if (xanatoo::wrap_in_section(d, p.sel.focus)) {
+                    needs_layout = true;
+                    reset_blink();
+                  }
+                } else if (n == 2) {
+                  edit();
+                  if (xanatoo::wrap_in_article(d, p.sel.focus)) {
+                    needs_layout = true;
+                    reset_blink();
+                  }
+                }
+              } else if (ctrl && !shift) {
                 int level = static_cast<int>(ev.key.keysym.sym - SDLK_0);
                 edit();
-                if (xanatoo::set_heading_level(d, p.sel.focus, level)) {
+                bool ok = false;
+                if (level == 1)
+                  ok = xanatoo::make_header(d, p.sel.focus);
+                else
+                  ok = xanatoo::set_heading_level(d, p.sel.focus, level);
+                if (ok) {
                   needs_layout = true;
                   reset_blink();
                 }
