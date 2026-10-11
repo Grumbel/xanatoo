@@ -11,8 +11,18 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Catch common mistakes; ImGui is vendored and not under our control.
 add_compile_options(-Wall -Wextra -Wno-unused-parameter)
 
-find_package(SDL2 REQUIRED)
-find_package(Freetype REQUIRED)
+# R36S cross builds pass SDL2_INCLUDE_DIRS / SDL2_LIBRARIES explicitly.
+if(NOT SDL2_LIBRARIES)
+  find_package(SDL2 REQUIRED)
+endif()
+if(NOT FREETYPE_LIBRARY AND NOT TARGET Freetype::Freetype)
+  find_package(Freetype REQUIRED)
+elseif(FREETYPE_LIBRARY AND NOT TARGET Freetype::Freetype)
+  add_library(Freetype::Freetype UNKNOWN IMPORTED)
+  set_target_properties(Freetype::Freetype PROPERTIES
+    IMPORTED_LOCATION "${FREETYPE_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${FREETYPE_INCLUDE_DIRS}")
+endif()
 # Cross builds (R36S) may pass FONTCONFIG_* explicitly; otherwise pkg-config.
 if(NOT FONTCONFIG_LIBRARIES)
   find_package(PkgConfig REQUIRED)

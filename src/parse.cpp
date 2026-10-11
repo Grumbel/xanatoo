@@ -239,8 +239,8 @@ void parse_inlines(Node& node, std::string_view text) {
       if (end != std::string_view::npos && end > i + 1) {
         std::string_view inner = text.substr(i + 1, end - (i + 1));
         bool is_url =
-            inner.starts_with("http://") || inner.starts_with("https://") ||
-            inner.starts_with("mailto:");
+            starts_with(inner, "http://") || starts_with(inner, "https://") ||
+            starts_with(inner, "mailto:");
         if (is_url) {
           flush_plain();
           InlineSpan s;
@@ -331,7 +331,7 @@ Document parse_markup(std::string_view source) {
     std::string_view trimmed = t.substr(lead);
 
     // Closing fence
-    if (trimmed == ":::" || trimmed.starts_with("::: ")) {
+    if (trimmed == ":::" || starts_with(trimmed, "::: ")) {
       // Treat bare ::: as close of current container if possible
       if (stack.size() > 1) {
         stack.pop_back();
@@ -341,7 +341,7 @@ Document parse_markup(std::string_view source) {
     }
 
     // Opening fences
-    if (trimmed.starts_with(":::article")) {
+    if (starts_with(trimmed, ":::article")) {
       NodeId n = doc.create(NodeKind::Article, current_parent());
       std::string id = fence_attr(trimmed, "id");
       if (id.empty()) id = fence_attr(trimmed, "label");
@@ -350,7 +350,7 @@ Document parse_markup(std::string_view source) {
       ++i;
       continue;
     }
-    if (trimmed.starts_with(":::section")) {
+    if (starts_with(trimmed, ":::section")) {
       NodeId n = doc.create(NodeKind::Section, current_parent());
       std::string id = fence_attr(trimmed, "id");
       if (id.empty()) id = fence_attr(trimmed, "label");
@@ -359,7 +359,7 @@ Document parse_markup(std::string_view source) {
       ++i;
       continue;
     }
-    if (trimmed.starts_with(":::header")) {
+    if (starts_with(trimmed, ":::header")) {
       // Header is a leaf title line (body until :::).
       NodeId n = doc.create(NodeKind::Header, current_parent());
       std::string id = fence_attr(trimmed, "id");
@@ -373,7 +373,7 @@ Document parse_markup(std::string_view source) {
         while (llead < lt.size() && (lt[llead] == ' ' || lt[llead] == '\t'))
           ++llead;
         std::string_view ltrim = lt.substr(llead);
-        if (ltrim == ":::" || ltrim.starts_with("::: ")) {
+        if (ltrim == ":::" || starts_with(ltrim, "::: ")) {
           ++i;
           break;
         }
@@ -384,7 +384,7 @@ Document parse_markup(std::string_view source) {
       if (!body.empty()) parse_inlines(doc.get(n), body);
       continue;
     }
-    if (trimmed.starts_with(":::stretch")) {
+    if (starts_with(trimmed, ":::stretch")) {
       NodeId n = doc.create(NodeKind::Stretch, current_parent());
       // Parse summary="..." if present
       auto pos = trimmed.find("summary=\"");
@@ -400,13 +400,13 @@ Document parse_markup(std::string_view source) {
       ++i;
       continue;
     }
-    if (trimmed.starts_with(":::columns")) {
+    if (starts_with(trimmed, ":::columns")) {
       NodeId n = doc.create(NodeKind::Columns, current_parent());
       stack.push_back(n);
       ++i;
       continue;
     }
-    if (trimmed.starts_with(":::column")) {
+    if (starts_with(trimmed, ":::column")) {
       NodeId n = doc.create(NodeKind::Column, current_parent());
       // Optional weight=1.5 (relative column width)
       auto wpos = trimmed.find("weight=");
@@ -426,7 +426,7 @@ Document parse_markup(std::string_view source) {
       ++i;
       continue;
     }
-    if (trimmed.starts_with(":::note")) {
+    if (starts_with(trimmed, ":::note")) {
       NodeId n = doc.create(NodeKind::Note, current_parent());
       // Optional subtype: :::note kind=tip  (stored in src)
       auto kpos = trimmed.find("kind=");
@@ -449,7 +449,7 @@ Document parse_markup(std::string_view source) {
         while (llead < lt.size() && (lt[llead] == ' ' || lt[llead] == '\t'))
           ++llead;
         std::string_view ltrim = lt.substr(llead);
-        if (ltrim == ":::" || ltrim.starts_with("::: ")) {
+        if (ltrim == ":::" || starts_with(ltrim, "::: ")) {
           ++i;
           break;
         }
@@ -465,7 +465,7 @@ Document parse_markup(std::string_view source) {
     // :::thread id="…" subject="…"
     // :::message id="…" from="…" date="…" in-reply-to="…" | about="#anchor"
     // :::comment is an alias for :::message
-    if (trimmed.starts_with(":::thread")) {
+    if (starts_with(trimmed, ":::thread")) {
       NodeId n = doc.create(NodeKind::Thread, current_parent());
       std::string id = fence_attr(trimmed, "id");
       if (id.empty()) id = fence_attr(trimmed, "label");
@@ -477,7 +477,7 @@ Document parse_markup(std::string_view source) {
       ++i;
       continue;
     }
-    if (trimmed.starts_with(":::message") || trimmed.starts_with(":::comment")) {
+    if (starts_with(trimmed, ":::message") || starts_with(trimmed, ":::comment")) {
       NodeId n = doc.create(NodeKind::Message, current_parent());
       std::string id = fence_attr(trimmed, "id");
       if (id.empty()) id = fence_attr(trimmed, "label");
@@ -497,7 +497,7 @@ Document parse_markup(std::string_view source) {
         if (!reply.empty() && reply[0] == '#') reply.erase(reply.begin());
         doc.get(n).alt = reply;
       } else if (!about.empty()) {
-        doc.get(n).alt = about.starts_with("about:") ? about
+        doc.get(n).alt = starts_with(about, "about:") ? about
                          : (std::string("about:") +
                             (about[0] == '#' ? about : ("#" + about)));
       }
@@ -507,7 +507,7 @@ Document parse_markup(std::string_view source) {
     }
 
     // :::code / :::codeblock [lang=cpp] … :::
-    if (trimmed.starts_with(":::codeblock") || trimmed.starts_with(":::code")) {
+    if (starts_with(trimmed, ":::codeblock") || starts_with(trimmed, ":::code")) {
       NodeId n = doc.create(NodeKind::CodeBlock, current_parent());
       auto lpos = trimmed.find("lang=");
       if (lpos != std::string_view::npos) {
@@ -529,7 +529,7 @@ Document parse_markup(std::string_view source) {
         while (llead < lt.size() && (lt[llead] == ' ' || lt[llead] == '\t'))
           ++llead;
         std::string_view ltrim = lt.substr(llead);
-        if (ltrim == ":::" || ltrim.starts_with("::: ")) {
+        if (ltrim == ":::" || starts_with(ltrim, "::: ")) {
           ++i;
           break;
         }
@@ -541,7 +541,7 @@ Document parse_markup(std::string_view source) {
       continue;
     }
     // GFM fenced code: ```lang … ```
-    if (trimmed.starts_with("```") || trimmed.starts_with("~~~")) {
+    if (starts_with(trimmed, "```") || starts_with(trimmed, "~~~")) {
       const char fence_ch = trimmed[0];
       size_t fence_len = 0;
       while (fence_len < trimmed.size() && trimmed[fence_len] == fence_ch)
@@ -595,33 +595,33 @@ Document parse_markup(std::string_view source) {
         continue;
       }
     }
-    if (trimmed.starts_with(":::deflist")) {
+    if (starts_with(trimmed, ":::deflist")) {
       NodeId n = doc.create(NodeKind::DefList, current_parent());
       stack.push_back(n);
       ++i;
       continue;
     }
-    if (trimmed.starts_with(":::figure")) {
+    if (starts_with(trimmed, ":::figure")) {
       NodeId n = doc.create(NodeKind::Figure, current_parent());
       stack.push_back(n);
       ++i;
       continue;
     }
-    if (trimmed.starts_with(":::biblio") ||
-        trimmed.starts_with(":::bibliography")) {
+    if (starts_with(trimmed, ":::biblio") ||
+        starts_with(trimmed, ":::bibliography")) {
       NodeId n = doc.create(NodeKind::Biblio, current_parent());
       stack.push_back(n);
       ++i;
       continue;
     }
-    if (trimmed.starts_with(":::table")) {
+    if (starts_with(trimmed, ":::table")) {
       NodeId n = doc.create(NodeKind::Table, current_parent());
       stack.push_back(n);
       ++i;
       continue;
     }
     // Nested table structure (for cells with block children)
-    if (trimmed.starts_with(":::row")) {
+    if (starts_with(trimmed, ":::row")) {
       NodeId parent = current_parent();
       if (doc.get(parent).kind != NodeKind::Table)
         parent = doc.create(NodeKind::Table, parent);
@@ -630,7 +630,7 @@ Document parse_markup(std::string_view source) {
       ++i;
       continue;
     }
-    if (trimmed.starts_with(":::cell") || trimmed.starts_with(":::th")) {
+    if (starts_with(trimmed, ":::cell") || starts_with(trimmed, ":::th")) {
       NodeId parent = current_parent();
       if (doc.get(parent).kind != NodeKind::TableRow) {
         NodeId table = parent;
@@ -639,7 +639,7 @@ Document parse_markup(std::string_view source) {
         parent = doc.create(NodeKind::TableRow, table);
       }
       NodeId n = doc.create(NodeKind::TableCell, parent);
-      if (trimmed.starts_with(":::th")) doc.get(n).level = 1;
+      if (starts_with(trimmed, ":::th")) doc.get(n).level = 1;
       // Optional weight=N on the fence line
       auto wpos = trimmed.find("weight=");
       if (wpos != std::string_view::npos) {
@@ -660,7 +660,7 @@ Document parse_markup(std::string_view source) {
     //   :::include other.md              → whole external document body
     //   :::include "path with spaces.md#H"
     //   :::include #H excerpt="phrase"   → range within target
-    if (trimmed.starts_with(":::include")) {
+    if (starts_with(trimmed, ":::include")) {
       NodeId n = doc.create(NodeKind::Transclude, current_parent());
       std::string_view rest = trimmed.substr(10);  // after :::include
       while (!rest.empty() && (rest[0] == ' ' || rest[0] == '\t'))
@@ -733,7 +733,7 @@ Document parse_markup(std::string_view source) {
     }
 
     // Image ![alt](src) optional {scale=1.5}
-    if (trimmed.starts_with("![")) {
+    if (starts_with(trimmed, "![")) {
       size_t mid = trimmed.find("](");
       size_t end = trimmed.find(')', mid == std::string_view::npos ? 0 : mid);
       if (mid != std::string_view::npos && end != std::string_view::npos) {
@@ -778,12 +778,12 @@ Document parse_markup(std::string_view source) {
 
     // Headings
     int heading_level = 0;
-    if (trimmed.starts_with("###### ")) heading_level = 6;
-    else if (trimmed.starts_with("##### ")) heading_level = 5;
-    else if (trimmed.starts_with("#### ")) heading_level = 4;
-    else if (trimmed.starts_with("### ")) heading_level = 3;
-    else if (trimmed.starts_with("## ")) heading_level = 2;
-    else if (trimmed.starts_with("# ")) heading_level = 1;
+    if (starts_with(trimmed, "###### ")) heading_level = 6;
+    else if (starts_with(trimmed, "##### ")) heading_level = 5;
+    else if (starts_with(trimmed, "#### ")) heading_level = 4;
+    else if (starts_with(trimmed, "### ")) heading_level = 3;
+    else if (starts_with(trimmed, "## ")) heading_level = 2;
+    else if (starts_with(trimmed, "# ")) heading_level = 1;
 
     if (heading_level > 0) {
       size_t skip = heading_level + 1;
@@ -812,9 +812,9 @@ Document parse_markup(std::string_view source) {
               break;
             }
           }
-          if (all && !trimmed.starts_with("#") && !trimmed.starts_with(">") &&
-              !trimmed.starts_with("```") && !trimmed.starts_with("~~~") &&
-              !trimmed.starts_with("|") && !trimmed.starts_with(":::")) {
+          if (all && !starts_with(trimmed, "#") && !starts_with(trimmed, ">") &&
+              !starts_with(trimmed, "```") && !starts_with(trimmed, "~~~") &&
+              !starts_with(trimmed, "|") && !starts_with(trimmed, ":::")) {
             int setext_level = (uc == '=') ? 1 : 2;
             NodeId n = doc.create(NodeKind::Header, current_parent());
             doc.get(n).level = setext_level;
@@ -916,7 +916,7 @@ Document parse_markup(std::string_view source) {
     }
 
     // Block quote: consecutive lines starting with "> "
-    if (trimmed.starts_with("> ")) {
+    if (starts_with(trimmed, "> ")) {
       std::string quote;
       while (i < lines.size() && !lines[i].blank) {
         std::string_view lt = lines[i].text;
@@ -924,7 +924,7 @@ Document parse_markup(std::string_view source) {
         while (llead < lt.size() && (lt[llead] == ' ' || lt[llead] == '\t'))
           ++llead;
         std::string_view ltrim = lt.substr(llead);
-        if (!ltrim.starts_with("> ")) break;
+        if (!starts_with(ltrim, "> ")) break;
         std::string_view body = ltrim.substr(2);
         bool hard_break = false;
         if (lt.size() >= 2 && lt[lt.size() - 1] == ' ' &&
@@ -1014,13 +1014,13 @@ Document parse_markup(std::string_view source) {
 
     // Definition list body (inside :::deflist): term lines + ": definition"
     if (doc.get(current_parent()).kind == NodeKind::DefList) {
-      if (trimmed.starts_with(": ")) {
+      if (starts_with(trimmed, ": ")) {
         NodeId def = doc.create(NodeKind::Definition, current_parent());
         parse_inlines(doc.get(def), trimmed.substr(2));
         ++i;
         continue;
       }
-      if (!trimmed.starts_with(":::")) {
+      if (!starts_with(trimmed, ":::")) {
         NodeId term = doc.create(NodeKind::Term, current_parent());
         parse_inlines(doc.get(term), trimmed);
         ++i;
@@ -1029,7 +1029,7 @@ Document parse_markup(std::string_view source) {
     }
 
     // Bibliography entry: [^key]: text
-    if (trimmed.starts_with("[^")) {
+    if (starts_with(trimmed, "[^")) {
       size_t close = trimmed.find("]:");
       if (close != std::string_view::npos && close > 2) {
         NodeId parent = current_parent();
@@ -1048,7 +1048,7 @@ Document parse_markup(std::string_view source) {
 
     // Caption under a figure: non-image text line becomes Caption
     if (doc.get(current_parent()).kind == NodeKind::Figure &&
-        !trimmed.starts_with("![") && !trimmed.starts_with(":::")) {
+        !starts_with(trimmed, "![") && !starts_with(trimmed, ":::")) {
       NodeId cap = doc.create(NodeKind::Caption, current_parent());
       parse_inlines(doc.get(cap), trimmed);
       ++i;
@@ -1063,10 +1063,10 @@ Document parse_markup(std::string_view source) {
       size_t llead = 0;
       while (llead < lt.size() && (lt[llead] == ' ' || lt[llead] == '\t')) ++llead;
       std::string_view ltrim = lt.substr(llead);
-      if (ltrim.starts_with(":::") || ltrim.starts_with("# ") ||
-          ltrim.starts_with("## ") || ltrim.starts_with("![") ||
-          ltrim.starts_with("> ") || ltrim.starts_with("|") ||
-          ltrim.starts_with("[^") ||
+      if (starts_with(ltrim, ":::") || starts_with(ltrim, "# ") ||
+          starts_with(ltrim, "## ") || starts_with(ltrim, "![") ||
+          starts_with(ltrim, "> ") || starts_with(ltrim, "|") ||
+          starts_with(ltrim, "[^") ||
           list_marker_len(ltrim, nullptr) > 0) {
         break;
       }
@@ -2943,7 +2943,7 @@ bool looks_like_gemtext(std::string_view source) {
     std::string_view line = source.substr(i, eol - i);
     if (!line.empty() && line.back() == '\r') line.remove_suffix(1);
     ++lines;
-    if (line.starts_with("=>") || line.starts_with("```") ||
+    if (starts_with(line, "=>") || starts_with(line, "```") ||
         (line.size() >= 2 && line[0] == '*' && line[1] == ' ') ||
         (line.size() >= 2 && line[0] == '>' && line[1] == ' '))
       ++gem_lines;
@@ -2998,7 +2998,7 @@ Document parse_gemtext(std::string_view source) {
     std::string_view raw = lines[li];
 
     if (pre) {
-      if (raw.starts_with("```")) {
+      if (starts_with(raw, "```")) {
         pre = false;
         flush_pre();
         end_list();
@@ -3009,7 +3009,7 @@ Document parse_gemtext(std::string_view source) {
       continue;
     }
 
-    if (raw.starts_with("```")) {
+    if (starts_with(raw, "```")) {
       end_list();
       pre = true;
       pre_lang = std::string(gem_trim(raw.substr(3)));
@@ -3018,7 +3018,7 @@ Document parse_gemtext(std::string_view source) {
     }
 
     // Link: => URL [label]
-    if (raw.starts_with("=>")) {
+    if (starts_with(raw, "=>")) {
       end_list();
       std::string_view rest = gem_trim(raw.substr(2));
       size_t sp = 0;

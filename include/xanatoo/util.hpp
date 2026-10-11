@@ -9,6 +9,16 @@
 
 namespace xanatoo {
 
+// C++17-friendly prefix/suffix checks (std::*::starts_with is C++20).
+inline bool starts_with(std::string_view s, std::string_view prefix) {
+  return s.size() >= prefix.size() &&
+         s.compare(0, prefix.size(), prefix) == 0;
+}
+inline bool ends_with(std::string_view s, std::string_view suffix) {
+  return s.size() >= suffix.size() &&
+         s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
 // ASCII-only lowercasing (anchors, extensions, comparisons).
 std::string ascii_lower(std::string s);
 

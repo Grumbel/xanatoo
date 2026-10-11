@@ -96,6 +96,7 @@ let
     "-isystem ${gccLib}/include"
     "-isystem ${sysroot}/usr/include/${multiarch}"
     "-isystem ${sysroot}/usr/include"
+    "-isystem ${sysroot}/usr/include/SDL2"
     "-march=armv8-a -mtune=cortex-a35"
     # GCC 10+ calls helpers for atomics (__aarch64_ldadd4_rel ...) that
     # GCC 9's libgcc lacks; the Cortex-A35 (ARMv8.0, no LSE) would take the
@@ -112,6 +113,7 @@ let
     "-isystem ${gccLib}/include"
     "-isystem ${sysroot}/usr/include/${multiarch}"
     "-isystem ${sysroot}/usr/include"
+    "-isystem ${sysroot}/usr/include/SDL2"
     "-march=armv8-a -mtune=cortex-a35"
     # GCC 10+ calls helpers for atomics (__aarch64_ldadd4_rel ...) that
     # GCC 9's libgcc lacks; the Cortex-A35 (ARMv8.0, no LSE) would take the
@@ -172,7 +174,7 @@ let
       "-DCMAKE_CXX_STANDARD=17"
       "-DXANATOO_GEMINI=OFF"
       # eoan's SDL2 / FreeType: paths into the sysroot (no device RPATH).
-      "-DSDL2_INCLUDE_DIRS=${sysroot}/usr/include"
+      "-DSDL2_INCLUDE_DIRS=${sysroot}/usr/include/SDL2"
       "-DSDL2_LIBRARIES=${sdlStub}/lib/libSDL2.so"
       "-DFREETYPE_INCLUDE_DIRS=${sysroot}/usr/include/freetype2"
       "-DFREETYPE_INCLUDE_DIR_ft2build=${sysroot}/usr/include/freetype2"

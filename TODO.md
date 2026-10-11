@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **162** (this delivery is **161**)
+Next bundle number: **163** (this delivery is **162**)
 
 ## Status (2026-10-11)
 
@@ -260,6 +260,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Diff demo crash: relayout after UI; clear soft/hover on buffer replace
 - [x] R36S / PortMaster flake outputs; XANATOO_DATA_DIR for examples
 - [x] Flake: hostPlatform.isLinux; drop x86_64-darwin (nixpkgs 26.11+)
+- [x] R36S: SDL2 include path; C++17 starts_with polyfill
 
 ## Open work / next steps
 
@@ -472,4 +473,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-158.*-icon-load-fallbacks-…` — icon load
 - `xanatoo-159.*-diff-demo-crash-…` — diff demo crash
 - `xanatoo-160.*-r36s-portmaster-…` — R36S port
-- `xanatoo-161.*-flake-platforms-…` — this delivery
+- `xanatoo-161.*-flake-platforms-…` — flake platforms
+- `xanatoo-162.*-r36s-build-fixes-…` — this delivery

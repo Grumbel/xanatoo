@@ -457,7 +457,7 @@ Document parse_org(std::string_view source) {
     }
 
     // Comments
-    if (t.starts_with("# ") || t == "#") {
+    if (starts_with(t, "# ") || t == "#") {
       ++i;
       continue;
     }
@@ -519,7 +519,7 @@ Document parse_org(std::string_view source) {
     }
 
     // Other #+ lines ignored
-    if (t.starts_with("#+")) {
+    if (starts_with(t, "#+")) {
       ++i;
       continue;
     }

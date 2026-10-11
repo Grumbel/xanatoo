@@ -1417,10 +1417,10 @@ int main(int argc, char** argv) {
           const std::string low = lower_ext(fpath);
           const bool is_doc =
               low.size() >= 3 &&
-              (low.ends_with(".md") || low.ends_with(".markdown") ||
-               low.ends_with(".sexp") || low.ends_with(".txt") ||
-               low.ends_with(".org") || low.ends_with(".gmi") ||
-               low.ends_with(".gemini"));
+              (xanatoo::ends_with(low, ".md") || xanatoo::ends_with(low, ".markdown") ||
+               xanatoo::ends_with(low, ".sexp") || xanatoo::ends_with(low, ".txt") ||
+               xanatoo::ends_with(low, ".org") || xanatoo::ends_with(low, ".gmi") ||
+               xanatoo::ends_with(low, ".gemini"));
 
           if (is_doc) {
             if (!std::filesystem::exists(fpath)) {
