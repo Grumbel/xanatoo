@@ -774,7 +774,8 @@ std::vector<std::string> default_relays() {
 
 void collect_ws_events(WsConn& c, std::map<std::string, NostrEvent>& by_id,
                        int timeout_sec) {
-  std::string carry;
+  // Seed from any bytes left after the HTTP upgrade (first WS frames).
+  std::string carry = std::move(c.carry);
   auto deadline =
       std::chrono::steady_clock::now() + std::chrono::seconds(timeout_sec);
   while (std::chrono::steady_clock::now() < deadline) {
@@ -810,6 +811,26 @@ void query_relay(const std::string& relay, const std::string& event_id,
     return;
   }
   collect_ws_events(c, by_id, 5);
+  ws_send_text(c, std::string("[\"CLOSE\",\"") + sub + "\"]");
+}
+
+void query_recent(const std::string& relay,
+                  std::map<std::string, NostrEvent>& by_id, std::string* last_err) {
+  WsConn c;
+  std::string err;
+  if (!ws_connect(c, relay, &err)) {
+    if (last_err) *last_err = err;
+    return;
+  }
+  std::string sub = "recent";
+  // Newest kind-1 notes from this relay (firehose sample for nostr:recent).
+  std::string req = std::string("[\"REQ\",\"") + sub +
+                    "\",{\"kinds\":[1],\"limit\":25}]";
+  if (!ws_send_text(c, req)) {
+    if (last_err) *last_err = "WS send failed";
+    return;
+  }
+  collect_ws_events(c, by_id, 6);
   ws_send_text(c, std::string("[\"CLOSE\",\"") + sub + "\"]");
 }
 

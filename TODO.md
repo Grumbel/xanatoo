@@ -6,9 +6,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **196** (this delivery is **195**)
+Next bundle number: **197** (this delivery is **196**)
 
 ## Status (2026-10-11)
+
+Build fix: implement missing `query_recent` for `nostr:recent` / firehose; seed `collect_ws_events` from handshake leftover (`WsConn::carry`).
 
 Stage **01**–**04** core features in place; ImGui without X11 syswm dependency.
 LCS structural diff marks; cross-document `:::include`.
@@ -521,4 +523,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-192.*-welcome-nostr-links-…` — welcome Nostr links
 - `xanatoo-193.*-nostr-connect-resilience-…` — nostr connect resilience
 - `xanatoo-194.*-fix-nostr-string-literals-…` — fix string literals
-- `xanatoo-195.*-nostr-recent-firehose-…` — this delivery
+- `xanatoo-195.*-nostr-recent-firehose-…` — nostr:recent firehose
+- `xanatoo-196.*-fix-query-recent-…` — this delivery (add missing query_recent + seed WS carry)
