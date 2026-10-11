@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **175** (this delivery is **174**)
+Next bundle number: **176** (this delivery is **175**)
 
 ## Status (2026-10-11)
 
@@ -264,7 +264,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] R36S: stick to kurvenrausch eoan SDL; ImGui legacy renderer path
 
 ### R36S / PortMaster — confirmed working; polish later
-- [x] UI chrome: ProggyClean 13px bitmap (default); TTF only via XANATOO_UI_FONT
+- [x] UI font restored to pre-R36S DejaVu 14px (throw away scale/Proggy experiments)
 - [x] Gamepad: connect hint, Y=history forward, browse-mode status hints; ImGui NavEnableGamepad
 - [x] On-screen virtual keyboard (F3 / Guide / View menu)
 - [x] Right-stick software cursor (A/B click) for R36S
@@ -499,4 +499,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-171.*-stick-separate-alpha-…` — stick separate + alpha
 - `xanatoo-172.*-ui-font-rollback-…` — ui font rollback
 - `xanatoo-173.*-dual-cursor-fixed-font-…` — dual cursor + fixed font
-- `xanatoo-174.*-proggyclean-ui-font-…` — this delivery
+- `xanatoo-174.*-proggyclean-ui-font-…` — proggyclean attempt
+- `xanatoo-175.*-restore-pre-r36s-ui-font-…` — this delivery

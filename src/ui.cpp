@@ -324,38 +324,66 @@ void Ui::tool_menu_end() {
   ImGui::PopID();
 }
 
-// Default UI face is ImGui's built-in ProggyClean (13px bitmap). It stays
-// sharp on low-res LCDs; anti-aliased TTFs (DejaVu etc.) go mushy at menu size
-// under the SDL_Renderer backend. Optional override: XANATOO_UI_FONT=/path.ttf
-static void load_ui_fonts(ImGuiIO& io) {
-  io.FontGlobalScale = 1.0f;
-
-  if (const char* env = std::getenv("XANATOO_UI_FONT")) {
-    if (env[0] != '\0' && fs::exists(env)) {
-      ImFontConfig cfg;
-      cfg.OversampleH = 1;
-      cfg.OversampleV = 1;
-      cfg.PixelSnapH = true;
-      const float size_px = 13.0f;
-      ImFont* font = io.Fonts->AddFontFromFileTTF(
-          env, size_px, &cfg, io.Fonts->GetGlyphRangesDefault());
-      if (font) {
-        std::cout << "UI font: " << env << " @ " << size_px << "px\n";
-        return;
-      }
-      std::cerr << "UI font load failed: " << env
-                << " — using ProggyClean\n";
+// Restored pre-R36S UI font path (commit before d55b74d UI-scale work).
+// GNOME 2–era faces: Bitstream Vera → DejaVu Sans.
+static std::string resolve_ui_font_path() {
+  const char* families[] = {
+      "DejaVu Sans",
+      "Bitstream Vera Sans",
+      "Liberation Sans",
+      "FreeSans",
+      "Nimbus Sans L",
+      "Sans",
+      nullptr,
+  };
+  for (const char** f = families; *f; ++f) {
+    std::string path = fontconfig_find(*f, 0, 0);
+    if (!path.empty()) return path;
+  }
+  const char* files[] = {
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/TTF/DejaVuSans.ttf",
+      "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/truetype/ttf-bitstream-vera/Vera.ttf",
+      "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+      nullptr,
+  };
+  for (const char** f = files; *f; ++f) {
+    if (fs::exists(*f)) return *f;
+  }
+  // PortMaster ships DejaVu next to the binary.
+  if (const char* data = std::getenv("XANATOO_DATA_DIR")) {
+    if (data[0] != '\0') {
+      fs::path p = fs::path(data) / "fonts" / "DejaVuSans.ttf";
+      if (fs::exists(p)) return p.string();
     }
   }
+  if (const char* body = std::getenv("XANATOO_FONT")) {
+    if (body[0] != '\0' && fs::exists(body)) return body;
+  }
+  return {};
+}
 
-  // ProggyClean: embedded monospace bitmap, designed for ~13px UI chrome.
+static void load_ui_fonts(ImGuiIO& io) {
+  // ~10–11 pt at 96 dpi — close to GNOME 2 menu/toolbar size
+  const float size_px = 14.0f;
+  std::string path = resolve_ui_font_path();
   ImFontConfig cfg;
-  cfg.SizePixels = 13.0f;
-  cfg.OversampleH = 1;
+  cfg.OversampleH = 2;
   cfg.OversampleV = 1;
-  cfg.PixelSnapH = true;
-  io.Fonts->AddFontDefault(&cfg);
-  std::cout << "UI font: ProggyClean @ 13px (bitmap)\n";
+  cfg.PixelSnapH = true;  // crisper menus on integer positions
+  if (!path.empty()) {
+    ImFont* font = io.Fonts->AddFontFromFileTTF(path.c_str(), size_px, &cfg,
+                                                io.Fonts->GetGlyphRangesDefault());
+    if (font) {
+      std::cout << "UI font: " << path << " @ " << size_px << "px\n";
+      return;
+    }
+    std::cerr << "UI font load failed: " << path << " — using ImGui default\n";
+  } else {
+    std::cerr << "No DejaVu/Vera/Liberation Sans found — using ImGui default\n";
+  }
+  io.Fonts->AddFontDefault();
 }
 
 bool Ui::init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale) {
@@ -367,21 +395,16 @@ bool Ui::init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale) {
   // Gamepad navigates ImGui menus when a controller is present.
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
   io.IniFilename = nullptr;
-  io.FontGlobalScale = 1.0f;
-
-  // ui_scale argument kept for API compatibility; font is never scaled.
-  (void)ui_scale;
-  (void)window;
+  (void)ui_scale;  // font size is fixed; scale arg kept for API only
 
   load_ui_fonts(io);
   apply_classic_theme();
+  // Slightly roomier chrome once a proportional face is loaded
   {
     ImGuiStyle& s = ImGui::GetStyle();
     s.FramePadding = ImVec2(7.f, 4.f);
     s.ItemSpacing = ImVec2(7.f, 5.f);
     s.ScrollbarSize = 14.f;
-    // Required for nearest-filtered font atlas (see imgui_impl_sdlrenderer2).
-    s.AntiAliasedLinesUseTex = false;
   }
   load_icons(renderer);
 

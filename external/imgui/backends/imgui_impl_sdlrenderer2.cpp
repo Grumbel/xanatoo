@@ -342,8 +342,7 @@ bool ImGui_ImplSDLRenderer2_CreateFontsTexture()
     io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);   // Load as RGBA 32-bit (75% of the memory is wasted, but default font is so small) because it is more likely to be compatible with user's existing shaders. If your ImTextureId represent a higher-level concept than just a GL texture id, consider calling GetTexDataAsAlpha8() instead to save on GPU memory.
 
     // Upload texture to graphics system
-    // Nearest sampling so ProggyClean / UI glyphs stay sharp on low-res LCDs
-    // (bilinear turns bitmap fonts to mush). Pair with style.AntiAliasedLinesUseTex=false.
+    // (Bilinear sampling is required by default. Set 'io.Fonts->Flags |= ImFontAtlasFlags_NoBakedLines' or 'style.AntiAliasedLinesUseTex = false' to allow point/nearest sampling)
     bd->FontTexture = SDL_CreateTexture(bd->Renderer,
 #if defined(SDL_PIXELFORMAT_RGBA32)
         SDL_PIXELFORMAT_RGBA32,
@@ -359,7 +358,7 @@ bool ImGui_ImplSDLRenderer2_CreateFontsTexture()
     SDL_UpdateTexture(bd->FontTexture, nullptr, pixels, 4 * width);
     SDL_SetTextureBlendMode(bd->FontTexture, SDL_BLENDMODE_BLEND);
 #if SDL_VERSION_ATLEAST(2,0,12)
-    SDL_SetTextureScaleMode(bd->FontTexture, SDL_ScaleModeNearest);
+    SDL_SetTextureScaleMode(bd->FontTexture, SDL_ScaleModeLinear);
 #endif
 
     // Store our identifier

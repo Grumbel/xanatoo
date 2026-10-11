@@ -30,13 +30,9 @@ export XDG_STATE_HOME="$GAMEDIR/conf"
 # Data next to the binary (examples, icons, font)
 export XANATOO_DATA_DIR="$GAMEDIR"
 export XANATOO_ICON_DIR="$GAMEDIR/icons"
-# Body document font only. UI chrome uses ImGui ProggyClean (bitmap).
-# Do NOT set XANATOO_UI_FONT to DejaVu — blurry at menu size on R36S LCD.
 if [ -f "$GAMEDIR/fonts/DejaVuSans.ttf" ]; then
   export XANATOO_FONT="$GAMEDIR/fonts/DejaVuSans.ttf"
 fi
-unset XANATOO_UI_FONT
-unset XANATOO_UI_SCALE
 
 # PortMaster gamepad mapping for SDL's controller API
 export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
