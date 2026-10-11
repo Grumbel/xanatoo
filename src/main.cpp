@@ -3843,13 +3843,60 @@ int main(int argc, char** argv) {
 
       renderer.draw(pane.layout, draw_scroll, ox);
 
-      // Logical structure overlay: colour bars + wash by NodeKind
+      // Logical structure overlay: colour bars + wash by NodeKind + right labels
       if (structure_mode) {
         SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
         const auto& ddoc = docs[pane.doc_index];
+        auto kind_label = [](const xanatoo::Node& n) -> const char* {
+          using K = xanatoo::NodeKind;
+          switch (n.kind) {
+            case K::Heading: {
+              static thread_local char buf[4];
+              int lv = n.level;
+              if (lv < 1) lv = 1;
+              if (lv > 6) lv = 6;
+              buf[0] = 'h';
+              buf[1] = static_cast<char>('0' + lv);
+              buf[2] = 0;
+              return buf;
+            }
+            case K::Paragraph: return "para";
+            case K::List: return n.level == 1 ? "ol" : "ul";
+            case K::ListItem:
+              if (n.label == "task") return "task";
+              if (n.label == "task-done") return "done";
+              return "li";
+            case K::BlockQuote: return "quote";
+            case K::Note: return "note";
+            case K::CodeBlock: return "code";
+            case K::Table: return "table";
+            case K::TableRow: return "row";
+            case K::TableCell: return n.level > 0 ? "th" : "td";
+            case K::DefList: return "deflist";
+            case K::Term: return "term";
+            case K::Definition: return "def";
+            case K::Stretch: return "stretch";
+            case K::Columns: return "columns";
+            case K::Column: return "column";
+            case K::Image: return "image";
+            case K::Figure: return "figure";
+            case K::Caption: return "caption";
+            case K::Biblio: return "biblio";
+            case K::BiblioEntry: return "ref";
+            case K::HorizontalRule: return "hr";
+            case K::Transclude: return "include";
+            case K::Thread: return "thread";
+            case K::Message: return "message";
+            default: return nullptr;
+          }
+        };
+        // Prefer mono for compact gutter tags; fall back to body.
+        xanatoo::Font& tag_font = fonts.mono.loaded() ? fonts.mono : fonts.regular;
+        const int tag_lh = tag_font.line_height();
         for (const auto& box : pane.layout.boxes) {
           if (box.node == xanatoo::INVALID_NODE) continue;
-          const auto kind = ddoc.get(box.node).kind;
+          const auto& node = ddoc.get(box.node);
+          const auto kind = node.kind;
           // Skip pure container shells that span the whole doc
           if (kind == xanatoo::NodeKind::Document) continue;
           uint8_t r = 120, g = 120, b = 130, a_bar = 200, a_wash = 28;
@@ -3900,12 +3947,37 @@ int main(int argc, char** argv) {
           int by = static_cast<int>(box.y - pane.scroll_y + ui_top);
           int bh = static_cast<int>(box.height);
           if (by + bh < clip_y || by > win_h - status_bar_h) continue;
+          // Leave room on the right for the kind tag.
+          const int tag_gutter = 56;
+          int wash_w = pane.w - 14 - tag_gutter;
+          if (wash_w < 20) wash_w = pane.w - 14;
           SDL_SetRenderDrawColor(sdl, r, g, b, a_bar);
           SDL_Rect mark{pane.x + 1, by, 5, bh};
           SDL_RenderFillRect(sdl, &mark);
           SDL_SetRenderDrawColor(sdl, r, g, b, a_wash);
-          SDL_Rect wash{pane.x + 6, by, pane.w - 14, bh};
+          SDL_Rect wash{pane.x + 6, by, wash_w, bh};
           SDL_RenderFillRect(sdl, &wash);
+
+          // Small kind label on the right edge of the region.
+          const char* tag = kind_label(node);
+          if (tag && bh >= 10 && tag_font.loaded()) {
+            int tw = tag_font.measure(tag);
+            int tx = pane.x + pane.w - tw - 8;
+            if (tx < pane.x + 10) tx = pane.x + 10;
+            // Baseline near the top of the box so stacked regions stay readable.
+            float baseline =
+                static_cast<float>(by) +
+                static_cast<float>(std::min(bh, tag_lh + 2)) - 3.f;
+            if (baseline < static_cast<float>(clip_y) + 8.f)
+              baseline = static_cast<float>(clip_y) + 8.f;
+            // Soft chip behind the tag for contrast on wash.
+            SDL_SetRenderDrawColor(sdl, 248, 246, 240, 200);
+            SDL_Rect chip{tx - 3, by + 1, tw + 6,
+                          std::min(bh - 2, tag_lh + 2)};
+            if (chip.h > 4) SDL_RenderFillRect(sdl, &chip);
+            renderer.draw_text(tag_font, static_cast<float>(tx), baseline, tag,
+                               r, g, b);
+          }
         }
         SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
       }
@@ -4221,7 +4293,7 @@ int main(int argc, char** argv) {
         label = "Diff marks on — orange bars mark passages that differ · Ctrl+Shift+D toggles";
         tr = 160; tg = 90; tb = 30;
       } else if (structure_mode) {
-        label = "Structure highlight — colour bars by block kind · Ctrl+Shift+L toggles · right-click for menu";
+        label = "Structure highlight — colour bars + kind tags on the right · Ctrl+Shift+L toggles";
         tr = 40; tg = 80; tb = 140;
       } else if (outline_mode) {
         label = "Outline — ↑/↓ select · Enter jump · 1-9 quick jump · Esc close";

@@ -66,6 +66,7 @@ Export via *File → Export as S-expression…* or *Export as Markdown…*.
 
 - **Ctrl+\\** — Toggle dual pane
 - **Ctrl+Shift+D** — Diff marks (two independent files)
+- **Ctrl+Shift+L** — Structure highlight (colour bars + kind tags on the right)
 - **Drag left margin** — Reorder or reparent a block
 - **Drag column gutter** — Resize column widths
 - **Drag image corner** — Resize image
