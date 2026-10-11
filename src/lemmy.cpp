@@ -6,6 +6,9 @@
 
 #include "xanatoo/lemmy.hpp"
 
+#include "xanatoo/https.hpp"
+#include "xanatoo/json_min.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
@@ -19,14 +22,7 @@
 #include <vector>
 
 #if defined(XANATOO_LEMMY) && XANATOO_LEMMY
-#include <openssl/err.h>
-#include <openssl/ssl.h>
-
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <sys/socket.h>
-#include <sys/time.h>
-#include <unistd.h>
+// HTTPS via xanatoo/https.hpp (OpenSSL)
 #endif
 
 namespace xanatoo {
@@ -94,330 +90,10 @@ bool is_lemmy_url(std::string_view s) {
 
 namespace {
 
-void ssl_once_init() {
-  static bool done = false;
-  if (done) return;
-  SSL_library_init();
-  SSL_load_error_strings();
-  OpenSSL_add_all_algorithms();
-  done = true;
-}
-
-int tcp_connect(const std::string& host, int port, std::string* err) {
-  addrinfo hints {};
-  hints.ai_socktype = SOCK_STREAM;
-  hints.ai_family = AF_UNSPEC;
-  addrinfo* res = nullptr;
-  std::string port_s = std::to_string(port);
-  if (getaddrinfo(host.c_str(), port_s.c_str(), &hints, &res) != 0) {
-    if (err) *err = "DNS failed for " + host;
-    return -1;
-  }
-  int fd = -1;
-  for (addrinfo* p = res; p; p = p->ai_next) {
-    fd = ::socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-    if (fd < 0) continue;
-    timeval tv;
-    tv.tv_sec = 15;
-    tv.tv_usec = 0;
-    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-    if (::connect(fd, p->ai_addr, p->ai_addrlen) == 0) break;
-    ::close(fd);
-    fd = -1;
-  }
-  freeaddrinfo(res);
-  if (fd < 0 && err) *err = "connect failed to " + host;
-  return fd;
-}
-
-struct HttpResult {
-  int status = 0;
-  std::string body;
-  std::string location;
-};
-
 std::string user_agent() {
   const char* env = std::getenv("XANATOO_LEMMY_USER_AGENT");
   if (env && env[0]) return env;
   return "xanatoo/0.1.0 (read-only Lemmy client; by grumbel; +https://github.com/Grumbel/xanatoo)";
-}
-
-std::optional<HttpResult> https_get(const std::string& url, std::string* err) {
-  if (!starts_with_ci(url, "https://")) {
-    if (err) *err = "only https supported for Lemmy";
-    return std::nullopt;
-  }
-  std::string_view rest = std::string_view(url).substr(8);
-  size_t slash = rest.find('/');
-  std::string host = std::string(
-      slash == std::string_view::npos ? rest : rest.substr(0, slash));
-  std::string path = std::string(
-      slash == std::string_view::npos ? "/" : rest.substr(slash));
-  int port = 443;
-  size_t colon = host.rfind(':');
-  if (colon != std::string::npos) {
-    port = std::atoi(host.c_str() + colon + 1);
-    if (port <= 0) port = 443;
-    host = host.substr(0, colon);
-  }
-
-  ssl_once_init();
-  int fd = tcp_connect(host, port, err);
-  if (fd < 0) return std::nullopt;
-
-  SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());
-  if (!ctx) {
-    ::close(fd);
-    if (err) *err = "SSL_CTX_new failed";
-    return std::nullopt;
-  }
-  SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, nullptr);
-  SSL* ssl = SSL_new(ctx);
-  if (!ssl) {
-    SSL_CTX_free(ctx);
-    ::close(fd);
-    if (err) *err = "SSL_new failed";
-    return std::nullopt;
-  }
-  SSL_set_fd(ssl, fd);
-  SSL_set_tlsext_host_name(ssl, host.c_str());
-  if (SSL_connect(ssl) != 1) {
-    if (err) *err = "TLS handshake failed";
-    SSL_free(ssl);
-    SSL_CTX_free(ctx);
-    ::close(fd);
-    return std::nullopt;
-  }
-
-  std::ostringstream req;
-  req << "GET " << path << " HTTP/1.1\r\n"
-      << "Host: " << host << "\r\n"
-      << "User-Agent: " << user_agent() << "\r\n"
-      << "Accept: application/json\r\n"
-      << "Accept-Language: en-US,en;q=0.9\r\n"
-      << "Connection: close\r\n"
-      << "\r\n";
-  std::string req_s = req.str();
-  if (SSL_write(ssl, req_s.data(), static_cast<int>(req_s.size())) <= 0) {
-    if (err) *err = "TLS write failed";
-    SSL_shutdown(ssl);
-    SSL_free(ssl);
-    SSL_CTX_free(ctx);
-    ::close(fd);
-    return std::nullopt;
-  }
-
-  std::string data;
-  char buf[4096];
-  for (;;) {
-    int n = SSL_read(ssl, buf, sizeof(buf));
-    if (n <= 0) break;
-    data.append(buf, static_cast<size_t>(n));
-    if (data.size() > 12 * 1024 * 1024) break;
-  }
-  SSL_shutdown(ssl);
-  SSL_free(ssl);
-  SSL_CTX_free(ctx);
-  ::close(fd);
-
-  size_t hdr_end = data.find("\r\n\r\n");
-  if (hdr_end == std::string::npos) {
-    if (err) *err = "malformed HTTP response";
-    return std::nullopt;
-  }
-  std::string headers = data.substr(0, hdr_end);
-  HttpResult out;
-  out.body = data.substr(hdr_end + 4);
-  {
-    size_t sp1 = headers.find(' ');
-    if (sp1 != std::string::npos) {
-      size_t sp2 = headers.find(' ', sp1 + 1);
-      std::string code = (sp2 == std::string::npos)
-                             ? headers.substr(sp1 + 1, 3)
-                             : headers.substr(sp1 + 1, sp2 - sp1 - 1);
-      out.status = std::atoi(code.c_str());
-    }
-  }
-  std::string hlow = ascii_lower_copy(headers);
-  size_t loc = hlow.find("\nlocation:");
-  if (loc != std::string::npos) {
-    size_t v0 = headers.find(':', loc);
-    size_t v1 = headers.find("\r\n", v0);
-    if (v0 != std::string::npos && v1 != std::string::npos) {
-      std::string val = headers.substr(v0 + 1, v1 - v0 - 1);
-      while (!val.empty() && (val.front() == ' ' || val.front() == '\t'))
-        val.erase(val.begin());
-      out.location = val;
-    }
-  }
-  return out;
-}
-
-// --- JSON helpers ---
-
-std::string json_unescape(std::string_view s) {
-  std::string o;
-  o.reserve(s.size());
-  for (size_t i = 0; i < s.size(); ++i) {
-    if (s[i] == '\\' && i + 1 < s.size()) {
-      char c = s[++i];
-      if (c == 'n') o.push_back('\n');
-      else if (c == 'r') o.push_back('\r');
-      else if (c == 't') o.push_back('\t');
-      else if (c == '"' || c == '\\' || c == '/') o.push_back(c);
-      else if (c == 'u' && i + 4 < s.size()) {
-        i += 4;
-        o.push_back('?');
-      } else
-        o.push_back(c);
-    } else {
-      o.push_back(s[i]);
-    }
-  }
-  return o;
-}
-
-std::string json_str_field(std::string_view json, std::string_view key) {
-  std::string pat = "\"";
-  pat += key;
-  pat += "\"";
-  size_t p = 0;
-  while ((p = json.find(pat, p)) != std::string_view::npos) {
-    if (p > 0) {
-      char prev = json[p - 1];
-      if (prev != '{' && prev != ',' && prev != ' ' && prev != '\n' &&
-          prev != '\r' && prev != '\t') {
-        p += pat.size();
-        continue;
-      }
-    }
-    size_t c = json.find(':', p + pat.size());
-    if (c == std::string_view::npos) return {};
-    size_t v = c + 1;
-    while (v < json.size() &&
-           std::isspace(static_cast<unsigned char>(json[v])))
-      ++v;
-    if (v >= json.size()) return {};
-    if (json[v] == 'n' && json.substr(v, 4) == "null") return {};
-    if (json[v] != '"') return {};
-    ++v;
-    std::string out;
-    while (v < json.size()) {
-      if (json[v] == '\\' && v + 1 < json.size()) {
-        out.push_back('\\');
-        out.push_back(json[v + 1]);
-        v += 2;
-        continue;
-      }
-      if (json[v] == '"') break;
-      out.push_back(json[v++]);
-    }
-    return json_unescape(out);
-  }
-  return {};
-}
-
-int64_t json_int_field(std::string_view json, std::string_view key) {
-  std::string pat = "\"";
-  pat += key;
-  pat += "\"";
-  size_t p = json.find(pat);
-  if (p == std::string_view::npos) return 0;
-  p = json.find(':', p + pat.size());
-  if (p == std::string_view::npos) return 0;
-  ++p;
-  while (p < json.size() && std::isspace(static_cast<unsigned char>(json[p])))
-    ++p;
-  return std::strtoll(std::string(json.substr(p, 24)).c_str(), nullptr, 10);
-}
-
-// Object value after "key": { ... }
-std::string_view json_object_after_key(std::string_view json,
-                                       std::string_view key) {
-  std::string pat = "\"";
-  pat += key;
-  pat += "\"";
-  size_t p = json.find(pat);
-  if (p == std::string_view::npos) return {};
-  p = json.find(':', p + pat.size());
-  if (p == std::string_view::npos) return {};
-  ++p;
-  while (p < json.size() && std::isspace(static_cast<unsigned char>(json[p])))
-    ++p;
-  if (p >= json.size() || json[p] != '{') return {};
-  int depth = 0;
-  size_t start = p;
-  for (size_t i = p; i < json.size(); ++i) {
-    char c = json[i];
-    if (c == '"') {
-      ++i;
-      while (i < json.size()) {
-        if (json[i] == '\\') {
-          i += 2;
-          continue;
-        }
-        if (json[i] == '"') break;
-        ++i;
-      }
-      continue;
-    }
-    if (c == '{') ++depth;
-    else if (c == '}') {
-      --depth;
-      if (depth == 0) return json.substr(start, i - start + 1);
-    }
-  }
-  return {};
-}
-
-// Array of objects after "key": [ {...}, ... ]
-std::vector<std::string> json_object_array_after_key(std::string_view json,
-                                                    std::string_view key) {
-  std::vector<std::string> out;
-  std::string pat = "\"";
-  pat += key;
-  pat += "\"";
-  size_t p = json.find(pat);
-  if (p == std::string_view::npos) return out;
-  p = json.find('[', p + pat.size());
-  if (p == std::string_view::npos) return out;
-  ++p;
-  while (p < json.size()) {
-    while (p < json.size() &&
-           (std::isspace(static_cast<unsigned char>(json[p])) || json[p] == ','))
-      ++p;
-    if (p >= json.size() || json[p] == ']') break;
-    if (json[p] != '{') break;
-    int depth = 0;
-    size_t start = p;
-    for (size_t i = p; i < json.size(); ++i) {
-      char c = json[i];
-      if (c == '"') {
-        ++i;
-        while (i < json.size()) {
-          if (json[i] == '\\') {
-            i += 2;
-            continue;
-          }
-          if (json[i] == '"') break;
-          ++i;
-        }
-        continue;
-      }
-      if (c == '{') ++depth;
-      else if (c == '}') {
-        --depth;
-        if (depth == 0) {
-          out.emplace_back(json.substr(start, i - start + 1));
-          p = i + 1;
-          break;
-        }
-      }
-    }
-    if (depth != 0) break;
-  }
-  return out;
 }
 
 std::string format_time_iso(std::string_view iso) {
@@ -727,7 +403,7 @@ std::optional<Document> lemmy_fetch(std::string_view url_in, std::string* err) {
   for (int hop = 0; hop < 4; ++hop) {
     std::cerr << "Lemmy: GET " << current << "\n";
     std::string req_err;
-    resp = https_get(current, &req_err);
+    resp = https_get(current, user_agent(), &req_err);
     if (!resp) {
       if (err) *err = req_err.empty() ? "request failed" : req_err;
       return std::nullopt;
@@ -806,7 +482,7 @@ std::optional<Document> lemmy_fetch(std::string_view url_in, std::string* err) {
         "&limit=80&max_depth=8&sort=Hot";
     std::cerr << "Lemmy: GET " << curl << "\n";
     std::string cerr;
-    auto cresp = https_get(curl, &cerr);
+    auto cresp = https_get(curl, user_agent(), &cerr);
     if (cresp && cresp->status == 200 && !cresp->body.empty()) {
       size_t cs = 0;
       while (cs < cresp->body.size() &&

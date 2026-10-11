@@ -27,6 +27,11 @@ Dear ImGui is allowed for chrome (menus/toolbars). No Qt/GTK/KDE.
 - Dear ImGui (menu bar / toolbar; vendored under external/imgui)
 - CMake + Nix flake
 
+## Shared network helpers
+
+- `include/xanatoo/https.hpp` + `src/https.cpp` — OpenSSL HTTPS GET/POST (Reddit, Lemmy; linked when any OpenSSL feature is ON).
+- `include/xanatoo/json_min.hpp` — tiny JSON field/object helpers for read-only API clients (header-only).
+
 ## Coding rules
 
 - GPLv3+ with short SPDX headers on every source file.

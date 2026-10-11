@@ -86,6 +86,7 @@ endif()
 if(XANATOO_NEED_OPENSSL)
   find_package(OpenSSL REQUIRED)
   target_link_libraries(xanatoo PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+  target_sources(xanatoo PRIVATE src/https.cpp)
 endif()
 
 if(XANATOO_GEMINI)

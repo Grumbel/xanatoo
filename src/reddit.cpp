@@ -6,6 +6,8 @@
 
 #include "xanatoo/reddit.hpp"
 
+#include "xanatoo/https.hpp"
+#include "xanatoo/json_min.hpp"
 #include "xanatoo/util.hpp"
 
 #include <algorithm>
@@ -24,14 +26,7 @@
 #include <vector>
 
 #if defined(XANATOO_REDDIT) && XANATOO_REDDIT
-#include <openssl/err.h>
-#include <openssl/ssl.h>
-
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <sys/socket.h>
-#include <sys/time.h>
-#include <unistd.h>
+// HTTPS via xanatoo/https.hpp (OpenSSL)
 #endif
 
 namespace xanatoo {
@@ -165,190 +160,11 @@ std::string reddit_json_url(std::string_view s) {
 
 namespace {
 
-void ssl_once_init() {
-  static bool done = false;
-  if (done) return;
-  SSL_library_init();
-  SSL_load_error_strings();
-  OpenSSL_add_all_algorithms();
-  done = true;
-}
-
-int tcp_connect(const std::string& host, int port, std::string* err) {
-  addrinfo hints {};
-  hints.ai_socktype = SOCK_STREAM;
-  hints.ai_family = AF_UNSPEC;
-  addrinfo* res = nullptr;
-  std::string port_s = std::to_string(port);
-  if (getaddrinfo(host.c_str(), port_s.c_str(), &hints, &res) != 0) {
-    if (err) *err = "DNS failed for " + host;
-    return -1;
-  }
-  int fd = -1;
-  for (addrinfo* p = res; p; p = p->ai_next) {
-    fd = ::socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-    if (fd < 0) continue;
-    timeval tv;
-    tv.tv_sec = 12;
-    tv.tv_usec = 0;
-    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-    if (::connect(fd, p->ai_addr, p->ai_addrlen) == 0) break;
-    ::close(fd);
-    fd = -1;
-  }
-  freeaddrinfo(res);
-  if (fd < 0 && err) *err = "connect failed to " + host;
-  return fd;
-}
-
-struct HttpResult {
-  int status = 0;
-  std::string body;
-  std::string location;
-  std::string content_type;
-};
-
-// Reddit's public .json endpoints often 403 datacenter / bot-scored IPs.
-// Prefer a descriptive UA; optional OAuth app credentials via env:
-//   XANATOO_REDDIT_CLIENT_ID / XANATOO_REDDIT_CLIENT_SECRET
 std::string reddit_user_agent() {
   const char* env = std::getenv("XANATOO_REDDIT_USER_AGENT");
   if (env && env[0]) return env;
   // Reddit's preferred form: platform:app_id:version (by /u/name)
   return "linux:xanatoo:0.1.0 (by /u/grumbel; read-only; +https://github.com/Grumbel/xanatoo)";
-}
-
-std::optional<HttpResult> https_request(const std::string& method,
-                                        const std::string& url,
-                                        const std::string& extra_headers,
-                                        const std::string& body_in,
-                                        std::string* err) {
-  if (!starts_with_ci(url, "https://")) {
-    if (err) *err = "only https supported for Reddit";
-    return std::nullopt;
-  }
-  std::string_view rest = std::string_view(url).substr(8);
-  size_t slash = rest.find('/');
-  std::string host = std::string(
-      slash == std::string_view::npos ? rest : rest.substr(0, slash));
-  std::string path = std::string(
-      slash == std::string_view::npos ? "/" : rest.substr(slash));
-  int port = 443;
-  size_t colon = host.rfind(':');
-  if (colon != std::string::npos) {
-    port = std::atoi(host.c_str() + colon + 1);
-    if (port <= 0) port = 443;
-    host = host.substr(0, colon);
-  }
-
-  ssl_once_init();
-  int fd = tcp_connect(host, port, err);
-  if (fd < 0) return std::nullopt;
-
-  SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());
-  if (!ctx) {
-    ::close(fd);
-    if (err) *err = "SSL_CTX_new failed";
-    return std::nullopt;
-  }
-  SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, nullptr);
-  SSL* ssl = SSL_new(ctx);
-  if (!ssl) {
-    SSL_CTX_free(ctx);
-    ::close(fd);
-    if (err) *err = "SSL_new failed";
-    return std::nullopt;
-  }
-  SSL_set_fd(ssl, fd);
-  SSL_set_tlsext_host_name(ssl, host.c_str());
-  if (SSL_connect(ssl) != 1) {
-    if (err) *err = "TLS handshake failed";
-    SSL_free(ssl);
-    SSL_CTX_free(ctx);
-    ::close(fd);
-    return std::nullopt;
-  }
-
-  std::ostringstream req;
-  req << method << " " << path << " HTTP/1.1\r\n"
-      << "Host: " << host << "\r\n"
-      << "User-Agent: " << reddit_user_agent() << "\r\n"
-      << "Accept: application/json, text/plain, */*\r\n"
-      << "Accept-Language: en-US,en;q=0.9\r\n"
-      << "Connection: close\r\n";
-  if (!extra_headers.empty()) req << extra_headers;
-  if (!body_in.empty()) {
-    req << "Content-Length: " << body_in.size() << "\r\n";
-  }
-  req << "\r\n";
-  if (!body_in.empty()) req << body_in;
-  std::string req_s = req.str();
-  if (SSL_write(ssl, req_s.data(), static_cast<int>(req_s.size())) <= 0) {
-    if (err) *err = "TLS write failed";
-    SSL_shutdown(ssl);
-    SSL_free(ssl);
-    SSL_CTX_free(ctx);
-    ::close(fd);
-    return std::nullopt;
-  }
-
-  std::string data;
-  char buf[4096];
-  for (;;) {
-    int n = SSL_read(ssl, buf, sizeof(buf));
-    if (n <= 0) break;
-    data.append(buf, static_cast<size_t>(n));
-    if (data.size() > 12 * 1024 * 1024) break;
-  }
-  SSL_shutdown(ssl);
-  SSL_free(ssl);
-  SSL_CTX_free(ctx);
-  ::close(fd);
-
-  size_t hdr_end = data.find("\r\n\r\n");
-  if (hdr_end == std::string::npos) {
-    if (err) *err = "malformed HTTP response";
-    return std::nullopt;
-  }
-  std::string headers = data.substr(0, hdr_end);
-  HttpResult out;
-  out.body = data.substr(hdr_end + 4);
-
-  {
-    size_t sp1 = headers.find(' ');
-    if (sp1 != std::string::npos) {
-      size_t sp2 = headers.find(' ', sp1 + 1);
-      std::string code = (sp2 == std::string::npos)
-                             ? headers.substr(sp1 + 1, 3)
-                             : headers.substr(sp1 + 1, sp2 - sp1 - 1);
-      out.status = std::atoi(code.c_str());
-    }
-  }
-  std::string hlow = ascii_lower_copy(headers);
-  auto header_val = [&](const char* name) -> std::string {
-    std::string key = std::string("\n") + name + ":";
-    size_t loc = hlow.find(key);
-    if (loc == std::string::npos) {
-      // first line case
-      if (hlow.rfind(std::string(name) + ":", 0) == 0) loc = 0;
-      else return {};
-    }
-    size_t v0 = headers.find(':', loc);
-    size_t v1 = headers.find("\r\n", v0);
-    if (v0 == std::string::npos || v1 == std::string::npos) return {};
-    std::string val = headers.substr(v0 + 1, v1 - v0 - 1);
-    while (!val.empty() && (val.front() == ' ' || val.front() == '\t'))
-      val.erase(val.begin());
-    return val;
-  };
-  out.location = header_val("location");
-  out.content_type = header_val("content-type");
-  return out;
-}
-
-std::optional<HttpResult> https_get(const std::string& url, std::string* err) {
-  return https_request("GET", url, {}, {}, err);
 }
 
 // App-only OAuth token (client credentials). Empty if env not set or fails.
@@ -379,7 +195,8 @@ std::string reddit_oauth_token(std::string* err) {
   std::string extra = "Authorization: Basic " + auth + "\r\n"
                       "Content-Type: application/x-www-form-urlencoded\r\n";
   auto resp = https_request("POST", "https://www.reddit.com/api/v1/access_token",
-                            extra, "grant_type=client_credentials", err);
+                            reddit_user_agent(), extra,
+                            "grant_type=client_credentials", err);
   if (!resp || resp->status != 200) {
     if (err && err->empty())
       *err = "OAuth token request failed (HTTP " +
@@ -404,186 +221,6 @@ std::string reddit_oauth_token(std::string* err) {
   }
   if (err) *err = "OAuth response missing access_token";
   return {};
-}
-
-// --- minimal JSON helpers (string / number / object slices) ---
-
-std::string json_unescape(std::string_view s) {
-  std::string o;
-  o.reserve(s.size());
-  for (size_t i = 0; i < s.size(); ++i) {
-    if (s[i] == '\\' && i + 1 < s.size()) {
-      char c = s[++i];
-      if (c == 'n') o.push_back('\n');
-      else if (c == 'r') o.push_back('\r');
-      else if (c == 't') o.push_back('\t');
-      else if (c == '"' || c == '\\' || c == '/') o.push_back(c);
-      else if (c == 'u' && i + 4 < s.size()) {
-        i += 4;
-        o.push_back('?');
-      } else
-        o.push_back(c);
-    } else {
-      o.push_back(s[i]);
-    }
-  }
-  return o;
-}
-
-std::string json_str_field(std::string_view json, std::string_view key) {
-  std::string pat = "\"";
-  pat += key;
-  pat += "\"";
-  size_t p = 0;
-  while ((p = json.find(pat, p)) != std::string_view::npos) {
-    // Ensure this looks like a key (preceded by { , or whitespace start)
-    if (p > 0) {
-      char prev = json[p - 1];
-      if (prev != '{' && prev != ',' && prev != ' ' && prev != '\n' &&
-          prev != '\r' && prev != '\t') {
-        p += pat.size();
-        continue;
-      }
-    }
-    size_t c = json.find(':', p + pat.size());
-    if (c == std::string_view::npos) return {};
-    size_t v = c + 1;
-    while (v < json.size() &&
-           std::isspace(static_cast<unsigned char>(json[v])))
-      ++v;
-    if (v >= json.size()) return {};
-    if (json[v] == 'n' && json.substr(v, 4) == "null") return {};
-    if (json[v] != '"') return {};
-    ++v;
-    std::string out;
-    while (v < json.size()) {
-      if (json[v] == '\\' && v + 1 < json.size()) {
-        out.push_back('\\');
-        out.push_back(json[v + 1]);
-        v += 2;
-        continue;
-      }
-      if (json[v] == '"') break;
-      out.push_back(json[v++]);
-    }
-    return json_unescape(out);
-  }
-  return {};
-}
-
-int64_t json_int_field(std::string_view json, std::string_view key) {
-  std::string pat = "\"";
-  pat += key;
-  pat += "\"";
-  size_t p = json.find(pat);
-  if (p == std::string_view::npos) return 0;
-  p = json.find(':', p + pat.size());
-  if (p == std::string_view::npos) return 0;
-  ++p;
-  while (p < json.size() && std::isspace(static_cast<unsigned char>(json[p])))
-    ++p;
-  return std::strtoll(std::string(json.substr(p, 24)).c_str(), nullptr, 10);
-}
-
-bool json_bool_field(std::string_view json, std::string_view key) {
-  std::string pat = "\"";
-  pat += key;
-  pat += "\"";
-  size_t p = json.find(pat);
-  if (p == std::string_view::npos) return false;
-  p = json.find(':', p + pat.size());
-  if (p == std::string_view::npos) return false;
-  ++p;
-  while (p < json.size() && std::isspace(static_cast<unsigned char>(json[p])))
-    ++p;
-  return p + 4 <= json.size() && json.substr(p, 4) == "true";
-}
-
-// Find the "data" object that is the value of a top-level (or listing) key,
-// returning a view of the {...} body. Shallow brace matcher from first '{'.
-std::string_view json_object_after_key(std::string_view json,
-                                       std::string_view key) {
-  std::string pat = "\"";
-  pat += key;
-  pat += "\"";
-  size_t p = json.find(pat);
-  if (p == std::string_view::npos) return {};
-  p = json.find(':', p + pat.size());
-  if (p == std::string_view::npos) return {};
-  ++p;
-  while (p < json.size() && std::isspace(static_cast<unsigned char>(json[p])))
-    ++p;
-  if (p >= json.size() || json[p] != '{') return {};
-  int depth = 0;
-  size_t start = p;
-  for (size_t i = p; i < json.size(); ++i) {
-    char c = json[i];
-    if (c == '"') {
-      ++i;
-      while (i < json.size()) {
-        if (json[i] == '\\') {
-          i += 2;
-          continue;
-        }
-        if (json[i] == '"') break;
-        ++i;
-      }
-      continue;
-    }
-    if (c == '{') ++depth;
-    else if (c == '}') {
-      --depth;
-      if (depth == 0) return json.substr(start, i - start + 1);
-    }
-  }
-  return {};
-}
-
-// Extract each element of the "children" array as a raw JSON object string.
-std::vector<std::string> json_children_objects(std::string_view listing_obj) {
-  std::vector<std::string> out;
-  std::string pat = "\"children\"";
-  size_t p = listing_obj.find(pat);
-  if (p == std::string_view::npos) return out;
-  p = listing_obj.find('[', p + pat.size());
-  if (p == std::string_view::npos) return out;
-  ++p;
-  while (p < listing_obj.size()) {
-    while (p < listing_obj.size() &&
-           (std::isspace(static_cast<unsigned char>(listing_obj[p])) ||
-            listing_obj[p] == ','))
-      ++p;
-    if (p >= listing_obj.size() || listing_obj[p] == ']') break;
-    if (listing_obj[p] != '{') break;
-    int depth = 0;
-    size_t start = p;
-    for (size_t i = p; i < listing_obj.size(); ++i) {
-      char c = listing_obj[i];
-      if (c == '"') {
-        ++i;
-        while (i < listing_obj.size()) {
-          if (listing_obj[i] == '\\') {
-            i += 2;
-            continue;
-          }
-          if (listing_obj[i] == '"') break;
-          ++i;
-        }
-        continue;
-      }
-      if (c == '{') ++depth;
-      else if (c == '}') {
-        --depth;
-        if (depth == 0) {
-          out.emplace_back(listing_obj.substr(start, i - start + 1));
-          p = i + 1;
-          break;
-        }
-      }
-    }
-    if (depth != 0) break;
-  }
-  return out;
 }
 
 std::string format_time(int64_t ts) {
@@ -745,7 +382,7 @@ void collect_from_listing(std::string_view listing_json,
                           std::vector<RedditPost>& comments) {
   std::string_view data = json_object_after_key(listing_json, "data");
   if (data.empty()) data = listing_json;
-  auto children = json_children_objects(data);
+  auto children = json_object_array_after_key(data, "children");
   for (const auto& ch : children) {
     RedditPost p = parse_thing_data(ch);
     if (p.kind == "t1" || (!p.body.empty() && p.title.empty()))
@@ -827,9 +464,10 @@ std::optional<Document> reddit_fetch(std::string_view url_in, std::string* err) 
       std::optional<HttpResult> one;
       if (!token.empty()) {
         std::string extra = "Authorization: Bearer " + token + "\r\n";
-        one = https_request("GET", current, extra, {}, &req_err);
+        one = https_request("GET", current, reddit_user_agent(), extra, {},
+                             &req_err);
       } else {
-        one = https_get(current, &req_err);
+        one = https_get(current, reddit_user_agent(), &req_err);
       }
       if (!one) {
         last_err = req_err.empty() ? "request failed" : req_err;
