@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **143** (this delivery is **142**)
+Next bundle number: **144** (this delivery is **143**)
 
 ## Status (2026-10-11)
 
@@ -241,6 +241,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Fix broken multi-line string in Gemini unsupported-MIME notice
 - [x] Session history for local + gemini://; History panel (Ctrl+Shift+H)
 - [x] Bookmarks menu + manager; persist ~/.config/xanatoo/bookmarks; Ctrl+Shift+B
+- [x] Welcome hub links to all examples; in-app open for local doc links
 
 ## Open work / next steps
 
@@ -432,4 +433,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-139.*-gemini-status-nav-…` — status + nav menu
 - `xanatoo-140.*-url-bar-interactive-…` — interactive URL field + 1024×768
 - `xanatoo-141.*-fix-gemini-mime-string-…` — fix Gemini MIME notice string
-- `xanatoo-142.*-history-bookmarks-…` — this delivery
+- `xanatoo-142.*-history-bookmarks-…` — history + bookmarks
+- `xanatoo-143.*-welcome-hub-…` — this delivery

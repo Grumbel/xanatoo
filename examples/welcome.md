@@ -1,78 +1,98 @@
-# The network
+# Welcome to xanatoo
 
-The web connects documents, but [hypertext](#hypertext) connects ideas.
+An interactive document workspace — edit, stretch, link, and browse in one place.
+Inspired by *Xanadu*, **HyperCard**, and the *Canon Cat*.
 
-![A small network of linked nodes](network.png){scale=0.9}
+![A small network of linked nodes](network.png){scale=0.85}
 
-:::stretch summary="What is hypertext?"
-Hypertext is a system of linked information that can be explored
-non-linearly. Passages can expand in place (*stretchtext*), images are
-first-class addressable content, and layout is part of the living
-document rather than a fixed page prescription.
+## Quick start
+
+1. Click anywhere and type — the document is live.
+2. **Enter** splits a paragraph; **Ctrl+Z** undoes.
+3. Click a stretchtext marker (▸ / ▾) to expand or collapse.
+4. Follow blue links: internal `#anchors`, other example files, or `gemini://`.
+5. **F1** opens the full keyboard reference · **F2** toggles browse (read-only) mode.
+
+:::stretch summary="Essential keys (expand for more)"
+| Key | Action |
+|-----|--------|
+| **Ctrl+S** | Save |
+| **Ctrl+O** / **Ctrl+L** | Open file / focus location bar |
+| **Ctrl+F** | Leap search (F3 next) |
+| **Ctrl+\\** | Dual-pane split |
+| **Alt+Left** / **Alt+Right** | History back / forward |
+| **Ctrl+Shift+H** | Session history panel |
+| **Ctrl+Shift+B** | Bookmark this page |
+| **Ctrl+B** / **I** / **K** | Bold / italic / link |
+| **F1** | Keyboard help document |
+
+Menus: **Alt+F** File · **E** Edit · **V** View · **B** Bookmarks · **H** Help.
 :::
+
+## Example documents
+
+Open any of these from this page (links load in the same pane and join session history):
+
+### Guides
+
+- [Keyboard reference](help.md) — complete keybinding list (**F1**)
+- [Article / Section / Header](sectioning.md) — semantic sectioning model
+
+### Demos
+
+- [Thread / RFC discussion](thread-rfc.md) — Thread and Message nodes
+- [Gemini gemtext sample](gemini-sample.gmi) — native gemtext layout
+- [Semantic format (S-expression)](semantic.sexp) — experimental sexpr form
+- [Sample (S-expression)](sample.sexp) — compact sexpr demo
+
+### Diff pair (open both for side-by-side marks)
+
+- [Diff demo — version 1](diff-v1.md)
+- [Diff demo — version 2](diff-v2.md)
+
+Or use **View → Examples → Diff demo (v1 \| v2, marks on)** to load both panes at once.
 
 :::columns
 :::column weight=1.1
-## Original
+### Stretchtext
 
-A passage from the original document, shown in a column.
+![Stretchtext expands in place](stretchtext.png){scale=0.8}
 
-![Stretchtext expands in place](stretchtext.png){scale=0.85}
+Collapsed passages keep a one-line summary. Click the marker to expand; the layout reflows immediately.
 :::
 :::column
-## Commentary
+### Columns & images
 
-An editable annotation linked in spirit to the original passage.
+![Side-by-side columns](columns.png){scale=0.8}
 
-![Side-by-side columns](columns.png){scale=0.85}
+Drag column gutters to reweight widths. Drag an image’s blue corner to resize (`{scale=…}` is saved).
 :::
 :::
 
-## Living documents
+## Living relationships
 
-This is a live document. Click to place the caret, type to insert text,
-Backspace to delete. **Enter** splits a paragraph (or list item; empty item exits the list). Shift+arrows select.
-Ctrl+C / Ctrl+V / Ctrl+X for clipboard, Ctrl+Z / Ctrl+Y for undo/redo.
-**Ctrl+\\** toggles a second view pane; **Tab** switches focus.
-Drag the gutter to resize. Open two files for independent documents.
-**Ctrl+F** leap search (type to find, F3 next, Esc cancel).
-**Ctrl+←/→** move by word. Click blue links to jump to #anchors or
-open external http(s) URLs in the system browser.
-Drag the blue corner on images to resize. Home/End move on the line.
-Click a stretchtext marker (▸ / ▾) to expand or collapse.
-Press **F1** for the full keyboard reference.
+Try an internal jump: [Quick start](#Quick start).
 
-Inspiration: Ted Nelson's *Xanadu*, Bill Atkinson's **HyperCard**, and
-Jef Raskin's *Canon Cat* — a keyboard-driven work processor that treated
-text as a continuous, searchable stream.
+External web links open in your system browser: [Project Xanadu](https://en.wikipedia.org/wiki/Project_Xanadu).
 
-> "A document is not just something you render and read. It is a live
-> workspace." — the xanatoo proposal
+With Gemini enabled, type a capsule in the location bar (**Ctrl+L**), for example:
 
----
+`gemini://geminiprotocol.net/`
 
-A live embedding of another passage (click to jump to the source):
+A live embedding of another passage on this page:
 
-:::include #Living documents
+:::include #Quick start
 
-Design pillars:
+## Design pillars
 
 - Addressable passages and stable node IDs
 - Stretchtext that reflows the living layout
-  - Expand and collapse without losing place
-  - Summary markers (▸ / ▾) stay interactive
 - Side-by-side views of related material
 - Direct manipulation of images and blocks
+- Session history and bookmarks for local files and capsules
 
-Ordered steps to explore:
+> “A document is not just something you render and read. It is a live workspace.” — the xanatoo proposal
 
-1. Click a stretchtext marker to expand
-2. Follow an internal or external link
-3. Toggle dual-pane with Ctrl+\\
+---
 
-Try an internal link: [Living documents](#Living documents) — click to jump.
-Or an external one: [Xanadu](https://en.wikipedia.org/wiki/Project_Xanadu).
-
-Images load relative to the document directory (PNG, JPEG, BMP, GIF via
-stb_image). Drag a corner handle to resize; the scale is saved as
-`{scale=…}` in the markup.
+Open **View → Examples** any time, or return here by opening `welcome.md` from the Examples menu.

@@ -598,30 +598,6 @@ int main(int argc, char** argv) {
     flash_status(expand ? "Expanded all" : "Collapsed all");
   };
 
-  auto activate_at_caret = [&]() {
-    // Prefer stretch toggle; else try internal link under caret glyph.
-    if (toggle_stretch_at_caret()) return;
-    Pane& p = F();
-    auto& d = doc_of(p);
-    auto cpos = xanatoo::caret_screen_pos(
-        p.layout, p.sel.focus, p.scroll_y,
-        static_cast<float>(body_font.line_height()));
-    if (!cpos.valid) return;
-    if (auto href = xanatoo::hit_test_link(d, p.layout, cpos.x, cpos.y,
-                                           p.scroll_y)) {
-      if (auto dest = xanatoo::jump_to_href(d, *href)) {
-        p.sel.focus = *dest;
-        p.sel.anchor = p.sel.focus;
-        scroll_caret_into_view(p);
-        flash_status("Followed " + *href);
-        reset_blink();
-      } else if (!href->empty() && (*href)[0] != '#') {
-        xanatoo::open_external_url(*href);
-        flash_status("Opening " + *href);
-      }
-    }
-  };
-
   auto find_help_path = [&]() -> std::string {
     const char* candidates[] = {
         "examples/help.md",
@@ -678,6 +654,40 @@ int main(int argc, char** argv) {
     }
 #endif
     return {};
+  };
+
+  // True for relative/local document links we should open in-pane
+  // (not http(s)/mailto/gemini schemes).
+  auto is_inapp_doc_href = [&](const std::string& href) -> bool {
+    if (href.empty() || href[0] == '#') return false;
+    if (xanatoo::is_gemini_url(href)) return false;
+    if (href.rfind("http://", 0) == 0 || href.rfind("https://", 0) == 0 ||
+        href.rfind("mailto:", 0) == 0)
+      return false;
+    // Scheme with :// → external; bare paths and file-looking names → in-app.
+    if (href.find("://") != std::string::npos) return false;
+    return true;
+  };
+
+  // Resolve a relative path against the focused pane's document directory.
+  auto resolve_doc_href = [&](const std::string& href) -> std::string {
+    if (href.empty()) return {};
+    fs::path hp(href);
+    if (hp.is_absolute()) return href;
+    std::string base = path_of(F());
+    if (!base.empty() && !xanatoo::is_gemini_url(base)) {
+      fs::path parent = fs::path(base).parent_path();
+      if (!parent.empty()) {
+        std::error_code ec;
+        auto canon = fs::weakly_canonical(parent / href, ec);
+        if (!ec) return canon.string();
+        return (parent / href).string();
+      }
+    }
+    // Fall back to repo search (examples/, cwd, …).
+    std::string found = find_repo_file(href.c_str());
+    if (!found.empty()) return found;
+    return href;
   };
 
   // Load a gemini:// URL or local path into the focused pane.
@@ -787,6 +797,43 @@ int main(int argc, char** argv) {
     if (record_history) push_nav_history(path);
     flash_status("Opened " + path);
     return true;
+  };
+
+
+  auto activate_at_caret = [&]() {
+    // Prefer stretch toggle; else try internal link under caret glyph.
+    if (toggle_stretch_at_caret()) return;
+    Pane& p = F();
+    auto& d = doc_of(p);
+    auto cpos = xanatoo::caret_screen_pos(
+        p.layout, p.sel.focus, p.scroll_y,
+        static_cast<float>(body_font.line_height()));
+    if (!cpos.valid) return;
+    if (auto href = xanatoo::hit_test_link(d, p.layout, cpos.x, cpos.y,
+                                           p.scroll_y)) {
+      if (auto dest = xanatoo::jump_to_href(d, *href)) {
+        p.sel.focus = *dest;
+        p.sel.anchor = p.sel.focus;
+        scroll_caret_into_view(p);
+        flash_status("Followed " + *href);
+        reset_blink();
+      } else if (!href->empty() && (*href)[0] != '#') {
+        std::string abs = *href;
+        if (!xanatoo::is_gemini_url(abs) && !gemini_current_url.empty()) {
+          std::string resolved =
+              xanatoo::resolve_gemini_url(gemini_current_url, abs);
+          if (!resolved.empty()) abs = resolved;
+        }
+        if (xanatoo::is_gemini_url(abs)) {
+          navigate_to_url(std::move(abs));
+        } else if (is_inapp_doc_href(abs)) {
+          navigate_to_url(resolve_doc_href(abs));
+        } else {
+          xanatoo::open_external_url(*href);
+          flash_status("Opening " + *href);
+        }
+      }
+    }
   };
 
 
@@ -1658,6 +1705,10 @@ int main(int argc, char** argv) {
                 }
                 if (xanatoo::is_gemini_url(abs)) {
                   navigate_to_url(std::move(abs));
+                  break;
+                }
+                if (is_inapp_doc_href(abs)) {
+                  navigate_to_url(resolve_doc_href(abs));
                   break;
                 }
                 flash_status("Opening " + *href);
