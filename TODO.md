@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **123** (this delivery is **122**)
+Next bundle number: **124** (this delivery is **123**)
 
 ## Status (2026-10-11)
 
@@ -215,6 +215,9 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Examples menu (View + Help); LoadDiffDemo dual-pane with marks
 - [x] Structure highlight: kind tags on the right edge of each region
 - [x] Fix ImGui 1.91 field names in release_input_capture (HoveredId, NavCursorVisible)
+- [x] Diff: status feedback + can_diff disables menu when only one buffer
+- [x] LoadDiffDemo respects dirty-buffer discard arming
+- [x] Structure tags skip table-row shells (less noise)
 
 ## Open work / next steps
 
@@ -386,4 +389,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-119.*-thread-messages-…` — Thread/Message markup
 - `xanatoo-120.*-diff-examples-…` — diff demo + Examples menu
 - `xanatoo-121.*-structure-labels-…` — structure kind tags
-- `xanatoo-122.*-imgui-hoverid-…` — this delivery
+- `xanatoo-122.*-imgui-hoverid-…` — ImGui 1.91 field fix
+- `xanatoo-123.*-diff-feedback-…` — this delivery

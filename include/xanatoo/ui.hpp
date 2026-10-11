@@ -93,6 +93,7 @@ struct UiState {
   bool split = false;
   bool outline = false;
   bool diff = false;
+  bool can_diff = false;  // two independent documents loaded
   bool structure = false;
   bool help = false;
   bool selection = false;

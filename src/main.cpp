@@ -2999,12 +2999,17 @@ int main(int argc, char** argv) {
                   needs_layout = true;
                 }
                 if (shared_doc || paths[1].empty()) {
+                  flash_status(
+                      "Diff needs two files — Examples → Diff demo, or "
+                      "xanatoo a.md b.md");
                   std::cout << "Diff marks need two open files "
                                "(xanatoo a.md b.md).\n";
                 } else {
                   diff_mode = !diff_mode;
                   refresh_diff();
-                  std::cout << (diff_mode ? "Diff marks on\n" : "Diff marks off\n");
+                  flash_status(diff_mode ? "Diff marks on" : "Diff marks off");
+                  std::cout << (diff_mode ? "Diff marks on\n"
+                                          : "Diff marks off\n");
                 }
                 break;
               }
@@ -3227,6 +3232,7 @@ int main(int argc, char** argv) {
       ui_state.split = split;
       ui_state.outline = outline_mode;
       ui_state.diff = diff_mode;
+      ui_state.can_diff = !shared_doc && !paths[1].empty();
       ui_state.structure = structure_mode;
       ui_state.help = help_mode;
       ui_state.selection = !F().sel.empty();
@@ -3702,11 +3708,20 @@ int main(int argc, char** argv) {
           }
           break;
         case C::ToggleDiff:
-          diff_mode = !diff_mode;
-          refresh_diff();
+          if (shared_doc || paths[1].empty()) {
+            flash_status(
+                "Diff needs two files — Examples → Diff demo, or "
+                "xanatoo a.md b.md");
+          } else {
+            diff_mode = !diff_mode;
+            refresh_diff();
+            flash_status(diff_mode ? "Diff marks on" : "Diff marks off");
+          }
           break;
         case C::ToggleStructure:
           structure_mode = !structure_mode;
+          flash_status(structure_mode ? "Structure highlight on"
+                                      : "Structure highlight off");
           break;
         case C::ToggleHelp:
           help_mode = !help_mode;
@@ -3759,6 +3774,13 @@ int main(int argc, char** argv) {
           break;
         }
         case C::LoadDiffDemo: {
+          if ((dirty_flags[0] || dirty_flags[1]) && !discard_armed) {
+            discard_armed = true;
+            flash_status(
+                "Unsaved changes — save first, or repeat Diff demo to discard");
+            break;
+          }
+          discard_armed = false;
           std::string p0 = find_repo_file("diff-v1.md");
           std::string p1 = find_repo_file("diff-v2.md");
           if (p0.empty()) p0 = find_repo_file("examples/diff-v1.md");
@@ -3959,8 +3981,10 @@ int main(int argc, char** argv) {
           SDL_RenderFillRect(sdl, &wash);
 
           // Small kind label on the right edge of the region.
+          // Skip pure table-row shells — tags on cells/table are enough.
           const char* tag = kind_label(node);
-          if (tag && bh >= 10 && tag_font.loaded()) {
+          if (tag && kind != xanatoo::NodeKind::TableRow && bh >= 10 &&
+              tag_font.loaded()) {
             int tw = tag_font.measure(tag);
             int tx = pane.x + pane.w - tw - 8;
             if (tx < pane.x + 10) tx = pane.x + 10;
