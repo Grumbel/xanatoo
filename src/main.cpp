@@ -1215,14 +1215,11 @@ int main(int argc, char** argv) {
 
 
   // CLI / argv may pass gemini:// / reddit / nostr — fetch after helpers exist
-  auto is_network_startup = [](const std::string& p) {
-    return is_in_app_remote_url(p);
-  };
-  if (!buffers.empty() && is_network_startup(buffers[0].path)) {
+  if (!buffers.empty() && is_in_app_remote_url(buffers[0].path)) {
     std::string u = buffers[0].path;
     buffers[0].path.clear();
     navigate_to_url(std::move(u));
-  } else if (buffers.size() > 1 && is_network_startup(buffers[1].path)) {
+  } else if (buffers.size() > 1 && is_in_app_remote_url(buffers[1].path)) {
     std::string u = buffers[1].path;
     buffers[1].path.clear();
     focus = 1;

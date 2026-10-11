@@ -10,6 +10,8 @@ Next bundle number: **210** (this delivery is **209**)
 
 ## Status (2026-10-11)
 
+Fix: is_network_startup lambda capture of is_in_app_remote_url.
+
 Continue: Nostr uses shared SSL init; trim unused includes; is_inapp_doc_href via is_in_app_remote_url.
 
 Continue refactor: Gemini uses shared TLS/TCP; main is_in_app_remote_url helper.
@@ -554,4 +556,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-206.*-readme-screenshot-…` — prior (welcome PNG in README)
 - `xanatoo-207.*-shared-https-json-…` — prior (extract https + json_min)
 - `xanatoo-208.*-gemini-shared-tls-…` — prior (Gemini TLS + main URL helper)
-- `xanatoo-209.*-nostr-shared-ssl-…` — this delivery (Nostr SSL init + small cleanups)
+- `xanatoo-209.*-nostr-shared-ssl-…` — prior (Nostr SSL init + small cleanups)
+- `xanatoo-211.*-fix-remote-url-capture-…` — this delivery
