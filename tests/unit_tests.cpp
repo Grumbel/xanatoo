@@ -10,6 +10,7 @@
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/util.hpp"
 #include "xanatoo/parse.hpp"
+#include "xanatoo/org.hpp"
 #include "xanatoo/types.hpp"
 
 #include <cstdio>
@@ -263,6 +264,90 @@ void test_url_edge_cases() {
   EXPECT(!is_nostr_ref("not-a-nostr-thing"));
 }
 
+
+void test_path_helpers() {
+  using namespace xanatoo;
+  EXPECT(path_ends_with_ci("File.MD", ".md"));
+  EXPECT(path_ends_with_ci("x.Org", ".org"));
+  EXPECT(!path_ends_with_ci("file.md", ".org"));
+  EXPECT(path_uses_org("notes.org"));
+  EXPECT(path_uses_org("Notes.ORG"));
+  EXPECT(!path_uses_org("notes.md"));
+  EXPECT(is_raster_image_path("pic.PNG"));
+  EXPECT(is_raster_image_path("a/b/c.jpeg"));
+  EXPECT(!is_raster_image_path("doc.md"));
+}
+
+void test_parse_org() {
+  using namespace xanatoo;
+  Document doc = parse_org(
+      "#+TITLE: Demo\n"
+      "\n"
+      "* TODO Heading :tag:\n"
+      "Body text with *bold* and /italic/.\n"
+      "\n"
+      "- item one\n"
+      "- item two\n"
+      "\n"
+      "** Nested\n"
+      "More.\n");
+
+  EXPECT(doc.root != INVALID_NODE);
+  int headers = 0, list_items = 0;
+  bool found_body = false;
+  std::vector<NodeId> stack{doc.root};
+  while (!stack.empty()) {
+    NodeId id = stack.back();
+    stack.pop_back();
+    const Node& n = doc.get(id);
+    if (n.kind == NodeKind::Header || n.kind == NodeKind::Heading)
+      ++headers;
+    if (n.kind == NodeKind::ListItem) ++list_items;
+    for (const auto& sp : n.spans) {
+      if (sp.text.find("Body") != std::string::npos ||
+          sp.text.find("bold") != std::string::npos)
+        found_body = true;
+    }
+    for (auto c : n.children) stack.push_back(c);
+  }
+  EXPECT(headers >= 1);
+  EXPECT(list_items >= 2);
+  EXPECT(found_body);
+
+  std::string out = serialize_org(doc);
+  EXPECT(!out.empty());
+  // Best-effort: still contains a star heading or TITLE residue
+  EXPECT(out.find("*") != std::string::npos ||
+         out.find("Heading") != std::string::npos);
+}
+
+void test_parse_document_dispatch() {
+  using namespace xanatoo;
+  Document org = parse_document("* Only\n", "x.org");
+  EXPECT(org.root != INVALID_NODE);
+  Document md = parse_document("# Only\n", "x.md");
+  EXPECT(md.root != INVALID_NODE);
+  Document gmi = parse_document("# Only\n", "x.gmi");
+  EXPECT(gmi.root != INVALID_NODE);
+}
+
+void test_reddit_json_url_shapes() {
+  using namespace xanatoo;
+  auto a = reddit_json_url("https://old.reddit.com/r/linux/");
+  EXPECT(a.find("www.reddit.com") != std::string::npos);
+  EXPECT(a.find(".json") != std::string::npos);
+
+  auto b = reddit_json_url("https://www.reddit.com/r/linux/.json?limit=10");
+  EXPECT(b.find(".json") != std::string::npos);
+  // Should not double-append .json awkwardly
+  EXPECT(b.find(".json.json") == std::string::npos);
+
+  auto c = reddit_json_url(
+      "https://www.reddit.com/r/linux/comments/abc123/title");
+  EXPECT(c.find("comments") != std::string::npos);
+  EXPECT(c.find(".json") != std::string::npos);
+}
+
 }  // namespace
 
 int main() {
@@ -276,6 +361,10 @@ int main() {
   test_parse_gemtext();
   test_json_edge_cases();
   test_url_edge_cases();
+  test_path_helpers();
+  test_parse_org();
+  test_parse_document_dispatch();
+  test_reddit_json_url_shapes();
 
   std::printf("%d passed, %d failed\n", g_passed, g_failed);
   return g_failed == 0 ? 0 : 1;
