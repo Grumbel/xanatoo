@@ -6,9 +6,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **213** (this delivery is **212**)
+Next bundle number: **214** (this delivery is **213**)
 
 ## Status (2026-10-11)
+
+Nostr: use shared json_min.hpp (drop local JSON helpers).
 
 Centralize starts_with_ci / ascii_lower(sv) / trim_ascii in util.hpp (re-applied).
 
@@ -560,4 +562,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-208.*-gemini-shared-tls-…` — prior (Gemini TLS + main URL helper)
 - `xanatoo-209.*-nostr-shared-ssl-…` — prior (Nostr SSL init + small cleanups)
 - `xanatoo-211.*-fix-remote-url-capture-…` — prior
-- `xanatoo-212.*-shared-string-helpers-…` — this delivery
+- `xanatoo-212.*-shared-string-helpers-…` — prior
+- `xanatoo-213.*-nostr-json-min-…` — this delivery

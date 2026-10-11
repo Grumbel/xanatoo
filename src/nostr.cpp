@@ -8,6 +8,7 @@
 #include "xanatoo/util.hpp"
 
 #include "xanatoo/https.hpp"
+#include "xanatoo/json_min.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -226,72 +227,6 @@ struct NostrEvent {
   std::vector<std::string> e_tags;
 };
 
-std::string json_unescape(std::string_view s) {
-  std::string o;
-  o.reserve(s.size());
-  for (size_t i = 0; i < s.size(); ++i) {
-    if (s[i] == '\\' && i + 1 < s.size()) {
-      char c = s[++i];
-      if (c == 'n')
-        o.push_back('\n');
-      else if (c == 'r')
-        o.push_back('\r');
-      else if (c == 't')
-        o.push_back('\t');
-      else if (c == 'u' && i + 4 < s.size()) {
-        // skip \uXXXX as '?'
-        i += 4;
-        o.push_back('?');
-      } else
-        o.push_back(c);
-    } else {
-      o.push_back(s[i]);
-    }
-  }
-  return o;
-}
-
-// Extract "key":"value" string field (first match).
-std::string json_str_field(std::string_view json, std::string_view key) {
-  std::string pat = "\"";
-  pat += key;
-  pat += "\"";
-  size_t p = json.find(pat);
-  if (p == std::string_view::npos) return {};
-  p = json.find(':', p + pat.size());
-  if (p == std::string_view::npos) return {};
-  ++p;
-  while (p < json.size() && std::isspace(static_cast<unsigned char>(json[p])))
-    ++p;
-  if (p >= json.size() || json[p] != '"') return {};
-  ++p;
-  std::string out;
-  while (p < json.size()) {
-    if (json[p] == '\\' && p + 1 < json.size()) {
-      out.push_back('\\');
-      out.push_back(json[p + 1]);
-      p += 2;
-      continue;
-    }
-    if (json[p] == '"') break;
-    out.push_back(json[p++]);
-  }
-  return json_unescape(out);
-}
-
-int64_t json_int_field(std::string_view json, std::string_view key) {
-  std::string pat = "\"";
-  pat += key;
-  pat += "\"";
-  size_t p = json.find(pat);
-  if (p == std::string_view::npos) return 0;
-  p = json.find(':', p + pat.size());
-  if (p == std::string_view::npos) return 0;
-  ++p;
-  while (p < json.size() && std::isspace(static_cast<unsigned char>(json[p])))
-    ++p;
-  return std::strtoll(std::string(json.substr(p, 24)).c_str(), nullptr, 10);
-}
 
 // Pull "e" tag values from tags array (NIP-10 aware).
 void parse_e_tags(std::string_view json, NostrEvent& ev) {
