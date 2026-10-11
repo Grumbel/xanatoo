@@ -1126,7 +1126,11 @@ int main(int argc, char** argv) {
   // Load path into a new or existing buffer; returns buffer index.
   auto ensure_buffer = [&](const std::string& path) -> int {
     int bi = find_buffer(path);
-    if (bi >= 0) return bi;
+    if (bi >= 0) {
+      if (std::find(tab_order.begin(), tab_order.end(), bi) == tab_order.end())
+        tab_order.push_back(bi);
+      return bi;
+    }
     DocBuffer b;
     b.path = path;
     b.doc = load_doc(path);
@@ -1609,25 +1613,53 @@ int main(int argc, char** argv) {
                   float lx = static_cast<float>(mxw - cx);
                   float ly = static_cast<float>(myw - cy);
                   if (lx >= 0 && ly >= 0 && lx <= cw && ly <= ch) {
+                    auto& sdoc = soft_doc(top);
                     if (auto sid = xanatoo::hit_test_stretch(
                             top.layout, lx, ly, top.scroll)) {
-                      if (top.doc.get(*sid).kind ==
+                      if (sdoc.get(*sid).kind ==
                           xanatoo::NodeKind::Stretch) {
-                        top.doc.get(*sid).expanded =
-                            !top.doc.get(*sid).expanded;
+                        // Shared buffer: stretch state is document-owned.
+                        int bi = top.buf;
+                        if (bi >= 0 && bi < static_cast<int>(buffers.size())) {
+                          // Snapshot for undo (view-independent history).
+                          buffers[static_cast<size_t>(bi)].history.push(
+                              sdoc, top.sel);
+                          sdoc.get(*sid).expanded =
+                              !sdoc.get(*sid).expanded;
+                          buffers[static_cast<size_t>(bi)].dirty = true;
+                          update_title();
+                        } else {
+                          sdoc.get(*sid).expanded =
+                              !sdoc.get(*sid).expanded;
+                        }
                         top.needs_layout = true;
+                        needs_layout = true;
+                        for (auto& osw : soft_wins)
+                          if (osw.buf == top.buf) osw.needs_layout = true;
                       }
                     }
                     if (auto href = xanatoo::hit_test_link(
-                            top.doc, top.layout, lx, ly, top.scroll)) {
+                            sdoc, top.layout, lx, ly, top.scroll)) {
                       if (!href->empty() && (*href)[0] == '#') {
                         if (auto dest =
-                                xanatoo::jump_to_href(top.doc, *href)) {
+                                xanatoo::jump_to_href(sdoc, *href)) {
                           auto cpos = xanatoo::caret_screen_pos(
                               top.layout, *dest, 0.f,
                               static_cast<float>(body_font.line_height()));
                           if (cpos.valid)
                             top.scroll = std::max(0.f, cpos.y - 24.f);
+                        }
+                      } else if (!href->empty()) {
+                        // Follow file / gemini / external from soft window.
+                        std::string abs = *href;
+                        if (xanatoo::is_gemini_url(abs) ||
+                            is_inapp_doc_href(abs)) {
+                          navigate_to_url(
+                              is_inapp_doc_href(abs) ? resolve_doc_href(abs)
+                                                    : abs);
+                        } else if (abs[0] != '#') {
+                          xanatoo::open_external_url(abs);
+                          flash_status("Opening " + abs);
                         }
                       }
                     }
@@ -4448,6 +4480,12 @@ int main(int argc, char** argv) {
             panes[1 - focus].sel = p.sel;
             panes[1 - focus].scroll_y = 0.f;
           }
+          for (auto& sw : soft_wins)
+            if (sw.buf == p.buf) {
+              sw.needs_layout = true;
+              sw.scroll = 0.f;
+              sw.sel = p.sel;
+            }
           needs_layout = true;
           update_title();
           flash_status("New document");
@@ -4678,6 +4716,12 @@ int main(int argc, char** argv) {
           xanatoo::ensure_valid_caret(buffers[static_cast<size_t>(p.buf)].doc, p.sel.focus);
           p.sel.anchor = p.sel.focus;
           p.scroll_y = 0.f;
+          for (auto& sw : soft_wins)
+            if (sw.buf == p.buf) {
+              sw.needs_layout = true;
+              sw.scroll = 0.f;
+              sw.sel = p.sel;
+            }
           update_title();
           needs_layout = true;
           flash_status("Reloaded " + rpath);
