@@ -43,3 +43,11 @@ nix build .#xanatoo-r36s
 nix build .#xanatoo-r36s-portmaster
 nix build .#xanatoo-r36s-portmaster-zip
 ```
+
+## Later polish
+
+Core PortMaster build is usable. Optional improvements:
+
+- ImGui font size / face for 640×480 readability
+- Gamepad bindings beyond the generic SDL controller map
+- Virtual keyboard when no physical keyboard is attached

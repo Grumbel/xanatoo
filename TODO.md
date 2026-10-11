@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **165** (this delivery is **164**)
+Next bundle number: **166** (this delivery is **165**)
 
 ## Status (2026-10-11)
 
@@ -263,6 +263,11 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] R36S: SDL2 include path; C++17 starts_with polyfill
 - [x] R36S: stick to kurvenrausch eoan SDL; ImGui legacy renderer path
 
+### R36S / PortMaster — confirmed working; polish later
+- [ ] UI font tuned for 640×480 (larger ImGui scale / bitmap-friendly face)
+- [ ] Stronger gamepad mapping (D-pad vs stick, button chord cheat-sheet)
+- [ ] On-screen / virtual keyboard for text entry without a physical keyboard
+
 ## Open work / next steps
 
 0. **Large-document virtualization** — layout/render only the viewport (history still snapshots whole docs; depth is capped for big trees)
@@ -477,4 +482,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-161.*-flake-platforms-…` — flake platforms
 - `xanatoo-162.*-r36s-build-fixes-…` — SDL/C++17
 - `xanatoo-163.*-r36s-sdl-2.0.20-…` — (reverted)
-- `xanatoo-164.*-r36s-eoan-imgui-…` — this delivery
+- `xanatoo-164.*-r36s-eoan-imgui-…` — eoan SDL + ImGui legacy
+- `xanatoo-165.*-r36s-polish-notes-…` — this delivery
