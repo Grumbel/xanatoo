@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **180** (this delivery is **179**)
+Next bundle number: **181** (this delivery is **180**)
 
 ## Status (2026-10-11)
 
@@ -504,4 +504,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-176.*-font-atlas-surface-geom-cursor-…` — font atlas + geom cursor
 - `xanatoo-177.*-r36s-org-gemini-examples-…` — examples in-pane + gemini TLS
 - `xanatoo-178.*-fix-stale-node-crash-…` — soft-link node crash
-- `xanatoo-179.*-no-abort-invalid-node-…` — this delivery
+- `xanatoo-179.*-no-abort-invalid-node-…` — no-abort invalid node
+- `xanatoo-180.*-harden-nav-layout-caret-…` — this delivery

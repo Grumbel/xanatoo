@@ -24,30 +24,47 @@ NodeId Document::create(NodeKind kind, NodeId parent) {
   return id;
 }
 
+namespace {
+// Stable sentinel so concurrent get() calls do not clobber each other's refs.
+Node& invalid_node_mut() {
+  static Node dummy = [] {
+    Node n;
+    n.id = INVALID_NODE;
+    n.kind = NodeKind::Paragraph;
+    n.parent = INVALID_NODE;
+    return n;
+  }();
+  // Keep dummy inert even if a caller writes through a non-const ref.
+  dummy.children.clear();
+  dummy.spans.clear();
+  dummy.id = INVALID_NODE;
+  dummy.kind = NodeKind::Paragraph;
+  dummy.parent = INVALID_NODE;
+  return dummy;
+}
+const Node& invalid_node_const() {
+  static const Node dummy = [] {
+    Node n;
+    n.id = INVALID_NODE;
+    n.kind = NodeKind::Paragraph;
+    n.parent = INVALID_NODE;
+    return n;
+  }();
+  return dummy;
+}
+}  // namespace
+
 Node& Document::get(NodeId id) {
   size_t idx = static_cast<size_t>(id - 1);
-  if (id == INVALID_NODE || idx >= nodes.size()) {
-    // Never abort over a stale caret/layout id. Return a process-local dummy.
-    static Node dummy;
-    dummy = Node{};
-    dummy.id = INVALID_NODE;
-    dummy.kind = NodeKind::Paragraph;
-    dummy.parent = INVALID_NODE;
-    return dummy;
-  }
+  if (id == INVALID_NODE || idx >= nodes.size())
+    return invalid_node_mut();
   return nodes[idx];
 }
 
 const Node& Document::get(NodeId id) const {
   size_t idx = static_cast<size_t>(id - 1);
-  if (id == INVALID_NODE || idx >= nodes.size()) {
-    static Node dummy;
-    dummy = Node{};
-    dummy.id = INVALID_NODE;
-    dummy.kind = NodeKind::Paragraph;
-    dummy.parent = INVALID_NODE;
-    return dummy;
-  }
+  if (id == INVALID_NODE || idx >= nodes.size())
+    return invalid_node_const();
   return nodes[idx];
 }
 

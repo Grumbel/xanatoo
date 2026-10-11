@@ -1362,9 +1362,16 @@ int main(int argc, char** argv) {
   auto pop_in_soft = [&](size_t si) {
     if (si >= soft_wins.size()) return;
     int bi = soft_wins[si].buf;
+    if (bi < 0 || bi >= static_cast<int>(buffers.size())) {
+      soft_wins.erase(soft_wins.begin() + static_cast<std::ptrdiff_t>(si));
+      return;
+    }
     panes[focus].buf = bi;
     panes[focus].sel = soft_wins[si].sel;
     panes[focus].scroll_y = soft_wins[si].scroll;
+    xanatoo::ensure_valid_caret(doc_of(panes[focus]), panes[focus].sel.focus);
+    panes[focus].sel.anchor = panes[focus].sel.focus;
+    panes[focus].layout = {};
     soft_wins.erase(soft_wins.begin() + static_cast<std::ptrdiff_t>(si));
     needs_layout = true;
     update_title();
@@ -2195,7 +2202,7 @@ int main(int argc, char** argv) {
                   std::cout << "Followed transclusion: " << bn.src << "\n";
                   followed = true;
                 } else {
-                  // External path.md[#anchor] — open the file in a soft window
+                  // External path.md[#anchor] — open in the focused pane
                   std::string path_part = bn.src;
                   size_t hash = path_part.find('#');
                   if (hash != std::string::npos)
@@ -2210,9 +2217,7 @@ int main(int argc, char** argv) {
                                  path_part;
                     }
                     if (std::filesystem::exists(resolved)) {
-                      open_browse(resolved.string(),
-                                  resolved.filename().string() +
-                                      " — included source");
+                      navigate_to_url(resolved.string());
                       std::cout << "Opened include source: " << resolved
                                 << "\n";
                       followed = true;
@@ -4997,7 +5002,10 @@ int main(int argc, char** argv) {
           const int bi = tab_order[static_cast<size_t>(tab_i)];
           if (panes[focus].buf == bi) break;  // already showing
           panes[focus].buf = bi;
-          // Fresh layout for the newly focused buffer (avoid stale glyphs).
+          // Fresh layout + caret for the newly focused buffer.
+          xanatoo::ensure_valid_caret(doc_of(panes[focus]), panes[focus].sel.focus);
+          panes[focus].sel.anchor = panes[focus].sel.focus;
+          panes[focus].layout = {};
           needs_layout = true;
           update_title();
           break;
@@ -5121,10 +5129,12 @@ int main(int argc, char** argv) {
           xanatoo::ensure_valid_caret(buffers[static_cast<size_t>(p.buf)].doc, p.sel.focus);
           p.sel.anchor = p.sel.focus;
           p.scroll_y = 0.f;
+          p.layout = {};
           for (auto& sw : soft_wins)
             if (sw.buf == p.buf) {
               sw.needs_layout = true;
               sw.scroll = 0.f;
+              sw.layout = {};
               sw.sel = p.sel;
             }
           update_title();
@@ -5134,16 +5144,30 @@ int main(int argc, char** argv) {
         }
         case C::Undo:
           if (buffers[static_cast<size_t>(p.buf)].history.undo(d, p.sel)) {
+            xanatoo::ensure_valid_caret(d, p.sel.focus);
+            p.sel.anchor = p.sel.focus;
+            p.layout = {};
             needs_layout = true;
             for (auto& sw : soft_wins)
-              if (sw.buf == p.buf) sw.needs_layout = true;
+              if (sw.buf == p.buf) {
+                sw.needs_layout = true;
+                sw.layout = {};
+                sw.sel = p.sel;
+              }
           }
           break;
         case C::Redo:
           if (buffers[static_cast<size_t>(p.buf)].history.redo(d, p.sel)) {
+            xanatoo::ensure_valid_caret(d, p.sel.focus);
+            p.sel.anchor = p.sel.focus;
+            p.layout = {};
             needs_layout = true;
             for (auto& sw : soft_wins)
-              if (sw.buf == p.buf) sw.needs_layout = true;
+              if (sw.buf == p.buf) {
+                sw.needs_layout = true;
+                sw.layout = {};
+                sw.sel = p.sel;
+              }
           }
           break;
         case C::Cut: {
@@ -6846,6 +6870,8 @@ int main(int argc, char** argv) {
 
     // Document software windows (bottom → top so last is topmost)
     for (auto& sw : soft_wins) {
+      if (sw.buf < 0 || sw.buf >= static_cast<int>(buffers.size()))
+        continue;
       if (sw.w < 280) sw.w = 280;
       if (sw.h < 200) sw.h = 200;
       if (sw.needs_layout) layout_soft(sw);
