@@ -145,10 +145,15 @@ std::string resolve_gemini_url(std::string_view base, std::string_view ref) {
   if (!b) return {};
 
   std::string path;
-  if (!ref.empty() && ref.front() == '/')
+  if (!ref.empty() && ref.front() == '/') {
     path = std::string(ref);
-  else
-    path = join_path(b->path_query, ref);
+  } else {
+    // Strip ?query from the base path before joining (query is not hierarchical).
+    std::string base_path = b->path_query;
+    size_t qpos = base_path.find('?');
+    if (qpos != std::string::npos) base_path.resize(qpos);
+    path = join_path(base_path, ref);
+  }
 
   std::ostringstream o;
   o << "gemini://" << b->host;

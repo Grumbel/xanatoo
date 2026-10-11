@@ -96,7 +96,8 @@ Glyph Font::load_glyph(uint32_t codepoint) {
         0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000);
     if (surf) {
       g.texture = SDL_CreateTextureFromSurface(renderer_, surf);
-      SDL_SetTextureBlendMode(g.texture, SDL_BLENDMODE_BLEND);
+      if (g.texture)
+        SDL_SetTextureBlendMode(g.texture, SDL_BLENDMODE_BLEND);
       SDL_FreeSurface(surf);
     }
   }

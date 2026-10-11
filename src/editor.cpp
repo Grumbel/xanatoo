@@ -562,8 +562,9 @@ void delete_forward(Document& doc, Caret& caret) {
 bool move_block_up(Document& doc, NodeId block) {
   if (block == INVALID_NODE) return false;
   Node& n = doc.get(block);
-  if (n.parent == INVALID_NODE) return false;
+  if (n.id != block || n.parent == INVALID_NODE) return false;
   Node& parent = doc.get(n.parent);
+  if (parent.id != n.parent) return false;
   auto it = std::find(parent.children.begin(), parent.children.end(), block);
   if (it == parent.children.begin() || it == parent.children.end()) return false;
   std::iter_swap(it, it - 1);
@@ -573,8 +574,9 @@ bool move_block_up(Document& doc, NodeId block) {
 bool move_block_down(Document& doc, NodeId block) {
   if (block == INVALID_NODE) return false;
   Node& n = doc.get(block);
-  if (n.parent == INVALID_NODE) return false;
+  if (n.id != block || n.parent == INVALID_NODE) return false;
   Node& parent = doc.get(n.parent);
+  if (parent.id != n.parent) return false;
   auto it = std::find(parent.children.begin(), parent.children.end(), block);
   if (it == parent.children.end() || (it + 1) == parent.children.end()) return false;
   std::iter_swap(it, it + 1);
@@ -1428,8 +1430,9 @@ static void renumber_ordered_list(Document& doc, NodeId list_id) {
 // Remove a child id from its parent’s children vector (does not destroy the node).
 static bool detach_from_parent(Document& doc, NodeId id) {
   Node& n = doc.get(id);
-  if (n.parent == INVALID_NODE) return false;
+  if (n.id != id || n.parent == INVALID_NODE) return false;
   Node& parent = doc.get(n.parent);
+  if (parent.id != n.parent) return false;  // stale parent id
   auto it = std::find(parent.children.begin(), parent.children.end(), id);
   if (it == parent.children.end()) return false;
   parent.children.erase(it);
@@ -1612,8 +1615,11 @@ bool split_block(Document& doc, Caret& caret) {
 
 // Drop empty inline spans; keep the node itself (may be an empty paragraph).
 static void compact_spans(Node& n) {
+  // Keep empty-text spans that still carry an href (link/cite with no label).
   n.spans.erase(std::remove_if(n.spans.begin(), n.spans.end(),
-                               [](const InlineSpan& s) { return s.text.empty(); }),
+                               [](const InlineSpan& s) {
+                                 return s.text.empty() && s.href.empty();
+                               }),
                 n.spans.end());
 }
 

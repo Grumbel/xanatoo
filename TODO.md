@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **183** (this delivery is **182**)
+Next bundle number: **184** (this delivery is **183**)
 
 ## Status (2026-10-11)
 
@@ -507,4 +507,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-179.*-no-abort-invalid-node-…` — no-abort invalid node
 - `xanatoo-180.*-harden-nav-layout-caret-…` — nav/layout caret harden
 - `xanatoo-181.*-ssl-gamepad-tab-soft-…` — ssl/gamepad/tab
-- `xanatoo-182.*-image-key-caret-collect-…` — this delivery
+- `xanatoo-182.*-image-key-caret-collect-…` — image key/caret collect
+- `xanatoo-183.*-compact-gemini-font-detach-…` — this delivery
