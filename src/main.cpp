@@ -1172,16 +1172,20 @@ int main(int argc, char** argv) {
             {
               int pi = pane_at(mx);
               int sx = panes[pi].x + panes[pi].w - 8;
-              if (mx >= sx && my < win_h - status_bar_h) {
+              // `my` is content Y (0 at top of viewport). Usable height excludes
+              // the menu/toolbar and the status bar.
+              float view_h = static_cast<float>(win_h - status_bar_h) - ui_top;
+              if (mx >= sx && my >= 0.f && my < view_h) {
                 focus = pi;
                 dragging_scroll = true;
                 scroll_drag_pane = pi;
-                // Jump scroll so thumb centres under cursor
-                float view_h = static_cast<float>(win_h - status_bar_h);
-                float content_h = std::max(view_h, panes[pi].layout.content_height);
+                // Jump scroll so the thumb tracks the click position.
+                float content_h =
+                    std::max(view_h, panes[pi].layout.content_height);
                 float max_s = std::max(0.f, content_h - view_h + 40.f);
                 float ratio = (view_h > 0.f) ? (my / view_h) : 0.f;
-                panes[pi].scroll_y = std::max(0.f, std::min(max_s, ratio * max_s));
+                ratio = std::max(0.f, std::min(1.f, ratio));
+                panes[pi].scroll_y = ratio * max_s;
                 break;
               }
             }
