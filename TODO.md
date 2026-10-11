@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **089** (this delivery is **088**)
+Next bundle number: **090** (this delivery is **089**)
 
 ## Status (2026-10-11)
 
@@ -149,6 +149,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Status bar prompts for citation key vs link href
 - [x] Typed link `:rel` — edit via `href rel=name`, hover shows relation
 - [x] `hit_test_link_ex` returns kind/rel/node for richer status UI
+- [x] Table column weights (`display_scale` / `:weight`) + draggable separators
 
 ## Open work / next steps
 
@@ -156,7 +157,7 @@ LCS structural diff marks; cross-document `:::include`.
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
 3. Editable transclusion mirror (edits on embed write through to source)
 4. Word-level / intra-block diff highlighting (basic pairing in)
-5. **Tables** — semantic grid + basic grid presentation in; column weights / nested blocks still open
+5. **Tables** — grid + column weights in; nested block cells still open
 6. **Docking** — tile/split zones (edge snap + maximize is in)
 7. **Citations** / typed link relations / range transclusion (insert+jump+:rel edit/hover in)
 
@@ -286,4 +287,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-085.*-newline-table-enter-…` — newlines + table Enter
 - `xanatoo-086.*-word-diff-table-tab-…` — word diff + table Tab
 - `xanatoo-087.*-cite-biblio-…` — citation + biblio insert
-- `xanatoo-088.*-link-rel-…` — this delivery
+- `xanatoo-088.*-link-rel-…` — typed link :rel
+- `xanatoo-089.*-table-weights-…` — this delivery

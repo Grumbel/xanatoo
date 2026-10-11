@@ -1624,7 +1624,10 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
   if (tag == "td" || tag == "th" || tag == "cell") {
     NodeId n = doc.create(NodeKind::TableCell, parent);
     doc.get(n).level = (tag == "th") ? 1 : 0;
-    size_t i = 1;
+    float weight = 1.f;
+    size_t i =
+        read_kwargs(e.kids, 1, nullptr, nullptr, &weight, nullptr, nullptr);
+    if (weight > 0.15f && weight < 20.f) doc.get(n).display_scale = weight;
     while (i + 1 < e.kids.size() && e.kids[i].kind == SExpr::Kind::Atom &&
            !e.kids[i].text.empty() && e.kids[i].text[0] == ':')
       i += 2;
@@ -2051,6 +2054,11 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
       out += pad;
       out += (node.level > 0) ? "(th" : "(td";
       emit_node_id(node, out);
+      if (node.display_scale > 0.15f &&
+          (node.display_scale < 0.99f || node.display_scale > 1.01f)) {
+        out += " :weight ";
+        out += format_sexpr_float(node.display_scale);
+      }
       serialize_sexpr_inlines(node, out);
       out += ")";
       break;

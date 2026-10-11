@@ -407,7 +407,6 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
     case NodeKind::Table: {
       float start_y = y;
-      // Collect row node ids so we can draw an outer border + row separators.
       std::vector<NodeId> rows;
       for (NodeId c : node.children) {
         if (doc.get(c).kind == NodeKind::TableRow) rows.push_back(c);
@@ -416,44 +415,75 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         for (NodeId c : node.children)
           layout_node(doc, c, x, y, max_width, out);
       } else {
-        // Lay out each row; remember per-row top/bottom for grid lines.
-        std::vector<float> row_tops;
-        std::vector<float> row_bottoms;
-        size_t n_cols = 0;
+        // Column weights from the first row's cells (display_scale).
+        // All rows share the same relative widths; dragging a separator
+        // updates the first-row cell weights (and is mirrored on drag).
+        std::vector<NodeId> weight_cells;
+        for (NodeId c : doc.get(rows[0]).children) {
+          if (doc.get(c).kind == NodeKind::TableCell) weight_cells.push_back(c);
+        }
+        size_t n_cols = weight_cells.size();
         for (NodeId rid : rows) {
-          row_tops.push_back(y);
-          layout_node(doc, rid, x, y, max_width, out);
-          row_bottoms.push_back(y);
-          const Node& rn = doc.get(rid);
           size_t cells = 0;
-          for (NodeId c : rn.children)
+          for (NodeId c : doc.get(rid).children)
             if (doc.get(c).kind == NodeKind::TableCell) ++cells;
           if (cells > n_cols) n_cols = cells;
         }
-        // Outer border
+        std::vector<float> weights(n_cols, 1.f);
+        float weight_sum = 0.f;
+        for (size_t i = 0; i < n_cols; ++i) {
+          float w = 1.f;
+          if (i < weight_cells.size()) {
+            w = doc.get(weight_cells[i]).display_scale;
+            if (w < 0.15f) w = 0.15f;
+            if (w > 20.f) w = 20.f;
+          }
+          weights[i] = w;
+          weight_sum += w;
+        }
+        if (weight_sum < 0.01f) weight_sum = static_cast<float>(n_cols);
+
+        std::vector<float> col_widths(n_cols);
+        for (size_t i = 0; i < n_cols; ++i) {
+          col_widths[i] = max_width * (weights[i] / weight_sum);
+          if (col_widths[i] < 32.f) col_widths[i] = 32.f;
+        }
+
+        std::vector<float> row_bottoms;
+        for (NodeId rid : rows) {
+          layout_node(doc, rid, x, y, max_width, out);
+          row_bottoms.push_back(y);
+        }
+
         const float stroke = 1.f;
         float table_h = y - start_y;
         if (table_h < 1.f) table_h = 1.f;
-        // top
         out.table_lines.push_back({id, x, start_y, max_width, stroke});
-        // bottom
         out.table_lines.push_back({id, x, y - stroke, max_width, stroke});
-        // left
         out.table_lines.push_back({id, x, start_y, stroke, table_h});
-        // right
         out.table_lines.push_back(
             {id, x + max_width - stroke, start_y, stroke, table_h});
-        // Horizontal separators between rows
         for (size_t r = 0; r + 1 < row_bottoms.size(); ++r) {
           float ly = row_bottoms[r] - stroke * 0.5f;
           out.table_lines.push_back({id, x, ly, max_width, stroke});
         }
-        // Vertical separators between columns (equal width, same as rows)
+        // Vertical separators + draggable gaps (same mechanism as Columns)
         if (n_cols > 1) {
-          float col_w = max_width / static_cast<float>(n_cols);
-          for (size_t c = 1; c < n_cols; ++c) {
-            float lx = x + col_w * static_cast<float>(c) - stroke * 0.5f;
+          float cx = x;
+          for (size_t c = 0; c + 1 < n_cols; ++c) {
+            cx += col_widths[c];
+            float lx = cx - stroke * 0.5f;
             out.table_lines.push_back({id, lx, start_y, stroke, table_h});
+            if (c < weight_cells.size() && c + 1 < weight_cells.size()) {
+              ColumnGap gap;
+              gap.columns = id;  // table id (hit-test uses left/right cells)
+              gap.left = weight_cells[c];
+              gap.right = weight_cells[c + 1];
+              gap.x = cx;
+              gap.y = start_y;
+              gap.height = table_h;
+              out.column_gaps.push_back(gap);
+            }
           }
         }
       }
@@ -464,7 +494,6 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
     case NodeKind::TableRow: {
       float start_y = y;
-      // Equal-width columns; presentation may refine weights later.
       std::vector<NodeId> cells;
       for (NodeId c : node.children) {
         if (doc.get(c).kind == NodeKind::TableCell) cells.push_back(c);
@@ -473,15 +502,47 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         for (NodeId c : node.children)
           layout_node(doc, c, x, y, max_width, out);
       } else {
-        float col_w = max_width / static_cast<float>(cells.size());
-        if (col_w < 40.f) col_w = 40.f;
+        // Weights: prefer first row of parent table (shared column model)
+        std::vector<float> weights(cells.size(), 1.f);
+        if (node.parent != INVALID_NODE &&
+            doc.get(node.parent).kind == NodeKind::Table) {
+          for (NodeId rid : doc.get(node.parent).children) {
+            if (doc.get(rid).kind != NodeKind::TableRow) continue;
+            size_t i = 0;
+            for (NodeId c : doc.get(rid).children) {
+              if (doc.get(c).kind != NodeKind::TableCell) continue;
+              if (i < weights.size()) {
+                float w = doc.get(c).display_scale;
+                if (w < 0.15f) w = 0.15f;
+                if (w > 20.f) w = 20.f;
+                weights[i] = w;
+              }
+              ++i;
+            }
+            break;  // first row only
+          }
+        } else {
+          for (size_t i = 0; i < cells.size(); ++i) {
+            float w = doc.get(cells[i]).display_scale;
+            if (w < 0.15f) w = 0.15f;
+            if (w > 20.f) w = 20.f;
+            weights[i] = w;
+          }
+        }
+        float weight_sum = 0.f;
+        for (float w : weights) weight_sum += w;
+        if (weight_sum < 0.01f) weight_sum = static_cast<float>(cells.size());
+
         float max_bottom = start_y;
         const float cell_pad = 4.f;
+        float cx = x;
         for (size_t i = 0; i < cells.size(); ++i) {
-          float cx = x + col_w * static_cast<float>(i) + cell_pad;
+          float col_w = max_width * (weights[i] / weight_sum);
+          if (col_w < 32.f) col_w = 32.f;
           float cy = start_y + cell_pad;
           LayoutResult cell_out;
-          layout_node(doc, cells[i], cx, cy, col_w - cell_pad * 2.f, cell_out);
+          layout_node(doc, cells[i], cx + cell_pad, cy, col_w - cell_pad * 2.f,
+                      cell_out);
           out.glyphs.insert(out.glyphs.end(), cell_out.glyphs.begin(),
                             cell_out.glyphs.end());
           out.boxes.insert(out.boxes.end(), cell_out.boxes.begin(),
@@ -506,6 +567,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           out.hr_lines.insert(out.hr_lines.end(), cell_out.hr_lines.begin(),
                               cell_out.hr_lines.end());
           if (cy > max_bottom) max_bottom = cy;
+          cx += col_w;
         }
         y = max_bottom + cell_pad + 2.f;
       }
