@@ -421,6 +421,30 @@ int main(int argc, char** argv) {
   std::string hovered_transclude_src;
   float mouse_x = 0.f, mouse_y = 0.f;
 
+  auto clear_interaction_hover = [&]() {
+    hovered_href.clear();
+    hovered_rel.clear();
+    hovered_preview.clear();
+    hovered_is_cite = false;
+    hovered_link_node = xanatoo::INVALID_NODE;
+    hovered_link_span = 0;
+    hovered_link_pane = -1;
+    hovered_stretch = xanatoo::INVALID_NODE;
+    hovered_stretch_pane = -1;
+    hovered_image = xanatoo::INVALID_NODE;
+    hovered_image_pane = -1;
+    hovered_image_handle = false;
+    hovered_col_gap = false;
+    hovered_col_gap_pane = -1;
+    hovered_task = xanatoo::INVALID_NODE;
+    hovered_task_pane = -1;
+    hovered_grip = xanatoo::INVALID_NODE;
+    hovered_grip_pane = -1;
+    hovered_transclude = xanatoo::INVALID_NODE;
+    hovered_transclude_pane = -1;
+    hovered_transclude_src.clear();
+  };
+
   SDL_Cursor* cursor_arrow = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
   SDL_Cursor* cursor_hand = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
   SDL_Cursor* cursor_sizewe = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE);
@@ -5299,6 +5323,9 @@ int main(int argc, char** argv) {
             std::cerr << "Diff demo: examples/diff-v1.md and diff-v2.md required\n";
             break;
           }
+          // Drop floats — their buf indices and layouts refer to old trees.
+          soft_wins.clear();
+          clear_interaction_hover();
           buffers.clear();
           {
             DocBuffer b0;
@@ -5350,6 +5377,13 @@ int main(int argc, char** argv) {
         ui.release_input_capture();
     }
 
+    // UI commands (Open, Diff demo, New tab, …) often replace documents after
+    // the frame's first layout pass. Relayout before draw so glyphs/carets
+    // never reference node ids from the previous document tree.
+    if (needs_layout && win_w >= 64 && win_h >= 64) {
+      layout_panes();
+      if (outline_mode) refresh_outline();
+    }
 
     // Gamepad stick / trigger continuous navigation (poll each frame).
     if (gamepad) {
@@ -5483,7 +5517,12 @@ int main(int argc, char** argv) {
             // Only the header line for expanded stretches is interactive;
             // wash the first line-height of the box when expanded.
             float h = box.height;
-            auto& sn = buffers[static_cast<size_t>(pane.buf)].doc.get(hovered_stretch);
+            auto& hdoc = buffers[static_cast<size_t>(pane.buf)].doc;
+            if (hovered_stretch == xanatoo::INVALID_NODE ||
+                hovered_stretch >= hdoc.next_id ||
+                static_cast<size_t>(hovered_stretch - 1) >= hdoc.nodes.size())
+              break;
+            auto& sn = hdoc.get(hovered_stretch);
             if (sn.expanded && h > static_cast<float>(body_font.line_height()) + 8.f)
               h = static_cast<float>(body_font.line_height()) + 6.f;
             SDL_SetRenderDrawColor(sdl, 40, 130, 90, 50);
