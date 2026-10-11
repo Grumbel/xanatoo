@@ -20,12 +20,12 @@ zip into `ports/PortMaster/autoinstall/` and start PortMaster once.
 /roms/ports/xanatoo/xanatoo          # binary
 /roms/ports/xanatoo/examples/        # welcome.md, help.md, …
 /roms/ports/xanatoo/icons/           # toolbar PNGs
-/roms/ports/xanatoo/fonts/           # DejaVuSans.ttf (or Noto/Roboto if added)
+/roms/ports/xanatoo/fonts/           # DejaVuSans.ttf
 /roms/ports/xanatoo/conf/            # created at runtime (bookmarks, …)
 ```
 
 Override UI face with `XANATOO_UI_FONT=/path/to.ttf` or scale with
-`XANATOO_UI_SCALE` (default 1.5 on the launcher).
+`XANATOO_UI_SCALE` (default 1.35 on the launcher).
 
 ## Controls
 

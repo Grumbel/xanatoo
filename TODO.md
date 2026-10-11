@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **172** (this delivery is **171**)
+Next bundle number: **173** (this delivery is **172**)
 
 ## Status (2026-10-11)
 
@@ -264,17 +264,16 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] R36S: stick to kurvenrausch eoan SDL; ImGui legacy renderer path
 
 ### R36S / PortMaster — confirmed working; polish later
-- [x] UI scale: auto 1.5 when width ≤720 / XANATOO_UI_SCALE / --ui-scale; larger body font
+- [x] UI scale: auto 1.35 when width ≤720 / XANATOO_UI_SCALE / --ui-scale
 - [x] Gamepad: connect hint, Y=history forward, browse-mode status hints; ImGui NavEnableGamepad
 - [x] On-screen virtual keyboard (F3 / Guide / View menu)
 - [x] Right-stick software cursor (A/B click) for R36S
 - [x] Stick cursor always on with pad; accel; LB+A caret; disconnect cleanup
 - [x] --fullscreen + R36S launcher uses it
 - [x] Stick cursor: drawn sprite (not system/X11 cursor) — visible on KMS/DRM
-- [x] UI font: prefer Noto/Roboto/Inter; XANATOO_UI_FONT; larger on ≤720px
-- [x] R36S launcher: UI scale 1.5, XANATOO_UI_FONT from shipped fonts/
 - [x] Stick cursor fully separate from hardware mouse (no WarpMouse)
 - [x] Stick sprite alpha fixed (ABGR8888 upload, same as glyphs)
+- [x] UI font: restore DejaVu / original 14px·1.35 (Noto/1.5 scale was unreadable)
 
 ## Open work / next steps
 
@@ -497,4 +496,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-168.*-stick-cursor-…` — stick cursor
 - `xanatoo-169.*-stick-cursor-polish-…` — stick cursor polish
 - `xanatoo-170.*-sprite-cursor-ui-font-…` — sprite cursor + UI font
-- `xanatoo-171.*-stick-separate-alpha-…` — this delivery
+- `xanatoo-171.*-stick-separate-alpha-…` — stick separate + alpha
+- `xanatoo-172.*-ui-font-rollback-…` — this delivery

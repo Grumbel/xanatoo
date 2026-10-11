@@ -30,17 +30,11 @@ export XDG_STATE_HOME="$GAMEDIR/conf"
 # Data next to the binary (examples, icons, font)
 export XANATOO_DATA_DIR="$GAMEDIR"
 export XANATOO_ICON_DIR="$GAMEDIR/icons"
-# 1.5 + 16px base → ~24px ImGui text on 640×480; readable on R36S LCD.
-export XANATOO_UI_SCALE="${XANATOO_UI_SCALE:-1.5}"
-# Prefer Noto/Roboto/Inter if shipped; else DejaVu (always packaged).
-for f in NotoSans-Regular.ttf NotoSansUI-Regular.ttf Roboto-Regular.ttf \
-         Inter-Regular.ttf DejaVuSans.ttf; do
-  if [ -f "$GAMEDIR/fonts/$f" ]; then
-    export XANATOO_FONT="$GAMEDIR/fonts/$f"
-    export XANATOO_UI_FONT="$GAMEDIR/fonts/$f"
-    break
-  fi
-done
+export XANATOO_UI_SCALE="${XANATOO_UI_SCALE:-1.35}"
+if [ -f "$GAMEDIR/fonts/DejaVuSans.ttf" ]; then
+  export XANATOO_FONT="$GAMEDIR/fonts/DejaVuSans.ttf"
+  export XANATOO_UI_FONT="$GAMEDIR/fonts/DejaVuSans.ttf"
+fi
 
 # PortMaster gamepad mapping for SDL's controller API
 export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"

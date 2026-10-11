@@ -324,35 +324,21 @@ void Ui::tool_menu_end() {
   ImGui::PopID();
 }
 
-// UI faces ordered for legibility at small sizes (large x-height first).
-// Handhelds (R36S 640×480) need a clear face; DejaVu is fine at ≥16px but
-// Noto/Roboto/Inter stay sharper in the 14–18px band when available.
+// GNOME 2–era UI faces: Bitstream Vera → DejaVu Sans was the usual desktop
+// default. Prefer these over “modern” UI faces — on R36S the larger Noto/
+// Roboto paths + 1.5 scale produced unreadable menus.
 static std::string resolve_ui_font_path() {
   if (const char* env = std::getenv("XANATOO_UI_FONT")) {
     if (env[0] != '\0' && fs::exists(env)) return env;
   }
-  // PortMaster ships fonts under XANATOO_DATA_DIR/fonts/.
+  // PortMaster ships DejaVu under XANATOO_DATA_DIR/fonts/.
   if (const char* data = std::getenv("XANATOO_DATA_DIR")) {
     if (data[0] != '\0') {
-      const char* names[] = {
-          "NotoSans-Regular.ttf", "NotoSansUI-Regular.ttf",
-          "Roboto-Regular.ttf",   "Inter-Regular.ttf",
-          "DejaVuSans.ttf",       nullptr,
-      };
-      for (const char** n = names; *n; ++n) {
-        fs::path p = fs::path(data) / "fonts" / *n;
-        if (fs::exists(p)) return p.string();
-      }
+      fs::path p = fs::path(data) / "fonts" / "DejaVuSans.ttf";
+      if (fs::exists(p)) return p.string();
     }
   }
   const char* families[] = {
-      "Noto Sans",
-      "Noto Sans UI",
-      "Roboto",
-      "Inter",
-      "Source Sans 3",
-      "Source Sans Pro",
-      "Cantarell",
       "DejaVu Sans",
       "Bitstream Vera Sans",
       "Liberation Sans",
@@ -366,9 +352,6 @@ static std::string resolve_ui_font_path() {
     if (!path.empty()) return path;
   }
   const char* files[] = {
-      "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-      "/usr/share/fonts/truetype/noto/NotoSansUI-Regular.ttf",
-      "/usr/share/fonts/truetype/roboto/Roboto-Regular.ttf",
       "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
       "/usr/share/fonts/TTF/DejaVuSans.ttf",
       "/usr/share/fonts/dejavu/DejaVuSans.ttf",
@@ -386,10 +369,9 @@ static void load_ui_fonts(ImGuiIO& io, float size_px) {
   // Desktop ~14px; handhelds pass a larger size for readability.
   std::string path = resolve_ui_font_path();
   ImFontConfig cfg;
-  // Slight oversample + pixel snap keeps menu text crisp on 640×480 LCDs.
   cfg.OversampleH = 2;
-  cfg.OversampleV = 2;
-  cfg.PixelSnapH = true;
+  cfg.OversampleV = 1;
+  cfg.PixelSnapH = true;  // crisper menus on integer positions
   if (!path.empty()) {
     ImFont* font = io.Fonts->AddFontFromFileTTF(path.c_str(), size_px, &cfg,
                                                 io.Fonts->GetGlyphRangesDefault());
@@ -399,7 +381,7 @@ static void load_ui_fonts(ImGuiIO& io, float size_px) {
     }
     std::cerr << "UI font load failed: " << path << " — using ImGui default\n";
   } else {
-    std::cerr << "No UI TTF found (set XANATOO_UI_FONT) — using ImGui default\n";
+    std::cerr << "No DejaVu/Vera/Liberation Sans found — using ImGui default\n";
   }
   io.Fonts->AddFontDefault();
 }
@@ -421,24 +403,18 @@ bool Ui::init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale) {
       if (e[0] != '\0') scale = std::strtof(e, nullptr);
     }
   }
-  bool small_screen = false;
   if (scale <= 0.f && window) {
     int ww = 0, wh = 0;
     SDL_GetWindowSize(window, &ww, &wh);
-    if (ww > 0 && ww <= 720) {
-      scale = 1.5f;  // R36S / similar handhelds (was 1.35)
-      small_screen = true;
-    } else {
+    if (ww > 0 && ww <= 720)
+      scale = 1.35f;  // R36S / similar handhelds
+    else
       scale = 1.f;
-    }
   }
   if (scale < 0.75f) scale = 0.75f;
   if (scale > 2.5f) scale = 2.5f;
 
-  // Base size is higher on tiny displays so menus stay readable even when
-  // the chosen face is only DejaVu (common on PortMaster).
-  const float base_px = small_screen ? 16.0f : 14.0f;
-  const float font_px = base_px * (scale > 1.f ? scale : 1.f);
+  const float font_px = 14.0f * (scale > 1.f ? scale : 1.f);
   load_ui_fonts(io, font_px);
   apply_classic_theme();
   {
