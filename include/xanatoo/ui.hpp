@@ -28,6 +28,7 @@ enum class UiCommand {
   Redo,
   Cut,
   Copy,
+  CopyPageUrl,  // current gemini:// or file path
   Paste,
   SelectAll,
   SelectBlock,

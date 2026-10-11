@@ -121,8 +121,15 @@ int main(int argc, char** argv) {
     if (paths[0].empty())
       std::cerr << "Note: examples/welcome.md not found; starting empty.\n";
   }
-  docs[0] = load_doc(paths[0]);
-  docs[1] = paths[1].empty() ? docs[0] : load_doc(paths[1]);
+  auto load_doc_or_placeholder = [&](const std::string& path) {
+    if (xanatoo::is_gemini_url(path)) {
+      // Real fetch happens after navigate_to_url is defined.
+      return xanatoo::parse_document("# Loading…\n", {});
+    }
+    return load_doc(path);
+  };
+  docs[0] = load_doc_or_placeholder(paths[0]);
+  docs[1] = paths[1].empty() ? docs[0] : load_doc_or_placeholder(paths[1]);
   // If only one file, pane 1 shares docs[0] until a second file is used
   bool shared_doc = paths[1].empty();
   bool dirty_flags[2] = {false, false};
@@ -2264,9 +2271,16 @@ int main(int argc, char** argv) {
               collapse_or_expand_all(true);
               break;
             case SDL_CONTROLLER_BUTTON_BACK:
-              browse_mode = !browse_mode;
-              flash_status(browse_mode ? "Browse mode (read-only)"
-                                       : "Edit mode");
+              // Prefer capsule history when available; else toggle browse.
+              if (nav_hist_pos > 0) {
+                --nav_hist_pos;
+                navigate_to_url(nav_history[static_cast<size_t>(nav_hist_pos)],
+                                /*record_history=*/false);
+              } else {
+                browse_mode = !browse_mode;
+                flash_status(browse_mode ? "Browse mode (read-only)"
+                                         : "Edit mode");
+              }
               break;
             case SDL_CONTROLLER_BUTTON_START:
               help_mode = !help_mode;
@@ -3681,15 +3695,27 @@ int main(int argc, char** argv) {
 
             case SDLK_u:
               if (ctrl && shift) {
-                // Unwrap enclosing stretch
-                edit();
-                if (auto first = xanatoo::unwrap_stretch(d, p.sel.focus.node)) {
-                  p.sel.focus.node = *first;
-                  p.sel.focus.span_index = 0;
-                  p.sel.focus.char_index = 0;
-                  p.sel.anchor = p.sel.focus;
-                  needs_layout = true;
-                  reset_blink();
+                // Browse / capsule: copy page URL; edit: unwrap stretch
+                std::string page = path_of(p);
+                if (page.empty()) page = gemini_current_url;
+                if (browse_mode || xanatoo::is_gemini_url(page)) {
+                  if (page.empty()) {
+                    flash_status("No page URL");
+                  } else {
+                    SDL_SetClipboardText(page.c_str());
+                    flash_status("Copied " + page);
+                  }
+                } else {
+                  edit();
+                  if (auto first =
+                          xanatoo::unwrap_stretch(d, p.sel.focus.node)) {
+                    p.sel.focus.node = *first;
+                    p.sel.focus.span_index = 0;
+                    p.sel.focus.char_index = 0;
+                    p.sel.anchor = p.sel.focus;
+                    needs_layout = true;
+                    reset_blink();
+                  }
                 }
               }
               break;
@@ -3816,6 +3842,7 @@ int main(int argc, char** argv) {
             c == C::Save ||
             c == C::SaveAs || c == C::ExportSexpr || c == C::ExportMarkdown ||
             c == C::Reload || c == C::ForceReload || c == C::Copy ||
+            c == C::CopyPageUrl ||
             c == C::SelectAll || c == C::SelectBlock || c == C::Find ||
             c == C::ToggleSplit || c == C::ToggleOutline || c == C::ToggleDiff ||
             c == C::ToggleStructure || c == C::ToggleBrowse ||
@@ -3956,6 +3983,17 @@ int main(int argc, char** argv) {
             xanatoo::delete_selection(d, p.sel);
             needs_layout = true;
           }
+          break;
+        }
+        case C::CopyPageUrl: {
+          std::string url = path_of(p);
+          if (url.empty()) url = gemini_current_url;
+          if (url.empty()) {
+            flash_status("No page URL");
+            break;
+          }
+          SDL_SetClipboardText(url.c_str());
+          flash_status("Copied " + url);
           break;
         }
         case C::Copy: {

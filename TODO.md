@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **138** (this delivery is **137**)
+Next bundle number: **139** (this delivery is **138**)
 
 ## Status (2026-10-11)
 
@@ -235,6 +235,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Shared navigate_to_url; Gemini 10/11 input; flake OpenSSL; Open URL menu
 - [x] Gemini: socket timeouts; non-text MIME notice; README/AGENTS
 - [x] Gemini history (Alt+Left/Right), reload, CLI gemini:// startup
+- [x] Copy page URL; quiet gemini startup; gamepad history back
 
 ## Open work / next steps
 
@@ -421,4 +422,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-134.*-gemini-…` — gemtext + gemini client
 - `xanatoo-135.*-gemini-polish-…` — navigate_to_url polish
 - `xanatoo-136.*-gemini-timeout-…` — timeouts + MIME
-- `xanatoo-137.*-gemini-history-…` — this delivery
+- `xanatoo-137.*-gemini-history-…` — history + reload
+- `xanatoo-138.*-gemini-copy-url-…` — this delivery

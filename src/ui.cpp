@@ -476,6 +476,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::Separator();
       menu_item_cmd("Cut", UiCommand::Cut, cmd, state.selection, "Ctrl+X");
       menu_item_cmd("Copy", UiCommand::Copy, cmd, state.selection, "Ctrl+C");
+      menu_item_cmd("Copy Page URL", UiCommand::CopyPageUrl, cmd, true,
+                    "Ctrl+Shift+U");
       menu_item_cmd("Paste", UiCommand::Paste, cmd, true, "Ctrl+V");
       menu_item_cmd("Select Block", UiCommand::SelectBlock, cmd, true, "Ctrl+A");
       menu_item_cmd("Select All", UiCommand::SelectAll, cmd, true, "Ctrl+Shift+A");
