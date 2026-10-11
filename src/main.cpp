@@ -3029,6 +3029,8 @@ int main(int argc, char** argv) {
             case SDLK_l:
               if (ctrl && shift) {
                 structure_mode = !structure_mode;
+                flash_status(structure_mode ? "Structure highlight on"
+                                            : "Structure highlight off");
                 std::cout << (structure_mode ? "Structure highlight on\n"
                                              : "Structure highlight off\n");
               }
@@ -4038,9 +4040,10 @@ int main(int argc, char** argv) {
               }
             }
             if (!hit) continue;
-            int by = static_cast<int>(box.y - pane.scroll_y);
+            // Content → screen: same convention as structure overlay (+ ui_top).
+            int by = static_cast<int>(box.y - pane.scroll_y + ui_top);
             int bh = static_cast<int>(box.height);
-            if (by + bh < 0 || by > win_h - status_bar_h) continue;
+            if (by + bh < clip_y || by > win_h - status_bar_h) continue;
             SDL_SetRenderDrawColor(sdl, 200, 120, 40, 200);
             SDL_Rect mark{pane.x + 2, by, 4, bh};
             SDL_RenderFillRect(sdl, &mark);
@@ -4091,10 +4094,22 @@ int main(int argc, char** argv) {
             }
             if (!hit) continue;
             int gx = pane.x + static_cast<int>(g.x);
-            int gy = static_cast<int>(g.y - pane.scroll_y - lh * 0.85f);
+            int gy = static_cast<int>(g.y - pane.scroll_y + ui_top - lh * 0.85f);
+            // Width: advance to next glyph on the same baseline/node when possible.
             int gw = 8;
-            // Approximate advance from next glyph on same baseline
-            // (best-effort; highlight remains readable either way)
+            {
+              const float baseline = g.y;
+              float next_x = g.x + 8.f;
+              for (const auto& ng : pane.layout.glyphs) {
+                if (ng.node != g.node) continue;
+                if (std::abs(ng.y - baseline) > 1.f) continue;
+                if (ng.x > g.x + 0.5f && ng.x < next_x) next_x = ng.x;
+              }
+              int adv = static_cast<int>(next_x - g.x);
+              if (adv > 2 && adv < 48) gw = adv;
+            }
+            if (gy + static_cast<int>(lh) < clip_y || gy > win_h - status_bar_h)
+              continue;
             SDL_SetRenderDrawColor(sdl, 220, 160, 40, 110);
             SDL_Rect r{gx, gy, gw, static_cast<int>(lh)};
             SDL_RenderFillRect(sdl, &r);
@@ -4106,7 +4121,7 @@ int main(int argc, char** argv) {
       // Column gutters (subtle vertical handles)
       for (const auto& gap : pane.layout.column_gaps) {
         int gx = pane.x + static_cast<int>(gap.x);
-        int gy = static_cast<int>(gap.y - pane.scroll_y);
+        int gy = static_cast<int>(gap.y - pane.scroll_y + ui_top);
         int gh = static_cast<int>(gap.height);
         bool active = dragging_col_gap && gap.left == col_gap_left;
         SDL_SetRenderDrawColor(sdl, active ? 25 : 190, active ? 90 : 188,
@@ -4123,14 +4138,14 @@ int main(int argc, char** argv) {
           SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
           SDL_SetRenderDrawColor(sdl, 80, 140, 220, 60);
           SDL_Rect r{pane.x + static_cast<int>(box.x),
-                     static_cast<int>(box.y - pane.scroll_y),
+                     static_cast<int>(box.y - pane.scroll_y + ui_top),
                      static_cast<int>(box.width),
                      static_cast<int>(box.height)};
           SDL_RenderFillRect(sdl, &r);
           SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
         }
         if (drop_line_y >= 0.f) {
-          int ly = static_cast<int>(drop_line_y - pane.scroll_y);
+          int ly = static_cast<int>(drop_line_y - pane.scroll_y + ui_top);
           SDL_SetRenderDrawColor(sdl, 25, 90, 170, 255);
           SDL_Rect line{pane.x + 24, ly - 1, pane.w - 40, 3};
           SDL_RenderFillRect(sdl, &line);
@@ -4149,7 +4164,8 @@ int main(int argc, char** argv) {
               bn.kind == xanatoo::NodeKind::List)
             continue;
           int gx = pane.x + static_cast<int>(box.x) + 4;
-          int gy = static_cast<int>(box.y - pane.scroll_y + box.height * 0.5f);
+          int gy = static_cast<int>(box.y - pane.scroll_y + ui_top +
+                                   box.height * 0.5f);
           SDL_SetRenderDrawColor(sdl, 160, 158, 150, 255);
           for (int d = -6; d <= 6; d += 6) {
             SDL_Rect dot{gx, gy + d, 3, 3};
