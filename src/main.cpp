@@ -4152,7 +4152,8 @@ int main(int argc, char** argv) {
         }
       } else if (i == focus && !dragging_block) {
         // Subtle grip dots on left margin of the box under the cursor
-        float adj_y = mouse_y + pane.scroll_y;
+        // mouse_y is window space; boxes are content space.
+        float adj_y = content_y(mouse_y) + pane.scroll_y;
         float lx = mouse_x - static_cast<float>(pane.x);
         for (const auto& box : pane.layout.boxes) {
           if (adj_y < box.y || adj_y > box.y + box.height) continue;
@@ -4211,18 +4212,22 @@ int main(int argc, char** argv) {
         panes[0].sel.focus.node != xanatoo::INVALID_NODE &&
         panes[0].sel.focus.node == panes[1].sel.focus.node) {
       float lh = static_cast<float>(body_font.line_height());
+      // draw_scroll matches pane rendering (content → screen under the toolbar).
+      const float ds0 = panes[0].scroll_y - ui_top;
+      const float ds1 = panes[1].scroll_y - ui_top;
       auto c0 = xanatoo::caret_screen_pos(panes[0].layout, panes[0].sel.focus,
-                                           panes[0].scroll_y, lh);
+                                           ds0, lh);
       auto c1 = xanatoo::caret_screen_pos(panes[1].layout, panes[1].sel.focus,
-                                           panes[1].scroll_y, lh);
+                                           ds1, lh);
       if (c0.valid && c1.valid) {
         int x0 = panes[0].x + static_cast<int>(c0.x);
         int y0 = static_cast<int>(c0.y);
         int x1 = panes[1].x + static_cast<int>(c1.x);
         int y1 = static_cast<int>(c1.y);
-        // Clamp into content area
+        // Clamp into content area below toolbar / above status bar
+        int min_y = static_cast<int>(ui_top);
         int max_y = win_h - status_bar_h;
-        if (y0 >= 0 && y0 < max_y && y1 >= 0 && y1 < max_y) {
+        if (y0 >= min_y && y0 < max_y && y1 >= min_y && y1 < max_y) {
           SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
           SDL_SetRenderDrawColor(sdl, 25, 90, 170, 160);
           // Straight connector + soft endpoints

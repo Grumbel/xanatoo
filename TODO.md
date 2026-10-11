@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **125** (this delivery is **124**)
+Next bundle number: **126** (this delivery is **125**)
 
 ## Status (2026-10-11)
 
@@ -219,6 +219,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] LoadDiffDemo respects dirty-buffer discard arming
 - [x] Structure tags skip table-row shells (less noise)
 - [x] Fix overlay screen Y (+ ui_top) for diff bars, word marks, gutters, drag
+- [x] Grip-dot hit-test uses content_y; dual-pane caret connector aligned
 
 ## Open work / next steps
 
@@ -392,4 +393,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-121.*-structure-labels-…` — structure kind tags
 - `xanatoo-122.*-imgui-hoverid-…` — ImGui 1.91 field fix
 - `xanatoo-123.*-diff-feedback-…` — diff menu feedback
-- `xanatoo-124.*-overlay-y-…` — this delivery
+- `xanatoo-124.*-overlay-y-…` — overlay Y alignment
+- `xanatoo-125.*-grip-connector-…` — this delivery
