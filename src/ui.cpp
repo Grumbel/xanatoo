@@ -151,6 +151,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
       "figure", "note", "replace", "outline", "paste", "copy", "new", "open",
       "zoomin", "zoomout", "structure", "diff",
       "back", "forward", "reload", "bookmark", "history", "browse",
+      "format", "insert", "view",
   };
 
   fs::path found_dir;
@@ -244,6 +245,48 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
   return pressed;
 }
 
+
+
+// Icon (or text) button that opens a popup menu. When true, fill items then tool_menu_end().
+bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip) {
+  const Icon* ic = icon(icon_name);
+  ImGui::PushID(id);
+  bool pressed = false;
+  if (ic) {
+    ImVec2 size(static_cast<float>(ic->w), static_cast<float>(ic->h));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.f, 3.f));
+    if (ImGui::ImageButton(
+            "##btn", reinterpret_cast<ImTextureID>(ic->texture), size,
+            ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0),
+            ImVec4(1, 1, 1, 1.f)))
+      pressed = true;
+    ImGui::PopStyleVar();
+  } else {
+    std::string label = tip && tip[0] ? tip : id;
+    size_t cut = label.find(" (");
+    if (cut != std::string::npos) label.resize(cut);
+    if (label.size() > 12) label.resize(12);
+    label += " ▾";
+    if (ImGui::SmallButton(label.c_str())) pressed = true;
+  }
+  if (pressed) ImGui::OpenPopup("##menu");
+  if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && tip && tip[0])
+    ImGui::SetTooltip("%s", tip);
+  // Advance toolbar cursor before opening the popup window.
+  ImGui::SameLine(0.f, 2.f);
+  bool open = ImGui::BeginPopup("##menu");
+  if (!open) {
+    ImGui::PopID();
+    return false;
+  }
+  // Popup is open; keep ID pushed until tool_menu_end().
+  return true;
+}
+
+void Ui::tool_menu_end() {
+  ImGui::EndPopup();
+  ImGui::PopID();
+}
 
 // GNOME 2–era UI faces: Bitstream Vera → DejaVu Sans was the usual desktop default.
 static std::string resolve_ui_font_path() {
@@ -753,7 +796,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   ImGui::PopStyleVar(2);
   result.top_reserved += browse_h;
 
-  // -- Edit row (document formatting tools) --
+  // -- Edit row (compact: primary icons + dropdown groups) --
   const float edit_h = 36.f;
   ImGui::SetNextWindowPos(ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
   ImGui::SetNextWindowSize(ImVec2(vp->Size.x, edit_h));
@@ -762,6 +805,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   if (ImGui::Begin("##toolbar_edit", nullptr, tb_flags)) {
     ImGui::BeginChild("##toolbar_edit_scroll", ImVec2(0.f, 0.f), false,
                       ImGuiWindowFlags_HorizontalScrollbar);
+
+    // File
     tool_button("tb_new", "new", "New document (Ctrl+N)", UiCommand::NewDocument,
                 cmd);
     tool_button("tb_open", "open", "Open… (Ctrl+O)", UiCommand::OpenDocument, cmd);
@@ -772,88 +817,101 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     ImGui::TextDisabled("|");
     ImGui::SameLine(0.f, 4.f);
 
+    // Clipboard
     tool_button("tb_cut", "cut", "Cut (Ctrl+X)", UiCommand::Cut, cmd,
                 state.selection);
     tool_button("tb_copy", "copy", "Copy (Ctrl+C)", UiCommand::Copy, cmd,
                 state.selection);
     tool_button("tb_paste", "paste", "Paste (Ctrl+V)", UiCommand::Paste, cmd);
+
+    ImGui::TextDisabled("|");
+    ImGui::SameLine(0.f, 4.f);
+
+    // Common inline styles
     tool_button("tb_bold", "bold", "Bold (Ctrl+B)", UiCommand::Bold, cmd,
                 state.selection);
     tool_button("tb_italic", "italic", "Italic (Ctrl+I)", UiCommand::Italic,
                 cmd, state.selection);
-    tool_button("tb_strike", "strike", "Strikethrough (Ctrl+Shift+X)",
-                UiCommand::Strike, cmd, state.selection);
-    tool_button("tb_code", "code", "Code (Ctrl+`)", UiCommand::Code, cmd,
-                state.selection);
     tool_button("tb_link", "link", "Link (Ctrl+K)", UiCommand::Link, cmd,
                 state.selection);
-    tool_button("tb_cite", "cite", "Citation (Ctrl+Shift+C)", UiCommand::Cite,
-                cmd, state.selection);
+
+    // More format styles
+    if (tool_menu_begin("tb_format", "format", "More formatting")) {
+      menu_item_cmd("Code", UiCommand::Code, cmd, state.selection, "Ctrl+`");
+      menu_item_cmd("Strikethrough", UiCommand::Strike, cmd, state.selection,
+                    "Ctrl+Shift+X");
+      menu_item_cmd("Citation…", UiCommand::Cite, cmd, state.selection,
+                    "Ctrl+Shift+C");
+      tool_menu_end();
+    }
 
     ImGui::TextDisabled("|");
     ImGui::SameLine(0.f, 4.f);
 
-    tool_button("tb_h1", "h1", "Header (Ctrl+1)", UiCommand::MakeHeader, cmd);
-    tool_button("tb_h2", "h2", "Wrap Section (Ctrl+Shift+1)", UiCommand::WrapSection,
-                cmd);
-    tool_button("tb_h3", "h3", "Wrap Article (Ctrl+Shift+2)", UiCommand::WrapArticle,
-                cmd);
-    tool_button("tb_para", "para", "Paragraph (Ctrl+0)", UiCommand::ParagraphLevel,
-                cmd);
+    // Structure group
+    if (tool_menu_begin("tb_structmenu", "structure", "Structure")) {
+      menu_item_cmd("Header", UiCommand::MakeHeader, cmd, true, "Ctrl+1");
+      menu_item_cmd("Wrap Section", UiCommand::WrapSection, cmd, true,
+                    "Ctrl+Shift+1");
+      menu_item_cmd("Wrap Article", UiCommand::WrapArticle, cmd, true,
+                    "Ctrl+Shift+2");
+      menu_item_cmd("Paragraph", UiCommand::ParagraphLevel, cmd, true, "Ctrl+0");
+      ImGui::Separator();
+      menu_item_cmd("Wrap Stretch…", UiCommand::WrapStretch, cmd, true, "Ctrl+E");
+      menu_item_cmd("Unwrap Stretch", UiCommand::UnwrapStretch, cmd, state.in_stretch,
+                    "Ctrl+Shift+U");
+      tool_menu_end();
+    }
+
+    // Lists / blocks group
+    if (tool_menu_begin("tb_lists", "list", "Lists & blocks")) {
+      menu_item_cmd("Unordered list", UiCommand::ToggleUnorderedList, cmd);
+      menu_item_cmd("Ordered list", UiCommand::ToggleOrderedList, cmd);
+      menu_item_cmd("Task item", UiCommand::ToggleTask, cmd, true, "Ctrl+Shift+T");
+      menu_item_cmd("Block quote", UiCommand::ToggleBlockQuote, cmd);
+      ImGui::Separator();
+      menu_item_cmd("Indent", UiCommand::IndentList, cmd, state.on_list_item);
+      menu_item_cmd("Outdent", UiCommand::OutdentList, cmd, state.on_list_item);
+      tool_menu_end();
+    }
+
+    // Insert group
+    if (tool_menu_begin("tb_insert", "insert", "Insert")) {
+      menu_item_cmd("Table", UiCommand::InsertTable, cmd);
+      menu_item_cmd("Image…", UiCommand::InsertImage, cmd, true, "Ctrl+Shift+I");
+      menu_item_cmd("Figure…", UiCommand::InsertFigure, cmd);
+      menu_item_cmd("Note", UiCommand::InsertNote, cmd);
+      menu_item_cmd("Code block", UiCommand::InsertCodeBlock, cmd);
+      menu_item_cmd("Horizontal rule", UiCommand::InsertHr, cmd);
+      menu_item_cmd("Columns (2)", UiCommand::InsertColumns, cmd);
+      menu_item_cmd("Transclude…", UiCommand::InsertTransclude, cmd);
+      menu_item_cmd("Bibliography entry", UiCommand::InsertBiblioEntry, cmd);
+      tool_menu_end();
+    }
 
     ImGui::TextDisabled("|");
     ImGui::SameLine(0.f, 4.f);
 
-    tool_button("tb_list", "list", "Unordered list", UiCommand::ToggleUnorderedList,
-                cmd);
-    tool_button("tb_olist", "olist", "Ordered list", UiCommand::ToggleOrderedList,
-                cmd);
-    tool_button("tb_task", "task", "Task item (Ctrl+Shift+T)",
-                UiCommand::ToggleTask, cmd);
-    tool_button("tb_quote", "quote", "Block quote", UiCommand::ToggleBlockQuote,
-                cmd);
-    tool_button("tb_table", "table", "Insert table", UiCommand::InsertTable, cmd);
-    tool_button("tb_image", "image", "Insert image (Ctrl+Shift+I)",
-                UiCommand::InsertImage, cmd);
-    tool_button("tb_figure", "figure", "Insert figure", UiCommand::InsertFigure,
-                cmd);
-    tool_button("tb_note", "note", "Insert note", UiCommand::InsertNote, cmd);
-
-    ImGui::TextDisabled("|");
-    ImGui::SameLine(0.f, 4.f);
-
-    tool_button("tb_split", "split", "Split pane (Ctrl+\\)", UiCommand::ToggleSplit,
-                cmd);
     tool_button("tb_find", "find", "Find (Ctrl+F)", UiCommand::Find, cmd);
-    tool_button("tb_replace", "replace", "Replace (Ctrl+H)", UiCommand::Replace,
-                cmd);
-    tool_button("tb_outline", "outline", "Heading outline (Ctrl+Shift+O)",
-                UiCommand::ToggleOutline, cmd);
-    {
-      if (state.structure) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                              ImVec4(0.4f, 0.5f, 0.75f, 1.f));
-      }
-      tool_button("tb_struct", "structure", "Structure highlight (Ctrl+Shift+L)",
-                  UiCommand::ToggleStructure, cmd);
-      if (state.structure) ImGui::PopStyleColor(2);
+    if (tool_menu_begin("tb_viewmenu", "view", "View tools")) {
+      menu_item_cmd("Replace…", UiCommand::Replace, cmd, true, "Ctrl+H");
+      ImGui::Separator();
+      if (ImGui::MenuItem("Split pane", "Ctrl+\\", state.split))
+        cmd = UiCommand::ToggleSplit;
+      if (ImGui::MenuItem("Heading outline", "Ctrl+Shift+O", state.outline))
+        cmd = UiCommand::ToggleOutline;
+      if (ImGui::MenuItem("Structure highlight", "Ctrl+Shift+L", state.structure))
+        cmd = UiCommand::ToggleStructure;
+      if (ImGui::MenuItem("Diff marks", "Ctrl+Shift+D", state.diff, state.can_diff))
+        cmd = UiCommand::ToggleDiff;
+      ImGui::Separator();
+      menu_item_cmd("Zoom in", UiCommand::ZoomIn, cmd, true, "Ctrl++");
+      menu_item_cmd("Zoom out", UiCommand::ZoomOut, cmd, true, "Ctrl+-");
+      ImGui::Separator();
+      menu_item_cmd("Help", UiCommand::ToggleHelp, cmd, true, "F1");
+      tool_menu_end();
     }
-    {
-      if (state.diff) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.4f, 0.2f, 1.f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                              ImVec4(0.7f, 0.45f, 0.25f, 1.f));
-      }
-      tool_button("tb_diff", "diff", "Diff marks (Ctrl+Shift+D)",
-                  UiCommand::ToggleDiff, cmd);
-      if (state.diff) ImGui::PopStyleColor(2);
-    }
-    tool_button("tb_zoomin", "zoomin", "Zoom in (Ctrl++)", UiCommand::ZoomIn,
-                cmd);
-    tool_button("tb_zoomout", "zoomout", "Zoom out (Ctrl+-)", UiCommand::ZoomOut,
-                cmd);
-    tool_button("tb_help", "help", "Help (F1)", UiCommand::ToggleHelp, cmd);
+
     ImGui::EndChild();
   }
   ImGui::End();

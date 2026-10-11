@@ -135,7 +135,7 @@ green. Use this for reading and navigating.
 
 - **Alt+Left** / **Alt+Right** — Back / Forward in session history
 - **Browse toolbar** — Back, Forward, Reload, location field, Bookmark, History, Browse mode
-- **Edit toolbar** — file, undo, format, and structure tools under the browse row
+- **Edit toolbar** — file, clipboard, bold/italic/link; menus for more format, structure, lists, insert, and view tools
 - **Ctrl+Shift+H** / **View → History** — session history panel (click to open)
 - **Ctrl+Shift+B** — Bookmark or un-bookmark the current page
 - **Bookmarks** menu — add/remove, list, open; **Show Bookmarks…** for the manager

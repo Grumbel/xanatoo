@@ -198,6 +198,8 @@ private:
   const Icon* icon(const char* name) const;
   bool tool_button(const char* id, const char* icon_name, const char* tip,
                    UiCommand c, UiCommand& out, bool enabled = true);
+  bool tool_menu_begin(const char* id, const char* icon_name, const char* tip);
+  void tool_menu_end();
 
   bool ready_ = false;
   SDL_Renderer* renderer_ = nullptr;
