@@ -24,8 +24,8 @@ zip into `ports/PortMaster/autoinstall/` and start PortMaster once.
 /roms/ports/xanatoo/conf/            # created at runtime (bookmarks, …)
 ```
 
-Override UI face with `XANATOO_UI_FONT=/path/to.ttf`. Optional chrome
-scale: `XANATOO_UI_SCALE` (font size stays fixed at 14px).
+Menus use ImGui’s built-in ProggyClean bitmap font (sharp on 640×480).
+Optional: `XANATOO_UI_FONT=/path/to.ttf` to force a TTF instead.
 
 ## Controls
 
