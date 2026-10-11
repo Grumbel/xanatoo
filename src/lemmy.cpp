@@ -515,7 +515,6 @@ void append_message(Document& doc, NodeId thread, const LemmyPost& post,
     meta += std::to_string(post.score) + " pts";
   }
   n.summary = meta;
-  // Indent comments via alt chain is complex without ids; skip fake reply-to
 
   const std::string permalink = post_permalink(post, origin);
 
@@ -574,10 +573,9 @@ void append_message(Document& doc, NodeId thread, const LemmyPost& post,
       }
       InlineSpan cl;
       cl.kind = InlineKind::Link;
-      if (post.comments > 0)
-        cl.text = std::to_string(post.comments) + " comments";
-      else
-        cl.text = "comments";
+      cl.text = post.comments > 0
+                    ? (std::to_string(post.comments) + " comments")
+                    : "comments";
       cl.href = permalink;
       doc.get(foot).spans.push_back(std::move(cl));
     }
@@ -737,13 +735,16 @@ std::optional<Document> lemmy_fetch(std::string_view url_in, std::string* err) {
   std::vector<LemmyPost> comments;
   std::string title;
 
-  // Single post response: post_view + comments
+  // Listing: { "posts": [ post_view, ... ] }
+  // Single post (newer Lemmy): { "post_view": ... } without embedded comments —
+  // comments come from GET /api/v3/comment/list?post_id=…
   std::string_view post_view = json_object_after_key(json, "post_view");
   if (!post_view.empty()) {
     LemmyPost p = parse_post_view(post_view);
     posts.push_back(p);
     if (!p.title.empty()) title = p.title;
     else if (!p.community.empty()) title = "c/" + p.community;
+    // Legacy: comments array on the same payload (older instances).
     auto comment_views = json_object_array_after_key(json, "comments");
     for (const auto& cv : comment_views)
       comments.push_back(parse_comment_view(cv));
@@ -757,6 +758,38 @@ std::optional<Document> lemmy_fetch(std::string_view url_in, std::string* err) {
       title = "c/" + posts.front().community;
     else
       title = "Lemmy";
+  }
+
+  // Fetch comments for a single post when the post endpoint omitted them.
+  int64_t need_comments_for = 0;
+  if (comments.empty()) {
+    if (pu.post_id > 0)
+      need_comments_for = pu.post_id;
+    else if (posts.size() == 1 && posts.front().id > 0)
+      need_comments_for = posts.front().id;
+  }
+  if (need_comments_for > 0) {
+    std::string curl =
+        pu.origin + "/api/v3/comment/list?post_id=" +
+        std::to_string(need_comments_for) +
+        "&limit=80&max_depth=8&sort=Hot";
+    std::cerr << "Lemmy: GET " << curl << "\n";
+    std::string cerr;
+    auto cresp = https_get(curl, &cerr);
+    if (cresp && cresp->status == 200 && !cresp->body.empty()) {
+      size_t cs = 0;
+      while (cs < cresp->body.size() &&
+             std::isspace(static_cast<unsigned char>(cresp->body[cs])))
+        ++cs;
+      std::string_view cjson(cresp->body.data() + cs,
+                             cresp->body.size() - cs);
+      auto comment_views = json_object_array_after_key(cjson, "comments");
+      for (const auto& cv : comment_views)
+        comments.push_back(parse_comment_view(cv));
+    } else {
+      std::cerr << "Lemmy: comment list failed"
+                << (cerr.empty() ? "" : (": " + cerr)) << "\n";
+    }
   }
 
   std::cerr << "Lemmy: " << posts.size() << " post(s), " << comments.size()
