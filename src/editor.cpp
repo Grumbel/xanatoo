@@ -1150,6 +1150,7 @@ bool unwrap_sectioning(Document& doc, Caret& caret) {
 bool toggle_task_item(Document& doc, Caret& caret) {
   if (caret.node == INVALID_NODE) return false;
   Node& n = doc.get(caret.node);
+  if (n.id != caret.node) return false;
   if (n.kind == NodeKind::ListItem) {
     if (n.label == "task") {
       n.label = "task-done";
@@ -1171,6 +1172,7 @@ bool toggle_task_item(Document& doc, Caret& caret) {
 bool toggle_list(Document& doc, Caret& caret, bool ordered) {
   if (caret.node == INVALID_NODE) return false;
   Node& n = doc.get(caret.node);
+  if (n.id != caret.node) return false;
 
   // Unwrap: ListItem → Paragraph, drop empty List
   if (n.kind == NodeKind::ListItem) {
@@ -1178,11 +1180,12 @@ bool toggle_list(Document& doc, Caret& caret, bool ordered) {
     NodeId list_id = n.parent;
     if (list_id == INVALID_NODE) return false;
     Node& list = doc.get(list_id);
-    if (list.kind != NodeKind::List) return false;
+    if (list.id != list_id || list.kind != NodeKind::List) return false;
     NodeId list_parent = list.parent;
     if (list_parent == INVALID_NODE) return false;
 
     Node& lp = doc.get(list_parent);
+    if (lp.id != list_parent) return false;
 
     auto iit = std::find(list.children.begin(), list.children.end(), item_id);
     if (iit != list.children.end()) list.children.erase(iit);
@@ -1245,11 +1248,11 @@ bool toggle_list(Document& doc, Caret& caret, bool ordered) {
 bool indent_list_item(Document& doc, Caret& caret) {
   if (caret.node == INVALID_NODE) return false;
   Node& item = doc.get(caret.node);
-  if (item.kind != NodeKind::ListItem) return false;
+  if (item.id != caret.node || item.kind != NodeKind::ListItem) return false;
   NodeId list_id = item.parent;
   if (list_id == INVALID_NODE) return false;
   Node& list = doc.get(list_id);
-  if (list.kind != NodeKind::List) return false;
+  if (list.id != list_id || list.kind != NodeKind::List) return false;
 
   auto it = std::find(list.children.begin(), list.children.end(), caret.node);
   if (it == list.children.begin() || it == list.children.end()) return false;
@@ -1285,19 +1288,20 @@ bool indent_list_item(Document& doc, Caret& caret) {
 bool outdent_list_item(Document& doc, Caret& caret) {
   if (caret.node == INVALID_NODE) return false;
   Node& item = doc.get(caret.node);
-  if (item.kind != NodeKind::ListItem) return false;
+  if (item.id != caret.node || item.kind != NodeKind::ListItem) return false;
   NodeId nested_id = item.parent;
   if (nested_id == INVALID_NODE) return false;
   Node& nested = doc.get(nested_id);
-  if (nested.kind != NodeKind::List) return false;
+  if (nested.id != nested_id || nested.kind != NodeKind::List) return false;
   NodeId host_item_id = nested.parent;
   if (host_item_id == INVALID_NODE) return false;
   Node& host_item = doc.get(host_item_id);
-  if (host_item.kind != NodeKind::ListItem) return false;
+  if (host_item.id != host_item_id || host_item.kind != NodeKind::ListItem)
+    return false;
   NodeId outer_id = host_item.parent;
   if (outer_id == INVALID_NODE) return false;
   Node& outer = doc.get(outer_id);
-  if (outer.kind != NodeKind::List) return false;
+  if (outer.id != outer_id || outer.kind != NodeKind::List) return false;
 
   auto nit =
       std::find(nested.children.begin(), nested.children.end(), caret.node);

@@ -1449,6 +1449,7 @@ int main(int argc, char** argv) {
       return;
     Pane& p = F();
     p.sel.focus = {outline[static_cast<size_t>(outline_sel)].node, 0, 0};
+    xanatoo::ensure_valid_caret(doc_of(p), p.sel.focus);
     p.sel.anchor = p.sel.focus;
     scroll_caret_into_view(p);
     reset_blink();

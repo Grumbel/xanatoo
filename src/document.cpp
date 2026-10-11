@@ -69,25 +69,33 @@ const Node& Document::get(NodeId id) const {
 }
 
 void Document::add_child(NodeId parent, NodeId child) {
-  get(parent).children.push_back(child);
-  get(child).parent = parent;
+  Node& p = get(parent);
+  Node& c = get(child);
+  if (p.id != parent || c.id != child) return;
+  p.children.push_back(child);
+  c.parent = parent;
 }
 
 void Document::append_text(NodeId node, const std::string& text,
                            InlineKind kind) {
+  Node& n = get(node);
+  if (n.id != node) return;
   InlineSpan span;
   span.kind = kind;
   span.text = text;
-  get(node).spans.push_back(std::move(span));
+  n.spans.push_back(std::move(span));
 }
 
 bool Document::insert_after(NodeId after, NodeId child) {
   Node& after_n = get(after);
-  if (after_n.parent == INVALID_NODE) return false;
+  if (after_n.id != after || after_n.parent == INVALID_NODE) return false;
   Node& parent = get(after_n.parent);
+  if (parent.id != after_n.parent) return false;
+  Node& ch = get(child);
+  if (ch.id != child) return false;
   auto it = std::find(parent.children.begin(), parent.children.end(), after);
   if (it == parent.children.end()) return false;
-  get(child).parent = after_n.parent;
+  ch.parent = after_n.parent;
   parent.children.insert(it + 1, child);
   return true;
 }
