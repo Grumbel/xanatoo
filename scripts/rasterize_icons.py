@@ -249,6 +249,55 @@ def draw_icon(name: str, size: int = 20) -> bytes:
     elif name == "diff":
         rect(buf, size, size, S(2), S(3), S(7), S(14), INK, SOFT)
         rect(buf, size, size, S(11), S(3), S(7), S(14), INK, ACCENT)
+    elif name == "back":
+        line(buf, size, size, S(12), S(4), S(6), S(10), INK, 2)
+        line(buf, size, size, S(6), S(10), S(12), S(16), INK, 2)
+        line(buf, size, size, S(6), S(10), S(16), S(10), INK, 2)
+    elif name == "forward":
+        line(buf, size, size, S(8), S(4), S(14), S(10), INK, 2)
+        line(buf, size, size, S(14), S(10), S(8), S(16), INK, 2)
+        line(buf, size, size, S(4), S(10), S(14), S(10), INK, 2)
+    elif name == "reload":
+        circle(buf, size, size, S(10), S(10), S(6), INK, None)
+        line(buf, size, size, S(14), S(4), S(14), S(8), INK, 2)
+        line(buf, size, size, S(14), S(8), S(10), S(8), INK, 2)
+    elif name == "bookmark":
+        line(buf, size, size, S(5), S(3), S(5), S(17), INK, 1)
+        line(buf, size, size, S(15), S(3), S(15), S(17), INK, 1)
+        line(buf, size, size, S(5), S(3), S(15), S(3), INK, 1)
+        line(buf, size, size, S(5), S(17), S(10), S(13), INK, 1)
+        line(buf, size, size, S(15), S(17), S(10), S(13), INK, 1)
+        for yy in range(S(4), S(13)):
+            for xx in range(S(6), S(15)):
+                px(buf, size, size, xx, yy, *ACCENT)
+    elif name == "history":
+        circle(buf, size, size, S(10), S(10), S(7), INK, SOFT)
+        line(buf, size, size, S(10), S(6), S(10), S(10), INK, 2)
+        line(buf, size, size, S(10), S(10), S(14), S(12), INK, 2)
+    elif name == "browse":
+        rect(buf, size, size, S(3), S(4), S(14), S(12), INK, SOFT)
+        line(buf, size, size, S(3), S(7), S(17), S(7), INK, 1)
+        px(buf, size, size, S(5), S(5), 0xCC, 0, 0, 255)
+        px(buf, size, size, S(7), S(5), 0xCC, 0x99, 0, 255)
+        px(buf, size, size, S(9), S(5), 0, 0x99, 0, 255)
+    elif name == "format":
+        line(buf, size, size, S(6), S(15), S(10), S(4), INK, 2)
+        line(buf, size, size, S(10), S(4), S(14), S(15), INK, 2)
+        line(buf, size, size, S(8), S(11), S(12), S(11), ACCENT, 2)
+    elif name == "insert":
+        rect(buf, size, size, S(4), S(4), S(12), S(12), INK, SOFT)
+        line(buf, size, size, S(10), S(6), S(10), S(14), ACCENT, 2)
+        line(buf, size, size, S(6), S(10), S(14), S(10), ACCENT, 2)
+    elif name == "view":
+        line(buf, size, size, S(3), S(10), S(10), S(5), INK, 1)
+        line(buf, size, size, S(10), S(5), S(17), S(10), INK, 1)
+        line(buf, size, size, S(17), S(10), S(10), S(15), INK, 1)
+        line(buf, size, size, S(10), S(15), S(3), S(10), INK, 1)
+        circle(buf, size, size, S(10), S(10), S(2), INK, ACCENT)
+    elif name == "lists":
+        for cy in (5, 10, 15):
+            circle(buf, size, size, S(4), S(cy), S(1), INK, INK)
+            line(buf, size, size, S(7), S(cy), S(16), S(cy), INK, 2)
     else:
         rect(buf, size, size, S(4), S(4), S(12), S(12), INK, ACCENT)
     return bytes(buf)

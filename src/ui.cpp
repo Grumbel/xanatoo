@@ -154,24 +154,32 @@ void Ui::load_icons(SDL_Renderer* renderer) {
       "format", "insert", "view", "lists",
   };
 
-  fs::path found_dir;
+  // Resolve candidate directories (may mix install tree + build tree).
+  std::vector<fs::path> dirs;
   for (const auto& root : roots) {
     std::error_code ec;
     auto canon = fs::weakly_canonical(root, ec);
     const fs::path& probe = ec ? root : canon;
-    if (fs::exists(probe / "save.png")) {
-      found_dir = probe;
-      break;
-    }
+    if (fs::is_directory(probe)) dirs.push_back(probe);
   }
-  if (found_dir.empty()) {
+  if (dirs.empty()) {
     std::cerr << "xanatoo: toolbar icons not found "
                  "(set XANATOO_ICON_DIR or install share/xanatoo/icons)\n";
     return;
   }
 
+  // Per-icon search so an older dir with save.png does not hide newer icons
+  // that only exist in the build output.
   for (const char* name : names) {
-    fs::path path = found_dir / (std::string(name) + ".png");
+    fs::path path;
+    for (const auto& dir : dirs) {
+      fs::path cand = dir / (std::string(name) + ".png");
+      if (fs::exists(cand)) {
+        path = cand;
+        break;
+      }
+    }
+    if (path.empty()) continue;
     int w = 0, h = 0, comp = 0;
     unsigned char* data = stbi_load(path.string().c_str(), &w, &h, &comp, 4);
     if (!data) continue;
@@ -192,8 +200,8 @@ void Ui::load_icons(SDL_Renderer* renderer) {
     ic.h = h;
     icons_[name] = ic;
   }
-  std::cout << "Loaded " << icons_.size() << " toolbar icons from " << found_dir
-            << "\n";
+  std::cout << "Loaded " << icons_.size() << "/" << (sizeof(names) / sizeof(names[0]))
+            << " toolbar icons (searched " << dirs.size() << " dir(s))\n";
 }
 
 const Ui::Icon* Ui::icon(const char* name) const {

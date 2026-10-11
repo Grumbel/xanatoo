@@ -4661,7 +4661,10 @@ int main(int argc, char** argv) {
           int tab_i = 0;
           try { tab_i = std::stoi(ui_frame.arg); } catch (...) { break; }
           if (tab_i < 0 || tab_i >= static_cast<int>(tab_order.size())) break;
-          panes[focus].buf = tab_order[static_cast<size_t>(tab_i)];
+          const int bi = tab_order[static_cast<size_t>(tab_i)];
+          if (panes[focus].buf == bi) break;  // already showing
+          panes[focus].buf = bi;
+          // Fresh layout for the newly focused buffer (avoid stale glyphs).
           needs_layout = true;
           update_title();
           break;
