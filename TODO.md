@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **194** (this delivery is **193**)
+Next bundle number: **195** (this delivery is **194**)
 
 ## Status (2026-10-11)
 
@@ -519,4 +519,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-190.*-nostr-threads-…` — Nostr v1 threads
 - `xanatoo-191.*-nostr-profiles-multirelay-…` — Nostr profiles/multirelay
 - `xanatoo-192.*-welcome-nostr-links-…` — welcome Nostr links
-- `xanatoo-193.*-nostr-connect-resilience-…` — this delivery
+- `xanatoo-193.*-nostr-connect-resilience-…` — nostr connect resilience
+- `xanatoo-194.*-fix-nostr-string-literals-…` — this delivery

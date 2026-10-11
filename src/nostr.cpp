@@ -862,7 +862,6 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
   std::map<std::string, NostrEvent> by_id;
   std::vector<std::string> failures;
   int tried = 0;
-  int connected = 0;
   // Try several relays; stop early once we have the root + a few replies.
   for (const auto& r : relays) {
     if (tried >= 5) break;
@@ -871,14 +870,11 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
     size_t before = by_id.size();
     query_relay(r, *id, by_id, &one_err);
     if (by_id.size() > before) {
-      ++connected;
-      std::cerr << "Nostr: got " << (by_id.size() - before) << " event(s) from "
-                << r << "
-";
+      std::cerr << "Nostr: got " << (by_id.size() - before)
+                << " event(s) from " << r << "\n";
     } else if (!one_err.empty()) {
       failures.push_back(one_err);
-      std::cerr << "Nostr: " << one_err << "
-";
+      std::cerr << "Nostr: " << one_err << "\n";
     }
     if (by_id.count(*id) && by_id.size() >= 3) break;
   }
@@ -903,9 +899,10 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
       pubkeys.push_back(kv.second.pubkey);
   }
   std::map<std::string, std::string> profiles;
+  std::string prof_err;
   for (const auto& r : relays) {
     if (r.rfind("wss://", 0) != 0) continue;
-    query_profiles(r, pubkeys, profiles, &last_err);
+    query_profiles(r, pubkeys, profiles, &prof_err);
     if (profiles.size() >= pubkeys.size()) break;
   }
 
