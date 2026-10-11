@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **151** (this delivery is **150**)
+Next bundle number: **152** (this delivery is **151**)
 
 ## Status (2026-10-11)
 
@@ -249,8 +249,11 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Bugfix: dirty checks, TAB cases, soft layout base, tab UI, open-switch
 - [x] Bugfix: soft-window doc access, stretch undo, reload/new soft sync
 - [x] Build fix: org unused var; soft relative links; tab close keeps floats
+- [x] Perf: large-doc render cull, history depth, org parse, outline, hit_test
 
 ## Open work / next steps
+
+0. **Large-document virtualization** — layout/render only the viewport (history still snapshots whole docs; depth is capped for big trees)
 
 1. Optional: HarfBuzz for complex scripts
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
@@ -448,4 +451,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-147.*-tabs-mdi-…` — tabs + MDI shared buffers
 - `xanatoo-148.*-bugfix-mdi-…` — first MDI bugfix pass
 - `xanatoo-149.*-bugfix-soft-…` — soft-window shared-buffer fixes
-- `xanatoo-150.*-build-soft-links-…` — this delivery
+- `xanatoo-150.*-build-soft-links-…` — soft links / tab close
+- `xanatoo-151.*-large-doc-perf-…` — this delivery

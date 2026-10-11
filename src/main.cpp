@@ -4368,8 +4368,10 @@ int main(int argc, char** argv) {
       }
     }
 
-    if (needs_layout) layout_panes();
-    if (outline_mode) refresh_outline();
+    if (needs_layout) {
+      layout_panes();
+      if (outline_mode) refresh_outline();
+    }
 
     float lh = static_cast<float>(body_font.line_height());
     // ImGui menu + toolbar

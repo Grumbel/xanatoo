@@ -15,6 +15,17 @@ void Renderer::clear(uint8_t r, uint8_t g, uint8_t b) {
 }
 
 void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) {
+  // Cull against the active SDL clip rect (pane / soft-window client area).
+  SDL_Rect clip{};
+  const SDL_bool clipped = SDL_RenderIsClipEnabled(sdl_);
+  if (clipped) SDL_RenderGetClipRect(sdl_, &clip);
+  auto visible = [&](int x, int y, int w, int h) -> bool {
+    if (!clipped) return true;
+    if (y + h < clip.y || y > clip.y + clip.h) return false;
+    if (x + w < clip.x || x > clip.x + clip.w) return false;
+    return true;
+  };
+
   if (images_) {
     for (const auto& pi : layout.images) {
       const Image& img = images_->get(pi.src, pi.base);
@@ -23,6 +34,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
           static_cast<int>(pi.y - scroll_y),
           static_cast<int>(pi.width),
           static_cast<int>(pi.height)};
+      if (!visible(dst.x, dst.y, dst.w, dst.h)) continue;
       if (img.ok && img.texture) {
         SDL_RenderCopy(sdl_, img.texture, nullptr, &dst);
       } else {
@@ -192,6 +204,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
     dst.y = static_cast<int>(pg.y - g.bearing_y - scroll_y);
     dst.w = g.width;
     dst.h = g.height;
+    if (!visible(dst.x, dst.y, dst.w, dst.h)) continue;
 
     switch (pg.kind) {
       case InlineKind::Link:

@@ -7,6 +7,7 @@
 #include <string>
 #include <optional>
 #include <vector>
+#include <deque>
 
 namespace xanatoo {
 
@@ -315,8 +316,8 @@ public:
 
 private:
   size_t max_depth_;
-  std::vector<EditorSnapshot> undo_;
-  std::vector<EditorSnapshot> redo_;
+  std::deque<EditorSnapshot> undo_;
+  std::deque<EditorSnapshot> redo_;
 };
 
 }  // namespace xanatoo

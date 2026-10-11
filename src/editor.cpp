@@ -98,6 +98,9 @@ std::optional<Caret> hit_test(const LayoutResult& layout,
   for (size_t i = 0; i < layout.glyphs.size(); ++i) {
     const auto& g = layout.glyphs[i];
     float gy = g.y - scroll_y;
+    // Glyphs are laid out top-to-bottom overall; skip lines far from the pointer
+    // so 10MB documents are not O(all glyphs) on every motion event.
+    if (gy < sy - 120.f || gy > sy + 80.f) continue;
     float gx = g.x;
     float gw = 8.f;
     if (i + 1 < layout.glyphs.size() &&
@@ -2841,10 +2844,18 @@ void History::reset(const Document& doc, const Selection& sel) {
 
 void History::push(const Document& doc, const Selection& sel) {
   redo_.clear();
+  // Full document snapshots are O(nodes). Cap depth hard on large trees so
+  // a 10MB org file does not keep dozens of full copies in RAM.
+  size_t depth = max_depth_;
+  const size_t n = doc.nodes.size();
+  if (n > 80000)
+    depth = 4;
+  else if (n > 20000)
+    depth = 8;
+  else if (n > 5000)
+    depth = 16;
   undo_.push_back({doc, sel});
-  if (undo_.size() > max_depth_) {
-    undo_.erase(undo_.begin());
-  }
+  while (undo_.size() > depth) undo_.pop_front();
 }
 
 bool History::undo(Document& doc, Selection& sel) {

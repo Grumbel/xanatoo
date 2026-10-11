@@ -7,6 +7,7 @@
 
 #include <fstream>
 #include <map>
+#include <unordered_map>
 #include <filesystem>
 
 namespace xanatoo {
@@ -86,11 +87,22 @@ static FontRole style_role(FontRole base, InlineKind kind) {
 
 static void decode_utf8(const std::string& text, std::vector<uint32_t>& out);
 
+// Message in-reply-to label → node id (rebuilt each layout).
+thread_local std::unordered_map<std::string, NodeId> g_msg_label_map;
+
 LayoutResult LayoutEngine::layout(const Document& doc, float max_width,
                                    const std::string& image_base) {
   LayoutResult result;
   image_base_ = image_base;
   if (doc.root == INVALID_NODE) return result;
+  // Rough glyph budget: a few characters per node on average.
+  result.glyphs.reserve(doc.nodes.size() * 8);
+  result.boxes.reserve(doc.nodes.size());
+  g_msg_label_map.clear();
+  for (const auto& n : doc.nodes) {
+    if (n.kind == NodeKind::Message && !n.label.empty())
+      g_msg_label_map.emplace(n.label, n.id);
+  }
   float y = 24.f;
   layout_node(doc, doc.root, 32.f, y, max_width - 64.f, result);
   result.content_height = y + 48.f;
@@ -413,13 +425,8 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           if (cur.empty()) break;
           std::string key = cur[0] == '#' ? cur.substr(1) : cur;
           NodeId parent_msg = INVALID_NODE;
-          for (const auto& cand : doc.nodes) {
-            if (cand.kind == NodeKind::Message && !cand.label.empty() &&
-                cand.label == key) {
-              parent_msg = cand.id;
-              break;
-            }
-          }
+          auto it = g_msg_label_map.find(key);
+          if (it != g_msg_label_map.end()) parent_msg = it->second;
           if (parent_msg == INVALID_NODE) break;
           ++depth;
           cur = doc.get(parent_msg).alt;

@@ -35,6 +35,18 @@ std::string to_upper(std::string s) {
   return s;
 }
 
+// Case-insensitive prefix test without allocating a full uppercased line.
+bool starts_with_ci(std::string_view s, std::string_view prefix) {
+  if (s.size() < prefix.size()) return false;
+  for (size_t i = 0; i < prefix.size(); ++i) {
+    char a = s[i], b = prefix[i];
+    if (a >= 'a' && a <= 'z') a = static_cast<char>(a - 'a' + 'A');
+    if (b >= 'a' && b <= 'z') b = static_cast<char>(b - 'a' + 'A');
+    if (a != b) return false;
+  }
+  return true;
+}
+
 bool is_todo_keyword(std::string_view w) {
   static const char* kws[] = {"TODO", "DONE", "NEXT", "WAITING", "CANCELLED",
                               "CANCELED", "HOLD", "WIP", nullptr};
@@ -133,6 +145,11 @@ struct Line {
 
 std::vector<Line> split_lines(std::string_view source) {
   std::vector<Line> out;
+  // Approximate line count from newlines.
+  size_t approx = 1;
+  for (char c : source)
+    if (c == '\n') ++approx;
+  out.reserve(approx);
   size_t i = 0;
   while (i <= source.size()) {
     size_t eol = source.find('\n', i);
@@ -297,6 +314,8 @@ std::vector<std::string> split_table_cells(std::string_view row) {
 
 Document parse_org(std::string_view source) {
   Document doc;
+  // Heuristic: ~one node per 40–80 bytes of source on typical Org files.
+  doc.nodes.reserve(source.size() / 48 > 64 ? source.size() / 48 : 64);
   doc.root = doc.create(NodeKind::Document);
 
   auto lines = split_lines(source);
@@ -385,21 +404,15 @@ Document parse_org(std::string_view source) {
   while (i < lines.size()) {
     const Line& L = lines[i];
     std::string_view t = L.text;
-    std::string upper = to_upper(std::string(t));
 
     // Inside a block
     if (block != BlockKind::None) {
       bool end = false;
-      if (block == BlockKind::Src &&
-          (upper.starts_with("#+END_SRC") || upper.starts_with("#+end_src")))
+      if (block == BlockKind::Src && starts_with_ci(t, "#+END_SRC"))
         end = true;
-      else if (block == BlockKind::Example &&
-               (upper.starts_with("#+END_EXAMPLE") ||
-                upper.starts_with("#+end_example")))
+      else if (block == BlockKind::Example && starts_with_ci(t, "#+END_EXAMPLE"))
         end = true;
-      else if (block == BlockKind::Quote &&
-               (upper.starts_with("#+END_QUOTE") ||
-                upper.starts_with("#+end_quote")))
+      else if (block == BlockKind::Quote && starts_with_ci(t, "#+END_QUOTE"))
         end = true;
       if (end) {
         flush_block();
@@ -416,7 +429,7 @@ Document parse_org(std::string_view source) {
 
     // PROPERTIES drawer
     if (in_props) {
-      if (upper.starts_with(":END:") || upper == ":END:") {
+      if (starts_with_ci(t, ":END:")) {
         in_props = false;
         ++i;
         continue;
@@ -450,19 +463,19 @@ Document parse_org(std::string_view source) {
     }
 
     // Meta keywords
-    if (upper.starts_with("#+TITLE:")) {
+    if (starts_with_ci(t, "#+TITLE:")) {
       doc.meta.title =
           std::string(trim_view(std::string_view(t).substr(8)));
       ++i;
       continue;
     }
-    if (upper.starts_with("#+AUTHOR:")) {
+    if (starts_with_ci(t, "#+AUTHOR:")) {
       doc.meta.author =
           std::string(trim_view(std::string_view(t).substr(9)));
       ++i;
       continue;
     }
-    if (upper.starts_with("#+LANGUAGE:") || upper.starts_with("#+LANG:")) {
+    if (starts_with_ci(t, "#+LANGUAGE:") || starts_with_ci(t, "#+LANG:")) {
       size_t col = t.find(':');
       doc.meta.lang =
           std::string(trim_view(std::string_view(t).substr(col + 1)));
@@ -471,7 +484,7 @@ Document parse_org(std::string_view source) {
     }
 
     // Begin blocks
-    if (upper.starts_with("#+BEGIN_SRC") || upper.starts_with("#+begin_src")) {
+    if (starts_with_ci(t, "#+BEGIN_SRC")) {
       flush_para();
       close_lists();
       std::string_view rest = trim_view(std::string_view(t).substr(11));
@@ -486,8 +499,7 @@ Document parse_org(std::string_view source) {
       ++i;
       continue;
     }
-    if (upper.starts_with("#+BEGIN_EXAMPLE") ||
-        upper.starts_with("#+begin_example")) {
+    if (starts_with_ci(t, "#+BEGIN_EXAMPLE")) {
       flush_para();
       close_lists();
       block_node = doc.create(NodeKind::CodeBlock, doc.root);
@@ -496,8 +508,7 @@ Document parse_org(std::string_view source) {
       ++i;
       continue;
     }
-    if (upper.starts_with("#+BEGIN_QUOTE") ||
-        upper.starts_with("#+begin_quote")) {
+    if (starts_with_ci(t, "#+BEGIN_QUOTE")) {
       flush_para();
       close_lists();
       block_node = doc.create(NodeKind::BlockQuote, doc.root);
@@ -513,7 +524,7 @@ Document parse_org(std::string_view source) {
       continue;
     }
 
-    if (upper.starts_with(":PROPERTIES:")) {
+    if (starts_with_ci(t, ":PROPERTIES:")) {
       in_props = true;
       ++i;
       continue;
