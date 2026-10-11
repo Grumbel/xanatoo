@@ -466,86 +466,61 @@ int main(int argc, char** argv) {
   SDL_Cursor* cursor_sizeall =
       SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEALL);
   SDL_Cursor* cursor_current = cursor_arrow;
-  // Software pointer sprite for gamepad stick cursor. Completely independent
-  // of the hardware mouse (no WarpMouse). R36S KMS/DRM has no system cursor.
-  // Hotspot is the tip (top-left of the arrow bitmap).
-  // Pixel layout matches Font glyph upload (masks from font.cpp).
-  SDL_Texture* stick_cursor_tex = nullptr;
-  int stick_cursor_tw = 0, stick_cursor_th = 0;
-  {
-    // 12×19 classic arrow (white fill, dark outline). Rows as bit masks
-    // of width 12; MSB is left edge.
-    static const uint16_t kArrowRows[] = {
-        0b100000000000,  // .
-        0b110000000000,  // ##
-        0b111000000000,  // ###
-        0b111100000000,
-        0b111110000000,
-        0b111111000000,
-        0b111111100000,
-        0b111111110000,
-        0b111111111000,
-        0b111111111100,
-        0b111111000000,  // stem start
-        0b111111000000,
-        0b110011000000,
-        0b110011000000,
-        0b100001100000,
-        0b000001100000,
-        0b000000110000,
-        0b000000110000,
-        0b000000010000,
-    };
-    constexpr int aw = 12,
-                  ah = static_cast<int>(sizeof(kArrowRows) /
-                                       sizeof(kArrowRows[0]));
-    std::vector<uint8_t> rgba(static_cast<size_t>(aw * ah * 4), 0);
-    auto put = [&](int x, int y, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
-      if (x < 0 || y < 0 || x >= aw || y >= ah) return;
-      size_t i = static_cast<size_t>((y * aw + x) * 4);
-      rgba[i + 0] = r;
-      rgba[i + 1] = g;
-      rgba[i + 2] = b;
-      rgba[i + 3] = a;
-    };
-    for (int y = 0; y < ah; ++y) {
-      for (int x = 0; x < aw; ++x) {
-        if ((kArrowRows[y] >> (aw - 1 - x)) & 1) {
-          put(x, y, 255, 255, 255, 255);
+  // Stick pointer is drawn with SDL rects/lines (no texture — avoids the
+  // alpha-inverted garbage we hit with CreateTexture/UpdateTexture).
+  auto draw_stick_cursor = [&](SDL_Renderer* r, int cx, int cy, bool pressed) {
+    // Classic arrow: tip at (cx, cy). White fill + black outline.
+    const int ox[7] = {0, 0, 4, 6, 9, 7, 11};
+    const int oy[7] = {0, 14, 11, 17, 15, 10, 8};
+    auto fill_tri = [&](int x0, int y0, int x1, int y1, int x2, int y2,
+                        Uint8 R, Uint8 G, Uint8 B) {
+      // Scanline fill for one triangle (no RenderGeometry needed).
+      auto edge = [](int ax, int ay, int bx, int by, int y, int& xL, int& xR) {
+        if (ay == by) return;
+        if (ay > by) {
+          std::swap(ax, bx);
+          std::swap(ay, by);
         }
+        if (y < ay || y > by) return;
+        float t = (by == ay) ? 0.f : float(y - ay) / float(by - ay);
+        int x = ax + int((bx - ax) * t);
+        if (x < xL) xL = x;
+        if (x > xR) xR = x;
+      };
+      int miny = std::min(y0, std::min(y1, y2));
+      int maxy = std::max(y0, std::max(y1, y2));
+      SDL_SetRenderDrawColor(r, R, G, B, 255);
+      for (int y = miny; y <= maxy; ++y) {
+        int xL = 100000, xR = -100000;
+        edge(x0, y0, x1, y1, y, xL, xR);
+        edge(x1, y1, x2, y2, y, xL, xR);
+        edge(x2, y2, x0, y0, y, xL, xR);
+        if (xL <= xR) SDL_RenderDrawLine(r, cx + xL, cy + y, cx + xR, cy + y);
       }
+    };
+    // Two triangles form the arrow head + stem-ish shape.
+    const Uint8 fr = pressed ? 180 : 255;
+    const Uint8 fg = pressed ? 200 : 255;
+    const Uint8 fb = pressed ? 255 : 255;
+    fill_tri(ox[0], oy[0], ox[1], oy[1], ox[2], oy[2], fr, fg, fb);
+    fill_tri(ox[0], oy[0], ox[2], oy[2], ox[6], oy[6], fr, fg, fb);
+    fill_tri(ox[2], oy[2], ox[5], oy[5], ox[6], oy[6], fr, fg, fb);
+    fill_tri(ox[2], oy[2], ox[3], oy[3], ox[4], oy[4], fr, fg, fb);
+    // Black outline
+    SDL_SetRenderDrawColor(r, 20, 24, 32, 255);
+    for (int i = 0; i < 7; ++i) {
+      int j = (i + 1) % 7;
+      // Outline only along silhouette edges (approximate)
+      SDL_RenderDrawLine(r, cx + ox[i], cy + oy[i], cx + ox[j], cy + oy[j]);
     }
-    // Dark outline on neighbouring empty pixels of filled cells.
-    for (int y = 0; y < ah; ++y) {
-      for (int x = 0; x < aw; ++x) {
-        size_t i = static_cast<size_t>((y * aw + x) * 4);
-        if (rgba[i + 3] == 0) continue;
-        for (int dy = -1; dy <= 1; ++dy) {
-          for (int dx = -1; dx <= 1; ++dx) {
-            if (dx == 0 && dy == 0) continue;
-            int nx = x + dx, ny = y + dy;
-            if (nx < 0 || ny < 0 || nx >= aw || ny >= ah) continue;
-            size_t ni = static_cast<size_t>((ny * aw + nx) * 4);
-            if (rgba[ni + 3] == 0) put(nx, ny, 20, 24, 32, 220);
-          }
-        }
-      }
-    }
-    // Upload as ABGR8888 (little-endian byte order R,G,B,A) — same packing
-    // Font glyphs use. Avoid CreateRGBSurfaceWithFormatFrom, which mis-mapped
-    // alpha on some SDL 2.0.x / KMS builds (transparent↔opaque inverted).
-    stick_cursor_tex = SDL_CreateTexture(
-        sdl, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, aw, ah);
-    if (stick_cursor_tex) {
-      SDL_SetTextureBlendMode(stick_cursor_tex, SDL_BLENDMODE_BLEND);
-      SDL_UpdateTexture(stick_cursor_tex, nullptr, rgba.data(), aw * 4);
-      stick_cursor_tw = aw;
-      stick_cursor_th = ah;
-    }
-  }
+    // Explicit tip + left edge + bottom for a clearer outline
+    SDL_RenderDrawLine(r, cx + 0, cy + 0, cx + 0, cy + 14);
+    SDL_RenderDrawLine(r, cx + 0, cy + 0, cx + 11, cy + 8);
+    SDL_RenderDrawLine(r, cx + 0, cy + 14, cx + 4, cy + 11);
+  };
   auto set_cursor = [&](SDL_Cursor* c) {
     // Real system cursor always tracks the hardware mouse (shapes included).
-    // The stick sprite is drawn separately and does not own this.
+    // The stick pointer is drawn separately and does not own this.
     if (!c) c = cursor_arrow;
     if (c != cursor_current) {
       SDL_SetCursor(c);
@@ -6995,23 +6970,10 @@ int main(int argc, char** argv) {
 
     ui.end_frame(sdl);
 
-    // Extra stick sprite on top of the scene. Does not hide the system cursor.
-    if (stick_cursor_on && stick_cursor_tex) {
-      const int cx = static_cast<int>(stick_cx);
-      const int cy = static_cast<int>(stick_cy);
-      SDL_Rect dst{cx, cy, stick_cursor_tw, stick_cursor_th};
-      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
-      if (stick_lmb || stick_rmb)
-        SDL_SetTextureColorMod(stick_cursor_tex, 180, 200, 255);
-      else
-        SDL_SetTextureColorMod(stick_cursor_tex, 255, 255, 255);
-      SDL_SetTextureAlphaMod(stick_cursor_tex, 255);
-      SDL_RenderCopy(sdl, stick_cursor_tex, nullptr, &dst);
-      if (stick_lmb || stick_rmb) {
-        SDL_SetRenderDrawColor(sdl, 80, 140, 255, 200);
-        SDL_Rect ring{cx - 3, cy - 3, 7, 7};
-        SDL_RenderDrawRect(sdl, &ring);
-      }
+    // Extra stick pointer (geometry, not a texture). System cursor untouched.
+    if (stick_cursor_on) {
+      draw_stick_cursor(sdl, static_cast<int>(stick_cx),
+                        static_cast<int>(stick_cy), stick_lmb || stick_rmb);
     }
 
     renderer.present();
@@ -7023,7 +6985,6 @@ int main(int argc, char** argv) {
     SDL_GameControllerClose(gamepad);
     gamepad = nullptr;
   }
-  if (stick_cursor_tex) SDL_DestroyTexture(stick_cursor_tex);
   if (cursor_arrow) SDL_FreeCursor(cursor_arrow);
   if (cursor_hand) SDL_FreeCursor(cursor_hand);
   if (cursor_sizewe) SDL_FreeCursor(cursor_sizewe);

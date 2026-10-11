@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **176** (this delivery is **175**)
+Next bundle number: **177** (this delivery is **176**)
 
 ## Status (2026-10-11)
 
@@ -500,4 +500,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-172.*-ui-font-rollback-…` — ui font rollback
 - `xanatoo-173.*-dual-cursor-fixed-font-…` — dual cursor + fixed font
 - `xanatoo-174.*-proggyclean-ui-font-…` — proggyclean attempt
-- `xanatoo-175.*-restore-pre-r36s-ui-font-…` — this delivery
+- `xanatoo-175.*-restore-pre-r36s-ui-font-…` — restore attempt
+- `xanatoo-176.*-font-atlas-surface-geom-cursor-…` — this delivery

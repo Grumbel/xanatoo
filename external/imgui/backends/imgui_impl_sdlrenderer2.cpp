@@ -193,9 +193,12 @@ static void ImGui_ImplSDLRenderer2_RenderGeometryLegacy(
             dst.h = (int)(maxy - miny);
             if (dst.w < 1) dst.w = 1;
             if (dst.h < 1) dst.h = 1;
-            SDL_SetTextureColorMod(texture, r, g, b);
-            SDL_SetTextureAlphaMod(texture, a);
+            SDL_SetTextureColorMod(texture, (Uint8)r, (Uint8)g, (Uint8)b);
+            SDL_SetTextureAlphaMod(texture, (Uint8)a);
             SDL_RenderCopy(renderer, texture, &src, &dst);
+            // Restore so the next batch (and other code) does not inherit tint.
+            SDL_SetTextureColorMod(texture, 255, 255, 255);
+            SDL_SetTextureAlphaMod(texture, 255);
         }
         else
         {
@@ -341,22 +344,28 @@ bool ImGui_ImplSDLRenderer2_CreateFontsTexture()
     int width, height;
     io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);   // Load as RGBA 32-bit (75% of the memory is wasted, but default font is so small) because it is more likely to be compatible with user's existing shaders. If your ImTextureId represent a higher-level concept than just a GL texture id, consider calling GetTexDataAsAlpha8() instead to save on GPU memory.
 
-    // Upload texture to graphics system
-    // (Bilinear sampling is required by default. Set 'io.Fonts->Flags |= ImFontAtlasFlags_NoBakedLines' or 'style.AntiAliasedLinesUseTex = false' to allow point/nearest sampling)
-    bd->FontTexture = SDL_CreateTexture(bd->Renderer,
-#if defined(SDL_PIXELFORMAT_RGBA32)
-        SDL_PIXELFORMAT_RGBA32,
-#else
-        SDL_PIXELFORMAT_RGBA8888,
-#endif
-        SDL_TEXTUREACCESS_STATIC, width, height);
-    if (bd->FontTexture == nullptr)
+    // Upload via CreateRGBSurfaceFrom + CreateTextureFromSurface — same path
+    // xanatoo FreeType glyphs and toolbar icons use. Direct CreateTexture +
+    // UpdateTexture with SDL_PIXELFORMAT_RGBA32 produced inverted/garbage
+    // glyphs on some SDL_Renderer backends (desktop + KMS).
+    SDL_Surface* surf = SDL_CreateRGBSurfaceFrom(
+        (void*)pixels, width, height, 32, 4 * width,
+        0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000);
+    if (surf == nullptr)
     {
-        SDL_Log("error creating texture");
+        SDL_Log("error creating font surface");
         return false;
     }
-    SDL_UpdateTexture(bd->FontTexture, nullptr, pixels, 4 * width);
+    bd->FontTexture = SDL_CreateTextureFromSurface(bd->Renderer, surf);
+    SDL_FreeSurface(surf);
+    if (bd->FontTexture == nullptr)
+    {
+        SDL_Log("error creating font texture");
+        return false;
+    }
     SDL_SetTextureBlendMode(bd->FontTexture, SDL_BLENDMODE_BLEND);
+    SDL_SetTextureColorMod(bd->FontTexture, 255, 255, 255);
+    SDL_SetTextureAlphaMod(bd->FontTexture, 255);
 #if SDL_VERSION_ATLEAST(2,0,12)
     SDL_SetTextureScaleMode(bd->FontTexture, SDL_ScaleModeLinear);
 #endif
