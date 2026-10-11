@@ -677,12 +677,19 @@ int main(int argc, char** argv) {
         panes[pi].buf = tab_order.empty() ? 0 : tab_order.front();
       }
     }
-    panes[0].layout = layout_engine.layout(
-        doc_of(panes[0]), static_cast<float>(panes[0].w), base_of(panes[0]));
-    if (split) {
-      panes[1].layout = layout_engine.layout(
-          doc_of(panes[1]), static_cast<float>(panes[1].w), base_of(panes[1]));
-    }
+    auto layout_one = [&](Pane& pane) {
+      try {
+        xanatoo::ensure_valid_caret(doc_of(pane), pane.sel.focus);
+        pane.sel.anchor = pane.sel.focus;
+        pane.layout = layout_engine.layout(
+            doc_of(pane), static_cast<float>(pane.w), base_of(pane));
+      } catch (const std::exception& e) {
+        std::cerr << "pane layout failed: " << e.what() << "\n";
+        pane.layout = {};
+      }
+    };
+    layout_one(panes[0]);
+    if (split) layout_one(panes[1]);
     needs_layout = false;
     last_layout_w = win_w;
     last_layout_h = win_h;
@@ -1050,6 +1057,9 @@ int main(int argc, char** argv) {
           p.buf = i;
           if (std::find(tab_order.begin(), tab_order.end(), i) == tab_order.end())
             tab_order.push_back(i);
+          xanatoo::ensure_valid_caret(doc_of(p), p.sel.focus);
+          p.sel.anchor = p.sel.focus;
+          p.layout = {};
           needs_layout = true;
           update_title();
           if (record_history) push_nav_history(path);

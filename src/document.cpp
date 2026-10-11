@@ -25,19 +25,28 @@ NodeId Document::create(NodeKind kind, NodeId parent) {
 }
 
 Node& Document::get(NodeId id) {
-  assert(id != INVALID_NODE && id < next_id);
   size_t idx = static_cast<size_t>(id - 1);
-  if (idx >= nodes.size()) {
-    throw std::runtime_error("invalid node id");
+  if (id == INVALID_NODE || idx >= nodes.size()) {
+    // Never abort over a stale caret/layout id. Return a process-local dummy.
+    static Node dummy;
+    dummy = Node{};
+    dummy.id = INVALID_NODE;
+    dummy.kind = NodeKind::Paragraph;
+    dummy.parent = INVALID_NODE;
+    return dummy;
   }
   return nodes[idx];
 }
 
 const Node& Document::get(NodeId id) const {
-  assert(id != INVALID_NODE && id < next_id);
   size_t idx = static_cast<size_t>(id - 1);
-  if (idx >= nodes.size()) {
-    throw std::runtime_error("invalid node id");
+  if (id == INVALID_NODE || idx >= nodes.size()) {
+    static Node dummy;
+    dummy = Node{};
+    dummy.id = INVALID_NODE;
+    dummy.kind = NodeKind::Paragraph;
+    dummy.parent = INVALID_NODE;
+    return dummy;
   }
   return nodes[idx];
 }
