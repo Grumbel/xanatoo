@@ -556,6 +556,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ex("Thread / RFC discussion", "thread-rfc.md");
         ex("Article / section / header", "sectioning.md");
         ex("Gemini gemtext sample", "gemini-sample.gmi");
+        ex("Org-mode sample", "sample.org");
         ex("Semantic format (sexpr)", "semantic.sexp");
         ex("Sample (sexpr)", "sample.sexp");
         ex("Diff demo — left (v1)", "diff-v1.md");
@@ -617,6 +618,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ex("Thread / RFC discussion", "thread-rfc.md");
         ex("Article / section / header", "sectioning.md");
         ex("Gemini gemtext sample", "gemini-sample.gmi");
+        ex("Org-mode sample", "sample.org");
         ex("Semantic format (sexpr)", "semantic.sexp");
         ex("Sample (sexpr)", "sample.sexp");
         ex("Diff demo — left (v1)", "diff-v1.md");

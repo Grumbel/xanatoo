@@ -279,7 +279,44 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
     case NodeKind::Header: {
       float start_y = y;
       y += 10.f;
-      layout_paragraph(doc, node, x, y, max_width, out, FontRole::Heading);
+      // Org TODO / :tags: live in src + tags. Show them as decoration glyphs
+      // that do not own a real span index (node = INVALID) so caret/edit stay
+      // on the title text only.
+      if (!node.src.empty() || !node.tags.empty()) {
+        const size_t glyph0 = out.glyphs.size();
+        size_t deco_before = node.src.empty() ? 0 : 1;
+        Node vis = node;
+        vis.spans.clear();
+        if (!node.src.empty()) {
+          InlineSpan todo;
+          todo.kind = InlineKind::Strong;
+          todo.text = node.src + " ";
+          vis.spans.push_back(std::move(todo));
+        }
+        for (const auto& sp : node.spans) vis.spans.push_back(sp);
+        size_t deco_tag_span = std::string::npos;
+        if (!node.tags.empty()) {
+          deco_tag_span = vis.spans.size();
+          InlineSpan tg;
+          tg.kind = InlineKind::Code;
+          tg.text = "  :" + node.tags + ":";
+          vis.spans.push_back(std::move(tg));
+        }
+        layout_paragraph(doc, vis, x, y, max_width, out, FontRole::Heading);
+        for (size_t gi = glyph0; gi < out.glyphs.size(); ++gi) {
+          auto& g = out.glyphs[gi];
+          g.node = id;
+          if (g.span_index < deco_before ||
+              (deco_tag_span != std::string::npos &&
+               g.span_index == deco_tag_span)) {
+            g.node = INVALID_NODE;  // decoration — not editable
+          } else if (deco_before > 0) {
+            g.span_index -= deco_before;
+          }
+        }
+      } else {
+        layout_paragraph(doc, node, x, y, max_width, out, FontRole::Heading);
+      }
       y += 12.f;
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;

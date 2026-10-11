@@ -83,7 +83,7 @@ Document parse_gemtext(std::string_view source);
 // Best-effort export (lossy vs full Markdown model).
 std::string serialize_gemtext(const Document& doc);
 
-// Dispatch: sexpr / gemtext by path (or look), else Markdown-ish markup.
+// Dispatch: sexpr / gemtext / org by path (or look), else Markdown-ish markup.
 Document parse_document(std::string_view source, std::string_view path = {});
 std::string serialize_document(const Document& doc, std::string_view path = {});
 

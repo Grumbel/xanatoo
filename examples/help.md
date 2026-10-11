@@ -136,6 +136,14 @@ green. Use this for reading and navigating.
 - Bookmarks persist in `~/.config/xanatoo/bookmarks` (one URL or path per line)
 - Local files and `gemini://` pages share the same session history
 
+## Org-mode (`.org`)
+
+Files ending in `.org` parse as an Org-mode subset: outline headings
+with optional `TODO`/`DONE` keywords and `:tags:`, lists and checkboxes,
+pipe tables, `#+BEGIN_SRC` / `QUOTE` / `EXAMPLE`, `[[link][desc]]`,
+and `#+TITLE` / `#+AUTHOR`. Tags live on the node (`Node.tags`);
+TODO keywords use `Header.src`; `:CUSTOM_ID:` becomes the stable label.
+
 ## Gemini (gemtext + gemini://)
 
 - **`.gmi` / `.gemini`** files parse as gemtext (headers, `=>` links, lists, quotes, pre).

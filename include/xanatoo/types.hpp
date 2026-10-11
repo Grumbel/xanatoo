@@ -75,13 +75,15 @@ struct Node {
   std::string summary;            // stretchtext collapsed label
   float display_scale = 1.f;      // image interactive scale (1 = natural fit)
   std::string label;              // stable semantic anchor (links: #label)
+  std::string tags;               // org-style tags without outer colons ("work:urgent")
   // CodeBlock: language id in `src` (e.g. "cpp"); Note: optional kind in `src`
   // Transclude: summary holds optional :excerpt phrase (range within target)
   // TableCell: level 1 = header cell, 0 = body cell
   // Thread: label = thread id; summary = subject
   // Message: label = message-id; src = from/author; summary = date (ISO);
   //          alt = in-reply-to id, or "about:#anchor" for passage comments
-  // Header: text title (no rank). Article/Section: containers grouping blocks.
+  // Header: text title (no rank); src may hold org TODO keyword; tags for org.
+  // Article/Section: containers grouping blocks.
 };
 
 // Document-level semantic metadata (not layout).

@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/parse.hpp"
+#include "xanatoo/org.hpp"
 #include "xanatoo/util.hpp"
 #include <cctype>
 #include <algorithm>
@@ -3237,12 +3238,15 @@ Document parse_document(std::string_view source, std::string_view path) {
     return parse_sexpr(source);
   if (path_uses_gemtext(path))
     return parse_gemtext(source);
+  if (path_uses_org(path))
+    return parse_org(source);
   return parse_markup(source);
 }
 
 std::string serialize_document(const Document& doc, std::string_view path) {
   if (path_uses_sexpr(path)) return serialize_sexpr(doc);
   if (path_uses_gemtext(path)) return serialize_gemtext(doc);
+  if (path_uses_org(path)) return serialize_org(doc);
   return serialize_markup(doc);
 }
 

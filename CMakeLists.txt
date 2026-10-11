@@ -24,6 +24,7 @@ add_executable(xanatoo
   src/layout.cpp
   src/render.cpp
   src/parse.cpp
+  src/org.cpp
   src/editor.cpp
   src/images.cpp
   src/ui.cpp

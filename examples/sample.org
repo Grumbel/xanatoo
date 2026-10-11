@@ -1,0 +1,61 @@
+#+TITLE: Org-mode sample
+#+AUTHOR: xanatoo
+#+LANGUAGE: en
+
+* Introduction
+
+This file is plain /Org mode/. xanatoo maps a practical subset onto its
+document model — headings, lists, tasks, tables, source blocks, and tags.
+
+* Getting started :tutorial:
+
+Open this buffer, click a heading, and edit. Save with =Ctrl+S=; the
+=.org= extension keeps the Org serialiser.
+
+** TODO Try a checkbox list :task:
+
+- [ ] Expand a stretch in [[welcome.md][Welcome]]
+- [X] Open this Org sample
+- [ ] Follow an internal link to [[#Design notes][Design notes]]
+
+** DONE Read the keyboard help
+
+See [[help.md][help.md]] for bindings (=F1=).
+
+* Design notes :design:meta:
+
+Org features map as follows:
+
+| Org construct      | xanatoo node                          |
+|--------------------+---------------------------------------|
+| =* heading=        | Header (depth in =level=)             |
+| =TODO= / =DONE=    | Header.=src=                          |
+| =:tags:=           | Node.=tags= (=work:urgent=)           |
+| =:CUSTOM_ID:=      | Node.=label= (stable =#anchor=)       |
+| lists / checkboxes | List / ListItem (=task= / =task-done=)|
+| =#+BEGIN_SRC=      | CodeBlock                             |
+| =#+BEGIN_QUOTE=    | BlockQuote                            |
+| pipe tables        | Table                                 |
+
+:PROPERTIES:
+:CUSTOM_ID: design-notes
+:END:
+
+* Source example
+
+#+BEGIN_SRC cpp
+int main() {
+  return 0;
+}
+#+END_SRC
+
+#+BEGIN_QUOTE
+Org is a solid outline format. We import the parts that fit an
+interactive document, without pretending to be Emacs.
+#+END_QUOTE
+
+* Links
+
+- File: [[help.md][Keyboard help]]
+- Anchor: [[#Introduction][Introduction]]
+- Web: [[https://orgmode.org/][orgmode.org]]

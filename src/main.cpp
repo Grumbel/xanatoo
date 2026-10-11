@@ -1157,7 +1157,9 @@ int main(int argc, char** argv) {
           const bool is_doc =
               low.size() >= 3 &&
               (low.ends_with(".md") || low.ends_with(".markdown") ||
-               low.ends_with(".sexp") || low.ends_with(".txt"));
+               low.ends_with(".sexp") || low.ends_with(".txt") ||
+               low.ends_with(".org") || low.ends_with(".gmi") ||
+               low.ends_with(".gemini"));
 
           if (is_doc) {
             if (!std::filesystem::exists(fpath)) {
