@@ -470,9 +470,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Citation…", UiCommand::Cite, cmd, state.selection,
                     "Ctrl+Shift+C");
       ImGui::Separator();
-      menu_insert_items(cmd);
-      ImGui::Separator();
-      menu_structure_items(state, cmd);
+      if (ImGui::BeginMenu("Structure")) {
+        menu_structure_items(state, cmd);
+        ImGui::EndMenu();
+      }
       ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Insert")) {
@@ -500,6 +501,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     if (ImGui::BeginMenu("Help")) {
       if (ImGui::MenuItem("Keyboard Reference", "F1", state.help))
         cmd = UiCommand::ToggleHelp;
+      ImGui::Separator();
+      menu_item_cmd("FORMAT.md", UiCommand::OpenFormatDoc, cmd);
+      menu_item_cmd("Semantic format demo", UiCommand::OpenSemanticDoc, cmd);
       ImGui::EndMenu();
     }
 

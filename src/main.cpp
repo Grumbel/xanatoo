@@ -1398,6 +1398,48 @@ int main(int argc, char** argv) {
               p.preferred_x = lx;
               reset_blink();
             }
+          } else if (ev.button.button == SDL_BUTTON_MIDDLE) {
+            // Middle-click paste at caret (common on Linux).
+            if (imgui_mouse) break;
+            const int mxw = ev.button.x, myw = ev.button.y;
+            bool over_soft = false;
+            if (outline_mode && mxw >= ol_x && mxw < ol_x + ol_w &&
+                myw >= ol_y && myw < ol_y + ol_h)
+              over_soft = true;
+            if (!over_soft && help_mode && mxw >= help_x &&
+                mxw < help_x + help_w && myw >= help_y && myw < help_y + help_h)
+              over_soft = true;
+            if (!over_soft) {
+              for (int i = static_cast<int>(soft_wins.size()) - 1; i >= 0; --i) {
+                const SoftWindow& sw = soft_wins[static_cast<size_t>(i)];
+                if (mxw >= sw.x && mxw < sw.x + sw.w && myw >= sw.y &&
+                    myw < sw.y + sw.h) {
+                  over_soft = true;
+                  break;
+                }
+              }
+            }
+            if (!over_soft && SDL_HasClipboardText()) {
+              float mx = static_cast<float>(mxw);
+              float my = content_y(static_cast<float>(myw));
+              focus = pane_at(mx);
+              Pane& pp = F();
+              float lx = local_x(mx, focus);
+              if (auto hit =
+                      xanatoo::hit_test(pp.layout, lx, my, pp.scroll_y)) {
+                pp.sel.focus = *hit;
+                pp.sel.anchor = pp.sel.focus;
+              }
+              char* clip = SDL_GetClipboardText();
+              if (clip && clip[0]) {
+                edit();
+                xanatoo::paste_plain_text(doc_of(pp), pp.sel.focus, clip);
+                pp.sel.anchor = pp.sel.focus;
+                needs_layout = true;
+                reset_blink();
+              }
+              if (clip) SDL_free(clip);
+            }
           } else if (ev.button.button == SDL_BUTTON_RIGHT) {
             // Soft windows / outline / help absorb right-clicks (no doc menu under them).
             const int rx = ev.button.x, ry = ev.button.y;
@@ -1626,6 +1668,30 @@ int main(int argc, char** argv) {
           // Soft-window interactions handled; rest of motion is for panes.
           if (imgui_mouse) break;
 
+          // Hovering a soft window (without an active document drag) should not
+          // drive pane selection, scroll-hover, or gutter feedback underneath.
+          if (!dragging_sel && !dragging_scroll && !dragging_split &&
+              !dragging_image && !dragging_block && !dragging_col_gap) {
+            const int mxw = ev.motion.x, myw = ev.motion.y;
+            bool over_soft = false;
+            if (outline_mode && mxw >= ol_x && mxw < ol_x + ol_w &&
+                myw >= ol_y && myw < ol_y + ol_h)
+              over_soft = true;
+            if (!over_soft && help_mode && mxw >= help_x &&
+                mxw < help_x + help_w && myw >= help_y && myw < help_y + help_h)
+              over_soft = true;
+            if (!over_soft) {
+              for (const auto& sw : soft_wins) {
+                if (mxw >= sw.x && mxw < sw.x + sw.w && myw >= sw.y &&
+                    myw < sw.y + sw.h) {
+                  over_soft = true;
+                  break;
+                }
+              }
+            }
+            if (over_soft) break;
+          }
+
           if (dragging_scroll) {
             float my = content_y(static_cast<float>(ev.motion.y));
             Pane& sp = panes[scroll_drag_pane];
@@ -1819,6 +1885,8 @@ int main(int argc, char** argv) {
             const bool prompt_key =
                 k == SDLK_ESCAPE || k == SDLK_BACKSPACE || k == SDLK_RETURN ||
                 k == SDLK_KP_ENTER ||
+                // Paste into the status-bar buffer
+                (ctrl && k == SDLK_v) ||
                 // Search: F3 / Shift+F3 still jump matches while the query is open
                 (search_mode && (k == SDLK_F3 || k == SDLK_g)) ||
                 // Allow Tab to switch replace-field focus when replace is open
@@ -2661,12 +2729,41 @@ int main(int argc, char** argv) {
                 if (SDL_HasClipboardText()) {
                   char* clip = SDL_GetClipboardText();
                   if (clip && clip[0]) {
-                    edit();
-                    if (!p.sel.empty()) xanatoo::delete_selection(d, p.sel);
-                    xanatoo::paste_plain_text(d, p.sel.focus, clip);
-                    p.sel.anchor = p.sel.focus;
-                    needs_layout = true;
-                    reset_blink();
+                    // Status-bar prompts: paste into the active buffer, not the doc.
+                    auto append_clip = [&](std::string& buf) {
+                      // Single-line prompts: strip newlines.
+                      for (const char* s = clip; *s; ++s) {
+                        if (*s == '\n' || *s == '\r') continue;
+                        buf.push_back(*s);
+                      }
+                    };
+                    if (save_as_mode) {
+                      append_clip(save_as_path);
+                    } else if (path_in_window_mode) {
+                      append_clip(path_in_window_buf);
+                    } else if (open_file_mode) {
+                      append_clip(open_file_buf);
+                    } else if (image_insert_mode) {
+                      append_clip(image_insert_path);
+                    } else if (include_insert_mode) {
+                      append_clip(include_insert_src);
+                    } else if (link_edit_mode) {
+                      append_clip(link_edit_href);
+                    } else if (summary_edit_mode) {
+                      append_clip(summary_edit_text);
+                    } else if (search_mode) {
+                      if (replace_mode && replace_focus)
+                        append_clip(replace_text);
+                      else
+                        append_clip(search_query);
+                    } else {
+                      edit();
+                      if (!p.sel.empty()) xanatoo::delete_selection(d, p.sel);
+                      xanatoo::paste_plain_text(d, p.sel.focus, clip);
+                      p.sel.anchor = p.sel.focus;
+                      needs_layout = true;
+                      reset_blink();
+                    }
                   }
                   if (clip) SDL_free(clip);
                 }

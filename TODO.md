@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **114** (this delivery is **113**)
+Next bundle number: **115** (this delivery is **114**)
 
 ## Status (2026-10-11)
 
@@ -192,6 +192,11 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Event routing: document click dismisses status-bar prompts
 - [x] UI: zoomin/zoomout/structure/diff toolbar icons
 - [x] UI: Unwrap Stretch menu item (Ctrl+Shift+U)
+- [x] Format menu: Structure submenu (Insert no longer duplicated)
+- [x] Help menu: FORMAT.md + semantic demo entries
+- [x] Ctrl+V pastes into status-bar prompts (paths, search, links…)
+- [x] Middle-click paste at caret (Linux-style)
+- [x] Mouse motion over soft windows no longer drives pane hover/selection underneath
 
 ## Open work / next steps
 
@@ -354,4 +359,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-110.*-path-input-em-…` — this delivery
 - `xanatoo-111.*-nested-table-md-…` — nested table markdown
 - `xanatoo-112.*-ui-icons-events-…` — icons, New/Open, capture fix
-- `xanatoo-113.*-events-icons-…` — this delivery
+- `xanatoo-113.*-events-icons-…` — prompt keys, soft right-click
+- `xanatoo-114.*-menus-paste-…` — this delivery
