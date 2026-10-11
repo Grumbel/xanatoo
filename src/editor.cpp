@@ -1948,6 +1948,8 @@ std::string node_text(const Document& doc, NodeId id) {
 
 void paste_plain_text(Document& doc, Caret& caret, const std::string& text) {
   if (text.empty() || caret.node == INVALID_NODE) return;
+  redirect_transclude_caret(doc, caret);
+  if (doc.get(caret.node).kind == NodeKind::Transclude) return;
 
   // Normalize newlines
   std::string norm;
@@ -1959,6 +1961,12 @@ void paste_plain_text(Document& doc, Caret& caret, const std::string& text) {
     } else {
       norm.push_back(text[i]);
     }
+  }
+
+  // Code blocks keep literal newlines (and tabs); do not paragraph-split.
+  if (doc.get(caret.node).kind == NodeKind::CodeBlock) {
+    insert_text(doc, caret, norm);
+    return;
   }
 
   // Split on blank lines into paragraph chunks
