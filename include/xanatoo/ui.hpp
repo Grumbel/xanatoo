@@ -160,7 +160,8 @@ public:
   Ui(const Ui&) = delete;
   Ui& operator=(const Ui&) = delete;
 
-  bool init(SDL_Window* window, SDL_Renderer* renderer);
+  // ui_scale: 0 = auto from window width (larger on ≤720px displays).
+  bool init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale = 0.f);
   void shutdown();
 
   void process_event(const SDL_Event& ev);

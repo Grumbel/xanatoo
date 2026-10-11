@@ -10,6 +10,8 @@ struct CliOptions {
   std::string font_path;
   std::string file_path;   // primary document
   std::string file_path2;  // optional second → dual-pane
+  bool fullscreen = false;
+  float ui_scale = 0.f;  // 0 = auto from window size
 };
 
 // Returns false if the process should exit (help printed or bad args).

@@ -159,3 +159,10 @@ TODO keywords use `Header.src`; `:CUSTOM_ID:` becomes the stable label.
   shows the page in **browse mode**. Relative `=>` links resolve against the
   current capsule URL. Status **10/11** input requests reopen the URL bar with a
   `?` query for you to complete. Build without the client: `-DXANATOO_GEMINI=OFF`.
+
+
+## Handheld / gamepad
+
+- `--fullscreen` / `-F` — borderless fullscreen (R36S launcher uses this)
+- `--ui-scale N` or `XANATOO_UI_SCALE` — enlarge ImGui chrome (auto 1.35 when width ≤720)
+- **D-pad** move · **A** activate · **B** collapse · **Back** history/browse · **Y** forward · **Start** help

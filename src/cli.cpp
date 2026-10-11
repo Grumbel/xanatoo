@@ -69,6 +69,9 @@ void print_usage(const char* argv0) {
       << "Ctrl+S saves the focused pane's document.\n"
       << "Ctrl+\\ toggles split; drag the gutter to resize panes.\n"
       << "\n"
+      << "  -F, --fullscreen      Borderless fullscreen\n"
+      << "  --ui-scale <n>        ImGui chrome scale (default: auto from width)\n"
+      << "\n"
       << "Font resolution: --font / XANATOO_FONT, then FontConfig\n"
       << "(regular/bold/italic/mono faces for styled text).\n";
 }
@@ -76,6 +79,22 @@ void print_usage(const char* argv0) {
 bool parse_cli(int argc, char** argv, CliOptions& opt) {
   for (int i = 1; i < argc; ++i) {
     std::string a = argv[i];
+    if (a == "--fullscreen" || a == "-F") {
+      opt.fullscreen = true;
+      continue;
+    }
+    if (a == "--ui-scale") {
+      if (i + 1 >= argc) {
+        std::cerr << "error: " << a << " requires a number\n";
+        return false;
+      }
+      opt.ui_scale = std::strtof(argv[++i], nullptr);
+      continue;
+    }
+    if (a.rfind("--ui-scale=", 0) == 0) {
+      opt.ui_scale = std::strtof(a.c_str() + 11, nullptr);
+      continue;
+    }
     if (a == "-h" || a == "--help") {
       print_usage(argv[0]);
       return false;

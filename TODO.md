@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **166** (this delivery is **165**)
+Next bundle number: **167** (this delivery is **166**)
 
 ## Status (2026-10-11)
 
@@ -264,9 +264,10 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] R36S: stick to kurvenrausch eoan SDL; ImGui legacy renderer path
 
 ### R36S / PortMaster — confirmed working; polish later
-- [ ] UI font tuned for 640×480 (larger ImGui scale / bitmap-friendly face)
-- [ ] Stronger gamepad mapping (D-pad vs stick, button chord cheat-sheet)
+- [x] UI scale: auto 1.35 when width ≤720 / XANATOO_UI_SCALE / --ui-scale; larger body font
+- [x] Gamepad: connect hint, Y=history forward, browse-mode status hints; ImGui NavEnableGamepad
 - [ ] On-screen / virtual keyboard for text entry without a physical keyboard
+- [x] --fullscreen + R36S launcher uses it
 
 ## Open work / next steps
 
@@ -483,4 +484,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-162.*-r36s-build-fixes-…` — SDL/C++17
 - `xanatoo-163.*-r36s-sdl-2.0.20-…` — (reverted)
 - `xanatoo-164.*-r36s-eoan-imgui-…` — eoan SDL + ImGui legacy
-- `xanatoo-165.*-r36s-polish-notes-…` — this delivery
+- `xanatoo-165.*-r36s-polish-notes-…` — polish notes
+- `xanatoo-166.*-ui-scale-gamepad-…` — this delivery

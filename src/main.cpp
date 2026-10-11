@@ -43,11 +43,13 @@ int main(int argc, char** argv) {
   SDL_GameControllerEventState(SDL_ENABLE);
   SDL_StartTextInput();
 
+  Uint32 win_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN;
+  if (opt.fullscreen) win_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
   SDL_Window* window = SDL_CreateWindow(
       "xanatoo",
       SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
       1024, 768,
-      SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN);
+      win_flags);
   if (!window) {
     std::cerr << "SDL_CreateWindow: " << SDL_GetError() << "\n";
     SDL_Quit();
@@ -191,7 +193,7 @@ int main(int argc, char** argv) {
   xanatoo::LayoutEngine layout_engine(fonts, &images);
   xanatoo::Renderer renderer(sdl, fonts, &images);
   xanatoo::Ui ui;
-  if (!ui.init(window, sdl)) {
+  if (!ui.init(window, sdl, opt.ui_scale)) {
     std::cerr << "Warning: ImGui UI failed to init; continuing without menus\n";
   }
   float ui_top = 0.f;  // menu + toolbar height (updated each frame)
@@ -255,10 +257,6 @@ int main(int argc, char** argv) {
   auto shared_doc = [&]() -> bool {
     return panes[0].buf == panes[1].buf;
   };
-  auto dirty_of = [&](int bi) -> bool& {
-    return buffers[static_cast<size_t>(bi)].dirty;
-  };
-
   buffers[0].history.reset(buffers[0].doc, panes[0].sel);
   if (buffers.size() > 1)
     buffers[1].history.reset(buffers[1].doc, panes[1].sel);
@@ -271,6 +269,12 @@ int main(int argc, char** argv) {
       win_w = nw;
       win_h = nh;
     }
+  }
+  // Handheld / small displays: slightly larger document text.
+  if (win_w > 0 && win_w <= 720 && body_px < 20) {
+    body_px = 20;
+    heading_px = 28;
+    fonts.set_sizes(body_px, heading_px);
   }
   bool running = true;
   bool needs_layout = true;
@@ -1226,13 +1230,6 @@ int main(int argc, char** argv) {
     tab_order.push_back(bi);
     update_title();
     return bi;
-  };
-
-  // Invalidate layouts for every view of a buffer.
-  auto touch_buffer_views = [&](int bi) {
-    needs_layout = true;
-    for (auto& sw : soft_wins)
-      if (sw.buf == bi) sw.needs_layout = true;
   };
 
   // Pop focused pane buffer into a floating window (shared buffer).
@@ -2773,7 +2770,13 @@ int main(int argc, char** argv) {
         }
 
         case SDL_CONTROLLERDEVICEADDED:
-          if (!gamepad) open_first_gamepad();
+          if (!gamepad) {
+            open_first_gamepad();
+            if (gamepad)
+              flash_status(
+                  "Pad: D-pad move · A open · B collapse · "
+                  "Back hist/browse · Start help");
+          }
           break;
         case SDL_CONTROLLERDEVICEREMOVED:
           if (gamepad &&
@@ -2815,7 +2818,16 @@ int main(int argc, char** argv) {
               }
               break;
             case SDL_CONTROLLER_BUTTON_Y:
-              structure_mode = !structure_mode;
+              // Forward in history when possible; else structure overlay.
+              if (nav_hist_pos + 1 < static_cast<int>(nav_history.size())) {
+                ++nav_hist_pos;
+                navigate_to_url(
+                    nav_history[static_cast<size_t>(nav_hist_pos)],
+                    /*record_history=*/false);
+              } else {
+                structure_mode = !structure_mode;
+                flash_status(structure_mode ? "Structure on" : "Structure off");
+              }
               break;
             case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
               nav_header(true);
@@ -6243,6 +6255,12 @@ int main(int argc, char** argv) {
         else
           label += "    click to open";
         tr = 30; tg = 80; tb = 170;
+      } else if (browse_mode) {
+        label = gamepad
+                    ? "Browse · D-pad move · A open · B collapse · "
+                      "Back hist · Y forward · Start help · F2 edit"
+                    : "Browse mode — arrows move · Enter open · F2 edit · F1 help";
+        tr = 50; tg = 90; tb = 70;
       } else {
         label =
             "F1 help · Ctrl+S save · Ctrl+A block · Ctrl+Shift+A all · "

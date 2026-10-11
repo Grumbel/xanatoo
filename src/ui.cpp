@@ -352,9 +352,8 @@ static std::string resolve_ui_font_path() {
   return {};
 }
 
-static void load_ui_fonts(ImGuiIO& io) {
-  // ~10–11 pt at 96 dpi — close to GNOME 2 menu/toolbar size
-  const float size_px = 14.0f;
+static void load_ui_fonts(ImGuiIO& io, float size_px) {
+  // Desktop ~14px; handhelds pass a larger size for readability.
   std::string path = resolve_ui_font_path();
   ImFontConfig cfg;
   cfg.OversampleH = 2;
@@ -374,23 +373,46 @@ static void load_ui_fonts(ImGuiIO& io) {
   io.Fonts->AddFontDefault();
 }
 
-bool Ui::init(SDL_Window* window, SDL_Renderer* renderer) {
+bool Ui::init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale) {
   if (ready_) return true;
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGuiIO& io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+  // Gamepad navigates ImGui menus when a controller is present.
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
   io.IniFilename = nullptr;
 
-  load_ui_fonts(io);
+  // Resolve UI scale: explicit arg → env → auto from window width.
+  float scale = ui_scale;
+  if (scale <= 0.f) {
+    if (const char* e = std::getenv("XANATOO_UI_SCALE")) {
+      if (e[0] != '\0') scale = std::strtof(e, nullptr);
+    }
+  }
+  if (scale <= 0.f && window) {
+    int ww = 0, wh = 0;
+    SDL_GetWindowSize(window, &ww, &wh);
+    if (ww > 0 && ww <= 720)
+      scale = 1.35f;  // R36S / similar handhelds
+    else
+      scale = 1.f;
+  }
+  if (scale < 0.75f) scale = 0.75f;
+  if (scale > 2.5f) scale = 2.5f;
+
+  const float font_px = 14.0f * (scale > 1.f ? scale : 1.f);
+  load_ui_fonts(io, font_px);
   apply_classic_theme();
-  // Slightly roomier chrome once a proportional face is loaded
   {
     ImGuiStyle& s = ImGui::GetStyle();
     s.FramePadding = ImVec2(7.f, 4.f);
     s.ItemSpacing = ImVec2(7.f, 5.f);
     s.ScrollbarSize = 14.f;
+    if (scale != 1.f) s.ScaleAllSizes(scale);
   }
+  if (scale != 1.f)
+    std::cout << "UI scale: " << scale << " (font " << font_px << "px)\n";
   load_icons(renderer);
 
   if (!ImGui_ImplSDL2_InitForSDLRenderer(window, renderer)) return false;

@@ -30,6 +30,7 @@ export XDG_STATE_HOME="$GAMEDIR/conf"
 # Data next to the binary (examples, icons, font)
 export XANATOO_DATA_DIR="$GAMEDIR"
 export XANATOO_ICON_DIR="$GAMEDIR/icons"
+export XANATOO_UI_SCALE="${XANATOO_UI_SCALE:-1.35}"
 if [ -f "$GAMEDIR/fonts/DejaVuSans.ttf" ]; then
   export XANATOO_FONT="$GAMEDIR/fonts/DejaVuSans.ttf"
 fi
@@ -43,8 +44,8 @@ pm_platform_helper "$GAMEDIR/xanatoo"
 
 # Open the welcome document when present so examples are immediately reachable.
 if [ -f "$GAMEDIR/examples/welcome.md" ]; then
-  ./xanatoo "$GAMEDIR/examples/welcome.md" "$@"
+  ./xanatoo --fullscreen "$GAMEDIR/examples/welcome.md" "$@"
 else
-  ./xanatoo "$@"
+  ./xanatoo --fullscreen "$@"
 fi
 pm_finish
