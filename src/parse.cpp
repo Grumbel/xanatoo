@@ -609,6 +609,37 @@ Document parse_markup(std::string_view source) {
       continue;
     }
 
+    // Setext headings: Title\n===== → H1, Title\n----- → H2
+    if (!trimmed.empty() && i + 1 < lines.size() && !lines[i + 1].blank) {
+      std::string_view next = lines[i + 1].text;
+      size_t nlead = 0;
+      while (nlead < next.size() && (next[nlead] == ' ' || next[nlead] == '\t'))
+        ++nlead;
+      std::string_view ntrim = next.substr(nlead);
+      if (ntrim.size() >= 3) {
+        char uc = ntrim[0];
+        if (uc == '=' || uc == '-') {
+          bool all = true;
+          for (char ch : ntrim) {
+            if (ch != uc) {
+              all = false;
+              break;
+            }
+          }
+          if (all && !trimmed.starts_with("#") && !trimmed.starts_with(">") &&
+              !trimmed.starts_with("```") && !trimmed.starts_with("~~~") &&
+              !trimmed.starts_with("|") && !trimmed.starts_with(":::")) {
+            int setext_level = (uc == '=') ? 1 : 2;
+            NodeId n = doc.create(NodeKind::Heading, current_parent());
+            doc.get(n).level = setext_level;
+            parse_inlines(doc.get(n), trimmed);
+            i += 2;
+            continue;
+          }
+        }
+      }
+    }
+
     // Unordered / ordered list (supports nested items via leading indent)
     {
       int ord = 0;
