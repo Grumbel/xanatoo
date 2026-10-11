@@ -66,6 +66,29 @@ size_t list_marker_len(std::string_view trimmed, int* ordered_index) {
   return 0;
 }
 
+
+// Extract key="value" or key='value' or key=bare from a fence line.
+std::string fence_attr(std::string_view line, std::string_view key) {
+  std::string pat(key);
+  pat += '=';
+  auto pos = line.find(pat);
+  if (pos == std::string_view::npos) return {};
+  pos += pat.size();
+  if (pos >= line.size()) return {};
+  char quote = 0;
+  if (line[pos] == '"' || line[pos] == '\'') {
+    quote = static_cast<char>(line[pos]);
+    ++pos;
+    auto end = line.find(quote, pos);
+    if (end == std::string_view::npos) return std::string(line.substr(pos));
+    return std::string(line.substr(pos, end - pos));
+  }
+  size_t end = pos;
+  while (end < line.size() && !std::isspace(static_cast<unsigned char>(line[end])))
+    ++end;
+  return std::string(line.substr(pos, end - pos));
+}
+
 // Parse inline spans for a single paragraph/heading line.
 void parse_inlines(Node& node, std::string_view text) {
   size_t i = 0;
@@ -393,6 +416,52 @@ Document parse_markup(std::string_view source) {
       if (!body.empty()) parse_inlines(doc.get(n), body);
       continue;
     }
+
+    // Thread / Message (mailing list, forum, or general comments)
+    // :::thread id="…" subject="…"
+    // :::message id="…" from="…" date="…" in-reply-to="…" | about="#anchor"
+    // :::comment is an alias for :::message
+    if (trimmed.starts_with(":::thread")) {
+      NodeId n = doc.create(NodeKind::Thread, current_parent());
+      std::string id = fence_attr(trimmed, "id");
+      if (id.empty()) id = fence_attr(trimmed, "label");
+      if (!id.empty()) doc.get(n).label = id;
+      std::string sub = fence_attr(trimmed, "subject");
+      if (sub.empty()) sub = fence_attr(trimmed, "title");
+      if (!sub.empty()) doc.get(n).summary = sub;
+      stack.push_back(n);
+      ++i;
+      continue;
+    }
+    if (trimmed.starts_with(":::message") || trimmed.starts_with(":::comment")) {
+      NodeId n = doc.create(NodeKind::Message, current_parent());
+      std::string id = fence_attr(trimmed, "id");
+      if (id.empty()) id = fence_attr(trimmed, "label");
+      if (!id.empty()) doc.get(n).label = id;
+      std::string from = fence_attr(trimmed, "from");
+      if (from.empty()) from = fence_attr(trimmed, "author");
+      if (from.empty()) from = fence_attr(trimmed, "by");
+      if (!from.empty()) doc.get(n).src = from;
+      std::string date = fence_attr(trimmed, "date");
+      if (date.empty()) date = fence_attr(trimmed, "at");
+      if (!date.empty()) doc.get(n).summary = date;
+      std::string reply = fence_attr(trimmed, "in-reply-to");
+      if (reply.empty()) reply = fence_attr(trimmed, "reply-to");
+      if (reply.empty()) reply = fence_attr(trimmed, "parent");
+      std::string about = fence_attr(trimmed, "about");
+      if (!reply.empty()) {
+        if (!reply.empty() && reply[0] == '#') reply.erase(reply.begin());
+        doc.get(n).alt = reply;
+      } else if (!about.empty()) {
+        doc.get(n).alt = about.starts_with("about:") ? about
+                         : (std::string("about:") +
+                            (about[0] == '#' ? about : ("#" + about)));
+      }
+      stack.push_back(n);
+      ++i;
+      continue;
+    }
+
     // :::code / :::codeblock [lang=cpp] … :::
     if (trimmed.starts_with(":::codeblock") || trimmed.starts_with(":::code")) {
       NodeId n = doc.create(NodeKind::CodeBlock, current_parent());
@@ -1198,7 +1267,65 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
       break;
     }
 
-    case NodeKind::Table: {
+    case NodeKind::Thread: {
+      out += pad;
+      out += ":::thread";
+      if (!node.label.empty()) {
+        out += " id=\"";
+        out += node.label;
+        out += "\"";
+      }
+      if (!node.summary.empty()) {
+        out += " subject=\"";
+        out += node.summary;
+        out += "\"";
+      }
+      out += "\n";
+      for (NodeId c : node.children)
+        serialize_node(doc, c, out, indent);
+      out += pad;
+      out += ":::\n\n";
+      break;
+    }
+
+    case NodeKind::Message: {
+      out += pad;
+      out += ":::message";
+      if (!node.label.empty()) {
+        out += " id=\"";
+        out += node.label;
+        out += "\"";
+      }
+      if (!node.src.empty()) {
+        out += " from=\"";
+        out += node.src;
+        out += "\"";
+      }
+      if (!node.summary.empty()) {
+        out += " date=\"";
+        out += node.summary;
+        out += "\"";
+      }
+      if (!node.alt.empty()) {
+        if (node.alt.rfind("about:", 0) == 0) {
+          out += " about=\"";
+          out += node.alt.substr(6);
+          out += "\"";
+        } else {
+          out += " in-reply-to=\"";
+          out += node.alt;
+          out += "\"";
+        }
+      }
+      out += "\n";
+      for (NodeId c : node.children)
+        serialize_node(doc, c, out, indent);
+      out += pad;
+      out += ":::\n\n";
+      break;
+    }
+
+case NodeKind::Table: {
       // Prefer GFM pipes when every cell is inline-only; otherwise use
       // :::row / :::cell so nested blocks round-trip.
       bool needs_blocks = false;
@@ -1755,6 +1882,57 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
     if (!label.empty()) doc.get(n).label = label;
     if (!kind.empty()) doc.get(n).src = kind;  // note subtype
     fill_inlines(doc.get(n), e.kids, i);
+    return;
+  }
+
+  if (tag == "thread") {
+    NodeId n = doc.create(NodeKind::Thread, parent);
+    std::string label, subject;
+    size_t i = 1;
+    while (i + 1 < e.kids.size() && e.kids[i].kind == SExpr::Kind::Atom &&
+           !e.kids[i].text.empty() && e.kids[i].text[0] == ':') {
+      const std::string& k = e.kids[i].text;
+      const std::string v = sexpr_text(e.kids[i + 1]);
+      if (k == ":id" || k == ":label") label = v;
+      else if (k == ":subject" || k == ":title") subject = v;
+      i += 2;
+    }
+    if (!label.empty()) doc.get(n).label = label;
+    if (!subject.empty()) doc.get(n).summary = subject;
+    parse_sexpr_children(doc, n, e.kids, i);
+    return;
+  }
+
+  if (tag == "message" || tag == "comment") {
+    NodeId n = doc.create(NodeKind::Message, parent);
+    std::string label, from, date, reply, about;
+    size_t i = 1;
+    while (i + 1 < e.kids.size() && e.kids[i].kind == SExpr::Kind::Atom &&
+           !e.kids[i].text.empty() && e.kids[i].text[0] == ':') {
+      const std::string& k = e.kids[i].text;
+      const std::string v = sexpr_text(e.kids[i + 1]);
+      if (k == ":id" || k == ":label") label = v;
+      else if (k == ":from" || k == ":author" || k == ":by") from = v;
+      else if (k == ":date" || k == ":at") date = v;
+      else if (k == ":in-reply-to" || k == ":reply-to" || k == ":parent")
+        reply = v;
+      else if (k == ":about") about = v;
+      i += 2;
+    }
+    if (!label.empty()) doc.get(n).label = label;
+    if (!from.empty()) doc.get(n).src = from;
+    if (!date.empty()) doc.get(n).summary = date;
+    if (!reply.empty()) {
+      if (!reply.empty() && reply[0] == '#') reply.erase(reply.begin());
+      doc.get(n).alt = reply;
+    } else if (!about.empty()) {
+      doc.get(n).alt = about.rfind("about:", 0) == 0
+                           ? about
+                           : (std::string("about:") +
+                              (about.empty() || about[0] == '#' ? about
+                                                                : ("#" + about)));
+    }
+    parse_sexpr_children(doc, n, e.kids, i);
     return;
   }
 
@@ -2538,6 +2716,53 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
           serialize_sexpr_node(doc, c, out, indent + 2);
         }
       }
+      out += ")";
+      break;
+    }
+
+    case NodeKind::Thread: {
+      out += pad;
+      out += "(thread";
+      emit_node_id(node, out);
+      if (!node.label.empty()) {
+        out += " :id ";
+        escape_sexpr_string(node.label, out);
+      }
+      if (!node.summary.empty()) {
+        out += " :subject ";
+        escape_sexpr_string(node.summary, out);
+      }
+      serialize_sexpr_children(doc, node, out, indent + 2);
+      out += ")";
+      break;
+    }
+
+    case NodeKind::Message: {
+      out += pad;
+      out += "(message";
+      emit_node_id(node, out);
+      if (!node.label.empty()) {
+        out += " :id ";
+        escape_sexpr_string(node.label, out);
+      }
+      if (!node.src.empty()) {
+        out += " :from ";
+        escape_sexpr_string(node.src, out);
+      }
+      if (!node.summary.empty()) {
+        out += " :date ";
+        escape_sexpr_string(node.summary, out);
+      }
+      if (!node.alt.empty()) {
+        if (node.alt.rfind("about:", 0) == 0) {
+          out += " :about ";
+          escape_sexpr_string(node.alt.substr(6), out);
+        } else {
+          out += " :in-reply-to ";
+          escape_sexpr_string(node.alt, out);
+        }
+      }
+      serialize_sexpr_children(doc, node, out, indent + 2);
       out += ")";
       break;
     }

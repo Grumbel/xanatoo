@@ -318,6 +318,109 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       break;
     }
 
+    case NodeKind::Thread: {
+      float start_y = y;
+      // Subject line
+      Node header = node;
+      header.kind = NodeKind::Paragraph;
+      header.spans.clear();
+      InlineSpan hs;
+      hs.kind = InlineKind::Strong;
+      hs.text = node.summary.empty() ? "Thread" : node.summary;
+      if (!node.label.empty()) {
+        hs.text += "  ·  #";
+        hs.text += node.label;
+      }
+      header.spans.push_back(std::move(hs));
+      layout_paragraph(doc, header, x, y, max_width, out, FontRole::Heading);
+      for (auto& g : out.glyphs) {
+        if (g.node == header.id) g.node = id;
+      }
+      y += 8.f;
+      for (NodeId child : node.children)
+        layout_node(doc, child, x, y, max_width, out);
+      y += 10.f;
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
+    case NodeKind::Message: {
+      float start_y = y;
+      // Indent by reply depth (follow in-reply-to chain via labels).
+      int depth = 0;
+      if (!node.alt.empty() && node.alt.rfind("about:", 0) != 0) {
+        std::string cur = node.alt;
+        for (int guard = 0; guard < 24; ++guard) {
+          if (cur.empty()) break;
+          std::string key = cur[0] == '#' ? cur.substr(1) : cur;
+          NodeId parent_msg = INVALID_NODE;
+          for (const auto& cand : doc.nodes) {
+            if (cand.kind == NodeKind::Message && !cand.label.empty() &&
+                cand.label == key) {
+              parent_msg = cand.id;
+              break;
+            }
+          }
+          if (parent_msg == INVALID_NODE) break;
+          ++depth;
+          cur = doc.get(parent_msg).alt;
+          if (cur.rfind("about:", 0) == 0) break;
+        }
+      }
+      if (depth > 8) depth = 8;
+      const float indent = 16.f * static_cast<float>(depth);
+      const float bar_w = 3.f;
+      float body_x = x + indent + bar_w + 10.f;
+      float body_w = max_width - indent - bar_w - 10.f;
+      if (body_w < 48.f) {
+        body_x = x + 8.f;
+        body_w = max_width - 8.f;
+      }
+
+      // Header: author · date · reply/about
+      Node header = node;
+      header.kind = NodeKind::Paragraph;
+      header.spans.clear();
+      {
+        InlineSpan a;
+        a.kind = InlineKind::Strong;
+        a.text = node.src.empty() ? "(unknown)" : node.src;
+        header.spans.push_back(std::move(a));
+      }
+      if (!node.summary.empty()) {
+        InlineSpan d;
+        d.kind = InlineKind::Text;
+        d.text = "  ·  ";
+        d.text += node.summary;
+        header.spans.push_back(std::move(d));
+      }
+      if (!node.alt.empty()) {
+        InlineSpan r;
+        r.kind = InlineKind::Emphasis;
+        if (node.alt.rfind("about:", 0) == 0) {
+          r.text = "  ·  re ";
+          r.text += node.alt.substr(6);
+        } else {
+          r.text = "  ·  reply to #";
+          r.text += node.alt;
+        }
+        header.spans.push_back(std::move(r));
+      }
+      layout_paragraph(doc, header, body_x, y, body_w, out, FontRole::Body);
+      for (auto& g : out.glyphs) {
+        if (g.node == header.id) g.node = id;
+      }
+      y += 4.f;
+      for (NodeId child : node.children)
+        layout_node(doc, child, body_x, y, body_w, out);
+      y += 10.f;
+      out.message_bars.push_back(
+          {id, x + indent, start_y, bar_w, y - start_y});
+      out.boxes.push_back({id, x + indent, start_y, max_width - indent,
+                           y - start_y});
+      break;
+    }
+
     case NodeKind::CodeBlock: {
       float start_y = y;
       const float pad = 8.f;

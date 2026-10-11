@@ -46,6 +46,8 @@ stable identity matter.
 | `(p …)` | Paragraph |
 | `(quote …)` | Quotation (attributed speech / excerpt) |
 | `(note …)` | Authorial aside / callout (semantic, not a sidebar region) |
+| `(thread …)` | Discussion container (mailing list / forum thread) |
+| `(message …)` | One post or comment; may reply to another message |
 | `(code :lang "cpp" "…")` | Preformatted code; `:lang` is a language tag |
 | `(hr)` | Thematic break |
 | `(ul …)` / `(ol …)` + `(li …)` | Lists |
@@ -99,3 +101,42 @@ Not part of the semantic document:
 ## Example
 
 See `examples/semantic.sexp`.
+
+## Threads and messages
+
+Mailing-list and forum discussions are first-class structure, not free text.
+
+```lisp
+(thread :id "t-rfc" :subject "RFC: widget API"
+  (message :id "m1" :from "Alice <alice@ex.org>" :date "2026-03-01T10:00:00Z"
+    (p "Proposal…"))
+  (message :id "m2" :from "Bob <bob@ex.org>" :date "2026-03-01T11:00:00Z"
+           :in-reply-to "m1"
+    (p "Counter-proposal…")))
+```
+
+Markdown fences:
+
+```
+:::thread id="t-rfc" subject="RFC: widget API"
+:::message id="m1" from="Alice <alice@ex.org>" date="2026-03-01T10:00:00Z"
+Proposal…
+
+:::
+:::message id="m2" from="Bob <bob@ex.org>" date="2026-03-01T11:00:00Z" in-reply-to="m1"
+Counter-proposal…
+
+:::
+:::
+```
+
+| Field | Node storage | Meaning |
+|-------|--------------|---------|
+| `id` / `:id` | `label` | Stable message-id (anchor `#m1`) |
+| `from` / `:from` | `src` | Author (display string or email) |
+| `date` / `:date` | `summary` | Timestamp (ISO-8601 preferred) |
+| `in-reply-to` | `alt` | Parent message-id (threading) |
+| `about` | `alt` = `about:#…` | Comment on a document passage |
+| `subject` (thread) | `summary` | Thread title |
+
+`:::comment` is an alias for `:::message`. Depth in the layout is derived by walking the `in-reply-to` chain within the document.

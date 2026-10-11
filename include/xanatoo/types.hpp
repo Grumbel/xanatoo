@@ -37,6 +37,8 @@ enum class NodeKind : uint8_t {
   Table,           // semantic grid (rows of cells; not pixel layout)
   TableRow,
   TableCell,       // level 0 = data cell, 1 = header cell
+  Thread,          // discussion container (mailing list / forum thread)
+  Message,         // one post or comment; may reply to another Message
 };
 
 enum class InlineKind : uint8_t {
@@ -73,6 +75,9 @@ struct Node {
   // CodeBlock: language id in `src` (e.g. "cpp"); Note: optional kind in `src`
   // Transclude: summary holds optional :excerpt phrase (range within target)
   // TableCell: level 1 = header cell, 0 = body cell
+  // Thread: label = thread id; summary = subject
+  // Message: label = message-id; src = from/author; summary = date (ISO);
+  //          alt = in-reply-to id, or "about:#anchor" for passage comments
 };
 
 // Document-level semantic metadata (not layout).

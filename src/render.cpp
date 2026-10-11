@@ -97,6 +97,19 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
     SDL_RenderFillRect(sdl_, &bar);
   }
 
+  // Message / comment bars (teal — discussion thread)
+  for (const auto& mb : layout.message_bars) {
+    SDL_SetRenderDrawColor(sdl_, 40, 130, 140, 255);
+    int bw = static_cast<int>(mb.width);
+    if (bw < 2) bw = 2;
+    SDL_Rect bar{
+        static_cast<int>(mb.x + origin_x),
+        static_cast<int>(mb.y - scroll_y),
+        bw,
+        static_cast<int>(mb.height)};
+    SDL_RenderFillRect(sdl_, &bar);
+  }
+
   // Table grid lines
   for (const auto& tl : layout.table_lines) {
     SDL_SetRenderDrawColor(sdl_, 160, 165, 175, 255);

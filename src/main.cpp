@@ -3833,6 +3833,9 @@ int main(int argc, char** argv) {
               r = 160; g = 160; b = 160; break;
             case xanatoo::NodeKind::Transclude:
               r = 180; g = 120; b = 40; break;
+            case xanatoo::NodeKind::Thread:
+            case xanatoo::NodeKind::Message:
+              r = 40; g = 130; b = 140; a_wash = 32; break;
             default:
               break;
           }

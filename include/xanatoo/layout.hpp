@@ -57,6 +57,8 @@ struct LayoutResult {
   std::vector<LayoutBox> quote_bars;
   // Vertical bars for notes (distinct colour from quotes).
   std::vector<LayoutBox> note_bars;
+  // Vertical bars for messages / comments (thread depth uses x indent).
+  std::vector<LayoutBox> message_bars;
   // Soft background rectangles for fenced code blocks.
   std::vector<LayoutBox> code_blocks;
   // Table grid lines. height <= 2 → horizontal; width <= 2 → vertical.
