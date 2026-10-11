@@ -466,7 +466,82 @@ int main(int argc, char** argv) {
   SDL_Cursor* cursor_sizeall =
       SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEALL);
   SDL_Cursor* cursor_current = cursor_arrow;
+  // Software pointer sprite for gamepad stick cursor. R36S (KMS/DRM) has no
+  // X11/system cursor — SDL_WarpMouse + SDL_SetCursor are invisible there.
+  // Hotspot is the tip (top-left of the arrow bitmap).
+  SDL_Texture* stick_cursor_tex = nullptr;
+  int stick_cursor_tw = 0, stick_cursor_th = 0;
+  {
+    // 12×19 classic arrow (white fill, dark outline). Rows as bit masks
+    // of width 12; MSB is left edge.
+    static const uint16_t kArrowRows[] = {
+        0b100000000000,  // .
+        0b110000000000,  // ##
+        0b111000000000,  // ###
+        0b111100000000,
+        0b111110000000,
+        0b111111000000,
+        0b111111100000,
+        0b111111110000,
+        0b111111111000,
+        0b111111111100,
+        0b111111000000,  // stem start
+        0b111111000000,
+        0b110011000000,
+        0b110011000000,
+        0b100001100000,
+        0b000001100000,
+        0b000000110000,
+        0b000000110000,
+        0b000000010000,
+    };
+    constexpr int aw = 12, ah = static_cast<int>(sizeof(kArrowRows) / sizeof(kArrowRows[0]));
+    std::vector<uint8_t> rgba(static_cast<size_t>(aw * ah * 4), 0);
+    auto put = [&](int x, int y, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+      if (x < 0 || y < 0 || x >= aw || y >= ah) return;
+      size_t i = static_cast<size_t>((y * aw + x) * 4);
+      rgba[i + 0] = r;
+      rgba[i + 1] = g;
+      rgba[i + 2] = b;
+      rgba[i + 3] = a;
+    };
+    for (int y = 0; y < ah; ++y) {
+      for (int x = 0; x < aw; ++x) {
+        if ((kArrowRows[y] >> (aw - 1 - x)) & 1) {
+          put(x, y, 255, 255, 255, 255);
+        }
+      }
+    }
+    // Dark outline on neighbouring empty pixels of filled cells.
+    for (int y = 0; y < ah; ++y) {
+      for (int x = 0; x < aw; ++x) {
+        size_t i = static_cast<size_t>((y * aw + x) * 4);
+        if (rgba[i + 3] == 0) continue;
+        for (int dy = -1; dy <= 1; ++dy) {
+          for (int dx = -1; dx <= 1; ++dx) {
+            if (dx == 0 && dy == 0) continue;
+            int nx = x + dx, ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= aw || ny >= ah) continue;
+            size_t ni = static_cast<size_t>((ny * aw + nx) * 4);
+            if (rgba[ni + 3] == 0) put(nx, ny, 20, 24, 32, 220);
+          }
+        }
+      }
+    }
+    SDL_Surface* surf = SDL_CreateRGBSurfaceWithFormatFrom(
+        rgba.data(), aw, ah, 32, aw * 4, SDL_PIXELFORMAT_RGBA32);
+    if (surf) {
+      stick_cursor_tex = SDL_CreateTextureFromSurface(sdl, surf);
+      if (stick_cursor_tex)
+        SDL_SetTextureBlendMode(stick_cursor_tex, SDL_BLENDMODE_BLEND);
+      stick_cursor_tw = aw;
+      stick_cursor_th = ah;
+      SDL_FreeSurface(surf);
+    }
+  }
   auto set_cursor = [&](SDL_Cursor* c) {
+    // Stick mode draws its own sprite; system cursor is hidden and unused.
+    if (stick_cursor_on) return;
     if (!c) c = cursor_arrow;
     if (c != cursor_current) {
       SDL_SetCursor(c);
@@ -6899,7 +6974,7 @@ int main(int argc, char** argv) {
       }
     }
 
-    // Pointer shape for interactive targets
+    // Pointer shape for interactive targets (system cursor; skipped in stick mode)
     if (hovered_col_gap)
       set_cursor(cursor_sizewe);
     else if (hovered_image_handle)
@@ -6915,6 +6990,29 @@ int main(int argc, char** argv) {
       set_cursor(cursor_arrow);
 
     ui.end_frame(sdl);
+
+    // Drawn sprite cursor for gamepad stick pointer (visible on KMS/DRM / R36S).
+    if (stick_cursor_on && stick_cursor_tex) {
+      SDL_ShowCursor(SDL_DISABLE);
+      const int cx = static_cast<int>(stick_cx);
+      const int cy = static_cast<int>(stick_cy);
+      SDL_Rect dst{cx, cy, stick_cursor_tw, stick_cursor_th};
+      // Dim slightly while a button is held so click feedback is obvious.
+      if (stick_lmb || stick_rmb)
+        SDL_SetTextureColorMod(stick_cursor_tex, 180, 200, 255);
+      else
+        SDL_SetTextureColorMod(stick_cursor_tex, 255, 255, 255);
+      SDL_RenderCopy(sdl, stick_cursor_tex, nullptr, &dst);
+      // Small hotspot ring when clicking.
+      if (stick_lmb || stick_rmb) {
+        SDL_SetRenderDrawColor(sdl, 80, 140, 255, 200);
+        SDL_Rect ring{cx - 3, cy - 3, 7, 7};
+        SDL_RenderDrawRect(sdl, &ring);
+      }
+    } else {
+      SDL_ShowCursor(SDL_ENABLE);
+    }
+
     renderer.present();
   }
 
@@ -6924,6 +7022,7 @@ int main(int argc, char** argv) {
     SDL_GameControllerClose(gamepad);
     gamepad = nullptr;
   }
+  if (stick_cursor_tex) SDL_DestroyTexture(stick_cursor_tex);
   if (cursor_arrow) SDL_FreeCursor(cursor_arrow);
   if (cursor_hand) SDL_FreeCursor(cursor_hand);
   if (cursor_sizewe) SDL_FreeCursor(cursor_sizewe);
