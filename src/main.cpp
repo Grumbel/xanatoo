@@ -466,9 +466,10 @@ int main(int argc, char** argv) {
   SDL_Cursor* cursor_sizeall =
       SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEALL);
   SDL_Cursor* cursor_current = cursor_arrow;
-  // Software pointer sprite for gamepad stick cursor. R36S (KMS/DRM) has no
-  // X11/system cursor — SDL_WarpMouse + SDL_SetCursor are invisible there.
+  // Software pointer sprite for gamepad stick cursor. Completely independent
+  // of the hardware mouse (no WarpMouse). R36S KMS/DRM has no system cursor.
   // Hotspot is the tip (top-left of the arrow bitmap).
+  // Pixel layout matches Font glyph upload (masks from font.cpp).
   SDL_Texture* stick_cursor_tex = nullptr;
   int stick_cursor_tw = 0, stick_cursor_th = 0;
   {
@@ -495,7 +496,9 @@ int main(int argc, char** argv) {
         0b000000110000,
         0b000000010000,
     };
-    constexpr int aw = 12, ah = static_cast<int>(sizeof(kArrowRows) / sizeof(kArrowRows[0]));
+    constexpr int aw = 12,
+                  ah = static_cast<int>(sizeof(kArrowRows) /
+                                       sizeof(kArrowRows[0]));
     std::vector<uint8_t> rgba(static_cast<size_t>(aw * ah * 4), 0);
     auto put = [&](int x, int y, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
       if (x < 0 || y < 0 || x >= aw || y >= ah) return;
@@ -528,15 +531,16 @@ int main(int argc, char** argv) {
         }
       }
     }
-    SDL_Surface* surf = SDL_CreateRGBSurfaceWithFormatFrom(
-        rgba.data(), aw, ah, 32, aw * 4, SDL_PIXELFORMAT_RGBA32);
-    if (surf) {
-      stick_cursor_tex = SDL_CreateTextureFromSurface(sdl, surf);
-      if (stick_cursor_tex)
-        SDL_SetTextureBlendMode(stick_cursor_tex, SDL_BLENDMODE_BLEND);
+    // Upload as ABGR8888 (little-endian byte order R,G,B,A) — same packing
+    // Font glyphs use. Avoid CreateRGBSurfaceWithFormatFrom, which mis-mapped
+    // alpha on some SDL 2.0.x / KMS builds (transparent↔opaque inverted).
+    stick_cursor_tex = SDL_CreateTexture(
+        sdl, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, aw, ah);
+    if (stick_cursor_tex) {
+      SDL_SetTextureBlendMode(stick_cursor_tex, SDL_BLENDMODE_BLEND);
+      SDL_UpdateTexture(stick_cursor_tex, nullptr, rgba.data(), aw * 4);
       stick_cursor_tw = aw;
       stick_cursor_th = ah;
-      SDL_FreeSurface(surf);
     }
   }
   auto set_cursor = [&](SDL_Cursor* c) {
@@ -2383,18 +2387,26 @@ int main(int argc, char** argv) {
           break;
 
         case SDL_MOUSEMOTION:
-          mouse_x = static_cast<float>(ev.motion.x);
-          mouse_y = static_cast<float>(ev.motion.y);
+          // Hardware mouse and stick pointer are independent. Stick mode
+          // owns mouse_x/y (set each frame from stick_cx/cy); ignore
+          // hardware motion so WarpMouse is never needed and the OS cursor
+          // is not dragged around.
           if (stick_cursor_on) {
-            stick_cx = mouse_x;
-            stick_cy = mouse_y;
+            mouse_x = stick_cx;
+            mouse_y = stick_cy;
+          } else {
+            mouse_x = static_cast<float>(ev.motion.x);
+            mouse_y = static_cast<float>(ev.motion.y);
           }
+          {
+            const int mx_i = static_cast<int>(mouse_x);
+            const int my_i = static_cast<int>(mouse_y);
 
           // Soft-window drag/resize continue even if ImGui wants the mouse
           // (capture flag can lag one frame after a title-bar grab).
           if (ol_dragging) {
-            ol_x = ev.motion.x - ol_drag_dx;
-            ol_y = ev.motion.y - ol_drag_dy;
+            ol_x = mx_i - ol_drag_dx;
+            ol_y = my_i - ol_drag_dy;
             if (ol_x < 0) ol_x = 0;
             if (ol_y < static_cast<int>(ui_top))
               ol_y = static_cast<int>(ui_top);
@@ -2409,15 +2421,14 @@ int main(int argc, char** argv) {
                 std::max(0.f, content_h - static_cast<float>(ch));
             float view_h = static_cast<float>(std::max(1, ch));
             float ratio =
-                (static_cast<float>(ev.motion.y) - static_cast<float>(cy)) /
-                view_h;
+                (mouse_y - static_cast<float>(cy)) / view_h;
             ratio = std::max(0.f, std::min(1.f, ratio));
             ol_scroll = ratio * max_s;
             break;
           }
           if (ol_resize) {
-            int dx = ev.motion.x - ol_resize_start_x;
-            int dy = ev.motion.y - ol_resize_start_y;
+            int dx = mx_i - ol_resize_start_x;
+            int dy = my_i - ol_resize_start_y;
             if (ol_resize & 1) {
               ol_w = ol_resize_start_w + dx;
               if (ol_w < 200) ol_w = 200;
@@ -2434,13 +2445,12 @@ int main(int argc, char** argv) {
             bool soft_motion = false;
             for (auto& sw : soft_wins) {
               if (sw.dragging) {
-                sw.x = ev.motion.x - sw.drag_dx;
-                sw.y = ev.motion.y - sw.drag_dy;
+                sw.x = mx_i - sw.drag_dx;
+                sw.y = my_i - sw.drag_dy;
                 if (sw.x < 0) sw.x = 0;
                 if (sw.y < static_cast<int>(ui_top))
                   sw.y = static_cast<int>(ui_top);
-                dock_preview =
-                    compute_dock_zone(ev.motion.x, ev.motion.y);
+                dock_preview = compute_dock_zone(mx_i, my_i);
                 soft_motion = true;
                 break;
               }
@@ -2451,17 +2461,15 @@ int main(int argc, char** argv) {
                              static_cast<float>(ch) + 40.f);
                 float view_h = static_cast<float>(std::max(1, ch));
                 float ratio =
-                    (static_cast<float>(ev.motion.y) -
-                     static_cast<float>(cy)) /
-                    view_h;
+                    (mouse_y - static_cast<float>(cy)) / view_h;
                 ratio = std::max(0.f, std::min(1.f, ratio));
                 sw.scroll = ratio * max_s;
                 soft_motion = true;
                 break;
               }
               if (sw.resize) {
-                int dx = ev.motion.x - sw.resize_start_x;
-                int dy = ev.motion.y - sw.resize_start_y;
+                int dx = mx_i - sw.resize_start_x;
+                int dy = my_i - sw.resize_start_y;
                 if (sw.resize & 1) {
                   sw.w = sw.resize_start_w + dx;
                   if (sw.w < 280) sw.w = 280;
@@ -2480,8 +2488,8 @@ int main(int argc, char** argv) {
             if (soft_motion) break;
           }
           if (help_dragging) {
-            help_x = ev.motion.x - help_drag_dx;
-            help_y = ev.motion.y - help_drag_dy;
+            help_x = mx_i - help_drag_dx;
+            help_y = my_i - help_drag_dy;
             if (help_x < 0) help_x = 0;
             if (help_y < static_cast<int>(ui_top)) help_y = static_cast<int>(ui_top);
             break;
@@ -2491,14 +2499,15 @@ int main(int argc, char** argv) {
             float max_s = std::max(
                 0.f, help_layout.content_height - static_cast<float>(ch) + 40.f);
             float view_h = static_cast<float>(std::max(1, ch));
-            float ratio = (static_cast<float>(ev.motion.y) - static_cast<float>(cy)) / view_h;
+            float ratio =
+                (mouse_y - static_cast<float>(cy)) / view_h;
             ratio = std::max(0.f, std::min(1.f, ratio));
             help_scroll = ratio * max_s;
             break;
           }
           if (help_resize) {
-            int dx = ev.motion.x - help_resize_start_x;
-            int dy = ev.motion.y - help_resize_start_y;
+            int dx = mx_i - help_resize_start_x;
+            int dy = my_i - help_resize_start_y;
             if (help_resize & 1) {
               help_w = help_resize_start_w + dx;
               if (help_w < 280) help_w = 280;
@@ -2516,7 +2525,7 @@ int main(int argc, char** argv) {
           if (imgui_mouse) break;
 
           // Status bar is not part of the document surface.
-          if (ev.motion.y >= win_h - status_bar_h &&
+          if (my_i >= win_h - status_bar_h &&
               !dragging_sel && !dragging_scroll && !dragging_split &&
               !dragging_image && !dragging_block && !dragging_col_gap) {
             break;
@@ -2526,7 +2535,7 @@ int main(int argc, char** argv) {
           // drive pane selection, scroll-hover, or gutter feedback underneath.
           if (!dragging_sel && !dragging_scroll && !dragging_split &&
               !dragging_image && !dragging_block && !dragging_col_gap) {
-            const int mxw = ev.motion.x, myw = ev.motion.y;
+            const int mxw = mx_i, myw = my_i;
             bool over_soft = false;
             if (outline_mode && mxw >= ol_x && mxw < ol_x + ol_w &&
                 myw >= ol_y && myw < ol_y + ol_h)
@@ -2547,7 +2556,7 @@ int main(int argc, char** argv) {
           }
 
           if (dragging_scroll) {
-            float my = content_y(static_cast<float>(ev.motion.y));
+            float my = content_y(mouse_y);
             Pane& sp = panes[scroll_drag_pane];
             float view_h = static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
             float content_h = std::max(view_h, sp.layout.content_height);
@@ -2558,14 +2567,14 @@ int main(int argc, char** argv) {
             break;
           }
           if (dragging_split && split) {
-            float mx = static_cast<float>(ev.motion.x);
+            float mx = mouse_x;
             split_ratio = mx / static_cast<float>(win_w);
             split_ratio = std::max(0.15f, std::min(0.85f, split_ratio));
             needs_layout = true;
             break;
           }
           if (dragging_image && resize_image != xanatoo::INVALID_NODE) {
-            float mx = static_cast<float>(ev.motion.x);
+            float mx = mouse_x;
             float dx = mx - resize_start_x;
             // 200px drag ≈ 1.0 scale change
             float scale = resize_start_scale + dx / 200.f;
@@ -2576,7 +2585,7 @@ int main(int argc, char** argv) {
           }
           if (dragging_col_gap && col_gap_left != xanatoo::INVALID_NODE &&
               col_gap_right != xanatoo::INVALID_NODE) {
-            float mx = static_cast<float>(ev.motion.x);
+            float mx = mouse_x;
             float dx = mx - col_gap_start_x;
             // Shift weight from one column to the other; keep total constant
             float total = col_gap_left_w + col_gap_right_w;
@@ -2619,8 +2628,8 @@ int main(int argc, char** argv) {
             break;
           }
           if (dragging_sel) {
-            float mx = static_cast<float>(ev.motion.x);
-            float my = content_y(static_cast<float>(ev.motion.y));
+            float mx = mouse_x;
+            float my = content_y(mouse_y);
             // Keep focus on the pane where drag started
             Pane& p = F();
             float lx = local_x(mx, focus);
@@ -2631,10 +2640,9 @@ int main(int argc, char** argv) {
           } else {
             // Track interactive elements under the cursor for status, tooltip,
             // highlight, and pointer shape.
-            float mx = static_cast<float>(ev.motion.x);
-            float my = content_y(static_cast<float>(ev.motion.y));
-            mouse_x = mx;
-            mouse_y = static_cast<float>(ev.motion.y);
+            float mx = mouse_x;
+            float my = content_y(mouse_y);
+            // mouse_x/y already set above (stick or hardware); do not clobber.
             int hover_pane = pane_at(mx);
             Pane& hp = panes[hover_pane];
             float lx = local_x(mx, hover_pane);
@@ -2785,6 +2793,7 @@ int main(int argc, char** argv) {
               }
             }
           }
+          }  // mx_i / my_i scope
           break;
 
         case SDL_TEXTINPUT: {
@@ -4727,6 +4736,7 @@ int main(int argc, char** argv) {
       }
       ui_state.has_floating = !soft_wins.empty();
       // Right-stick software cursor (before ImGui frame).
+      // Fully independent of the hardware mouse: never WarpMouse / SetCursor.
       if (gamepad) {
         auto axis_e = [&](SDL_GameControllerAxis a) -> float {
           Sint16 v = SDL_GameControllerGetAxis(gamepad, a);
@@ -4743,6 +4753,7 @@ int main(int argc, char** argv) {
         stick_cursor_on = true;
         float rx = axis_e(SDL_CONTROLLER_AXIS_RIGHTX);
         float ry = axis_e(SDL_CONTROLLER_AXIS_RIGHTY);
+        bool stick_moved = false;
         if (rx != 0.f || ry != 0.f) {
           // Non-linear response: fine aim near centre, faster at full tilt.
           auto curve = [](float v) {
@@ -4761,16 +4772,19 @@ int main(int argc, char** argv) {
             stick_cx = static_cast<float>(win_w - 1);
           if (stick_cy > static_cast<float>(win_h - 1))
             stick_cy = static_cast<float>(win_h - 1);
-          mouse_x = stick_cx;
-          mouse_y = stick_cy;
+          stick_moved = true;
+        }
+        // Stick owns the logical pointer used for hit-testing / ImGui.
+        mouse_x = stick_cx;
+        mouse_y = stick_cy;
+        if (stick_moved) {
           const int ix = static_cast<int>(stick_cx);
           const int iy = static_cast<int>(stick_cy);
           static int last_ix = -1, last_iy = -1;
-          SDL_WarpMouseInWindow(window, ix, iy);
           if (ix != last_ix || iy != last_iy) {
             last_ix = ix;
             last_iy = iy;
-            // Drive hover highlighting in the document path.
+            // Synthetic motion only — does not move the OS/hardware cursor.
             SDL_Event me{};
             me.type = SDL_MOUSEMOTION;
             me.motion.x = ix;
@@ -4778,7 +4792,7 @@ int main(int argc, char** argv) {
             me.motion.xrel = 0;
             me.motion.yrel = 0;
             me.motion.windowID = SDL_GetWindowID(window);
-            me.motion.state = SDL_GetMouseState(nullptr, nullptr);
+            me.motion.state = 0;
             if (stick_lmb) me.motion.state |= SDL_BUTTON(SDL_BUTTON_LEFT);
             if (stick_rmb) me.motion.state |= SDL_BUTTON(SDL_BUTTON_RIGHT);
             SDL_PushEvent(&me);
@@ -6997,11 +7011,13 @@ int main(int argc, char** argv) {
       const int cx = static_cast<int>(stick_cx);
       const int cy = static_cast<int>(stick_cy);
       SDL_Rect dst{cx, cy, stick_cursor_tw, stick_cursor_th};
+      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
       // Dim slightly while a button is held so click feedback is obvious.
       if (stick_lmb || stick_rmb)
         SDL_SetTextureColorMod(stick_cursor_tex, 180, 200, 255);
       else
         SDL_SetTextureColorMod(stick_cursor_tex, 255, 255, 255);
+      SDL_SetTextureAlphaMod(stick_cursor_tex, 255);
       SDL_RenderCopy(sdl, stick_cursor_tex, nullptr, &dst);
       // Small hotspot ring when clicking.
       if (stick_lmb || stick_rmb) {

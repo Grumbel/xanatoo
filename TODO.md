@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **171** (this delivery is **170**)
+Next bundle number: **172** (this delivery is **171**)
 
 ## Status (2026-10-11)
 
@@ -273,6 +273,8 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Stick cursor: drawn sprite (not system/X11 cursor) — visible on KMS/DRM
 - [x] UI font: prefer Noto/Roboto/Inter; XANATOO_UI_FONT; larger on ≤720px
 - [x] R36S launcher: UI scale 1.5, XANATOO_UI_FONT from shipped fonts/
+- [x] Stick cursor fully separate from hardware mouse (no WarpMouse)
+- [x] Stick sprite alpha fixed (ABGR8888 upload, same as glyphs)
 
 ## Open work / next steps
 
@@ -494,4 +496,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-167.*-virtual-keyboard-…` — virtual keyboard
 - `xanatoo-168.*-stick-cursor-…` — stick cursor
 - `xanatoo-169.*-stick-cursor-polish-…` — stick cursor polish
-- `xanatoo-170.*-sprite-cursor-ui-font-…` — this delivery
+- `xanatoo-170.*-sprite-cursor-ui-font-…` — sprite cursor + UI font
+- `xanatoo-171.*-stick-separate-alpha-…` — this delivery
