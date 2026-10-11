@@ -270,6 +270,9 @@ int main(int argc, char** argv) {
   std::string path_in_window_buf;
   bool open_file_mode = false;  // File→Open into focused pane (status-bar path)
   std::string open_file_buf;
+  std::string status_notice;
+  Uint32 status_notice_until = 0;
+  bool discard_armed = false;
 
   bool help_mode = false;  // F1 help as a real document in a software window
   xanatoo::Document help_doc;
@@ -341,10 +344,27 @@ int main(int argc, char** argv) {
   };
   auto mark_dirty = [&]() {
     int di = F().doc_index;
+    discard_armed = false;  // new edits require a fresh discard warning
     if (!dirty_flags[di]) {
       dirty_flags[di] = true;
       update_title();
     }
+  };
+  auto flash_status = [&](const std::string& msg) {
+    status_notice = msg;
+    status_notice_until = SDL_GetTicks() + 4000;
+  };
+  auto allow_discard_dirty = [&](int di) -> bool {
+    if (di < 0 || di > 1) di = 0;
+    if (!dirty_flags[di]) return true;
+    if (discard_armed) {
+      discard_armed = false;
+      return true;
+    }
+    discard_armed = true;
+    flash_status("Unsaved changes — Ctrl+S to save, or repeat to discard");
+    std::cerr << "Unsaved changes — save first, or repeat the command to discard.\n";
+    return false;
   };
   auto edit = [&]() {
     checkpoint();
@@ -2064,16 +2084,15 @@ int main(int argc, char** argv) {
                 needs_layout = true;
                 reset_blink();
               } else if (ctrl) {
-                if (dirty_flags[0] || dirty_flags[1]) {
-                  std::cerr << "Unsaved changes — Ctrl+S to save, "
-                               "Ctrl+Q again after saving, or save and quit.\n";
-                  // Soft warning once: if already warned, allow quit
-                  static bool quit_warned = false;
-                  if (!quit_warned) {
-                    quit_warned = true;
-                    break;
-                  }
+                if ((dirty_flags[0] || dirty_flags[1]) && !discard_armed) {
+                  discard_armed = true;
+                  flash_status(
+                      "Unsaved changes — Ctrl+S to save, or Ctrl+Q again to quit");
+                  std::cerr
+                      << "Unsaved changes — save first, or Ctrl+Q again to quit.\n";
+                  break;
                 }
+                discard_armed = false;
                 running = false;
               }
               break;
@@ -2419,7 +2438,11 @@ int main(int argc, char** argv) {
                     if (!found.empty()) path = found;
                   }
                   if (!fs::exists(path)) {
+                    flash_status("Open: file not found");
                     std::cerr << "Open: file not found: " << path << "\n";
+                  } else if (!allow_discard_dirty(p.doc_index)) {
+                    // keep open_file_mode so the user can confirm
+                    break;
                   } else {
                     docs[p.doc_index] = load_doc(path);
                     path_of(p) = path;
@@ -2434,11 +2457,15 @@ int main(int argc, char** argv) {
                     }
                     needs_layout = true;
                     update_title();
+                    flash_status("Opened " + path);
                     std::cout << "Opened: " << path << "\n";
+                    open_file_mode = false;
+                    open_file_buf.clear();
                   }
+                } else {
+                  open_file_mode = false;
+                  open_file_buf.clear();
                 }
-                open_file_mode = false;
-                open_file_buf.clear();
                 break;
               }
               if (save_as_mode) {
@@ -2800,6 +2827,7 @@ int main(int argc, char** argv) {
 
             case SDLK_n:
               if (ctrl) {
+                if (!allow_discard_dirty(p.doc_index)) break;
                 docs[p.doc_index] =
                     xanatoo::parse_document(xanatoo::fallback_document(), {});
                 path_of(p).clear();
@@ -2814,6 +2842,7 @@ int main(int argc, char** argv) {
                 }
                 needs_layout = true;
                 update_title();
+                flash_status("New document");
               }
               break;
 
@@ -3166,10 +3195,19 @@ int main(int argc, char** argv) {
       auto& p = F();
       auto& d = doc_of(p);
       switch (ui_frame.cmd) {
-        case C::Quit:
+        case C::Quit: {
+          if ((dirty_flags[0] || dirty_flags[1]) && !discard_armed) {
+            discard_armed = true;
+            flash_status(
+                "Unsaved changes — Ctrl+S to save, or Quit again to exit");
+            break;
+          }
+          discard_armed = false;
           running = false;
           break;
+        }
         case C::NewDocument: {
+          if (!allow_discard_dirty(p.doc_index)) break;
           docs[p.doc_index] =
               xanatoo::parse_document(xanatoo::fallback_document(), {});
           path_of(p).clear();
@@ -3184,6 +3222,7 @@ int main(int argc, char** argv) {
           }
           needs_layout = true;
           update_title();
+          flash_status("New document");
           break;
         }
         case C::OpenDocument:
@@ -3998,9 +4037,13 @@ int main(int argc, char** argv) {
       if (path_in_window_mode) {
         label = "Open in window: ";
         label += path_in_window_buf.empty() ? "…" : path_in_window_buf;
+        label += "    Enter open · Esc cancel";
+        tr = 220; tg = 230; tb = 245;
       } else if (open_file_mode) {
         label = "Open file: ";
         label += open_file_buf.empty() ? "…" : open_file_buf;
+        label += "    Enter open · Esc cancel";
+        tr = 220; tg = 230; tb = 245;
       } else if (save_as_mode) {
         label = "Save as: ";
         label += save_as_path.empty() ? "…" : save_as_path;
@@ -4045,6 +4088,10 @@ int main(int argc, char** argv) {
         label += search_query.empty() ? "…" : search_query;
         label += "    F3 next · Shift+F3 prev · Esc cancel";
         tr = 220; tg = 230; tb = 245;
+      } else if (!status_notice.empty() &&
+                 SDL_GetTicks() < status_notice_until) {
+        label = status_notice;
+        tr = 255; tg = 240; tb = 200;
       } else if (dragging_block) {
         label = "Moving block — drop before/after any block (columns & lists OK)";
         tr = 40; tg = 90; tb = 160;

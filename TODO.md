@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **115** (this delivery is **114**)
+Next bundle number: **116** (this delivery is **115**)
 
 ## Status (2026-10-11)
 
@@ -197,6 +197,9 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Ctrl+V pastes into status-bar prompts (paths, search, links…)
 - [x] Middle-click paste at caret (Linux-style)
 - [x] Mouse motion over soft windows no longer drives pane hover/selection underneath
+- [x] Dirty-buffer protection for New / Open / Quit (repeat to confirm discard)
+- [x] Status-bar flash notices for warnings and open/new feedback
+- [x] File→Quit uses the same unsaved-changes warn as Ctrl+Q
 
 ## Open work / next steps
 
@@ -360,4 +363,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-111.*-nested-table-md-…` — nested table markdown
 - `xanatoo-112.*-ui-icons-events-…` — icons, New/Open, capture fix
 - `xanatoo-113.*-events-icons-…` — prompt keys, soft right-click
-- `xanatoo-114.*-menus-paste-…` — this delivery
+- `xanatoo-114.*-menus-paste-…` — menus, prompt paste, middle-click
+- `xanatoo-115.*-dirty-status-…` — this delivery
