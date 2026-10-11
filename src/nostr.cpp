@@ -21,6 +21,8 @@
 #if defined(XANATOO_NOSTR) && XANATOO_NOSTR
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <poll.h>
+#include <errno.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -410,6 +412,51 @@ bool parse_wss_url(std::string_view url, std::string& host, std::string& path,
   return !host.empty();
 }
 
+bool tcp_connect_timeout(int fd, const sockaddr* addr, socklen_t len,
+                         int timeout_ms) {
+  int flags = fcntl(fd, F_GETFL, 0);
+  if (flags < 0) return false;
+  if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) return false;
+  int rc = ::connect(fd, addr, len);
+  if (rc == 0) {
+    fcntl(fd, F_SETFL, flags);
+    return true;
+  }
+  if (errno != EINPROGRESS) {
+    fcntl(fd, F_SETFL, flags);
+    return false;
+  }
+  pollfd pfd{};
+  pfd.fd = fd;
+  pfd.events = POLLOUT;
+  rc = ::poll(&pfd, 1, timeout_ms);
+  if (rc <= 0) {
+    fcntl(fd, F_SETFL, flags);
+    return false;
+  }
+  int soerr = 0;
+  socklen_t sl = sizeof(soerr);
+  if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &soerr, &sl) < 0 || soerr != 0) {
+    fcntl(fd, F_SETFL, flags);
+    return false;
+  }
+  fcntl(fd, F_SETFL, flags);
+  return true;
+}
+
+std::string normalize_relay_url(std::string r) {
+  while (!r.empty() && std::isspace(static_cast<unsigned char>(r.front())))
+    r.erase(r.begin());
+  while (!r.empty() && std::isspace(static_cast<unsigned char>(r.back())))
+    r.pop_back();
+  if (r.empty()) return {};
+  // Plain host → wss
+  if (r.rfind("ws://", 0) == 0) return {};  // refuse cleartext
+  if (r.rfind("wss://", 0) != 0) r = "wss://" + r;
+  while (r.size() > 8 && r.back() == '/') r.pop_back();
+  return r;
+}
+
 bool ws_connect(WsConn& c, const std::string& url, std::string* err) {
   std::string host, path;
   int port = 443;
@@ -417,26 +464,34 @@ bool ws_connect(WsConn& c, const std::string& url, std::string* err) {
     if (err) *err = "bad relay URL (need wss://)";
     return false;
   }
+  if (path.empty()) path = "/";
 
   addrinfo hints{};
   hints.ai_socktype = SOCK_STREAM;
-  hints.ai_family = AF_UNSPEC;
+  // Prefer IPv4 first: many handheld networks mishandle AAAA for relays.
+  hints.ai_family = AF_INET;
   addrinfo* res = nullptr;
   std::string port_s = std::to_string(port);
-  if (getaddrinfo(host.c_str(), port_s.c_str(), &hints, &res) != 0) {
+  int gai = getaddrinfo(host.c_str(), port_s.c_str(), &hints, &res);
+  if (gai != 0) {
+    hints.ai_family = AF_UNSPEC;
+    gai = getaddrinfo(host.c_str(), port_s.c_str(), &hints, &res);
+  }
+  if (gai != 0) {
     if (err) *err = "DNS failed for " + host;
     return false;
   }
+
   int fd = -1;
   for (addrinfo* p = res; p; p = p->ai_next) {
     fd = ::socket(p->ai_family, p->ai_socktype, p->ai_protocol);
     if (fd < 0) continue;
     timeval tv{};
-    tv.tv_sec = 8;
+    tv.tv_sec = 5;
     tv.tv_usec = 0;
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-    if (::connect(fd, p->ai_addr, p->ai_addrlen) == 0) break;
+    if (tcp_connect_timeout(fd, p->ai_addr, p->ai_addrlen, 4000)) break;
     ::close(fd);
     fd = -1;
   }
@@ -454,6 +509,7 @@ bool ws_connect(WsConn& c, const std::string& url, std::string* err) {
     if (err) *err = "SSL_CTX_new failed";
     return false;
   }
+  SSL_CTX_set_min_proto_version(c.ctx, TLS1_2_VERSION);
   SSL_CTX_set_verify(c.ctx, SSL_VERIFY_NONE, nullptr);
   c.ssl = SSL_new(c.ctx);
   if (!c.ssl) {
@@ -462,19 +518,25 @@ bool ws_connect(WsConn& c, const std::string& url, std::string* err) {
   }
   SSL_set_fd(c.ssl, c.fd);
   SSL_set_tlsext_host_name(c.ssl, host.c_str());
-  if (SSL_connect(c.ssl) != 1) {
-    if (err) *err = "TLS handshake failed";
+  // Some stacks need multiple SSL_connect calls when the socket times out mid-handshake
+  int ssl_rc = SSL_connect(c.ssl);
+  if (ssl_rc != 1) {
+    int e = SSL_get_error(c.ssl, ssl_rc);
+    if (err) *err = "TLS handshake failed (" + std::to_string(e) + ") " + host;
     return false;
   }
 
   std::string key = "dGhlIHNhbXBsZSBub25jZQ==";
   std::ostringstream req;
   req << "GET " << path << " HTTP/1.1\r\n"
-      << "Host: " << host << "\r\n"
+      << "Host: " << host;
+  if (port != 443) req << ":" << port;
+  req << "\r\n"
       << "Upgrade: websocket\r\n"
       << "Connection: Upgrade\r\n"
       << "Sec-WebSocket-Key: " << key << "\r\n"
       << "Sec-WebSocket-Version: 13\r\n"
+      << "User-Agent: xanatoo/0.1\r\n"
       << "\r\n";
   std::string reqs = req.str();
   if (!c.write_all(reqs.data(), reqs.size())) {
@@ -482,11 +544,15 @@ bool ws_connect(WsConn& c, const std::string& url, std::string* err) {
     return false;
   }
   std::string resp;
-  for (int i = 0; i < 32 && resp.find("\r\n\r\n") == std::string::npos; ++i) {
+  for (int i = 0; i < 40 && resp.find("\r\n\r\n") == std::string::npos; ++i) {
     if (!c.read_some(resp, 8192)) break;
   }
   if (resp.find("101") == std::string::npos) {
-    if (err) *err = "WS upgrade rejected by " + host;
+    if (err) {
+      std::string line = resp.substr(0, resp.find('\n'));
+      if (line.size() > 80) line.resize(80);
+      *err = "WS upgrade rejected by " + host + (line.empty() ? "" : (": " + line));
+    }
     return false;
   }
   return true;
@@ -687,11 +753,16 @@ Document events_to_document(const std::string& root_id,
 }
 
 std::vector<std::string> default_relays() {
+  // Ordered by general reliability; flaky hosts last (or omitted).
   return {
       "wss://relay.damus.io",
       "wss://nos.lol",
-      "wss://relay.nostr.band",
+      "wss://relay.primal.net",
+      "wss://nostr.bitcoiner.social",
+      "wss://relay.snort.social",
       "wss://nostr.wine",
+      // nostr.band often refuses or times out from some networks — try late
+      "wss://relay.nostr.band",
   };
 }
 
@@ -778,24 +849,50 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
     return std::nullopt;
   }
 
-  std::vector<std::string> relays = hint_relays;
-  for (const auto& r : default_relays()) {
+  std::vector<std::string> relays;
+  auto add_relay = [&](std::string r) {
+    r = normalize_relay_url(std::move(r));
+    if (r.empty()) return;
     if (std::find(relays.begin(), relays.end(), r) == relays.end())
-      relays.push_back(r);
-  }
+      relays.push_back(std::move(r));
+  };
+  for (const auto& r : hint_relays) add_relay(r);
+  for (const auto& r : default_relays()) add_relay(r);
 
   std::map<std::string, NostrEvent> by_id;
-  std::string last_err = "no relays answered";
+  std::vector<std::string> failures;
   int tried = 0;
+  int connected = 0;
+  // Try several relays; stop early once we have the root + a few replies.
   for (const auto& r : relays) {
-    if (tried >= 3) break;
-    if (r.rfind("wss://", 0) != 0) continue;
+    if (tried >= 5) break;
     ++tried;
-    query_relay(r, *id, by_id, &last_err);
+    std::string one_err;
+    size_t before = by_id.size();
+    query_relay(r, *id, by_id, &one_err);
+    if (by_id.size() > before) {
+      ++connected;
+      std::cerr << "Nostr: got " << (by_id.size() - before) << " event(s) from "
+                << r << "
+";
+    } else if (!one_err.empty()) {
+      failures.push_back(one_err);
+      std::cerr << "Nostr: " << one_err << "
+";
+    }
+    if (by_id.count(*id) && by_id.size() >= 3) break;
   }
 
   if (by_id.empty()) {
-    if (err) *err = last_err;
+    if (err) {
+      *err = "no events from " + std::to_string(tried) + " relay(s)";
+      if (!failures.empty()) {
+        *err += " — ";
+        *err += failures.front();
+        if (failures.size() > 1)
+          *err += " (+" + std::to_string(failures.size() - 1) + " more)";
+      }
+    }
     return std::nullopt;
   }
 
