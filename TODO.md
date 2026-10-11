@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **087** (this delivery is **086**)
+Next bundle number: **088** (this delivery is **087**)
 
 ## Status (2026-10-11)
 
@@ -144,6 +144,9 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Enter in TableCell inserts a new row (same column count)
 - [x] Tab / Shift+Tab moves between table cells
 - [x] Word-level intra-block diff marks for similar modified blocks
+- [x] Citation insert/edit (Ctrl+Shift+C / Format → Citation)
+- [x] Bibliography entry insert (Format → Bibliography Entry)
+- [x] Status bar prompts for citation key vs link href
 
 ## Open work / next steps
 
@@ -153,7 +156,7 @@ LCS structural diff marks; cross-document `:::include`.
 4. Word-level / intra-block diff highlighting (basic pairing in)
 5. **Tables** — semantic grid + basic grid presentation in; column weights / nested blocks still open
 6. **Docking** — tile/split zones (edge snap + maximize is in)
-7. **Citations** / typed link relations / range transclusion (see FORMAT.md)
+7. **Citations** / typed link relations / range transclusion (insert+jump in; :rel UI still open)
 
 ## Design notes
 
@@ -279,4 +282,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-083.*-md-semantic-…` — markdown semantic round-trip
 - `xanatoo-084.*-table-present-…` — table grid presentation
 - `xanatoo-085.*-newline-table-enter-…` — newlines + table Enter
-- `xanatoo-086.*-word-diff-table-tab-…` — this delivery
+- `xanatoo-086.*-word-diff-table-tab-…` — word diff + table Tab
+- `xanatoo-087.*-cite-biblio-…` — this delivery

@@ -226,6 +226,7 @@ int main(int argc, char** argv) {
   bool image_insert_mode = false;
   std::string image_insert_path;
   bool link_edit_mode = false;
+  bool link_edit_is_cite = false;  // true → citation key, not link href
   std::string link_edit_href;
   xanatoo::NodeId link_edit_node = xanatoo::INVALID_NODE;
   size_t link_edit_span = 0;
@@ -1634,6 +1635,7 @@ int main(int argc, char** argv) {
                 image_insert_path.clear();
               } else if (link_edit_mode) {
                 link_edit_mode = false;
+                link_edit_is_cite = false;
                 link_edit_href.clear();
               } else if (summary_edit_mode) {
                 summary_edit_mode = false;
@@ -1937,15 +1939,38 @@ int main(int argc, char** argv) {
               if (link_edit_mode) {
                 if (link_edit_node != xanatoo::INVALID_NODE) {
                   auto& node = d.get(link_edit_node);
-                  if (link_edit_span < node.spans.size()) {
-                    node.spans[link_edit_span].href = link_edit_href;
-                    node.spans[link_edit_span].kind = xanatoo::InlineKind::Link;
+                  // BiblioEntry: edit the entry's label (cite target key)
+                  if (node.kind == xanatoo::NodeKind::BiblioEntry &&
+                      link_edit_is_cite) {
+                    std::string key = link_edit_href;
+                    if (key.rfind("cite:", 0) == 0) key = key.substr(5);
+                    if (!key.empty() && key[0] == '#') key = key.substr(1);
+                    if (key.empty()) key = "key";
+                    node.label = key;
                     mark_dirty();
                     needs_layout = true;
-                    std::cout << "Link href: " << link_edit_href << "\n";
+                    std::cout << "Bibliography key: " << key << "\n";
+                  } else if (link_edit_span < node.spans.size()) {
+                    auto& sp = node.spans[link_edit_span];
+                    if (link_edit_is_cite) {
+                      // Strip optional cite: / # prefix from the typed key
+                      std::string key = link_edit_href;
+                      if (key.rfind("cite:", 0) == 0) key = key.substr(5);
+                      if (!key.empty() && key[0] == '#') key = key.substr(1);
+                      sp.href = key;
+                      sp.kind = xanatoo::InlineKind::Cite;
+                      std::cout << "Citation key: " << key << "\n";
+                    } else {
+                      sp.href = link_edit_href;
+                      sp.kind = xanatoo::InlineKind::Link;
+                      std::cout << "Link href: " << link_edit_href << "\n";
+                    }
+                    mark_dirty();
+                    needs_layout = true;
                   }
                 }
                 link_edit_mode = false;
+                link_edit_is_cite = false;
                 link_edit_href.clear();
                 break;
               }
@@ -2170,7 +2195,35 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_c:
-              if (ctrl) {
+              if (ctrl && shift && !p.sel.empty()) {
+                // Ctrl+Shift+C — wrap selection as a citation; type the key
+                std::string text = xanatoo::selected_text(d, p.sel);
+                std::string key = text;
+                for (char& ch : key) {
+                  if (ch >= 'A' && ch <= 'Z')
+                    ch = static_cast<char>(ch - 'A' + 'a');
+                  else if (!((ch >= 'a' && ch <= 'z') ||
+                             (ch >= '0' && ch <= '9')))
+                    ch = '-';
+                }
+                while (!key.empty() && key.front() == '-')
+                  key.erase(key.begin());
+                while (!key.empty() && key.back() == '-') key.pop_back();
+                if (key.empty()) key = "key";
+                if (key.size() > 32) key.resize(32);
+                edit();
+                xanatoo::apply_style_to_selection(
+                    d, p.sel, xanatoo::InlineKind::Cite, key);
+                link_edit_mode = true;
+                link_edit_is_cite = true;
+                search_mode = false;
+                save_as_mode = false;
+                link_edit_node = p.sel.focus.node;
+                link_edit_span = p.sel.focus.span_index;
+                link_edit_href = key;
+                needs_layout = true;
+                reset_blink();
+              } else if (ctrl) {
                 std::string text = xanatoo::selected_text(d, p.sel);
                 if (!text.empty()) SDL_SetClipboardText(text.c_str());
               }
@@ -2416,6 +2469,7 @@ int main(int argc, char** argv) {
                 xanatoo::apply_style_to_selection(
                     d, p.sel, xanatoo::InlineKind::Link, href);
                 link_edit_mode = true;
+                link_edit_is_cite = false;
                 search_mode = false;
                 save_as_mode = false;
                 link_edit_node = p.sel.focus.node;
@@ -2686,12 +2740,54 @@ int main(int argc, char** argv) {
             xanatoo::apply_style_to_selection(d, p.sel, xanatoo::InlineKind::Link,
                                               "#" + text);
             link_edit_mode = true;
+            link_edit_is_cite = false;
             link_edit_node = p.sel.focus.node;
             link_edit_span = p.sel.focus.span_index;
             link_edit_href = "#" + text;
             needs_layout = true;
           }
           break;
+        case C::Cite:
+          if (!p.sel.empty()) {
+            std::string text = xanatoo::selected_text(d, p.sel);
+            std::string key = text;
+            for (char& ch : key) {
+              if (ch >= 'A' && ch <= 'Z')
+                ch = static_cast<char>(ch - 'A' + 'a');
+              else if (!((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')))
+                ch = '-';
+            }
+            while (!key.empty() && key.front() == '-') key.erase(key.begin());
+            while (!key.empty() && key.back() == '-') key.pop_back();
+            if (key.empty()) key = "key";
+            if (key.size() > 32) key.resize(32);
+            edit();
+            xanatoo::apply_style_to_selection(d, p.sel, xanatoo::InlineKind::Cite,
+                                              key);
+            link_edit_mode = true;
+            link_edit_is_cite = true;
+            link_edit_node = p.sel.focus.node;
+            link_edit_span = p.sel.focus.span_index;
+            link_edit_href = key;
+            needs_layout = true;
+          }
+          break;
+        case C::InsertBiblioEntry: {
+          edit();
+          std::string key = "key";
+          if (xanatoo::insert_biblio_entry(d, p.sel.focus, key)) {
+            p.sel.anchor = p.sel.focus;
+            // Open key-edit on the entry label via status: reuse link_edit for label
+            // (label is not a span; set it when Enter confirms after typing).
+            link_edit_mode = true;
+            link_edit_is_cite = true;
+            link_edit_node = p.sel.focus.node;
+            link_edit_span = 0;
+            link_edit_href = key;
+            needs_layout = true;
+          }
+          break;
+        }
         case C::InsertParagraph:
           edit();
           if (xanatoo::insert_sibling_after(d, p.sel.focus,
@@ -3111,7 +3207,7 @@ int main(int argc, char** argv) {
         label += "    Enter insert · Esc cancel";
         tr = 220; tg = 230; tb = 245;
       } else if (link_edit_mode) {
-        label = "Link href: ";
+        label = link_edit_is_cite ? "Citation key: " : "Link href: ";
         label += link_edit_href.empty() ? "…" : link_edit_href;
         label += "    Enter confirm · Esc cancel";
         tr = 220; tg = 230; tb = 245;

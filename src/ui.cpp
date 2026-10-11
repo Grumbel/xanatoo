@@ -384,6 +384,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Italic", UiCommand::Italic, cmd, state.selection, "Ctrl+I");
       menu_item_cmd("Code", UiCommand::Code, cmd, state.selection, "Ctrl+`");
       menu_item_cmd("Link…", UiCommand::Link, cmd, state.selection, "Ctrl+K");
+      menu_item_cmd("Citation…", UiCommand::Cite, cmd, state.selection,
+                    "Ctrl+Shift+C");
       ImGui::Separator();
       menu_item_cmd("Paragraph", UiCommand::InsertParagraph, cmd);
       menu_item_cmd("Horizontal Rule", UiCommand::InsertHr, cmd);
@@ -392,6 +394,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Code Block", UiCommand::InsertCodeBlock, cmd);
       menu_item_cmd("Table", UiCommand::InsertTable, cmd);
       menu_item_cmd("Definition List", UiCommand::InsertDefList, cmd);
+      menu_item_cmd("Bibliography Entry", UiCommand::InsertBiblioEntry, cmd);
       ImGui::Separator();
       menu_item_cmd("Unordered List", UiCommand::ToggleUnorderedList, cmd, true,
                     "Ctrl+Shift+8");

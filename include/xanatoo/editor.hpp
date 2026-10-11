@@ -112,6 +112,10 @@ std::optional<NodeId> insert_sibling_after(Document& doc, Caret& caret,
 // Semantic structure helpers (table / deflist skeletons).
 std::optional<NodeId> insert_table(Document& doc, Caret& caret);
 std::optional<NodeId> insert_deflist(Document& doc, Caret& caret);
+// Insert a bibliography entry (creates a Biblio container if needed).
+// `key` becomes the entry label (cite target); body is placeholder text.
+std::optional<NodeId> insert_biblio_entry(Document& doc, Caret& caret,
+                                         const std::string& key = "key");
 
 // Insert an Image node after the caret's block. Follows with an empty
 // paragraph and moves the caret there so typing can continue.

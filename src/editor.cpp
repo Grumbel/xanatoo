@@ -757,6 +757,33 @@ std::optional<NodeId> insert_deflist(Document& doc, Caret& caret) {
   return list;
 }
 
+std::optional<NodeId> insert_biblio_entry(Document& doc, Caret& caret,
+                                         const std::string& key) {
+  // Prefer appending to an existing Biblio; otherwise create one after the
+  // caret's block.
+  NodeId biblio = INVALID_NODE;
+  if (doc.root != INVALID_NODE) {
+    for (const Node& n : doc.nodes) {
+      if (n.id != INVALID_NODE && n.kind == NodeKind::Biblio) {
+        biblio = n.id;
+        break;
+      }
+    }
+  }
+  if (biblio == INVALID_NODE) {
+    auto b = insert_sibling_after(doc, caret, NodeKind::Biblio);
+    if (!b) return std::nullopt;
+    biblio = *b;
+  }
+  NodeId entry = doc.create(NodeKind::BiblioEntry, biblio);
+  doc.get(entry).label = key.empty() ? "key" : key;
+  doc.append_text(entry, "Reference text");
+  caret.node = entry;
+  caret.span_index = 0;
+  caret.char_index = 0;
+  return entry;
+}
+
 std::optional<NodeId> insert_image(Document& doc, Caret& caret,
                                    const std::string& path,
                                    const std::string& alt) {
