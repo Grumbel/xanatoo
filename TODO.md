@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **093** (this delivery is **092**)
+Next bundle number: **094** (this delivery is **093**)
 
 ## Status (2026-10-11)
 
@@ -155,12 +155,13 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] GUI: stretch wrap/summary, list indent, columns, select block reachable via menu
 - [x] Soft-window tile zones (left/right/top/bottom + maximize) with drag preview
 - [x] Nested block content in table cells (layout + sexpr + insert-into-cell)
+- [x] Same-document transclusion write-through (embed body glyphs → source node)
 
 ## Open work / next steps
 
 1. Optional: HarfBuzz for complex scripts
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
-3. Editable transclusion mirror (edits on embed write through to source)
+3. Editable transclusion mirror (same-doc write-through in; external still read-only)
 4. Word-level / intra-block diff highlighting (basic pairing in)
 5. **Tables** — grid + column weights + nested block cells in (markdown nested still limited)
 6. **Docking** — edge snap + maximize + tile zones in
@@ -296,4 +297,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-089.*-table-weights-…` — table column weights
 - `xanatoo-090.*-gui-structure-…` — context menu + structure highlight
 - `xanatoo-091.*-dock-tiles-…` — soft-window tile zones
-- `xanatoo-092.*-nested-cells-…` — this delivery
+- `xanatoo-092.*-nested-cells-…` — nested table cells
+- `xanatoo-093.*-transclude-edit-…` — this delivery

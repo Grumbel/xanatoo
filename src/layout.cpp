@@ -797,7 +797,8 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       std::string label_href = node.src.empty() ? std::string{"(no target)"}
                                                 : node.src;
 
-      // Label line
+      // Label line (always tagged with the Transclude node so clicks can
+      // follow the include and structure highlight marks the embed).
       {
         Node label;
         label.id = id;
@@ -812,11 +813,16 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         y += 4.f;
       }
 
-      // Body: copy of target spans, or a missing marker
+      // Body: copy of target spans, or a missing marker.
+      // Same-document includes tag glyphs with the *source* node id so
+      // caret/edit hit-tests write through to the live passage. External
+      // includes stay tagged with the Transclude node (read-only mirror).
       {
         Node body;
-        body.id = id;
         body.kind = NodeKind::Paragraph;
+        const bool local_writable =
+            !external && target_id != INVALID_NODE && src_doc == &doc;
+        body.id = local_writable ? target_id : id;
         if (!body_spans.empty()) {
           body.spans = std::move(body_spans);
         } else {
@@ -827,6 +833,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           else
             s.text = "[missing transclusion]";
           body.spans.push_back(std::move(s));
+          body.id = id;  // missing marker is not writable
         }
         layout_paragraph(doc, body, x + bar_w + indent, y,
                          max_width - bar_w - indent, out, FontRole::Body);

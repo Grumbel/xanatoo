@@ -62,6 +62,11 @@ std::vector<SelRect> selection_rects(const LayoutResult& layout,
                                      float scroll_y,
                                      float line_height);
 
+// If caret sits on a same-document Transclude, move it to the source
+// passage so subsequent edits write through. Returns true when redirected.
+// External includes are left alone (read-only mirror).
+bool redirect_transclude_caret(Document& doc, Caret& caret);
+
 // Editing operations (mutate Document, caller re-layouts afterwards).
 void insert_text(Document& doc, Caret& caret, const std::string& utf8);
 

@@ -398,9 +398,43 @@ void apply_style_to_selection(Document& doc, Selection& sel, InlineKind kind,
   sel.anchor = sel.focus = a;
 }
 
+bool redirect_transclude_caret(Document& doc, Caret& caret) {
+  if (caret.node == INVALID_NODE) return false;
+  const Node& n = doc.get(caret.node);
+  if (n.kind != NodeKind::Transclude) return false;
+  // path.md#anchor → external (no write-through in this process)
+  const std::string& src = n.src;
+  if (src.empty()) return false;
+  // Detect external path: anything before '#' that looks like a file path
+  size_t hash = src.find('#');
+  std::string path_part = (hash == std::string::npos) ? src : src.substr(0, hash);
+  std::string href_part =
+      (hash == std::string::npos) ? std::string{} : src.substr(hash);
+  if (path_part.find('.') != std::string::npos ||
+      path_part.find('/') != std::string::npos ||
+      path_part.find('\\') != std::string::npos) {
+    // External file include — leave caret on the Transclude (read-only)
+    return false;
+  }
+  if (href_part.empty()) {
+    if (!src.empty() && src[0] == '#')
+      href_part = src;
+    else
+      href_part = std::string("#") + src;
+  }
+  NodeId target = find_anchor_node(doc, href_part);
+  if (target == INVALID_NODE || target == caret.node) return false;
+  caret.node = target;
+  caret.span_index = 0;
+  caret.char_index = 0;
+  return true;
+}
+
 void insert_text(Document& doc, Caret& caret, const std::string& utf8) {
   if (caret.node == INVALID_NODE || utf8.empty()) return;
-  // Reject control chars except we allow nothing special here
+  redirect_transclude_caret(doc, caret);
+  // External transclusion body is a read-only mirror — refuse mutation
+  if (doc.get(caret.node).kind == NodeKind::Transclude) return;
   Node& n = doc.get(caret.node);
   if (n.spans.empty()) {
     InlineSpan s;
@@ -425,6 +459,8 @@ static void renumber_ordered_list(Document& doc, NodeId list_id);
 
 void delete_backward(Document& doc, Caret& caret) {
   if (caret.node == INVALID_NODE) return;
+  redirect_transclude_caret(doc, caret);
+  if (doc.get(caret.node).kind == NodeKind::Transclude) return;
   Node& n = doc.get(caret.node);
 
   if (caret.char_index == 0 && caret.span_index == 0) {
@@ -497,6 +533,8 @@ void delete_backward(Document& doc, Caret& caret) {
 
 void delete_forward(Document& doc, Caret& caret) {
   if (caret.node == INVALID_NODE) return;
+  redirect_transclude_caret(doc, caret);
+  if (doc.get(caret.node).kind == NodeKind::Transclude) return;
   Node& n = doc.get(caret.node);
   if (n.spans.empty() || caret.span_index >= n.spans.size()) return;
 
@@ -1366,6 +1404,9 @@ static void erase_range_in_node(Node& n, size_t from_span, size_t from_ch,
 
 void delete_selection(Document& doc, Selection& sel) {
   if (sel.empty()) return;
+  redirect_transclude_caret(doc, sel.anchor);
+  redirect_transclude_caret(doc, sel.focus);
+  if (doc.get(sel.focus.node).kind == NodeKind::Transclude) return;
   Caret a = sel.anchor;
   Caret b = sel.focus;
   if (caret_cmp(doc, a, b) > 0) std::swap(a, b);
