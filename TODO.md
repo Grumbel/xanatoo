@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **135** (this delivery is **134**)
+Next bundle number: **136** (this delivery is **135**)
 
 ## Status (2026-10-11)
 
@@ -232,6 +232,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Browse mode gates menus, paste, drag-edit; steady caret
 - [x] Gemtext parser (.gmi) + optional gemini:// client (OpenSSL)
 - [x] URL bar (Ctrl+L) for gemini:// and local paths
+- [x] Shared navigate_to_url; Gemini 10/11 input; flake OpenSSL; Open URL menu
 
 ## Open work / next steps
 
@@ -415,4 +416,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-131.*-header-enter-…` — Enter on Header → paragraph
 - `xanatoo-132.*-browse-gamepad-…` — browse + gamepad
 - `xanatoo-133.*-browse-gate-…` — browse gates
-- `xanatoo-134.*-gemini-…` — this delivery
+- `xanatoo-134.*-gemini-…` — gemtext + gemini client
+- `xanatoo-135.*-gemini-polish-…` — this delivery

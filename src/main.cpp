@@ -617,6 +617,98 @@ int main(int argc, char** argv) {
     return {};
   };
 
+  // Load a gemini:// URL or local path into the focused pane.
+  auto navigate_to_url = [&](std::string target) -> bool {
+    while (!target.empty() &&
+           (target.back() == ' ' || target.back() == '\t'))
+      target.pop_back();
+    if (target.empty()) return false;
+    Pane& p = F();
+
+    auto load_into_pane = [&](xanatoo::Document doc, const std::string& label) {
+      docs[p.doc_index] = std::move(doc);
+      path_of(p) = label;
+      dirty_flags[p.doc_index] = false;
+      xanatoo::ensure_valid_caret(docs[p.doc_index], p.sel.focus);
+      p.sel.anchor = p.sel.focus;
+      p.scroll_y = 0.f;
+      histories[p.doc_index].reset(docs[p.doc_index], p.sel);
+      if (panes[0].doc_index == panes[1].doc_index) {
+        panes[1 - focus].sel = p.sel;
+        panes[1 - focus].scroll_y = 0.f;
+      }
+      needs_layout = true;
+      update_title();
+    };
+
+    if (xanatoo::is_gemini_url(target)) {
+#if defined(XANATOO_GEMINI) && XANATOO_GEMINI
+      flash_status("Fetching " + target + "…");
+      std::string err;
+      auto resp = xanatoo::gemini_fetch(target, &err);
+      if (!resp) {
+        flash_status("Gemini failed: " + err);
+        std::cerr << "Gemini: " << err << "\n";
+        return false;
+      }
+      if (resp->status == 10 || resp->status == 11) {
+        // Input request — open URL bar with query for the user to complete.
+        url_bar_mode = true;
+        url_bar_buf = resp->final_url;
+        if (!url_bar_buf.empty() && url_bar_buf.back() != '?')
+          url_bar_buf.push_back('?');
+        flash_status(std::string(resp->status == 11 ? "Sensitive input: "
+                                                    : "Input: ") +
+                     resp->meta);
+        return false;
+      }
+      if (resp->status < 20 || resp->status >= 30) {
+        flash_status("Gemini status " + std::to_string(resp->status) + " " +
+                     resp->meta);
+        return false;
+      }
+      if (!allow_discard_dirty(p.doc_index)) return false;
+      std::string meta = resp->meta;
+      for (char& c : meta)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      xanatoo::Document gdoc;
+      if (meta.find("text/markdown") != std::string::npos ||
+          meta.find("text/x-markdown") != std::string::npos) {
+        gdoc = xanatoo::parse_document(resp->body, "remote.md");
+      } else {
+        gdoc = xanatoo::parse_gemtext(resp->body);
+      }
+      gemini_current_url = resp->final_url;
+      load_into_pane(std::move(gdoc), resp->final_url);
+      browse_mode = true;
+      flash_status("Gemini " + std::to_string(resp->status) + " " +
+                   resp->final_url);
+      return true;
+#else
+      flash_status("Gemini client disabled (build with -DXANATOO_GEMINI=ON)");
+      return false;
+#endif
+    }
+
+    // Local path
+    std::string path = target;
+    if (!fs::exists(path)) {
+      std::string found = find_repo_file(path.c_str());
+      if (!found.empty()) path = found;
+    }
+    if (!fs::exists(path)) {
+      flash_status("Not found: " + target);
+      return false;
+    }
+    if (!allow_discard_dirty(p.doc_index)) return false;
+    gemini_current_url.clear();
+    load_into_pane(load_doc(path), path);
+    flash_status("Opened " + path);
+    return true;
+  };
+
+
+
   auto soft_client_rect = [&](const SoftWindow& sw) {
     return std::tuple{sw.x + help_pad, sw.y + help_title_h + 4,
                       sw.w - help_pad * 2,
@@ -1469,50 +1561,7 @@ int main(int argc, char** argv) {
                   if (!resolved.empty()) abs = resolved;
                 }
                 if (xanatoo::is_gemini_url(abs)) {
-                  // Queue via URL bar path: set buffer and synthesise load
-                  url_bar_buf = abs;
-                  url_bar_mode = true;
-                  // Fall through: inject by reusing Enter logic is heavy;
-                  // set mode and let user press Enter, or fetch immediately.
-                  url_bar_mode = false;
-                  // Immediate fetch: store and use a one-shot by setting
-                  // open via same mechanism as Ctrl+L Enter.
-                  // Simplest: put URL in buffer and process as Enter would.
-                  {
-                    std::string target = abs;
-#if defined(XANATOO_GEMINI) && XANATOO_GEMINI
-                    flash_status("Fetching " + target + "…");
-                    std::string err;
-                    auto resp = xanatoo::gemini_fetch(target, &err);
-                    if (!resp) {
-                      flash_status("Gemini failed: " + err);
-                    } else if (resp->status >= 20 && resp->status < 30) {
-                      auto gdoc = xanatoo::parse_gemtext(resp->body);
-                      if (allow_discard_dirty(p.doc_index)) {
-                        docs[p.doc_index] = std::move(gdoc);
-                        path_of(p) = resp->final_url;
-                        gemini_current_url = resp->final_url;
-                        dirty_flags[p.doc_index] = false;
-                        xanatoo::ensure_valid_caret(docs[p.doc_index],
-                                                    p.sel.focus);
-                        p.sel.anchor = p.sel.focus;
-                        p.scroll_y = 0.f;
-                        histories[p.doc_index].reset(docs[p.doc_index], p.sel);
-                        needs_layout = true;
-                        update_title();
-                        browse_mode = true;
-                        flash_status("Gemini " + resp->final_url);
-                      }
-                    } else {
-                      flash_status("Gemini status " +
-                                   std::to_string(resp->status) + " " +
-                                   resp->meta);
-                    }
-#else
-                    flash_status("Gemini client disabled at build time");
-                    (void)target;
-#endif
-                  }
+                  navigate_to_url(std::move(abs));
                   break;
                 }
                 flash_status("Opening " + *href);
@@ -2829,94 +2878,9 @@ int main(int argc, char** argv) {
               }
               if (url_bar_mode) {
                 std::string target = url_bar_buf;
-                while (!target.empty() &&
-                       (target.back() == ' ' || target.back() == '\t'))
-                  target.pop_back();
                 url_bar_mode = false;
                 url_bar_buf.clear();
-                if (target.empty()) break;
-
-                auto load_into_pane = [&](xanatoo::Document doc,
-                                         const std::string& label) {
-                  if (!allow_discard_dirty(p.doc_index)) {
-                    flash_status(
-                        "Unsaved changes — save or discard before loading");
-                    return;
-                  }
-                  docs[p.doc_index] = std::move(doc);
-                  path_of(p) = label;
-                  dirty_flags[p.doc_index] = false;
-                  xanatoo::ensure_valid_caret(docs[p.doc_index], p.sel.focus);
-                  p.sel.anchor = p.sel.focus;
-                  p.scroll_y = 0.f;
-                  histories[p.doc_index].reset(docs[p.doc_index], p.sel);
-                  if (panes[0].doc_index == panes[1].doc_index) {
-                    panes[1 - focus].sel = p.sel;
-                    panes[1 - focus].scroll_y = 0.f;
-                  }
-                  needs_layout = true;
-                  update_title();
-                };
-
-                if (xanatoo::is_gemini_url(target)) {
-#if defined(XANATOO_GEMINI) && XANATOO_GEMINI
-                  flash_status("Fetching " + target + "…");
-                  std::string err;
-                  auto resp = xanatoo::gemini_fetch(target, &err);
-                  if (!resp) {
-                    flash_status("Gemini failed: " + err);
-                    std::cerr << "Gemini: " << err << "\n";
-                    break;
-                  }
-                  if (resp->status == 10 || resp->status == 11) {
-                    flash_status("Gemini input required: " + resp->meta);
-                    break;
-                  }
-                  if (resp->status < 20 || resp->status >= 30) {
-                    flash_status("Gemini status " + std::to_string(resp->status) +
-                                " " + resp->meta);
-                    break;
-                  }
-                  // 20 success — body is gemtext unless meta says otherwise
-                  std::string meta = resp->meta;
-                  for (char& c : meta)
-                    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-                  xanatoo::Document gdoc;
-                  if (meta.find("text/gemini") != std::string::npos ||
-                      meta.empty() || meta.find("text/plain") != std::string::npos) {
-                    gdoc = xanatoo::parse_gemtext(resp->body);
-                  } else if (meta.find("text/markdown") != std::string::npos ||
-                             meta.find("text/x-markdown") != std::string::npos) {
-                    gdoc = xanatoo::parse_document(resp->body, "remote.md");
-                  } else {
-                    // Treat as plain text paragraphs
-                    gdoc = xanatoo::parse_gemtext(resp->body);
-                  }
-                  gemini_current_url = resp->final_url;
-                  load_into_pane(std::move(gdoc), resp->final_url);
-                  browse_mode = true;
-                  flash_status("Gemini " + std::to_string(resp->status) + " " +
-                               resp->final_url);
-#else
-                  flash_status(
-                      "Gemini client disabled (build with -DXANATOO_GEMINI=ON)");
-#endif
-                  break;
-                }
-
-                // Local path
-                std::string path = target;
-                if (!fs::exists(path)) {
-                  std::string found = find_repo_file(path.c_str());
-                  if (!found.empty()) path = found;
-                }
-                if (!fs::exists(path)) {
-                  flash_status("Not found: " + target);
-                  break;
-                }
-                gemini_current_url.clear();
-                load_into_pane(load_doc(path), path);
-                flash_status("Opened " + path);
+                navigate_to_url(std::move(target));
                 break;
               }
               if (open_file_mode) {
@@ -3779,7 +3743,8 @@ int main(int argc, char** argv) {
       if (browse_mode && ui_frame.cmd != C::None) {
         const C c = ui_frame.cmd;
         const bool allowed =
-            c == C::Quit || c == C::OpenDocument || c == C::Save ||
+            c == C::Quit || c == C::OpenDocument || c == C::OpenUrlBar ||
+            c == C::Save ||
             c == C::SaveAs || c == C::ExportSexpr || c == C::ExportMarkdown ||
             c == C::Reload || c == C::ForceReload || c == C::Copy ||
             c == C::SelectAll || c == C::SelectBlock || c == C::Find ||
@@ -3832,6 +3797,16 @@ int main(int argc, char** argv) {
           path_in_window_mode = false;
           save_as_mode = false;
           search_mode = false;
+          url_bar_mode = false;
+          break;
+        case C::OpenUrlBar:
+          url_bar_mode = true;
+          url_bar_buf = gemini_current_url.empty() ? "gemini://"
+                                                  : gemini_current_url;
+          search_mode = false;
+          save_as_mode = false;
+          open_file_mode = false;
+          path_in_window_mode = false;
           break;
         case C::Save: {
           std::string& spath = path_of(p);

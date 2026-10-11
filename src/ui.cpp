@@ -455,6 +455,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     if (ImGui::BeginMenu("File")) {
       menu_item_cmd("New", UiCommand::NewDocument, cmd, true, "Ctrl+N");
       menu_item_cmd("Open…", UiCommand::OpenDocument, cmd, true, "Ctrl+O");
+      menu_item_cmd("Open URL…", UiCommand::OpenUrlBar, cmd, true, "Ctrl+L");
       ImGui::Separator();
       menu_item_cmd("Save", UiCommand::Save, cmd, true, "Ctrl+S");
       menu_item_cmd("Save As…", UiCommand::SaveAs, cmd, true, "Ctrl+Shift+S");

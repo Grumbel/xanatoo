@@ -30,6 +30,7 @@
               SDL2
               freetype
               fontconfig
+              openssl
               # Prefer top-level libx11; xorg.* package set is deprecated.
               libx11
             ];
@@ -79,6 +80,7 @@
               SDL2
               freetype
               fontconfig
+              openssl
               libx11
               dejavu_fonts
               gdb
