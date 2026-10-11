@@ -887,6 +887,27 @@ std::optional<NodeId> insert_biblio_entry(Document& doc, Caret& caret,
   return entry;
 }
 
+std::optional<NodeId> insert_transclude(Document& doc, Caret& caret,
+                                        const std::string& src) {
+  if (src.empty()) return std::nullopt;
+  auto tid = insert_sibling_after(doc, caret, NodeKind::Transclude);
+  if (!tid) {
+    // Fallback when caret is on a container: create under root after last child
+    if (doc.root == INVALID_NODE) return std::nullopt;
+    NodeId n = doc.create(NodeKind::Transclude, doc.root);
+    doc.get(n).src = src;
+    caret.node = n;
+    caret.span_index = 0;
+    caret.char_index = 0;
+    return n;
+  }
+  doc.get(*tid).src = src;
+  caret.node = *tid;
+  caret.span_index = 0;
+  caret.char_index = 0;
+  return tid;
+}
+
 std::optional<NodeId> insert_image(Document& doc, Caret& caret,
                                    const std::string& path,
                                    const std::string& alt) {

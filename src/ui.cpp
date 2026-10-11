@@ -358,6 +358,7 @@ static void menu_insert_items(UiCommand& cmd) {
   menu_item_cmd("Definition List", UiCommand::InsertDefList, cmd);
   menu_item_cmd("Bibliography Entry", UiCommand::InsertBiblioEntry, cmd);
   menu_item_cmd("Columns (2)", UiCommand::InsertColumns, cmd);
+  menu_item_cmd("Include / Transclude…", UiCommand::InsertTransclude, cmd);
 }
 
 static void menu_structure_items(const UiState& state, UiCommand& cmd) {

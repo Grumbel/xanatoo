@@ -46,6 +46,7 @@ enum class UiCommand {
   InsertDefList,
   InsertBiblioEntry,
   InsertColumns,
+  InsertTransclude,
   // Structure / lists
   ToggleUnorderedList,
   ToggleOrderedList,

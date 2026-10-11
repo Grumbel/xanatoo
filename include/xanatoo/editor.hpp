@@ -123,6 +123,10 @@ std::optional<NodeId> insert_columns(Document& doc, Caret& caret, int n = 2);
 // `key` becomes the entry label (cite target); body is placeholder text.
 std::optional<NodeId> insert_biblio_entry(Document& doc, Caret& caret,
                                          const std::string& key = "key");
+// Insert a Transclude (:::include) after the caret's block.
+// `src` is `#Heading`, `file.md`, or `file.md#Heading`.
+std::optional<NodeId> insert_transclude(Document& doc, Caret& caret,
+                                        const std::string& src);
 
 // Insert an Image node after the caret's block. Follows with an empty
 // paragraph and moves the caret there so typing can continue.

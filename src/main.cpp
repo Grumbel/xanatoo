@@ -225,6 +225,8 @@ int main(int argc, char** argv) {
   std::string save_as_path;
   bool image_insert_mode = false;
   std::string image_insert_path;
+  bool include_insert_mode = false;
+  std::string include_insert_src;
   bool link_edit_mode = false;
   bool link_edit_is_cite = false;  // true → citation key, not link href
   std::string link_edit_href;
@@ -1230,7 +1232,7 @@ int main(int argc, char** argv) {
               }
             }
 
-            // Click a transclusion → jump to its source passage
+            // Click a transclusion → jump to local source, or open external file
             {
               bool followed = false;
               float adj_y = my + p.scroll_y;
@@ -1252,6 +1254,30 @@ int main(int argc, char** argv) {
                   reset_blink();
                   std::cout << "Followed transclusion: " << bn.src << "\n";
                   followed = true;
+                } else {
+                  // External path.md[#anchor] — open the file in a soft window
+                  std::string path_part = bn.src;
+                  size_t hash = path_part.find('#');
+                  if (hash != std::string::npos)
+                    path_part = path_part.substr(0, hash);
+                  if (!path_part.empty() &&
+                      (path_part.find('.') != std::string::npos ||
+                       path_part.find('/') != std::string::npos)) {
+                    std::filesystem::path resolved = path_part;
+                    std::string base = path_of(p);
+                    if (!base.empty() && resolved.is_relative()) {
+                      resolved = std::filesystem::path(base).parent_path() /
+                                 path_part;
+                    }
+                    if (std::filesystem::exists(resolved)) {
+                      open_browse(resolved.string(),
+                                  resolved.filename().string() +
+                                      " — included source");
+                      std::cout << "Opened include source: " << resolved
+                                << "\n";
+                      followed = true;
+                    }
+                  }
                 }
                 break;
               }
@@ -1618,6 +1644,10 @@ int main(int argc, char** argv) {
             image_insert_path += ev.text.text;
             break;
           }
+          if (include_insert_mode) {
+            include_insert_src += ev.text.text;
+            break;
+          }
           if (link_edit_mode) {
             link_edit_href += ev.text.text;
             break;
@@ -1741,6 +1771,9 @@ int main(int argc, char** argv) {
               } else if (image_insert_mode) {
                 image_insert_mode = false;
                 image_insert_path.clear();
+              } else if (include_insert_mode) {
+                include_insert_mode = false;
+                include_insert_src.clear();
               } else if (link_edit_mode) {
                 link_edit_mode = false;
                 link_edit_is_cite = false;
@@ -1967,6 +2000,16 @@ int main(int argc, char** argv) {
                 }
                 break;
               }
+              if (include_insert_mode) {
+                if (!include_insert_src.empty()) {
+                  while (!include_insert_src.empty() &&
+                         (static_cast<unsigned char>(include_insert_src.back()) &
+                          0xc0) == 0x80)
+                    include_insert_src.pop_back();
+                  if (!include_insert_src.empty()) include_insert_src.pop_back();
+                }
+                break;
+              }
               if (link_edit_mode) {
                 if (!link_edit_href.empty()) {
                   while (!link_edit_href.empty() &&
@@ -2165,6 +2208,22 @@ int main(int argc, char** argv) {
                 }
                 image_insert_mode = false;
                 image_insert_path.clear();
+                break;
+              }
+              if (include_insert_mode) {
+                if (!include_insert_src.empty()) {
+                  edit();
+                  if (xanatoo::insert_transclude(d, p.sel.focus,
+                                                 include_insert_src)) {
+                    p.sel.anchor = p.sel.focus;
+                    needs_layout = true;
+                    reset_blink();
+                    std::cout << "Inserted include: " << include_insert_src
+                              << "\n";
+                  }
+                }
+                include_insert_mode = false;
+                include_insert_src.clear();
                 break;
               }
               // Ctrl+Enter: new empty paragraph after current block
@@ -3001,6 +3060,16 @@ int main(int argc, char** argv) {
             needs_layout = true;
           }
           break;
+        case C::InsertTransclude: {
+          include_insert_mode = true;
+          include_insert_src.clear();
+          if (!p.sel.empty()) {
+            std::string t = xanatoo::selected_text(d, p.sel);
+            if (!t.empty() && t[0] != '#') t = "#" + t;
+            include_insert_src = t;
+          }
+          break;
+        }
         case C::InsertImage:
           image_insert_mode = true;
           image_insert_path.clear();
@@ -3443,7 +3512,7 @@ int main(int argc, char** argv) {
       const int bar_h = 28;
       SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
       if (search_mode || save_as_mode || path_in_window_mode || link_edit_mode ||
-          summary_edit_mode) {
+          summary_edit_mode || image_insert_mode || include_insert_mode) {
         SDL_SetRenderDrawColor(sdl, 30, 30, 40, 240);
       } else {
         SDL_SetRenderDrawColor(sdl, 236, 234, 228, 245);
@@ -3452,7 +3521,7 @@ int main(int argc, char** argv) {
       SDL_RenderFillRect(sdl, &bar);
       // Top edge line
       if (search_mode || save_as_mode || path_in_window_mode || link_edit_mode ||
-          summary_edit_mode) {
+          summary_edit_mode || image_insert_mode || include_insert_mode) {
         SDL_SetRenderDrawColor(sdl, 80, 160, 255, 255);
       } else {
         SDL_SetRenderDrawColor(sdl, 200, 198, 190, 255);
@@ -3474,6 +3543,11 @@ int main(int argc, char** argv) {
         label = "Image path: ";
         label += image_insert_path.empty() ? "…" : image_insert_path;
         label += "    Enter insert · Esc cancel";
+        tr = 220; tg = 230; tb = 245;
+      } else if (include_insert_mode) {
+        label = "Include: ";
+        label += include_insert_src.empty() ? "…" : include_insert_src;
+        label += "    (#Heading · file.md · file.md#Heading)  Enter · Esc";
         tr = 220; tg = 230; tb = 245;
       } else if (link_edit_mode) {
         if (link_edit_is_cite) {
