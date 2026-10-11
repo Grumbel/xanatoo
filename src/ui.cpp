@@ -751,7 +751,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       cmd = UiCommand::ToggleStructure;
     if (ImGui::MenuItem("Heading Outline", "Ctrl+Shift+O", state.outline))
       cmd = UiCommand::ToggleOutline;
-    if (ImGui::MenuItem("Diff Marks", "Ctrl+Shift+D", state.diff))
+    if (ImGui::MenuItem("Diff Marks", "Ctrl+Shift+D", state.diff, state.can_diff))
       cmd = UiCommand::ToggleDiff;
     menu_item_cmd("Find…", UiCommand::Find, cmd, true, "Ctrl+F");
     menu_item_cmd("Replace…", UiCommand::Replace, cmd, true, "Ctrl+H");

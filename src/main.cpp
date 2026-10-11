@@ -2670,7 +2670,51 @@ int main(int argc, char** argv) {
             case SDLK_PAGEUP:
             case SDLK_PAGEDOWN: {
               const bool up = (ev.key.keysym.sym == SDLK_PAGEUP);
-              const float view_h = static_cast<float>(win_h - status_bar_h) - ui_top;
+              // When the pointer is over soft chrome, page that surface instead
+              // of the document (matches wheel routing).
+              int mxk = 0, myk = 0;
+              SDL_GetMouseState(&mxk, &myk);
+              auto page_scroll = [&](float& scroll, float content_h,
+                                     float view_h) {
+                if (view_h < 1.f) view_h = 1.f;
+                const float step = view_h * 0.85f;
+                float max_s = std::max(0.f, content_h - view_h + 40.f);
+                if (up)
+                  scroll = std::max(0.f, scroll - step);
+                else
+                  scroll = std::min(max_s, scroll + step);
+              };
+              if (outline_mode && mxk >= ol_x && mxk < ol_x + ol_w &&
+                  myk >= ol_y && myk < ol_y + ol_h) {
+                page_scroll(ol_scroll, static_cast<float>(outline.size()) * 22.f,
+                            static_cast<float>(ol_h - help_title_h - 8));
+                break;
+              }
+              {
+                bool soft_paged = false;
+                for (int i = static_cast<int>(soft_wins.size()) - 1; i >= 0;
+                     --i) {
+                  SoftWindow& sw = soft_wins[static_cast<size_t>(i)];
+                  if (mxk >= sw.x && mxk < sw.x + sw.w && myk >= sw.y &&
+                      myk < sw.y + sw.h) {
+                    auto [cx, cy, cw, ch] = soft_client_rect(sw);
+                    page_scroll(sw.scroll, sw.layout.content_height,
+                                static_cast<float>(std::max(1, ch)));
+                    soft_paged = true;
+                    break;
+                  }
+                }
+                if (soft_paged) break;
+              }
+              if (help_mode && mxk >= help_x && mxk < help_x + help_w &&
+                  myk >= help_y && myk < help_y + help_h) {
+                auto [cx, cy, cw, ch] = help_client_rect();
+                page_scroll(help_scroll, help_layout.content_height,
+                            static_cast<float>(std::max(1, ch)));
+                break;
+              }
+              const float view_h =
+                  static_cast<float>(win_h - status_bar_h) - ui_top;
               const float step = view_h * 0.85f;
               float max_s = std::max(
                   0.f, p.layout.content_height - view_h + 40.f);
