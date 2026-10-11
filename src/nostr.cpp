@@ -737,17 +737,21 @@ Document events_to_document(const std::string& root_id,
     auto pit = profiles.find(e.pubkey);
     n.src = (pit != profiles.end()) ? pit->second : short_npub(e.pubkey);
     n.summary = format_time(e.created_at);
-    if (e.id != root_id && !e.reply_to.empty())
+    // Only mark real in-reply-to chains; do not invent a parent for
+    // independent firehose notes (that made every line say "reply to #root").
+    if (!e.reply_to.empty())
       n.alt = e.reply_to;
-    else if (e.id != root_id)
-      n.alt = root_id;
-    doc.append_text(msg, e.content.empty() ? "(empty)" : e.content);
+    // Body lives on a child Paragraph — Message layout/serialize only walk
+    // children, not spans on the Message node itself.
+    NodeId body = doc.create(NodeKind::Paragraph, msg);
+    doc.append_text(body, e.content.empty() ? "(empty)" : e.content);
   }
 
   if (doc.get(thread).children.empty()) {
     NodeId msg = doc.create(NodeKind::Message, thread);
     doc.get(msg).src = "xanatoo";
-    doc.append_text(msg,
+    NodeId body = doc.create(NodeKind::Paragraph, msg);
+    doc.append_text(body,
                     "No events returned from relays for this id.\n"
                     "The note may be rare, or relays may be unreachable.");
   }
