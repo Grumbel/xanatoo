@@ -707,14 +707,42 @@ int main(int argc, char** argv) {
           break;
 
         case SDL_DROPFILE: {
-          // Drag-and-drop image files from the desktop/file manager into a pane.
+          // Drag-and-drop: documents open in a soft window; images insert at caret.
           char* dropped = ev.drop.file;
           if (!dropped) break;
           std::string fpath(dropped);
           SDL_free(dropped);
 
+          auto lower_ext = [](std::string p) {
+            for (char& c : p)
+              if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+            return p;
+          };
+          const std::string low = lower_ext(fpath);
+          const bool is_doc =
+              low.size() >= 3 &&
+              (low.ends_with(".md") || low.ends_with(".markdown") ||
+               low.ends_with(".sexp") || low.ends_with(".txt"));
+
+          if (is_doc) {
+            if (!std::filesystem::exists(fpath)) {
+              std::cerr << "Drop: file not found: " << fpath << "\n";
+              break;
+            }
+            std::string title;
+            try {
+              title = std::filesystem::path(fpath).filename().string();
+            } catch (...) {
+              title = fpath;
+            }
+            open_browse(fpath, title);
+            std::cout << "Opened dropped document: " << fpath << "\n";
+            break;
+          }
+
           if (!xanatoo::is_raster_image_path(fpath)) {
-            std::cerr << "Drop ignored (not an image): " << fpath << "\n";
+            std::cerr << "Drop ignored (not an image or document): " << fpath
+                      << "\n";
             break;
           }
 
