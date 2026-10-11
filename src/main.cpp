@@ -404,7 +404,7 @@ int main(int argc, char** argv) {
     float doc_y = cpos.y;
     float margin = 40.f;
     // Visible content height excludes menu/toolbar and status bar.
-    float view_h = static_cast<float>(win_h) - ui_top - 28.f;
+    float view_h = static_cast<float>(win_h - status_bar_h) - ui_top;
     if (view_h < 80.f) view_h = 80.f;
     if (doc_y - p.scroll_y < margin) {
       p.scroll_y = std::max(0.f, doc_y - margin);
@@ -771,6 +771,7 @@ int main(int argc, char** argv) {
           int mx = 0, my_raw = 0;
           SDL_GetMouseState(&mx, &my_raw);
           if (static_cast<float>(my_raw) < ui_top) break;
+          if (my_raw >= win_h - status_bar_h) break;
 
           focus = pane_at(static_cast<float>(mx));
           Pane& p = F();
@@ -1171,12 +1172,12 @@ int main(int argc, char** argv) {
             {
               int pi = pane_at(mx);
               int sx = panes[pi].x + panes[pi].w - 8;
-              if (mx >= sx && my < win_h - 28) {
+              if (mx >= sx && my < win_h - status_bar_h) {
                 focus = pi;
                 dragging_scroll = true;
                 scroll_drag_pane = pi;
                 // Jump scroll so thumb centres under cursor
-                float view_h = static_cast<float>(win_h - 28);
+                float view_h = static_cast<float>(win_h - status_bar_h);
                 float content_h = std::max(view_h, panes[pi].layout.content_height);
                 float max_s = std::max(0.f, content_h - view_h + 40.f);
                 float ratio = (view_h > 0.f) ? (my / view_h) : 0.f;
@@ -1690,6 +1691,13 @@ int main(int argc, char** argv) {
           // Soft-window interactions handled; rest of motion is for panes.
           if (imgui_mouse) break;
 
+          // Status bar is not part of the document surface.
+          if (ev.motion.y >= win_h - status_bar_h &&
+              !dragging_sel && !dragging_scroll && !dragging_split &&
+              !dragging_image && !dragging_block && !dragging_col_gap) {
+            break;
+          }
+
           // Hovering a soft window (without an active document drag) should not
           // drive pane selection, scroll-hover, or gutter feedback underneath.
           if (!dragging_sel && !dragging_scroll && !dragging_split &&
@@ -1717,7 +1725,7 @@ int main(int argc, char** argv) {
           if (dragging_scroll) {
             float my = content_y(static_cast<float>(ev.motion.y));
             Pane& sp = panes[scroll_drag_pane];
-            float view_h = static_cast<float>(win_h) - ui_top - 28.f;
+            float view_h = static_cast<float>(win_h - status_bar_h) - ui_top;
             float content_h = std::max(view_h, sp.layout.content_height);
             float max_s = std::max(0.f, content_h - view_h + 40.f);
             float ratio = (view_h > 0.f) ? (my / view_h) : 0.f;
@@ -2099,6 +2107,23 @@ int main(int argc, char** argv) {
               }
               break;
 
+            case SDLK_w:
+              if (ctrl) {
+                // Close topmost soft chrome (browse window → help → outline).
+                if (!soft_wins.empty()) {
+                  soft_wins.pop_back();
+                  flash_status("Closed window");
+                } else if (help_mode) {
+                  help_mode = false;
+                  help_dragging = false;
+                } else if (outline_mode) {
+                  outline_mode = false;
+                  ol_dragging = false;
+                  ol_resize = 0;
+                }
+              }
+              break;
+
             case SDLK_f:
               if (ctrl) {
                 search_mode = true;
@@ -2443,7 +2468,9 @@ int main(int argc, char** argv) {
                     flash_status("Open: file not found");
                     std::cerr << "Open: file not found: " << path << "\n";
                   } else if (!allow_discard_dirty(p.doc_index)) {
-                    // keep open_file_mode so the user can confirm
+                    // keep open_file_mode so a second Enter discards and opens
+                    flash_status(
+                        "Unsaved changes — Enter again to discard and open");
                     break;
                   } else {
                     docs[p.doc_index] = load_doc(path);
@@ -2614,7 +2641,7 @@ int main(int argc, char** argv) {
             case SDLK_PAGEUP:
             case SDLK_PAGEDOWN: {
               const bool up = (ev.key.keysym.sym == SDLK_PAGEUP);
-              const float view_h = static_cast<float>(win_h) - ui_top - 28.f;
+              const float view_h = static_cast<float>(win_h - status_bar_h) - ui_top;
               const float step = view_h * 0.85f;
               float max_s = std::max(
                   0.f, p.layout.content_height - view_h + 40.f);
@@ -3712,13 +3739,13 @@ int main(int argc, char** argv) {
     int pane_count = split ? 2 : 1;
     for (int i = 0; i < pane_count; ++i) {
       Pane& pane = panes[i];
-      float view_h_pane = static_cast<float>(win_h) - ui_top - 28.f;
+      float view_h_pane = static_cast<float>(win_h - status_bar_h) - ui_top;
       float max_scroll =
           std::max(0.f, pane.layout.content_height - view_h_pane + 40.f);
       if (pane.scroll_y > max_scroll) pane.scroll_y = max_scroll;
 
       const int clip_y = static_cast<int>(ui_top);
-      SDL_Rect clip{pane.x, clip_y, pane.w, win_h - 28 - clip_y};
+      SDL_Rect clip{pane.x, clip_y, pane.w, win_h - status_bar_h - clip_y};
       SDL_RenderSetClipRect(sdl, &clip);
 
       float ox = static_cast<float>(pane.x);
@@ -3790,7 +3817,7 @@ int main(int argc, char** argv) {
           }
           int by = static_cast<int>(box.y - pane.scroll_y + ui_top);
           int bh = static_cast<int>(box.height);
-          if (by + bh < clip_y || by > win_h - 28) continue;
+          if (by + bh < clip_y || by > win_h - status_bar_h) continue;
           SDL_SetRenderDrawColor(sdl, r, g, b, a_bar);
           SDL_Rect mark{pane.x + 1, by, 5, bh};
           SDL_RenderFillRect(sdl, &mark);
@@ -3835,7 +3862,7 @@ int main(int argc, char** argv) {
             if (!hit) continue;
             int by = static_cast<int>(box.y - pane.scroll_y);
             int bh = static_cast<int>(box.height);
-            if (by + bh < 0 || by > win_h - 28) continue;
+            if (by + bh < 0 || by > win_h - status_bar_h) continue;
             SDL_SetRenderDrawColor(sdl, 200, 120, 40, 200);
             SDL_Rect mark{pane.x + 2, by, 4, bh};
             SDL_RenderFillRect(sdl, &mark);
@@ -3956,7 +3983,7 @@ int main(int argc, char** argv) {
 
       // Scrollbar thumb (in the content band below the toolbar)
       {
-        float view_h = static_cast<float>(win_h) - ui_top - 28.f;
+        float view_h = static_cast<float>(win_h - status_bar_h) - ui_top;
         if (view_h < 1.f) view_h = 1.f;
         float content_h = std::max(view_h, pane.layout.content_height);
         float thumb_h = std::max(24.f, view_h * (view_h / content_h));
@@ -3980,7 +4007,7 @@ int main(int argc, char** argv) {
       int mid = panes[1].x - 3;
       SDL_SetRenderDrawColor(sdl, 210, 208, 200, 255);
       SDL_Rect div{mid, static_cast<int>(ui_top), 6,
-                 win_h - 28 - static_cast<int>(ui_top)};
+                 win_h - status_bar_h - static_cast<int>(ui_top)};
       SDL_RenderFillRect(sdl, &div);
     }
 
@@ -4000,7 +4027,7 @@ int main(int argc, char** argv) {
         int x1 = panes[1].x + static_cast<int>(c1.x);
         int y1 = static_cast<int>(c1.y);
         // Clamp into content area
-        int max_y = win_h - 28;
+        int max_y = win_h - status_bar_h;
         if (y0 >= 0 && y0 < max_y && y1 >= 0 && y1 < max_y) {
           SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
           SDL_SetRenderDrawColor(sdl, 25, 90, 170, 160);

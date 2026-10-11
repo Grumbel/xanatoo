@@ -355,12 +355,13 @@ bool Ui::want_capture_mouse() const {
 
 void Ui::release_input_capture() {
   if (!ready_) return;
-  ImGuiContext& g = *GImGui;
-  if (g.ActiveId != 0) ImGui::ClearActiveID();
-  // Close menus so WantCaptureKeyboard drops on the next frame.
-  if (g.OpenPopupStack.Size > 0)
-    ImGui::ClosePopupsOverWindow(nullptr, false);
+  // Drop the active widget (menu item / toolbar button) and clear keyboard
+  // nav focus so the next keystroke is not eaten by ImGui chrome.
+  if (GImGui->ActiveId != 0) ImGui::ClearActiveID();
+  if (GImGui->HoverId != 0) GImGui->HoverId = 0;
   ImGui::FocusWindow(nullptr);
+  GImGui->NavId = 0;
+  GImGui->NavDisableHighlight = true;
 }
 
 void Ui::open_context_menu(float x, float y) {
