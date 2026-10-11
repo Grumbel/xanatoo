@@ -1350,6 +1350,7 @@ int main(int argc, char** argv) {
                 float hx = pi.x + pi.width - hs;
                 float hy = pi.y + pi.height - hs - p.scroll_y;
                 if (lx >= hx && lx <= hx + hs && my >= hy && my <= hy + hs) {
+                  if (browse_mode) break;
                   edit();
                   dragging_image = true;
                   resize_image = pi.node;
@@ -1368,6 +1369,7 @@ int main(int argc, char** argv) {
               for (const auto& gap : p.layout.column_gaps) {
                 if (adj_y < gap.y || adj_y > gap.y + gap.height) continue;
                 if (std::abs(lx - gap.x) > 8.f) continue;
+                if (browse_mode) break;
                 edit();
                 dragging_col_gap = true;
                 col_gap_left = gap.left;
@@ -1398,6 +1400,7 @@ int main(int argc, char** argv) {
                     bn.kind == xanatoo::NodeKind::List)
                   continue;
                 if (bn.parent == xanatoo::INVALID_NODE) continue;
+                if (browse_mode) break;
                 dragging_block = true;
                 drag_block_id = box.node;
                 drop_target_id = xanatoo::INVALID_NODE;
@@ -1460,7 +1463,7 @@ int main(int argc, char** argv) {
             }
 
             // Click list-item marker column → toggle GFM task checkbox
-            {
+            if (!browse_mode) {
               bool toggled = false;
               float adj_y = my + p.scroll_y;
               for (const auto& box : p.layout.boxes) {
@@ -1571,6 +1574,7 @@ int main(int argc, char** argv) {
             }
           } else if (ev.button.button == SDL_BUTTON_MIDDLE) {
             // Middle-click paste at caret (common on Linux).
+            if (browse_mode) break;
             if (imgui_mouse) break;
             const int mxw = ev.button.x, myw = ev.button.y;
             bool over_soft = false;
@@ -3589,6 +3593,27 @@ int main(int argc, char** argv) {
       using C = xanatoo::UiCommand;
       auto& p = F();
       auto& d = doc_of(p);
+
+      // Browse mode: ignore mutating commands from menus/toolbar.
+      if (browse_mode && ui_frame.cmd != C::None) {
+        const C c = ui_frame.cmd;
+        const bool allowed =
+            c == C::Quit || c == C::OpenDocument || c == C::Save ||
+            c == C::SaveAs || c == C::ExportSexpr || c == C::ExportMarkdown ||
+            c == C::Reload || c == C::ForceReload || c == C::Copy ||
+            c == C::SelectAll || c == C::SelectBlock || c == C::Find ||
+            c == C::ToggleSplit || c == C::ToggleOutline || c == C::ToggleDiff ||
+            c == C::ToggleStructure || c == C::ToggleBrowse ||
+            c == C::ToggleHelp || c == C::OpenFormatDoc ||
+            c == C::OpenSemanticDoc || c == C::OpenInWindow ||
+            c == C::OpenExample || c == C::LoadDiffDemo || c == C::ZoomIn ||
+            c == C::ZoomOut;
+        if (!allowed) {
+          flash_status("Browse mode — F2 to edit");
+          ui_frame.cmd = C::None;
+        }
+      }
+
       switch (ui_frame.cmd) {
         case C::Quit: {
           if ((dirty_flags[0] || dirty_flags[1]) && !discard_armed) {
@@ -4436,8 +4461,9 @@ int main(int argc, char** argv) {
         auto cpos = xanatoo::caret_screen_pos(
             pane.layout, pane.sel.focus, draw_scroll, lh);
         if (cpos.valid) pane.preferred_x = cpos.x;
-        Uint32 blink_phase = (SDL_GetTicks() - caret_blink_start) % 1000;
-        if (blink_phase < 600) {
+        // Browse mode: steady caret (reading focus). Edit mode: blink.
+        if (browse_mode ||
+            ((SDL_GetTicks() - caret_blink_start) % 1000) < 600) {
           renderer.draw_caret(cpos, ox);
         }
       }

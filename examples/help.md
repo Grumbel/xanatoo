@@ -102,8 +102,9 @@ See **Examples → Article / section / header**.
 
 ## Browse mode and gamepad
 
-**F2** toggles **Browse mode** (read-only). Typing and edits are blocked; the
-status bar turns green. Use this for reading and navigating.
+**F2** toggles **Browse mode** (read-only). Typing, edits, paste, and
+structure changes are blocked (menus/toolbar included); the status bar turns
+green. Use this for reading and navigating.
 
 ### Keyboard (browse)
 - Arrows / Page / Home / End — move and scroll
