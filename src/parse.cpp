@@ -751,8 +751,14 @@ Document parse_markup(std::string_view source) {
           ++llead;
         std::string_view ltrim = lt.substr(llead);
         if (!ltrim.starts_with("> ")) break;
-        if (!quote.empty()) quote.push_back(' ');
-        quote.append(ltrim.substr(2));
+        std::string_view body = ltrim.substr(2);
+        bool hard_break = false;
+        if (lt.size() >= 2 && lt[lt.size() - 1] == ' ' &&
+            lt[lt.size() - 2] == ' ')
+          hard_break = true;
+        while (!body.empty() && body.back() == ' ') body.remove_suffix(1);
+        if (!quote.empty()) quote.push_back(hard_break ? '\n' : ' ');
+        quote.append(body);
         ++i;
       }
       if (!quote.empty()) {
@@ -875,7 +881,8 @@ Document parse_markup(std::string_view source) {
       continue;
     }
 
-    // Paragraph: gather consecutive non-blank, non-fence lines
+    // Paragraph: gather consecutive non-blank, non-fence lines.
+    // Two trailing spaces → hard line break ('\n' in span text).
     std::string para;
     while (i < lines.size() && !lines[i].blank) {
       std::string_view lt = lines[i].text;
@@ -889,8 +896,11 @@ Document parse_markup(std::string_view source) {
           list_marker_len(ltrim, nullptr) > 0) {
         break;
       }
-      if (!para.empty()) para.push_back(' ');
-      // Prefer the original line content without leading indent for simplicity
+      bool hard_break = false;
+      if (lt.size() >= 2 && lt[lt.size() - 1] == ' ' && lt[lt.size() - 2] == ' ')
+        hard_break = true;
+      while (!ltrim.empty() && ltrim.back() == ' ') ltrim.remove_suffix(1);
+      if (!para.empty()) para.push_back(hard_break ? '\n' : ' ');
       para.append(ltrim);
       ++i;
     }
@@ -907,6 +917,11 @@ namespace {
 
 void escape_md_plain(const std::string& text, std::string& out) {
   for (char c : text) {
+    if (c == '\n') {
+      // GFM hard line break
+      out += "  \n";
+      continue;
+    }
     if (c == '\\' || c == '`' || c == '*' || c == '_' || c == '[' || c == ']' ||
         c == '(' || c == ')' || c == '#' || c == '!' || c == '|' || c == '~' ||
         c == '<' || c == '>') {
@@ -994,9 +1009,21 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
     }
 
     case NodeKind::BlockQuote: {
+      // Emit one "> " prefix per visual line (hard breaks become new quote lines)
+      std::string body;
+      serialize_inlines(node, body);
       out += pad;
       out += "> ";
-      serialize_inlines(node, out);
+      for (size_t bi = 0; bi < body.size(); ++bi) {
+        if (body[bi] == '\n') {
+          // serialize_inlines already expands hard breaks to "  \n"
+          out.push_back('\n');
+          out += pad;
+          out += "> ";
+        } else {
+          out.push_back(body[bi]);
+        }
+      }
       out += "\n\n";
       break;
     }
