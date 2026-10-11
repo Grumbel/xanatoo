@@ -151,7 +151,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
       "figure", "note", "replace", "outline", "paste", "copy", "new", "open",
       "zoomin", "zoomout", "structure", "diff",
       "back", "forward", "reload", "bookmark", "history", "browse",
-      "format", "insert", "view",
+      "format", "insert", "view", "lists",
   };
 
   fs::path found_dir;
@@ -222,13 +222,27 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
     ImGui::PopStyleVar();
     ImGui::PopID();
   } else {
-    // Text fallback: short label from tip (before " (" or end)
-    std::string label = id;
-    if (tip && tip[0]) {
+    // Text fallback when PNG missing (e.g. icons not rasterized yet).
+    static const std::unordered_map<std::string, const char*> kShort = {
+        {"back", "◀"}, {"forward", "▶"}, {"reload", "↻"}, {"bookmark", "★"},
+        {"history", "Hist"}, {"browse", "Browse"}, {"format", "Aa▾"},
+        {"insert", "+▾"}, {"view", "View▾"}, {"lists", "List▾"},
+        {"new", "New"}, {"open", "Open"}, {"save", "Save"}, {"undo", "Undo"},
+        {"redo", "Redo"}, {"cut", "Cut"}, {"copy", "Copy"}, {"paste", "Paste"},
+        {"bold", "B"}, {"italic", "I"}, {"link", "Link"}, {"find", "Find"},
+        {"code", "Code"}, {"list", "List"}, {"structure", "Struct"},
+    };
+    std::string label;
+    auto it = kShort.find(icon_name ? icon_name : "");
+    if (it != kShort.end())
+      label = it->second;
+    else if (tip && tip[0]) {
       label = tip;
       size_t cut = label.find(" (");
       if (cut != std::string::npos) label.resize(cut);
-      if (label.size() > 10) label.resize(10);
+      if (label.size() > 8) label.resize(8);
+    } else {
+      label = id;
     }
     label += "##";
     label += id;
@@ -262,10 +276,23 @@ bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip)
       pressed = true;
     ImGui::PopStyleVar();
   } else {
-    std::string label = tip && tip[0] ? tip : id;
-    size_t cut = label.find(" (");
-    if (cut != std::string::npos) label.resize(cut);
-    if (label.size() > 12) label.resize(12);
+    static const std::unordered_map<std::string, const char*> kShort = {
+        {"format", "Aa"}, {"insert", "+"}, {"view", "View"}, {"lists", "List"},
+        {"structure", "Struct"}, {"list", "List"}, {"code", "Aa"},
+        {"table", "+"}, {"h1", "H"}, {"outline", "View"},
+    };
+    std::string label;
+    auto it = kShort.find(icon_name ? icon_name : "");
+    if (it != kShort.end())
+      label = it->second;
+    else if (tip && tip[0]) {
+      label = tip;
+      size_t cut = label.find(" (");
+      if (cut != std::string::npos) label.resize(cut);
+      if (label.size() > 10) label.resize(10);
+    } else {
+      label = id;
+    }
     label += " ▾";
     if (ImGui::SmallButton(label.c_str())) pressed = true;
   }
@@ -864,7 +891,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     }
 
     // Lists / blocks group
-    if (tool_menu_begin("tb_lists", "list", "Lists & blocks")) {
+    if (tool_menu_begin("tb_lists", "lists", "Lists & blocks")) {
       menu_item_cmd("Unordered list", UiCommand::ToggleUnorderedList, cmd);
       menu_item_cmd("Ordered list", UiCommand::ToggleOrderedList, cmd);
       menu_item_cmd("Task item", UiCommand::ToggleTask, cmd, true, "Ctrl+Shift+T");
@@ -935,22 +962,25 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       // Reorderable left off until tab_order is updated on drag.
       if (ImGui::BeginTabBar("##doctabs",
                              ImGuiTabBarFlags_FittingPolicyScroll)) {
+        const bool force_sel = tab_force_select_;
+        tab_force_select_ = false;
         for (int i = 0; i < static_cast<int>(state.tab_labels.size()); ++i) {
-          const bool was_active = (i == state.active_tab);
-          ImGuiTabItemFlags flags =
-              was_active ? ImGuiTabItemFlags_SetSelected : 0;
+          // One-shot SetSelected when main changed active_tab (Next/Prev tab).
+          // Continuous SetSelected fights ImGui clicks → flicker / stacked docs.
+          ImGuiTabItemFlags flags = 0;
+          if (force_sel && i == state.active_tab)
+            flags |= ImGuiTabItemFlags_SetSelected;
           bool open = true;
-          // Unique id: label alone can collide ("untitled" twice).
           std::string id = state.tab_labels[static_cast<size_t>(i)];
           id += "###tab";
           id += std::to_string(i);
           if (ImGui::BeginTabItem(id.c_str(), &open, flags)) {
-            // BeginTabItem is true for the selected tab; notify if user changed it.
-            if (!was_active && cmd == UiCommand::None) {
-              cmd = UiCommand::SelectTab;
-              result.arg = std::to_string(i);
-            }
             ImGui::EndTabItem();
+          }
+          if (ImGui::IsItemClicked(ImGuiMouseButton_Left) &&
+              i != state.active_tab && cmd == UiCommand::None) {
+            cmd = UiCommand::SelectTab;
+            result.arg = std::to_string(i);
           }
           if (!open && cmd == UiCommand::None) {
             cmd = UiCommand::CloseTab;
@@ -958,6 +988,11 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
           }
         }
         ImGui::EndTabBar();
+        // After main applies SelectTab/NextTab, active_tab changes → sync ImGui.
+        if (state.active_tab != tab_synced_active_) {
+          tab_synced_active_ = state.active_tab;
+          tab_force_select_ = true;
+        }
       }
       ImGui::SameLine();
       if (ImGui::SmallButton("+")) cmd = UiCommand::NewTab;

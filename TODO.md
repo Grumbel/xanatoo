@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **157** (this delivery is **156**)
+Next bundle number: **158** (this delivery is **157**)
 
 ## Status (2026-10-11)
 
@@ -255,6 +255,7 @@ LCS structural diff marks; cross-document `:::include`.
 - [x] Diff uses pane buffers; navigate switches existing tab; Next/Prev tab title
 - [x] Split browse/edit toolbars; Back/Forward/URL on browse row
 - [x] Compact edit toolbar with format/structure/lists/insert/view menus
+- [x] Fix tab bar flicker; icon text fallbacks + lists icon
 
 ## Open work / next steps
 
@@ -462,4 +463,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-153.*-layout-loop-guard-…` — layout loop guard
 - `xanatoo-154.*-diff-nav-tabs-…` — diff/nav/tabs
 - `xanatoo-155.*-browse-edit-toolbars-…` — dual toolbars
-- `xanatoo-156.*-compact-edit-toolbar-…` — this delivery
+- `xanatoo-156.*-compact-edit-toolbar-…` — compact edit toolbar
+- `xanatoo-157.*-tabs-icons-…` — this delivery

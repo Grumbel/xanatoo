@@ -217,6 +217,11 @@ private:
   std::string url_synced_from_;  // last doc_label pushed into url_input_
   bool focus_url_bar_ = false;   // Ctrl+L / Open URL menu
   bool url_bar_editing_ = false;
+
+  // Tab bar: one-shot SetSelected so keyboard Next/Prev syncs ImGui without
+  // fighting click selection every frame (which caused flicker).
+  bool tab_force_select_ = false;
+  int tab_synced_active_ = -1;
 };
 
 }  // namespace xanatoo
