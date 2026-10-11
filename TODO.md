@@ -6,9 +6,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **206** (this delivery is **205**)
+Next bundle number: **207** (this delivery is **206**)
 
 ## Status (2026-10-11)
+
+README: welcome screenshot under docs/screenshot-welcome.png.
 
 Lemmy comments threaded via Message.alt from Lemmy path (indent in layout).
 
@@ -542,4 +544,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-202.*-lemmy-api-…` — prior (Lemmy API v3)
 - `xanatoo-203.*-lemmy-post-links-…` — on origin (title/comments/community hyperlinks)
 - `xanatoo-204.*-lemmy-comment-list-…` — prior (comment/list API)
-- `xanatoo-205.*-lemmy-comment-thread-…` — this delivery (path → alt indent)
+- `xanatoo-205.*-lemmy-comment-thread-…` — prior (path → alt indent)
+- `xanatoo-206.*-readme-screenshot-…` — this delivery (welcome PNG in README)

@@ -8,6 +8,8 @@ hypertext ideas, HyperCard, and the Canon Cat.
 
 See [PROPOSAL.md](PROPOSAL.md) for the full vision. Local-only for now.
 
+![xanatoo screenshot](docs/screenshot.png)
+
 ## Quick start
 
 ```bash
