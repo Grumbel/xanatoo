@@ -53,58 +53,113 @@ std::string common_prefix(const std::vector<std::string>& items) {
   return p;
 }
 
-std::vector<std::string> path_candidates(std::string_view typed) {
+// List filesystem matches for `typed` under directory `list_dir`.
+// Results are paths as the user should see them (relative names, or
+// preserving a "~/…" / absolute prefix from `typed`).
+std::vector<std::string> list_path_matches(std::string_view typed,
+                                           const fs::path& list_dir) {
+  std::error_code ec;
+  if (!fs::is_directory(list_dir, ec)) return {};
+
   std::string expanded = expand_user_path(typed);
-  std::string dir_part;
+  std::string dir_prefix;  // including trailing '/' when present in typed form
   std::string file_part;
+
   if (expanded.empty()) {
-    dir_part = ".";
     file_part = {};
-  } else if (!expanded.empty() && expanded.back() == '/') {
-    dir_part = expanded;
+  } else if (expanded.back() == '/') {
+    dir_prefix = std::string(typed);  // keep user form (e.g. "~/" or "ex/")
+    if (!dir_prefix.empty() && dir_prefix.back() != '/') dir_prefix.push_back('/');
+    // Prefer expanded for listing, but prefix from typed for display
+    if (starts_with(typed, "~/"))
+      dir_prefix = std::string(typed);
+    else if (!typed.empty() && typed.back() == '/')
+      dir_prefix = std::string(typed);
+    else
+      dir_prefix = expanded;
     file_part = {};
   } else {
-    auto slash = expanded.find_last_of('/');
-    if (slash == std::string::npos) {
-      dir_part = ".";
-      file_part = expanded;
+    auto slash = typed.find_last_of('/');
+    if (slash == std::string_view::npos) {
+      file_part = std::string(typed);
+      dir_prefix = {};
     } else {
-      dir_part = expanded.substr(0, slash + 1);
-      file_part = expanded.substr(slash + 1);
+      dir_prefix = std::string(typed.substr(0, slash + 1));
+      file_part = std::string(typed.substr(slash + 1));
     }
   }
 
-  std::error_code ec;
-  fs::path dir_path(dir_part.empty() ? "." : dir_part);
-  if (!fs::is_directory(dir_path, ec)) return {};
-
   std::vector<std::string> out;
-  for (auto it = fs::directory_iterator(dir_path, ec);
+  for (auto it = fs::directory_iterator(list_dir, ec);
        !ec && it != fs::directory_iterator(); it.increment(ec)) {
     const auto& entry = *it;
     std::string name = entry.path().filename().string();
     if (!file_part.empty() && !starts_with(name, file_part)) continue;
     if (!name.empty() && name[0] == '.' &&
         (file_part.empty() || file_part[0] != '.'))
-      continue;  // hide dotfiles unless typing a dot prefix
-    std::string full;
-    if (dir_part == ".")
-      full = name;
-    else if (!dir_part.empty() && dir_part.back() == '/')
-      full = dir_part + name;
-    else
-      full = dir_part + "/" + name;
-    // Preserve ~/ form in completion when the user typed ~
-    if (starts_with(typed, "~/") && starts_with(full, expand_user_path("~/"))) {
-      std::string home = expand_user_path("~/");
-      if (starts_with(full, home))
-        full = std::string("~/") + full.substr(home.size());
-    }
+      continue;
+    std::string full = dir_prefix + name;
     std::error_code ec2;
     if (entry.is_directory(ec2)) full.push_back('/');
     out.push_back(std::move(full));
   }
   std::sort(out.begin(), out.end());
+  out.erase(std::unique(out.begin(), out.end()), out.end());
+  return out;
+}
+
+std::vector<std::string> path_candidates(std::string_view typed) {
+  std::string expanded = expand_user_path(typed);
+
+  // Directory to list: parent of the partial path, or the path itself if it
+  // ends with '/', or cwd / base for a bare name.
+  fs::path list_dir = ".";
+  if (typed == "~") {
+    // Bare tilde → complete to "~/…" under $HOME
+    list_dir = expanded.empty() ? fs::path(".") : fs::path(expanded);
+    // Rewrite typed form so matches come back as "~/name"
+    std::vector<std::string> home_hits =
+        list_path_matches("~/", list_dir);
+    return home_hits;
+  } else if (expanded.empty()) {
+    list_dir = ".";
+  } else if (expanded.back() == '/') {
+    list_dir = expanded;
+  } else {
+    auto slash = expanded.find_last_of('/');
+    if (slash == std::string::npos) {
+      list_dir = ".";
+    } else if (slash == 0) {
+      list_dir = "/";
+    } else {
+      list_dir = expanded.substr(0, slash);
+    }
+  }
+
+  std::vector<std::string> out = list_path_matches(typed, list_dir);
+  if (!out.empty()) return out;
+
+  // Relative bare names: also search project data/source (examples/, …).
+  if (!expanded.empty() && expanded[0] != '/' && expanded[0] != '~') {
+    auto try_base = [&](const char* env) {
+      if (!env || !*env) return std::vector<std::string>{};
+      fs::path base(env);
+      fs::path dir = base;
+      if (expanded.back() == '/') {
+        dir = base / expanded;
+      } else {
+        auto slash = expanded.find_last_of('/');
+        if (slash == std::string::npos)
+          dir = base;
+        else
+          dir = base / expanded.substr(0, slash);
+      }
+      return list_path_matches(typed, dir);
+    };
+    out = try_base(std::getenv("XANATOO_DATA_DIR"));
+    if (!out.empty()) return out;
+    out = try_base(std::getenv("XANATOO_SOURCE"));
+  }
   return out;
 }
 
@@ -212,18 +267,16 @@ bool Minibuffer::tab_complete_path() {
     candidate_i = 0;
     return true;
   }
-  // Expand common prefix relative to directory stem.
+  // Expand shared prefix when it is strictly longer than what was typed.
   std::string cp = common_prefix(candidates);
-  if (cp.size() > text.size() && starts_with(cp, text)) {
-    text = cp;
+  if (cp.size() > text.size()) {
+    text = std::move(cp);
     cursor = text.size();
-    candidate_i = -1;  // next Tab starts cycling
-    // Keep candidates for a second Tab to cycle.
+    // Keep candidates; next Tab cycles from the first match.
     candidate_i = 0;
-    // Actually after prefix expand, set up for cycling from first
     return true;
   }
-  // No longer common prefix → start cycling
+  // Already at the shared prefix (or none) → cycle from the first match.
   candidate_i = 0;
   text = candidates[0];
   cursor = text.size();

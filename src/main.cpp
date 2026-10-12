@@ -3350,21 +3350,33 @@ int main(int argc, char** argv) {
 
           // Status prompts own Esc / Backspace / Enter; block document keys so
           // arrows do not move the caret while typing a path or query.
+          // Path/URL minibuffer also needs Tab (complete), arrows (cursor /
+          // history), Home/End, Delete, and C-a/e/k/u/w.
           const bool status_prompt =
               save_as_mode || path_in_window_mode || open_file_mode ||
               url_bar_mode || image_insert_mode || include_insert_mode ||
               link_edit_mode || summary_edit_mode || search_mode;
           if (status_prompt) {
             const SDL_Keycode k = ev.key.keysym.sym;
+            const bool minibuf_path =
+                open_file_mode || save_as_mode || path_in_window_mode ||
+                url_bar_mode || image_insert_mode || include_insert_mode;
             const bool prompt_key =
                 k == SDLK_ESCAPE || k == SDLK_BACKSPACE || k == SDLK_RETURN ||
-                k == SDLK_KP_ENTER ||
+                k == SDLK_KP_ENTER || k == SDLK_DELETE ||
                 // Paste into the status-bar buffer
                 (ctrl && k == SDLK_v) ||
                 // Search: F3 / Shift+F3 still jump matches while the query is open
                 (search_mode && (k == SDLK_F3 || k == SDLK_g)) ||
                 // Allow Tab to switch replace-field focus when replace is open
-                (search_mode && replace_mode && k == SDLK_TAB);
+                (search_mode && replace_mode && k == SDLK_TAB) ||
+                // Path minibuffer: completion + cursor + history
+                (minibuf_path &&
+                 (k == SDLK_TAB || k == SDLK_UP || k == SDLK_DOWN ||
+                  k == SDLK_LEFT || k == SDLK_RIGHT || k == SDLK_HOME ||
+                  k == SDLK_END ||
+                  (ctrl && (k == SDLK_a || k == SDLK_e || k == SDLK_k ||
+                            k == SDLK_u || k == SDLK_w))));
             if (!prompt_key) break;
           } else if (imgui_keys && ev.key.keysym.sym != SDLK_ESCAPE &&
                      ev.key.keysym.sym != SDLK_F1 &&
@@ -3433,7 +3445,8 @@ int main(int argc, char** argv) {
                 // no filesystem completion for remote schemes
                 used = false;
               } else {
-                minibuf.tab_complete_path();
+                if (!minibuf.tab_complete_path())
+                  flash_status("No path completions");
                 minibuf_sync_out();
               }
             } else if (k == SDLK_UP) {
