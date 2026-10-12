@@ -3148,11 +3148,29 @@ int main(int argc, char** argv) {
               focus = pane_at(mx);
               Pane& p = F();
               float lx = local_x(mx, focus);
-              // Place caret under the click so structure/insert actions
-              // apply to the right block.
-              if (auto hit = xanatoo::hit_test(p.layout, lx, my, p.scroll_y)) {
-                p.sel.focus = *hit;
-                if (!(SDL_GetModState() & KMOD_SHIFT)) p.sel.anchor = p.sel.focus;
+              // Keep an existing selection when the click lands inside it
+              // (Cut/Copy/Bold from the menu need the range). Only move the
+              // caret when there is no selection, or the click is outside.
+              bool keep_selection = false;
+              if (!p.sel.empty()) {
+                const float lh = static_cast<float>(body_font.line_height());
+                auto rects = xanatoo::selection_rects(p.layout, p.sel,
+                                                      p.scroll_y, lh);
+                for (const auto& r : rects) {
+                  if (lx >= r.x && lx < r.x + r.w && my >= r.y &&
+                      my < r.y + r.h) {
+                    keep_selection = true;
+                    break;
+                  }
+                }
+              }
+              if (!keep_selection) {
+                if (auto hit =
+                        xanatoo::hit_test(p.layout, lx, my, p.scroll_y)) {
+                  p.sel.focus = *hit;
+                  if (!(SDL_GetModState() & KMOD_SHIFT))
+                    p.sel.anchor = p.sel.focus;
+                }
               }
               ui.open_context_menu(static_cast<float>(ev.button.x),
                                    static_cast<float>(ev.button.y));

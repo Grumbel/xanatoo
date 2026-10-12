@@ -6,7 +6,12 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **262** (this delivery is **261**)
+Next bundle number: **263** (this delivery is **262**)
+
+## Status (2026-10-12)
+
+Right-click context menu no longer clears the selection when the click is
+inside the selected range (Cut/Copy/style keep their target).
 
 ## Status (2026-10-12)
 
@@ -803,4 +808,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-258.*-fix-tests-stb-include-…` — prior
 - `xanatoo-259.*-fix-wrap-test-warning-…` — prior
 - `xanatoo-260.*-fix-scrollbar-clip-wrap-…` — prior
-- `xanatoo-261.*-rewrite-paragraph-wrap-…` — this delivery
+- `xanatoo-261.*-rewrite-paragraph-wrap-…` — prior
+- `xanatoo-262.*-context-menu-keep-sel-…` — this delivery
