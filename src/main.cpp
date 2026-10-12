@@ -421,6 +421,13 @@ int main(int argc, char** argv) {
   bool outline_mode = false;
   std::vector<xanatoo::OutlineEntry> outline;
   int outline_sel = 0;
+  // Same-doc backlinks soft window (Ctrl+Shift+B).
+  bool backlinks_mode = false;
+  std::vector<xanatoo::BacklinkEntry> backlinks;
+  int backlinks_sel = 0;
+  std::string backlinks_label;
+  int bl_x = 80, bl_y = 120, bl_w = 360, bl_h = 320;
+  float bl_scroll = 0.f;
   // View-local Section/Article fold (not in the document; future: SQLite).
   std::unordered_set<xanatoo::NodeId> folded_sections;
   int ol_x = 40, ol_y = 100, ol_w = 320, ol_h = 420;
@@ -590,6 +597,96 @@ int main(int argc, char** argv) {
     if (outline_sel >= static_cast<int>(outline.size()))
       outline_sel = std::max(0, static_cast<int>(outline.size()) - 1);
     if (outline_sel < 0) outline_sel = 0;
+  };
+
+  auto refresh_backlinks = [&]() {
+    backlinks.clear();
+    const auto& d = doc_of(F());
+    xanatoo::NodeId id = F().sel.focus.node;
+    std::string lab = xanatoo::address_label(d, id);
+    if (lab.empty()) {
+      // Prefer enclosing section's header label, then any # from plain text.
+      xanatoo::NodeId sec = xanatoo::enclosing_section(d, id);
+      if (sec != xanatoo::INVALID_NODE) lab = xanatoo::address_label(d, sec);
+    }
+    if (lab.empty() && id != xanatoo::INVALID_NODE) {
+      // Match jump_to_href style: use first heading text as soft anchor? skip
+      lab = xanatoo::address_label(d, id);
+    }
+    backlinks_label = lab;
+    if (!lab.empty())
+      xanatoo::collect_backlinks(d, lab, backlinks);
+    if (backlinks_sel >= static_cast<int>(backlinks.size()))
+      backlinks_sel = std::max(0, static_cast<int>(backlinks.size()) - 1);
+    if (backlinks_sel < 0) backlinks_sel = 0;
+  };
+
+  auto open_transclude_in_other_pane = [&]() {
+    auto& p = F();
+    const auto& d = doc_of(p);
+    xanatoo::NodeId id = p.sel.focus.node;
+    // Walk up to a Transclude node under the caret.
+    xanatoo::NodeId tid = xanatoo::INVALID_NODE;
+    for (xanatoo::NodeId cur = id; cur != xanatoo::INVALID_NODE;
+         cur = d.get(cur).parent) {
+      if (d.get(cur).kind == xanatoo::NodeKind::Transclude) {
+        tid = cur;
+        break;
+      }
+    }
+    if (tid == xanatoo::INVALID_NODE) {
+      // Fallback: first visible transclude under caret y — skip, require caret
+      flash_status("No include under caret");
+      return;
+    }
+    const auto& tn = d.get(tid);
+    xanatoo::NodeId local = xanatoo::resolve_transclude_local(d, tn.src);
+    if (!split) {
+      split = true;
+      needs_layout = true;
+    }
+    int other = 1 - focus;
+    if (local != xanatoo::INVALID_NODE) {
+      panes[other].buf = p.buf;  // same doc
+      panes[other].sel.focus = {local, 0, 0};
+      panes[other].sel.anchor = panes[other].sel.focus;
+      scroll_caret_into_view(panes[other]);
+      flash_status("Include → other pane: " + tn.src);
+      return;
+    }
+    // External path
+    std::string path_part = tn.src;
+    size_t hash = path_part.find('#');
+    std::string anchor;
+    if (hash != std::string::npos) {
+      anchor = path_part.substr(hash);
+      path_part = path_part.substr(0, hash);
+    }
+    if (path_part.empty()) {
+      flash_status("Broken include: " + tn.src);
+      return;
+    }
+    std::filesystem::path resolved = path_part;
+    std::string base = path_of(p);
+    if (!base.empty() && resolved.is_relative())
+      resolved = std::filesystem::path(base).parent_path() / path_part;
+    if (!std::filesystem::exists(resolved)) {
+      flash_status("Broken include (missing file): " + resolved.string());
+      return;
+    }
+    // Load into other pane's buffer if possible — navigate_to_url uses focus.
+    int saved = focus;
+    focus = other;
+    navigate_to_url(resolved.string() + (anchor.empty() ? "" : ""));
+    if (!anchor.empty()) {
+      if (auto dest = xanatoo::jump_to_href(doc_of(panes[other]), anchor)) {
+        panes[other].sel.focus = *dest;
+        panes[other].sel.anchor = *dest;
+        scroll_caret_into_view(panes[other]);
+      }
+    }
+    focus = saved;
+    flash_status("Opened include in other pane: " + resolved.string());
   };
 
   auto flash_status = [&](const std::string& msg) {
@@ -2445,15 +2542,24 @@ int main(int argc, char** argv) {
               if (toggled) break;
             }
 
-            // Click a transclusion → jump to local source, or open external file
+            // Click a transclusion → jump to local source, or open external file.
+            // Alt+click opens the target in the other pane.
             {
               bool followed = false;
+              const bool alt_click = (SDL_GetModState() & KMOD_ALT) != 0;
               float adj_y = my + p.scroll_y;
               for (const auto& box : p.layout.boxes) {
                 if (adj_y < box.y || adj_y > box.y + box.height) continue;
                 if (lx < box.x || lx > box.x + box.width) continue;
                 const auto& bn = doc_of(p).get(box.node);
                 if (bn.kind != xanatoo::NodeKind::Transclude) continue;
+                if (alt_click) {
+                  p.sel.focus = {box.node, 0, 0};
+                  p.sel.anchor = p.sel.focus;
+                  open_transclude_in_other_pane();
+                  followed = true;
+                  break;
+                }
                 if (auto dest = xanatoo::jump_to_href(doc_of(p), bn.src)) {
                   p.sel.focus = *dest;
                   p.sel.anchor = p.sel.focus;
@@ -2466,10 +2572,8 @@ int main(int argc, char** argv) {
                   }
                   reset_blink();
                   flash_status("Followed include " + bn.src);
-                  std::cout << "Followed transclusion: " << bn.src << "\n";
                   followed = true;
                 } else {
-                  // External path.md[#anchor] — open in the focused pane
                   std::string path_part = bn.src;
                   size_t hash = path_part.find('#');
                   if (hash != std::string::npos)
@@ -2485,10 +2589,12 @@ int main(int argc, char** argv) {
                     }
                     if (std::filesystem::exists(resolved)) {
                       navigate_to_url(resolved.string());
-                      std::cout << "Opened include source: " << resolved
-                                << "\n";
                       followed = true;
+                    } else {
+                      flash_status("Broken include: " + bn.src);
                     }
+                  } else {
+                    flash_status("Broken include: " + bn.src);
                   }
                 }
                 break;
@@ -3495,6 +3601,36 @@ int main(int argc, char** argv) {
             if (used) break;
           }
 
+          if (backlinks_mode) {
+            if (ev.key.keysym.sym == SDLK_ESCAPE ||
+                (ev.key.keysym.sym == SDLK_b && ctrl && alt)) {
+              backlinks_mode = false;
+              break;
+            }
+            if (ev.key.keysym.sym == SDLK_UP) {
+              if (backlinks_sel > 0) --backlinks_sel;
+              break;
+            }
+            if (ev.key.keysym.sym == SDLK_DOWN) {
+              if (backlinks_sel + 1 < static_cast<int>(backlinks.size()))
+                ++backlinks_sel;
+              break;
+            }
+            if (ev.key.keysym.sym == SDLK_RETURN ||
+                ev.key.keysym.sym == SDLK_KP_ENTER) {
+              if (backlinks_sel >= 0 &&
+                  backlinks_sel < static_cast<int>(backlinks.size())) {
+                auto& p = F();
+                p.sel.focus = {backlinks[static_cast<size_t>(backlinks_sel)].source,
+                               0, 0};
+                p.sel.anchor = p.sel.focus;
+                scroll_caret_into_view(p);
+                reset_blink();
+              }
+              break;
+            }
+          }
+
           // Outline software window: Esc/toggle close; arrows + 1-9 + Enter
           // navigate without eating other document keys.
           if (outline_mode) {
@@ -4343,7 +4479,15 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_UP:
-              if ((ev.key.keysym.mod & KMOD_ALT) != 0) {
+              if ((ev.key.keysym.mod & KMOD_ALT) != 0 &&
+                  (ev.key.keysym.mod & KMOD_SHIFT) != 0) {
+                edit();
+                if (xanatoo::move_section_up(d, p.sel.focus)) {
+                  needs_layout = true;
+                  reset_blink();
+                  flash_status("Section moved up");
+                }
+              } else if ((ev.key.keysym.mod & KMOD_ALT) != 0) {
                 edit();
                 if (xanatoo::move_block_up(d, p.sel.focus.node)) {
                   needs_layout = true;
@@ -4876,6 +5020,15 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_b:
+              if (ctrl && alt) {
+                backlinks_mode = !backlinks_mode;
+                if (backlinks_mode) {
+                  refresh_backlinks();
+                  backlinks_sel = 0;
+                  bl_scroll = 0.f;
+                }
+                break;
+              }
               if (ctrl && shift) {
                 std::string url = path_of(p);
                 if (url.empty()) url = gemini_current_url;
@@ -5029,6 +5182,17 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_LEFTBRACKET:
+              if (ctrl && alt) {
+                edit();
+                if (xanatoo::demote_section(d, p.sel.focus)) {
+                  p.sel.anchor = p.sel.focus;
+                  needs_layout = true;
+                  flash_status("Section demoted");
+                } else {
+                  flash_status("Cannot demote section");
+                }
+                break;
+              }
               if (ctrl && shift) {
                 // Collapse all stretch nodes
                 edit();
@@ -5041,6 +5205,17 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_RIGHTBRACKET:
+              if (ctrl && alt) {
+                edit();
+                if (xanatoo::promote_section(d, p.sel.focus)) {
+                  p.sel.anchor = p.sel.focus;
+                  needs_layout = true;
+                  flash_status("Section promoted");
+                } else {
+                  flash_status("Cannot promote section");
+                }
+                break;
+              }
               if (ctrl && shift) {
                 // Expand all stretch nodes
                 edit();
@@ -5089,6 +5264,7 @@ int main(int argc, char** argv) {
     if (needs_layout && win_w >= 64 && win_h >= 64) {
       layout_panes();
       if (outline_mode) refresh_outline();
+      if (backlinks_mode) refresh_backlinks();
     }
 
     float lh = static_cast<float>(body_font.line_height());
@@ -5099,6 +5275,7 @@ int main(int argc, char** argv) {
       ui_state.has_path = !path_of(F()).empty();
       ui_state.split = split;
       ui_state.outline = outline_mode;
+      ui_state.backlinks = backlinks_mode;
       ui_state.diff = diff_mode;
       ui_state.can_diff = !shared_doc() && panes[0].buf != panes[1].buf &&
                           panes[0].buf >= 0 && panes[1].buf >= 0;
@@ -5247,7 +5424,8 @@ int main(int argc, char** argv) {
             c == C::Reload || c == C::ForceReload || c == C::Copy ||
             c == C::CopyPageUrl ||
             c == C::SelectAll || c == C::SelectBlock || c == C::Find ||
-            c == C::ToggleSplit || c == C::ToggleOutline || c == C::ToggleDiff ||
+            c == C::ToggleSplit || c == C::ToggleOutline || c == C::ToggleBacklinks ||
+            c == C::OpenTranscludeOther || c == C::ToggleDiff ||
             c == C::ToggleStructure || c == C::ToggleBrowse ||
             c == C::ToggleHelp || c == C::ToggleVirtualKeyboard ||
             c == C::OpenFormatDoc ||
@@ -5866,6 +6044,38 @@ int main(int argc, char** argv) {
             flash_status("Unwrapped section/article");
           }
           break;
+        case C::PromoteSection:
+          edit();
+          if (xanatoo::promote_section(d, p.sel.focus)) {
+            needs_layout = true;
+            flash_status("Section promoted");
+          } else {
+            flash_status("Cannot promote section");
+          }
+          break;
+        case C::DemoteSection:
+          edit();
+          if (xanatoo::demote_section(d, p.sel.focus)) {
+            needs_layout = true;
+            flash_status("Section demoted");
+          } else {
+            flash_status("Cannot demote section (need previous section sibling)");
+          }
+          break;
+        case C::MoveSectionUp:
+          edit();
+          if (xanatoo::move_section_up(d, p.sel.focus)) {
+            needs_layout = true;
+            flash_status("Section moved up");
+          }
+          break;
+        case C::MoveSectionDown:
+          edit();
+          if (xanatoo::move_section_down(d, p.sel.focus)) {
+            needs_layout = true;
+            flash_status("Section moved down");
+          }
+          break;
         case C::ParagraphLevel:
           edit();
           if (xanatoo::set_heading_level(d, p.sel.focus, 0)) needs_layout = true;
@@ -5955,6 +6165,22 @@ int main(int argc, char** argv) {
             outline_sel = 0;
             ol_scroll = 0.f;
           }
+          break;
+        case C::ToggleBacklinks:
+          backlinks_mode = !backlinks_mode;
+          if (backlinks_mode) {
+            refresh_backlinks();
+            backlinks_sel = 0;
+            bl_scroll = 0.f;
+            if (backlinks_label.empty())
+              flash_status("Backlinks: place caret on a labelled node");
+            else
+              flash_status("Backlinks to #" + backlinks_label + " (" +
+                           std::to_string(backlinks.size()) + ")");
+          }
+          break;
+        case C::OpenTranscludeOther:
+          open_transclude_in_other_pane();
           break;
         case C::ToggleDiff:
           if (shared_doc() || buffers.size() < 2) {
@@ -6166,6 +6392,7 @@ int main(int argc, char** argv) {
     if (needs_layout && win_w >= 64 && win_h >= 64) {
       layout_panes();
       if (outline_mode) refresh_outline();
+      if (backlinks_mode) refresh_backlinks();
     }
 
     // Gamepad sticks / triggers (poll each frame).
@@ -7225,6 +7452,72 @@ label = "Outline — ↑/↓ · ←/→ fold · Enter jump · twisty · Esc";
         for (int i = 0; i < 3; ++i)
           SDL_RenderDrawLine(sdl, gx - i * 3, gy, gx, gy - i * 3);
       }
+    }
+
+    // Backlinks soft window (Ctrl+Alt+B)
+    if (backlinks_mode) {
+      if (bl_w < 200) bl_w = 200;
+      if (bl_h < 120) bl_h = 120;
+      const float step = 22.f;
+      const int title_h = help_title_h;
+      const int pad = 8;
+      int cx = bl_x + pad, cy = bl_y + title_h + 4;
+      int cw = bl_w - pad * 2, ch = bl_h - title_h - pad - 4;
+      {
+        float content_h = static_cast<float>(backlinks.size()) * step + 8.f;
+        float max_s = std::max(0.f, content_h - static_cast<float>(ch));
+        if (bl_scroll > max_s) bl_scroll = max_s;
+      }
+      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+      SDL_SetRenderDrawColor(sdl, 0, 0, 0, 40);
+      SDL_Rect shadow{bl_x + 3, bl_y + 3, bl_w, bl_h};
+      SDL_RenderFillRect(sdl, &shadow);
+      SDL_SetRenderDrawColor(sdl, 248, 246, 240, 255);
+      SDL_Rect frame{bl_x, bl_y, bl_w, bl_h};
+      SDL_RenderFillRect(sdl, &frame);
+      SDL_SetRenderDrawColor(sdl, 90, 60, 140, 255);
+      SDL_RenderDrawRect(sdl, &frame);
+      SDL_SetRenderDrawColor(sdl, 220, 210, 235, 255);
+      SDL_Rect title{bl_x + 1, bl_y + 1, bl_w - 2, title_h};
+      SDL_RenderFillRect(sdl, &title);
+      SDL_SetRenderDrawColor(sdl, 90, 60, 140, 255);
+      SDL_RenderDrawLine(sdl, bl_x, bl_y + title_h, bl_x + bl_w, bl_y + title_h);
+      SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+      std::string title_s = backlinks_label.empty()
+                                ? "Backlinks (no label under caret)"
+                                : ("Backlinks → #" + backlinks_label);
+      renderer.draw_text(body_font, static_cast<float>(bl_x + 10),
+                         static_cast<float>(bl_y + 6 + body_font.ascender()),
+                         title_s, 90, 60, 140);
+      SDL_Rect clip{cx, cy, cw, ch};
+      SDL_RenderSetClipRect(sdl, &clip);
+      float ty = static_cast<float>(cy) + body_font.ascender() - bl_scroll;
+      if (backlinks.empty()) {
+        renderer.draw_text(body_font, static_cast<float>(cx + 8), ty,
+                           "(none in this document)", 120, 118, 110);
+      }
+      for (int i = 0; i < static_cast<int>(backlinks.size()); ++i) {
+        if (ty > static_cast<float>(cy + ch) + step) break;
+        if (ty + step >= static_cast<float>(cy)) {
+          const auto& e = backlinks[static_cast<size_t>(i)];
+          std::string line = e.kind;
+          if (!e.rel.empty()) line += ":" + e.rel;
+          line += "  ";
+          line += e.preview;
+          if (i == backlinks_sel) {
+            SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(sdl, 90, 60, 140, 40);
+            SDL_Rect hi{cx + 2, static_cast<int>(ty - body_font.ascender() - 2),
+                        cw - 4, static_cast<int>(step)};
+            SDL_RenderFillRect(sdl, &hi);
+            SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+          }
+          renderer.draw_text(body_font, static_cast<float>(cx + 8), ty, line, 40,
+                             40, 45);
+        }
+        ty += step;
+      }
+      SDL_RenderSetClipRect(sdl, nullptr);
     }
 
     // Help as a real document in a software window

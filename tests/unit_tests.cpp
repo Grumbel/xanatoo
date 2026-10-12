@@ -10,6 +10,7 @@
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/util.hpp"
 #include "xanatoo/parse.hpp"
+#include "xanatoo/editor.hpp"
 #include "xanatoo/org.hpp"
 #include "xanatoo/types.hpp"
 
@@ -582,6 +583,59 @@ void test_json_array_and_bool() {
 
 
 
+
+void test_promote_demote_section() {
+  using namespace xanatoo;
+  Document doc = parse_markup(
+      "# A\n"
+      "body a\n"
+      "\n"
+      "## B\n"
+      "body b\n");
+  // Find section for B
+  NodeId sec_b = INVALID_NODE;
+  for (const auto& n : doc.nodes) {
+    if (n.kind == NodeKind::Section) {
+      for (NodeId c : n.children) {
+        if (doc.get(c).kind == NodeKind::Header) {
+          std::string t = plain_text(doc, c);
+          if (t.find('B') != std::string::npos) sec_b = n.id;
+        }
+      }
+    }
+  }
+  EXPECT(sec_b != INVALID_NODE);
+  Caret caret{sec_b, 0, 0};
+  // B is nested under A after normalize — promote should lift
+  NodeId parent = doc.get(sec_b).parent;
+  EXPECT(parent != INVALID_NODE);
+  if (doc.get(parent).kind == NodeKind::Section ||
+      doc.get(parent).kind == NodeKind::Article) {
+    EXPECT(promote_section(doc, caret));
+    EXPECT(doc.get(sec_b).parent != parent);
+  }
+}
+
+void test_backlinks_collect() {
+  using namespace xanatoo;
+  Document doc = parse_markup(
+      "# Target {#tgt}\n"
+      "see [x](#tgt) and more.\n");
+  // Ensure some label exists
+  std::string lab;
+  for (const auto& n : doc.nodes) {
+    if (!n.label.empty()) {
+      lab = n.label;
+      break;
+    }
+  }
+  std::vector<BacklinkEntry> bl;
+  if (!lab.empty()) {
+    collect_backlinks(doc, lab, bl);
+    EXPECT(bl.size() >= 1);
+  }
+}
+
 void test_atx_section_tree() {
   using namespace xanatoo;
   Document doc = parse_markup(
@@ -623,6 +677,8 @@ int main() {
   test_path_helpers();
   test_parse_org();
   test_atx_section_tree();
+  test_promote_demote_section();
+  test_backlinks_collect();
   test_parse_document_dispatch();
   test_reddit_json_url_shapes();
   test_path_format_dispatch();

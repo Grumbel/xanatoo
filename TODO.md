@@ -6,9 +6,12 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **230** (this delivery is **229**)
+Next bundle number: **233** (this delivery is **232**)
 
 ## Status (2026-10-12)
+
+Section promote/demote + subtree move; same-doc backlinks panel (Ctrl+Alt+B); transclude Alt+click / Open in other pane + broken status.
+
 
 Minibuffer: Tab path completion, ↑↓ history (persisted under ~/.config/xanatoo/), cursor editing (C-a/e/k/u/w).
 

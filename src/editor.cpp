@@ -1147,6 +1147,249 @@ bool unwrap_sectioning(Document& doc, Caret& caret) {
   return true;
 }
 
+
+NodeId enclosing_section(const Document& doc, NodeId id) {
+  for (NodeId cur = id; cur != INVALID_NODE; cur = doc.get(cur).parent) {
+    const Node& n = doc.get(cur);
+    if (n.kind == NodeKind::Section || n.kind == NodeKind::Article)
+      return cur;
+  }
+  return INVALID_NODE;
+}
+
+static void bump_section_header_level(Document& doc, NodeId sec, int delta) {
+  const Node& s = doc.get(sec);
+  for (NodeId c : s.children) {
+    Node& ch = doc.get(c);
+    if (ch.kind == NodeKind::Header || ch.kind == NodeKind::Heading) {
+      int lv = ch.level > 0 ? ch.level : 1;
+      lv += delta;
+      if (lv < 1) lv = 1;
+      if (lv > 9) lv = 9;
+      ch.level = lv;
+      break;
+    }
+  }
+}
+
+bool promote_section(Document& doc, Caret& caret) {
+  NodeId sec = enclosing_section(doc, caret.node);
+  if (sec == INVALID_NODE) return false;
+  Node& s = doc.get(sec);
+  if (s.parent == INVALID_NODE) return false;
+  Node& parent = doc.get(s.parent);
+  if (parent.kind != NodeKind::Section && parent.kind != NodeKind::Article)
+    return false;
+  if (parent.parent == INVALID_NODE) return false;
+  Node& gp = doc.get(parent.parent);
+
+  size_t pidx = 0;
+  for (; pidx < parent.children.size(); ++pidx)
+    if (parent.children[pidx] == sec) break;
+  if (pidx >= parent.children.size()) return false;
+  parent.children.erase(parent.children.begin() +
+                        static_cast<std::ptrdiff_t>(pidx));
+
+  size_t gidx = 0;
+  for (; gidx < gp.children.size(); ++gidx)
+    if (gp.children[gidx] == parent.id) break;
+  if (gidx >= gp.children.size()) {
+    parent.children.insert(parent.children.begin() +
+                               static_cast<std::ptrdiff_t>(pidx),
+                           sec);
+    return false;
+  }
+  s.parent = gp.id;
+  gp.children.insert(gp.children.begin() +
+                         static_cast<std::ptrdiff_t>(gidx + 1),
+                     sec);
+  bump_section_header_level(doc, sec, -1);
+  return true;
+}
+
+bool demote_section(Document& doc, Caret& caret) {
+  NodeId sec = enclosing_section(doc, caret.node);
+  if (sec == INVALID_NODE) return false;
+  Node& s = doc.get(sec);
+  if (s.parent == INVALID_NODE) return false;
+  Node& parent = doc.get(s.parent);
+
+  size_t idx = 0;
+  for (; idx < parent.children.size(); ++idx)
+    if (parent.children[idx] == sec) break;
+  if (idx == 0 || idx >= parent.children.size()) return false;
+
+  NodeId prev = INVALID_NODE;
+  for (size_t i = idx; i > 0; --i) {
+    NodeId cand = parent.children[i - 1];
+    NodeKind k = doc.get(cand).kind;
+    if (k == NodeKind::Section || k == NodeKind::Article) {
+      prev = cand;
+      break;
+    }
+  }
+  if (prev == INVALID_NODE) return false;
+
+  parent.children.erase(parent.children.begin() +
+                        static_cast<std::ptrdiff_t>(idx));
+  s.parent = prev;
+  doc.get(prev).children.push_back(sec);
+  bump_section_header_level(doc, sec, +1);
+  return true;
+}
+
+bool move_section_up(Document& doc, Caret& caret) {
+  NodeId sec = enclosing_section(doc, caret.node);
+  if (sec == INVALID_NODE) return false;
+  return move_block_up(doc, sec);
+}
+
+bool move_section_down(Document& doc, Caret& caret) {
+  NodeId sec = enclosing_section(doc, caret.node);
+  if (sec == INVALID_NODE) return false;
+  return move_block_down(doc, sec);
+}
+
+std::string address_label(const Document& doc, NodeId id) {
+  if (id == INVALID_NODE) return {};
+  const Node& n = doc.get(id);
+  if (!n.label.empty()) return n.label;
+  if (n.kind == NodeKind::Section || n.kind == NodeKind::Article) {
+    for (NodeId c : n.children) {
+      const Node& ch = doc.get(c);
+      if (ch.kind == NodeKind::Header || ch.kind == NodeKind::Heading) {
+        if (!ch.label.empty()) return ch.label;
+        return {};
+      }
+    }
+  }
+  return {};
+}
+
+static std::string normalize_href_label(std::string_view href) {
+  std::string h(href);
+  if (h.rfind("cite:", 0) == 0) h = h.substr(5);
+  if (!h.empty() && h[0] == '#') h = h.substr(1);
+  auto hash = h.find('#');
+  if (hash != std::string::npos) h = h.substr(hash + 1);
+  return h;
+}
+
+static std::string short_node_preview(const Document& doc, NodeId id) {
+  std::string t = plain_text(doc, id);
+  if (t.empty()) {
+    const Node& n = doc.get(id);
+    if (n.kind == NodeKind::Transclude) t = n.src;
+  }
+  std::string out;
+  bool sp = false;
+  for (char c : t) {
+    if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+      sp = true;
+      continue;
+    }
+    if (sp && !out.empty()) out.push_back(' ');
+    sp = false;
+    out.push_back(c);
+  }
+  if (out.size() > 60) {
+    size_t cut = 60;
+    while (cut > 0 && (static_cast<unsigned char>(out[cut]) & 0xc0) == 0x80)
+      --cut;
+    out.resize(cut);
+    out += "…";
+  }
+  return out.empty() ? std::string("(empty)") : out;
+}
+
+void collect_link_edges(const Document& doc, std::vector<LinkEdge>& out) {
+  out.clear();
+  for (const Node& n : doc.nodes) {
+    if (n.id == INVALID_NODE) continue;
+    if (n.kind == NodeKind::Transclude && !n.src.empty()) {
+      LinkEdge e;
+      e.source = n.id;
+      e.kind = "include";
+      e.href = n.src;
+      out.push_back(std::move(e));
+    }
+    if (n.kind == NodeKind::Message && n.alt.rfind("about:", 0) == 0) {
+      LinkEdge e;
+      e.source = n.id;
+      e.kind = "about";
+      e.href = n.alt.substr(6);
+      out.push_back(std::move(e));
+    }
+    for (const auto& sp : n.spans) {
+      if (sp.kind == InlineKind::Link && !sp.href.empty()) {
+        LinkEdge e;
+        e.source = n.id;
+        e.kind = "link";
+        e.rel = sp.rel;
+        e.href = sp.href;
+        out.push_back(std::move(e));
+      } else if (sp.kind == InlineKind::Cite && !sp.href.empty()) {
+        LinkEdge e;
+        e.source = n.id;
+        e.kind = "cite";
+        e.href = sp.href;
+        out.push_back(std::move(e));
+      }
+    }
+  }
+}
+
+void collect_backlinks(const Document& doc, std::string_view label,
+                       std::vector<BacklinkEntry>& out) {
+  out.clear();
+  if (label.empty()) return;
+  std::string want(label);
+  if (!want.empty() && want[0] == '#') want = want.substr(1);
+
+  std::vector<LinkEdge> edges;
+  collect_link_edges(doc, edges);
+  for (const auto& e : edges) {
+    std::string lab = normalize_href_label(e.href);
+    bool same_doc = true;
+    if (e.href.find("://") != std::string::npos) same_doc = false;
+    if (!e.href.empty() && e.href[0] != '#' && e.kind == "link") {
+      if (e.href.find('#') == std::string::npos &&
+          (e.href.find('/') != std::string::npos ||
+           e.href.find('.') != std::string::npos))
+        same_doc = false;
+    }
+    if (e.kind == "include") {
+      std::string src = e.href;
+      auto hash = src.find('#');
+      std::string path = hash == std::string::npos ? src : src.substr(0, hash);
+      if (!path.empty()) same_doc = false;
+    }
+    if (!same_doc) continue;
+    if (lab != want) continue;
+    BacklinkEntry b;
+    b.source = e.source;
+    b.kind = e.kind;
+    b.rel = e.rel;
+    b.href = e.href;
+    b.preview = short_node_preview(doc, e.source);
+    out.push_back(std::move(b));
+  }
+}
+
+NodeId resolve_transclude_local(const Document& doc, std::string_view src) {
+  if (src.empty()) return INVALID_NODE;
+  std::string s(src);
+  auto hash = s.find('#');
+  std::string path = hash == std::string::npos ? std::string{} : s.substr(0, hash);
+  std::string anchor = hash == std::string::npos ? s : s.substr(hash);
+  if (path.empty() && !anchor.empty() && anchor[0] != '#')
+    anchor = "#" + anchor;
+  if (!path.empty()) return INVALID_NODE;
+  if (anchor.empty()) return INVALID_NODE;
+  return find_anchor_node(doc, anchor);
+}
+
+
 bool toggle_task_item(Document& doc, Caret& caret) {
   if (caret.node == INVALID_NODE) return false;
   Node& n = doc.get(caret.node);

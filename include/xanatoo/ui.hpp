@@ -94,10 +94,16 @@ enum class UiCommand {
   WrapSection,
   WrapArticle,
   UnwrapSectioning,
+  PromoteSection,
+  DemoteSection,
+  MoveSectionUp,
+  MoveSectionDown,
   ParagraphLevel,
   // View
   ToggleSplit,
   ToggleOutline,
+  ToggleBacklinks,
+  OpenTranscludeOther,  // open include target in the other pane
   ToggleDiff,
   ToggleStructure,
   ToggleBrowse,  // read-only navigation mode
@@ -118,6 +124,7 @@ struct UiState {
   bool has_path = false;
   bool split = false;
   bool outline = false;
+  bool backlinks = false;
   bool diff = false;
   bool can_diff = false;  // two independent documents loaded
   bool structure = false;

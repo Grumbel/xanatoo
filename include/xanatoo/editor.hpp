@@ -5,6 +5,7 @@
 #include "xanatoo/types.hpp"
 #include "xanatoo/layout.hpp"
 #include <string>
+#include <string_view>
 #include <unordered_set>
 #include <optional>
 #include <vector>
@@ -152,6 +153,41 @@ bool wrap_in_section(Document& doc, Caret& caret);
 bool wrap_in_article(Document& doc, Caret& caret);
 // If caret is inside a Section/Article, lift children to the parent.
 bool unwrap_sectioning(Document& doc, Caret& caret);
+
+// Nearest Section/Article ancestor (or the node itself). INVALID if none.
+NodeId enclosing_section(const Document& doc, NodeId id);
+// Lift section one level (sibling of its parent section). Updates soft Header.level.
+bool promote_section(Document& doc, Caret& caret);
+// Nest section under the previous sibling Section/Article. Soft level++.
+bool demote_section(Document& doc, Caret& caret);
+// Move the enclosing section among its siblings (whole subtree).
+bool move_section_up(Document& doc, Caret& caret);
+bool move_section_down(Document& doc, Caret& caret);
+
+// Same-document link/transclude/cite edges that target `label` (without '#').
+struct BacklinkEntry {
+  NodeId source = INVALID_NODE;  // node that holds the pointer
+  std::string kind;              // "link" | "cite" | "include" | "about"
+  std::string rel;               // optional typed relation
+  std::string href;              // raw target as stored
+  std::string preview;           // short source text
+};
+// Label of a node for addressing (#label): node.label, else empty.
+std::string address_label(const Document& doc, NodeId id);
+void collect_backlinks(const Document& doc, std::string_view label,
+                       std::vector<BacklinkEntry>& out);
+// All outbound edges from the document (for a full index / status).
+struct LinkEdge {
+  NodeId source = INVALID_NODE;
+  std::string kind;
+  std::string rel;
+  std::string href;
+};
+void collect_link_edges(const Document& doc, std::vector<LinkEdge>& out);
+
+// Resolve a Transclude `src` field within `doc` (same-doc #anchor only).
+// Returns INVALID_NODE if missing or external.
+NodeId resolve_transclude_local(const Document& doc, std::string_view src);
 
 // Toggle list membership of the caret's text block.
 // - Paragraph/Heading/BlockQuote → become a ListItem under a new List

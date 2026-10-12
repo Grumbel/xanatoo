@@ -24,6 +24,8 @@ pretending to be a full Xanadu implementation).
 (`folded_sections` in memory → layout skips body; outline twisties; Ctrl+Shift+F),
 large-doc layout virtualization (viewport + height hints).
 
+**Implemented (232):** promote/demote, section move, same-doc backlinks, transclude other-pane + broken flash.
+
 **Still open on this line:** promote/demote / move subtree; SQLite side store;
 dual-pane “outline | body” view (view only, same tree).
 

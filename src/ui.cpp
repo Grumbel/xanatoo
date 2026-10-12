@@ -520,6 +520,14 @@ static void menu_structure_items(const UiState& state, UiCommand& cmd) {
   menu_item_cmd("Wrap in Article", UiCommand::WrapArticle, cmd, true,
                 "Ctrl+Shift+2");
   menu_item_cmd("Unwrap Section/Article", UiCommand::UnwrapSectioning, cmd);
+  menu_item_cmd("Promote Section", UiCommand::PromoteSection, cmd, true,
+                "Ctrl+Alt+]");
+  menu_item_cmd("Demote Section", UiCommand::DemoteSection, cmd, true,
+                "Ctrl+Alt+[");
+  menu_item_cmd("Move Section Up", UiCommand::MoveSectionUp, cmd, true,
+                "Alt+Shift+Up");
+  menu_item_cmd("Move Section Down", UiCommand::MoveSectionDown, cmd, true,
+                "Alt+Shift+Down");
   ImGui::Separator();
   menu_item_cmd("Header (depth 2)", UiCommand::Heading2, cmd, true, "Ctrl+2");
   menu_item_cmd("Header (depth 3)", UiCommand::Heading3, cmd, true, "Ctrl+3");
@@ -638,6 +646,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleSplit;
       if (ImGui::MenuItem("Heading Outline", "Ctrl+Shift+O", state.outline))
         cmd = UiCommand::ToggleOutline;
+      if (ImGui::MenuItem("Backlinks", "Ctrl+Alt+B", state.backlinks))
+        cmd = UiCommand::ToggleBacklinks;
       if (ImGui::MenuItem("Diff Marks", "Ctrl+Shift+D", state.diff, state.can_diff))
         cmd = UiCommand::ToggleDiff;
       if (ImGui::MenuItem("Structure Highlight", "Ctrl+Shift+L", state.structure))
@@ -682,7 +692,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     if (ImGui::BeginMenu("Bookmarks")) {
       const char* add_label =
           state.current_bookmarked ? "Remove Bookmark" : "Bookmark This Page";
-      if (ImGui::MenuItem(add_label, "Ctrl+Shift+B", false, state.has_path)) {
+      if (ImGui::MenuItem(add_label, "Ctrl+Alt+B", false, state.has_path)) {
         cmd = state.current_bookmarked ? UiCommand::RemoveBookmark
                                        : UiCommand::AddBookmark;
       }
@@ -820,8 +830,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
 
     {
       const char* bm_tip =
-          state.current_bookmarked ? "Remove bookmark (Ctrl+Shift+B)"
-                                   : "Bookmark this page (Ctrl+Shift+B)";
+          state.current_bookmarked ? "Remove bookmark (Ctrl+Alt+B)"
+                                   : "Bookmark this page (Ctrl+Alt+B)";
       tool_button("tb_bookmark", "bookmark", bm_tip,
                   state.current_bookmarked ? UiCommand::RemoveBookmark
                                            : UiCommand::AddBookmark,
@@ -913,6 +923,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                     "Ctrl+Shift+1");
       menu_item_cmd("Wrap Article", UiCommand::WrapArticle, cmd, true,
                     "Ctrl+Shift+2");
+      menu_item_cmd("Promote Section", UiCommand::PromoteSection, cmd, true,
+                    "Ctrl+Alt+]");
+      menu_item_cmd("Demote Section", UiCommand::DemoteSection, cmd, true,
+                    "Ctrl+Alt+[");
       menu_item_cmd("Paragraph", UiCommand::ParagraphLevel, cmd, true, "Ctrl+0");
       ImGui::Separator();
       menu_item_cmd("Wrap Stretch…", UiCommand::WrapStretch, cmd, true, "Ctrl+E");
@@ -958,6 +972,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleSplit;
       if (ImGui::MenuItem("Heading outline", "Ctrl+Shift+O", state.outline))
         cmd = UiCommand::ToggleOutline;
+      if (ImGui::MenuItem("Backlinks", "Ctrl+Alt+B", state.backlinks))
+        cmd = UiCommand::ToggleBacklinks;
+      menu_item_cmd("Open include → other pane", UiCommand::OpenTranscludeOther,
+                    cmd);
       if (ImGui::MenuItem("Structure highlight", "Ctrl+Shift+L", state.structure))
         cmd = UiCommand::ToggleStructure;
       if (ImGui::MenuItem("Diff marks", "Ctrl+Shift+D", state.diff, state.can_diff))
