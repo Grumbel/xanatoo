@@ -6,7 +6,14 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **246** (this delivery is **245**)
+Next bundle number: **247** (this delivery is **246**)
+
+## Status (2026-10-12)
+
+Section **Focus** mode (outline title-bar toggle / Ctrl+Alt+F / View menu):
+body layout shows only the focused Section/Article (ancestors as headers for
+context; other branches omitted). Outline still lists the full tree; clicking
+a row retargets the filter. View filter only — document unchanged.
 
 ## Status (2026-10-12)
 
@@ -419,7 +426,7 @@ LCS structural diff marks; cross-document `:::include`.
 
 ## Open work / next steps
 
-0. **Large-document virtualization** — v1 in (viewport + height-hint skip for sequential blocks). Still open: tighter invalidation on edits, column-internal skip, measure-only pass without FreeType for far blocks, history depth already capped.
+0. **Large-document navigation** — section Focus mode (246); virtualization — v1 in (viewport + height-hint skip for sequential blocks). Still open: tighter invalidation on edits, column-internal skip, measure-only pass without FreeType for far blocks, history depth already capped.
 
 1. Optional: HarfBuzz for complex scripts
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
@@ -698,4 +705,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-242.*-outline-jump-reliable-…` — prior
 - `xanatoo-243.*-fix-view-settings-scope-…` — prior
 - `xanatoo-244.*-virt-drop-hints-undo-load-…` — prior
-- `xanatoo-245.*-outline-jump-to-top-…` — this delivery
+- `xanatoo-245.*-outline-jump-to-top-…` — prior
+- `xanatoo-246.*-section-focus-mode-…` — this delivery

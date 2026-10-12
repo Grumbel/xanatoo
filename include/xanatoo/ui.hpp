@@ -129,6 +129,7 @@ enum class UiCommand {
   ViewMeasureFull,          // max_content_width = 0
   ViewMeasureComfortable,   // ~720px
   ViewMeasureWide,          // ~960px
+  ToggleSectionFocus,       // outline: body shows one section only
 };
 
 
@@ -138,6 +139,7 @@ struct UiState {
   bool has_path = false;
   bool split = false;
   bool outline = false;
+  bool section_focus = false;
   bool backlinks = false;
   bool diff = false;
   bool can_diff = false;  // two independent documents loaded

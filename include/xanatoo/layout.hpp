@@ -124,11 +124,15 @@ public:
   // blocks without re-measuring them.
   // folded_sections: view-local set of Section/Article ids whose body is
   // hidden (header still laid out). Not stored in the document.
+  // focus_section: when not INVALID_NODE, only that Section/Article (and its
+  // descendants) is fully laid out; ancestors show header only; other
+  // branches are omitted. View filter — document unchanged.
   LayoutResult layout(const Document& doc, float max_width,
                       const std::string& image_base = {},
                       const LayoutViewport& viewport = {},
                       const std::unordered_map<NodeId, float>* height_hints = nullptr,
-                      const std::unordered_set<NodeId>* folded_sections = nullptr);
+                      const std::unordered_set<NodeId>* folded_sections = nullptr,
+                      NodeId focus_section = INVALID_NODE);
 
 private:
   FontSet& fonts_;
@@ -139,6 +143,7 @@ private:
   LayoutViewport viewport_;
   const std::unordered_map<NodeId, float>* height_hints_ = nullptr;
   const std::unordered_set<NodeId>* folded_sections_ = nullptr;
+  NodeId focus_section_ = INVALID_NODE;
   bool skipped_any_ = false;
 
   // If the block has a height hint and lies fully outside the materialised

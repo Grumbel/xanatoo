@@ -484,6 +484,9 @@ int main(int argc, char** argv) {
   // View-local Section/Article fold (not in the document; future: SQLite).
   std::unordered_set<xanatoo::NodeId> folded_sections;
   std::string last_fold_doc_key;
+  // Outline "Focus" mode: body shows only the focused section (layout filter).
+  bool section_focus_mode = false;
+  xanatoo::NodeId section_focus_id = xanatoo::INVALID_NODE;
   int ol_x = 40, ol_y = 100, ol_w = 320, ol_h = 420;
   bool ol_dragging = false;
   int ol_drag_dx = 0, ol_drag_dy = 0;
@@ -727,6 +730,35 @@ int main(int argc, char** argv) {
     }
   };
 
+  auto toggle_section_focus_mode = [&]() {
+    section_focus_mode = !section_focus_mode;
+    if (section_focus_mode) {
+      // Seed from outline selection or caret section.
+      section_focus_id = xanatoo::INVALID_NODE;
+      if (!outline.empty() && outline_sel >= 0 &&
+          outline_sel < static_cast<int>(outline.size())) {
+        section_focus_id = outline[static_cast<size_t>(outline_sel)].section;
+      }
+      if (section_focus_id == xanatoo::INVALID_NODE) {
+        section_focus_id =
+            xanatoo::enclosing_section(doc_of(F()), F().sel.focus.node);
+      }
+      if (section_focus_id == xanatoo::INVALID_NODE) {
+        section_focus_mode = false;
+        flash_status("Focus: no section under caret / outline");
+        return;
+      }
+      for (int pi = 0; pi < 2; ++pi) panes[pi].height_cache.clear();
+      needs_layout = true;
+      flash_status("Focus section on — outline picks what you see");
+    } else {
+      section_focus_id = xanatoo::INVALID_NODE;
+      for (int pi = 0; pi < 2; ++pi) panes[pi].height_cache.clear();
+      needs_layout = true;
+      flash_status("Focus section off — full document");
+    }
+  };
+
   auto reload_folds_for_focused = [&]() {
     folded_sections.clear();
     std::string doc_key = path_of(F());
@@ -954,7 +986,8 @@ int main(int argc, char** argv) {
             pane.height_cache.empty() ? nullptr : &pane.height_cache;
         pane.layout = layout_engine.layout(
             doc_of(pane), static_cast<float>(pane.w), base_of(pane), vp, hints,
-            &folded_sections);
+            &folded_sections,
+            (section_focus_mode && section_focus_id != xanatoo::INVALID_NODE) ? section_focus_id : xanatoo::INVALID_NODE);
         // Refresh height hints from measured (and skipped-stub) boxes.
         for (const auto& b : pane.layout.boxes) {
           if (b.node != xanatoo::INVALID_NODE && b.height > 0.f)
@@ -1023,8 +1056,9 @@ int main(int argc, char** argv) {
     try {
       xanatoo::ensure_valid_caret(doc_of(p), p.sel.focus);
       xanatoo::ensure_valid_caret(doc_of(p), p.sel.anchor);
-      p.layout = layout_engine.layout(doc_of(p), static_cast<float>(p.w),
-                                      base_of(p), {}, nullptr, &folded_sections);
+      p.layout = layout_engine.layout(
+          doc_of(p), static_cast<float>(p.w), base_of(p), {}, nullptr,
+          &folded_sections, (section_focus_mode && section_focus_id != xanatoo::INVALID_NODE) ? section_focus_id : xanatoo::INVALID_NODE);
       for (const auto& b : p.layout.boxes) {
         if (b.node != xanatoo::INVALID_NODE && b.height > 0.f)
           p.height_cache[b.node] = b.height;
@@ -2025,6 +2059,18 @@ int main(int argc, char** argv) {
       else dest = er.section;
     }
     if (dest == xanatoo::INVALID_NODE) return;
+    // Keep section-focus filter in sync with outline selection.
+    if (section_focus_mode) {
+      xanatoo::NodeId sec = er.section;
+      if (sec == xanatoo::INVALID_NODE) {
+        sec = xanatoo::enclosing_section(d, dest);
+      }
+      if (sec != section_focus_id) {
+        section_focus_id = sec;
+        for (int pi = 0; pi < 2; ++pi) panes[pi].height_cache.clear();
+        needs_layout = true;
+      }
+    }
     expand_ancestors_for_node(dest);
     if (needs_layout) layout_panes();
     p.sel.focus = {dest, 0, 0};
@@ -2324,9 +2370,18 @@ int main(int argc, char** argv) {
                   ol_dragging = false;
                   ol_resize = 0;
                 } else {
-                  ol_dragging = true;
-                  ol_drag_dx = mxw - ol_x;
-                  ol_drag_dy = myw - ol_y;
+                  // Focus chip sits just left of ×.
+                  const char* flab = section_focus_mode ? "Focus●" : "Focus";
+                  int fw = body_font.measure(flab);
+                  int fx = ol_x + ol_w - 28 - fw - 10;
+                  if (mxw >= fx - 4 && mxw < ol_x + ol_w - 28) {
+                    toggle_section_focus_mode();
+                    ol_dragging = false;
+                  } else {
+                    ol_dragging = true;
+                    ol_drag_dx = mxw - ol_x;
+                    ol_drag_dy = myw - ol_y;
+                  }
                 }
                 break;
               }
@@ -4208,6 +4263,11 @@ int main(int argc, char** argv) {
                 toggle_fold_at_caret();
                 break;
               }
+              if (ctrl && alt) {
+                // Body shows only the focused outline section.
+                toggle_section_focus_mode();
+                break;
+              }
               if (ctrl) {
                 search_mode = true;
                 replace_mode = false;
@@ -5618,6 +5678,7 @@ int main(int argc, char** argv) {
       ui_state.has_path = !path_of(F()).empty();
       ui_state.split = split;
       ui_state.outline = outline_mode;
+      ui_state.section_focus = section_focus_mode;
       ui_state.backlinks = backlinks_mode;
       ui_state.diff = diff_mode;
       ui_state.can_diff = !shared_doc() && panes[0].buf != panes[1].buf &&
@@ -5782,7 +5843,8 @@ int main(int argc, char** argv) {
             c == C::ViewLineSpacingLoose || c == C::ViewMarginsNarrow ||
             c == C::ViewMarginsNormal || c == C::ViewMarginsWide ||
             c == C::ViewMarginsExtra || c == C::ViewMeasureFull ||
-            c == C::ViewMeasureComfortable || c == C::ViewMeasureWide;
+            c == C::ViewMeasureComfortable || c == C::ViewMeasureWide ||
+            c == C::ToggleSectionFocus;
         if (!allowed) {
           flash_status("Browse mode — F2 to edit");
           ui_frame.cmd = C::None;
@@ -6790,6 +6852,9 @@ int main(int argc, char** argv) {
               xanatoo::ViewSettings::kMeasureWide;
           apply_view_settings();
           flash_status("Measure: wide (~960px)");
+          break;
+        case C::ToggleSectionFocus:
+          toggle_section_focus_mode();
           break;
         default:
           break;
@@ -7804,6 +7869,24 @@ label = "Outline — ↑/↓ · ←/→ fold · Enter jump · twisty · Esc";
                          static_cast<float>(ol_y + 6 + body_font.ascender()),
                          outline_docked ? "Outline · body →" : "Outline", 25, 90,
                          170);
+      // Focus toggle (section isolation) — left of close.
+      {
+        const char* flab = section_focus_mode ? "Focus●" : "Focus";
+        int fw = body_font.measure(flab);
+        int fx = ol_x + ol_w - 28 - fw - 10;
+        if (section_focus_mode) {
+          SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
+          SDL_SetRenderDrawColor(sdl, 25, 90, 170, 50);
+          SDL_Rect chip{fx - 4, ol_y + 4, fw + 8, help_title_h - 6};
+          SDL_RenderFillRect(sdl, &chip);
+          SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_NONE);
+        }
+        renderer.draw_text(
+            body_font, static_cast<float>(fx),
+            static_cast<float>(ol_y + 6 + body_font.ascender()), flab,
+            section_focus_mode ? 25 : 80, section_focus_mode ? 90 : 70,
+            section_focus_mode ? 170 : 60);
+      }
       renderer.draw_text(body_font, static_cast<float>(ol_x + ol_w - 22),
                          static_cast<float>(ol_y + 6 + body_font.ascender()),
                          "×", 80, 40, 40);

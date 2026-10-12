@@ -16,6 +16,17 @@ namespace xanatoo {
 
 namespace {
 
+// True if `id` is `root` or nested under `root`.
+bool node_is_descendant(const Document& doc, NodeId root, NodeId id) {
+  if (root == INVALID_NODE || id == INVALID_NODE) return false;
+  for (NodeId cur = id; cur != INVALID_NODE && cur < doc.next_id;
+       cur = doc.get(cur).parent) {
+    if (cur == root) return true;
+  }
+  return false;
+}
+
+
 // Cached external documents for :::include path.md[#anchor].
 // Keyed by resolved absolute path. Cleared via clear_external_doc_cache().
 std::map<std::string, Document>& external_doc_cache_map() {
@@ -126,12 +137,14 @@ LayoutResult LayoutEngine::layout(
     const Document& doc, float max_width, const std::string& image_base,
     const LayoutViewport& viewport,
     const std::unordered_map<NodeId, float>* height_hints,
-    const std::unordered_set<NodeId>* folded_sections) {
+    const std::unordered_set<NodeId>* folded_sections,
+    NodeId focus_section) {
   LayoutResult result;
   image_base_ = image_base;
   viewport_ = viewport;
   height_hints_ = height_hints;
   folded_sections_ = folded_sections;
+  focus_section_ = focus_section;
   skipped_any_ = false;
   if (viewport_.active()) {
     result.materialised_top = viewport_.top - viewport_.overscan;
@@ -165,6 +178,7 @@ LayoutResult LayoutEngine::layout(
   result.virtualized = skipped_any_;
   height_hints_ = nullptr;
   folded_sections_ = nullptr;
+  focus_section_ = INVALID_NODE;
   return result;
 }
 
@@ -177,7 +191,16 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
   switch (node.kind) {
     case NodeKind::Document:
-      layout_children_sequential(doc, node.children, x, y, max_width, out);
+      if (focus_section_ != INVALID_NODE) {
+        // Only section tree on the path to the focus; skip preamble blocks.
+        for (NodeId child : node.children) {
+          const Node& ch = doc.get(child);
+          if (ch.kind == NodeKind::Section || ch.kind == NodeKind::Article)
+            layout_node(doc, child, x, y, max_width, out);
+        }
+      } else {
+        layout_children_sequential(doc, node.children, x, y, max_width, out);
+      }
       break;
 
     case NodeKind::List:
@@ -393,6 +416,35 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
     case NodeKind::Article:
     case NodeKind::Section: {
+      // Section-focus view: show only the focused section (full), its
+      // ancestors (header only), and descendants of the focus (full).
+      if (focus_section_ != INVALID_NODE) {
+        const bool is_focus = (id == focus_section_);
+        const bool under_focus = node_is_descendant(doc, focus_section_, id);
+        const bool is_ancestor = node_is_descendant(doc, id, focus_section_);
+        if (!is_focus && !under_focus && !is_ancestor)
+          break;  // sibling / other branch — omit entirely
+        if (is_ancestor && !is_focus && !under_focus) {
+          float start_y = y;
+          float inset = (node.kind == NodeKind::Section) ? 8.f : 0.f;
+          y += 6.f;
+          for (NodeId child : node.children) {
+            const Node& ch = doc.get(child);
+            if (ch.kind == NodeKind::Header || ch.kind == NodeKind::Heading)
+              layout_node(doc, child, x + inset, y, max_width - inset, out);
+          }
+          // Recurse into section children so the path reaches the focus.
+          for (NodeId child : node.children) {
+            const Node& ch = doc.get(child);
+            if (ch.kind == NodeKind::Section || ch.kind == NodeKind::Article)
+              layout_node(doc, child, x + inset, y, max_width - inset, out);
+          }
+          y += 6.f;
+          out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+          break;
+        }
+        // focus or descendant: fall through to full layout
+      }
       float start_y = y;
       // Nested sections indent slightly; articles keep full width.
       float inset = (node.kind == NodeKind::Section) ? 8.f : 0.f;

@@ -647,6 +647,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleSplit;
       if (ImGui::MenuItem("Heading Outline", "Ctrl+Shift+O", state.outline))
         cmd = UiCommand::ToggleOutline;
+      if (ImGui::MenuItem("Focus current section", "Ctrl+Alt+F", state.section_focus,
+                          state.outline || true))
+        cmd = UiCommand::ToggleSectionFocus;
       ImGui::TextDisabled("  Ctrl+Alt+O docks outline | body");
       if (ImGui::MenuItem("Backlinks", "Ctrl+Alt+B", state.backlinks))
         cmd = UiCommand::ToggleBacklinks;
