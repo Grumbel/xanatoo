@@ -6,7 +6,16 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **241** (this delivery is **240**)
+Next bundle number: **242** (this delivery is **241**)
+
+## Status (2026-10-12)
+
+View display settings (rendering only, not document format): line spacing
+(tight/normal/relaxed/loose), margins (narrow…extra), measure/column width
+(full / ~720 / ~960). Persisted in `~/.config/xanatoo/view.conf`. LayoutEngine
+reads LayoutOptions (margin_x/y, line_spacing, max_content_width).
+
+HarfBuzz remains deferred — English/feature polish first.
 
 ## Status (2026-10-12)
 
@@ -661,4 +670,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-237.*-epub-import-…` — prior
 - `xanatoo-238.*-fix-compile-order-braces-…` — prior
 - `xanatoo-239.*-backlinks-unused-vars-…` — prior
-- `xanatoo-240.*-epub-sanitize-calibre-html-…` — this delivery
+- `xanatoo-240.*-epub-sanitize-calibre-html-…` — prior
+- `xanatoo-241.*-view-display-settings-…` — this delivery

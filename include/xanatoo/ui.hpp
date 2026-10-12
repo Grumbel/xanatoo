@@ -117,7 +117,21 @@ enum class UiCommand {
   LoadDiffDemo,      // dual-pane diff-v1 | diff-v2 + diff marks on
   ZoomIn,
   ZoomOut,
+  // View display (rendering only — not document format)
+  ViewLineSpacingTight,
+  ViewLineSpacingNormal,
+  ViewLineSpacingRelaxed,
+  ViewLineSpacingLoose,
+  ViewMarginsNarrow,
+  ViewMarginsNormal,
+  ViewMarginsWide,
+  ViewMarginsExtra,
+  ViewMeasureFull,          // max_content_width = 0
+  ViewMeasureComfortable,   // ~720px
+  ViewMeasureWide,          // ~960px
 };
+
+
 
 struct UiState {
   bool dirty = false;
@@ -128,6 +142,10 @@ struct UiState {
   bool diff = false;
   bool can_diff = false;  // two independent documents loaded
   bool structure = false;
+  // Display prefs (for menu checks)
+  float view_line_spacing = 1.30f;
+  float view_margin_x = 32.f;
+  float view_max_content_width = 0.f;
   bool browse = false;  // read-only navigation
   bool virtual_keyboard = false;
   // Gamepad right-stick software pointer (extra; real mouse stays separate)

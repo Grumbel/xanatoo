@@ -5654,7 +5654,12 @@ int main(int argc, char** argv) {
             c == C::OpenFormatDoc ||
             c == C::OpenSemanticDoc || c == C::OpenInWindow ||
             c == C::OpenExample || c == C::LoadDiffDemo || c == C::ZoomIn ||
-            c == C::ZoomOut;
+            c == C::ZoomOut || c == C::ViewLineSpacingTight ||
+            c == C::ViewLineSpacingNormal || c == C::ViewLineSpacingRelaxed ||
+            c == C::ViewLineSpacingLoose || c == C::ViewMarginsNarrow ||
+            c == C::ViewMarginsNormal || c == C::ViewMarginsWide ||
+            c == C::ViewMarginsExtra || c == C::ViewMeasureFull ||
+            c == C::ViewMeasureComfortable || c == C::ViewMeasureWide;
         if (!allowed) {
           flash_status("Browse mode — F2 to edit");
           ui_frame.cmd = C::None;
@@ -6603,6 +6608,63 @@ int main(int argc, char** argv) {
           heading_px = std::max(14, heading_px - 2);
           fonts.set_sizes(body_px, heading_px);
           needs_layout = true;
+          break;
+        case C::ViewLineSpacingTight:
+          view_settings.line_spacing = xanatoo::ViewSettings::kLineTight;
+          apply_view_settings();
+          flash_status("Line spacing: tight");
+          break;
+        case C::ViewLineSpacingNormal:
+          view_settings.line_spacing = xanatoo::ViewSettings::kLineNormal;
+          apply_view_settings();
+          flash_status("Line spacing: normal");
+          break;
+        case C::ViewLineSpacingRelaxed:
+          view_settings.line_spacing = xanatoo::ViewSettings::kLineRelaxed;
+          apply_view_settings();
+          flash_status("Line spacing: relaxed");
+          break;
+        case C::ViewLineSpacingLoose:
+          view_settings.line_spacing = xanatoo::ViewSettings::kLineLoose;
+          apply_view_settings();
+          flash_status("Line spacing: loose");
+          break;
+        case C::ViewMarginsNarrow:
+          view_settings.margin_x = xanatoo::ViewSettings::kMarginNarrow;
+          apply_view_settings();
+          flash_status("Margins: narrow");
+          break;
+        case C::ViewMarginsNormal:
+          view_settings.margin_x = xanatoo::ViewSettings::kMarginNormal;
+          apply_view_settings();
+          flash_status("Margins: normal");
+          break;
+        case C::ViewMarginsWide:
+          view_settings.margin_x = xanatoo::ViewSettings::kMarginWide;
+          apply_view_settings();
+          flash_status("Margins: wide");
+          break;
+        case C::ViewMarginsExtra:
+          view_settings.margin_x = xanatoo::ViewSettings::kMarginExtra;
+          apply_view_settings();
+          flash_status("Margins: extra wide");
+          break;
+        case C::ViewMeasureFull:
+          view_settings.max_content_width = 0.f;
+          apply_view_settings();
+          flash_status("Measure: full width");
+          break;
+        case C::ViewMeasureComfortable:
+          view_settings.max_content_width =
+              xanatoo::ViewSettings::kMeasureComfortable;
+          apply_view_settings();
+          flash_status("Measure: comfortable (~720px)");
+          break;
+        case C::ViewMeasureWide:
+          view_settings.max_content_width =
+              xanatoo::ViewSettings::kMeasureWide;
+          apply_view_settings();
+          flash_status("Measure: wide (~960px)");
           break;
         default:
           break;

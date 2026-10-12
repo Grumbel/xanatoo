@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/ui.hpp"
+#include <cmath>
 #include "xanatoo/font.hpp"
 
 #include "imgui.h"
@@ -660,6 +661,43 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::Separator();
       menu_item_cmd("Zoom In", UiCommand::ZoomIn, cmd, true, "Ctrl++");
       menu_item_cmd("Zoom Out", UiCommand::ZoomOut, cmd, true, "Ctrl+-");
+      if (ImGui::BeginMenu("Line spacing")) {
+        auto ls = state.view_line_spacing;
+        auto near = [](float a, float b) { return std::fabs(a - b) < 0.05f; };
+        if (ImGui::MenuItem("Tight", nullptr, near(ls, 1.10f)))
+          cmd = UiCommand::ViewLineSpacingTight;
+        if (ImGui::MenuItem("Normal", nullptr, near(ls, 1.30f)))
+          cmd = UiCommand::ViewLineSpacingNormal;
+        if (ImGui::MenuItem("Relaxed", nullptr, near(ls, 1.55f)))
+          cmd = UiCommand::ViewLineSpacingRelaxed;
+        if (ImGui::MenuItem("Loose", nullptr, near(ls, 1.80f)))
+          cmd = UiCommand::ViewLineSpacingLoose;
+        ImGui::EndMenu();
+      }
+      if (ImGui::BeginMenu("Margins")) {
+        auto mx = state.view_margin_x;
+        auto near = [](float a, float b) { return std::fabs(a - b) < 1.f; };
+        if (ImGui::MenuItem("Narrow", nullptr, near(mx, 12.f)))
+          cmd = UiCommand::ViewMarginsNarrow;
+        if (ImGui::MenuItem("Normal", nullptr, near(mx, 32.f)))
+          cmd = UiCommand::ViewMarginsNormal;
+        if (ImGui::MenuItem("Wide", nullptr, near(mx, 56.f)))
+          cmd = UiCommand::ViewMarginsWide;
+        if (ImGui::MenuItem("Extra wide", nullptr, near(mx, 80.f)))
+          cmd = UiCommand::ViewMarginsExtra;
+        ImGui::EndMenu();
+      }
+      if (ImGui::BeginMenu("Measure (column width)")) {
+        auto mw = state.view_max_content_width;
+        auto near = [](float a, float b) { return std::fabs(a - b) < 1.f; };
+        if (ImGui::MenuItem("Full width", nullptr, mw < 1.f))
+          cmd = UiCommand::ViewMeasureFull;
+        if (ImGui::MenuItem("Comfortable (~720px)", nullptr, near(mw, 720.f)))
+          cmd = UiCommand::ViewMeasureComfortable;
+        if (ImGui::MenuItem("Wide (~960px)", nullptr, near(mw, 960.f)))
+          cmd = UiCommand::ViewMeasureWide;
+        ImGui::EndMenu();
+      }
       ImGui::Separator();
       menu_item_cmd("FORMAT.md in window", UiCommand::OpenFormatDoc, cmd);
       menu_item_cmd("semantic.sexp in window", UiCommand::OpenSemanticDoc, cmd);

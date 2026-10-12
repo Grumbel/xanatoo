@@ -5,6 +5,7 @@
 #include "xanatoo/parse.hpp"
 #include "xanatoo/util.hpp"
 
+#include <algorithm>
 #include <fstream>
 #include <map>
 #include <unordered_map>
@@ -150,9 +151,17 @@ LayoutResult LayoutEngine::layout(
     if (n.kind == NodeKind::Message && !n.label.empty())
       g_msg_label_map.emplace(n.label, n.id);
   }
-  float y = 24.f;
-  layout_node(doc, doc.root, 32.f, y, max_width - 64.f, result);
-  result.content_height = y + 48.f;
+  float mx = options_.margin_x;
+  float y = options_.margin_y;
+  float content_w = std::max(40.f, max_width - 2.f * mx);
+  if (options_.max_content_width > 0.f &&
+      content_w > options_.max_content_width) {
+    const float extra = content_w - options_.max_content_width;
+    mx += extra * 0.5f;
+    content_w = options_.max_content_width;
+  }
+  layout_node(doc, doc.root, mx, y, content_w, result);
+  result.content_height = y + options_.margin_y + 24.f;
   result.virtualized = skipped_any_;
   height_hints_ = nullptr;
   folded_sections_ = nullptr;
@@ -1165,7 +1174,7 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
       out.glyphs.push_back(pg);
       lx += static_cast<float>(g.advance >> 6);
     }
-    baseline += metrics.line_height() * 1.3f;
+    baseline += metrics.line_height() * options_.line_spacing;
     pen_x = x;
     line_start = x;
     line_start_idx = end_idx;

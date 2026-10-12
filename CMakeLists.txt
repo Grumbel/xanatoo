@@ -51,6 +51,7 @@ add_executable(xanatoo
   src/minibuffer.cpp
   src/sidestore.cpp
   src/epub_import.cpp
+  src/view_settings.cpp
   src/cli.cpp
   src/gemini.cpp
   src/nostr.cpp
@@ -193,6 +194,7 @@ add_executable(xanatoo_tests
   src/nostr.cpp
   src/gemini.cpp
   src/epub_import.cpp
+  src/view_settings.cpp
 )
 target_include_directories(xanatoo_tests PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include

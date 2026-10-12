@@ -10,6 +10,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "xanatoo/view_settings.hpp"
+
 namespace xanatoo {
 
 struct PositionedGlyph {
@@ -93,9 +95,29 @@ struct LayoutViewport {
 // Call after reload so changed includes are picked up.
 void clear_external_doc_cache();
 
+// Per-layout rendering options (from ViewSettings). Geometry only.
+struct LayoutOptions {
+  float margin_x = 32.f;
+  float margin_y = 24.f;
+  float line_spacing = 1.30f;
+  float max_content_width = 0.f;  // 0 = fill pane
+
+  static LayoutOptions from_view(const ViewSettings& v) {
+    LayoutOptions o;
+    o.margin_x = v.margin_x;
+    o.margin_y = v.margin_y;
+    o.line_spacing = v.line_spacing;
+    o.max_content_width = v.max_content_width;
+    return o;
+  }
+};
+
 class LayoutEngine {
 public:
   LayoutEngine(FontSet& fonts, ImageCache* images = nullptr);
+
+  void set_options(const LayoutOptions& o) { options_ = o; }
+  const LayoutOptions& options() const { return options_; }
 
   // height_hints: optional prior block heights (from a previous LayoutResult's
   // boxes). Used only when viewport is active to skip off-screen sequential
@@ -111,6 +133,7 @@ public:
 private:
   FontSet& fonts_;
   ImageCache* images_;
+  LayoutOptions options_{};
 
   std::string image_base_;
   LayoutViewport viewport_;
