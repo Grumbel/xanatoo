@@ -560,6 +560,11 @@ int main(int argc, char** argv) {
     if (outline_sel < 0) outline_sel = 0;
   };
 
+  auto flash_status = [&](const std::string& msg) {
+    status_notice = msg;
+    status_notice_until = SDL_GetTicks() + 4000;
+  };
+
   auto toggle_section_fold = [&](xanatoo::NodeId section) {
     if (section == xanatoo::INVALID_NODE) return;
     const auto& d = doc_of(F());
@@ -626,10 +631,6 @@ int main(int argc, char** argv) {
       for (auto& sw : soft_wins)
         if (sw.buf == di) sw.needs_layout = true;
     }
-  };
-  auto flash_status = [&](const std::string& msg) {
-    status_notice = msg;
-    status_notice_until = SDL_GetTicks() + 4000;
   };
 
   auto push_nav_history = [&](const std::string& url) {
@@ -6296,7 +6297,7 @@ int main(int argc, char** argv) {
       if (structure_mode) {
         SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
         const auto& ddoc = buffers[static_cast<size_t>(pane.buf)].doc;
-        auto kind_label = [](const xanatoo::Node& n) -> const char* {
+        auto kind_label = [&ddoc](const xanatoo::Node& n) -> const char* {
           using K = xanatoo::NodeKind;
           switch (n.kind) {
             case K::Heading: {
@@ -6314,14 +6315,14 @@ int main(int argc, char** argv) {
               static thread_local char buf[12];
               int lv = n.level;
               if (lv < 1) {
-                NodeId p = n.parent;
-                while (p != xanatoo::INVALID_NODE &&
-                       p < ddoc.next_id &&
-                       static_cast<size_t>(p - 1) < ddoc.nodes.size()) {
-                  const auto& pn = ddoc.get(p);
+                xanatoo::NodeId pid = n.parent;
+                while (pid != xanatoo::INVALID_NODE &&
+                       pid < ddoc.next_id &&
+                       static_cast<size_t>(pid - 1) < ddoc.nodes.size()) {
+                  const auto& pn = ddoc.get(pid);
                   if (pn.kind == K::Section || pn.kind == K::Article)
                     ++lv;
-                  p = pn.parent;
+                  pid = pn.parent;
                 }
               }
               if (lv < 1) lv = 1;
