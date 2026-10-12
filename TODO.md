@@ -6,7 +6,13 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **255** (this delivery is **254**)
+Next bundle number: **256** (this delivery is **255**)
+
+## Status (2026-10-12)
+
+Justify quality: only stretch lines ≥88% full; cap gap to ~1.25em; trim
+trailing spaces for right edge. Layout gutter pane.w-(kSbW+2). Hint to use
+Measure when justifying full-width.
 
 ## Status (2026-10-12)
 
@@ -758,4 +764,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-251.*-classic-scrollbar-marks-…` — prior
 - `xanatoo-252.*-scrollbar-page-hover-…` — prior
 - `xanatoo-253.*-scrollbar-marks-virt-…` — prior
-- `xanatoo-254.*-justify-scrollbar-gutter-…` — this delivery
+- `xanatoo-254.*-justify-scrollbar-gutter-…` — prior
+- `xanatoo-255.*-justify-quality-gutter-…` — this delivery

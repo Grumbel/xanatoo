@@ -286,6 +286,8 @@ int main(int argc, char** argv) {
   // Classic BeOS / GNOME 2–style document scrollbar (wider + arrow buttons).
   const int kSbW = 14;
   const int kSbArrow = 14;
+  // Layout must not use the scrollbar strip (track + 2px air).
+  const int kSbLayoutGutter = kSbW + 2;
   bool dragging_image = false;
   xanatoo::NodeId resize_image = xanatoo::INVALID_NODE;
   float resize_start_x = 0.f;
@@ -997,7 +999,7 @@ int main(int argc, char** argv) {
         const std::unordered_map<xanatoo::NodeId, float>* hints =
             pane.height_cache.empty() ? nullptr : &pane.height_cache;
         pane.layout = layout_engine.layout(
-            doc_of(pane), static_cast<float>(std::max(40, pane.w - kSbW)), base_of(pane), vp, hints,
+            doc_of(pane), static_cast<float>(std::max(40, pane.w - kSbLayoutGutter)), base_of(pane), vp, hints,
             &folded_sections,
             active_focus_section());
         // Refresh height hints from measured (and skipped-stub) boxes.
@@ -1069,7 +1071,7 @@ int main(int argc, char** argv) {
       xanatoo::ensure_valid_caret(doc_of(p), p.sel.focus);
       xanatoo::ensure_valid_caret(doc_of(p), p.sel.anchor);
       p.layout = layout_engine.layout(
-          doc_of(p), static_cast<float>(std::max(40, p.w - kSbW)),
+          doc_of(p), static_cast<float>(std::max(40, p.w - kSbLayoutGutter)),
           base_of(p), {}, nullptr, &folded_sections,
           active_focus_section());
       for (const auto& b : p.layout.boxes) {
@@ -6984,7 +6986,15 @@ int main(int argc, char** argv) {
         case C::ToggleJustify:
           view_settings.justify = !view_settings.justify;
           apply_view_settings();
-          flash_status(view_settings.justify ? "Justify on" : "Justify off");
+          if (view_settings.justify) {
+            if (view_settings.max_content_width < 1.f)
+              flash_status(
+                  "Justify on — View→Measure Comfortable for book-like width");
+            else
+              flash_status("Justify on");
+          } else {
+            flash_status("Justify off");
+          }
           break;
         default:
           break;

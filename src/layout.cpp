@@ -1210,12 +1210,19 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
   size_t line_start_idx = 0;
 
   auto break_line = [&](size_t end_idx, bool last_or_hard) {
-    // Natural width and inter-word gaps (space runs between non-space).
+    // Trim trailing spaces so the last word can sit on the right margin.
+    size_t content_end = end_idx;
+    while (content_end > line_start_idx && chars[content_end - 1].cp == ' ')
+      --content_end;
+
+    // Natural width of visible content and inter-word gaps (space runs).
     float natural = 0.f;
     int gaps = 0;
     bool seen_nonspace = false;
     bool in_space = false;
-    for (size_t i = line_start_idx; i < end_idx; ++i) {
+    float space_adv = static_cast<float>(metrics.glyph(' ').advance >> 6);
+    if (space_adv < 1.f) space_adv = 4.f;
+    for (size_t i = line_start_idx; i < content_end; ++i) {
       Font& font = fonts_.pick(chars[i].role);
       const Glyph& g = font.glyph(chars[i].cp);
       natural += static_cast<float>(g.advance >> 6);
@@ -1227,14 +1234,23 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
         seen_nonspace = true;
       }
     }
+
     float gap_extra = 0.f;
     const bool can_justify =
         options_.justify && !last_or_hard && gaps > 0 &&
         base_role != FontRole::Code && base_role != FontRole::Heading &&
         base_role != FontRole::BodyItalic;  // captions stay ragged
-    if (can_justify) {
+    if (can_justify && max_width > 1.f) {
+      // Only stretch lines that already nearly fill the measure — otherwise
+      // full-window columns produce huge rivers (looks like a width bug).
+      const float fill = natural / max_width;
       float room = max_width - natural;
-      if (room > 0.5f) gap_extra = room / static_cast<float>(gaps);
+      if (fill >= 0.88f && room > 0.5f) {
+        gap_extra = room / static_cast<float>(gaps);
+        // Cap expansion so a slightly short line does not blow open gaps.
+        const float cap = space_adv * 1.25f;
+        if (gap_extra > cap) gap_extra = cap;
+      }
     }
 
     float lx = line_start;
@@ -1243,14 +1259,16 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     for (size_t i = line_start_idx; i < end_idx; ++i) {
       Font& font = fonts_.pick(chars[i].role);
       const Glyph& g = font.glyph(chars[i].cp);
-      if (chars[i].cp == ' ') {
-        if (had_nonspace) after_space_run = true;
-      } else {
-        if (after_space_run && gap_extra > 0.f) {
-          lx += gap_extra;
-          after_space_run = false;
+      if (i < content_end) {
+        if (chars[i].cp == ' ') {
+          if (had_nonspace) after_space_run = true;
+        } else {
+          if (after_space_run && gap_extra > 0.f) {
+            lx += gap_extra;
+            after_space_run = false;
+          }
+          had_nonspace = true;
         }
-        had_nonspace = true;
       }
       PositionedGlyph pg;
       pg.codepoint = chars[i].cp;
