@@ -6,7 +6,14 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **242** (this delivery is **241**)
+Next bundle number: **243** (this delivery is **242**)
+
+## Status (2026-10-12)
+
+Outline click jump reliability: narrow ▸/▾ hit zone so heading text always
+jumps; resolve Section-only rows to first text child; scroll_caret falls back
+to ancestor layout boxes and force-full layout when virtualization has no
+glyph for the target.
 
 ## Status (2026-10-12)
 
@@ -671,4 +678,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-238.*-fix-compile-order-braces-…` — prior
 - `xanatoo-239.*-backlinks-unused-vars-…` — prior
 - `xanatoo-240.*-epub-sanitize-calibre-html-…` — prior
-- `xanatoo-241.*-view-display-settings-…` — this delivery
+- `xanatoo-241.*-view-display-settings-…` — prior
+- `xanatoo-242.*-outline-jump-reliable-…` — this delivery

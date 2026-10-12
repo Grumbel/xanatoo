@@ -32,6 +32,7 @@
 #include <cmath>
 #include <cstring>
 #include <vector>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -973,12 +974,51 @@ int main(int argc, char** argv) {
     }
   };
 
+  // Document Y of the caret for scrolling. Prefer glyphs; fall back to the
+  // caret node's layout box, then any ancestor box (virtualized layouts often
+  // only stub the Section, while the outline points at the Header child).
+  auto caret_doc_y = [&](Pane& p) -> std::optional<float> {
+    const float lh = static_cast<float>(body_font.line_height());
+    auto cpos = xanatoo::caret_screen_pos(p.layout, p.sel.focus, 0.f, lh);
+    if (cpos.valid) return cpos.y;
+    const auto& d = doc_of(p);
+    for (xanatoo::NodeId id = p.sel.focus.node;
+         id != xanatoo::INVALID_NODE && id < d.next_id;
+         id = d.get(id).parent) {
+      for (const auto& box : p.layout.boxes) {
+        if (box.node == id) return box.y;
+      }
+    }
+    return std::nullopt;
+  };
+
+  // Materialise the whole pane once so off-screen outline targets get boxes.
+  auto force_full_pane_layout = [&](Pane& p) {
+    try {
+      xanatoo::ensure_valid_caret(doc_of(p), p.sel.focus);
+      xanatoo::ensure_valid_caret(doc_of(p), p.sel.anchor);
+      p.layout = layout_engine.layout(doc_of(p), static_cast<float>(p.w),
+                                      base_of(p), {}, nullptr, &folded_sections);
+      for (const auto& b : p.layout.boxes) {
+        if (b.node != xanatoo::INVALID_NODE && b.height > 0.f)
+          p.height_cache[b.node] = b.height;
+      }
+      p.materialised_top = 0.f;
+      p.materialised_bottom = p.layout.content_height;
+    } catch (const std::exception& e) {
+      std::cerr << "force full layout failed: " << e.what() << "\n";
+    }
+  };
+
   auto scroll_caret_into_view = [&](Pane& p) {
-    auto cpos = xanatoo::caret_screen_pos(
-        p.layout, p.sel.focus, 0.f,
-        static_cast<float>(body_font.line_height()));
-    if (!cpos.valid) return;
-    float doc_y = cpos.y;
+    auto yopt = caret_doc_y(p);
+    if (!yopt) {
+      // Target not in the current (virtualized) band — full pass then retry.
+      force_full_pane_layout(p);
+      yopt = caret_doc_y(p);
+    }
+    if (!yopt) return;
+    float doc_y = *yopt;
     float margin = 40.f;
     // Visible content height excludes menu/toolbar and status bar.
     float view_h = static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
@@ -988,6 +1028,8 @@ int main(int argc, char** argv) {
     } else if (doc_y - p.scroll_y > view_h - margin) {
       p.scroll_y = doc_y - (view_h - margin);
     }
+    // After a long jump, re-virtualize around the new scroll position.
+    needs_layout = true;
     ensure_virtual_layout(p);
   };
 
@@ -1918,10 +1960,30 @@ int main(int argc, char** argv) {
         outline_sel >= static_cast<int>(outline.size()))
       return;
     Pane& p = F();
-    xanatoo::NodeId dest = outline[static_cast<size_t>(outline_sel)].node;
+    const auto& er = outline[static_cast<size_t>(outline_sel)];
+    xanatoo::Document& d = doc_of(p);
+    // Prefer the title Header; if the row only has a Section id (no header
+    // child), land on the first text node under that section so
+    // ensure_valid_caret does not relocate to the top of the document.
+    xanatoo::NodeId dest = er.node;
+    if (dest != xanatoo::INVALID_NODE && dest < d.next_id) {
+      const auto& n = d.get(dest);
+      if (n.id != dest || !xanatoo::is_text_node_kind(n.kind))
+        dest = xanatoo::INVALID_NODE;
+    } else {
+      dest = xanatoo::INVALID_NODE;
+    }
+    if (dest == xanatoo::INVALID_NODE && er.section != xanatoo::INVALID_NODE) {
+      std::vector<xanatoo::NodeId> texts;
+      xanatoo::collect_text_nodes(d, er.section, texts);
+      if (!texts.empty()) dest = texts.front();
+      else dest = er.section;
+    }
+    if (dest == xanatoo::INVALID_NODE) return;
     expand_ancestors_for_node(dest);
+    if (needs_layout) layout_panes();
     p.sel.focus = {dest, 0, 0};
-    xanatoo::ensure_valid_caret(doc_of(p), p.sel.focus);
+    xanatoo::ensure_valid_caret(d, p.sel.focus);
     p.sel.anchor = p.sel.focus;
     scroll_caret_into_view(p);
     reset_blink();
@@ -2247,11 +2309,17 @@ int main(int argc, char** argv) {
                   if (row >= 0 && row < static_cast<int>(outline.size())) {
                     outline_sel = row;
                     const auto& er = outline[static_cast<size_t>(row)];
-                    // Disclosure / left gutter toggles fold; body jumps.
+                    // Disclosure hit only on the ▸/▾ glyph, not the heading
+                    // text (old 48+level*12 zone stole clicks into fold).
                     float local_x = static_cast<float>(mxw - cx);
+                    const float indent_px =
+                        static_cast<float>(std::max(0, er.level - 1)) * 12.f;
+                    // Paint draws at cx+8 with level spaces then the twisty.
+                    const float twist_x0 = 8.f + indent_px;
+                    const float twist_x1 = twist_x0 + 22.f;
                     const bool on_twist =
-                        er.has_children && local_x < 48.f +
-                            static_cast<float>(std::max(0, er.level - 1)) * 12.f;
+                        er.has_children && local_x >= twist_x0 - 2.f &&
+                        local_x < twist_x1;
                     if (on_twist && er.section != xanatoo::INVALID_NODE) {
                       toggle_section_fold(er.section);
                     } else {
