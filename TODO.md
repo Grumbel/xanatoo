@@ -6,16 +6,29 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **222** (this delivery is **221**)
+Next bundle number: **223** (this delivery is **222**)
 
 ## Status (2026-10-12)
 
 Large-document virtualization (v1): viewport-scoped sequential layout with
-per-pane block height cache. Off-screen Document/Section/Article/Thread/List/
-Column/DefList/Biblio children skip glyph materialisation when a prior height
-hint exists; content_height stays accurate via stub boxes. Scroll/page/wheel
-re-layout when the view leaves the materialised overscan band. Width change
-clears height hints. Selection endpoints preserved across layout.
+per-pane block height cache. Off-screen sequential blocks skip glyph
+materialisation when height hints exist.
+
+## Status (2026-10-12) — section tree
+
+Product decisions:
+- Fold / view state ultimately in side SQLite (not the document); docs trend
+  toward immutability; originals may be ingested for versioning/annotation.
+- Jump to outline target without auto-expand (expand later).
+- Always normalize org stars and ATX/setext into nested Section + Header trees.
+- Never auto-derive Article (intentional magazine-scale unit only).
+- Structure highlight labels Header as headerN (level / section depth).
+
+Implemented: org + markdown ATX/setext → Section tree; org serialize walks
+sections; structure overlay shows headerN; unit tests for nest ownership.
+
+Still open: view-local fold (not in .md), collapsible outline tree UI,
+promote/demote, SQLite side store.
 
 ## Status (2026-10-11)
 

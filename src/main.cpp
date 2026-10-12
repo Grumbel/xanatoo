@@ -742,16 +742,7 @@ int main(int argc, char** argv) {
     refresh_diff();
   };
 
-  auto clear_pane_height_cache = [&](Pane& p) {
-    p.height_cache.clear();
-    p.materialised_top = 0.f;
-    p.materialised_bottom = 0.f;
-  };
 
-  auto clear_all_height_caches = [&]() {
-    clear_pane_height_cache(panes[0]);
-    clear_pane_height_cache(panes[1]);
-  };
 
   // Re-layout when scroll leaves the materialised band (virtualization).
   auto ensure_virtual_layout = [&](Pane& p) {
@@ -6243,7 +6234,33 @@ int main(int argc, char** argv) {
               buf[2] = 0;
               return buf;
             }
-            case K::Header: return "header";
+            case K::Header: {
+              // Show interop depth (org stars / ATX) or section nesting.
+              static thread_local char buf[12];
+              int lv = n.level;
+              if (lv < 1) {
+                NodeId p = n.parent;
+                while (p != xanatoo::INVALID_NODE &&
+                       p < ddoc.next_id &&
+                       static_cast<size_t>(p - 1) < ddoc.nodes.size()) {
+                  const auto& pn = ddoc.get(p);
+                  if (pn.kind == K::Section || pn.kind == K::Article)
+                    ++lv;
+                  p = pn.parent;
+                }
+              }
+              if (lv < 1) lv = 1;
+              if (lv > 9) lv = 9;
+              buf[0] = 'h';
+              buf[1] = 'e';
+              buf[2] = 'a';
+              buf[3] = 'd';
+              buf[4] = 'e';
+              buf[5] = 'r';
+              buf[6] = static_cast<char>('0' + lv);
+              buf[7] = 0;
+              return buf;
+            }
             case K::Article: return "article";
             case K::Section: return "section";
             case K::Paragraph: return "para";

@@ -293,8 +293,9 @@ void test_parse_org() {
       "More.\n");
 
   EXPECT(doc.root != INVALID_NODE);
-  int headers = 0, list_items = 0;
+  int headers = 0, list_items = 0, sections = 0;
   bool found_body = false;
+  bool nested_under_section = false;
   std::vector<NodeId> stack{doc.root};
   while (!stack.empty()) {
     NodeId id = stack.back();
@@ -302,15 +303,23 @@ void test_parse_org() {
     const Node& n = doc.get(id);
     if (n.kind == NodeKind::Header || n.kind == NodeKind::Heading)
       ++headers;
+    if (n.kind == NodeKind::Section) ++sections;
     if (n.kind == NodeKind::ListItem) ++list_items;
     for (const auto& sp : n.spans) {
       if (sp.text.find("Body") != std::string::npos ||
           sp.text.find("bold") != std::string::npos)
         found_body = true;
     }
+    // Nested "** Nested" section should be child of the outer section.
+    if (n.kind == NodeKind::Section && n.level == 2 &&
+        n.parent != INVALID_NODE &&
+        doc.get(n.parent).kind == NodeKind::Section)
+      nested_under_section = true;
     for (auto c : n.children) stack.push_back(c);
   }
-  EXPECT(headers >= 1);
+  EXPECT(headers >= 2);
+  EXPECT(sections >= 2);
+  EXPECT(nested_under_section);
   EXPECT(list_items >= 2);
   EXPECT(found_body);
 
@@ -570,6 +579,34 @@ void test_json_array_and_bool() {
 
 }  // namespace
 
+
+void test_atx_section_tree() {
+  using namespace xanatoo;
+  Document doc = parse_markup(
+      "# Top\n"
+      "Body A\n"
+      "\n"
+      "## Nested\n"
+      "Body B\n");
+  int sections = 0, headers = 0;
+  bool body_under_section = false;
+  std::vector<NodeId> st{doc.root};
+  while (!st.empty()) {
+    NodeId id = st.back();
+    st.pop_back();
+    const Node& n = doc.get(id);
+    if (n.kind == NodeKind::Section) ++sections;
+    if (n.kind == NodeKind::Header) ++headers;
+    if (n.kind == NodeKind::Paragraph && n.parent != INVALID_NODE &&
+        doc.get(n.parent).kind == NodeKind::Section)
+      body_under_section = true;
+    for (auto c : n.children) st.push_back(c);
+  }
+  EXPECT(sections >= 2);
+  EXPECT(headers >= 2);
+  EXPECT(body_under_section);
+}
+
 int main() {
   test_string_helpers();
   test_json_min();
@@ -583,6 +620,7 @@ int main() {
   test_url_edge_cases();
   test_path_helpers();
   test_parse_org();
+  test_atx_section_tree();
   test_parse_document_dispatch();
   test_reddit_json_url_shapes();
   test_path_format_dispatch();

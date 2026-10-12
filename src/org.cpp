@@ -319,6 +319,20 @@ Document parse_org(std::string_view source) {
 
   auto close_lists = [&]() { list_frames.clear(); };
 
+  // Implicit Section stack from heading depth (* / ** / …). Body attaches to
+  // the innermost open section (or the document root). Never auto-creates
+  // Article — that is intentional structure only.
+  struct SecFrame {
+    NodeId section = INVALID_NODE;
+    int depth = 0;
+  };
+  std::vector<SecFrame> sec_stack;
+
+  auto section_parent = [&]() -> NodeId {
+    if (!sec_stack.empty()) return sec_stack.back().section;
+    return doc.root;
+  };
+
   auto current_parent = [&]() -> NodeId {
     if (!list_frames.empty()) {
       NodeId list = list_frames.back().list;
@@ -328,7 +342,7 @@ Document parse_org(std::string_view source) {
       }
       return list;
     }
-    return doc.root;
+    return section_parent();
   };
 
   // Flush a paragraph buffer
@@ -350,7 +364,7 @@ Document parse_org(std::string_view source) {
       if ((L.level == 1) == ordered) return list_frames.back().list;
       list_frames.pop_back();
     }
-    NodeId parent = doc.root;
+    NodeId parent = section_parent();
     if (!list_frames.empty()) {
       // nest under previous item
       NodeId list = list_frames.back().list;
@@ -481,7 +495,7 @@ Document parse_org(std::string_view source) {
       size_t sp = 0;
       while (sp < rest.size() && !is_ws(rest[sp])) ++sp;
       lang = std::string(rest.substr(0, sp));
-      block_node = doc.create(NodeKind::CodeBlock, doc.root);
+      block_node = doc.create(NodeKind::CodeBlock, section_parent());
       doc.get(block_node).src = lang;
       block = BlockKind::Src;
       block_acc.clear();
@@ -491,7 +505,7 @@ Document parse_org(std::string_view source) {
     if (starts_with_ci(t, "#+BEGIN_EXAMPLE")) {
       flush_para();
       close_lists();
-      block_node = doc.create(NodeKind::CodeBlock, doc.root);
+      block_node = doc.create(NodeKind::CodeBlock, section_parent());
       block = BlockKind::Example;
       block_acc.clear();
       ++i;
@@ -500,7 +514,7 @@ Document parse_org(std::string_view source) {
     if (starts_with_ci(t, "#+BEGIN_QUOTE")) {
       flush_para();
       close_lists();
-      block_node = doc.create(NodeKind::BlockQuote, doc.root);
+      block_node = doc.create(NodeKind::BlockQuote, section_parent());
       block = BlockKind::Quote;
       block_acc.clear();
       ++i;
@@ -523,18 +537,29 @@ Document parse_org(std::string_view source) {
     if (is_hr_line(t)) {
       flush_para();
       close_lists();
-      doc.create(NodeKind::HorizontalRule, doc.root);
+      doc.create(NodeKind::HorizontalRule, section_parent());
       ++i;
       continue;
     }
 
-    // Headings
+    // Headings → Section tree (depth = star count). Header is the title
+    // child; following body attaches to the section until a heading of
+    // equal or shallower depth.
     HeadingParts hp;
     if (parse_heading_line(L, hp)) {
       flush_para();
       close_lists();
-      NodeId n = doc.create(NodeKind::Header, doc.root);
-      doc.get(n).level = hp.level;
+      int depth = hp.level > 0 ? hp.level : 1;
+      if (depth > 16) depth = 16;
+      while (!sec_stack.empty() && sec_stack.back().depth >= depth)
+        sec_stack.pop_back();
+      NodeId parent = section_parent();
+      NodeId sec = doc.create(NodeKind::Section, parent);
+      // Soft interop: remember star depth on the section for serializers.
+      doc.get(sec).level = depth;
+      sec_stack.push_back({sec, depth});
+      NodeId n = doc.create(NodeKind::Header, sec);
+      doc.get(n).level = depth;
       doc.get(n).src = hp.todo;
       doc.get(n).tags = hp.tags;
       parse_org_inlines(doc.get(n), hp.title);
@@ -547,7 +572,7 @@ Document parse_org(std::string_view source) {
     if (is_table_row(t) && !is_table_sep(t)) {
       flush_para();
       close_lists();
-      NodeId table = doc.create(NodeKind::Table, doc.root);
+      NodeId table = doc.create(NodeKind::Table, section_parent());
       bool header_done = false;
       while (i < lines.size() && is_table_row(lines[i].text)) {
         if (is_table_sep(lines[i].text)) {
@@ -681,9 +706,27 @@ void ser_node_org(const Document& doc, NodeId id, std::string& out,
       ser_children(doc, node, out, 0);
       break;
 
+    case NodeKind::Section:
+    case NodeKind::Article:
+      // Structure only — children serialise (header emits stars).
+      for (NodeId c : node.children)
+        ser_node_org(doc, c, out, list_indent);
+      break;
+
     case NodeKind::Header:
     case NodeKind::Heading: {
-      int depth = node.level > 0 ? node.level : 1;
+      int depth = node.level > 0 ? node.level : 0;
+      if (depth <= 0) {
+        // Derive from enclosing Section/Article count.
+        NodeId p = node.parent;
+        while (p != INVALID_NODE) {
+          const Node& pn = doc.get(p);
+          if (pn.kind == NodeKind::Section || pn.kind == NodeKind::Article)
+            ++depth;
+          p = pn.parent;
+        }
+      }
+      if (depth < 1) depth = 1;
       if (depth > 8) depth = 8;
       out.append(static_cast<size_t>(depth), '*');
       out.push_back(' ');
@@ -797,8 +840,6 @@ void ser_node_org(const Document& doc, NodeId id, std::string& out,
       break;
     }
 
-    case NodeKind::Article:
-    case NodeKind::Section:
     case NodeKind::Stretch:
     case NodeKind::Columns:
     case NodeKind::Column:

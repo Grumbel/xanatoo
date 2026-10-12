@@ -67,6 +67,16 @@ Dear ImGui is allowed for chrome (menus/toolbars). No Qt/GTK/KDE.
   triggers re-layout. Width changes clear the cache.
 - History still snapshots whole documents (depth capped for large trees).
 
+## Section tree (structure)
+
+- Org stars and Markdown ATX/setext always normalize into nested `Section`
+  nodes with a `Header` title child. Body blocks are children of the section.
+- `Article` is never synthesised automatically.
+- Soft interop: `Section.level` / `Header.level` may still hold depth for export.
+- View fold state will live outside the document (future SQLite); do not rely
+  on dirtying `.md`/`.org` for collapse alone.
+- Structure highlight shows `headerN` for header depth.
+
 ## Continuity
 
 Read `TODO.md` first. Record plans and outcomes there.

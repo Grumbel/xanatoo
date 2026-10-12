@@ -314,7 +314,37 @@ Document parse_markup(std::string_view source) {
   std::vector<NodeId> stack;
   stack.push_back(root);
 
-  auto current_parent = [&]() -> NodeId { return stack.back(); };
+  // Implicit Section stack from ATX / setext headings. Body attaches to the
+  // innermost open section. Cleared when an explicit ::: fence opens or closes
+  // so fence structure stays the authority inside containers.
+  struct AtxSec {
+    NodeId section = INVALID_NODE;
+    int depth = 0;
+  };
+  std::vector<AtxSec> atx_sec;
+
+  auto current_parent = [&]() -> NodeId {
+    if (!atx_sec.empty()) return atx_sec.back().section;
+    return stack.back();
+  };
+
+  auto push_fence = [&](NodeId n) {
+    stack.push_back(n);
+    atx_sec.clear();
+  };
+
+  auto open_atx_section = [&](int depth) -> NodeId {
+    if (depth < 1) depth = 1;
+    if (depth > 16) depth = 16;
+    while (!atx_sec.empty() && atx_sec.back().depth >= depth)
+      atx_sec.pop_back();
+    NodeId parent =
+        atx_sec.empty() ? stack.back() : atx_sec.back().section;
+    NodeId sec = doc.create(NodeKind::Section, parent);
+    doc.get(sec).level = depth;  // soft interop for export
+    atx_sec.push_back({sec, depth});
+    return sec;
+  };
 
   while (i < lines.size()) {
     const Line& L = lines[i];
@@ -335,6 +365,7 @@ Document parse_markup(std::string_view source) {
       // Treat bare ::: as close of current container if possible
       if (stack.size() > 1) {
         stack.pop_back();
+        atx_sec.clear();
       }
       ++i;
       continue;
@@ -346,7 +377,7 @@ Document parse_markup(std::string_view source) {
       std::string id = fence_attr(trimmed, "id");
       if (id.empty()) id = fence_attr(trimmed, "label");
       if (!id.empty()) doc.get(n).label = id;
-      stack.push_back(n);
+      push_fence(n);
       ++i;
       continue;
     }
@@ -355,7 +386,7 @@ Document parse_markup(std::string_view source) {
       std::string id = fence_attr(trimmed, "id");
       if (id.empty()) id = fence_attr(trimmed, "label");
       if (!id.empty()) doc.get(n).label = id;
-      stack.push_back(n);
+      push_fence(n);
       ++i;
       continue;
     }
@@ -396,13 +427,13 @@ Document parse_markup(std::string_view source) {
         }
       }
       doc.get(n).expanded = false; // start collapsed — classic stretchtext
-      stack.push_back(n);
+      push_fence(n);
       ++i;
       continue;
     }
     if (starts_with(trimmed, ":::columns")) {
       NodeId n = doc.create(NodeKind::Columns, current_parent());
-      stack.push_back(n);
+      push_fence(n);
       ++i;
       continue;
     }
@@ -422,7 +453,7 @@ Document parse_markup(std::string_view source) {
           if (w > 0.1f && w < 20.f) doc.get(n).display_scale = w;
         } catch (...) {}
       }
-      stack.push_back(n);
+      push_fence(n);
       ++i;
       continue;
     }
@@ -473,7 +504,7 @@ Document parse_markup(std::string_view source) {
       std::string sub = fence_attr(trimmed, "subject");
       if (sub.empty()) sub = fence_attr(trimmed, "title");
       if (!sub.empty()) doc.get(n).summary = sub;
-      stack.push_back(n);
+      push_fence(n);
       ++i;
       continue;
     }
@@ -501,7 +532,7 @@ Document parse_markup(std::string_view source) {
                          : (std::string("about:") +
                             (about[0] == '#' ? about : ("#" + about)));
       }
-      stack.push_back(n);
+      push_fence(n);
       ++i;
       continue;
     }
@@ -597,26 +628,26 @@ Document parse_markup(std::string_view source) {
     }
     if (starts_with(trimmed, ":::deflist")) {
       NodeId n = doc.create(NodeKind::DefList, current_parent());
-      stack.push_back(n);
+      push_fence(n);
       ++i;
       continue;
     }
     if (starts_with(trimmed, ":::figure")) {
       NodeId n = doc.create(NodeKind::Figure, current_parent());
-      stack.push_back(n);
+      push_fence(n);
       ++i;
       continue;
     }
     if (starts_with(trimmed, ":::biblio") ||
         starts_with(trimmed, ":::bibliography")) {
       NodeId n = doc.create(NodeKind::Biblio, current_parent());
-      stack.push_back(n);
+      push_fence(n);
       ++i;
       continue;
     }
     if (starts_with(trimmed, ":::table")) {
       NodeId n = doc.create(NodeKind::Table, current_parent());
-      stack.push_back(n);
+      push_fence(n);
       ++i;
       continue;
     }
@@ -626,7 +657,7 @@ Document parse_markup(std::string_view source) {
       if (doc.get(parent).kind != NodeKind::Table)
         parent = doc.create(NodeKind::Table, parent);
       NodeId n = doc.create(NodeKind::TableRow, parent);
-      stack.push_back(n);
+      push_fence(n);
       ++i;
       continue;
     }
@@ -649,7 +680,7 @@ Document parse_markup(std::string_view source) {
         } catch (...) {
         }
       }
-      stack.push_back(n);
+      push_fence(n);
       ++i;
       continue;
     }
@@ -787,8 +818,9 @@ Document parse_markup(std::string_view source) {
 
     if (heading_level > 0) {
       size_t skip = heading_level + 1;
-      NodeId n = doc.create(NodeKind::Header, current_parent());
-      // level is only a soft depth hint for outline/export, not a rank.
+      NodeId sec = open_atx_section(heading_level);
+      NodeId n = doc.create(NodeKind::Header, sec);
+      // Soft interop depth (structure is the Section tree).
       doc.get(n).level = heading_level;
       parse_inlines(doc.get(n), trimmed.substr(skip));
       ++i;
@@ -816,7 +848,8 @@ Document parse_markup(std::string_view source) {
               !starts_with(trimmed, "```") && !starts_with(trimmed, "~~~") &&
               !starts_with(trimmed, "|") && !starts_with(trimmed, ":::")) {
             int setext_level = (uc == '=') ? 1 : 2;
-            NodeId n = doc.create(NodeKind::Header, current_parent());
+            NodeId sec = open_atx_section(setext_level);
+            NodeId n = doc.create(NodeKind::Header, sec);
             doc.get(n).level = setext_level;
             parse_inlines(doc.get(n), trimmed);
             i += 2;

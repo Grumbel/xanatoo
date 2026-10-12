@@ -24,10 +24,14 @@ namespace xanatoo {
 //   # comments and other #+keywords ignored
 //
 // Mapping:
-//   heading depth → Header.level
+//   heading depth → nested Section tree (depth = star count); Header is the
+//                   title child. Soft interop: Section.level and Header.level
+//                   also store the star count for export.
+//   body after a heading → children of that Section until a shallower heading
 //   TODO keyword  → Header.src
 //   tags          → Node.tags  (stored without surrounding colons: "a:b")
 //   CUSTOM_ID     → Node.label
+//   Article is never synthesised automatically (magazine-scale intentional unit).
 //
 // Extensions .org prefer this format.
 
