@@ -49,6 +49,7 @@ add_executable(xanatoo
   src/ui.cpp
   src/util.cpp
   src/minibuffer.cpp
+  src/sidestore.cpp
   src/cli.cpp
   src/gemini.cpp
   src/nostr.cpp
