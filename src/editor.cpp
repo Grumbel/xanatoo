@@ -1254,12 +1254,29 @@ std::string address_label(const Document& doc, NodeId id) {
   if (id == INVALID_NODE) return {};
   const Node& n = doc.get(id);
   if (!n.label.empty()) return n.label;
+  if (n.kind == NodeKind::Header || n.kind == NodeKind::Heading) {
+    std::string t = plain_text(doc, id);
+    // Collapse internal whitespace (matches how users often write #anchors).
+    std::string out;
+    bool sp = false;
+    for (char c : t) {
+      if (c == ' ' || c == '	' || c == '
+' || c == '') {
+        sp = true;
+        continue;
+      }
+      if (sp && !out.empty()) out.push_back(' ');
+      sp = false;
+      out.push_back(c);
+    }
+    return out;
+  }
   if (n.kind == NodeKind::Section || n.kind == NodeKind::Article) {
     for (NodeId c : n.children) {
       const Node& ch = doc.get(c);
       if (ch.kind == NodeKind::Header || ch.kind == NodeKind::Heading) {
         if (!ch.label.empty()) return ch.label;
-        return {};
+        return address_label(doc, c);
       }
     }
   }
@@ -1365,7 +1382,7 @@ void collect_backlinks(const Document& doc, std::string_view label,
       if (!path.empty()) same_doc = false;
     }
     if (!same_doc) continue;
-    if (lab != want) continue;
+    if (ascii_lower(lab) != ascii_lower(want)) continue;
     BacklinkEntry b;
     b.source = e.source;
     b.kind = e.kind;

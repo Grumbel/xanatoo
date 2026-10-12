@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **235** (this delivery is **234**)
+Next bundle number: **236** (this delivery is **235**)
 
 ## Status (2026-10-12)
 

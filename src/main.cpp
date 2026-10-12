@@ -432,6 +432,8 @@ int main(int argc, char** argv) {
   std::string backlinks_label;
   int bl_x = 80, bl_y = 120, bl_w = 360, bl_h = 320;
   float bl_scroll = 0.f;
+  bool bl_dragging = false;
+  int bl_drag_dx = 0, bl_drag_dy = 0;
   // View-local Section/Article fold (not in the document; future: SQLite).
   std::unordered_set<xanatoo::NodeId> folded_sections;
   std::string last_fold_doc_key;
@@ -2096,6 +2098,46 @@ int main(int argc, char** argv) {
             // before the ImGui capture check and before the document panes.
             // Z-order matches paint order: outline → browse → help.
 
+            // ---- Backlinks software window ----
+            if (backlinks_mode &&
+                mxw >= bl_x - help_edge && mxw <= bl_x + bl_w + help_edge &&
+                myw >= bl_y - help_edge && myw <= bl_y + bl_h + help_edge) {
+              const bool inside =
+                  mxw >= bl_x && mxw < bl_x + bl_w && myw >= bl_y &&
+                  myw < bl_y + bl_h;
+              if (inside && myw < bl_y + help_title_h) {
+                if (mxw >= bl_x + bl_w - 28) {
+                  backlinks_mode = false;
+                  bl_dragging = false;
+                } else {
+                  bl_dragging = true;
+                  bl_drag_dx = mxw - bl_x;
+                  bl_drag_dy = myw - bl_y;
+                }
+                break;
+              }
+              if (inside) {
+                const int title_h = help_title_h;
+                const int pad = 8;
+                int cx = bl_x + pad, cy = bl_y + title_h + 4;
+                int ch = bl_h - title_h - pad - 4;
+                const float step = 22.f;
+                int row = static_cast<int>(
+                    (static_cast<float>(myw - cy) + bl_scroll) / step);
+                if (row >= 0 && row < static_cast<int>(backlinks.size())) {
+                  backlinks_sel = row;
+                  auto& pp = F();
+                  pp.sel.focus = {
+                      backlinks[static_cast<size_t>(row)].source, 0, 0};
+                  pp.sel.anchor = pp.sel.focus;
+                  expand_ancestors_for_node(pp.sel.focus.node);
+                  scroll_caret_into_view(pp);
+                  reset_blink();
+                }
+                break;
+              }
+            }
+
             // ---- Outline software window ----
             if (outline_mode &&
                 mxw >= ol_x - help_edge &&
@@ -2115,7 +2157,12 @@ int main(int argc, char** argv) {
                     mxw >= ol_x &&
                     mxw <= ol_x + ol_w + help_edge;
                 if (on_r || on_b) {
-                  ol_resize = (on_r ? 1 : 0) | (on_b ? 2 : 0);
+                  if (outline_docked) {
+                    // Docked: only horizontal resize (dock width).
+                    ol_resize = 1;
+                  } else {
+                    ol_resize = (on_r ? 1 : 0) | (on_b ? 2 : 0);
+                  }
                   ol_resize_start_x = mxw;
                   ol_resize_start_y = myw;
                   ol_resize_start_w = ol_w;
@@ -2837,6 +2884,7 @@ int main(int argc, char** argv) {
             ol_dragging = false;
             ol_resize = 0;
             ol_scroll_dragging = false;
+            bl_dragging = false;
             if (dragging_block && drag_block_id != xanatoo::INVALID_NODE &&
                 drop_target_id != xanatoo::INVALID_NODE &&
                 drop_target_id != drag_block_id) {
@@ -2903,14 +2951,32 @@ int main(int argc, char** argv) {
             int dy = my_i - ol_resize_start_y;
             if (ol_resize & 1) {
               ol_w = ol_resize_start_w + dx;
-              if (ol_w < 200) ol_w = 200;
-              if (ol_w > win_w - 20) ol_w = win_w - 20;
+              if (outline_docked) {
+                if (ol_w < 160) ol_w = 160;
+                if (ol_w > win_w / 2) ol_w = win_w / 2;
+                if (ol_w != outline_dock_w) {
+                  outline_dock_w = ol_w;
+                  needs_layout = true;
+                  layout_panes();
+                }
+              } else {
+                if (ol_w < 200) ol_w = 200;
+                if (ol_w > win_w - 20) ol_w = win_w - 20;
+              }
             }
-            if (ol_resize & 2) {
+            if (ol_resize & 2 && !outline_docked) {
               ol_h = ol_resize_start_h + dy;
               if (ol_h < 140) ol_h = 140;
               if (ol_h > win_h - 40) ol_h = win_h - 40;
             }
+            break;
+          }
+          if (bl_dragging) {
+            bl_x = mx_i - bl_drag_dx;
+            bl_y = my_i - bl_drag_dy;
+            if (bl_x < 0) bl_x = 0;
+            if (bl_y < static_cast<int>(ui_top))
+              bl_y = static_cast<int>(ui_top);
             break;
           }
           {
@@ -7631,6 +7697,9 @@ label = "Outline — ↑/↓ · ←/→ fold · Enter jump · twisty · Esc";
       renderer.draw_text(body_font, static_cast<float>(bl_x + 10),
                          static_cast<float>(bl_y + 6 + body_font.ascender()),
                          title_s, 90, 60, 140);
+      renderer.draw_text(body_font, static_cast<float>(bl_x + bl_w - 22),
+                         static_cast<float>(bl_y + 6 + body_font.ascender()),
+                         "×", 80, 40, 40);
       SDL_Rect clip{cx, cy, cw, ch};
       SDL_RenderSetClipRect(sdl, &clip);
       float ty = static_cast<float>(cy) + body_font.ascender() - bl_scroll;

@@ -584,6 +584,25 @@ void test_json_array_and_bool() {
 
 
 
+
+void test_address_label_soft() {
+  using namespace xanatoo;
+  Document doc = parse_markup("# Hello World\n\nSee [x](#Hello World).\n");
+  NodeId hdr = INVALID_NODE;
+  for (const auto& n : doc.nodes) {
+    if (n.kind == NodeKind::Header || n.kind == NodeKind::Heading) {
+      hdr = n.id;
+      break;
+    }
+  }
+  EXPECT(hdr != INVALID_NODE);
+  std::string lab = address_label(doc, hdr);
+  EXPECT(!lab.empty());
+  std::vector<BacklinkEntry> bl;
+  collect_backlinks(doc, lab, bl);
+  EXPECT(bl.size() >= 1);
+}
+
 void test_promote_demote_section() {
   using namespace xanatoo;
   Document doc = parse_markup(
@@ -679,6 +698,7 @@ int main() {
   test_atx_section_tree();
   test_promote_demote_section();
   test_backlinks_collect();
+  test_address_label_soft();
   test_parse_document_dispatch();
   test_reddit_json_url_shapes();
   test_path_format_dispatch();
