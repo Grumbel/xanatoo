@@ -6,7 +6,13 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **244** (this delivery is **243**)
+Next bundle number: **245** (this delivery is **244**)
+
+## Status (2026-10-12)
+
+Virtualization: drop height-hint cache on undo/redo, navigate/load, New, and
+Reload — spine-only invalidation left stale block heights after full tree
+replace (wrong skip heights / scroll). Typing still uses spine invalidation.
 
 ## Status (2026-10-12)
 
@@ -685,4 +691,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-240.*-epub-sanitize-calibre-html-…` — prior
 - `xanatoo-241.*-view-display-settings-…` — prior
 - `xanatoo-242.*-outline-jump-reliable-…` — prior
-- `xanatoo-243.*-fix-view-settings-scope-…` — this delivery
+- `xanatoo-243.*-fix-view-settings-scope-…` — prior
+- `xanatoo-244.*-virt-drop-hints-undo-load-…` — this delivery

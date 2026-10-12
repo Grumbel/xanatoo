@@ -689,6 +689,17 @@ int main(int argc, char** argv) {
     }
   };
 
+  // Full drop of virtualization hints for a buffer (undo/redo, reload, navigate).
+  // Spine-only invalidation is wrong when the whole tree is replaced.
+  auto drop_height_hints_for_buf = [&](int bi) {
+    for (int pi = 0; pi < 2; ++pi) {
+      if (panes[pi].buf != bi) continue;
+      panes[pi].height_cache.clear();
+      panes[pi].materialised_top = 0.f;
+      panes[pi].materialised_bottom = 0.f;
+    }
+  };
+
   auto toggle_section_fold = [&](xanatoo::NodeId section) {
     if (section == xanatoo::INVALID_NODE) return;
     const auto& d = doc_of(F());
@@ -1275,6 +1286,7 @@ int main(int argc, char** argv) {
       // Drop stale layout boxes that still reference the previous tree —
       // otherwise the next frame can call doc.get() with dead node ids.
       p.layout = {};
+      drop_height_hints_for_buf(p.buf);
       buffers[static_cast<size_t>(p.buf)].history.reset(nd, p.sel);
       if (panes[0].buf == panes[1].buf) {
         panes[1 - focus].sel = p.sel;
@@ -5046,6 +5058,7 @@ int main(int argc, char** argv) {
                         doc_of(panes[1 - focus]), panes[1 - focus].sel.focus);
                     panes[1 - focus].sel.anchor = panes[1 - focus].sel.focus;
                   }
+                  drop_height_hints_for_buf(p.buf);
                   needs_layout = true;
                   reset_blink();
                 }
@@ -5060,6 +5073,7 @@ int main(int argc, char** argv) {
                         doc_of(panes[1 - focus]), panes[1 - focus].sel.focus);
                     panes[1 - focus].sel.anchor = panes[1 - focus].sel.focus;
                   }
+                  drop_height_hints_for_buf(p.buf);
                   needs_layout = true;
                   reset_blink();
                 }
@@ -5076,10 +5090,13 @@ int main(int argc, char** argv) {
                 xanatoo::ensure_valid_caret(buffers[static_cast<size_t>(p.buf)].doc, p.sel.focus);
                 p.sel.anchor = p.sel.focus;
                 p.scroll_y = 0.f;
+                p.layout = {};
+                drop_height_hints_for_buf(p.buf);
                 buffers[static_cast<size_t>(p.buf)].history.reset(buffers[static_cast<size_t>(p.buf)].doc, p.sel);
                 if (panes[0].buf == panes[1].buf) {
                   panes[1 - focus].sel = p.sel;
                   panes[1 - focus].scroll_y = 0.f;
+                  panes[1 - focus].layout = {};
                 }
                 needs_layout = true;
                 update_title();
@@ -5190,7 +5207,9 @@ int main(int argc, char** argv) {
                                               panes[pi].sel.focus);
                   panes[pi].sel.anchor = panes[pi].sel.focus;
                   panes[pi].scroll_y = 0.f;
+                  panes[pi].layout = {};
                 }
+                drop_height_hints_for_buf(p.buf);
                 update_title();
                 needs_layout = true;
                 reset_blink();
@@ -6034,6 +6053,7 @@ int main(int argc, char** argv) {
             xanatoo::ensure_valid_caret(d, p.sel.focus);
             p.sel.anchor = p.sel.focus;
             p.layout = {};
+            drop_height_hints_for_buf(p.buf);
             needs_layout = true;
             for (auto& sw : soft_wins)
               if (sw.buf == p.buf) {
@@ -6048,6 +6068,7 @@ int main(int argc, char** argv) {
             xanatoo::ensure_valid_caret(d, p.sel.focus);
             p.sel.anchor = p.sel.focus;
             p.layout = {};
+            drop_height_hints_for_buf(p.buf);
             needs_layout = true;
             for (auto& sw : soft_wins)
               if (sw.buf == p.buf) {
