@@ -224,3 +224,56 @@ for plain `nix build`.
 - Reusable idea: **develop shell = deps + env + PATH scripts; scripts drive
   out-of-tree configure/build/run/gdb; packaged wrappers stay separate for
   `nix build` / `nix run`.**
+
+
+---
+
+## SDL2 / sdl2-compat startup abort
+
+On current nixpkgs, `SDL2` is **sdl2-compat**: a shim that loads **SDL3** at
+runtime. If the dynamic loader finds a host `libSDL2` (via a polluted
+`LD_LIBRARY_PATH`) or cannot resolve the matching SDL3, the process can
+**`abort()` inside `dllinit` before `main`**:
+
+```
+#0  raise / abort
+#3  dllinit () from libSDL2-2.0.so.0   # sdl2-compat
+#4  _dl_init / _dl_start_user
+```
+
+**Mitigation in this shell:** helpers and `shellHook` set `LD_LIBRARY_PATH` to
+the nixpkgs `SDL2` + `sdl3` (+ peers), ignoring a hostile host path. Extra
+entries: `XANATOO_EXTRA_LD_LIBRARY_PATH`.
+
+**Debug the loader:**
+
+```sh
+export SDL2COMPAT_DEBUG_LOGGING=1
+xanatoo-run
+# or
+ldd $XANATOO_BUILD_DIR/xanatoo | grep -i sdl
+```
+
+---
+
+## Debug symbols (develop)
+
+`xanatoo-configure` defaults to:
+
+| Flag | Value |
+|------|--------|
+| `CMAKE_BUILD_TYPE` | `Debug` |
+| `CMAKE_CXX_FLAGS_DEBUG` | `-g3 -O0 -fno-omit-frame-pointer` |
+
+After changing these, wipe the build dir and reconfigure:
+
+```sh
+rm -rf "$XANATOO_BUILD_DIR"
+xanatoo-configure && xanatoo-build
+xanatoo-run-gdb
+```
+
+Package builds remain `RelWithDebInfo` via `nix build` (not stripped of all
+info, but optimised). For deepest SDL stack traces you need debuginfo for
+glibc/SDL from nixpkgs (`separateDebugInfo` / `enableDebugging`), which is
+optional and heavier than the app flags above.

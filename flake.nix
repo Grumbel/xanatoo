@@ -28,11 +28,15 @@
 
             buildInputs = with pkgs; [
               SDL2
+              # nixpkgs SDL2 is sdl2-compat: runtime needs matching SDL3 on the
+              # loader path (see develop shell LD_LIBRARY_PATH).
+              sdl3
               freetype
               fontconfig
               openssl
               # Prefer top-level libx11; xorg.* package set is deprecated.
               libx11
+              libGL
             ];
 
             cmakeFlags = [
@@ -116,6 +120,13 @@
             export XANATOO_ICON_DIR="''${XANATOO_ICON_DIR:-$XANATOO_BUILD_DIR/icons}"
             # examples/, welcome.md, help: prefer the live source tree
             export XANATOO_DATA_DIR="''${XANATOO_DATA_DIR:-$XANATOO_SOURCE}"
+
+            # Host LD_LIBRARY_PATH often breaks sdl2-compat: wrong libSDL2 or
+            # missing SDL3 → SIGABRT in dllinit() before main(). Prefer the
+            # nixpkgs set that matches the linked SDL2.
+            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath (with pkgs; [
+              SDL2 sdl3 libx11 libGL freetype fontconfig openssl
+            ])}''${XANATOO_EXTRA_LD_LIBRARY_PATH:+:$XANATOO_EXTRA_LD_LIBRARY_PATH}"
           '';
 
           xanatooConfigure = pkgs.writeShellScriptBin "xanatoo-configure" (
@@ -127,6 +138,8 @@
               echo "xanatoo-configure: CMAKE_BUILD_TYPE=''${CMAKE_BUILD_TYPE:-Debug}"
               cmake -S "$XANATOO_SOURCE" -B "$XANATOO_BUILD_DIR" -G Ninja \
                 -DCMAKE_BUILD_TYPE="''${CMAKE_BUILD_TYPE:-Debug}" \
+                -DCMAKE_CXX_FLAGS_DEBUG="''${CMAKE_CXX_FLAGS_DEBUG:--g3 -O0 -fno-omit-frame-pointer}" \
+                -DCMAKE_C_FLAGS_DEBUG="''${CMAKE_C_FLAGS_DEBUG:--g3 -O0 -fno-omit-frame-pointer}" \
                 "$@"
             ''
           );
@@ -244,10 +257,16 @@ except Exception:
               export XANATOO_FONT="''${XANATOO_FONT:-${dejavuFont}}"
               export XANATOO_ICON_DIR="''${XANATOO_ICON_DIR:-$XANATOO_BUILD_DIR/icons}"
               export XANATOO_DATA_DIR="''${XANATOO_DATA_DIR:-$XANATOO_SOURCE}"
+              export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath (with pkgs; [
+                SDL2 sdl3 libx11 libGL freetype fontconfig openssl
+              ])}''${XANATOO_EXTRA_LD_LIBRARY_PATH:+:$XANATOO_EXTRA_LD_LIBRARY_PATH}"
               # Prefer ccache when available (ccacheStdenv or explicit launcher).
               if command -v ccache >/dev/null 2>&1; then
                 export CMAKE_CXX_COMPILER_LAUNCHER="''${CMAKE_CXX_COMPILER_LAUNCHER:-ccache}"
               fi
+              # Full debug info for out-of-tree builds (override before configure).
+              export CMAKE_CXX_FLAGS_DEBUG="''${CMAKE_CXX_FLAGS_DEBUG:--g3 -O0 -fno-omit-frame-pointer}"
+              export CMAKE_C_FLAGS_DEBUG="''${CMAKE_C_FLAGS_DEBUG:--g3 -O0 -fno-omit-frame-pointer}"
               cat <<'XANATOO_DEV_BANNER'
 xanatoo — nix develop (out-of-tree CMake)
 
@@ -288,6 +307,15 @@ xanatoo — nix develop (out-of-tree CMake)
     xanatoo-configure && xanatoo-build
     xanatoo-run
     # or: xanatoo-run-gdb
+
+  If the binary aborts before main in sdl2-compat dllinit:
+    · this shell sets LD_LIBRARY_PATH to nixpkgs SDL2+SDL3 (host path is toxic)
+    · re-enter the shell, or: export SDL2COMPAT_DEBUG_LOGGING=1
+    · then: xanatoo-run-gdb   (should stop with a better message on stderr)
+
+  Debug symbols: CMAKE_BUILD_TYPE=Debug with -g3 -O0 -fno-omit-frame-pointer
+  (set at configure time). After changing flags: rm -rf $XANATOO_BUILD_DIR &&
+  xanatoo-configure && xanatoo-build
 
   Full write-up: docs/ENVIRONMENT.md
 XANATOO_DEV_BANNER
