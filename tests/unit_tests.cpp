@@ -14,10 +14,13 @@
 #include "xanatoo/org.hpp"
 #include "xanatoo/types.hpp"
 #include "xanatoo/epub_import.hpp"
+#include "xanatoo/layout.hpp"
+#include "xanatoo/font.hpp"
 
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <algorithm>
 #include <string_view>
 
 namespace {
@@ -684,6 +687,103 @@ void test_atx_section_tree() {
 }
 
 
+
+void test_layout_wrap_respects_max_width() {
+  using namespace xanatoo;
+  // Metrics-only: no SDL window. Font textures may be null; advances still work.
+  FontSet fonts;
+  std::string path = fontconfig_find("DejaVu Sans", 0, 0);
+  if (path.empty()) path = fontconfig_find("Liberation Sans", 0, 0);
+  if (path.empty()) path = fontconfig_find("FreeSans", 0, 0);
+  if (path.empty()) {
+    std::fprintf(stderr, "SKIP test_layout_wrap_respects_max_width (no font)\n");
+    return;
+  }
+  if (!fonts.load(nullptr, path, 18, 24)) {
+    std::fprintf(stderr, "SKIP test_layout_wrap_respects_max_width (font load failed)\n");
+    return;
+  }
+
+  // Long paragraph similar to the Storm of Steel overflow report.
+  const char* md =
+      "We stalked several working parties that, unfortunately, were separated "
+      "from us by dense entanglements. The somewhat eccentric sergeant-major "
+      "suggested giving himself up as a deserter and holding the enemy in "
+      "parley until we had surrounded the first post. This plan was turned "
+      "down after a brief discussion, and we crept back, disappointed, to the "
+      "outpost.\n";
+  Document doc = parse_document(md, "wrap-test.md");
+  EXPECT(doc.root != INVALID_NODE);
+
+  const float pane_w = 640.f;
+  const float sb_gutter = 18.f;  // kSbW+4
+  const float layout_w = pane_w - sb_gutter;
+
+  LayoutEngine engine(fonts, nullptr);
+  LayoutOptions opts;
+  opts.margin_x = 32.f;
+  opts.margin_y = 24.f;
+  opts.line_spacing = 1.3f;
+  opts.justify = false;
+  engine.set_options(opts);
+
+  LayoutResult lr = engine.layout(doc, layout_w);
+  EXPECT(!lr.glyphs.empty());
+
+  // Every glyph must stay within the content box: [margin_x, layout_w - margin_x]
+  // (layout places the column at x=margin_x with width content_w).
+  const float left = opts.margin_x;
+  const float right = layout_w - opts.margin_x;
+  float max_right = left;
+  for (const auto& g : lr.glyphs) {
+    // advance is 26.6 fixed; visual right ≈ x - bearing + width, fall back to advance
+    float glyph_right = g.x;
+    // PositionedGlyph may not expose bearing; use x as left of ink approx and
+    // advance from a fresh measure is unavailable — use char as 0-width safe:
+    // the layout stores baseline x as the pen position including bearing_x already
+    // in pg.x = lx + bearing_x. Next advance was added to lx. Approximate right
+    // edge as x + a conservative max of advance using font.
+    Font& f = fonts.pick(g.font);
+    const Glyph& met = f.glyph(g.codepoint);
+    float adv = static_cast<float>(met.advance >> 6);
+    float ink_r = g.x - static_cast<float>(met.bearing_x) +
+                  static_cast<float>(met.width);
+    float edge = std::max(g.x + adv * 0.01f, ink_r);
+    // pen position for this glyph started at g.x - bearing_x; right of cell is
+    // pen + advance.
+    float cell_r = g.x - static_cast<float>(met.bearing_x) + adv;
+    edge = std::max(edge, cell_r);
+    if (edge > max_right) max_right = edge;
+    EXPECT(edge <= right + 1.5f);
+  }
+  EXPECT(max_right <= right + 1.5f);
+
+  // With justify on, still must not overflow.
+  opts.justify = true;
+  engine.set_options(opts);
+  lr = engine.layout(doc, layout_w);
+  for (const auto& g : lr.glyphs) {
+    Font& f = fonts.pick(g.font);
+    const Glyph& met = f.glyph(g.codepoint);
+    float adv = static_cast<float>(met.advance >> 6);
+    float cell_r = g.x - static_cast<float>(met.bearing_x) + adv;
+    EXPECT(cell_r <= right + 1.5f);
+  }
+
+  // Simulate the reported overflow: pane width with scrollbar, narrow window.
+  const float narrow = 400.f;
+  lr = engine.layout(doc, narrow - sb_gutter);
+  const float right_n = (narrow - sb_gutter) - opts.margin_x;
+  for (const auto& g : lr.glyphs) {
+    Font& f = fonts.pick(g.font);
+    const Glyph& met = f.glyph(g.codepoint);
+    float adv = static_cast<float>(met.advance >> 6);
+    float cell_r = g.x - static_cast<float>(met.bearing_x) + adv;
+    EXPECT(cell_r <= right_n + 1.5f);
+  }
+}
+
+
 void test_sanitize_epub_markdown() {
   using namespace xanatoo;
   // Empty calibre spacer spans (NBSP / spaces / entities)
@@ -753,6 +853,7 @@ int main() {
   test_serialize_roundtrip_md();
   test_json_array_and_bool();
   test_sanitize_epub_markdown();
+  test_layout_wrap_respects_max_width();
 
   std::printf("%d passed, %d failed\n", g_passed, g_failed);
   return g_failed == 0 ? 0 : 1;

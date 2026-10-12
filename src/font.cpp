@@ -81,8 +81,8 @@ Glyph Font::load_glyph(uint32_t codepoint) {
   g.bearing_y = slot->bitmap_top;
   g.advance = static_cast<int>(slot->advance.x);
 
-  if (g.width > 0 && g.height > 0) {
-    // Convert grayscale bitmap to RGBA for SDL
+  if (g.width > 0 && g.height > 0 && renderer_) {
+    // Convert grayscale bitmap to RGBA for SDL (skip when metrics-only).
     std::vector<uint8_t> rgba(g.width * g.height * 4);
     for (int i = 0; i < g.width * g.height; ++i) {
       uint8_t a = slot->bitmap.buffer[i];

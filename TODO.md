@@ -6,7 +6,13 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **256** (this delivery is **255**)
+Next bundle number: **257** (this delivery is **256**)
+
+## Status (2026-10-12)
+
+Wrap overflow regression: unit test `test_layout_wrap_respects_max_width`
+(Storm of Steel style paragraph); layout gutter kSbW+4; clip excludes
+scrollbar; wrap uses max_width-1 safety; Font metrics-only (null renderer).
 
 ## Status (2026-10-12)
 
@@ -765,4 +771,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-252.*-scrollbar-page-hover-…` — prior
 - `xanatoo-253.*-scrollbar-marks-virt-…` — prior
 - `xanatoo-254.*-justify-scrollbar-gutter-…` — prior
-- `xanatoo-255.*-justify-quality-gutter-…` — this delivery
+- `xanatoo-255.*-justify-quality-gutter-…` — prior
+- `xanatoo-256.*-wrap-width-test-clip-…` — this delivery

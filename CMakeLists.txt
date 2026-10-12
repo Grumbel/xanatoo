@@ -195,10 +195,19 @@ add_executable(xanatoo_tests
   src/gemini.cpp
   src/epub_import.cpp
   src/view_settings.cpp
+  src/layout.cpp
+  src/font.cpp
 )
 target_include_directories(xanatoo_tests PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${SDL2_INCLUDE_DIRS}
+  ${FREETYPE_INCLUDE_DIRS}
+  ${FONTCONFIG_INCLUDE_DIRS}
+)
+target_link_libraries(xanatoo_tests PRIVATE
+  ${SDL2_LIBRARIES}
+  Freetype::Freetype
+  ${FONTCONFIG_LIBRARIES}
 )
 # Detection/parse APIs compile without OpenSSL clients.
 target_compile_definitions(xanatoo_tests PRIVATE

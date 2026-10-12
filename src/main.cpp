@@ -287,7 +287,8 @@ int main(int argc, char** argv) {
   const int kSbW = 14;
   const int kSbArrow = 14;
   // Layout must not use the scrollbar strip (track + 2px air).
-  const int kSbLayoutGutter = kSbW + 2;
+  // Content width matches the clip to the left of the scrollbar.
+  const int kSbLayoutGutter = kSbW + 4;
   bool dragging_image = false;
   xanatoo::NodeId resize_image = xanatoo::INVALID_NODE;
   float resize_start_x = 0.f;
@@ -7079,7 +7080,8 @@ int main(int argc, char** argv) {
       if (pane.scroll_y > max_scroll) pane.scroll_y = max_scroll;
 
       const int clip_y = static_cast<int>(ui_top);
-      SDL_Rect clip{pane.x, clip_y, pane.w, win_h - status_bar_h - clip_y - static_cast<int>(ui_bottom)};
+      SDL_Rect clip{pane.x, clip_y, std::max(1, pane.w - kSbW),
+                   win_h - status_bar_h - clip_y - static_cast<int>(ui_bottom)};
       SDL_RenderSetClipRect(sdl, &clip);
 
       float ox = static_cast<float>(pane.x);

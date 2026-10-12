@@ -1317,7 +1317,8 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     const Glyph& g = font.glyph(chars[i].cp);
     float adv = static_cast<float>(g.advance >> 6);
 
-    if (pen_x + adv > x + max_width && chars[i].cp != ' ' &&
+    // Stay strictly inside the measure; 1px safety for bearing/rounding.
+    if (pen_x + adv > x + max_width - 1.f && chars[i].cp != ' ' &&
         i > line_start_idx) {
       size_t break_at = i;
       for (size_t j = i; j > line_start_idx; --j) {
