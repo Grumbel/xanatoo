@@ -280,6 +280,8 @@ int main(int argc, char** argv) {
   bool dragging_split = false;
   bool dragging_scroll = false;
   int scroll_drag_pane = 0;
+  float scroll_drag_grab = 0.f;  // Y offset within thumb when drag starts
+  int sb_hover = 0;              // 0 none, 1 ↑, 2 ↓, 3 track (focused pane)
   // Classic BeOS / GNOME 2–style document scrollbar (wider + arrow buttons).
   const int kSbW = 14;
   const int kSbArrow = 14;
@@ -2770,16 +2772,38 @@ int main(int argc, char** argv) {
                   ensure_virtual_layout(sp);
                   break;
                 }
-                dragging_scroll = true;
-                scroll_drag_pane = pi;
-                // Jump so the thumb tracks the click on the track (between arrows).
+                // Track between arrows: page toward click, or grab the thumb.
                 float track_h =
                     std::max(1.f, view_h - 2.f * static_cast<float>(kSbArrow));
                 float track_my = my - static_cast<float>(kSbArrow);
-                float ratio = track_my / track_h;
-                ratio = std::max(0.f, std::min(1.f, ratio));
-                sp.scroll_y = ratio * max_s;
-                ensure_virtual_layout(sp);
+                float thumb_h = std::max(
+                    20.f, track_h * (view_h / std::max(view_h, content_h)));
+                if (thumb_h > track_h) thumb_h = track_h;
+                float travel = std::max(0.f, track_h - thumb_h);
+                float ratio =
+                    (max_s > 0.f) ? (sp.scroll_y / max_s) : 0.f;
+                float thumb_top = ratio * travel;
+                float thumb_bot = thumb_top + thumb_h;
+                if (track_my < thumb_top || track_my > thumb_bot) {
+                  // Shift+click jumps; plain click pages toward the click.
+                  if ((SDL_GetModState() & KMOD_SHIFT) != 0) {
+                    float tr = track_my / std::max(1.f, track_h);
+                    tr = std::max(0.f, std::min(1.f, tr));
+                    sp.scroll_y = tr * max_s;
+                  } else if (track_my < thumb_top) {
+                    sp.scroll_y =
+                        std::max(0.f, sp.scroll_y - view_h * 0.85f);
+                  } else {
+                    sp.scroll_y =
+                        std::min(max_s, sp.scroll_y + view_h * 0.85f);
+                  }
+                  ensure_virtual_layout(sp);
+                  break;
+                }
+                // On thumb — drag without jumping.
+                dragging_scroll = true;
+                scroll_drag_pane = pi;
+                scroll_drag_grab = track_my - thumb_top;
                 break;
               }
             }
@@ -3372,6 +3396,24 @@ int main(int argc, char** argv) {
             if (over_soft) break;
           }
 
+          // Scrollbar hover (focused pane) for arrow highlight.
+          if (!dragging_scroll) {
+            sb_hover = 0;
+            float myh = mouse_y - ui_top;
+            float view_h =
+                static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
+            int sx = panes[focus].x + panes[focus].w - kSbW;
+            if (mouse_x >= sx && mouse_x < panes[focus].x + panes[focus].w &&
+                myh >= 0.f && myh < view_h) {
+              if (myh < static_cast<float>(kSbArrow))
+                sb_hover = 1;
+              else if (myh >= view_h - static_cast<float>(kSbArrow))
+                sb_hover = 2;
+              else
+                sb_hover = 3;
+            }
+          }
+
           if (dragging_scroll) {
             float my = mouse_y - ui_top;
             Pane& sp = panes[scroll_drag_pane];
@@ -3382,7 +3424,12 @@ int main(int argc, char** argv) {
             float track_h =
                 std::max(1.f, view_h - 2.f * static_cast<float>(kSbArrow));
             float track_my = my - static_cast<float>(kSbArrow);
-            float ratio = track_my / track_h;
+            float thumb_h = std::max(
+                20.f, track_h * (view_h / std::max(view_h, content_h)));
+            if (thumb_h > track_h) thumb_h = track_h;
+            float travel = std::max(1.f, track_h - thumb_h);
+            float thumb_top = track_my - scroll_drag_grab;
+            float ratio = thumb_top / travel;
             ratio = std::max(0.f, std::min(1.f, ratio));
             sp.scroll_y = ratio * max_s;
             ensure_virtual_layout(sp);
@@ -7654,9 +7701,15 @@ int main(int argc, char** argv) {
           if (cpos.valid) mark_at(cpos.y, 40, 140, 70);
         }
 
-        // ↑ / ↓ buttons
+        // ↑ / ↓ buttons (hover highlight when sb_hover matches)
         auto draw_arrow_btn = [&](int by, bool up) {
-          SDL_SetRenderDrawColor(sdl, 230, 228, 220, 255);
+          const bool hot =
+              (&pane == &panes[focus]) &&
+              ((up && sb_hover == 1) || (!up && sb_hover == 2));
+          if (hot)
+            SDL_SetRenderDrawColor(sdl, 200, 210, 230, 255);
+          else
+            SDL_SetRenderDrawColor(sdl, 230, 228, 220, 255);
           SDL_Rect btn{sx, by, kSbW, kSbArrow};
           SDL_RenderFillRect(sdl, &btn);
           SDL_SetRenderDrawColor(sdl, 120, 118, 110, 255);

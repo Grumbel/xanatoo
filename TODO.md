@@ -6,7 +6,12 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **252** (this delivery is **251**)
+Next bundle number: **253** (this delivery is **252**)
+
+## Status (2026-10-12)
+
+Scrollbar: trough click pages toward the click; Shift+click jumps; thumb
+grab keeps offset (no jump); arrow hover highlight.
 
 ## Status (2026-10-12)
 
@@ -739,4 +744,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-248.*-polish-view-menus-sqlite-…` — prior
 - `xanatoo-249.*-polish-focus-view-constants-…` — prior
 - `xanatoo-250.*-outline-scroll-box-top-…` — prior
-- `xanatoo-251.*-classic-scrollbar-marks-…` — this delivery
+- `xanatoo-251.*-classic-scrollbar-marks-…` — prior
+- `xanatoo-252.*-scrollbar-page-hover-…` — this delivery
