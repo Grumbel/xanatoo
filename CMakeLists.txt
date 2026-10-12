@@ -201,6 +201,7 @@ add_executable(xanatoo_tests
 )
 target_include_directories(xanatoo_tests PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/external
   ${SDL2_INCLUDE_DIRS}
   ${FREETYPE_INCLUDE_DIRS}
   ${FONTCONFIG_INCLUDE_DIRS}
