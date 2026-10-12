@@ -6,7 +6,14 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **238** (this delivery is **237**)
+Next bundle number: **239** (this delivery is **238**)
+
+## Status (2026-10-12)
+
+Compile fix: reorder `invalidate_height_around` / `open_transclude_in_other_pane`
+after their callees (`flash_status`, `scroll_caret_into_view`, `navigate_to_url`);
+repair mismatched braces in Ctrl+Shift+O outline toggle (jump-to-case errors);
+append include `#anchor` when opening transclude in other pane.
 
 ## Status (2026-10-12)
 
@@ -639,4 +646,6 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-220.*-nix-develop-helpers-…` — prior
 - `xanatoo-221.*-layout-virtualization-…` — this delivery
 - `xanatoo-224.*-fix-fold-compile-…` — prior
-- `xanatoo-225.*-brainstorm-doc-…` — this delivery
+- `xanatoo-225.*-brainstorm-doc-…` — prior
+- `xanatoo-237.*-epub-import-…` — prior
+- `xanatoo-238.*-fix-compile-order-braces-…` — this delivery

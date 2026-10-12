@@ -659,77 +659,18 @@ int main(int argc, char** argv) {
     if (backlinks_sel < 0) backlinks_sel = 0;
   };
 
-  auto open_transclude_in_other_pane = [&]() {
-    auto& p = F();
-    const auto& d = doc_of(p);
-    xanatoo::NodeId id = p.sel.focus.node;
-    // Walk up to a Transclude node under the caret.
-    xanatoo::NodeId tid = xanatoo::INVALID_NODE;
-    for (xanatoo::NodeId cur = id; cur != xanatoo::INVALID_NODE;
-         cur = d.get(cur).parent) {
-      if (d.get(cur).kind == xanatoo::NodeKind::Transclude) {
-        tid = cur;
-        break;
-      }
-    }
-    if (tid == xanatoo::INVALID_NODE) {
-      // Fallback: first visible transclude under caret y — skip, require caret
-      flash_status("No include under caret");
-      return;
-    }
-    const auto& tn = d.get(tid);
-    xanatoo::NodeId local = xanatoo::resolve_transclude_local(d, tn.src);
-    if (!split) {
-      split = true;
-      needs_layout = true;
-    }
-    int other = 1 - focus;
-    if (local != xanatoo::INVALID_NODE) {
-      panes[other].buf = p.buf;  // same doc
-      panes[other].sel.focus = {local, 0, 0};
-      panes[other].sel.anchor = panes[other].sel.focus;
-      scroll_caret_into_view(panes[other]);
-      flash_status("Include → other pane: " + tn.src);
-      return;
-    }
-    // External path
-    std::string path_part = tn.src;
-    size_t hash = path_part.find('#');
-    std::string anchor;
-    if (hash != std::string::npos) {
-      anchor = path_part.substr(hash);
-      path_part = path_part.substr(0, hash);
-    }
-    if (path_part.empty()) {
-      flash_status("Broken include: " + tn.src);
-      return;
-    }
-    std::filesystem::path resolved = path_part;
-    std::string base = path_of(p);
-    if (!base.empty() && resolved.is_relative())
-      resolved = std::filesystem::path(base).parent_path() / path_part;
-    if (!std::filesystem::exists(resolved)) {
-      flash_status("Broken include (missing file): " + resolved.string());
-      return;
-    }
-    // Load into other pane's buffer if possible — navigate_to_url uses focus.
-    int saved = focus;
-    focus = other;
-    navigate_to_url(resolved.string() + (anchor.empty() ? "" : ""));
-    if (!anchor.empty()) {
-      if (auto dest = xanatoo::jump_to_href(doc_of(panes[other]), anchor)) {
-        panes[other].sel.focus = *dest;
-        panes[other].sel.anchor = *dest;
-        scroll_caret_into_view(panes[other]);
-      }
-    }
-    focus = saved;
-    flash_status("Opened include in other pane: " + resolved.string());
-  };
-
   auto flash_status = [&](const std::string& msg) {
     status_notice = msg;
     status_notice_until = SDL_GetTicks() + 4000;
+  };
+
+  auto invalidate_height_around = [&](Pane& pane, xanatoo::NodeId id) {
+    if (id == xanatoo::INVALID_NODE) return;
+    const auto& d = doc_of(pane);
+    for (xanatoo::NodeId cur = id; cur != xanatoo::INVALID_NODE && cur < d.next_id;
+         cur = d.get(cur).parent) {
+      pane.height_cache.erase(cur);
+    }
   };
 
   auto toggle_section_fold = [&](xanatoo::NodeId section) {
@@ -809,15 +750,6 @@ int main(int argc, char** argv) {
     Pane& p = F();
     buffers[static_cast<size_t>(p.buf)].history.push(doc_of(p), p.sel);
   };
-  auto invalidate_height_around = [&](Pane& pane, xanatoo::NodeId id) {
-    if (id == xanatoo::INVALID_NODE) return;
-    const auto& d = doc_of(pane);
-    for (xanatoo::NodeId cur = id; cur != xanatoo::INVALID_NODE && cur < d.next_id;
-         cur = d.get(cur).parent) {
-      pane.height_cache.erase(cur);
-    }
-  };
-
   auto mark_dirty = [&]() {
     int di = F().buf;
     discard_armed = false;  // new edits require a fresh discard warning
@@ -1497,6 +1429,76 @@ int main(int argc, char** argv) {
     }
     return true;
   };
+
+
+  auto open_transclude_in_other_pane = [&]() {
+    auto& p = F();
+    const auto& d = doc_of(p);
+    xanatoo::NodeId id = p.sel.focus.node;
+    // Walk up to a Transclude node under the caret.
+    xanatoo::NodeId tid = xanatoo::INVALID_NODE;
+    for (xanatoo::NodeId cur = id; cur != xanatoo::INVALID_NODE;
+         cur = d.get(cur).parent) {
+      if (d.get(cur).kind == xanatoo::NodeKind::Transclude) {
+        tid = cur;
+        break;
+      }
+    }
+    if (tid == xanatoo::INVALID_NODE) {
+      // Fallback: first visible transclude under caret y — skip, require caret
+      flash_status("No include under caret");
+      return;
+    }
+    const auto& tn = d.get(tid);
+    xanatoo::NodeId local = xanatoo::resolve_transclude_local(d, tn.src);
+    if (!split) {
+      split = true;
+      needs_layout = true;
+    }
+    int other = 1 - focus;
+    if (local != xanatoo::INVALID_NODE) {
+      panes[other].buf = p.buf;  // same doc
+      panes[other].sel.focus = {local, 0, 0};
+      panes[other].sel.anchor = panes[other].sel.focus;
+      scroll_caret_into_view(panes[other]);
+      flash_status("Include → other pane: " + tn.src);
+      return;
+    }
+    // External path
+    std::string path_part = tn.src;
+    size_t hash = path_part.find('#');
+    std::string anchor;
+    if (hash != std::string::npos) {
+      anchor = path_part.substr(hash);
+      path_part = path_part.substr(0, hash);
+    }
+    if (path_part.empty()) {
+      flash_status("Broken include: " + tn.src);
+      return;
+    }
+    std::filesystem::path resolved = path_part;
+    std::string base = path_of(p);
+    if (!base.empty() && resolved.is_relative())
+      resolved = std::filesystem::path(base).parent_path() / path_part;
+    if (!std::filesystem::exists(resolved)) {
+      flash_status("Broken include (missing file): " + resolved.string());
+      return;
+    }
+    // Load into other pane's buffer if possible — navigate_to_url uses focus.
+    int saved = focus;
+    focus = other;
+    navigate_to_url(resolved.string() + (anchor.empty() ? "" : anchor));
+    if (!anchor.empty()) {
+      if (auto dest = xanatoo::jump_to_href(doc_of(panes[other]), anchor)) {
+        panes[other].sel.focus = *dest;
+        panes[other].sel.anchor = *dest;
+        scroll_caret_into_view(panes[other]);
+      }
+    }
+    focus = saved;
+    flash_status("Opened include in other pane: " + resolved.string());
+  };
+
 
 
   auto activate_at_caret = [&]() {
@@ -5057,9 +5059,6 @@ int main(int argc, char** argv) {
                   refresh_outline();
                   outline_sel = 0;
                   ol_scroll = 0.f;
-                }
-                needs_layout = true;
-                layout_panes();
                   // Prefer selecting the heading nearest the caret
                   for (int i = 0; i < static_cast<int>(outline.size()); ++i) {
                     if (outline[static_cast<size_t>(i)].node ==
@@ -5069,6 +5068,8 @@ int main(int argc, char** argv) {
                     }
                   }
                 }
+                needs_layout = true;
+                layout_panes();
                 break;
               }
               if (ctrl) {
