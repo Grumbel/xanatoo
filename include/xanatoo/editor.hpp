@@ -5,6 +5,7 @@
 #include "xanatoo/types.hpp"
 #include "xanatoo/layout.hpp"
 #include <string>
+#include <unordered_set>
 #include <optional>
 #include <vector>
 #include <deque>
@@ -282,12 +283,18 @@ void compute_diff_marks(const Document& a, const Document& b,
 bool table_move_cell(Document& doc, Caret& caret, bool forward);
 
 // Heading outline for navigation (document order).
+// Built from Section/Article trees when present; optional view-local fold set
+// hides nested rows (document body fold is the same set used by layout).
 struct OutlineEntry {
-  NodeId node = INVALID_NODE;
+  NodeId node = INVALID_NODE;     // Header/Heading to jump to
+  NodeId section = INVALID_NODE;  // enclosing Section/Article (for fold)
   int level = 1;  // section nesting depth (1 = top), or legacy heading level
   std::string text;
+  bool has_children = false;  // nested outline rows when expanded
+  bool folded = false;        // view-local: body (and outline children) hidden
 };
-void collect_outline(const Document& doc, std::vector<OutlineEntry>& out);
+void collect_outline(const Document& doc, std::vector<OutlineEntry>& out,
+                     const std::unordered_set<NodeId>* folded_sections = nullptr);
 
 // ---------------------------------------------------------------------------
 // Undo / redo via document snapshots (simple, correct at current scale).

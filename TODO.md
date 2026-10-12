@@ -6,7 +6,7 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **223** (this delivery is **222**)
+Next bundle number: **224** (this delivery is **223**)
 
 ## Status (2026-10-12)
 
@@ -27,8 +27,11 @@ Product decisions:
 Implemented: org + markdown ATX/setext → Section tree; org serialize walks
 sections; structure overlay shows headerN; unit tests for nest ownership.
 
-Still open: view-local fold (not in .md), collapsible outline tree UI,
-promote/demote, SQLite side store.
+Implemented (223): view-local Section/Article fold (layout skips body;
+outline twisties + ←/→; Ctrl+Shift+F). Fold not in document (SQLite later).
+Jump still does not auto-expand.
+
+Still open: promote/demote, SQLite side store, dual-pane outline view.
 
 ## Status (2026-10-11)
 

@@ -2513,10 +2513,36 @@ bool table_move_cell(Document& doc, Caret& caret, bool forward) {
   return true;
 }
 
-void collect_outline(const Document& doc, std::vector<OutlineEntry>& out) {
+void collect_outline(const Document& doc, std::vector<OutlineEntry>& out,
+                     const std::unordered_set<NodeId>* folded_sections) {
   out.clear();
   if (doc.root == INVALID_NODE) return;
-  // DFS with section depth: Article/Section increase depth for nested headers.
+
+  auto is_folded = [&](NodeId id) {
+    return folded_sections &&
+           folded_sections->find(id) != folded_sections->end();
+  };
+
+  auto first_header_child = [&](const Node& sec) -> NodeId {
+    for (NodeId c : sec.children) {
+      const Node& ch = doc.get(c);
+      if (ch.kind == NodeKind::Header || ch.kind == NodeKind::Heading)
+        return c;
+    }
+    return INVALID_NODE;
+  };
+
+  auto has_nested_section = [&](const Node& sec) {
+    for (NodeId c : sec.children) {
+      const Node& ch = doc.get(c);
+      if (ch.kind == NodeKind::Section || ch.kind == NodeKind::Article)
+        return true;
+    }
+    return false;
+  };
+
+  // DFS: Section/Article emit one outline row (from title Header) and optionally
+  // recurse. Legacy Header/Heading without a section parent still appear.
   struct Frame {
     NodeId id;
     int depth;
@@ -2527,23 +2553,52 @@ void collect_outline(const Document& doc, std::vector<OutlineEntry>& out) {
     Frame fr = stack.back();
     stack.pop_back();
     const Node& n = doc.get(fr.id);
-    if (n.id != fr.id) continue;  // stale child id — skip
-    int depth = fr.depth;
-    if (n.kind == NodeKind::Section || n.kind == NodeKind::Article)
-      depth = fr.depth + 1;
-    if (n.kind == NodeKind::Heading || n.kind == NodeKind::Header) {
+    if (n.id != fr.id) continue;
+
+    if (n.kind == NodeKind::Section || n.kind == NodeKind::Article) {
+      const int depth = std::max(1, std::min(8, fr.depth + 1));
       OutlineEntry e;
-      e.node = fr.id;
-      if (n.kind == NodeKind::Heading && n.level > 0)
-        e.level = std::max(1, std::min(6, n.level));
-      else
-        e.level = std::max(1, std::min(8, depth > 0 ? depth : 1));
-      e.text = node_text(doc, fr.id);
-      if (e.text.empty()) e.text = "(empty header)";
+      e.section = fr.id;
+      e.node = first_header_child(n);
+      if (e.node == INVALID_NODE) e.node = fr.id;
+      e.level = depth;
+      if (e.node != INVALID_NODE && e.node != fr.id) {
+        const Node& h = doc.get(e.node);
+        if (h.level > 0)
+          e.level = std::max(1, std::min(8, h.level));
+        e.text = node_text(doc, e.node);
+      }
+      if (e.text.empty()) e.text = "(empty section)";
+      e.has_children = has_nested_section(n);
+      e.folded = is_folded(fr.id);
       out.push_back(std::move(e));
+      if (e.folded) continue;  // hide nested outline rows while folded
+      for (auto it = n.children.rbegin(); it != n.children.rend(); ++it)
+        stack.push_back({*it, depth});
+      continue;
     }
+
+    // Legacy ranked heading not wrapped in a Section (older docs).
+    if (n.kind == NodeKind::Heading || n.kind == NodeKind::Header) {
+      const Node& parent = (n.parent != INVALID_NODE) ? doc.get(n.parent) : n;
+      if (parent.kind == NodeKind::Section || parent.kind == NodeKind::Article) {
+        // Already represented by the section row.
+      } else {
+        OutlineEntry e;
+        e.node = fr.id;
+        e.section = INVALID_NODE;
+        if (n.level > 0)
+          e.level = std::max(1, std::min(8, n.level));
+        else
+          e.level = std::max(1, std::min(8, fr.depth > 0 ? fr.depth : 1));
+        e.text = node_text(doc, fr.id);
+        if (e.text.empty()) e.text = "(empty header)";
+        out.push_back(std::move(e));
+      }
+    }
+
     for (auto it = n.children.rbegin(); it != n.children.rend(); ++it)
-      stack.push_back({*it, depth});
+      stack.push_back({*it, fr.depth});
   }
 }
 

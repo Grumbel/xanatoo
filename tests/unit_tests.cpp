@@ -10,12 +10,14 @@
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/util.hpp"
 #include "xanatoo/parse.hpp"
+#include "xanatoo/editor.hpp"
 #include "xanatoo/org.hpp"
 #include "xanatoo/types.hpp"
 
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <unordered_set>
 #include <string_view>
 
 namespace {
@@ -580,6 +582,31 @@ void test_json_array_and_bool() {
 }  // namespace
 
 
+
+void test_outline_section_tree() {
+  using namespace xanatoo;
+  Document doc = parse_markup(
+      "# Top\n"
+      "Body A\n"
+      "\n"
+      "## Nested\n"
+      "Body B\n");
+  std::vector<OutlineEntry> ol;
+  collect_outline(doc, ol, nullptr);
+  EXPECT(ol.size() >= 2);
+  EXPECT(ol[0].level == 1);
+  EXPECT(ol[1].level >= 2);
+  EXPECT(ol[0].section != INVALID_NODE);
+  EXPECT(ol[0].has_children);
+
+  std::unordered_set<NodeId> folded;
+  folded.insert(ol[0].section);
+  std::vector<OutlineEntry> ol2;
+  collect_outline(doc, ol2, &folded);
+  EXPECT(ol2.size() == 1);
+  EXPECT(ol2[0].folded);
+}
+
 void test_atx_section_tree() {
   using namespace xanatoo;
   Document doc = parse_markup(
@@ -621,6 +648,7 @@ int main() {
   test_path_helpers();
   test_parse_org();
   test_atx_section_tree();
+  test_outline_section_tree();
   test_parse_document_dispatch();
   test_reddit_json_url_shapes();
   test_path_format_dispatch();

@@ -8,6 +8,7 @@
 #include <fstream>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <filesystem>
 
 namespace xanatoo {
@@ -123,11 +124,13 @@ void LayoutEngine::layout_children_sequential(
 LayoutResult LayoutEngine::layout(
     const Document& doc, float max_width, const std::string& image_base,
     const LayoutViewport& viewport,
-    const std::unordered_map<NodeId, float>* height_hints) {
+    const std::unordered_map<NodeId, float>* height_hints,
+    const std::unordered_set<NodeId>* folded_sections) {
   LayoutResult result;
   image_base_ = image_base;
   viewport_ = viewport;
   height_hints_ = height_hints;
+  folded_sections_ = folded_sections;
   skipped_any_ = false;
   if (viewport_.active()) {
     result.materialised_top = viewport_.top - viewport_.overscan;
@@ -152,6 +155,7 @@ LayoutResult LayoutEngine::layout(
   result.content_height = y + 48.f;
   result.virtualized = skipped_any_;
   height_hints_ = nullptr;
+  folded_sections_ = nullptr;
   return result;
 }
 
@@ -384,8 +388,25 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       // Nested sections indent slightly; articles keep full width.
       float inset = (node.kind == NodeKind::Section) ? 8.f : 0.f;
       y += 6.f;
-      layout_children_sequential(doc, node.children, x + inset, y,
-                                 max_width - inset, out);
+      const bool folded =
+          folded_sections_ && folded_sections_->find(id) != folded_sections_->end();
+      // Always materialise title headers so fold state stays visible.
+      std::vector<NodeId> body;
+      body.reserve(node.children.size());
+      for (NodeId child : node.children) {
+        const Node& ch = doc.get(child);
+        if (ch.kind == NodeKind::Header || ch.kind == NodeKind::Heading)
+          layout_node(doc, child, x + inset, y, max_width - inset, out);
+        else
+          body.push_back(child);
+      }
+      if (folded) {
+        // Compact cue under the header (view-local fold; not Stretch).
+        y += 6.f;
+        out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+        break;
+      }
+      layout_children_sequential(doc, body, x + inset, y, max_width - inset, out);
       y += 8.f;
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;

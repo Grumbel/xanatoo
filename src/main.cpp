@@ -30,6 +30,7 @@
 #include <cstring>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace fs = std::filesystem;
 
@@ -388,6 +389,8 @@ int main(int argc, char** argv) {
   bool outline_mode = false;
   std::vector<xanatoo::OutlineEntry> outline;
   int outline_sel = 0;
+  // View-local Section/Article fold (not in the document; future: SQLite).
+  std::unordered_set<xanatoo::NodeId> folded_sections;
   int ol_x = 40, ol_y = 100, ol_w = 320, ol_h = 420;
   bool ol_dragging = false;
   int ol_drag_dx = 0, ol_drag_dy = 0;
@@ -551,9 +554,44 @@ int main(int argc, char** argv) {
   auto F = [&]() -> Pane& { return panes[focus]; };
 
   auto refresh_outline = [&]() {
-    xanatoo::collect_outline(doc_of(F()), outline);
+    xanatoo::collect_outline(doc_of(F()), outline, &folded_sections);
     if (outline_sel >= static_cast<int>(outline.size()))
       outline_sel = std::max(0, static_cast<int>(outline.size()) - 1);
+    if (outline_sel < 0) outline_sel = 0;
+  };
+
+  auto toggle_section_fold = [&](xanatoo::NodeId section) {
+    if (section == xanatoo::INVALID_NODE) return;
+    const auto& d = doc_of(F());
+    if (section >= d.next_id) return;
+    const auto& n = d.get(section);
+    if (n.kind != xanatoo::NodeKind::Section &&
+        n.kind != xanatoo::NodeKind::Article)
+      return;
+    if (folded_sections.count(section))
+      folded_sections.erase(section);
+    else
+      folded_sections.insert(section);
+    needs_layout = true;
+    if (outline_mode) refresh_outline();
+  };
+
+  // Fold the Section/Article that contains the caret (or the section itself).
+  auto toggle_fold_at_caret = [&]() {
+    auto& d = doc_of(F());
+    xanatoo::NodeId id = F().sel.focus.node;
+    while (id != xanatoo::INVALID_NODE && id < d.next_id) {
+      const auto& n = d.get(id);
+      if (n.kind == xanatoo::NodeKind::Section ||
+          n.kind == xanatoo::NodeKind::Article) {
+        toggle_section_fold(id);
+        flash_status(folded_sections.count(id) ? "Section folded"
+                                               : "Section expanded");
+        return;
+      }
+      id = n.parent;
+    }
+    flash_status("No section under caret");
   };
 
   auto refresh_diff = [&]() {
@@ -713,7 +751,8 @@ int main(int argc, char** argv) {
         const std::unordered_map<xanatoo::NodeId, float>* hints =
             pane.height_cache.empty() ? nullptr : &pane.height_cache;
         pane.layout = layout_engine.layout(
-            doc_of(pane), static_cast<float>(pane.w), base_of(pane), vp, hints);
+            doc_of(pane), static_cast<float>(pane.w), base_of(pane), vp, hints,
+            &folded_sections);
         // Refresh height hints from measured (and skipped-stub) boxes.
         for (const auto& b : pane.layout.boxes) {
           if (b.node != xanatoo::INVALID_NODE && b.height > 0.f)
@@ -1899,8 +1938,17 @@ int main(int argc, char** argv) {
                       (static_cast<float>(myw - cy) + ol_scroll) / step);
                   if (row >= 0 && row < static_cast<int>(outline.size())) {
                     outline_sel = row;
-                    jump_outline_sel();
-                    // Keep window open (TOC stays available).
+                    const auto& er = outline[static_cast<size_t>(row)];
+                    // Disclosure / left gutter toggles fold; body jumps.
+                    float local_x = static_cast<float>(mxw - cx);
+                    const bool on_twist =
+                        er.has_children && local_x < 48.f +
+                            static_cast<float>(std::max(0, er.level - 1)) * 12.f;
+                    if (on_twist && er.section != xanatoo::INVALID_NODE) {
+                      toggle_section_fold(er.section);
+                    } else {
+                      jump_outline_sel();
+                    }
                   }
                 }
                 break;
@@ -3322,8 +3370,8 @@ int main(int argc, char** argv) {
                           k == SDLK_PLUS || k == SDLK_KP_PLUS ||
                           k == SDLK_KP_MINUS)) ||
                 (ctrl && shift &&
-                 (k == SDLK_o || k == SDLK_l || k == SDLK_d || k == SDLK_LEFTBRACKET ||
-                  k == SDLK_RIGHTBRACKET));
+                 (k == SDLK_o || k == SDLK_l || k == SDLK_d || k == SDLK_f ||
+                  k == SDLK_LEFTBRACKET || k == SDLK_RIGHTBRACKET));
             if (!browse_ok) break;
             // Space / Enter activate stretch or link
             if (k == SDLK_SPACE ||
@@ -3372,6 +3420,28 @@ int main(int argc, char** argv) {
                   outline_sel = static_cast<int>(outline.size()) - 1;
                 outline_consumed = true;
                 break;
+              case SDLK_LEFT: {
+                if (outline_sel >= 0 &&
+                    outline_sel < static_cast<int>(outline.size())) {
+                  const auto& er =
+                      outline[static_cast<size_t>(outline_sel)];
+                  if (er.section != xanatoo::INVALID_NODE && !er.folded)
+                    toggle_section_fold(er.section);
+                }
+                outline_consumed = true;
+                break;
+              }
+              case SDLK_RIGHT: {
+                if (outline_sel >= 0 &&
+                    outline_sel < static_cast<int>(outline.size())) {
+                  const auto& er =
+                      outline[static_cast<size_t>(outline_sel)];
+                  if (er.section != xanatoo::INVALID_NODE && er.folded)
+                    toggle_section_fold(er.section);
+                }
+                outline_consumed = true;
+                break;
+              }
               case SDLK_RETURN:
               case SDLK_KP_ENTER:
                 jump_outline_sel();
@@ -3581,6 +3651,11 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_f:
+              if (ctrl && shift) {
+                // View-local section fold (not stored in the document).
+                toggle_fold_at_caret();
+                break;
+              }
               if (ctrl) {
                 search_mode = true;
                 replace_mode = false;
@@ -6760,7 +6835,7 @@ int main(int argc, char** argv) {
         label = "Structure highlight — colour bars + kind tags on the right · Ctrl+Shift+L toggles";
         tr = 40; tg = 80; tb = 140;
       } else if (outline_mode) {
-        label = "Outline — ↑/↓ select · Enter jump · 1-9 quick jump · Esc close";
+label = "Outline — ↑/↓ · ←/→ fold · Enter jump · twisty · Esc";
         tr = 40; tg = 90; tb = 160;
       } else if (hovered_col_gap) {
         label = "Column gutter — drag to adjust relative widths";
@@ -6941,12 +7016,17 @@ int main(int argc, char** argv) {
         std::string line;
         if (i < 9) {
           line += static_cast<char>('1' + i);
-          line += "  ";
+          line += " ";
         } else {
-          line += "   ";
+          line += "  ";
         }
         for (int ind = 1; ind < e.level; ++ind) line += "  ";
+        if (e.has_children)
+          line += e.folded ? "▸ " : "▾ ";
+        else
+          line += "  ";
         line += e.text;
+        if (e.folded && e.has_children) line += " …";
         if (i == outline_sel) {
           SDL_SetRenderDrawBlendMode(sdl, SDL_BLENDMODE_BLEND);
           SDL_SetRenderDrawColor(sdl, 25, 90, 170, 40);

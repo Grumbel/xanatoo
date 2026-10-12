@@ -76,6 +76,8 @@ Dear ImGui is allowed for chrome (menus/toolbars). No Qt/GTK/KDE.
 - View fold state will live outside the document (future SQLite); do not rely
   on dirtying `.md`/`.org` for collapse alone.
 - Structure highlight shows `headerN` for header depth.
+- View-local fold: `folded_sections` set passed into layout; Section/
+  Article show header only when folded. Outline twisties / ←→ / Ctrl+Shift+F.
 
 ## Continuity
 

@@ -8,6 +8,7 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace xanatoo {
 
@@ -99,10 +100,13 @@ public:
   // height_hints: optional prior block heights (from a previous LayoutResult's
   // boxes). Used only when viewport is active to skip off-screen sequential
   // blocks without re-measuring them.
+  // folded_sections: view-local set of Section/Article ids whose body is
+  // hidden (header still laid out). Not stored in the document.
   LayoutResult layout(const Document& doc, float max_width,
                       const std::string& image_base = {},
                       const LayoutViewport& viewport = {},
-                      const std::unordered_map<NodeId, float>* height_hints = nullptr);
+                      const std::unordered_map<NodeId, float>* height_hints = nullptr,
+                      const std::unordered_set<NodeId>* folded_sections = nullptr);
 
 private:
   FontSet& fonts_;
@@ -111,6 +115,7 @@ private:
   std::string image_base_;
   LayoutViewport viewport_;
   const std::unordered_map<NodeId, float>* height_hints_ = nullptr;
+  const std::unordered_set<NodeId>* folded_sections_ = nullptr;
   bool skipped_any_ = false;
 
   // If the block has a height hint and lies fully outside the materialised
