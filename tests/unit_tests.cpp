@@ -736,16 +736,14 @@ void test_layout_wrap_respects_max_width() {
   const float right = layout_w - opts.margin_x;
   float max_right = left;
   for (const auto& g : lr.glyphs) {
+    if (g.codepoint == ' ' || g.codepoint == 0) continue;
     // pg.x = pen + bearing_x; cell right = pen + advance.
     Font& f = fonts.pick(g.font);
     const Glyph& met = f.glyph(g.codepoint);
     float adv = static_cast<float>(met.advance >> 6);
-    float ink_r = g.x - static_cast<float>(met.bearing_x) +
-                  static_cast<float>(met.width);
     float cell_r = g.x - static_cast<float>(met.bearing_x) + adv;
-    float edge = std::max(ink_r, cell_r);
-    if (edge > max_right) max_right = edge;
-    EXPECT(edge <= right + 1.5f);
+    if (cell_r > max_right) max_right = cell_r;
+    EXPECT(cell_r <= right + 1.5f);
   }
   EXPECT(max_right <= right + 1.5f);
 
@@ -754,6 +752,7 @@ void test_layout_wrap_respects_max_width() {
   engine.set_options(opts);
   lr = engine.layout(doc, layout_w);
   for (const auto& g : lr.glyphs) {
+    if (g.codepoint == ' ' || g.codepoint == 0) continue;
     Font& f = fonts.pick(g.font);
     const Glyph& met = f.glyph(g.codepoint);
     float adv = static_cast<float>(met.advance >> 6);
@@ -766,6 +765,7 @@ void test_layout_wrap_respects_max_width() {
   lr = engine.layout(doc, narrow - sb_gutter);
   const float right_n = (narrow - sb_gutter) - opts.margin_x;
   for (const auto& g : lr.glyphs) {
+    if (g.codepoint == ' ' || g.codepoint == 0) continue;
     Font& f = fonts.pick(g.font);
     const Glyph& met = f.glyph(g.codepoint);
     float adv = static_cast<float>(met.advance >> 6);

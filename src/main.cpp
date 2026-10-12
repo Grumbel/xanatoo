@@ -7625,6 +7625,9 @@ int main(int argc, char** argv) {
         }
       }
 
+      // Scrollbar lives in the strip excluded from the content clip.
+      SDL_RenderSetClipRect(sdl, nullptr);
+
       // Classic scrollbar: track, ↑/↓, chapter/search markers, thumb.
       {
         float view_h =

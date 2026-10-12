@@ -1238,17 +1238,13 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     float gap_extra = 0.f;
     const bool can_justify =
         options_.justify && !last_or_hard && gaps > 0 &&
-        base_role != FontRole::Code && base_role != FontRole::Heading &&
-        base_role != FontRole::BodyItalic;  // captions stay ragged
+        base_role != FontRole::Code && base_role != FontRole::Heading;
     if (can_justify && max_width > 1.f) {
-      // Only stretch lines that already nearly fill the measure — otherwise
-      // full-window columns produce huge rivers (looks like a width bug).
-      const float fill = natural / max_width;
       float room = max_width - natural;
-      if (fill >= 0.88f && room > 0.5f) {
+      if (room > 0.5f) {
         gap_extra = room / static_cast<float>(gaps);
-        // Cap expansion so a slightly short line does not blow open gaps.
-        const float cap = space_adv * 1.25f;
+        // Soft cap keeps rivers bounded on very short lines; still justifies.
+        const float cap = space_adv * 3.f;
         if (gap_extra > cap) gap_extra = cap;
       }
     }
@@ -1316,10 +1312,19 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     Font& font = fonts_.pick(chars[i].role);
     const Glyph& g = font.glyph(chars[i].cp);
     float adv = static_cast<float>(g.advance >> 6);
+    const float limit = x + max_width;
 
-    // Stay strictly inside the measure; 1px safety for bearing/rounding.
-    if (pen_x + adv > x + max_width - 1.f && chars[i].cp != ' ' &&
-        i > line_start_idx) {
+    // Never let the pen past the measure. Spaces that would overflow end the
+    // line (they must not be placed past the right edge — that broke the
+    // wrap test and looked like text under the scrollbar).
+    if (pen_x + adv > limit && i > line_start_idx) {
+      if (chars[i].cp == ' ') {
+        break_line(i, false);
+        while (i < chars.size() && chars[i].cp == ' ') ++i;
+        if (i >= chars.size()) break;
+        --i;
+        continue;
+      }
       size_t break_at = i;
       for (size_t j = i; j > line_start_idx; --j) {
         if (chars[j - 1].cp == ' ') {

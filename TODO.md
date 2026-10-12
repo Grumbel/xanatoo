@@ -6,7 +6,14 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **260** (this delivery is **259**)
+Next bundle number: **261** (this delivery is **260**)
+
+## Status (2026-10-12)
+
+Scrollbar was clipped away (drawn under content clip of pane.w-kSbW) — clear
+clip before drawing it. Wrap no longer lets spaces past the measure (root of
+overflow test failures). Justify always applies on soft-wrapped body lines
+with a soft gap cap (3em), not only ≥88% full lines.
 
 ## Status (2026-10-12)
 
@@ -788,4 +795,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-256.*-wrap-width-test-clip-…` — prior
 - `xanatoo-257.*-fix-tests-images-link-…` — prior
 - `xanatoo-258.*-fix-tests-stb-include-…` — prior
-- `xanatoo-259.*-fix-wrap-test-warning-…` — this delivery
+- `xanatoo-259.*-fix-wrap-test-warning-…` — prior
+- `xanatoo-260.*-fix-scrollbar-clip-wrap-…` — this delivery
