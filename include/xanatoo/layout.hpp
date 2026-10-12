@@ -101,6 +101,7 @@ struct LayoutOptions {
   float margin_y = 24.f;
   float line_spacing = 1.30f;
   float max_content_width = 0.f;  // 0 = fill pane
+  bool justify = false;
 
   static LayoutOptions from_view(const ViewSettings& v) {
     LayoutOptions o;
@@ -108,6 +109,7 @@ struct LayoutOptions {
     o.margin_y = v.margin_y;
     o.line_spacing = v.line_spacing;
     o.max_content_width = v.max_content_width;
+    o.justify = v.justify;
     return o;
   }
 };

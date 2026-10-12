@@ -130,6 +130,7 @@ enum class UiCommand {
   ViewMeasureComfortable,   // ~720px
   ViewMeasureWide,          // ~960px
   ToggleSectionFocus,       // outline: body shows one section only
+  ToggleJustify,            // view: justify wrapped lines
 };
 
 
@@ -140,6 +141,7 @@ struct UiState {
   bool split = false;
   bool outline = false;
   bool section_focus = false;
+  bool justify = false;
   bool backlinks = false;
   bool diff = false;
   bool can_diff = false;  // two independent documents loaded

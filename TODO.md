@@ -6,7 +6,13 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **254** (this delivery is **253**)
+Next bundle number: **255** (this delivery is **254**)
+
+## Status (2026-10-12)
+
+Layout width reserves scrollbar gutter (`pane.w - kSbW`). View **Justify**
+option (persisted): distributes extra space across word gaps on wrapped body
+lines (not last/hard breaks, headings, code, captions).
 
 ## Status (2026-10-12)
 
@@ -751,4 +757,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-250.*-outline-scroll-box-top-…` — prior
 - `xanatoo-251.*-classic-scrollbar-marks-…` — prior
 - `xanatoo-252.*-scrollbar-page-hover-…` — prior
-- `xanatoo-253.*-scrollbar-marks-virt-…` — this delivery
+- `xanatoo-253.*-scrollbar-marks-virt-…` — prior
+- `xanatoo-254.*-justify-scrollbar-gutter-…` — this delivery

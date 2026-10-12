@@ -728,6 +728,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         fill_measure_items(state, cmd);
         ImGui::EndMenu();
       }
+      if (ImGui::MenuItem("Justify lines", nullptr, state.justify))
+        cmd = UiCommand::ToggleJustify;
       ImGui::Separator();
       menu_item_cmd("FORMAT.md in window", UiCommand::OpenFormatDoc, cmd);
       menu_item_cmd("semantic.sexp in window", UiCommand::OpenSemanticDoc, cmd);

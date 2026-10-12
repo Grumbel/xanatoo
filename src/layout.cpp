@@ -1209,11 +1209,49 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
   float line_start = x;
   size_t line_start_idx = 0;
 
-  auto break_line = [&](size_t end_idx) {
-    float lx = line_start;
+  auto break_line = [&](size_t end_idx, bool last_or_hard) {
+    // Natural width and inter-word gaps (space runs between non-space).
+    float natural = 0.f;
+    int gaps = 0;
+    bool seen_nonspace = false;
+    bool in_space = false;
     for (size_t i = line_start_idx; i < end_idx; ++i) {
       Font& font = fonts_.pick(chars[i].role);
       const Glyph& g = font.glyph(chars[i].cp);
+      natural += static_cast<float>(g.advance >> 6);
+      if (chars[i].cp == ' ') {
+        if (seen_nonspace) in_space = true;
+      } else {
+        if (in_space) ++gaps;
+        in_space = false;
+        seen_nonspace = true;
+      }
+    }
+    float gap_extra = 0.f;
+    const bool can_justify =
+        options_.justify && !last_or_hard && gaps > 0 &&
+        base_role != FontRole::Code && base_role != FontRole::Heading &&
+        base_role != FontRole::BodyItalic;  // captions stay ragged
+    if (can_justify) {
+      float room = max_width - natural;
+      if (room > 0.5f) gap_extra = room / static_cast<float>(gaps);
+    }
+
+    float lx = line_start;
+    bool after_space_run = false;
+    bool had_nonspace = false;
+    for (size_t i = line_start_idx; i < end_idx; ++i) {
+      Font& font = fonts_.pick(chars[i].role);
+      const Glyph& g = font.glyph(chars[i].cp);
+      if (chars[i].cp == ' ') {
+        if (had_nonspace) after_space_run = true;
+      } else {
+        if (after_space_run && gap_extra > 0.f) {
+          lx += gap_extra;
+          after_space_run = false;
+        }
+        had_nonspace = true;
+      }
       PositionedGlyph pg;
       pg.codepoint = chars[i].cp;
       pg.x = lx + static_cast<float>(g.bearing_x);
@@ -1235,7 +1273,7 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
   for (size_t i = 0; i < chars.size(); ++i) {
     // Explicit newline (code blocks, pasted multi-line text)
     if (chars[i].cp == '\n' || chars[i].cp == '\r') {
-      break_line(i);  // flush without drawing the control character
+      break_line(i, true);  // hard break — do not justify
       if (chars[i].cp == '\r' && i + 1 < chars.size() &&
           chars[i + 1].cp == '\n')
         ++i;  // CRLF
@@ -1270,7 +1308,7 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
           break;
         }
       }
-      break_line(break_at);
+      break_line(break_at, false);
       while (i < chars.size() && chars[i].cp == ' ') ++i;
       if (i >= chars.size()) break;
       --i;
@@ -1279,7 +1317,7 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     pen_x += adv;
   }
   if (line_start_idx < chars.size()) {
-    break_line(chars.size());
+    break_line(chars.size(), true);
   }
 
   y = baseline - metrics.ascender() + metrics.line_height() * 0.2f;

@@ -997,7 +997,7 @@ int main(int argc, char** argv) {
         const std::unordered_map<xanatoo::NodeId, float>* hints =
             pane.height_cache.empty() ? nullptr : &pane.height_cache;
         pane.layout = layout_engine.layout(
-            doc_of(pane), static_cast<float>(pane.w), base_of(pane), vp, hints,
+            doc_of(pane), static_cast<float>(std::max(40, pane.w - kSbW)), base_of(pane), vp, hints,
             &folded_sections,
             active_focus_section());
         // Refresh height hints from measured (and skipped-stub) boxes.
@@ -1069,8 +1069,9 @@ int main(int argc, char** argv) {
       xanatoo::ensure_valid_caret(doc_of(p), p.sel.focus);
       xanatoo::ensure_valid_caret(doc_of(p), p.sel.anchor);
       p.layout = layout_engine.layout(
-          doc_of(p), static_cast<float>(p.w), base_of(p), {}, nullptr,
-          &folded_sections, active_focus_section());
+          doc_of(p), static_cast<float>(std::max(40, p.w - kSbW)),
+          base_of(p), {}, nullptr, &folded_sections,
+          active_focus_section());
       for (const auto& b : p.layout.boxes) {
         if (b.node != xanatoo::INVALID_NODE && b.height > 0.f)
           p.height_cache[b.node] = b.height;
@@ -5802,6 +5803,7 @@ int main(int argc, char** argv) {
       ui_state.split = split;
       ui_state.outline = outline_mode;
       ui_state.section_focus = section_focus_mode;
+      ui_state.justify = view_settings.justify;
       ui_state.backlinks = backlinks_mode;
       ui_state.diff = diff_mode;
       ui_state.can_diff = !shared_doc() && panes[0].buf != panes[1].buf &&
@@ -5967,7 +5969,7 @@ int main(int argc, char** argv) {
             c == C::ViewMarginsNormal || c == C::ViewMarginsWide ||
             c == C::ViewMarginsExtra || c == C::ViewMeasureFull ||
             c == C::ViewMeasureComfortable || c == C::ViewMeasureWide ||
-            c == C::ToggleSectionFocus;
+            c == C::ToggleSectionFocus || c == C::ToggleJustify;
         if (!allowed) {
           flash_status("Browse mode — F2 to edit");
           ui_frame.cmd = C::None;
@@ -6978,6 +6980,11 @@ int main(int argc, char** argv) {
           break;
         case C::ToggleSectionFocus:
           toggle_section_focus_mode();
+          break;
+        case C::ToggleJustify:
+          view_settings.justify = !view_settings.justify;
+          apply_view_settings();
+          flash_status(view_settings.justify ? "Justify on" : "Justify off");
           break;
         default:
           break;

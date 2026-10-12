@@ -18,6 +18,8 @@ struct ViewSettings {
   // Cap on content column width in px; 0 = use the full pane (minus margins).
   // When set, the column is centered in the pane.
   float max_content_width = 0.f;
+  // Justify wrapped body lines (not last line / headings / code).
+  bool justify = false;
 
   static constexpr float kLineTight = 1.10f;
   static constexpr float kLineNormal = 1.30f;
