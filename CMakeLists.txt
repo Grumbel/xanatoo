@@ -197,6 +197,7 @@ add_executable(xanatoo_tests
   src/view_settings.cpp
   src/layout.cpp
   src/font.cpp
+  src/images.cpp
 )
 target_include_directories(xanatoo_tests PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include

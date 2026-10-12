@@ -5784,13 +5784,7 @@ int main(int argc, char** argv) {
         std::string dk = path_of(F());
         if (dk != last_fold_doc_key) {
           last_fold_doc_key = dk;
-          folded_sections.clear();
-          if (!dk.empty()) {
-            std::unordered_set<std::string> keys;
-            xanatoo::load_section_folds(dk, keys);
-            xanatoo::folds_keys_to_ids(doc_of(F()), keys, folded_sections);
-          }
-          needs_layout = true;
+          reload_folds_for_focused();
         }
       }
       if (outline_mode) refresh_outline();
@@ -7013,13 +7007,7 @@ int main(int argc, char** argv) {
         std::string dk = path_of(F());
         if (dk != last_fold_doc_key) {
           last_fold_doc_key = dk;
-          folded_sections.clear();
-          if (!dk.empty()) {
-            std::unordered_set<std::string> keys;
-            xanatoo::load_section_folds(dk, keys);
-            xanatoo::folds_keys_to_ids(doc_of(F()), keys, folded_sections);
-          }
-          needs_layout = true;
+          reload_folds_for_focused();
         }
       }
       if (outline_mode) refresh_outline();
