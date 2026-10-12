@@ -192,6 +192,7 @@ add_executable(xanatoo_tests
   src/lemmy.cpp
   src/nostr.cpp
   src/gemini.cpp
+  src/epub_import.cpp
 )
 target_include_directories(xanatoo_tests PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include

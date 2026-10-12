@@ -6,7 +6,14 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **240** (this delivery is **239**)
+Next bundle number: **241** (this delivery is **240**)
+
+## Status (2026-10-12)
+
+EPUB import: post-pandoc `sanitize_epub_markdown` strips Calibre residual
+HTML (`<span class="calibreN">` empty/nbsp spacers, unwrap simple spans,
+empty page `<a id>` markers, `&nbsp;` / U+00A0 → space). Runs on cache hits
+too so older imports clean up without re-pandoc. Unit tests covered.
 
 ## Status (2026-10-12)
 
@@ -653,4 +660,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-225.*-brainstorm-doc-…` — prior
 - `xanatoo-237.*-epub-import-…` — prior
 - `xanatoo-238.*-fix-compile-order-braces-…` — prior
-- `xanatoo-239.*-backlinks-unused-vars-…` — this delivery
+- `xanatoo-239.*-backlinks-unused-vars-…` — prior
+- `xanatoo-240.*-epub-sanitize-calibre-html-…` — this delivery

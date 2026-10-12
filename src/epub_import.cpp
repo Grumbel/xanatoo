@@ -70,9 +70,254 @@ static fs::path import_cache_dir(const std::string& epub_path) {
 }
 
 static bool pandoc_available() {
-  // portable-ish: command -v via shell
   int rc = std::system("command -v pandoc >/dev/null 2>&1");
   return rc == 0;
+}
+
+static bool is_ascii_space(unsigned char c) {
+  return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' ||
+         c == '\v';
+}
+
+// True if s[i..] starts with a UTF-8 U+00A0 (C2 A0).
+static bool is_nbsp_utf8(std::string_view s, size_t i) {
+  return i + 1 < s.size() &&
+         static_cast<unsigned char>(s[i]) == 0xC2 &&
+         static_cast<unsigned char>(s[i + 1]) == 0xA0;
+}
+
+// Content of a span is only whitespace / NBSP / empty HTML entities.
+static bool is_ws_only_html_content(std::string_view inner) {
+  size_t i = 0;
+  while (i < inner.size()) {
+    if (is_ascii_space(static_cast<unsigned char>(inner[i]))) {
+      ++i;
+      continue;
+    }
+    if (is_nbsp_utf8(inner, i)) {
+      i += 2;
+      continue;
+    }
+    // &nbsp; &#160; &#xa0; &#xA0;
+    if (inner[i] == '&') {
+      auto rest = inner.substr(i);
+      if (rest.size() >= 6 &&
+          (rest.compare(0, 6, "&nbsp;") == 0)) {
+        i += 6;
+        continue;
+      }
+      if (rest.size() >= 6 &&
+          (rest.compare(0, 6, "&#160;") == 0)) {
+        i += 6;
+        continue;
+      }
+      if (rest.size() >= 6 &&
+          (rest.compare(0, 6, "&#xa0;") == 0 ||
+           rest.compare(0, 6, "&#xA0;") == 0)) {
+        i += 6;
+        continue;
+      }
+      if (rest.size() >= 7 &&
+          (rest.compare(0, 7, "&#x00a0;") == 0 ||
+           rest.compare(0, 7, "&#x00A0;") == 0)) {
+        i += 7;
+        continue;
+      }
+    }
+    return false;
+  }
+  return true;
+}
+
+// Case-insensitive match of tag name at s[pos] (pos points past '<').
+static bool tag_name_is(std::string_view s, size_t pos, const char* name) {
+  for (size_t k = 0; name[k]; ++k) {
+    if (pos + k >= s.size()) return false;
+    char c = s[pos + k];
+    char n = name[k];
+    if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+    if (c != n) return false;
+  }
+  size_t after = pos + std::char_traits<char>::length(name);
+  if (after >= s.size()) return false;
+  char c = s[after];
+  return is_ascii_space(static_cast<unsigned char>(c)) || c == '>' ||
+         c == '/';
+}
+
+// Find end of an HTML open/close tag starting at '<' (returns index of '>').
+static size_t find_tag_close(std::string_view s, size_t lt) {
+  bool quote = false;
+  char q = 0;
+  for (size_t i = lt + 1; i < s.size(); ++i) {
+    char c = s[i];
+    if (quote) {
+      if (c == q) quote = false;
+      continue;
+    }
+    if (c == '"' || c == '\'') {
+      quote = true;
+      q = c;
+      continue;
+    }
+    if (c == '>') return i;
+  }
+  return std::string::npos;
+}
+
+std::string sanitize_epub_markdown(std::string md) {
+  // 1) Decode common NBSP forms to ordinary space (keeps word separation).
+  {
+    std::string out;
+    out.reserve(md.size());
+    for (size_t i = 0; i < md.size();) {
+      if (is_nbsp_utf8(md, i)) {
+        out.push_back(' ');
+        i += 2;
+        continue;
+      }
+      if (md[i] == '&') {
+        auto rest = std::string_view(md).substr(i);
+        if (rest.size() >= 6 && rest.compare(0, 6, "&nbsp;") == 0) {
+          out.push_back(' ');
+          i += 6;
+          continue;
+        }
+        if (rest.size() >= 6 && rest.compare(0, 6, "&#160;") == 0) {
+          out.push_back(' ');
+          i += 6;
+          continue;
+        }
+        if (rest.size() >= 6 &&
+            (rest.compare(0, 6, "&#xa0;") == 0 ||
+             rest.compare(0, 6, "&#xA0;") == 0)) {
+          out.push_back(' ');
+          i += 6;
+          continue;
+        }
+      }
+      out.push_back(md[i]);
+      ++i;
+    }
+    md.swap(out);
+  }
+
+  // 2) Repeatedly strip empty / whitespace-only <span …>…</span> and empty
+  //    <a id=…></a> / <a …/> page markers. Also unwrap simple <span>text</span>
+  //    with no nested tags (drops class="calibreN" wrappers, keeps text).
+  //    Limit passes so pathological nesting cannot loop forever.
+  for (int pass = 0; pass < 32; ++pass) {
+    std::string out;
+    out.reserve(md.size());
+    bool changed = false;
+    size_t i = 0;
+    while (i < md.size()) {
+      if (md[i] != '<') {
+        out.push_back(md[i]);
+        ++i;
+        continue;
+      }
+
+      // Closing tags we do not handle alone — copy through unless part of pair.
+      size_t gt = find_tag_close(md, i);
+      if (gt == std::string::npos) {
+        out.append(md, i, std::string::npos);
+        break;
+      }
+
+      // Self-closing empty anchor: <a id="…" /> or <a …/>
+      if (tag_name_is(md, i + 1, "a")) {
+        std::string_view tag(md.data() + i, gt - i + 1);
+        bool self_close = false;
+        if (tag.size() >= 2 && tag[tag.size() - 2] == '/') self_close = true;
+        // Empty pair: <a …></a>
+        if (!self_close) {
+          size_t after = gt + 1;
+          // skip whitespace between
+          size_t j = after;
+          while (j < md.size() && is_ascii_space(static_cast<unsigned char>(md[j])))
+            ++j;
+          if (j + 3 < md.size() && md[j] == '<' && md[j + 1] == '/' &&
+              tag_name_is(md, j + 2, "a")) {
+            size_t gt2 = find_tag_close(md, j);
+            if (gt2 != std::string::npos) {
+              // drop the whole empty anchor pair
+              i = gt2 + 1;
+              changed = true;
+              continue;
+            }
+          }
+        } else {
+          // self-closing <a …/>
+          i = gt + 1;
+          changed = true;
+          continue;
+        }
+      }
+
+      if (tag_name_is(md, i + 1, "span")) {
+        // Find matching </span> with no nested '<' inside (simple unwrap / drop).
+        size_t after_open = gt + 1;
+        size_t close = after_open;
+        bool nested = false;
+        while (close < md.size()) {
+          if (md[close] == '<') {
+            if (close + 6 < md.size() && md[close + 1] == '/' &&
+                tag_name_is(md, close + 2, "span")) {
+              break;
+            }
+            nested = true;
+            break;
+          }
+          ++close;
+        }
+        if (!nested && close < md.size()) {
+          size_t gt2 = find_tag_close(md, close);
+          if (gt2 != std::string::npos) {
+            std::string_view inner(md.data() + after_open, close - after_open);
+            if (is_ws_only_html_content(inner)) {
+              // Calibre often uses empty/nbsp spans as word separators —
+              // keep a single space so "word<span>&nbsp;</span>word" stays
+              // two words. Purely empty <span></span> yields no space.
+              if (!inner.empty())
+                out.push_back(' ');
+              i = gt2 + 1;
+              changed = true;
+              continue;
+            }
+            // Unwrap: keep inner text, drop the span tags.
+            out.append(inner);
+            i = gt2 + 1;
+            changed = true;
+            continue;
+          }
+        }
+      }
+
+      // Default: copy the open tag through unchanged.
+      out.append(md, i, gt - i + 1);
+      i = gt + 1;
+    }
+    md.swap(out);
+    if (!changed) break;
+  }
+
+  return md;
+}
+
+static bool write_text_file(const fs::path& path, const std::string& text) {
+  std::ofstream out(path, std::ios::binary | std::ios::trunc);
+  if (!out) return false;
+  out.write(text.data(), static_cast<std::streamsize>(text.size()));
+  return static_cast<bool>(out);
+}
+
+static std::string read_text_file(const fs::path& path) {
+  std::ifstream in(path, std::ios::binary);
+  if (!in) return {};
+  std::ostringstream ss;
+  ss << in.rdbuf();
+  return ss.str();
 }
 
 EpubImportResult import_epub_via_pandoc(const std::string& epub_path) {
@@ -149,6 +394,20 @@ EpubImportResult import_epub_via_pandoc(const std::string& epub_path) {
     }
   } else {
     std::cout << "Reusing EPUB import cache: " << md.string() << "\n";
+  }
+
+  // Always sanitize (including cache hits) so older imports lose calibre HTML.
+  {
+    std::string raw = read_text_file(md);
+    if (raw.empty() && !fs::exists(md)) {
+      out.error = "Derived Markdown missing after import";
+      return out;
+    }
+    std::string cleaned = sanitize_epub_markdown(std::move(raw));
+    if (!write_text_file(md, cleaned)) {
+      out.error = "Cannot write sanitized Markdown: " + md.string();
+      return out;
+    }
   }
 
   out.ok = true;

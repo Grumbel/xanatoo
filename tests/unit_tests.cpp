@@ -13,6 +13,7 @@
 #include "xanatoo/editor.hpp"
 #include "xanatoo/org.hpp"
 #include "xanatoo/types.hpp"
+#include "xanatoo/epub_import.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -682,6 +683,47 @@ void test_atx_section_tree() {
   EXPECT(body_under_section);
 }
 
+
+void test_sanitize_epub_markdown() {
+  using namespace xanatoo;
+  // Empty calibre spacer spans (NBSP / spaces / entities)
+  EXPECT_EQ(sanitize_epub_markdown(
+                "Hello<span class=\"calibre4\"> </span>world"),
+            "Hello world");
+  EXPECT_EQ(sanitize_epub_markdown(
+                "A<span class=\"calibre4\">&nbsp;</span>B"),
+            "A B");
+  EXPECT_EQ(sanitize_epub_markdown(
+                "A<span class=\"calibre4\"> </span>B"),
+            "A B");
+  // UTF-8 U+00A0 as two bytes in a source string
+  {
+    std::string in = "X<span class=\"c\">";
+    in.push_back(static_cast<char>(0xC2));
+    in.push_back(static_cast<char>(0xA0));
+    in += "</span>Y";
+    EXPECT_EQ(sanitize_epub_markdown(in), "X Y");
+  }
+  // Unwrap span that only wraps text
+  EXPECT_EQ(sanitize_epub_markdown(
+                "Say <span class=\"calibre1\">hello</span>."),
+            "Say hello.");
+  // Empty page anchors
+  EXPECT_EQ(sanitize_epub_markdown(
+                "Text<a id=\"page_1\"></a> more"),
+            "Text more");
+  EXPECT_EQ(sanitize_epub_markdown("Text<a id=\"x\"/> more"), "Text more");
+  // Nested-looking content with real text preserved
+  EXPECT_EQ(sanitize_epub_markdown(
+                "<span class=\"calibre\">Keep me</span>"),
+            "Keep me");
+  // Markdown structure must survive
+  EXPECT_EQ(sanitize_epub_markdown("# Title\n\nPara with *em*.\n"),
+            "# Title\n\nPara with *em*.\n");
+  // Standalone NBSP entity in text
+  EXPECT_EQ(sanitize_epub_markdown("a&nbsp;b"), "a b");
+}
+
 int main() {
   test_string_helpers();
   test_json_min();
@@ -710,6 +752,7 @@ int main() {
   test_gemtext_structures();
   test_serialize_roundtrip_md();
   test_json_array_and_bool();
+  test_sanitize_epub_markdown();
 
   std::printf("%d passed, %d failed\n", g_passed, g_failed);
   return g_failed == 0 ? 0 : 1;

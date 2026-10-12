@@ -22,6 +22,14 @@ struct EpubImportResult {
 
 // Convert epub_path to Markdown under the cache dir (or reuse if up to date).
 // Requires `pandoc` on PATH. On failure, ok=false and error is set.
+// Always runs sanitize_epub_markdown on the derived Markdown (including
+// cache hits) so older imports pick up cleaner HTML stripping.
 EpubImportResult import_epub_via_pandoc(const std::string& epub_path);
+
+// Strip Calibre / EPUB residual HTML that pandoc leaves in GFM output:
+// empty or whitespace-only <span class="calibreN">…</span>, empty page
+// anchors, &nbsp; / U+00A0, and unwrap simple span wrappers that only
+// carry class attributes. Safe on already-clean Markdown.
+std::string sanitize_epub_markdown(std::string md);
 
 }  // namespace xanatoo
