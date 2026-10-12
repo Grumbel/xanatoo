@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/ui.hpp"
+#include "xanatoo/view_settings.hpp"
 #include <cmath>
 #include "xanatoo/font.hpp"
 
@@ -32,36 +33,41 @@ bool near_eq(float a, float b, float eps) { return std::fabs(a - b) < eps; }
 
 // Shared View / toolbar items for display prefs (not document format).
 void fill_line_spacing_items(const UiState& state, UiCommand& cmd) {
+  using VS = xanatoo::ViewSettings;
   const float ls = state.view_line_spacing;
-  if (ImGui::MenuItem("Tight", nullptr, near_eq(ls, 1.10f, 0.05f)))
+  if (ImGui::MenuItem("Tight", nullptr, near_eq(ls, VS::kLineTight, 0.05f)))
     cmd = UiCommand::ViewLineSpacingTight;
-  if (ImGui::MenuItem("Normal", nullptr, near_eq(ls, 1.30f, 0.05f)))
+  if (ImGui::MenuItem("Normal", nullptr, near_eq(ls, VS::kLineNormal, 0.05f)))
     cmd = UiCommand::ViewLineSpacingNormal;
-  if (ImGui::MenuItem("Relaxed", nullptr, near_eq(ls, 1.55f, 0.05f)))
+  if (ImGui::MenuItem("Relaxed", nullptr, near_eq(ls, VS::kLineRelaxed, 0.05f)))
     cmd = UiCommand::ViewLineSpacingRelaxed;
-  if (ImGui::MenuItem("Loose", nullptr, near_eq(ls, 1.80f, 0.05f)))
+  if (ImGui::MenuItem("Loose", nullptr, near_eq(ls, VS::kLineLoose, 0.05f)))
     cmd = UiCommand::ViewLineSpacingLoose;
 }
 
 void fill_margins_items(const UiState& state, UiCommand& cmd) {
+  using VS = xanatoo::ViewSettings;
   const float mx = state.view_margin_x;
-  if (ImGui::MenuItem("Narrow", nullptr, near_eq(mx, 12.f, 1.f)))
+  if (ImGui::MenuItem("Narrow", nullptr, near_eq(mx, VS::kMarginNarrow, 1.f)))
     cmd = UiCommand::ViewMarginsNarrow;
-  if (ImGui::MenuItem("Normal", nullptr, near_eq(mx, 32.f, 1.f)))
+  if (ImGui::MenuItem("Normal", nullptr, near_eq(mx, VS::kMarginNormal, 1.f)))
     cmd = UiCommand::ViewMarginsNormal;
-  if (ImGui::MenuItem("Wide", nullptr, near_eq(mx, 56.f, 1.f)))
+  if (ImGui::MenuItem("Wide", nullptr, near_eq(mx, VS::kMarginWide, 1.f)))
     cmd = UiCommand::ViewMarginsWide;
-  if (ImGui::MenuItem("Extra wide", nullptr, near_eq(mx, 80.f, 1.f)))
+  if (ImGui::MenuItem("Extra wide", nullptr, near_eq(mx, VS::kMarginExtra, 1.f)))
     cmd = UiCommand::ViewMarginsExtra;
 }
 
 void fill_measure_items(const UiState& state, UiCommand& cmd) {
+  using VS = xanatoo::ViewSettings;
   const float mw = state.view_max_content_width;
   if (ImGui::MenuItem("Full width", nullptr, mw < 1.f))
     cmd = UiCommand::ViewMeasureFull;
-  if (ImGui::MenuItem("Comfortable (~720px)", nullptr, near_eq(mw, 720.f, 1.f)))
+  if (ImGui::MenuItem("Comfortable (~720px)", nullptr,
+                      near_eq(mw, VS::kMeasureComfortable, 1.f)))
     cmd = UiCommand::ViewMeasureComfortable;
-  if (ImGui::MenuItem("Wide (~960px)", nullptr, near_eq(mw, 960.f, 1.f)))
+  if (ImGui::MenuItem("Wide (~960px)", nullptr,
+                      near_eq(mw, VS::kMeasureWide, 1.f)))
     cmd = UiCommand::ViewMeasureWide;
 }
 

@@ -6,7 +6,13 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **249** (this delivery is **248**)
+Next bundle number: **250** (this delivery is **249**)
+
+## Status (2026-10-12)
+
+Polish: View menu numbers from ViewSettings constants; `active_focus_section()`
+for layout calls; Focus mode uses `drop_height_hints_for_buf`; outline title
+shows focused section name when Focus is on.
 
 ## Status (2026-10-12)
 
@@ -719,4 +725,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-245.*-outline-jump-to-top-…` — prior
 - `xanatoo-246.*-section-focus-mode-…` — prior
 - `xanatoo-247.*-toolbar-linespace-measure-…` — prior
-- `xanatoo-248.*-polish-view-menus-sqlite-…` — this delivery
+- `xanatoo-248.*-polish-view-menus-sqlite-…` — prior
+- `xanatoo-249.*-polish-focus-view-constants-…` — this delivery
