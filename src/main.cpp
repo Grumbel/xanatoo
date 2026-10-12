@@ -222,6 +222,7 @@ int main(int argc, char** argv) {
     int w = 0;
     // Prior block heights for viewport virtualization (node → height).
     std::unordered_map<xanatoo::NodeId, float> height_cache;
+    int last_layout_pane_w = 0;  // drop cache when this pane's width changes
     // Content-Y band last materialised (including overscan).
     float materialised_top = 0.f;
     float materialised_bottom = 0.f;
@@ -711,6 +712,10 @@ int main(int argc, char** argv) {
       folded_sections.insert(section);
     else
       folded_sections.erase(section);
+    for (int pi = 0; pi < 2; ++pi) {
+      if (panes[pi].buf == F().buf)
+        invalidate_height_around(panes[pi], section);
+    }
     needs_layout = true;
     if (outline_mode) refresh_outline();
     // Persist view-local fold in side SQLite (documents stay immutable).
@@ -750,6 +755,7 @@ int main(int argc, char** argv) {
     flash_status("No section under caret");
   };
 
+
   auto refresh_diff = [&]() {
     diff_marks[0].clear();
     diff_marks[1].clear();
@@ -770,6 +776,15 @@ int main(int argc, char** argv) {
     Pane& p = F();
     buffers[static_cast<size_t>(p.buf)].history.push(doc_of(p), p.sel);
   };
+  auto invalidate_height_around = [&](Pane& pane, xanatoo::NodeId id) {
+    if (id == xanatoo::INVALID_NODE) return;
+    const auto& d = doc_of(pane);
+    for (xanatoo::NodeId cur = id; cur != xanatoo::INVALID_NODE && cur < d.next_id;
+         cur = d.get(cur).parent) {
+      pane.height_cache.erase(cur);
+    }
+  };
+
   auto mark_dirty = [&]() {
     int di = F().buf;
     discard_armed = false;  // new edits require a fresh discard warning
@@ -781,8 +796,45 @@ int main(int argc, char** argv) {
       // Soft windows sharing this buffer must re-layout.
       for (auto& sw : soft_wins)
         if (sw.buf == di) sw.needs_layout = true;
+      // Virtualization: drop height hints for the edited node and ancestors
+      // so the next layout remeasures only the affected spine (not the world).
+      for (int pi = 0; pi < 2; ++pi) {
+        if (panes[pi].buf == di)
+          invalidate_height_around(panes[pi], F().sel.focus.node);
+      }
     }
   };
+
+  // Expand folded Section/Article ancestors so a jump target is visible.
+  // Persists unfolds to the side store (view state, not the document).
+  auto expand_ancestors_for_node = [&](xanatoo::NodeId target) {
+    if (target == xanatoo::INVALID_NODE) return;
+    const auto& d = doc_of(F());
+    bool any = false;
+    std::string doc_key = path_of(F());
+    for (xanatoo::NodeId id = target; id != xanatoo::INVALID_NODE && id < d.next_id;
+         id = d.get(id).parent) {
+      const auto& n = d.get(id);
+      if (n.kind != xanatoo::NodeKind::Section &&
+          n.kind != xanatoo::NodeKind::Article)
+        continue;
+      if (!folded_sections.count(id)) continue;
+      folded_sections.erase(id);
+      any = true;
+      if (!doc_key.empty()) {
+        std::string sk = xanatoo::section_stable_key(d, id);
+        xanatoo::save_section_fold(doc_key, sk, false);
+      }
+      for (int pi = 0; pi < 2; ++pi) {
+        if (panes[pi].buf == F().buf) invalidate_height_around(panes[pi], id);
+      }
+    }
+    if (any) {
+      needs_layout = true;
+      if (outline_mode) refresh_outline();
+    }
+  };
+
 
   auto push_nav_history = [&](const std::string& url) {
     if (url.empty()) return;
@@ -888,10 +940,12 @@ int main(int argc, char** argv) {
         panes[pi].buf = tab_order.empty() ? 0 : tab_order.front();
       }
     }
-    // Block heights depend on width; drop hints when pane geometry changed.
-    if (last_layout_w != win_w) {
-      panes[0].height_cache.clear();
-      panes[1].height_cache.clear();
+    // Block heights depend on width; drop hints when this pane's width changed.
+    for (int pi = 0; pi < 2; ++pi) {
+      if (panes[pi].w != panes[pi].last_layout_pane_w) {
+        panes[pi].height_cache.clear();
+        panes[pi].last_layout_pane_w = panes[pi].w;
+      }
     }
     auto layout_one = [&](Pane& pane) {
       try {
@@ -1415,6 +1469,7 @@ int main(int argc, char** argv) {
     if (auto href = xanatoo::hit_test_link(d, p.layout, cpos.x, cpos.y,
                                            p.scroll_y)) {
       if (auto dest = xanatoo::jump_to_href(d, *href)) {
+        expand_ancestors_for_node(dest->node);
         p.sel.focus = *dest;
         p.sel.anchor = p.sel.focus;
         scroll_caret_into_view(p);
@@ -1819,7 +1874,9 @@ int main(int argc, char** argv) {
         outline_sel >= static_cast<int>(outline.size()))
       return;
     Pane& p = F();
-    p.sel.focus = {outline[static_cast<size_t>(outline_sel)].node, 0, 0};
+    xanatoo::NodeId dest = outline[static_cast<size_t>(outline_sel)].node;
+    expand_ancestors_for_node(dest);
+    p.sel.focus = {dest, 0, 0};
     xanatoo::ensure_valid_caret(doc_of(p), p.sel.focus);
     p.sel.anchor = p.sel.focus;
     scroll_caret_into_view(p);
@@ -2497,6 +2554,7 @@ int main(int argc, char** argv) {
               if (auto dest = xanatoo::jump_to_href(doc_of(p), *href)) {
                 const bool ctrl_click =
                     (SDL_GetModState() & KMOD_CTRL) != 0;
+                expand_ancestors_for_node(dest->node);
                 // Ctrl+click: open target in the other pane (enable split)
                 if (ctrl_click) {
                   if (!split) {
@@ -2594,6 +2652,7 @@ int main(int argc, char** argv) {
                   break;
                 }
                 if (auto dest = xanatoo::jump_to_href(doc_of(p), bn.src)) {
+                  expand_ancestors_for_node(dest->node);
                   p.sel.focus = *dest;
                   p.sel.anchor = p.sel.focus;
                   scroll_caret_into_view(p);

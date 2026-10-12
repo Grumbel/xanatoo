@@ -6,7 +6,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **234** (this delivery is **233**)
+Next bundle number: **235** (this delivery is **234**)
+
+## Status (2026-10-12)
+
+Virtualization: per-pane width cache invalidation; edit/fold drops height hints along the caret/section spine only. Outline/link/include jumps expand folded ancestors (persisted in sidestore).
 
 ## Status (2026-10-12)
 
@@ -48,7 +52,7 @@ Implemented (223): view-local Section/Article fold (layout skips body;
 outline twisties + ←/→; Ctrl+Shift+F). Fold not in document (SQLite later).
 Jump still does not auto-expand.
 
-Still open: promote/demote, SQLite side store, dual-pane outline view.
+Still open: richer sidestore (annotations/versioning); independent outline UI expand vs body fold.
 
 ## Status (2026-10-11)
 
