@@ -6,7 +6,12 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **245** (this delivery is **244**)
+Next bundle number: **246** (this delivery is **245**)
+
+## Status (2026-10-12)
+
+Outline jump scrolls the heading to the **top** of the pane (not merely into
+view at the bottom edge). Typing/arrow `scroll_caret_into_view` unchanged.
 
 ## Status (2026-10-12)
 
@@ -692,4 +697,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-241.*-view-display-settings-…` — prior
 - `xanatoo-242.*-outline-jump-reliable-…` — prior
 - `xanatoo-243.*-fix-view-settings-scope-…` — prior
-- `xanatoo-244.*-virt-drop-hints-undo-load-…` — this delivery
+- `xanatoo-244.*-virt-drop-hints-undo-load-…` — prior
+- `xanatoo-245.*-outline-jump-to-top-…` — this delivery

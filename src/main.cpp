@@ -1059,6 +1059,24 @@ int main(int argc, char** argv) {
     ensure_virtual_layout(p);
   };
 
+  // Outline / TOC navigation: pin the target near the top of the pane so the
+  // section body is readable without scrolling up from a bottom-edge snap.
+  auto scroll_caret_to_top = [&](Pane& p) {
+    auto yopt = caret_doc_y(p);
+    if (!yopt) {
+      force_full_pane_layout(p);
+      yopt = caret_doc_y(p);
+    }
+    if (!yopt) return;
+    const float margin = 16.f;
+    float view_h = static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
+    if (view_h < 80.f) view_h = 80.f;
+    float max_s = std::max(0.f, p.layout.content_height - view_h + 40.f);
+    p.scroll_y = std::max(0.f, std::min(max_s, *yopt - margin));
+    needs_layout = true;
+    ensure_virtual_layout(p);
+  };
+
 
 
   // ---- Browse / gamepad navigation (no text entry) ----
@@ -2012,7 +2030,7 @@ int main(int argc, char** argv) {
     p.sel.focus = {dest, 0, 0};
     xanatoo::ensure_valid_caret(d, p.sel.focus);
     p.sel.anchor = p.sel.focus;
-    scroll_caret_into_view(p);
+    scroll_caret_to_top(p);
     reset_blink();
   };
 
