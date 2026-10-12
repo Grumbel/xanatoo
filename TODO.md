@@ -6,7 +6,13 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **250** (this delivery is **249**)
+Next bundle number: **251** (this delivery is **250**)
+
+## Status (2026-10-12)
+
+Outline jump scroll: pin to layout **box top** (not caret baseline) so
+heading ascenders are not clipped; force full layout when the target has
+no box yet under virtualization.
 
 ## Status (2026-10-12)
 
@@ -726,4 +732,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-246.*-section-focus-mode-…` — prior
 - `xanatoo-247.*-toolbar-linespace-measure-…` — prior
 - `xanatoo-248.*-polish-view-menus-sqlite-…` — prior
-- `xanatoo-249.*-polish-focus-view-constants-…` — this delivery
+- `xanatoo-249.*-polish-focus-view-constants-…` — prior
+- `xanatoo-250.*-outline-scroll-box-top-…` — this delivery

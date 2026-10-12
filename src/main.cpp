@@ -1101,14 +1101,45 @@ int main(int argc, char** argv) {
 
   // Outline / TOC navigation: pin the target near the top of the pane so the
   // section body is readable without scrolling up from a bottom-edge snap.
+  // Prefer the layout *box top* (not caret baseline) so heading ascenders are
+  // not clipped under the toolbar.
   auto scroll_caret_to_top = [&](Pane& p) {
-    auto yopt = caret_doc_y(p);
+    auto box_top_of = [&](xanatoo::NodeId id) -> std::optional<float> {
+      if (id == xanatoo::INVALID_NODE) return std::nullopt;
+      for (const auto& box : p.layout.boxes) {
+        if (box.node == id) return box.y;
+      }
+      return std::nullopt;
+    };
+
+    auto resolve_top = [&]() -> std::optional<float> {
+      const auto& d = doc_of(p);
+      // Header/Heading box, then Section, then any ancestor box.
+      if (auto y = box_top_of(p.sel.focus.node)) return y;
+      xanatoo::NodeId sec =
+          xanatoo::enclosing_section(d, p.sel.focus.node);
+      if (auto y = box_top_of(sec)) return y;
+      for (xanatoo::NodeId id = p.sel.focus.node;
+           id != xanatoo::INVALID_NODE && id < d.next_id;
+           id = d.get(id).parent) {
+        if (auto y = box_top_of(id)) return y;
+      }
+      // Last resort: caret baseline minus roughly one line so glyphs fit.
+      if (auto cy = caret_doc_y(p)) {
+        const float lh = static_cast<float>(body_font.line_height());
+        return std::max(0.f, *cy - lh);
+      }
+      return std::nullopt;
+    };
+
+    auto yopt = resolve_top();
     if (!yopt) {
       force_full_pane_layout(p);
-      yopt = caret_doc_y(p);
+      yopt = resolve_top();
     }
     if (!yopt) return;
-    const float margin = 16.f;
+    // Small pad so the box edge is not flush under the chrome.
+    const float margin = 8.f;
     float view_h = static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
     if (view_h < 80.f) view_h = 80.f;
     float max_s = std::max(0.f, p.layout.content_height - view_h + 40.f);
@@ -2082,6 +2113,20 @@ int main(int argc, char** argv) {
     p.sel.focus = {dest, 0, 0};
     xanatoo::ensure_valid_caret(d, p.sel.focus);
     p.sel.anchor = p.sel.focus;
+    // Outline jumps need a complete materialisation so box tops exist for
+    // the target (virtualized bands often omit it until after scroll).
+    if (!p.layout.boxes.empty()) {
+      bool have_box = false;
+      for (const auto& b : p.layout.boxes) {
+        if (b.node == p.sel.focus.node) {
+          have_box = true;
+          break;
+        }
+      }
+      if (!have_box) force_full_pane_layout(p);
+    } else {
+      force_full_pane_layout(p);
+    }
     scroll_caret_to_top(p);
     reset_blink();
   };
