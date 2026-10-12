@@ -6,7 +6,13 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **261** (this delivery is **260**)
+Next bundle number: **262** (this delivery is **261**)
+
+## Status (2026-10-12)
+
+Rewrite `layout_paragraph` word-wrap from scratch (word/space machine instead
+of pen-break). Fixes systematic overflow past the measure that the unit test
+caught. Justify still on soft-wrapped body lines with 3em gap cap.
 
 ## Status (2026-10-12)
 
@@ -796,4 +802,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-257.*-fix-tests-images-link-…` — prior
 - `xanatoo-258.*-fix-tests-stb-include-…` — prior
 - `xanatoo-259.*-fix-wrap-test-warning-…` — prior
-- `xanatoo-260.*-fix-scrollbar-clip-wrap-…` — this delivery
+- `xanatoo-260.*-fix-scrollbar-clip-wrap-…` — prior
+- `xanatoo-261.*-rewrite-paragraph-wrap-…` — this delivery

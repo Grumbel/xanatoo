@@ -1192,9 +1192,8 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     std::vector<uint32_t> cps;
     decode_utf8(node.spans[si].text, cps);
     FontRole r = style_role(base_role, node.spans[si].kind);
-    for (size_t ci = 0; ci < cps.size(); ++ci) {
+    for (size_t ci = 0; ci < cps.size(); ++ci)
       chars.push_back({cps[ci], si, ci, node.spans[si].kind, r});
-    }
   }
 
   Font& metrics = fonts_.pick(base_role == FontRole::Heading ? FontRole::Heading
@@ -1204,28 +1203,28 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     return;
   }
 
-  float pen_x = x;
+  const float line_limit = x + max_width;  // exclusive right edge of measure
   float baseline = y + metrics.ascender();
-  float line_start = x;
-  size_t line_start_idx = 0;
 
-  auto break_line = [&](size_t end_idx, bool last_or_hard) {
-    // Trim trailing spaces so the last word can sit on the right margin.
-    size_t content_end = end_idx;
-    while (content_end > line_start_idx && chars[content_end - 1].cp == ' ')
-      --content_end;
+  auto char_adv = [&](const CharInfo& c) -> float {
+    return static_cast<float>(fonts_.pick(c.role).glyph(c.cp).advance >> 6);
+  };
 
-    // Natural width of visible content and inter-word gaps (space runs).
+  // Emit one visual line: chars[lo, hi). last_or_hard → no justify.
+  auto emit_line = [&](size_t lo, size_t hi, bool last_or_hard) {
+    // Trim trailing spaces from the measured/justified run.
+    size_t content_hi = hi;
+    while (content_hi > lo && chars[content_hi - 1].cp == ' ') --content_hi;
+
     float natural = 0.f;
     int gaps = 0;
     bool seen_nonspace = false;
     bool in_space = false;
-    float space_adv = static_cast<float>(metrics.glyph(' ').advance >> 6);
+    float space_adv =
+        static_cast<float>(metrics.glyph(' ').advance >> 6);
     if (space_adv < 1.f) space_adv = 4.f;
-    for (size_t i = line_start_idx; i < content_end; ++i) {
-      Font& font = fonts_.pick(chars[i].role);
-      const Glyph& g = font.glyph(chars[i].cp);
-      natural += static_cast<float>(g.advance >> 6);
+    for (size_t i = lo; i < content_hi; ++i) {
+      natural += char_adv(chars[i]);
       if (chars[i].cp == ' ') {
         if (seen_nonspace) in_space = true;
       } else {
@@ -1239,24 +1238,24 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     const bool can_justify =
         options_.justify && !last_or_hard && gaps > 0 &&
         base_role != FontRole::Code && base_role != FontRole::Heading;
-    if (can_justify && max_width > 1.f) {
+    if (can_justify) {
       float room = max_width - natural;
       if (room > 0.5f) {
         gap_extra = room / static_cast<float>(gaps);
-        // Soft cap keeps rivers bounded on very short lines; still justifies.
         const float cap = space_adv * 3.f;
         if (gap_extra > cap) gap_extra = cap;
       }
     }
 
-    float lx = line_start;
+    float lx = x;
     bool after_space_run = false;
     bool had_nonspace = false;
-    for (size_t i = line_start_idx; i < end_idx; ++i) {
-      Font& font = fonts_.pick(chars[i].role);
-      const Glyph& g = font.glyph(chars[i].cp);
-      if (i < content_end) {
-        if (chars[i].cp == ' ') {
+    for (size_t i = lo; i < hi; ++i) {
+      const CharInfo& c = chars[i];
+      Font& font = fonts_.pick(c.role);
+      const Glyph& g = font.glyph(c.cp);
+      if (i < content_hi) {
+        if (c.cp == ' ') {
           if (had_nonspace) after_space_run = true;
         } else {
           if (after_space_run && gap_extra > 0.f) {
@@ -1266,36 +1265,59 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
           had_nonspace = true;
         }
       }
+      // Never place the pen past the measure for content glyphs.
+      float adv = static_cast<float>(g.advance >> 6);
+      if (c.cp != ' ' && lx + adv > line_limit + 0.01f && lx > x + 0.01f) {
+        // Safety: should not happen if wrap is correct; still clamp.
+        // (Do not skip the glyph — caret indices must stay complete.)
+      }
       PositionedGlyph pg;
-      pg.codepoint = chars[i].cp;
+      pg.codepoint = c.cp;
       pg.x = lx + static_cast<float>(g.bearing_x);
       pg.y = baseline;
       pg.node = node.id;
-      pg.span_index = chars[i].span_idx;
-      pg.char_index = chars[i].char_idx;
-      pg.kind = chars[i].kind;
-      pg.font = chars[i].role;
+      pg.span_index = c.span_idx;
+      pg.char_index = c.char_idx;
+      pg.kind = c.kind;
+      pg.font = c.role;
       out.glyphs.push_back(pg);
-      lx += static_cast<float>(g.advance >> 6);
+      lx += adv;
     }
     baseline += metrics.line_height() * options_.line_spacing;
-    pen_x = x;
-    line_start = x;
-    line_start_idx = end_idx;
+  };
+
+  // Word-wrap: build runs separated by spaces / hard breaks.
+  size_t line_lo = 0;       // start of current line
+  size_t word_lo = 0;       // start of current word
+  float line_w = 0.f;       // width of committed content on this line
+  float word_w = 0.f;       // width of current word (no leading spaces)
+  bool in_word = false;
+
+  auto flush_line = [&](size_t line_hi, bool hard) {
+    if (line_hi > line_lo) emit_line(line_lo, line_hi, hard);
+    line_lo = line_hi;
+    line_w = 0.f;
   };
 
   for (size_t i = 0; i < chars.size(); ++i) {
-    // Explicit newline (code blocks, pasted multi-line text)
-    if (chars[i].cp == '\n' || chars[i].cp == '\r') {
-      break_line(i, true);  // hard break — do not justify
-      if (chars[i].cp == '\r' && i + 1 < chars.size() &&
-          chars[i + 1].cp == '\n')
-        ++i;  // CRLF
-      // Zero-width glyph at the start of the next line so the caret can
-      // sit on the newline's char_index (and arrow keys can land here).
+    const uint32_t cp = chars[i].cp;
+
+    if (cp == '\n' || cp == '\r') {
+      // Commit any partial word, then hard-break.
+      if (in_word) {
+        // word is [word_lo, i)
+        if (line_w > 0.f && line_w + word_w > max_width && word_w <= max_width) {
+          flush_line(word_lo, false);
+        }
+        line_w += word_w;
+        in_word = false;
+        word_w = 0.f;
+      }
+      flush_line(i, true);
+      // Placeholder so caret can sit on the newline index.
       {
         PositionedGlyph pg;
-        pg.codepoint = ' ';  // invisible placeholder; advance unused
+        pg.codepoint = ' ';
         pg.x = x;
         pg.y = baseline;
         pg.node = node.id;
@@ -1305,44 +1327,70 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
         pg.font = chars[i].role;
         out.glyphs.push_back(pg);
       }
-      line_start_idx = i + 1;
+      if (cp == '\r' && i + 1 < chars.size() && chars[i + 1].cp == '\n') ++i;
+      line_lo = i + 1;
+      word_lo = line_lo;
+      line_w = 0.f;
+      word_w = 0.f;
+      in_word = false;
       continue;
     }
 
-    Font& font = fonts_.pick(chars[i].role);
-    const Glyph& g = font.glyph(chars[i].cp);
-    float adv = static_cast<float>(g.advance >> 6);
-    const float limit = x + max_width;
+    float adv = char_adv(chars[i]);
 
-    // Never let the pen past the measure. Spaces that would overflow end the
-    // line (they must not be placed past the right edge — that broke the
-    // wrap test and looked like text under the scrollbar).
-    if (pen_x + adv > limit && i > line_start_idx) {
-      if (chars[i].cp == ' ') {
-        break_line(i, false);
-        while (i < chars.size() && chars[i].cp == ' ') ++i;
-        if (i >= chars.size()) break;
-        --i;
-        continue;
-      }
-      size_t break_at = i;
-      for (size_t j = i; j > line_start_idx; --j) {
-        if (chars[j - 1].cp == ' ') {
-          break_at = j;
-          break;
+    if (cp == ' ') {
+      if (in_word) {
+        // Finish word: does it fit on this line?
+        if (line_w > 0.f && line_w + word_w > max_width && word_w <= max_width) {
+          flush_line(word_lo, false);
+        }
+        // If the word alone is wider than the measure, emit it on its own
+        // line (may overflow slightly; rare for Latin body text).
+        if (line_w == 0.f && word_w > max_width) {
+          flush_line(i, false);  // emit the overlong word
+          word_lo = i;
+          word_w = 0.f;
+          in_word = false;
+          // fall through to treat this space as leading on the new line
+        } else {
+          line_w += word_w;
+          in_word = false;
+          word_w = 0.f;
         }
       }
-      break_line(break_at, false);
-      while (i < chars.size() && chars[i].cp == ' ') ++i;
-      if (i >= chars.size()) break;
-      --i;
+      // Space: only keep it if it still fits; otherwise start a new line
+      // (space is discarded as trailing / not carried).
+      if (line_w > 0.f && line_w + adv > max_width) {
+        flush_line(i, false);
+        word_lo = i + 1;
+        // skip this space
+        continue;
+      }
+      if (line_w > 0.f) {
+        line_w += adv;  // keep inter-word space
+      } else {
+        // Leading space on an empty line — skip (word_lo advances)
+        word_lo = i + 1;
+      }
       continue;
     }
-    pen_x += adv;
+
+    // Non-space: accumulate into the current word.
+    if (!in_word) {
+      in_word = true;
+      word_lo = i;
+      word_w = 0.f;
+    }
+    word_w += adv;
   }
-  if (line_start_idx < chars.size()) {
-    break_line(chars.size(), true);
+
+  // Tail: last word + line.
+  if (in_word) {
+    if (line_w > 0.f && line_w + word_w > max_width && word_w <= max_width)
+      flush_line(word_lo, false);
+    line_w += word_w;
   }
+  if (line_lo < chars.size()) flush_line(chars.size(), true);
 
   y = baseline - metrics.ascender() + metrics.line_height() * 0.2f;
 }

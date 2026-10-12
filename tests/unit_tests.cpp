@@ -735,16 +735,32 @@ void test_layout_wrap_respects_max_width() {
   const float left = opts.margin_x;
   const float right = layout_w - opts.margin_x;
   float max_right = left;
+  float worst = 0.f;
+  uint32_t worst_cp = 0;
+  int overflow_n = 0;
   for (const auto& g : lr.glyphs) {
     if (g.codepoint == ' ' || g.codepoint == 0) continue;
-    // pg.x = pen + bearing_x; cell right = pen + advance.
     Font& f = fonts.pick(g.font);
     const Glyph& met = f.glyph(g.codepoint);
     float adv = static_cast<float>(met.advance >> 6);
     float cell_r = g.x - static_cast<float>(met.bearing_x) + adv;
     if (cell_r > max_right) max_right = cell_r;
-    EXPECT(cell_r <= right + 1.5f);
+    if (cell_r > right + 1.5f) {
+      ++overflow_n;
+      if (cell_r - right > worst) {
+        worst = cell_r - right;
+        worst_cp = g.codepoint;
+      }
+    }
   }
+  if (overflow_n) {
+    std::fprintf(stderr,
+                 "wrap overflow: n=%d max_right=%.2f right=%.2f worst=+%.2f "
+                 "cp=U+%04X layout_w=%.1f mx=%.1f glyphs=%zu\n",
+                 overflow_n, max_right, right, worst, worst_cp, layout_w,
+                 opts.margin_x, lr.glyphs.size());
+  }
+  EXPECT(overflow_n == 0);
   EXPECT(max_right <= right + 1.5f);
 
   // With justify on, still must not overflow.
