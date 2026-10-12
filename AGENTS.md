@@ -58,6 +58,15 @@ Dear ImGui is allowed for chrome (menus/toolbars). No Qt/GTK/KDE.
 - Requires `XANATOO_SOURCE` (set in shellHook). Default build dir `/tmp/xanatoo-build`.
 - See `docs/ENVIRONMENT.md`.
 
+## Layout virtualization
+
+- `LayoutEngine::layout` accepts optional `LayoutViewport` + height-hint map.
+- Sequential containers (Document, Section, Article, Thread, List, Column,
+  DefList, Biblio) skip off-screen children when a prior box height is known.
+- Main keeps per-pane `height_cache`; scroll outside the materialised band
+  triggers re-layout. Width changes clear the cache.
+- History still snapshots whole documents (depth capped for large trees).
+
 ## Continuity
 
 Read `TODO.md` first. Record plans and outcomes there.

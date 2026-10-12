@@ -29,6 +29,7 @@
 #include <cmath>
 #include <cstring>
 #include <vector>
+#include <unordered_map>
 
 namespace fs = std::filesystem;
 
@@ -216,6 +217,11 @@ int main(int argc, char** argv) {
     xanatoo::LayoutResult layout{};
     int x = 0;
     int w = 0;
+    // Prior block heights for viewport virtualization (node → height).
+    std::unordered_map<xanatoo::NodeId, float> height_cache;
+    // Content-Y band last materialised (including overscan).
+    float materialised_top = 0.f;
+    float materialised_bottom = 0.f;
   };
 
   Pane panes[2];
@@ -688,12 +694,41 @@ int main(int argc, char** argv) {
         panes[pi].buf = tab_order.empty() ? 0 : tab_order.front();
       }
     }
+    // Block heights depend on width; drop hints when pane geometry changed.
+    if (last_layout_w != win_w) {
+      panes[0].height_cache.clear();
+      panes[1].height_cache.clear();
+    }
     auto layout_one = [&](Pane& pane) {
       try {
         xanatoo::ensure_valid_caret(doc_of(pane), pane.sel.focus);
-        pane.sel.anchor = pane.sel.focus;
+        xanatoo::ensure_valid_caret(doc_of(pane), pane.sel.anchor);
+        float view_h =
+            static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
+        if (view_h < 80.f) view_h = 80.f;
+        xanatoo::LayoutViewport vp;
+        vp.top = pane.scroll_y;
+        vp.bottom = pane.scroll_y + view_h;
+        vp.overscan = std::max(800.f, view_h * 1.5f);
+        const std::unordered_map<xanatoo::NodeId, float>* hints =
+            pane.height_cache.empty() ? nullptr : &pane.height_cache;
         pane.layout = layout_engine.layout(
-            doc_of(pane), static_cast<float>(pane.w), base_of(pane));
+            doc_of(pane), static_cast<float>(pane.w), base_of(pane), vp, hints);
+        // Refresh height hints from measured (and skipped-stub) boxes.
+        for (const auto& b : pane.layout.boxes) {
+          if (b.node != xanatoo::INVALID_NODE && b.height > 0.f)
+            pane.height_cache[b.node] = b.height;
+        }
+        if (pane.layout.virtualized) {
+          pane.materialised_top = pane.layout.materialised_top;
+          pane.materialised_bottom = pane.layout.materialised_bottom;
+        } else if (vp.active()) {
+          pane.materialised_top = vp.top - vp.overscan;
+          pane.materialised_bottom = vp.bottom + vp.overscan;
+        } else {
+          pane.materialised_top = 0.f;
+          pane.materialised_bottom = pane.layout.content_height;
+        }
       } catch (const std::exception& e) {
         std::cerr << "pane layout failed: " << e.what() << "\n";
         pane.layout = {};
@@ -705,6 +740,32 @@ int main(int argc, char** argv) {
     last_layout_w = win_w;
     last_layout_h = win_h;
     refresh_diff();
+  };
+
+  auto clear_pane_height_cache = [&](Pane& p) {
+    p.height_cache.clear();
+    p.materialised_top = 0.f;
+    p.materialised_bottom = 0.f;
+  };
+
+  auto clear_all_height_caches = [&]() {
+    clear_pane_height_cache(panes[0]);
+    clear_pane_height_cache(panes[1]);
+  };
+
+  // Re-layout when scroll leaves the materialised band (virtualization).
+  auto ensure_virtual_layout = [&](Pane& p) {
+    if (p.height_cache.empty()) return;
+    float view_h =
+        static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
+    if (view_h < 80.f) view_h = 80.f;
+    const float margin = 64.f;
+    const float vis_top = p.scroll_y;
+    const float vis_bot = p.scroll_y + view_h;
+    if (vis_top < p.materialised_top + margin ||
+        vis_bot > p.materialised_bottom - margin) {
+      needs_layout = true;
+    }
   };
 
   auto scroll_caret_into_view = [&](Pane& p) {
@@ -722,6 +783,7 @@ int main(int argc, char** argv) {
     } else if (doc_y - p.scroll_y > view_h - margin) {
       p.scroll_y = doc_y - (view_h - margin);
     }
+    ensure_virtual_layout(p);
   };
 
 
@@ -736,6 +798,7 @@ int main(int argc, char** argv) {
       p.scroll_y = std::max(0.f, p.scroll_y - step);
     else
       p.scroll_y = std::min(max_s, p.scroll_y + step);
+    ensure_virtual_layout(p);
   };
 
   auto nav_move_block = [&](bool prev) {
@@ -1759,6 +1822,14 @@ int main(int argc, char** argv) {
           Pane& p = panes[pi];
           p.scroll_y -= static_cast<float>(ev.wheel.y) * 48.f;
           p.scroll_y = std::max(0.f, p.scroll_y);
+          {
+            float view_h =
+                static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
+            float max_s =
+                std::max(0.f, p.layout.content_height - view_h + 40.f);
+            if (p.scroll_y > max_s) p.scroll_y = max_s;
+          }
+          ensure_virtual_layout(p);
           break;
         }
 
@@ -2122,6 +2193,7 @@ int main(int argc, char** argv) {
                 float ratio = (view_h > 0.f) ? (my / view_h) : 0.f;
                 ratio = std::max(0.f, std::min(1.f, ratio));
                 panes[pi].scroll_y = ratio * max_s;
+                ensure_virtual_layout(panes[pi]);
                 break;
               }
             }
@@ -2693,6 +2765,7 @@ int main(int argc, char** argv) {
             float ratio = (view_h > 0.f) ? (my / view_h) : 0.f;
             ratio = std::max(0.f, std::min(1.f, ratio));
             sp.scroll_y = ratio * max_s;
+            ensure_virtual_layout(sp);
             break;
           }
           if (dragging_split && split) {
@@ -4164,6 +4237,7 @@ int main(int argc, char** argv) {
                 p.scroll_y = std::max(0.f, p.scroll_y - step);
               else
                 p.scroll_y = std::min(max_s, p.scroll_y + step);
+              ensure_virtual_layout(p);
               // Move caret to a glyph near the top of the new viewport
               move_and_sel([&] {
                 if (p.layout.glyphs.empty()) return;

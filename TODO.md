@@ -6,7 +6,16 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **221** (this delivery is **220**)
+Next bundle number: **222** (this delivery is **221**)
+
+## Status (2026-10-12)
+
+Large-document virtualization (v1): viewport-scoped sequential layout with
+per-pane block height cache. Off-screen Document/Section/Article/Thread/List/
+Column/DefList/Biblio children skip glyph materialisation when a prior height
+hint exists; content_height stays accurate via stub boxes. Scroll/page/wheel
+re-layout when the view leaves the materialised overscan band. Width change
+clears height hints. Selection endpoints preserved across layout.
 
 ## Status (2026-10-11)
 
@@ -317,7 +326,7 @@ LCS structural diff marks; cross-document `:::include`.
 
 ## Open work / next steps
 
-0. **Large-document virtualization** — layout/render only the viewport (history still snapshots whole docs; depth is capped for big trees)
+0. **Large-document virtualization** — v1 in (viewport + height-hint skip for sequential blocks). Still open: tighter invalidation on edits, column-internal skip, measure-only pass without FreeType for far blocks, history depth already capped.
 
 1. Optional: HarfBuzz for complex scripts
 2. Replace snapshot undo with a tighter operation log if memory becomes an issue
@@ -584,4 +593,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-217.*-more-unit-tests-…` — prior
 - `xanatoo-218.*-sexpr-unit-tests-…` — prior
 - `xanatoo-219.*-more-markup-tests-…` — prior
-- `xanatoo-220.*-nix-develop-helpers-…` — this delivery
+- `xanatoo-220.*-nix-develop-helpers-…` — prior
+- `xanatoo-221.*-layout-virtualization-…` — this delivery

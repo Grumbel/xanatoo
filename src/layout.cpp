@@ -90,13 +90,57 @@ static void decode_utf8(const std::string& text, std::vector<uint32_t>& out);
 // Message in-reply-to label → node id (rebuilt each layout).
 thread_local std::unordered_map<std::string, NodeId> g_msg_label_map;
 
-LayoutResult LayoutEngine::layout(const Document& doc, float max_width,
-                                   const std::string& image_base) {
+bool LayoutEngine::try_skip_block(NodeId id, float x, float& y, float max_width,
+                                  LayoutResult& out) {
+  if (!viewport_.active() || !height_hints_ || id == INVALID_NODE)
+    return false;
+  auto it = height_hints_->find(id);
+  if (it == height_hints_->end()) return false;
+  const float h = it->second;
+  if (h < 1.f) return false;
+  const float y0 = y;
+  const float y1 = y + h;
+  const float band0 = viewport_.top - viewport_.overscan;
+  const float band1 = viewport_.bottom + viewport_.overscan;
+  if (y1 < band0 || y0 > band1) {
+    out.boxes.push_back({id, x, y0, max_width, h});
+    y = y1;
+    skipped_any_ = true;
+    return true;
+  }
+  return false;
+}
+
+void LayoutEngine::layout_children_sequential(
+    const Document& doc, const std::vector<NodeId>& children, float x, float& y,
+    float max_width, LayoutResult& out) {
+  for (NodeId child : children) {
+    if (try_skip_block(child, x, y, max_width, out)) continue;
+    layout_node(doc, child, x, y, max_width, out);
+  }
+}
+
+LayoutResult LayoutEngine::layout(
+    const Document& doc, float max_width, const std::string& image_base,
+    const LayoutViewport& viewport,
+    const std::unordered_map<NodeId, float>* height_hints) {
   LayoutResult result;
   image_base_ = image_base;
+  viewport_ = viewport;
+  height_hints_ = height_hints;
+  skipped_any_ = false;
+  if (viewport_.active()) {
+    result.materialised_top = viewport_.top - viewport_.overscan;
+    result.materialised_bottom = viewport_.bottom + viewport_.overscan;
+  }
   if (doc.root == INVALID_NODE) return result;
   // Rough glyph budget: a few characters per node on average.
-  result.glyphs.reserve(doc.nodes.size() * 8);
+  // When virtualizing, most blocks are skipped so reserve less aggressively.
+  const size_t glyph_budget =
+      (viewport_.active() && height_hints_ && !height_hints_->empty())
+          ? doc.nodes.size() * 2
+          : doc.nodes.size() * 8;
+  result.glyphs.reserve(glyph_budget);
   result.boxes.reserve(doc.nodes.size());
   g_msg_label_map.clear();
   for (const auto& n : doc.nodes) {
@@ -106,6 +150,8 @@ LayoutResult LayoutEngine::layout(const Document& doc, float max_width,
   float y = 24.f;
   layout_node(doc, doc.root, 32.f, y, max_width - 64.f, result);
   result.content_height = y + 48.f;
+  result.virtualized = skipped_any_;
+  height_hints_ = nullptr;
   return result;
 }
 
@@ -118,23 +164,17 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
   switch (node.kind) {
     case NodeKind::Document:
-      for (NodeId child : node.children) {
-        layout_node(doc, child, x, y, max_width, out);
-      }
+      layout_children_sequential(doc, node.children, x, y, max_width, out);
       break;
 
     case NodeKind::List:
-      for (NodeId child : node.children) {
-        layout_node(doc, child, x, y, max_width, out);
-      }
+      layout_children_sequential(doc, node.children, x, y, max_width, out);
       y += 8.f;  // trailing gap after the list block
       break;
 
     case NodeKind::Column:
       // Column content is laid out by the parent Columns node.
-      for (NodeId child : node.children) {
-        layout_node(doc, child, x, y, max_width, out);
-      }
+      layout_children_sequential(doc, node.children, x, y, max_width, out);
       break;
 
     case NodeKind::Columns: {
@@ -344,8 +384,8 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       // Nested sections indent slightly; articles keep full width.
       float inset = (node.kind == NodeKind::Section) ? 8.f : 0.f;
       y += 6.f;
-      for (NodeId child : node.children)
-        layout_node(doc, child, x + inset, y, max_width - inset, out);
+      layout_children_sequential(doc, node.children, x + inset, y,
+                                 max_width - inset, out);
       y += 8.f;
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
@@ -412,8 +452,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         if (g.node == header.id) g.node = id;
       }
       y += 8.f;
-      for (NodeId child : node.children)
-        layout_node(doc, child, x, y, max_width, out);
+      layout_children_sequential(doc, node.children, x, y, max_width, out);
       y += 10.f;
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
@@ -509,8 +548,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
     case NodeKind::DefList: {
       float start_y = y;
-      for (NodeId c : node.children)
-        layout_node(doc, c, x, y, max_width, out);
+      layout_children_sequential(doc, node.children, x, y, max_width, out);
       y += 8.f;
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
@@ -560,8 +598,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
     case NodeKind::Biblio: {
       float start_y = y;
-      for (NodeId c : node.children)
-        layout_node(doc, c, x, y, max_width, out);
+      layout_children_sequential(doc, node.children, x, y, max_width, out);
       y += 8.f;
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;

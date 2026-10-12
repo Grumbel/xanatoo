@@ -7,6 +7,7 @@
 #include "xanatoo/images.hpp"
 #include <vector>
 #include <string>
+#include <unordered_map>
 
 namespace xanatoo {
 
@@ -69,6 +70,22 @@ struct LayoutResult {
   std::vector<LayoutBox> hr_lines;
   std::vector<ColumnGap> column_gaps;
   float content_height = 0.f;
+  // True when a viewport was active and some sequential blocks were skipped
+  // via height hints (glyphs only materialised near the view).
+  bool virtualized = false;
+  // Document Y band that was fully materialised (top − overscan … bottom + overscan).
+  float materialised_top = 0.f;
+  float materialised_bottom = 0.f;
+};
+
+// Optional viewport for large-document virtualization.
+// When bottom > top, sequential block children outside
+// [top − overscan, bottom + overscan] may be skipped if a height hint exists.
+struct LayoutViewport {
+  float top = 0.f;
+  float bottom = 0.f;
+  float overscan = 1200.f;
+  bool active() const { return bottom > top; }
 };
 
 // Drop cached external documents used by :::include path.md[…].
@@ -79,14 +96,32 @@ class LayoutEngine {
 public:
   LayoutEngine(FontSet& fonts, ImageCache* images = nullptr);
 
+  // height_hints: optional prior block heights (from a previous LayoutResult's
+  // boxes). Used only when viewport is active to skip off-screen sequential
+  // blocks without re-measuring them.
   LayoutResult layout(const Document& doc, float max_width,
-                      const std::string& image_base = {});
+                      const std::string& image_base = {},
+                      const LayoutViewport& viewport = {},
+                      const std::unordered_map<NodeId, float>* height_hints = nullptr);
 
 private:
   FontSet& fonts_;
   ImageCache* images_;
 
   std::string image_base_;
+  LayoutViewport viewport_;
+  const std::unordered_map<NodeId, float>* height_hints_ = nullptr;
+  bool skipped_any_ = false;
+
+  // If the block has a height hint and lies fully outside the materialised
+  // band, advance y by that height, emit a stub box, and return true.
+  bool try_skip_block(NodeId id, float x, float& y, float max_width,
+                      LayoutResult& out);
+
+  void layout_children_sequential(const Document& doc,
+                                  const std::vector<NodeId>& children,
+                                  float x, float& y, float max_width,
+                                  LayoutResult& out);
 
   void layout_node(const Document& doc, NodeId id,
                    float x, float& y, float max_width,
