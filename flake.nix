@@ -248,8 +248,51 @@ except Exception:
               if command -v ccache >/dev/null 2>&1; then
                 export CMAKE_CXX_COMPILER_LAUNCHER="''${CMAKE_CXX_COMPILER_LAUNCHER:-ccache}"
               fi
-              echo "xanatoo develop: source=$XANATOO_SOURCE build=$XANATOO_BUILD_DIR"
-              echo "  xanatoo-configure | xanatoo-build | xanatoo-run | xanatoo-run-gdb | xanatoo-test"
+              cat <<'XANATOO_DEV_BANNER'
+xanatoo — nix develop (out-of-tree CMake)
+
+  Pattern: deps + env + PATH scripts here; packaged wrappers stay for
+  `nix build` / `nix run`. Same idea as biltoo / Pingus.
+
+  Commands (build-before-run; safe outside this shell → clear error):
+    xanatoo-configure   cmake -S $XANATOO_SOURCE -B $XANATOO_BUILD_DIR -G Ninja
+    xanatoo-build       reconfigure if cache missing / source path changed, then ninja
+    xanatoo-run         build, then run the unwrapped binary (args forwarded)
+    xanatoo-run-gdb     build, then gdb auto-run (quit on exit 0; stay on crash)
+    xanatoo-test        build, then xanatoo_tests / ctest
+
+  One-shot from outside:
+    nix develop -c xanatoo-run examples/welcome.md
+    nix develop -c xanatoo-run-gdb
+    nix develop -c xanatoo-test
+
+  Why this shape:
+    • Helpers are writeShellScriptBin on PATH (not shellHook functions) so
+      `nix develop -c …` works.
+    • XANATOO_SOURCE is set only in shellHook — helpers refuse to run without it.
+    • xanatoo-build compares CMAKE_HOME_DIRECTORY to $XANATOO_SOURCE and
+      reconfigures when the checkout moved or the cache is stale/gone.
+    • Develop defaults to Debug; `nix build` packages use RelWithDebInfo.
+    • Unwrapped binary gets the same runtime hints as the package wrapper
+      (XANATOO_FONT, XANATOO_ICON_DIR, XANATOO_DATA_DIR → live source tree).
+
+  Env (override anytime):
+    XANATOO_SOURCE      this tree ($PWD)
+    XANATOO_BUILD_DIR   default /tmp/xanatoo-build
+    CMAKE_BUILD_TYPE    default Debug
+    XANATOO_FONT        DejaVu Sans from nixpkgs
+    XANATOO_ICON_DIR    $XANATOO_BUILD_DIR/icons
+    XANATOO_DATA_DIR    $XANATOO_SOURCE (examples / welcome / help)
+
+  Typical loop:
+    xanatoo-configure && xanatoo-build
+    xanatoo-run
+    # or: xanatoo-run-gdb
+
+  Full write-up: docs/ENVIRONMENT.md
+XANATOO_DEV_BANNER
+              echo "  source=$XANATOO_SOURCE"
+              echo "  build=$XANATOO_BUILD_DIR  type=''${CMAKE_BUILD_TYPE:-Debug}"
             '';
           };
         });
