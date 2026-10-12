@@ -6,7 +6,12 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **243** (this delivery is **242**)
+Next bundle number: **244** (this delivery is **243**)
+
+## Status (2026-10-12)
+
+Fix: declare `view_settings` + `apply_view_settings` in main (handlers were
+committed without the load/apply wiring — compile error).
 
 ## Status (2026-10-12)
 
@@ -679,4 +684,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-239.*-backlinks-unused-vars-…` — prior
 - `xanatoo-240.*-epub-sanitize-calibre-html-…` — prior
 - `xanatoo-241.*-view-display-settings-…` — prior
-- `xanatoo-242.*-outline-jump-reliable-…` — this delivery
+- `xanatoo-242.*-outline-jump-reliable-…` — prior
+- `xanatoo-243.*-fix-view-settings-scope-…` — this delivery

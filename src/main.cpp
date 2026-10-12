@@ -19,6 +19,7 @@
 #include "xanatoo/minibuffer.hpp"
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/epub_import.hpp"
+#include "xanatoo/view_settings.hpp"
 #include "xanatoo/cli.hpp"
 
 #include <SDL.h>
@@ -236,6 +237,9 @@ int main(int argc, char** argv) {
   update_title();
 
   xanatoo::LayoutEngine layout_engine(fonts, &images);
+  xanatoo::ViewSettings view_settings;
+  xanatoo::load_view_settings(view_settings);
+  layout_engine.set_options(xanatoo::LayoutOptions::from_view(view_settings));
   xanatoo::Renderer renderer(sdl, fonts, &images);
   xanatoo::Ui ui;
   if (!ui.init(window, sdl, opt.ui_scale)) {
@@ -333,6 +337,17 @@ int main(int argc, char** argv) {
   bool running = true;
   bool needs_layout = true;
   int last_layout_w = 0, last_layout_h = 0;
+
+  auto apply_view_settings = [&]() {
+    view_settings.clamp();
+    layout_engine.set_options(xanatoo::LayoutOptions::from_view(view_settings));
+    panes[0].height_cache.clear();
+    panes[1].height_cache.clear();
+    needs_layout = true;
+    if (!xanatoo::save_view_settings(view_settings))
+      std::cerr << "Could not persist view settings to "
+                << xanatoo::view_settings_path() << "\n";
+  };
 
   // Leap-style search (Canon Cat inspiration)
   bool search_mode = false;
@@ -5571,6 +5586,9 @@ int main(int argc, char** argv) {
       ui_state.can_diff = !shared_doc() && panes[0].buf != panes[1].buf &&
                           panes[0].buf >= 0 && panes[1].buf >= 0;
       ui_state.structure = structure_mode;
+      ui_state.view_line_spacing = view_settings.line_spacing;
+      ui_state.view_margin_x = view_settings.margin_x;
+      ui_state.view_max_content_width = view_settings.max_content_width;
       ui_state.browse = browse_mode;
       ui_state.virtual_keyboard = virtual_keyboard;
       ui_state.help = help_mode;
