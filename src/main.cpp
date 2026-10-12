@@ -354,6 +354,7 @@ int main(int argc, char** argv) {
   bool path_in_window_mode = false;
   std::string path_in_window_buf;
   bool open_file_mode = false;  // File→Open into focused pane (status-bar path)
+  std::string open_file_buf;
   bool url_bar_mode = false;    // Ctrl+L — open gemini:// or file path
   std::string url_bar_buf;
   // Shared Emacs-style minibuffer for path/URL prompts (cursor, Tab, history).
@@ -394,8 +395,7 @@ int main(int argc, char** argv) {
   std::vector<std::string> bookmarks = xanatoo::load_bookmarks();
   bool history_panel_open = false;
   bool bookmarks_panel_open = false;
-  std::string open_file_buf;
-  std::string status_notice;
+    std::string status_notice;
   Uint32 status_notice_until = 0;
   bool discard_armed = false;
 
