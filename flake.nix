@@ -138,8 +138,7 @@
               echo "xanatoo-configure: CMAKE_BUILD_TYPE=''${CMAKE_BUILD_TYPE:-Debug}"
               cmake -S "$XANATOO_SOURCE" -B "$XANATOO_BUILD_DIR" -G Ninja \
                 -DCMAKE_BUILD_TYPE="''${CMAKE_BUILD_TYPE:-Debug}" \
-                -DCMAKE_CXX_FLAGS_DEBUG="''${CMAKE_CXX_FLAGS_DEBUG:--g3 -O0 -fno-omit-frame-pointer}" \
-                -DCMAKE_C_FLAGS_DEBUG="''${CMAKE_C_FLAGS_DEBUG:--g3 -O0 -fno-omit-frame-pointer}" \
+                -DCMAKE_CXX_FLAGS_DEBUG="''${CMAKE_CXX_FLAGS_DEBUG:--g3 -Og -fno-omit-frame-pointer}" \
                 "$@"
             ''
           );
@@ -265,8 +264,9 @@ except Exception:
                 export CMAKE_CXX_COMPILER_LAUNCHER="''${CMAKE_CXX_COMPILER_LAUNCHER:-ccache}"
               fi
               # Full debug info for out-of-tree builds (override before configure).
-              export CMAKE_CXX_FLAGS_DEBUG="''${CMAKE_CXX_FLAGS_DEBUG:--g3 -O0 -fno-omit-frame-pointer}"
-              export CMAKE_C_FLAGS_DEBUG="''${CMAKE_C_FLAGS_DEBUG:--g3 -O0 -fno-omit-frame-pointer}"
+              # -Og: optimise for debug; satisfies Nix _FORTIFY_SOURCE (needs -O).
+              # C-only FLAGS_DEBUG omitted — project is CXX-only.
+              export CMAKE_CXX_FLAGS_DEBUG="''${CMAKE_CXX_FLAGS_DEBUG:--g3 -Og -fno-omit-frame-pointer}"
               cat <<'XANATOO_DEV_BANNER'
 xanatoo — nix develop (out-of-tree CMake)
 
@@ -313,7 +313,7 @@ xanatoo — nix develop (out-of-tree CMake)
     · re-enter the shell, or: export SDL2COMPAT_DEBUG_LOGGING=1
     · then: xanatoo-run-gdb   (should stop with a better message on stderr)
 
-  Debug symbols: CMAKE_BUILD_TYPE=Debug with -g3 -O0 -fno-omit-frame-pointer
+  Debug symbols: CMAKE_BUILD_TYPE=Debug with -g3 -Og -fno-omit-frame-pointer
   (set at configure time). After changing flags: rm -rf $XANATOO_BUILD_DIR &&
   xanatoo-configure && xanatoo-build
 

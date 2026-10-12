@@ -263,7 +263,7 @@ ldd $XANATOO_BUILD_DIR/xanatoo | grep -i sdl
 | Flag | Value |
 |------|--------|
 | `CMAKE_BUILD_TYPE` | `Debug` |
-| `CMAKE_CXX_FLAGS_DEBUG` | `-g3 -O0 -fno-omit-frame-pointer` |
+| `CMAKE_CXX_FLAGS_DEBUG` | `-g3 -Og -fno-omit-frame-pointer` |
 
 After changing these, wipe the build dir and reconfigure:
 
@@ -277,3 +277,9 @@ Package builds remain `RelWithDebInfo` via `nix build` (not stripped of all
 info, but optimised). For deepest SDL stack traces you need debuginfo for
 glibc/SDL from nixpkgs (`separateDebugInfo` / `enableDebugging`), which is
 optional and heavier than the app flags above.
+
+**Note:** plain `-O0` triggers glibc `#warning _FORTIFY_SOURCE requires … -O`
+under Nix hardening, and `CMAKE_C_FLAGS_DEBUG` is unused (CXX-only project).
+Develop defaults to **`-Og`** instead: still debugger-friendly, keeps Fortify
+happy. Override with `CMAKE_CXX_FLAGS_DEBUG='-g3 -O0 -U_FORTIFY_SOURCE …'` if
+you truly want zero optimisation.
