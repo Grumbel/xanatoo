@@ -298,6 +298,20 @@ def draw_icon(name: str, size: int = 20) -> bytes:
         for cy in (5, 10, 15):
             circle(buf, size, size, S(4), S(cy), S(1), INK, INK)
             line(buf, size, size, S(7), S(cy), S(16), S(cy), INK, 2)
+    elif name == "linespacing":
+        for yy in (5, 10, 15):
+            line(buf, size, size, S(5), S(yy), S(16), S(yy), INK, 1)
+        line(buf, size, size, S(2), S(5), S(2), S(15), ACCENT, 1)
+        line(buf, size, size, S(2), S(5), S(1), S(7), ACCENT, 1)
+        line(buf, size, size, S(2), S(5), S(3), S(7), ACCENT, 1)
+        line(buf, size, size, S(2), S(15), S(1), S(13), ACCENT, 1)
+        line(buf, size, size, S(2), S(15), S(3), S(13), ACCENT, 1)
+    elif name == "measure":
+        rect(buf, size, size, S(3), S(3), S(14), S(14), INK, SOFT)
+        line(buf, size, size, S(6), S(3), S(6), S(17), ACCENT, 1)
+        line(buf, size, size, S(14), S(3), S(14), S(17), ACCENT, 1)
+        for yy in (6, 9, 12, 15):
+            line(buf, size, size, S(7), S(yy), S(13), S(yy), INK, 1)
     else:
         rect(buf, size, size, S(4), S(4), S(12), S(12), INK, ACCENT)
     return bytes(buf)

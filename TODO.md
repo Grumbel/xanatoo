@@ -6,7 +6,12 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **247** (this delivery is **246**)
+Next bundle number: **248** (this delivery is **247**)
+
+## Status (2026-10-12)
+
+Browse toolbar: Line spacing + Measure dropdowns with `linespacing` /
+`measure` icons (SVG + drawn fallback). Same options as View menu.
 
 ## Status (2026-10-12)
 
@@ -706,4 +711,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-243.*-fix-view-settings-scope-…` — prior
 - `xanatoo-244.*-virt-drop-hints-undo-load-…` — prior
 - `xanatoo-245.*-outline-jump-to-top-…` — prior
-- `xanatoo-246.*-section-focus-mode-…` — this delivery
+- `xanatoo-246.*-section-focus-mode-…` — prior
+- `xanatoo-247.*-toolbar-linespace-measure-…` — this delivery

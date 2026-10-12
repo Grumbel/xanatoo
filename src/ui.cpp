@@ -153,6 +153,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
       "figure", "note", "replace", "outline", "paste", "copy", "new", "open",
       "zoomin", "zoomout", "structure", "diff",
       "back", "forward", "reload", "bookmark", "history", "browse",
+      "linespacing", "measure",
       "format", "insert", "view", "lists",
   };
 
@@ -235,7 +236,9 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
     // Text fallback when PNG missing (e.g. icons not rasterized yet).
     static const std::unordered_map<std::string, const char*> kShort = {
         {"back", "◀"}, {"forward", "▶"}, {"reload", "↻"}, {"bookmark", "★"},
-        {"history", "Hist"}, {"browse", "Browse"}, {"format", "Aa▾"},
+        {"history", "Hist"}, {"browse", "Browse"},
+        {"linespacing", "≡↕"}, {"measure", "▣|"},
+        {"format", "Aa▾"},
         {"insert", "+▾"}, {"view", "View▾"}, {"lists", "List▾"},
         {"new", "New"}, {"open", "Open"}, {"save", "Save"}, {"undo", "Undo"},
         {"redo", "Redo"}, {"cut", "Cut"}, {"copy", "Copy"}, {"paste", "Paste"},
@@ -290,6 +293,7 @@ bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip)
         {"format", "Aa"}, {"insert", "+"}, {"view", "View"}, {"lists", "List"},
         {"structure", "Struct"}, {"list", "List"}, {"code", "Aa"},
         {"table", "+"}, {"h1", "H"}, {"outline", "View"},
+        {"linespacing", "Sp"}, {"measure", "Me"},
     };
     std::string label;
     auto it = kShort.find(icon_name ? icon_name : "");
@@ -878,6 +882,33 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                   state.current_bookmarked ? UiCommand::RemoveBookmark
                                            : UiCommand::AddBookmark,
                   cmd, state.has_path || !state.doc_label.empty());
+    }
+    // Display: line spacing + measure (view-only, not document format)
+    if (tool_menu_begin("tb_linespacing", "linespacing",
+                        "Line spacing (view)")) {
+      auto ls = state.view_line_spacing;
+      auto near = [](float a, float b) { return std::fabs(a - b) < 0.05f; };
+      if (ImGui::MenuItem("Tight", nullptr, near(ls, 1.10f)))
+        cmd = UiCommand::ViewLineSpacingTight;
+      if (ImGui::MenuItem("Normal", nullptr, near(ls, 1.30f)))
+        cmd = UiCommand::ViewLineSpacingNormal;
+      if (ImGui::MenuItem("Relaxed", nullptr, near(ls, 1.55f)))
+        cmd = UiCommand::ViewLineSpacingRelaxed;
+      if (ImGui::MenuItem("Loose", nullptr, near(ls, 1.80f)))
+        cmd = UiCommand::ViewLineSpacingLoose;
+      tool_menu_end();
+    }
+    if (tool_menu_begin("tb_measure", "measure",
+                        "Measure / column width (view)")) {
+      auto mw = state.view_max_content_width;
+      auto near = [](float a, float b) { return std::fabs(a - b) < 1.f; };
+      if (ImGui::MenuItem("Full width", nullptr, mw < 1.f))
+        cmd = UiCommand::ViewMeasureFull;
+      if (ImGui::MenuItem("Comfortable (~720px)", nullptr, near(mw, 720.f)))
+        cmd = UiCommand::ViewMeasureComfortable;
+      if (ImGui::MenuItem("Wide (~960px)", nullptr, near(mw, 960.f)))
+        cmd = UiCommand::ViewMeasureWide;
+      tool_menu_end();
     }
     {
       if (state.history_open) {
