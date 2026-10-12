@@ -7695,8 +7695,11 @@ int main(int argc, char** argv) {
       } else if (structure_mode) {
         label = "Structure highlight — colour bars + kind tags on the right · Ctrl+Shift+L toggles";
         tr = 40; tg = 80; tb = 140;
+      } else if (section_focus_mode) {
+        label = "Focus section — body shows one section · outline picks target · Ctrl+Alt+F off";
+        tr = 25; tg = 90; tb = 170;
       } else if (outline_mode) {
-label = "Outline — ↑/↓ · ←/→ fold · Enter jump · twisty · Esc";
+        label = "Outline — ↑/↓ · ←/→ fold · Enter jump · twisty · Esc";
         tr = 40; tg = 90; tb = 160;
       } else if (hovered_col_gap) {
         label = "Column gutter — drag to adjust relative widths";

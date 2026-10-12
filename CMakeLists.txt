@@ -80,7 +80,7 @@ find_package(SQLite3 REQUIRED)
 
 target_link_libraries(xanatoo PRIVATE
   ${SDL2_LIBRARIES}
-  SQLite::SQLite3
+  SQLite3::SQLite3
   Freetype::Freetype
   ${FONTCONFIG_LIBRARIES}
 )

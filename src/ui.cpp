@@ -25,6 +25,49 @@ namespace fs = std::filesystem;
 
 namespace xanatoo {
 
+
+namespace {
+
+bool near_eq(float a, float b, float eps) { return std::fabs(a - b) < eps; }
+
+// Shared View / toolbar items for display prefs (not document format).
+void fill_line_spacing_items(const UiState& state, UiCommand& cmd) {
+  const float ls = state.view_line_spacing;
+  if (ImGui::MenuItem("Tight", nullptr, near_eq(ls, 1.10f, 0.05f)))
+    cmd = UiCommand::ViewLineSpacingTight;
+  if (ImGui::MenuItem("Normal", nullptr, near_eq(ls, 1.30f, 0.05f)))
+    cmd = UiCommand::ViewLineSpacingNormal;
+  if (ImGui::MenuItem("Relaxed", nullptr, near_eq(ls, 1.55f, 0.05f)))
+    cmd = UiCommand::ViewLineSpacingRelaxed;
+  if (ImGui::MenuItem("Loose", nullptr, near_eq(ls, 1.80f, 0.05f)))
+    cmd = UiCommand::ViewLineSpacingLoose;
+}
+
+void fill_margins_items(const UiState& state, UiCommand& cmd) {
+  const float mx = state.view_margin_x;
+  if (ImGui::MenuItem("Narrow", nullptr, near_eq(mx, 12.f, 1.f)))
+    cmd = UiCommand::ViewMarginsNarrow;
+  if (ImGui::MenuItem("Normal", nullptr, near_eq(mx, 32.f, 1.f)))
+    cmd = UiCommand::ViewMarginsNormal;
+  if (ImGui::MenuItem("Wide", nullptr, near_eq(mx, 56.f, 1.f)))
+    cmd = UiCommand::ViewMarginsWide;
+  if (ImGui::MenuItem("Extra wide", nullptr, near_eq(mx, 80.f, 1.f)))
+    cmd = UiCommand::ViewMarginsExtra;
+}
+
+void fill_measure_items(const UiState& state, UiCommand& cmd) {
+  const float mw = state.view_max_content_width;
+  if (ImGui::MenuItem("Full width", nullptr, mw < 1.f))
+    cmd = UiCommand::ViewMeasureFull;
+  if (ImGui::MenuItem("Comfortable (~720px)", nullptr, near_eq(mw, 720.f, 1.f)))
+    cmd = UiCommand::ViewMeasureComfortable;
+  if (ImGui::MenuItem("Wide (~960px)", nullptr, near_eq(mw, 960.f, 1.f)))
+    cmd = UiCommand::ViewMeasureWide;
+}
+
+}  // namespace
+
+
 Ui::~Ui() { shutdown(); }
 
 // ---------------------------------------------------------------------------
@@ -651,8 +694,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleSplit;
       if (ImGui::MenuItem("Heading Outline", "Ctrl+Shift+O", state.outline))
         cmd = UiCommand::ToggleOutline;
-      if (ImGui::MenuItem("Focus current section", "Ctrl+Alt+F", state.section_focus,
-                          state.outline || true))
+      if (ImGui::MenuItem("Focus current section", "Ctrl+Alt+F", state.section_focus))
         cmd = UiCommand::ToggleSectionFocus;
       ImGui::TextDisabled("  Ctrl+Alt+O docks outline | body");
       if (ImGui::MenuItem("Backlinks", "Ctrl+Alt+B", state.backlinks))
@@ -669,40 +711,15 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Zoom In", UiCommand::ZoomIn, cmd, true, "Ctrl++");
       menu_item_cmd("Zoom Out", UiCommand::ZoomOut, cmd, true, "Ctrl+-");
       if (ImGui::BeginMenu("Line spacing")) {
-        auto ls = state.view_line_spacing;
-        auto near = [](float a, float b) { return std::fabs(a - b) < 0.05f; };
-        if (ImGui::MenuItem("Tight", nullptr, near(ls, 1.10f)))
-          cmd = UiCommand::ViewLineSpacingTight;
-        if (ImGui::MenuItem("Normal", nullptr, near(ls, 1.30f)))
-          cmd = UiCommand::ViewLineSpacingNormal;
-        if (ImGui::MenuItem("Relaxed", nullptr, near(ls, 1.55f)))
-          cmd = UiCommand::ViewLineSpacingRelaxed;
-        if (ImGui::MenuItem("Loose", nullptr, near(ls, 1.80f)))
-          cmd = UiCommand::ViewLineSpacingLoose;
+        fill_line_spacing_items(state, cmd);
         ImGui::EndMenu();
       }
       if (ImGui::BeginMenu("Margins")) {
-        auto mx = state.view_margin_x;
-        auto near = [](float a, float b) { return std::fabs(a - b) < 1.f; };
-        if (ImGui::MenuItem("Narrow", nullptr, near(mx, 12.f)))
-          cmd = UiCommand::ViewMarginsNarrow;
-        if (ImGui::MenuItem("Normal", nullptr, near(mx, 32.f)))
-          cmd = UiCommand::ViewMarginsNormal;
-        if (ImGui::MenuItem("Wide", nullptr, near(mx, 56.f)))
-          cmd = UiCommand::ViewMarginsWide;
-        if (ImGui::MenuItem("Extra wide", nullptr, near(mx, 80.f)))
-          cmd = UiCommand::ViewMarginsExtra;
+        fill_margins_items(state, cmd);
         ImGui::EndMenu();
       }
       if (ImGui::BeginMenu("Measure (column width)")) {
-        auto mw = state.view_max_content_width;
-        auto near = [](float a, float b) { return std::fabs(a - b) < 1.f; };
-        if (ImGui::MenuItem("Full width", nullptr, mw < 1.f))
-          cmd = UiCommand::ViewMeasureFull;
-        if (ImGui::MenuItem("Comfortable (~720px)", nullptr, near(mw, 720.f)))
-          cmd = UiCommand::ViewMeasureComfortable;
-        if (ImGui::MenuItem("Wide (~960px)", nullptr, near(mw, 960.f)))
-          cmd = UiCommand::ViewMeasureWide;
+        fill_measure_items(state, cmd);
         ImGui::EndMenu();
       }
       ImGui::Separator();
@@ -886,28 +903,15 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     // Display: line spacing + measure (view-only, not document format)
     if (tool_menu_begin("tb_linespacing", "linespacing",
                         "Line spacing (view)")) {
-      auto ls = state.view_line_spacing;
-      auto near = [](float a, float b) { return std::fabs(a - b) < 0.05f; };
-      if (ImGui::MenuItem("Tight", nullptr, near(ls, 1.10f)))
-        cmd = UiCommand::ViewLineSpacingTight;
-      if (ImGui::MenuItem("Normal", nullptr, near(ls, 1.30f)))
-        cmd = UiCommand::ViewLineSpacingNormal;
-      if (ImGui::MenuItem("Relaxed", nullptr, near(ls, 1.55f)))
-        cmd = UiCommand::ViewLineSpacingRelaxed;
-      if (ImGui::MenuItem("Loose", nullptr, near(ls, 1.80f)))
-        cmd = UiCommand::ViewLineSpacingLoose;
+      fill_line_spacing_items(state, cmd);
       tool_menu_end();
     }
     if (tool_menu_begin("tb_measure", "measure",
                         "Measure / column width (view)")) {
-      auto mw = state.view_max_content_width;
-      auto near = [](float a, float b) { return std::fabs(a - b) < 1.f; };
-      if (ImGui::MenuItem("Full width", nullptr, mw < 1.f))
-        cmd = UiCommand::ViewMeasureFull;
-      if (ImGui::MenuItem("Comfortable (~720px)", nullptr, near(mw, 720.f)))
-        cmd = UiCommand::ViewMeasureComfortable;
-      if (ImGui::MenuItem("Wide (~960px)", nullptr, near(mw, 960.f)))
-        cmd = UiCommand::ViewMeasureWide;
+      fill_measure_items(state, cmd);
+      ImGui::Separator();
+      ImGui::TextDisabled("Margins");
+      fill_margins_items(state, cmd);
       tool_menu_end();
     }
     {

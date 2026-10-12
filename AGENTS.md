@@ -63,7 +63,9 @@ Dear ImGui is allowed for chrome (menus/toolbars). No Qt/GTK/KDE.
 - `LayoutEngine::layout` accepts optional `LayoutViewport` + height-hint map.
 - Sequential containers (Document, Section, Article, Thread, List, Column,
   DefList, Biblio) skip off-screen children when a prior box height is known.
-- Main keeps per-pane `height_cache`; scroll outside the materialised band
+- Main keeps per-pane `height_cache`
+- View display prefs (`ViewSettings` / `view.conf`): line spacing, margins, measure — layout only, not document format
+- Section Focus mode: `LayoutEngine::layout(..., focus_section)` filters body to one Section/Article (outline still full tree); scroll outside the materialised band
   triggers re-layout. Width changes clear the cache.
 - History still snapshots whole documents (depth capped for large trees).
 

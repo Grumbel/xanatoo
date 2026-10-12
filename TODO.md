@@ -6,7 +6,13 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **248** (this delivery is **247**)
+Next bundle number: **249** (this delivery is **248**)
+
+## Status (2026-10-12)
+
+Polish: dedupe View/toolbar display menus (`fill_*_items`); margins under
+Measure toolbar menu; SQLite3::SQLite3 (drop deprecation); Focus menu always
+enabled; status-bar hint when section Focus is on; AGENTS notes.
 
 ## Status (2026-10-12)
 
@@ -712,4 +718,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-244.*-virt-drop-hints-undo-load-…` — prior
 - `xanatoo-245.*-outline-jump-to-top-…` — prior
 - `xanatoo-246.*-section-focus-mode-…` — prior
-- `xanatoo-247.*-toolbar-linespace-measure-…` — this delivery
+- `xanatoo-247.*-toolbar-linespace-measure-…` — prior
+- `xanatoo-248.*-polish-view-menus-sqlite-…` — this delivery
