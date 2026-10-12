@@ -6,7 +6,12 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **253** (this delivery is **252**)
+Next bundle number: **254** (this delivery is **253**)
+
+## Status (2026-10-12)
+
+Scrollbar chapter marks stable under virtualization: prefer Section boxes,
+fill missing Y from height_cache tree walk (nested under stubs too).
 
 ## Status (2026-10-12)
 
@@ -745,4 +750,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-249.*-polish-focus-view-constants-…` — prior
 - `xanatoo-250.*-outline-scroll-box-top-…` — prior
 - `xanatoo-251.*-classic-scrollbar-marks-…` — prior
-- `xanatoo-252.*-scrollbar-page-hover-…` — this delivery
+- `xanatoo-252.*-scrollbar-page-hover-…` — prior
+- `xanatoo-253.*-scrollbar-marks-virt-…` — this delivery

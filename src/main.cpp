@@ -27,6 +27,7 @@
 #include <string>
 #include <filesystem>
 #include <algorithm>
+#include <functional>
 #include <fstream>
 #include <cctype>
 #include <cstdlib>
@@ -7656,24 +7657,94 @@ int main(int argc, char** argv) {
           SDL_Rect tick{sx + 1, my - 1, kSbW - 2, 2};
           SDL_RenderFillRect(sdl, &tick);
         };
-        // Chapter / section breaks (ensure outline is available even if panel closed).
+        // Chapter / section breaks. Virtualization often stubs a whole Section
+        // (no Header child boxes) — prefer Section id, and synthesise Y from
+        // height_cache when a node is outside the materialised band.
         if (outline.empty()) {
           xanatoo::collect_outline(doc_of(pane), outline, &folded_sections);
         }
         if (!outline.empty()) {
+          std::unordered_map<xanatoo::NodeId, float> mark_y;
+          mark_y.reserve(pane.layout.boxes.size() + 16);
+          for (const auto& box : pane.layout.boxes) {
+            if (box.node != xanatoo::INVALID_NODE)
+              mark_y[box.node] = box.y;
+          }
+          // Fill missing Section/Article positions by walking with height hints.
+          const auto& dmark = doc_of(pane);
+          std::function<float(xanatoo::NodeId, float)> walk_y =
+              [&](xanatoo::NodeId id, float y) -> float {
+            if (id == xanatoo::INVALID_NODE || id >= dmark.next_id) return y;
+            const auto& n = dmark.get(id);
+            if (!mark_y.count(id)) mark_y[id] = y;
+            if (n.kind == xanatoo::NodeKind::Document) {
+              for (xanatoo::NodeId c : n.children) y = walk_y(c, y);
+              return y;
+            }
+            if (n.kind == xanatoo::NodeKind::Section ||
+                n.kind == xanatoo::NodeKind::Article) {
+              // If layout already has a stub/full box height, advance by it
+              // when children were not materialised (no child entries in mark_y
+              // beyond what we just set for id).
+              auto hit = pane.height_cache.find(id);
+              bool child_known = false;
+              for (xanatoo::NodeId c : n.children) {
+                if (mark_y.count(c)) {
+                  child_known = true;
+                  break;
+                }
+              }
+              if (hit != pane.height_cache.end() && !child_known) {
+                // Parent was virtualized as one stub — still place nested
+                // outline targets using child height hints so marks remain.
+                float cy = y;
+                for (xanatoo::NodeId c : n.children) {
+                  if (!mark_y.count(c)) mark_y[c] = cy;
+                  auto ch = pane.height_cache.find(c);
+                  cy += ch != pane.height_cache.end()
+                            ? ch->second
+                            : static_cast<float>(body_font.line_height());
+                }
+                return y + hit->second;
+              }
+              float cy = y;
+              for (xanatoo::NodeId c : n.children) cy = walk_y(c, cy);
+              if (hit != pane.height_cache.end() && cy <= y + 0.5f)
+                return y + hit->second;
+              return cy > y ? cy : y + (hit != pane.height_cache.end()
+                                            ? hit->second
+                                            : 24.f);
+            }
+            auto hit = pane.height_cache.find(id);
+            if (hit != pane.height_cache.end()) return y + hit->second;
+            return y + static_cast<float>(body_font.line_height());
+          };
+          if (dmark.root != xanatoo::INVALID_NODE) {
+            // Prefer content_height-consistent origin: layout boxes already
+            // used absolute y; walk only fills gaps (does not overwrite).
+            float y0 = view_settings.margin_y;
+            // If root box exists, start from it.
+            auto root_it = mark_y.find(dmark.root);
+            if (root_it != mark_y.end()) y0 = root_it->second;
+            walk_y(dmark.root, y0);
+          }
           for (const auto& e : outline) {
-            xanatoo::NodeId id = e.node;
-            if (id == xanatoo::INVALID_NODE) id = e.section;
-            for (const auto& box : pane.layout.boxes) {
-              if (box.node == id) {
-                // Level-1 sections a bit stronger.
-                if (e.level <= 1)
-                  mark_at(box.y, 25, 90, 170);
-                else
-                  mark_at(box.y, 140, 160, 190);
+            float y = -1.f;
+            // Prefer Section (stable under virtualization stubs), then Header.
+            for (xanatoo::NodeId id :
+                 {e.section, e.node}) {
+              if (id == xanatoo::INVALID_NODE) continue;
+              auto it = mark_y.find(id);
+              if (it != mark_y.end()) {
+                y = it->second;
                 break;
               }
             }
+            if (y < 0.f) continue;
+            if (e.level <= 1)
+              mark_at(y, 25, 90, 170);
+            else
+              mark_at(y, 140, 160, 190);
           }
         }
         // Search hits (cheap capped scan while leap search is active).
