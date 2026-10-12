@@ -6,7 +6,12 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **251** (this delivery is **250**)
+Next bundle number: **252** (this delivery is **251**)
+
+## Status (2026-10-12)
+
+Classic scrollbar: wider track (14px), ↑/↓ buttons, chapter ticks from outline,
+search-hit ticks while leap search is active, caret mark on focused pane.
 
 ## Status (2026-10-12)
 
@@ -733,4 +738,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-247.*-toolbar-linespace-measure-…` — prior
 - `xanatoo-248.*-polish-view-menus-sqlite-…` — prior
 - `xanatoo-249.*-polish-focus-view-constants-…` — prior
-- `xanatoo-250.*-outline-scroll-box-top-…` — this delivery
+- `xanatoo-250.*-outline-scroll-box-top-…` — prior
+- `xanatoo-251.*-classic-scrollbar-marks-…` — this delivery

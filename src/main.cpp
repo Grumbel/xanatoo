@@ -280,6 +280,9 @@ int main(int argc, char** argv) {
   bool dragging_split = false;
   bool dragging_scroll = false;
   int scroll_drag_pane = 0;
+  // Classic BeOS / GNOME 2–style document scrollbar (wider + arrow buttons).
+  const int kSbW = 14;
+  const int kSbArrow = 14;
   bool dragging_image = false;
   xanatoo::NodeId resize_image = xanatoo::INVALID_NODE;
   float resize_start_x = 0.f;
@@ -2741,25 +2744,42 @@ int main(int argc, char** argv) {
             float mx = static_cast<float>(ev.button.x);
             float my = content_y(static_cast<float>(ev.button.y));
 
-            // Drag scrollbar (right edge of a pane)?
+            // Classic scrollbar (right edge): arrows page, track jumps/drags.
             {
               int pi = pane_at(mx);
-              int sx = panes[pi].x + panes[pi].w - 8;
+              int sx = panes[pi].x + panes[pi].w - kSbW;
               // `my` is content Y (0 at top of viewport). Usable height excludes
               // the menu/toolbar and the status bar.
-              float view_h = static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
+              float view_h =
+                  static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
               if (mx >= sx && my >= 0.f && my < view_h) {
                 focus = pi;
+                Pane& sp = panes[pi];
+                float content_h =
+                    std::max(view_h, sp.layout.content_height);
+                float max_s = std::max(0.f, content_h - view_h + 40.f);
+                const float step =
+                    static_cast<float>(body_font.line_height()) * 3.f;
+                if (my < static_cast<float>(kSbArrow)) {
+                  sp.scroll_y = std::max(0.f, sp.scroll_y - step);
+                  ensure_virtual_layout(sp);
+                  break;
+                }
+                if (my >= view_h - static_cast<float>(kSbArrow)) {
+                  sp.scroll_y = std::min(max_s, sp.scroll_y + step);
+                  ensure_virtual_layout(sp);
+                  break;
+                }
                 dragging_scroll = true;
                 scroll_drag_pane = pi;
-                // Jump scroll so the thumb tracks the click position.
-                float content_h =
-                    std::max(view_h, panes[pi].layout.content_height);
-                float max_s = std::max(0.f, content_h - view_h + 40.f);
-                float ratio = (view_h > 0.f) ? (my / view_h) : 0.f;
+                // Jump so the thumb tracks the click on the track (between arrows).
+                float track_h =
+                    std::max(1.f, view_h - 2.f * static_cast<float>(kSbArrow));
+                float track_my = my - static_cast<float>(kSbArrow);
+                float ratio = track_my / track_h;
                 ratio = std::max(0.f, std::min(1.f, ratio));
-                panes[pi].scroll_y = ratio * max_s;
-                ensure_virtual_layout(panes[pi]);
+                sp.scroll_y = ratio * max_s;
+                ensure_virtual_layout(sp);
                 break;
               }
             }
@@ -3353,12 +3373,16 @@ int main(int argc, char** argv) {
           }
 
           if (dragging_scroll) {
-            float my = content_y(mouse_y);
+            float my = mouse_y - ui_top;
             Pane& sp = panes[scroll_drag_pane];
-            float view_h = static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
+            float view_h =
+                static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
             float content_h = std::max(view_h, sp.layout.content_height);
             float max_s = std::max(0.f, content_h - view_h + 40.f);
-            float ratio = (view_h > 0.f) ? (my / view_h) : 0.f;
+            float track_h =
+                std::max(1.f, view_h - 2.f * static_cast<float>(kSbArrow));
+            float track_my = my - static_cast<float>(kSbArrow);
+            float ratio = track_my / track_h;
             ratio = std::max(0.f, std::min(1.f, ratio));
             sp.scroll_y = ratio * max_s;
             ensure_virtual_layout(sp);
@@ -7546,22 +7570,120 @@ int main(int argc, char** argv) {
         }
       }
 
-      // Scrollbar thumb (in the content band below the toolbar)
+      // Classic scrollbar: track, ↑/↓, chapter/search markers, thumb.
       {
-        float view_h = static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
+        float view_h =
+            static_cast<float>(win_h - status_bar_h) - ui_top - ui_bottom;
         if (view_h < 1.f) view_h = 1.f;
         float content_h = std::max(view_h, pane.layout.content_height);
-        float thumb_h = std::max(24.f, view_h * (view_h / content_h));
-        float track = std::max(0.f, view_h - thumb_h);
-        float ratio = (max_scroll > 0.f) ? (pane.scroll_y / max_scroll) : 0.f;
-        float thumb_y = ui_top + ratio * track;
-        int sx = pane.x + pane.w - 6;
-        SDL_SetRenderDrawColor(sdl, 190, 188, 180, 255);
-        SDL_Rect track_r{sx, static_cast<int>(ui_top), 5, static_cast<int>(view_h)};
+        const float arrow = static_cast<float>(kSbArrow);
+        float track_h = std::max(1.f, view_h - 2.f * arrow);
+        // Thumb sized against full view; position on track between arrows.
+        float thumb_h = std::max(
+            20.f, track_h * (view_h / content_h));
+        if (thumb_h > track_h) thumb_h = track_h;
+        float track_travel = std::max(0.f, track_h - thumb_h);
+        float ratio =
+            (max_scroll > 0.f) ? (pane.scroll_y / max_scroll) : 0.f;
+        float thumb_y = ui_top + arrow + ratio * track_travel;
+        int sx = pane.x + pane.w - kSbW;
+        int top = static_cast<int>(ui_top);
+        int vh = static_cast<int>(view_h);
+
+        // Track (bevelled trough)
+        SDL_SetRenderDrawColor(sdl, 210, 208, 200, 255);
+        SDL_Rect track_r{sx, top, kSbW, vh};
         SDL_RenderFillRect(sdl, &track_r);
-        SDL_SetRenderDrawColor(sdl, 120, 118, 110, 255);
-        SDL_Rect thumb{sx, static_cast<int>(thumb_y), 5, static_cast<int>(thumb_h)};
+        SDL_SetRenderDrawColor(sdl, 160, 158, 150, 255);
+        SDL_RenderDrawRect(sdl, &track_r);
+
+        // Metadata marks on the track (doc Y → track fraction).
+        auto mark_at = [&](float doc_y, int r, int g, int b) {
+          if (content_h < 1.f) return;
+          float frac = std::max(0.f, std::min(1.f, doc_y / content_h));
+          int my = top + static_cast<int>(arrow + frac * track_h);
+          if (my < top + static_cast<int>(arrow) ||
+              my > top + vh - static_cast<int>(arrow))
+            return;
+          SDL_SetRenderDrawColor(sdl, r, g, b, 255);
+          SDL_Rect tick{sx + 1, my - 1, kSbW - 2, 2};
+          SDL_RenderFillRect(sdl, &tick);
+        };
+        // Chapter / section breaks (ensure outline is available even if panel closed).
+        if (outline.empty()) {
+          xanatoo::collect_outline(doc_of(pane), outline, &folded_sections);
+        }
+        if (!outline.empty()) {
+          for (const auto& e : outline) {
+            xanatoo::NodeId id = e.node;
+            if (id == xanatoo::INVALID_NODE) id = e.section;
+            for (const auto& box : pane.layout.boxes) {
+              if (box.node == id) {
+                // Level-1 sections a bit stronger.
+                if (e.level <= 1)
+                  mark_at(box.y, 25, 90, 170);
+                else
+                  mark_at(box.y, 140, 160, 190);
+                break;
+              }
+            }
+          }
+        }
+        // Search hits (cheap capped scan while leap search is active).
+        if (search_mode && !search_query.empty() &&
+            &pane == &panes[focus]) {
+          xanatoo::Caret from{};
+          size_t mlen = 0;
+          for (int n = 0; n < 48; ++n) {
+            auto hit = xanatoo::find_next(doc_of(pane), search_query, from,
+                                          mlen);
+            if (!hit) break;
+            auto cpos = xanatoo::caret_screen_pos(
+                pane.layout, *hit, 0.f,
+                static_cast<float>(body_font.line_height()));
+            if (cpos.valid) mark_at(cpos.y, 200, 120, 40);
+            from = *hit;
+            from.char_index += (mlen > 0 ? mlen : 1);
+          }
+        }
+        // Caret position on the focused pane.
+        if (&pane == &panes[focus]) {
+          auto cpos = xanatoo::caret_screen_pos(
+              pane.layout, pane.sel.focus, 0.f,
+              static_cast<float>(body_font.line_height()));
+          if (cpos.valid) mark_at(cpos.y, 40, 140, 70);
+        }
+
+        // ↑ / ↓ buttons
+        auto draw_arrow_btn = [&](int by, bool up) {
+          SDL_SetRenderDrawColor(sdl, 230, 228, 220, 255);
+          SDL_Rect btn{sx, by, kSbW, kSbArrow};
+          SDL_RenderFillRect(sdl, &btn);
+          SDL_SetRenderDrawColor(sdl, 120, 118, 110, 255);
+          SDL_RenderDrawRect(sdl, &btn);
+          int cx = sx + kSbW / 2;
+          int cy = by + kSbArrow / 2;
+          SDL_SetRenderDrawColor(sdl, 60, 58, 50, 255);
+          if (up) {
+            SDL_RenderDrawLine(sdl, cx, cy - 3, cx - 4, cy + 2);
+            SDL_RenderDrawLine(sdl, cx, cy - 3, cx + 4, cy + 2);
+            SDL_RenderDrawLine(sdl, cx - 4, cy + 2, cx + 4, cy + 2);
+          } else {
+            SDL_RenderDrawLine(sdl, cx, cy + 3, cx - 4, cy - 2);
+            SDL_RenderDrawLine(sdl, cx, cy + 3, cx + 4, cy - 2);
+            SDL_RenderDrawLine(sdl, cx - 4, cy - 2, cx + 4, cy - 2);
+          }
+        };
+        draw_arrow_btn(top, true);
+        draw_arrow_btn(top + vh - kSbArrow, false);
+
+        // Thumb
+        SDL_SetRenderDrawColor(sdl, 150, 148, 140, 255);
+        SDL_Rect thumb{sx + 1, static_cast<int>(thumb_y), kSbW - 2,
+                       std::max(8, static_cast<int>(thumb_h))};
         SDL_RenderFillRect(sdl, &thumb);
+        SDL_SetRenderDrawColor(sdl, 90, 88, 80, 255);
+        SDL_RenderDrawRect(sdl, &thumb);
       }
     }
 
