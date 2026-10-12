@@ -6,7 +6,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **239** (this delivery is **238**)
+Next bundle number: **240** (this delivery is **239**)
+
+## Status (2026-10-12)
+
+Backlinks hit-test: drop unused `cx`/`ch` (only `cy` used for row pick).
 
 ## Status (2026-10-12)
 
@@ -648,4 +652,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-224.*-fix-fold-compile-…` — prior
 - `xanatoo-225.*-brainstorm-doc-…` — prior
 - `xanatoo-237.*-epub-import-…` — prior
-- `xanatoo-238.*-fix-compile-order-braces-…` — this delivery
+- `xanatoo-238.*-fix-compile-order-braces-…` — prior
+- `xanatoo-239.*-backlinks-unused-vars-…` — this delivery

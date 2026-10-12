@@ -2160,9 +2160,7 @@ int main(int argc, char** argv) {
               }
               if (inside) {
                 const int title_h = help_title_h;
-                const int pad = 8;
-                int cx = bl_x + pad, cy = bl_y + title_h + 4;
-                int ch = bl_h - title_h - pad - 4;
+                const int cy = bl_y + title_h + 4;
                 const float step = 22.f;
                 int row = static_cast<int>(
                     (static_cast<float>(myw - cy) + bl_scroll) / step);
