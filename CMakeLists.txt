@@ -187,6 +187,7 @@ add_executable(xanatoo_tests
   src/document.cpp
   src/parse.cpp
   src/org.cpp
+  src/editor.cpp
   src/reddit.cpp
   src/lemmy.cpp
   src/nostr.cpp
@@ -194,6 +195,7 @@ add_executable(xanatoo_tests
 )
 target_include_directories(xanatoo_tests PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${SDL2_INCLUDE_DIRS}
 )
 # Detection/parse APIs compile without OpenSSL clients.
 target_compile_definitions(xanatoo_tests PRIVATE

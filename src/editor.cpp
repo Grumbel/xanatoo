@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/editor.hpp"
+#include "xanatoo/layout.hpp"
 #include "xanatoo/util.hpp"
 #include <cctype>
 #include <cmath>
@@ -1260,8 +1261,7 @@ std::string address_label(const Document& doc, NodeId id) {
     std::string out;
     bool sp = false;
     for (char c : t) {
-      if (c == ' ' || c == '	' || c == '
-' || c == '') {
+      if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
         sp = true;
         continue;
       }

@@ -3,7 +3,6 @@
 #pragma once
 
 #include "xanatoo/types.hpp"
-#include "xanatoo/layout.hpp"
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -12,6 +11,9 @@
 #include <deque>
 
 namespace xanatoo {
+
+struct LayoutResult;  // layout.hpp — avoid SDL pull for unit tests
+
 
 // Caret is pure document data — never stores pixels.
 struct Caret {
