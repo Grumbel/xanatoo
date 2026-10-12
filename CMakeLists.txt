@@ -48,6 +48,7 @@ add_executable(xanatoo
   src/images.cpp
   src/ui.cpp
   src/util.cpp
+  src/minibuffer.cpp
   src/cli.cpp
   src/gemini.cpp
   src/nostr.cpp
@@ -177,6 +178,7 @@ install(DIRECTORY examples/
 add_executable(xanatoo_tests
   tests/unit_tests.cpp
   src/util.cpp
+  src/minibuffer.cpp
   src/document.cpp
   src/parse.cpp
   src/org.cpp

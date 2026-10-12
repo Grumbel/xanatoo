@@ -6,9 +6,12 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **229** (this delivery is **228**)
+Next bundle number: **230** (this delivery is **229**)
 
 ## Status (2026-10-12)
+
+Minibuffer: Tab path completion, ↑↓ history (persisted under ~/.config/xanatoo/), cursor editing (C-a/e/k/u/w).
+
 
 nix develop: verbose shellHook banner + expanded docs/ENVIRONMENT.md (biltoo/Pingus pattern write-up).
 

@@ -16,6 +16,7 @@
 #include "xanatoo/images.hpp"
 #include "xanatoo/ui.hpp"
 #include "xanatoo/util.hpp"
+#include "xanatoo/minibuffer.hpp"
 #include "xanatoo/cli.hpp"
 
 #include <SDL.h>
@@ -355,6 +356,37 @@ int main(int argc, char** argv) {
   bool open_file_mode = false;  // File→Open into focused pane (status-bar path)
   bool url_bar_mode = false;    // Ctrl+L — open gemini:// or file path
   std::string url_bar_buf;
+  // Shared Emacs-style minibuffer for path/URL prompts (cursor, Tab, history).
+  xanatoo::Minibuffer minibuf;
+  std::vector<std::string> minibuf_hist_path =
+      xanatoo::load_minibuffer_history("path");
+  std::vector<std::string> minibuf_hist_url =
+      xanatoo::load_minibuffer_history("url");
+  auto minibuf_active = [&]() {
+    return open_file_mode || save_as_mode || path_in_window_mode ||
+           url_bar_mode || image_insert_mode || include_insert_mode;
+  };
+  auto minibuf_begin = [&](const std::string& initial = {}) {
+    minibuf.clear();
+    if (!initial.empty()) minibuf.set_text(initial);
+  };
+  auto minibuf_commit_path_hist = [&]() {
+    xanatoo::push_minibuffer_history(minibuf_hist_path, minibuf.text);
+    xanatoo::save_minibuffer_history("path", minibuf_hist_path);
+  };
+  auto minibuf_commit_url_hist = [&]() {
+    xanatoo::push_minibuffer_history(minibuf_hist_url, minibuf.text);
+    xanatoo::save_minibuffer_history("url", minibuf_hist_url);
+  };
+  // Sync legacy string buffers from minibuf (Enter handlers still read them).
+  auto minibuf_sync_out = [&]() {
+    if (open_file_mode) open_file_buf = minibuf.text;
+    if (save_as_mode) save_as_path = minibuf.text;
+    if (path_in_window_mode) path_in_window_buf = minibuf.text;
+    if (url_bar_mode) url_bar_buf = minibuf.text;
+    if (image_insert_mode) image_insert_path = minibuf.text;
+    if (include_insert_mode) include_insert_src = minibuf.text;
+  };
   std::string gemini_current_url;  // base for relative gemini links
   std::vector<std::string> nav_history;
   int nav_hist_pos = -1;  // index into nav_history
@@ -1096,6 +1128,7 @@ int main(int argc, char** argv) {
       if (resp->status == 10 || resp->status == 11) {
         // Input request — open URL bar with query for the user to complete.
         url_bar_mode = true;
+        minibuf_begin(url_bar_buf);
         url_bar_buf = resp->final_url;
         if (!url_bar_buf.empty() && url_bar_buf.back() != '?')
           url_bar_buf.push_back('?');
@@ -3041,30 +3074,15 @@ int main(int argc, char** argv) {
         case SDL_TEXTINPUT: {
           // Status-bar prompts own typing even when ImGui still reports capture
           // (menu bar / toolbar focus must not steal path or search input).
-          if (save_as_mode) {
-            save_as_path += ev.text.text;
+          if (minibuf_active()) {
+            minibuf.insert_utf8(ev.text.text);
+            minibuf_sync_out();
             break;
           }
-          if (path_in_window_mode) {
-            path_in_window_buf += ev.text.text;
-            break;
-          }
-          if (open_file_mode) {
-            open_file_buf += ev.text.text;
-            break;
-          }
-          if (url_bar_mode) {
-            url_bar_buf += ev.text.text;
-            break;
-          }
-          if (image_insert_mode) {
-            image_insert_path += ev.text.text;
-            break;
-          }
-          if (include_insert_mode) {
-            include_insert_src += ev.text.text;
-            break;
-          }
+
+          
+          
+          
           if (link_edit_mode) {
             link_edit_href += ev.text.text;
             break;
@@ -3389,6 +3407,79 @@ int main(int argc, char** argv) {
             help_mode = false;
             help_dragging = false;
             break;
+          }
+
+
+          // ---- Minibuffer (path/URL prompts): Tab, history, cursor ----
+          if (minibuf_active()) {
+            const SDL_Keycode k = ev.key.keysym.sym;
+            bool used = true;
+            if (k == SDLK_ESCAPE) {
+              open_file_mode = false;
+              save_as_mode = false;
+              path_in_window_mode = false;
+              url_bar_mode = false;
+              image_insert_mode = false;
+              include_insert_mode = false;
+              open_file_buf.clear();
+              save_as_path.clear();
+              path_in_window_buf.clear();
+              url_bar_buf.clear();
+              image_insert_path.clear();
+              include_insert_src.clear();
+              minibuf.clear();
+            } else if (k == SDLK_TAB) {
+              if (url_bar_mode && (minibuf.text.find("://") != std::string::npos)) {
+                // no filesystem completion for remote schemes
+                used = false;
+              } else {
+                minibuf.tab_complete_path();
+                minibuf_sync_out();
+              }
+            } else if (k == SDLK_UP) {
+              if (url_bar_mode)
+                minibuf.history_older(minibuf_hist_url);
+              else
+                minibuf.history_older(minibuf_hist_path);
+              minibuf_sync_out();
+            } else if (k == SDLK_DOWN) {
+              if (url_bar_mode)
+                minibuf.history_newer(minibuf_hist_url);
+              else
+                minibuf.history_newer(minibuf_hist_path);
+              minibuf_sync_out();
+            } else if (k == SDLK_LEFT && !ctrl) {
+              minibuf.move_left();
+            } else if (k == SDLK_RIGHT && !ctrl) {
+              minibuf.move_right();
+            } else if (k == SDLK_HOME || (ctrl && k == SDLK_a)) {
+              minibuf.move_home();
+            } else if (k == SDLK_END || (ctrl && k == SDLK_e)) {
+              minibuf.move_end();
+            } else if (ctrl && k == SDLK_k) {
+              minibuf.kill_to_end();
+              minibuf_sync_out();
+            } else if (ctrl && k == SDLK_u) {
+              minibuf.kill_line();
+              minibuf_sync_out();
+            } else if (ctrl && k == SDLK_w) {
+              minibuf.kill_word_back();
+              minibuf_sync_out();
+            } else if (k == SDLK_BACKSPACE) {
+              if (ctrl)
+                minibuf.kill_word_back();
+              else
+                minibuf.backspace();
+              minibuf_sync_out();
+            } else if (k == SDLK_DELETE) {
+              minibuf.delete_forward();
+              minibuf_sync_out();
+            } else if (k == SDLK_RETURN || k == SDLK_KP_ENTER) {
+              used = false;  // fall through to existing Enter handlers
+            } else {
+              used = false;
+            }
+            if (used) break;
           }
 
           // Outline software window: Esc/toggle close; arrows + 1-9 + Enter
@@ -3815,7 +3906,9 @@ int main(int argc, char** argv) {
                 break;
               }
               if (save_as_mode) {
+                minibuf_sync_out();
                 if (!save_as_path.empty()) {
+                  save_as_path = xanatoo::expand_user_path(save_as_path);
                   while (!save_as_path.empty() &&
                          (static_cast<unsigned char>(save_as_path.back()) & 0xc0) == 0x80)
                     save_as_path.pop_back();
@@ -4009,28 +4102,35 @@ int main(int argc, char** argv) {
                 break;
               }
               if (path_in_window_mode) {
+                minibuf_sync_out();
                 if (!path_in_window_buf.empty()) {
-                  std::string path = path_in_window_buf;
+                  std::string path = xanatoo::expand_user_path(path_in_window_buf);
                   if (!fs::exists(path)) {
                     std::string found = find_repo_file(path.c_str());
                     if (!found.empty()) path = found;
                   }
                   open_browse(path, path);
+                  minibuf_commit_path_hist();
                 }
                 path_in_window_mode = false;
                 path_in_window_buf.clear();
+                minibuf.clear();
                 break;
               }
               if (url_bar_mode) {
+                minibuf_sync_out();
                 std::string target = url_bar_buf;
                 url_bar_mode = false;
                 url_bar_buf.clear();
+                if (!target.empty()) minibuf_commit_url_hist();
+                minibuf.clear();
                 navigate_to_url(std::move(target));
                 break;
               }
               if (open_file_mode) {
+                minibuf_sync_out();
                 if (!open_file_buf.empty()) {
-                  std::string path = open_file_buf;
+                  std::string path = xanatoo::expand_user_path(open_file_buf);
                   if (!fs::exists(path)) {
                     std::string found = find_repo_file(path.c_str());
                     if (!found.empty()) path = found;
@@ -4047,8 +4147,10 @@ int main(int argc, char** argv) {
                       update_title();
                       push_nav_history(path);
                       flash_status("Switched to " + path);
+                      minibuf_commit_path_hist();
                       open_file_mode = false;
                       open_file_buf.clear();
+                      minibuf.clear();
                     } else if (!allow_discard_dirty(p.buf)) {
                       flash_status(
                           "Unsaved changes — Enter again to discard and open");
@@ -4076,6 +4178,7 @@ int main(int argc, char** argv) {
                       push_nav_history(path);
                       flash_status("Opened " + path);
                       std::cout << "Opened: " << path << "\n";
+                      minibuf_commit_path_hist();
                       open_file_mode = false;
                       open_file_buf.clear();
                     }
@@ -4087,7 +4190,9 @@ int main(int argc, char** argv) {
                 break;
               }
               if (save_as_mode) {
+                minibuf_sync_out();
                 if (!save_as_path.empty()) {
+                  save_as_path = xanatoo::expand_user_path(save_as_path);
                   std::string text = xanatoo::serialize_document(d, save_as_path);
                   std::ofstream out(save_as_path);
                   if (!out) {
@@ -4100,14 +4205,18 @@ int main(int argc, char** argv) {
                     update_title();
                     flash_status("Saved as " + save_as_path);
                     std::cout << "Saved as: " << save_as_path << "\n";
+                    minibuf_commit_path_hist();
                   }
                 }
                 save_as_mode = false;
                 save_as_path.clear();
+                minibuf.clear();
                 break;
               }
               if (image_insert_mode) {
+                minibuf_sync_out();
                 if (!image_insert_path.empty()) {
+                  image_insert_path = xanatoo::expand_user_path(image_insert_path);
                   edit();
                   bool ok = false;
                   if (image_insert_as_figure) {
@@ -4127,14 +4236,17 @@ int main(int argc, char** argv) {
                     p.sel.anchor = p.sel.focus;
                     needs_layout = true;
                     reset_blink();
+                    minibuf_commit_path_hist();
                   }
                 }
                 image_insert_mode = false;
                 image_insert_as_figure = false;
                 image_insert_path.clear();
+                minibuf.clear();
                 break;
               }
               if (include_insert_mode) {
+                minibuf_sync_out();
                 if (!include_insert_src.empty()) {
                   edit();
                   if (xanatoo::insert_transclude(d, p.sel.focus,
@@ -4144,10 +4256,12 @@ int main(int argc, char** argv) {
                     reset_blink();
                     std::cout << "Inserted include: " << include_insert_src
                               << "\n";
+                    minibuf_commit_path_hist();
                   }
                 }
                 include_insert_mode = false;
                 include_insert_src.clear();
+                minibuf.clear();
                 break;
               }
               // Ctrl+Enter: new empty paragraph after current block
@@ -4538,6 +4652,7 @@ int main(int argc, char** argv) {
             case SDLK_s:
               if (ctrl && shift) {
                 save_as_mode = true;
+                minibuf_begin(save_as_path);
                 search_mode = false;
                 save_as_path = path_of(p).empty() ? "untitled.md" : path_of(p);
                 break;
@@ -4590,6 +4705,7 @@ int main(int argc, char** argv) {
               }
               if (ctrl) {
                 open_file_mode = true;
+                minibuf_begin();
                 open_file_buf.clear();
                 path_in_window_mode = false;
                 save_as_mode = false;
@@ -4768,6 +4884,7 @@ int main(int argc, char** argv) {
               if (ctrl && shift) {
                 // Insert image — prompt for path in status bar
                 image_insert_mode = true;
+                minibuf_begin();
                 image_insert_path.clear();
                 save_as_mode = false;
                 search_mode = false;
@@ -5169,6 +5286,7 @@ int main(int argc, char** argv) {
         }
         case C::OpenDocument:
           open_file_mode = true;
+          minibuf_begin();
           open_file_buf.clear();
           path_in_window_mode = false;
           save_as_mode = false;
@@ -5335,6 +5453,7 @@ int main(int argc, char** argv) {
           if (spath.empty()) {
             save_as_mode = true;
             save_as_path = "untitled.md";
+            minibuf_begin(save_as_path);
           } else {
             std::string text = xanatoo::serialize_document(d, spath);
             std::ofstream out(spath);
@@ -5353,6 +5472,7 @@ int main(int argc, char** argv) {
           save_as_mode = true;
           search_mode = false;
           save_as_path = path_of(p).empty() ? "untitled.md" : path_of(p);
+          minibuf_begin(save_as_path);
           break;
         case C::ExportSexpr:
         case C::ExportMarkdown: {
@@ -5369,6 +5489,7 @@ int main(int argc, char** argv) {
             if (fp.has_parent_path() && !fp.parent_path().empty())
               save_as_path = (fp.parent_path() / (fp.stem().string() + ext)).string();
           }
+          minibuf_begin(save_as_path);
           break;
         }
         case C::Reload:
@@ -5659,6 +5780,7 @@ int main(int argc, char** argv) {
           break;
         case C::InsertTransclude: {
           include_insert_mode = true;
+          minibuf_begin();
           include_insert_src.clear();
           if (!p.sel.empty()) {
             std::string t = xanatoo::selected_text(d, p.sel);
@@ -5669,11 +5791,13 @@ int main(int argc, char** argv) {
         }
         case C::InsertImage:
           image_insert_mode = true;
+          minibuf_begin();
           image_insert_as_figure = false;
           image_insert_path.clear();
           break;
         case C::InsertFigure:
           image_insert_mode = true;
+          minibuf_begin();
           image_insert_as_figure = true;
           image_insert_path.clear();
           break;
@@ -5920,6 +6044,7 @@ int main(int argc, char** argv) {
         }
         case C::OpenInWindow:
           path_in_window_mode = true;
+          minibuf_begin();
           path_in_window_buf.clear();
           break;
         case C::OpenExample: {
@@ -6736,33 +6861,38 @@ int main(int argc, char** argv) {
       uint8_t tr = 40, tg = 40, tb = 45;
       if (path_in_window_mode) {
         label = "Open in window: ";
-        label += path_in_window_buf.empty() ? "…" : path_in_window_buf;
-        label += "    Enter open · Esc cancel";
+        label += minibuf.display_with_cursor();
+        label += "    Tab complete · ↑↓ history · Enter · Esc";
+        label += minibuf.status_hint();
         tr = 220; tg = 230; tb = 245;
       } else if (open_file_mode) {
         label = "Open file: ";
-        label += open_file_buf.empty() ? "…" : open_file_buf;
-        label += "    Enter open · Esc cancel";
+        label += minibuf.display_with_cursor();
+        label += "    Tab complete · ↑↓ history · Enter · Esc";
+        label += minibuf.status_hint();
         tr = 220; tg = 230; tb = 245;
       } else if (url_bar_mode) {
         label = "URL: ";
-        label += url_bar_buf.empty() ? "…" : url_bar_buf;
-        label += "    Enter go · Esc cancel · gemini:// or path";
+        label += minibuf.display_with_cursor();
+        label += "    ↑↓ history · Enter · Esc · gemini:// or path";
+        label += minibuf.status_hint();
         tr = 220; tg = 230; tb = 245;
       } else if (save_as_mode) {
         label = "Save as: ";
-        label += save_as_path.empty() ? "…" : save_as_path;
-        label += "    Enter confirm · Esc cancel";
+        label += minibuf.display_with_cursor();
+        label += "    Tab complete · ↑↓ history · Enter · Esc";
+        label += minibuf.status_hint();
         tr = 220; tg = 230; tb = 245;
       } else if (image_insert_mode) {
         label = image_insert_as_figure ? "Figure image path: " : "Image path: ";
-        label += image_insert_path.empty() ? "…" : image_insert_path;
-        label += "    Enter insert · Esc cancel";
+        label += minibuf.display_with_cursor();
+        label += "    Tab complete · ↑↓ history · Enter · Esc";
+        label += minibuf.status_hint();
         tr = 220; tg = 230; tb = 245;
       } else if (include_insert_mode) {
         label = "Include: ";
-        label += include_insert_src.empty() ? "…" : include_insert_src;
-        label += "    (#Heading · file.md · file.md#Heading)  Enter · Esc";
+        label += minibuf.display_with_cursor();
+        label += "    Tab · ↑↓ · Enter · Esc  (#H · file.md · file.md#H) · Esc";
         tr = 220; tg = 230; tb = 245;
       } else if (link_edit_mode) {
         if (link_edit_is_cite) {
