@@ -736,23 +736,14 @@ void test_layout_wrap_respects_max_width() {
   const float right = layout_w - opts.margin_x;
   float max_right = left;
   for (const auto& g : lr.glyphs) {
-    // advance is 26.6 fixed; visual right ≈ x - bearing + width, fall back to advance
-    float glyph_right = g.x;
-    // PositionedGlyph may not expose bearing; use x as left of ink approx and
-    // advance from a fresh measure is unavailable — use char as 0-width safe:
-    // the layout stores baseline x as the pen position including bearing_x already
-    // in pg.x = lx + bearing_x. Next advance was added to lx. Approximate right
-    // edge as x + a conservative max of advance using font.
+    // pg.x = pen + bearing_x; cell right = pen + advance.
     Font& f = fonts.pick(g.font);
     const Glyph& met = f.glyph(g.codepoint);
     float adv = static_cast<float>(met.advance >> 6);
     float ink_r = g.x - static_cast<float>(met.bearing_x) +
                   static_cast<float>(met.width);
-    float edge = std::max(g.x + adv * 0.01f, ink_r);
-    // pen position for this glyph started at g.x - bearing_x; right of cell is
-    // pen + advance.
     float cell_r = g.x - static_cast<float>(met.bearing_x) + adv;
-    edge = std::max(edge, cell_r);
+    float edge = std::max(ink_r, cell_r);
     if (edge > max_right) max_right = edge;
     EXPECT(edge <= right + 1.5f);
   }

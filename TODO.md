@@ -6,7 +6,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **259** (this delivery is **258**)
+Next bundle number: **260** (this delivery is **259**)
+
+## Status (2026-10-12)
+
+Silence unused `glyph_right` in layout wrap unit test.
 
 ## Status (2026-10-12)
 
@@ -783,4 +787,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-255.*-justify-quality-gutter-…` — prior
 - `xanatoo-256.*-wrap-width-test-clip-…` — prior
 - `xanatoo-257.*-fix-tests-images-link-…` — prior
-- `xanatoo-258.*-fix-tests-stb-include-…` — this delivery
+- `xanatoo-258.*-fix-tests-stb-include-…` — prior
+- `xanatoo-259.*-fix-wrap-test-warning-…` — this delivery
