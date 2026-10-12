@@ -6,7 +6,7 @@ A lightweight, realtime, editable document system built with **C++20**, **SDL2**
 and **FreeType**. Inspired by Markdown, classical typesetting, Ted Nelson's
 hypertext ideas, HyperCard, and the Canon Cat.
 
-See [PROPOSAL.md](PROPOSAL.md) for the full vision. Local-only for now.
+See [PROPOSAL.md](PROPOSAL.md) for the full vision. Design brainstorm (structure, links, transclusion, identity): [docs/BRAINSTORM.md](docs/BRAINSTORM.md). Local-only for now.
 
 ![xanatoo screenshot](docs/screenshot.png)
 

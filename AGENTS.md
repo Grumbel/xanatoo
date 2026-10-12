@@ -82,6 +82,7 @@ Dear ImGui is allowed for chrome (menus/toolbars). No Qt/GTK/KDE.
 ## Continuity
 
 Read `TODO.md` first. Record plans and outcomes there.
+Longer design notes: `docs/BRAINSTORM.md`.
 Handover is via cumulative git bundles only.
 Bundle names: `xanatoo-NNN.description-BASE.bundle` (formerly `glyphtoo-NNN…`).
 

@@ -6,9 +6,13 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **224** (this delivery is **223**)
+Next bundle number: **226** (this delivery is **225**)
 
 ## Status (2026-10-12)
+
+Design brainstorm captured in `docs/BRAINSTORM.md` (galleries, transclusion, identity, Xanadu-style links, SQLite direction).
+
+## Status (2026-10-12) — continued
 
 Large-document virtualization (v1): viewport-scoped sequential layout with
 per-pane block height cache. Off-screen sequential blocks skip glyph
@@ -611,3 +615,5 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-219.*-more-markup-tests-…` — prior
 - `xanatoo-220.*-nix-develop-helpers-…` — prior
 - `xanatoo-221.*-layout-virtualization-…` — this delivery
+- `xanatoo-224.*-fix-fold-compile-…` — prior
+- `xanatoo-225.*-brainstorm-doc-…` — this delivery
