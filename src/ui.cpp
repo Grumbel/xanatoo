@@ -646,6 +646,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleSplit;
       if (ImGui::MenuItem("Heading Outline", "Ctrl+Shift+O", state.outline))
         cmd = UiCommand::ToggleOutline;
+      ImGui::TextDisabled("  Ctrl+Alt+O docks outline | body");
       if (ImGui::MenuItem("Backlinks", "Ctrl+Alt+B", state.backlinks))
         cmd = UiCommand::ToggleBacklinks;
       if (ImGui::MenuItem("Diff Marks", "Ctrl+Shift+D", state.diff, state.can_diff))
@@ -972,6 +973,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleSplit;
       if (ImGui::MenuItem("Heading outline", "Ctrl+Shift+O", state.outline))
         cmd = UiCommand::ToggleOutline;
+      ImGui::TextDisabled("  Ctrl+Alt+O docks outline left (body right)");
       if (ImGui::MenuItem("Backlinks", "Ctrl+Alt+B", state.backlinks))
         cmd = UiCommand::ToggleBacklinks;
       menu_item_cmd("Open include → other pane", UiCommand::OpenTranscludeOther,

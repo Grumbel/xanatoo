@@ -73,8 +73,11 @@ target_include_directories(xanatoo PRIVATE
   ${FONTCONFIG_INCLUDE_DIRS}
 )
 
+find_package(SQLite3 REQUIRED)
+
 target_link_libraries(xanatoo PRIVATE
   ${SDL2_LIBRARIES}
+  SQLite::SQLite3
   Freetype::Freetype
   ${FONTCONFIG_LIBRARIES}
 )

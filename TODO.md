@@ -6,7 +6,11 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **233** (this delivery is **232**)
+Next bundle number: **234** (this delivery is **233**)
+
+## Status (2026-10-12)
+
+Docked dual-pane outline (Ctrl+Shift+O; Ctrl+Alt+O toggles float/dock). SQLite side store for section folds (~/.config/xanatoo/sidestore.sqlite).
 
 ## Status (2026-10-12)
 

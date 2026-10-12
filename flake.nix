@@ -34,6 +34,7 @@
               freetype
               fontconfig
               openssl
+              sqlite
               # Prefer top-level libx11; xorg.* package set is deprecated.
               libx11
               libGL
@@ -125,7 +126,7 @@
             # missing SDL3 → SIGABRT in dllinit() before main(). Prefer the
             # nixpkgs set that matches the linked SDL2.
             export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath (with pkgs; [
-              SDL2 sdl3 libx11 libGL freetype fontconfig openssl
+              SDL2 sdl3 libx11 libGL freetype fontconfig openssl sqlite
             ])}''${XANATOO_EXTRA_LD_LIBRARY_PATH:+:$XANATOO_EXTRA_LD_LIBRARY_PATH}"
           '';
 
@@ -257,7 +258,7 @@ except Exception:
               export XANATOO_ICON_DIR="''${XANATOO_ICON_DIR:-$XANATOO_BUILD_DIR/icons}"
               export XANATOO_DATA_DIR="''${XANATOO_DATA_DIR:-$XANATOO_SOURCE}"
               export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath (with pkgs; [
-                SDL2 sdl3 libx11 libGL freetype fontconfig openssl
+                SDL2 sdl3 libx11 libGL freetype fontconfig openssl sqlite
               ])}''${XANATOO_EXTRA_LD_LIBRARY_PATH:+:$XANATOO_EXTRA_LD_LIBRARY_PATH}"
               # Prefer ccache when available (ccacheStdenv or explicit launcher).
               if command -v ccache >/dev/null 2>&1; then

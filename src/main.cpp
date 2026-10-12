@@ -17,6 +17,7 @@
 #include "xanatoo/ui.hpp"
 #include "xanatoo/util.hpp"
 #include "xanatoo/minibuffer.hpp"
+#include "xanatoo/sidestore.hpp"
 #include "xanatoo/cli.hpp"
 
 #include <SDL.h>
@@ -419,6 +420,8 @@ int main(int argc, char** argv) {
   const int help_edge = 6;  // hit thickness for edges/corner
   // Heading outline as a software window (Ctrl+Shift+O) — same chrome as Help.
   bool outline_mode = false;
+  bool outline_docked = true;  // dual-pane outline | body (vs floating chrome)
+  int outline_dock_w = 280;
   std::vector<xanatoo::OutlineEntry> outline;
   int outline_sel = 0;
   // Same-doc backlinks soft window (Ctrl+Shift+B).
@@ -430,6 +433,7 @@ int main(int argc, char** argv) {
   float bl_scroll = 0.f;
   // View-local Section/Article fold (not in the document; future: SQLite).
   std::unordered_set<xanatoo::NodeId> folded_sections;
+  std::string last_fold_doc_key;
   int ol_x = 40, ol_y = 100, ol_w = 320, ol_h = 420;
   bool ol_dragging = false;
   int ol_drag_dx = 0, ol_drag_dy = 0;
@@ -702,10 +706,28 @@ int main(int argc, char** argv) {
     if (n.kind != xanatoo::NodeKind::Section &&
         n.kind != xanatoo::NodeKind::Article)
       return;
-    if (folded_sections.count(section))
-      folded_sections.erase(section);
-    else
+    const bool now_folded = !folded_sections.count(section);
+    if (now_folded)
       folded_sections.insert(section);
+    else
+      folded_sections.erase(section);
+    needs_layout = true;
+    if (outline_mode) refresh_outline();
+    // Persist view-local fold in side SQLite (documents stay immutable).
+    std::string doc_key = path_of(F());
+    if (!doc_key.empty()) {
+      std::string sk = xanatoo::section_stable_key(d, section);
+      xanatoo::save_section_fold(doc_key, sk, now_folded);
+    }
+  };
+
+  auto reload_folds_for_focused = [&]() {
+    folded_sections.clear();
+    std::string doc_key = path_of(F());
+    if (doc_key.empty()) return;
+    std::unordered_set<std::string> keys;
+    xanatoo::load_section_folds(doc_key, keys);
+    xanatoo::folds_keys_to_ids(doc_of(F()), keys, folded_sections);
     needs_layout = true;
     if (outline_mode) refresh_outline();
   };
@@ -840,19 +862,23 @@ int main(int argc, char** argv) {
   };
 
   auto layout_panes = [&]() {
-    const int ww = std::max(64, win_w);
+    const int dock =
+        (outline_mode && outline_docked)
+            ? std::max(160, std::min(outline_dock_w, win_w / 2))
+            : 0;
+    const int ww = std::max(64, win_w - dock);
     const int gutter = split ? 6 : 0;
     if (split) {
       int left_w = static_cast<int>(split_ratio * (ww - gutter));
       left_w = std::max(120, std::min(ww - gutter - 120, left_w));
-      panes[0].x = 0;
+      panes[0].x = dock;
       panes[0].w = left_w;
-      panes[1].x = left_w + gutter;
-      panes[1].w = ww - panes[1].x;
+      panes[1].x = dock + left_w + gutter;
+      panes[1].w = ww - left_w - gutter;
     } else {
-      panes[0].x = 0;
+      panes[0].x = dock;
       panes[0].w = ww;
-      panes[1].x = 0;
+      panes[1].x = dock;
       panes[1].w = 0;
     }
     // Clamp pane buffer indices if tabs were closed out from under them.
@@ -1814,6 +1840,13 @@ int main(int argc, char** argv) {
   auto content_y = [&](float window_y) { return window_y - ui_top; };
 
   auto outline_client_rect = [&]() {
+    if (outline_docked && outline_mode) {
+      const int top = static_cast<int>(ui_top);
+      const int h = win_h - status_bar_h - top;
+      return std::tuple{help_pad, top + help_title_h + 4,
+                        outline_dock_w - help_pad * 2,
+                        h - help_title_h - help_pad - 4};
+    }
     return std::tuple{ol_x + help_pad, ol_y + help_title_h + 4,
                       ol_w - help_pad * 2,
                       ol_h - help_title_h - help_pad - 4};
@@ -4843,12 +4876,25 @@ int main(int argc, char** argv) {
               break;
 
             case SDLK_o:
+              if (ctrl && alt) {
+                outline_docked = !outline_docked;
+                if (outline_mode) {
+                  needs_layout = true;
+                  layout_panes();
+                }
+                flash_status(outline_docked ? "Outline docked (left)"
+                                            : "Outline floating");
+                break;
+              }
               if (ctrl && shift) {
                 outline_mode = !outline_mode;
                 if (outline_mode) {
                   refresh_outline();
                   outline_sel = 0;
                   ol_scroll = 0.f;
+                }
+                needs_layout = true;
+                layout_panes();
                   // Prefer selecting the heading nearest the caret
                   for (int i = 0; i < static_cast<int>(outline.size()); ++i) {
                     if (outline[static_cast<size_t>(i)].node ==
@@ -5263,6 +5309,19 @@ int main(int argc, char** argv) {
 
     if (needs_layout && win_w >= 64 && win_h >= 64) {
       layout_panes();
+      {
+        std::string dk = path_of(F());
+        if (dk != last_fold_doc_key) {
+          last_fold_doc_key = dk;
+          folded_sections.clear();
+          if (!dk.empty()) {
+            std::unordered_set<std::string> keys;
+            xanatoo::load_section_folds(dk, keys);
+            xanatoo::folds_keys_to_ids(doc_of(F()), keys, folded_sections);
+          }
+          needs_layout = true;
+        }
+      }
       if (outline_mode) refresh_outline();
       if (backlinks_mode) refresh_backlinks();
     }
@@ -6165,6 +6224,8 @@ int main(int argc, char** argv) {
             outline_sel = 0;
             ol_scroll = 0.f;
           }
+          needs_layout = true;
+          layout_panes();
           break;
         case C::ToggleBacklinks:
           backlinks_mode = !backlinks_mode;
@@ -6391,6 +6452,19 @@ int main(int argc, char** argv) {
     // never reference node ids from the previous document tree.
     if (needs_layout && win_w >= 64 && win_h >= 64) {
       layout_panes();
+      {
+        std::string dk = path_of(F());
+        if (dk != last_fold_doc_key) {
+          last_fold_doc_key = dk;
+          folded_sections.clear();
+          if (!dk.empty()) {
+            std::unordered_set<std::string> keys;
+            xanatoo::load_section_folds(dk, keys);
+            xanatoo::folds_keys_to_ids(doc_of(F()), keys, folded_sections);
+          }
+          needs_layout = true;
+        }
+      }
       if (outline_mode) refresh_outline();
       if (backlinks_mode) refresh_backlinks();
     }
@@ -7336,10 +7410,18 @@ label = "Outline — ↑/↓ · ←/→ fold · Enter jump · twisty · Esc";
       }
     }
 
-    // Heading outline software window (Ctrl+Shift+O)
+    // Heading outline: docked dual-pane (left strip) or floating window
     if (outline_mode) {
-      if (ol_w < 200) ol_w = 200;
-      if (ol_h < 140) ol_h = 140;
+      if (outline_docked) {
+        ol_x = 0;
+        ol_y = static_cast<int>(ui_top);
+        ol_w = std::max(160, std::min(outline_dock_w, win_w / 2));
+        ol_h = win_h - status_bar_h - ol_y;
+        outline_dock_w = ol_w;
+      } else {
+        if (ol_w < 200) ol_w = 200;
+        if (ol_h < 140) ol_h = 140;
+      }
       const float step = outline_row_step();
       auto [cx, cy, cw, ch] = outline_client_rect();
       {
@@ -7369,7 +7451,8 @@ label = "Outline — ↑/↓ · ←/→ fold · Enter jump · twisty · Esc";
 
       renderer.draw_text(body_font, static_cast<float>(ol_x + 10),
                          static_cast<float>(ol_y + 6 + body_font.ascender()),
-                         "Outline", 25, 90, 170);
+                         outline_docked ? "Outline · body →" : "Outline", 25, 90,
+                         170);
       renderer.draw_text(body_font, static_cast<float>(ol_x + ol_w - 22),
                          static_cast<float>(ol_y + 6 + body_font.ascender()),
                          "×", 80, 40, 40);
