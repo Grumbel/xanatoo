@@ -63,7 +63,8 @@
                 --set-default XANATOO_FONT \
                   "${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSans.ttf" \
                 --set-default XANATOO_ICON_DIR \
-                  "${xanatoo}/share/xanatoo/icons"
+                  "${xanatoo}/share/xanatoo/icons" \
+                --prefix PATH : "${pkgs.pandoc}/bin"
             '';
             meta = xanatoo.meta;
           };
@@ -249,6 +250,7 @@ except Exception:
               xanatooRun
               xanatooRunGdb
               xanatooTest
+              pandoc  # EPUB → Markdown import (optional at runtime)
             ];
             CMAKE_BUILD_TYPE = "Debug";
             shellHook = ''

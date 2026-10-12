@@ -50,6 +50,7 @@ add_executable(xanatoo
   src/util.cpp
   src/minibuffer.cpp
   src/sidestore.cpp
+  src/epub_import.cpp
   src/cli.cpp
   src/gemini.cpp
   src/nostr.cpp

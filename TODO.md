@@ -6,7 +6,13 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **236** (this delivery is **235**)
+Next bundle number: **237** (this delivery is **236**)
+
+## Status (2026-10-12)
+
+EPUB import via pandoc → GFM Markdown (`content.md` + `--extract-media` under
+`~/.cache/xanatoo/epub-import/`). Original `.epub` stays immutable; buffer path
+is the derived Markdown. Drop / open / CLI accept `.epub` when pandoc is on PATH.
 
 ## Status (2026-10-12)
 

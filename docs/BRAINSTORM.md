@@ -250,3 +250,17 @@ From `TODO.md` / recent tips — not repeated in full:
 When an idea here is implemented, record the outcome in `TODO.md` and trim or
 mark the corresponding brainstorm section so this file stays a **forward** notebook,
 not a second changelog.
+
+
+## EPUB import (implemented path)
+
+EPUB is treated as **immutable**. Opening `.epub` runs:
+
+```bash
+pandoc book.epub -f epub -t gfm -o content.md --extract-media=media
+```
+
+under `~/.cache/xanatoo/epub-import/<stem>-<hash>/`. The editor loads the
+derived Markdown; media paths resolve relative to that directory. Re-import
+is skipped when `content.md` is newer than the EPUB. Requires `pandoc` on
+`PATH` (provided in `nix develop` / wrapped `nix run`).

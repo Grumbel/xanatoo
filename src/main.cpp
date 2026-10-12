@@ -18,6 +18,7 @@
 #include "xanatoo/util.hpp"
 #include "xanatoo/minibuffer.hpp"
 #include "xanatoo/sidestore.hpp"
+#include "xanatoo/epub_import.hpp"
 #include "xanatoo/cli.hpp"
 
 #include <SDL.h>
@@ -99,9 +100,28 @@ int main(int argc, char** argv) {
   xanatoo::Font& body_font = fonts.regular;
 
 
-  auto load_doc = [&](const std::string& path) -> xanatoo::Document {
+  // Resolve EPUB (immutable) → derived Markdown via pandoc; other paths pass through.
+  auto resolve_open_path = [&](std::string path) -> std::string {
+    if (path.empty() || !xanatoo::is_epub_path(path)) return path;
+    auto imp = xanatoo::import_epub_via_pandoc(path);
+    if (!imp.ok) {
+      std::cerr << "EPUB import failed: " << imp.error << "\n";
+      return {};
+    }
+    return imp.markdown_path;
+  };
+
+  auto load_doc = [&](std::string path) -> xanatoo::Document {
     if (path.empty()) {
       return xanatoo::parse_document(xanatoo::fallback_document(), {});
+    }
+    if (xanatoo::is_epub_path(path)) {
+      std::string md = resolve_open_path(path);
+      if (md.empty()) {
+        return xanatoo::parse_document(
+            "# EPUB import failed\n\nInstall **pandoc** and try again.\n", {});
+      }
+      path = std::move(md);
     }
     std::ifstream in(path);
     if (!in) {
@@ -153,13 +173,24 @@ int main(int argc, char** argv) {
         std::cerr << "Note: examples/welcome.md not found; starting empty.\n";
     }
     DocBuffer b0;
-    b0.path = p0;
-    b0.doc = load_doc_or_placeholder(p0);
+    {
+      std::string r0 = resolve_open_path(p0);
+      b0.path = r0.empty() ? p0 : r0;
+      b0.doc = load_doc_or_placeholder(b0.path.empty() ? p0 : b0.path);
+      // If EPUB resolve failed, still attempt load_doc on original for error page.
+      if (xanatoo::is_epub_path(p0) && r0.empty())
+        b0.doc = load_doc(p0);
+    }
     buffers.push_back(std::move(b0));
     if (!p1.empty()) {
       DocBuffer b1;
-      b1.path = p1;
-      b1.doc = load_doc_or_placeholder(p1);
+      {
+        std::string r1 = resolve_open_path(p1);
+        b1.path = r1.empty() ? p1 : r1;
+        b1.doc = load_doc_or_placeholder(b1.path);
+        if (xanatoo::is_epub_path(p1) && r1.empty())
+          b1.doc = load_doc(p1);
+      }
       buffers.push_back(std::move(b1));
     }
   }
@@ -1450,11 +1481,20 @@ int main(int argc, char** argv) {
       }
     }
     if (!allow_discard_dirty(p.buf)) return false;
-    load_into_pane(load_doc(path), path);
-    if (std::find(tab_order.begin(), tab_order.end(), p.buf) == tab_order.end())
-      tab_order.push_back(p.buf);
-    if (record_history) push_nav_history(path);
-    flash_status("Opened " + path);
+    {
+      const bool was_epub = xanatoo::is_epub_path(path);
+      std::string open_path = resolve_open_path(path);
+      if (open_path.empty()) {
+        flash_status("EPUB import failed (need pandoc on PATH)");
+        return false;
+      }
+      load_into_pane(load_doc(open_path), open_path);
+      if (std::find(tab_order.begin(), tab_order.end(), p.buf) == tab_order.end())
+        tab_order.push_back(p.buf);
+      if (record_history) push_nav_history(open_path);
+      flash_status(was_epub ? ("Imported EPUB → " + open_path)
+                            : ("Opened " + open_path));
+    }
     return true;
   };
 
@@ -1962,7 +2002,7 @@ int main(int argc, char** argv) {
               (xanatoo::ends_with(low, ".md") || xanatoo::ends_with(low, ".markdown") ||
                xanatoo::ends_with(low, ".sexp") || xanatoo::ends_with(low, ".txt") ||
                xanatoo::ends_with(low, ".org") || xanatoo::ends_with(low, ".gmi") ||
-               xanatoo::ends_with(low, ".gemini"));
+               xanatoo::ends_with(low, ".gemini") || xanatoo::ends_with(low, ".epub"));
 
           if (is_doc) {
             if (!std::filesystem::exists(fpath)) {
