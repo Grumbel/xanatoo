@@ -2037,6 +2037,12 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
     if (outline_consumed) return;
   }
 
+  // Table-driven shortcuts share the menu/toolbar command implementations.
+  if (auto bound = keymap_lookup(ev.key.keysym.sym, ctrl, shift)) {
+    execute_command(app, *bound);
+    return;
+  }
+
   auto clear_sel = [&]() { p.sel.anchor = p.sel.focus; };
   auto move_and_sel = [&](auto mover) {
     if (!shift) clear_sel();
@@ -2969,9 +2975,6 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         app.link_edit_href = key;
         app.needs_layout = true;
         reset_blink(app);
-      } else if (ctrl) {
-        std::string text = xanatoo::selected_text(d, p.sel);
-        if (!text.empty()) SDL_SetClipboardText(text.c_str());
       }
       break;
 
@@ -2981,15 +2984,6 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
           edit(app);
           xanatoo::apply_style_to_selection(d, p.sel,
                                             xanatoo::InlineKind::Strike);
-          app.needs_layout = true;
-          reset_blink(app);
-        }
-      } else if (ctrl) {
-        std::string text = xanatoo::selected_text(d, p.sel);
-        if (!text.empty()) {
-          SDL_SetClipboardText(text.c_str());
-          edit(app);
-          xanatoo::delete_selection(d, p.sel);
           app.needs_layout = true;
           reset_blink(app);
         }
@@ -3044,101 +3038,6 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       }
       break;
 
-    case SDLK_z:
-      if (ctrl) {
-        if (app.buffers[static_cast<size_t>(p.buf)].history.undo(d, p.sel)) {
-          if (app.panes[0].buf == app.panes[1].buf) {
-            xanatoo::ensure_valid_caret(doc_of(app, app.panes[1 - app.focus]),
-                                        app.panes[1 - app.focus].sel.focus);
-            app.panes[1 - app.focus].sel.anchor =
-                app.panes[1 - app.focus].sel.focus;
-          }
-          drop_height_hints_for_buf(app, p.buf);
-          app.needs_layout = true;
-          reset_blink(app);
-        }
-      }
-      break;
-
-    case SDLK_y:
-      if (ctrl) {
-        if (app.buffers[static_cast<size_t>(p.buf)].history.redo(d, p.sel)) {
-          if (app.panes[0].buf == app.panes[1].buf) {
-            xanatoo::ensure_valid_caret(doc_of(app, app.panes[1 - app.focus]),
-                                        app.panes[1 - app.focus].sel.focus);
-            app.panes[1 - app.focus].sel.anchor =
-                app.panes[1 - app.focus].sel.focus;
-          }
-          drop_height_hints_for_buf(app, p.buf);
-          app.needs_layout = true;
-          reset_blink(app);
-        }
-      }
-      break;
-
-    case SDLK_n:
-      if (ctrl) {
-        if (!allow_discard_dirty(app, p.buf)) break;
-        app.buffers[static_cast<size_t>(p.buf)].doc =
-            xanatoo::parse_document(xanatoo::fallback_document(), {});
-        path_of(app, p).clear();
-        app.buffers[static_cast<size_t>(p.buf)].dirty = false;
-        xanatoo::ensure_valid_caret(app.buffers[static_cast<size_t>(p.buf)].doc,
-                                    p.sel.focus);
-        p.sel.anchor = p.sel.focus;
-        p.scroll_y = 0.f;
-        p.layout = {};
-        drop_height_hints_for_buf(app, p.buf);
-        app.buffers[static_cast<size_t>(p.buf)].history.reset(
-            app.buffers[static_cast<size_t>(p.buf)].doc, p.sel);
-        if (app.panes[0].buf == app.panes[1].buf) {
-          app.panes[1 - app.focus].sel = p.sel;
-          app.panes[1 - app.focus].scroll_y = 0.f;
-          app.panes[1 - app.focus].layout = {};
-        }
-        app.needs_layout = true;
-        update_title(app);
-        flash_status(app, "New document");
-      }
-      break;
-
-    case SDLK_s:
-      if (ctrl && shift) {
-        app.save_as_mode = true;
-        minibuf_begin(app, app.save_as_path);
-        app.search_mode = false;
-        app.save_as_path =
-            path_of(app, p).empty() ? "untitled.md" : path_of(app, p);
-        break;
-      }
-      if (ctrl) {
-        std::string& spath = path_of(app, p);
-        if (spath.empty()) {
-          std::string candidate = "untitled.md";
-          for (int n = 1; n < 1000; ++n) {
-            if (!std::filesystem::exists(candidate)) break;
-            candidate = "untitled-" + std::to_string(n) + ".md";
-          }
-          spath = candidate;
-          std::cout << "Saving untitled buffer as: " << spath << "\n";
-        }
-        {
-          std::string text = xanatoo::serialize_document(d, spath);
-          std::ofstream out(spath);
-          if (!out) {
-            std::cerr << "Failed to save: " << spath << "\n";
-          } else {
-            out << text;
-            std::cout << "Saved: " << spath << "\n";
-            app.buffers[static_cast<size_t>(p.buf)].dirty = false;
-            app.discard_armed = false;
-            update_title(app);
-            flash_status(app, "Saved " + spath);
-          }
-        }
-      }
-      break;
-
     case SDLK_o:
       if (ctrl && alt) {
         app.outline_docked = !app.outline_docked;
@@ -3178,46 +3077,6 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       }
       break;
 
-    case SDLK_r:
-      if (ctrl) {
-        // Reload focused document from disk or re-fetch gemini://
-        std::string& rpath = path_of(app, p);
-        if (rpath.empty()) {
-          flash_status(app, "Reload: no path (Save As or Open URL first)");
-          break;
-        }
-        if (app.buffers[static_cast<size_t>(p.buf)].dirty && !shift) {
-          flash_status(app,
-                       "Unsaved changes — Ctrl+Shift+R to discard and reload");
-          break;
-        }
-        if (is_in_app_remote_url(rpath)) {
-          navigate_to_url(app, rpath, /*record_history=*/false);
-          break;
-        }
-        xanatoo::clear_external_doc_cache();
-        app.buffers[static_cast<size_t>(p.buf)].doc = load_doc(app, rpath);
-        app.buffers[static_cast<size_t>(p.buf)].dirty = false;
-        app.buffers[static_cast<size_t>(p.buf)].history.reset(
-            app.buffers[static_cast<size_t>(p.buf)].doc, p.sel);
-        for (int pi = 0; pi < 2; ++pi) {
-          if (app.panes[pi].buf != p.buf) continue;
-          xanatoo::ensure_valid_caret(
-              app.buffers[static_cast<size_t>(p.buf)].doc,
-              app.panes[pi].sel.focus);
-          app.panes[pi].sel.anchor = app.panes[pi].sel.focus;
-          app.panes[pi].scroll_y = 0.f;
-          app.panes[pi].layout = {};
-        }
-        drop_height_hints_for_buf(app, p.buf);
-        update_title(app);
-        app.needs_layout = true;
-        reset_blink(app);
-        flash_status(app, "Reloaded " + rpath);
-        std::cout << "Reloaded: " << rpath << "\n";
-      }
-      break;
-
     case SDLK_d:
       if (ctrl && shift) {
         // Side-by-side version marks (needs two independent docs)
@@ -3238,17 +3097,6 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
           std::cout << (app.diff_mode ? "Diff marks on\n" : "Diff marks off\n");
         }
         break;
-      }
-      if (ctrl) {
-        edit(app);
-        if (auto nid = xanatoo::duplicate_block(d, p.sel.focus.node)) {
-          p.sel.focus.node = *nid;
-          p.sel.focus.span_index = 0;
-          p.sel.focus.char_index = 0;
-          p.sel.anchor = p.sel.focus;
-          app.needs_layout = true;
-          reset_blink(app);
-        }
       }
       break;
 

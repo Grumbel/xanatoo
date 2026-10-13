@@ -259,11 +259,14 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
                                   p.sel.focus);
       p.sel.anchor = p.sel.focus;
       p.scroll_y = 0.f;
+      p.layout = {};
+      drop_height_hints_for_buf(app, p.buf);
       app.buffers[static_cast<size_t>(p.buf)].history.reset(
           app.buffers[static_cast<size_t>(p.buf)].doc, p.sel);
       if (app.panes[0].buf == app.panes[1].buf) {
         app.panes[1 - app.focus].sel = p.sel;
         app.panes[1 - app.focus].scroll_y = 0.f;
+        app.panes[1 - app.focus].layout = {};
       }
       for (auto& sw : app.soft_wins)
         if (sw.buf == p.buf) {
@@ -515,11 +518,17 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       app.buffers[static_cast<size_t>(p.buf)].dirty = false;
       app.buffers[static_cast<size_t>(p.buf)].history.reset(
           app.buffers[static_cast<size_t>(p.buf)].doc, p.sel);
-      xanatoo::ensure_valid_caret(app.buffers[static_cast<size_t>(p.buf)].doc,
-                                  p.sel.focus);
-      p.sel.anchor = p.sel.focus;
-      p.scroll_y = 0.f;
-      p.layout = {};
+      for (int pi = 0; pi < 2; ++pi) {
+        Pane& rp = app.panes[pi];
+        if (rp.buf != p.buf) continue;
+        xanatoo::ensure_valid_caret(app.buffers[static_cast<size_t>(p.buf)].doc,
+                                    rp.sel.focus);
+        rp.sel.anchor = rp.sel.focus;
+        rp.scroll_y = 0.f;
+        rp.layout = {};
+      }
+      drop_height_hints_for_buf(app, p.buf);
+      reset_blink(app);
       for (auto& sw : app.soft_wins)
         if (sw.buf == p.buf) {
           sw.needs_layout = true;
@@ -537,6 +546,12 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         xanatoo::ensure_valid_caret(d, p.sel.focus);
         p.sel.anchor = p.sel.focus;
         p.layout = {};
+        if (app.panes[0].buf == app.panes[1].buf) {
+          Pane& other = app.panes[1 - app.focus];
+          xanatoo::ensure_valid_caret(d, other.sel.focus);
+          other.sel.anchor = other.sel.focus;
+        }
+        reset_blink(app);
         drop_height_hints_for_buf(app, p.buf);
         app.needs_layout = true;
         for (auto& sw : app.soft_wins)
@@ -552,6 +567,12 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         xanatoo::ensure_valid_caret(d, p.sel.focus);
         p.sel.anchor = p.sel.focus;
         p.layout = {};
+        if (app.panes[0].buf == app.panes[1].buf) {
+          Pane& other = app.panes[1 - app.focus];
+          xanatoo::ensure_valid_caret(d, other.sel.focus);
+          other.sel.anchor = other.sel.focus;
+        }
+        reset_blink(app);
         drop_height_hints_for_buf(app, p.buf);
         app.needs_layout = true;
         for (auto& sw : app.soft_wins)
@@ -569,6 +590,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         edit(app);
         xanatoo::delete_selection(d, p.sel);
         app.needs_layout = true;
+        reset_blink(app);
       }
       break;
     }

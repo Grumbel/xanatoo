@@ -384,6 +384,11 @@ std::string soft_title(App& app, const SoftWindow& sw);
 void layout_soft(App& app, SoftWindow& sw);
 void raise_soft(App& app, size_t i);
 
+// ---- keymap ----
+// Ctrl+<key> chord → command (nullopt = not a table binding).
+std::optional<xanatoo::UiCommand> keymap_lookup(SDL_Keycode sym, bool ctrl,
+                                                bool shift);
+
 // ---- chrome (theme-based canvas widgets) ----
 StatusLine compute_status(App& app);
 void draw_floating_frame(App& app, const SDL_Rect& outer,
