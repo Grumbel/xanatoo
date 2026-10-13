@@ -791,6 +791,21 @@ void test_layout_wrap_respects_max_width() {
 }
 
 
+void test_utf8_pop_back() {
+  using namespace xanatoo;
+  std::string a = "abc";
+  utf8_pop_back(a);
+  EXPECT_EQ(a, "ab");
+  std::string b = "h\xC3\xA9";  // "hé"
+  utf8_pop_back(b);
+  EXPECT_EQ(b, "h");
+  std::string c = "\xE2\x82\xAC";  // single 3-byte code point
+  utf8_pop_back(c);
+  EXPECT(c.empty());
+  utf8_pop_back(c);  // no-op on empty
+  EXPECT(c.empty());
+}
+
 void test_sanitize_epub_markdown() {
   using namespace xanatoo;
   // Empty calibre spacer spans (NBSP / spaces / entities)
@@ -859,6 +874,7 @@ int main() {
   test_gemtext_structures();
   test_serialize_roundtrip_md();
   test_json_array_and_bool();
+  test_utf8_pop_back();
   test_sanitize_epub_markdown();
   test_layout_wrap_respects_max_width();
 

@@ -149,4 +149,11 @@ bool save_bookmarks(const std::vector<std::string>& entries) {
   return static_cast<bool>(out);
 }
 
+void utf8_pop_back(std::string& s) {
+  if (s.empty()) return;
+  while (!s.empty() && (static_cast<unsigned char>(s.back()) & 0xc0) == 0x80)
+    s.pop_back();
+  if (!s.empty()) s.pop_back();
+}
+
 }  // namespace xanatoo

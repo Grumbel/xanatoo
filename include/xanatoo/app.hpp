@@ -2,6 +2,17 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 #pragma once
 
+#include <SDL.h>
+
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
 #include "xanatoo/cli.hpp"
 #include "xanatoo/editor.hpp"
 #include "xanatoo/font.hpp"
@@ -13,16 +24,6 @@
 #include "xanatoo/types.hpp"
 #include "xanatoo/ui.hpp"
 #include "xanatoo/view_settings.hpp"
-
-#include <SDL.h>
-#include <cstdint>
-#include <optional>
-#include <string_view>
-#include <string>
-#include <tuple>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
 
 // Application world: plain data (App + the records below) and free-function
 // "systems" that read/transform it. No behaviour lives on the data types.
@@ -66,7 +67,7 @@ struct Pane {
 enum class SoftDock { None = 0, Left, Right, Top, Bottom, Max };
 
 struct SoftWindow {
-  int buf = -1;  // index into buffers (−1 = unused)
+  int buf = -1;       // index into buffers (−1 = unused)
   std::string title;  // display override; empty → derive from path
   xanatoo::Selection sel{};
   xanatoo::LayoutResult layout;
@@ -125,8 +126,11 @@ struct Hover {
 
 struct App {
   App(SDL_Window* w, SDL_Renderer* r)
-      : window(w), sdl(r), images(r),
-        layout_engine(fonts, &images), renderer(r, fonts, &images) {}
+      : window(w),
+        sdl(r),
+        images(r),
+        layout_engine(fonts, &images),
+        renderer(r, fonts, &images) {}
   App(const App&) = delete;
   App& operator=(const App&) = delete;
 
@@ -351,9 +355,8 @@ void add_bookmark(App& app, const std::string& url);
 void remove_bookmark(App& app, const std::string& url);
 bool is_inapp_doc_href(App& app, const std::string& href);
 std::string resolve_doc_href(App& app, const std::string& href,
-                              const std::string& base_path = {});
-bool navigate_to_url(App& app, std::string target,
-                             bool record_history = true);
+                             const std::string& base_path = {});
+bool navigate_to_url(App& app, std::string target, bool record_history = true);
 void open_transclude_in_other_pane(App& app);
 void activate_at_caret(App& app);
 
@@ -391,6 +394,9 @@ void draw_hover_tooltip(App& app);
 void present_frame(App& app);
 void handle_event(App& app, SDL_Event& ev);
 void run_frame(App& app);
+// Apply a menu/toolbar/shortcut command (shared by chrome and keyboard).
+void execute_command(App& app, xanatoo::UiCommand cmd,
+                     const std::string& arg = {});
 bool app_init(App& app);
 void app_shutdown(App& app);
 

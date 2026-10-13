@@ -3,6 +3,10 @@
 //
 // App lifecycle: build the initial world state / tear down platform handles.
 
+#include <cstdlib>
+#include <filesystem>
+#include <iostream>
+
 #include "xanatoo/app.hpp"
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/gemini.hpp"
@@ -12,10 +16,6 @@
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/util.hpp"
-
-#include <cstdlib>
-#include <filesystem>
-#include <iostream>
 
 namespace fs = std::filesystem;
 
@@ -50,7 +50,7 @@ bool app_init(App& app) {
   app.minibuf_hist_url = load_minibuffer_history("url");
   app.bookmarks = load_bookmarks();
 
-{
+  {
     std::string p0 = app.opt.file_path;
     std::string p1 = app.opt.file_path2;
     if (p0.empty()) {
@@ -63,9 +63,9 @@ bool app_init(App& app) {
       std::string r0 = resolve_open_path(app, p0);
       b0.path = r0.empty() ? p0 : r0;
       b0.doc = load_doc_or_placeholder(app, b0.path.empty() ? p0 : b0.path);
-      // If EPUB resolve failed, still attempt load_doc on original for error page.
-      if (xanatoo::is_epub_path(p0) && r0.empty())
-        b0.doc = load_doc(app, p0);
+      // If EPUB resolve failed, still attempt load_doc on original for error
+      // page.
+      if (xanatoo::is_epub_path(p0) && r0.empty()) b0.doc = load_doc(app, p0);
     }
     app.buffers.push_back(std::move(b0));
     if (!p1.empty()) {
@@ -74,31 +74,32 @@ bool app_init(App& app) {
         std::string r1 = resolve_open_path(app, p1);
         b1.path = r1.empty() ? p1 : r1;
         b1.doc = load_doc_or_placeholder(app, b1.path);
-        if (xanatoo::is_epub_path(p1) && r1.empty())
-          b1.doc = load_doc(app, p1);
+        if (xanatoo::is_epub_path(p1) && r1.empty()) b1.doc = load_doc(app, p1);
       }
       app.buffers.push_back(std::move(b1));
     }
   }
-for (int i = 0; i < static_cast<int>(app.buffers.size()); ++i)
+  for (int i = 0; i < static_cast<int>(app.buffers.size()); ++i)
     app.tab_order.push_back(i);
-update_title(app);
-xanatoo::load_view_settings(app.view_settings);
-app.layout_engine.set_options(xanatoo::LayoutOptions::from_view(app.view_settings));
-if (!app.ui.init(app.window, app.sdl, app.opt.ui_scale)) {
+  update_title(app);
+  xanatoo::load_view_settings(app.view_settings);
+  app.layout_engine.set_options(
+      xanatoo::LayoutOptions::from_view(app.view_settings));
+  if (!app.ui.init(app.window, app.sdl, app.opt.ui_scale)) {
     std::cerr << "Warning: ImGui UI failed to init; continuing without menus\n";
   }
-app.panes[0].buf = 0;
-app.panes[1].buf = (app.buffers.size() > 1) ? 1 : 0;
-xanatoo::ensure_valid_caret(app.buffers[0].doc, app.panes[0].sel.focus);
-app.panes[0].sel.anchor = app.panes[0].sel.focus;
-xanatoo::ensure_valid_caret(app.buffers[static_cast<size_t>(app.panes[1].buf)].doc,
-                              app.panes[1].sel.focus);
-app.panes[1].sel.anchor = app.panes[1].sel.focus;
-app.buffers[0].history.reset(app.buffers[0].doc, app.panes[0].sel);
-if (app.buffers.size() > 1)
+  app.panes[0].buf = 0;
+  app.panes[1].buf = (app.buffers.size() > 1) ? 1 : 0;
+  xanatoo::ensure_valid_caret(app.buffers[0].doc, app.panes[0].sel.focus);
+  app.panes[0].sel.anchor = app.panes[0].sel.focus;
+  xanatoo::ensure_valid_caret(
+      app.buffers[static_cast<size_t>(app.panes[1].buf)].doc,
+      app.panes[1].sel.focus);
+  app.panes[1].sel.anchor = app.panes[1].sel.focus;
+  app.buffers[0].history.reset(app.buffers[0].doc, app.panes[0].sel);
+  if (app.buffers.size() > 1)
     app.buffers[1].history.reset(app.buffers[1].doc, app.panes[1].sel);
-{
+  {
     int nw = 0, nh = 0;
     SDL_GetWindowSize(app.window, &nw, &nh);
     if (nw >= 64 && nh >= 64) {
@@ -106,22 +107,22 @@ if (app.buffers.size() > 1)
       app.win_h = nh;
     }
   }
-if (app.win_w > 0 && app.win_w <= 720 && app.body_px < 20) {
+  if (app.win_w > 0 && app.win_w <= 720 && app.body_px < 20) {
     app.body_px = 20;
     app.heading_px = 28;
     app.fonts.set_sizes(app.body_px, app.heading_px);
   }
-open_first_gamepad(app);
-if (app.gamepad) app.stick_cursor_on = true;
-for (const auto& b : app.buffers) {
+  open_first_gamepad(app);
+  if (app.gamepad) app.stick_cursor_on = true;
+  for (const auto& b : app.buffers) {
     if (!b.path.empty()) push_nav_history(app, b.path);
   }
-if (!app.buffers.empty() && is_in_app_remote_url(app.buffers[0].path)) {
+  if (!app.buffers.empty() && is_in_app_remote_url(app.buffers[0].path)) {
     std::string u = app.buffers[0].path;
     app.buffers[0].path.clear();
     navigate_to_url(app, std::move(u));
-  }
-else if (app.buffers.size() > 1 && is_in_app_remote_url(app.buffers[1].path)) {
+  } else if (app.buffers.size() > 1 &&
+             is_in_app_remote_url(app.buffers[1].path)) {
     std::string u = app.buffers[1].path;
     app.buffers[1].path.clear();
     app.focus = 1;
