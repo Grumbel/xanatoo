@@ -38,6 +38,15 @@ option(XANATOO_LEMMY "Enable Lemmy API v3 fetch (OpenSSL HTTPS)" ON)
 
 add_executable(xanatoo
   src/main.cpp
+  src/app_init.cpp
+  src/app_buffers.cpp
+  src/app_view.cpp
+  src/app_nav.cpp
+  src/app_softwin.cpp
+  src/app_prompts.cpp
+  src/app_pointer.cpp
+  src/app_events.cpp
+  src/app_frame.cpp
   src/font.cpp
   src/document.cpp
   src/layout.cpp
