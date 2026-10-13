@@ -61,7 +61,7 @@ toolbar and shortcuts should route through `execute_command`.
 
 - GPLv3+ with short SPDX headers on every source file.
 - Author: Ingo Ruhnke <grumbel@gmail.com>
-- Co-authored-by: Grok <grok@x.ai> on every commit.
+- Commit directly to git; add a `Co-authored-by:` trailer for the AI agent that did the work.
 - Prefer clear data layouts over clever abstractions.
 - No drive-by feature removal; discuss first.
 
@@ -104,8 +104,8 @@ toolbar and shortcuts should route through `execute_command`.
 
 Read `TODO.md` first. Record plans and outcomes there.
 Longer design notes: `docs/BRAINSTORM.md`.
-Handover is via cumulative git bundles only.
-Bundle names: `xanatoo-NNN.description-BASE.bundle` (formerly `glyphtoo-NNN…`).
+Work is committed directly to git (bundles were only a Grok Web handover
+mechanism; historical bundle numbers in TODO.md are archival).
 
 ## Nostr
 
