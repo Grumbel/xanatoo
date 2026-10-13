@@ -1187,6 +1187,28 @@ void serialize_inlines(const Node& node, std::string& out) {
   }
 }
 
+// Heading depth (1–6) if `sec` can be written as an ATX "#"-heading and
+// re-parses to the same tree; 0 when it needs ::: fences.
+int atx_section_depth(const Document& doc, const Node& sec) {
+  auto plain = [&](const Node& n) {
+    if (n.kind != NodeKind::Section || !n.label.empty() || n.children.empty())
+      return false;
+    const Node& h = doc.get(n.children.front());
+    return h.kind == NodeKind::Header && h.label.empty() && h.src.empty() &&
+           h.tags.empty() && !h.spans.empty();
+  };
+  if (!plain(sec)) return 0;
+  int depth = 1;
+  for (NodeId p = sec.parent; p != INVALID_NODE;) {
+    const Node& pn = doc.get(p);
+    if (pn.kind == NodeKind::Document) break;
+    if (!plain(pn)) return 0;
+    ++depth;
+    p = pn.parent;
+  }
+  return depth <= 6 ? depth : 0;
+}
+
 void serialize_node(const Document& doc, NodeId id, std::string& out,
                     int indent) {
   if (id == INVALID_NODE) return;
@@ -1244,6 +1266,19 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
     }
 
     case NodeKind::Section: {
+      // Plain Markdown heading when the section tree is pure ATX shape
+      // (unlabelled section + unlabelled Header first, only such ancestors).
+      if (int depth = atx_section_depth(doc, node); depth > 0) {
+        const Node& hd = doc.get(node.children.front());
+        out += pad;
+        out.append(static_cast<size_t>(depth), '#');
+        out += ' ';
+        serialize_inlines(hd, out);
+        out += "\n\n";
+        for (size_t ci = 1; ci < node.children.size(); ++ci)
+          serialize_node(doc, node.children[ci], out, indent);
+        break;
+      }
       out += pad;
       out += ":::section";
       if (!node.label.empty()) {

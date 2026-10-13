@@ -572,6 +572,18 @@ void test_serialize_roundtrip_md() {
   EXPECT(again.root != INVALID_NODE);
 }
 
+void test_serialize_md_uses_atx_headings() {
+  using namespace xanatoo;
+  const char* src = "# A\n\ntext\n\n## B\n\nmore\n\n# C\n\nend\n";
+  Document doc = parse_document(src, "r.md");
+  std::string out = serialize_document(doc, "r.md");
+  EXPECT(out.find(":::") == std::string::npos);
+  EXPECT(out.find("# A") != std::string::npos);
+  EXPECT(out.find("## B") != std::string::npos);
+  Document again = parse_document(out, "r.md");
+  EXPECT_EQ(serialize_document(again, "r.md"), out);
+}
+
 void test_json_array_and_bool() {
   using namespace xanatoo;
   const char* j = R"({"flags":{"on":true,"off":false},"items":[{"n":1},{"n":2},{"n":3}]})";
@@ -873,6 +885,7 @@ int main() {
   test_markup_columns();
   test_gemtext_structures();
   test_serialize_roundtrip_md();
+  test_serialize_md_uses_atx_headings();
   test_json_array_and_bool();
   test_utf8_pop_back();
   test_sanitize_epub_markdown();
