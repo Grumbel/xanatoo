@@ -18,6 +18,25 @@ Dear ImGui is allowed for chrome (menus/toolbars). No Qt/GTK/KDE.
 - Immediate visual feedback after every edit.
 - Local-only for now; network is a later optional layer.
 
+## Source layout (app = world + systems)
+
+`main()` only creates the SDL window/renderer and loops `run_frame`.
+All state is the plain-data `xanatoo::app::App` (`include/xanatoo/app.hpp`);
+behaviour is free functions ("systems") taking `App&`:
+
+| File | System |
+|------|--------|
+| `app_init.cpp` | build initial world, shutdown |
+| `app_events.cpp` | `handle_event` → one `on_<sdl_event>` per event type |
+| `app_frame.cpp` | frame stages: sync size, relayout, `run_chrome` (UiState + `execute_command`), draw panes, overlays |
+| `app_chrome.cpp` | status line (`compute_status` is pure data → `draw_status_bar`), floating window frame, client scrollbar |
+| `app_buffers.cpp` / `app_view.cpp` / `app_nav.cpp` / `app_softwin.cpp` / `app_prompts.cpp` / `app_pointer.cpp` | document buffers, scroll/fold/outline, URL history + bookmarks, floating windows, minibuffer, cursor/gamepad |
+| `theme.cpp` | classic palette (`Palette`) + stateless bevel/gradient/window primitives shared with the ImGui theme |
+
+Rules: no behaviour on data types; new modal state goes in `App` (group
+related fields into small records like `FloatPanel` / `Hover`); menus,
+toolbar and shortcuts should route through `execute_command`.
+
 ## Tech stack (current)
 
 - C++20

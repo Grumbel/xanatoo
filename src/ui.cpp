@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/ui.hpp"
+#include "xanatoo/theme.hpp"
 #include "xanatoo/view_settings.hpp"
 #include <cmath>
 #include "xanatoo/font.hpp"
@@ -107,17 +108,20 @@ void Ui::apply_classic_theme() {
     return ImVec4(r / 255.f, g / 255.f, b / 255.f, a / 255.f);
   };
 
-  // Paper / panel surfaces
-  const ImVec4 bg = C(0xEF, 0xEB, 0xE7);       // Clearlooks window
-  const ImVec4 bg2 = C(0xF6, 0xF5, 0xF4);      // menu / toolbar
-  const ImVec4 bg3 = C(0xE8, 0xE6, 0xE3);      // button face
-  const ImVec4 border = C(0x9C, 0x9A, 0x97);
-  const ImVec4 text = C(0x2E, 0x34, 0x36);
-  const ImVec4 text_dis = C(0x88, 0x88, 0x84);
-  const ImVec4 sel = C(0x4A, 0x90, 0xD9);      // BeOS / classic blue
+  // Colours come from the shared classic palette (theme.hpp) so canvas
+  // windows and ImGui chrome stay in step.
+  const theme::Palette& pal = theme::palette();
+  auto P = [](theme::Rgb c) { return ImVec4(c.r / 255.f, c.g / 255.f, c.b / 255.f, 1.f); };
+  const ImVec4 bg = P(pal.face);
+  const ImVec4 bg2 = P(pal.face_light);
+  const ImVec4 bg3 = P(pal.face_dark);
+  const ImVec4 border = P(pal.frame);
+  const ImVec4 text = P(pal.text);
+  const ImVec4 text_dis = P(pal.text_dim);
+  const ImVec4 sel = P(pal.accent);
   const ImVec4 sel_hi = C(0x6A, 0xA8, 0xE8);
-  const ImVec4 header = C(0xD8, 0xD4, 0xCE);
-  const ImVec4 title = C(0xC8, 0xD4, 0xE8);    // soft title blue
+  const ImVec4 header = P(pal.face_dark);
+  const ImVec4 title = P(pal.tab_idle_top);
 
   ImVec4* c = s.Colors;
   c[ImGuiCol_Text] = text;
@@ -131,7 +135,7 @@ void Ui::apply_classic_theme() {
   c[ImGuiCol_FrameBgHovered] = C(0xF0, 0xF6, 0xFC);
   c[ImGuiCol_FrameBgActive] = C(0xE0, 0xEC, 0xF8);
   c[ImGuiCol_TitleBg] = title;
-  c[ImGuiCol_TitleBgActive] = C(0xB0, 0xC4, 0xE0);
+  c[ImGuiCol_TitleBgActive] = P(pal.tab_top);
   c[ImGuiCol_TitleBgCollapsed] = header;
   c[ImGuiCol_MenuBarBg] = bg2;
   c[ImGuiCol_ScrollbarBg] = C(0xE4, 0xE2, 0xDE);
@@ -482,6 +486,12 @@ void Ui::shutdown() {
 
 void Ui::process_event(const SDL_Event& ev) {
   if (!ready_) return;
+  // Ctrl+Tab / Ctrl+Shift+Tab belong to the document tab strip; keep ImGui's
+  // built-in window switcher overlay from popping up over the page.
+  if ((ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP) &&
+      ev.key.keysym.sym == SDLK_TAB && (ev.key.keysym.mod & KMOD_CTRL)) {
+    return;
+  }
   ImGui_ImplSDL2_ProcessEvent(&ev);
 }
 

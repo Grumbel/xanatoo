@@ -47,6 +47,8 @@ add_executable(xanatoo
   src/app_pointer.cpp
   src/app_events.cpp
   src/app_frame.cpp
+  src/app_chrome.cpp
+  src/theme.cpp
   src/font.cpp
   src/document.cpp
   src/layout.cpp

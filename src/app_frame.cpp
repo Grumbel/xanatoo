@@ -20,6 +20,7 @@
 #include "xanatoo/parse.hpp"
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/sidestore.hpp"
+#include "xanatoo/theme.hpp"
 #include "xanatoo/util.hpp"
 
 namespace fs = std::filesystem;
@@ -2008,12 +2009,12 @@ void draw_pane(App& app, int i) {
     int top = static_cast<int>(app.ui_top);
     int vh = static_cast<int>(view_h);
 
-    // Track (bevelled trough)
-    SDL_SetRenderDrawColor(app.sdl, 210, 208, 200, 255);
+    // Track (sunken trough)
+    namespace th = xanatoo::theme;
+    const th::Palette& pal = th::palette();
     SDL_Rect track_r{sx, top, kSbW, vh};
-    SDL_RenderFillRect(app.sdl, &track_r);
-    SDL_SetRenderDrawColor(app.sdl, 160, 158, 150, 255);
-    SDL_RenderDrawRect(app.sdl, &track_r);
+    th::fill(app.sdl, track_r, pal.face_dark);
+    th::bevel(app.sdl, track_r, th::Bevel::Sunken);
 
     // Metadata marks on the track (doc Y → track fraction).
     auto mark_at = [&](float doc_y, int r, int g, int b) {
@@ -2146,14 +2147,8 @@ void draw_pane(App& app, int i) {
       const bool hot =
           (&pane == &app.panes[app.focus]) &&
           ((up && app.sb_hover == 1) || (!up && app.sb_hover == 2));
-      if (hot)
-        SDL_SetRenderDrawColor(app.sdl, 200, 210, 230, 255);
-      else
-        SDL_SetRenderDrawColor(app.sdl, 230, 228, 220, 255);
       SDL_Rect btn{sx, by, kSbW, kSbArrow};
-      SDL_RenderFillRect(app.sdl, &btn);
-      SDL_SetRenderDrawColor(app.sdl, 120, 118, 110, 255);
-      SDL_RenderDrawRect(app.sdl, &btn);
+      th::draw_button_face(app.sdl, btn, false, hot);
       int cx = sx + kSbW / 2;
       int cy = by + kSbArrow / 2;
       SDL_SetRenderDrawColor(app.sdl, 60, 58, 50, 255);
@@ -2171,12 +2166,21 @@ void draw_pane(App& app, int i) {
     draw_arrow_btn(top + vh - kSbArrow, false);
 
     // Thumb
-    SDL_SetRenderDrawColor(app.sdl, 150, 148, 140, 255);
     SDL_Rect thumb{sx + 1, static_cast<int>(thumb_y), kSbW - 2,
                    std::max(8, static_cast<int>(thumb_h))};
-    SDL_RenderFillRect(app.sdl, &thumb);
-    SDL_SetRenderDrawColor(app.sdl, 90, 88, 80, 255);
-    SDL_RenderDrawRect(app.sdl, &thumb);
+    th::draw_button_face(app.sdl, thumb,
+                         app.dragging_scroll && app.scroll_drag_pane == i,
+                         false);
+    // Grip ridges (BeOS-style) when the thumb is tall enough.
+    if (thumb.h >= 24) {
+      const int gy = thumb.y + thumb.h / 2;
+      for (int k = -1; k <= 1; ++k) {
+        th::hline(app.sdl, thumb.x + 3, thumb.x + thumb.w - 4, gy + k * 3,
+                  pal.shadow);
+        th::hline(app.sdl, thumb.x + 3, thumb.x + thumb.w - 4, gy + k * 3 + 1,
+                  pal.highlight);
+      }
+    }
   }
 }
 
@@ -2190,11 +2194,14 @@ void draw_split_chrome(App& app) {
   SDL_RenderSetClipRect(app.sdl, nullptr);
   if (app.split) {
     int mid = app.panes[1].x - 3;
-    SDL_SetRenderDrawColor(app.sdl, 210, 208, 200, 255);
     SDL_Rect div{mid, static_cast<int>(app.ui_top), 6,
                  app.win_h - status_bar_h - static_cast<int>(app.ui_top) -
                      static_cast<int>(app.ui_bottom)};
-    SDL_RenderFillRect(app.sdl, &div);
+    xanatoo::theme::fill(app.sdl, div, xanatoo::theme::palette().face);
+    xanatoo::theme::vline(app.sdl, div.x, div.y, div.y + div.h - 1,
+                          xanatoo::theme::palette().highlight);
+    xanatoo::theme::vline(app.sdl, div.x + div.w - 1, div.y, div.y + div.h - 1,
+                          xanatoo::theme::palette().shadow);
   }
   if (app.split && shared_doc(app) &&
       app.panes[0].sel.focus.node != xanatoo::INVALID_NODE &&
@@ -2233,344 +2240,6 @@ void draw_split_chrome(App& app) {
   }
 }
 
-void draw_status_bar(App& app) {
-  {
-    const int bar_h = 28;
-    SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
-    if (app.search_mode || app.save_as_mode || app.path_in_window_mode ||
-        app.open_file_mode || app.url_bar_mode || app.link_edit_mode ||
-        app.summary_edit_mode || app.image_insert_mode ||
-        app.include_insert_mode) {
-      SDL_SetRenderDrawColor(app.sdl, 30, 30, 40, 240);
-    } else {
-      SDL_SetRenderDrawColor(app.sdl, 236, 234, 228, 245);
-    }
-    SDL_Rect bar{0, app.win_h - bar_h, app.win_w, bar_h};
-    SDL_RenderFillRect(app.sdl, &bar);
-    // Top edge line
-    if (app.search_mode || app.save_as_mode || app.path_in_window_mode ||
-        app.open_file_mode || app.url_bar_mode || app.link_edit_mode ||
-        app.summary_edit_mode || app.image_insert_mode ||
-        app.include_insert_mode) {
-      SDL_SetRenderDrawColor(app.sdl, 80, 160, 255, 255);
-    } else {
-      SDL_SetRenderDrawColor(app.sdl, 200, 198, 190, 255);
-    }
-    SDL_RenderDrawLine(app.sdl, 0, app.win_h - bar_h, app.win_w,
-                       app.win_h - bar_h);
-    SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
-
-    std::string label;
-    uint8_t tr = 40, tg = 40, tb = 45;
-    if (app.path_in_window_mode) {
-      label = "Open in window: ";
-      label += app.minibuf.display_with_cursor();
-      label += "    Tab complete · ↑↓ history · Enter · Esc";
-      label += app.minibuf.status_hint();
-      tr = 220;
-      tg = 230;
-      tb = 245;
-    } else if (app.open_file_mode) {
-      label = "Open file: ";
-      label += app.minibuf.display_with_cursor();
-      label += "    Tab complete · ↑↓ history · Enter · Esc";
-      label += app.minibuf.status_hint();
-      tr = 220;
-      tg = 230;
-      tb = 245;
-    } else if (app.url_bar_mode) {
-      label = "URL: ";
-      label += app.minibuf.display_with_cursor();
-      label += "    ↑↓ history · Enter · Esc · gemini:// or path";
-      label += app.minibuf.status_hint();
-      tr = 220;
-      tg = 230;
-      tb = 245;
-    } else if (app.save_as_mode) {
-      label = "Save as: ";
-      label += app.minibuf.display_with_cursor();
-      label += "    Tab complete · ↑↓ history · Enter · Esc";
-      label += app.minibuf.status_hint();
-      tr = 220;
-      tg = 230;
-      tb = 245;
-    } else if (app.image_insert_mode) {
-      label =
-          app.image_insert_as_figure ? "Figure image path: " : "Image path: ";
-      label += app.minibuf.display_with_cursor();
-      label += "    Tab complete · ↑↓ history · Enter · Esc";
-      label += app.minibuf.status_hint();
-      tr = 220;
-      tg = 230;
-      tb = 245;
-    } else if (app.include_insert_mode) {
-      label = "Include: ";
-      label += app.minibuf.display_with_cursor();
-      label += "    Tab · ↑↓ · Enter · Esc  (#H · file.md · file.md#H) · Esc";
-      tr = 220;
-      tg = 230;
-      tb = 245;
-    } else if (app.link_edit_mode) {
-      if (app.link_edit_is_cite) {
-        label = "Citation key: ";
-        label += app.link_edit_href.empty() ? "…" : app.link_edit_href;
-      } else {
-        label = "Link: ";
-        label += app.link_edit_href.empty() ? "…" : app.link_edit_href;
-        label += "    (optional: href rel=glossary)";
-      }
-      label += "    Enter confirm · Esc cancel";
-      tr = 220;
-      tg = 230;
-      tb = 245;
-    } else if (app.summary_edit_mode) {
-      label = "Stretch summary: ";
-      label += app.summary_edit_text.empty() ? "…" : app.summary_edit_text;
-      label += "    Enter confirm · Esc cancel";
-      tr = 220;
-      tg = 230;
-      tb = 245;
-    } else if (app.search_mode && app.replace_mode) {
-      label = "Find: ";
-      label += app.search_query.empty() ? "…" : app.search_query;
-      label += "  →  Replace: ";
-      label += app.replace_text.empty() ? "…" : app.replace_text;
-      label += app.replace_focus ? "  [repl] " : "  [find] ";
-      label += " Tab switch · Enter replace · Ctrl+Shift+Enter all · Esc";
-      tr = 220;
-      tg = 230;
-      tb = 245;
-    } else if (app.search_mode) {
-      label = "Leap: ";
-      label += app.search_query.empty() ? "…" : app.search_query;
-      label += "    F3 next · Shift+F3 prev · Esc cancel";
-      tr = 220;
-      tg = 230;
-      tb = 245;
-    } else if (!app.status_notice.empty() &&
-               SDL_GetTicks() < app.status_notice_until) {
-      label = app.status_notice;
-      tr = 255;
-      tg = 240;
-      tb = 200;
-    } else if (app.dragging_block) {
-      label = "Moving block — drop before/after any block (columns & lists OK)";
-      tr = 40;
-      tg = 90;
-      tb = 160;
-    } else if (app.dragging_col_gap) {
-      label = "Resizing columns — drag to adjust relative widths";
-      tr = 40;
-      tg = 90;
-      tb = 160;
-    } else if (app.diff_mode) {
-      label =
-          "Diff marks on — orange bars mark passages that differ · "
-          "Ctrl+Shift+D toggles";
-      tr = 160;
-      tg = 90;
-      tb = 30;
-    } else if (app.browse_mode) {
-      std::string page = path_of(app, focused_pane(app));
-      if (page.empty()) page = app.gemini_current_url;
-      if (!page.empty() && xanatoo::is_gemini_url(page)) {
-        label = page;
-        if (app.nav_hist_pos >= 0 && !app.nav_history.empty()) {
-          label += "  ·  ";
-          label += std::to_string(app.nav_hist_pos + 1);
-          label += "/";
-          label += std::to_string(static_cast<int>(app.nav_history.size()));
-        }
-        label += "  ·  browse · F2 edit";
-      } else {
-        label =
-            "Browse (read-only) · arrows / gamepad · A/Space open · F2 edit";
-      }
-      tr = 40;
-      tg = 120;
-      tb = 90;
-    } else if (!path_of(app, focused_pane(app)).empty() &&
-               xanatoo::is_gemini_url(path_of(app, focused_pane(app)))) {
-      label = path_of(app, focused_pane(app));
-      if (app.nav_hist_pos >= 0 && !app.nav_history.empty()) {
-        label += "  ·  ";
-        label += std::to_string(app.nav_hist_pos + 1);
-        label += "/";
-        label += std::to_string(static_cast<int>(app.nav_history.size()));
-      }
-      tr = 50;
-      tg = 90;
-      tb = 70;
-    } else if (app.structure_mode) {
-      label =
-          "Structure highlight — colour bars + kind tags on the right · "
-          "Ctrl+Shift+L toggles";
-      tr = 40;
-      tg = 80;
-      tb = 140;
-    } else if (app.section_focus_mode) {
-      label =
-          "Focus section — body shows one section · outline picks target · "
-          "Ctrl+Alt+F off";
-      tr = 25;
-      tg = 90;
-      tb = 170;
-    } else if (app.outline_mode) {
-      label = "Outline — ↑/↓ · ←/→ fold · Enter jump · twisty · Esc";
-      tr = 40;
-      tg = 90;
-      tb = 160;
-    } else if (app.hover.col_gap) {
-      label = "Column gutter — drag to adjust relative widths";
-      tr = 40;
-      tg = 100;
-      tb = 150;
-    } else if (app.hover.task != xanatoo::INVALID_NODE) {
-      std::string st = "task";
-      if (app.hover.task_pane >= 0 && app.hover.task_pane < 2) {
-        const auto& tn =
-            doc_of(app, app.panes[app.hover.task_pane]).get(app.hover.task);
-        st = tn.label.empty() ? "bullet" : tn.label;
-      }
-      if (st == "task-done")
-        label = "Task — click to mark unchecked";
-      else if (st == "task")
-        label = "Task — click to mark done";
-      else
-        label = "List marker — click to convert to task checkbox";
-      tr = 40;
-      tg = 120;
-      tb = 80;
-    } else if (app.hover.grip != xanatoo::INVALID_NODE) {
-      label =
-          "Drag block — drop before/after another block (columns & lists OK)";
-      tr = 40;
-      tg = 100;
-      tb = 150;
-    } else if (app.hover.transclude != xanatoo::INVALID_NODE) {
-      label = "Include: ";
-      label += app.hover.transclude_src.empty() ? "(empty)"
-                                                : app.hover.transclude_src;
-      label += "    click to jump to source";
-      tr = 30;
-      tg = 80;
-      tb = 170;
-    } else if (app.hover.image != xanatoo::INVALID_NODE) {
-      if (app.hover.image_handle)
-        label = "Image resize handle — drag corner to scale";
-      else
-        label = "Image — drag corner handle to resize · scale saved in markup";
-      tr = 40;
-      tg = 100;
-      tb = 150;
-    } else if (app.hover.stretch != xanatoo::INVALID_NODE) {
-      bool expanded = false;
-      if (app.hover.stretch_pane >= 0 && app.hover.stretch_pane < 2) {
-        auto& sd = doc_of(app, app.panes[app.hover.stretch_pane]);
-        expanded = sd.get(app.hover.stretch).expanded;
-      }
-      label = expanded ? "Stretchtext — click ▾ to collapse"
-                       : "Stretchtext — click ▸ to expand";
-      tr = 40;
-      tg = 100;
-      tb = 150;
-    } else if (!app.hover.href.empty()) {
-      if (app.hover.is_cite)
-        label = "Cite: ";
-      else if (app.hover.href[0] == '#')
-        label = "Anchor: ";
-      else if (xanatoo::is_gemini_url(app.hover.href))
-        label = "Gemini: ";
-      else if (xanatoo::is_reddit_url(app.hover.href))
-        label = "Reddit: ";
-      else if (xanatoo::is_lemmy_url(app.hover.href))
-        label = "Lemmy: ";
-      else if (xanatoo::is_nostr_ref(app.hover.href))
-        label = "Nostr: ";
-      else if (app.hover.href.rfind("http://", 0) == 0 ||
-               app.hover.href.rfind("https://", 0) == 0)
-        label = "Web: ";
-      else if (app.hover.href.rfind("mailto:", 0) == 0)
-        label = "Mail: ";
-      else
-        label = "Document: ";
-      label += app.hover.href;
-      if (!app.hover.rel.empty()) {
-        label += "  rel=";
-        label += app.hover.rel;
-      }
-      if (app.hover.href[0] == '#')
-        label += "    click to jump";
-      else if (app.hover.href.rfind("http://", 0) == 0 ||
-               app.hover.href.rfind("https://", 0) == 0 ||
-               app.hover.href.rfind("mailto:", 0) == 0)
-        label += "    click to open externally";
-      else
-        label += "    click to open";
-      tr = 30;
-      tg = 80;
-      tb = 170;
-    } else if (app.browse_mode) {
-      label =
-          app.gamepad
-              ? "Browse · R-stick pointer · A click · LB+A caret · "
-                "D-pad nav · L-stick scroll · Start help · F2 edit"
-              : "Browse mode — arrows move · Enter open · F2 edit · F1 help";
-      tr = 50;
-      tg = 90;
-      tb = 70;
-    } else {
-      label =
-          "F1 help · Ctrl+S save · Ctrl+A block · Ctrl+Shift+A all · "
-          "Ctrl+F leap · Ctrl+B/I style · drag to select";
-      tr = 70;
-      tg = 68;
-      tb = 62;
-    }
-    float baseline = static_cast<float>(app.win_h - 8) - app.ui_bottom;
-    app.renderer.draw_text(app.fonts.regular, 10.f, baseline, label, tr, tg,
-                           tb);
-
-    // Document / selection stats on the right (idle status only)
-    if (!app.search_mode && !app.save_as_mode && !app.link_edit_mode &&
-        !app.summary_edit_mode && !app.help_mode && !app.outline_mode &&
-        !app.image_insert_mode && !app.include_insert_mode &&
-        !app.path_in_window_mode && !app.open_file_mode) {
-      std::string stats;
-      const auto& fsel = focused_pane(app).sel;
-      if (!fsel.empty()) {
-        std::string t =
-            xanatoo::selected_text(doc_of(app, focused_pane(app)), fsel);
-        size_t words = 0, chars = 0;
-        bool in_word = false;
-        for (unsigned char c : t) {
-          if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
-            in_word = false;
-          } else {
-            ++chars;
-            if (!in_word) {
-              in_word = true;
-              ++words;
-            }
-          }
-        }
-        stats = std::to_string(words) + " sel words · " +
-                std::to_string(chars) + " sel chars";
-      } else {
-        auto st = xanatoo::document_stats(doc_of(app, focused_pane(app)));
-        stats = std::to_string(st.words) + " words · " +
-                std::to_string(st.chars) + " chars";
-        if (st.headings > 0)
-          stats += " · " + std::to_string(st.headings) + " headings";
-      }
-      int sw = app.fonts.regular.measure(stats);
-      app.renderer.draw_text(app.fonts.regular,
-                             static_cast<float>(app.win_w - sw - 12), baseline,
-                             stats, 110, 108, 100);
-    }
-  }
-}
-
 void draw_outline_panel(App& app) {
   if (app.outline_mode) {
     if (app.outline_docked) {
@@ -2591,66 +2260,37 @@ void draw_outline_panel(App& app) {
       if (app.ol.scroll > max_s) app.ol.scroll = max_s;
     }
 
-    SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(app.sdl, 0, 0, 0, 40);
-    SDL_Rect shadow{app.ol.x + 3, app.ol.y + 3, app.ol.w, app.ol.h};
-    SDL_RenderFillRect(app.sdl, &shadow);
-    SDL_SetRenderDrawColor(app.sdl, 248, 246, 240, 255);
-    SDL_Rect frame{app.ol.x, app.ol.y, app.ol.w, app.ol.h};
-    SDL_RenderFillRect(app.sdl, &frame);
-    SDL_SetRenderDrawColor(app.sdl, 25, 90, 170, 255);
-    SDL_RenderDrawRect(app.sdl, &frame);
-    // Title bar
-    SDL_SetRenderDrawColor(app.sdl, 200, 216, 240, 255);
-    SDL_Rect title{app.ol.x + 1, app.ol.y + 1, app.ol.w - 2, help_title_h};
-    SDL_RenderFillRect(app.sdl, &title);
-    SDL_SetRenderDrawColor(app.sdl, 25, 90, 170, 255);
-    SDL_RenderDrawLine(app.sdl, app.ol.x, app.ol.y + help_title_h,
-                       app.ol.x + app.ol.w, app.ol.y + help_title_h);
-    SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
-
-    {
-      std::string ol_title =
-          app.outline_docked ? "Outline · body →" : "Outline";
-      if (app.section_focus_mode) {
-        ol_title = "Outline · Focus";
-        if (!app.outline.empty() && app.outline_sel >= 0 &&
-            app.outline_sel < static_cast<int>(app.outline.size())) {
-          const std::string& tx =
-              app.outline[static_cast<size_t>(app.outline_sel)].text;
-          if (!tx.empty()) {
-            ol_title += ": ";
-            ol_title += tx.size() > 18 ? tx.substr(0, 17) + "…" : tx;
-          }
+    std::string ol_title = app.outline_docked ? "Outline · body →" : "Outline";
+    if (app.section_focus_mode) {
+      ol_title = "Outline · Focus";
+      if (!app.outline.empty() && app.outline_sel >= 0 &&
+          app.outline_sel < static_cast<int>(app.outline.size())) {
+        const std::string& tx =
+            app.outline[static_cast<size_t>(app.outline_sel)].text;
+        if (!tx.empty()) {
+          ol_title += ": ";
+          ol_title += tx.size() > 18 ? tx.substr(0, 17) + "…" : tx;
         }
       }
-      app.renderer.draw_text(
-          app.fonts.regular, static_cast<float>(app.ol.x + 10),
-          static_cast<float>(app.ol.y + 6 + app.fonts.regular.ascender()),
-          ol_title, 25, 90, 170);
     }
-    // Focus toggle (section isolation) — left of close.
+    draw_floating_frame(app, SDL_Rect{app.ol.x, app.ol.y, app.ol.w, app.ol.h},
+                        ol_title, true, !app.outline_docked);
+    // Focus toggle (section isolation) — a small push button left of close.
     {
-      const char* flab = app.section_focus_mode ? "Focus●" : "Focus";
-      int fw = app.fonts.regular.measure(flab);
-      int fx = app.ol.x + app.ol.w - 28 - fw - 10;
-      if (app.section_focus_mode) {
-        SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
-        SDL_SetRenderDrawColor(app.sdl, 25, 90, 170, 50);
-        SDL_Rect chip{fx - 4, app.ol.y + 4, fw + 8, help_title_h - 6};
-        SDL_RenderFillRect(app.sdl, &chip);
-        SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
-      }
+      namespace th = xanatoo::theme;
+      const char* flab = app.section_focus_mode ? "Focus ●" : "Focus";
+      const int fw = app.fonts.regular.measure(flab);
+      SDL_Rect fb{app.ol.x + app.ol.w - 28 - fw - 18, app.ol.y + 5, fw + 12,
+                  help_title_h - 10};
+      th::draw_button_face(app.sdl, fb, app.section_focus_mode, false);
+      const th::Palette& pal = th::palette();
       app.renderer.draw_text(
-          app.fonts.regular, static_cast<float>(fx),
-          static_cast<float>(app.ol.y + 6 + app.fonts.regular.ascender()), flab,
-          app.section_focus_mode ? 25 : 80, app.section_focus_mode ? 90 : 70,
-          app.section_focus_mode ? 170 : 60);
+          app.fonts.regular, static_cast<float>(fb.x + 6),
+          static_cast<float>(fb.y +
+                             (fb.h - app.fonts.regular.line_height()) / 2 +
+                             app.fonts.regular.ascender()),
+          flab, pal.text.r, pal.text.g, pal.text.b);
     }
-    app.renderer.draw_text(
-        app.fonts.regular, static_cast<float>(app.ol.x + app.ol.w - 22),
-        static_cast<float>(app.ol.y + 6 + app.fonts.regular.ascender()), "×",
-        80, 40, 40);
 
     SDL_Rect clip{cx, cy, cw, ch};
     SDL_RenderSetClipRect(app.sdl, &clip);
@@ -2678,15 +2318,13 @@ void draw_outline_panel(App& app) {
       line += e.text;
       if (e.folded && e.has_children) line += " …";
       if (i == app.outline_sel) {
-        SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
-        SDL_SetRenderDrawColor(app.sdl, 25, 90, 170, 40);
+        const auto& pal = xanatoo::theme::palette();
         SDL_Rect hi{cx + 2,
                     static_cast<int>(ty - app.fonts.regular.ascender() - 2),
                     cw - 4, static_cast<int>(step)};
-        SDL_RenderFillRect(app.sdl, &hi);
-        SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
+        xanatoo::theme::fill(app.sdl, hi, pal.accent);
         app.renderer.draw_text(app.fonts.regular, static_cast<float>(cx + 8),
-                               ty, line, 25, 90, 170);
+                               ty, line, 255, 255, 255);
       } else {
         app.renderer.draw_text(app.fonts.regular, static_cast<float>(cx + 8),
                                ty, line, 50, 48, 42);
@@ -2701,33 +2339,11 @@ void draw_outline_panel(App& app) {
     }
     SDL_RenderSetClipRect(app.sdl, nullptr);
 
-    // Scrollbar
     {
-      float content_h = static_cast<float>(app.outline.size()) * step + 8.f;
-      float max_s = std::max(0.f, content_h - static_cast<float>(ch));
-      if (max_s > 1.f) {
-        const int sb_w = 8;
-        float view_h = static_cast<float>(ch);
-        float thumb_h = std::max(20.f, view_h * (view_h / (view_h + max_s)));
-        float track = std::max(0.f, view_h - thumb_h);
-        float ratio = app.ol.scroll / max_s;
-        int thumb_y = cy + static_cast<int>(ratio * track);
-        int sx = cx + cw - sb_w;
-        SDL_SetRenderDrawColor(app.sdl, 220, 218, 212, 255);
-        SDL_Rect track_r{sx, cy, sb_w, ch};
-        SDL_RenderFillRect(app.sdl, &track_r);
-        SDL_SetRenderDrawColor(app.sdl, 25, 90, 170, 255);
-        SDL_Rect thumb{sx, thumb_y, sb_w, static_cast<int>(thumb_h)};
-        SDL_RenderFillRect(app.sdl, &thumb);
-      }
-    }
-    // Resize grip
-    {
-      const int gx = app.ol.x + app.ol.w - 3;
-      const int gy = app.ol.y + app.ol.h - 3;
-      SDL_SetRenderDrawColor(app.sdl, 25, 90, 170, 255);
-      for (int i = 0; i < 3; ++i)
-        SDL_RenderDrawLine(app.sdl, gx - i * 3, gy, gx, gy - i * 3);
+      const float content_h =
+          static_cast<float>(app.outline.size()) * step + 8.f;
+      const float max_s = std::max(0.f, content_h - static_cast<float>(ch));
+      draw_client_scrollbar(app, cx, cy, cw, ch, app.ol.scroll, max_s);
     }
   }
 }
@@ -2746,33 +2362,11 @@ void draw_backlinks_panel(App& app) {
       float max_s = std::max(0.f, content_h - static_cast<float>(ch));
       if (app.bl.scroll > max_s) app.bl.scroll = max_s;
     }
-    SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(app.sdl, 0, 0, 0, 40);
-    SDL_Rect shadow{app.bl.x + 3, app.bl.y + 3, app.bl.w, app.bl.h};
-    SDL_RenderFillRect(app.sdl, &shadow);
-    SDL_SetRenderDrawColor(app.sdl, 248, 246, 240, 255);
-    SDL_Rect frame{app.bl.x, app.bl.y, app.bl.w, app.bl.h};
-    SDL_RenderFillRect(app.sdl, &frame);
-    SDL_SetRenderDrawColor(app.sdl, 90, 60, 140, 255);
-    SDL_RenderDrawRect(app.sdl, &frame);
-    SDL_SetRenderDrawColor(app.sdl, 220, 210, 235, 255);
-    SDL_Rect title{app.bl.x + 1, app.bl.y + 1, app.bl.w - 2, title_h};
-    SDL_RenderFillRect(app.sdl, &title);
-    SDL_SetRenderDrawColor(app.sdl, 90, 60, 140, 255);
-    SDL_RenderDrawLine(app.sdl, app.bl.x, app.bl.y + title_h,
-                       app.bl.x + app.bl.w, app.bl.y + title_h);
-    SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
-    std::string title_s = app.backlinks_label.empty()
-                              ? "Backlinks (no label under caret)"
-                              : ("Backlinks → #" + app.backlinks_label);
-    app.renderer.draw_text(
-        app.fonts.regular, static_cast<float>(app.bl.x + 10),
-        static_cast<float>(app.bl.y + 6 + app.fonts.regular.ascender()),
-        title_s, 90, 60, 140);
-    app.renderer.draw_text(
-        app.fonts.regular, static_cast<float>(app.bl.x + app.bl.w - 22),
-        static_cast<float>(app.bl.y + 6 + app.fonts.regular.ascender()), "×",
-        80, 40, 40);
+    draw_floating_frame(app, SDL_Rect{app.bl.x, app.bl.y, app.bl.w, app.bl.h},
+                        app.backlinks_label.empty()
+                            ? "Backlinks (no label under caret)"
+                            : ("Backlinks → #" + app.backlinks_label),
+                        true);
     SDL_Rect clip{cx, cy, cw, ch};
     SDL_RenderSetClipRect(app.sdl, &clip);
     float ty =
@@ -2789,21 +2383,26 @@ void draw_backlinks_panel(App& app) {
         if (!e.rel.empty()) line += ":" + e.rel;
         line += "  ";
         line += e.preview;
-        if (i == app.backlinks_sel) {
-          SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
-          SDL_SetRenderDrawColor(app.sdl, 90, 60, 140, 40);
+        const bool sel = i == app.backlinks_sel;
+        if (sel) {
           SDL_Rect hi{cx + 2,
                       static_cast<int>(ty - app.fonts.regular.ascender() - 2),
                       cw - 4, static_cast<int>(step)};
-          SDL_RenderFillRect(app.sdl, &hi);
-          SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
+          xanatoo::theme::fill(app.sdl, hi, xanatoo::theme::palette().accent);
         }
         app.renderer.draw_text(app.fonts.regular, static_cast<float>(cx + 8),
-                               ty, line, 40, 40, 45);
+                               ty, line, sel ? 255 : 40, sel ? 255 : 40,
+                               sel ? 255 : 45);
       }
       ty += step;
     }
     SDL_RenderSetClipRect(app.sdl, nullptr);
+    {
+      const float content_h =
+          static_cast<float>(app.backlinks.size()) * step + 8.f;
+      const float max_s = std::max(0.f, content_h - static_cast<float>(ch));
+      draw_client_scrollbar(app, cx, cy, cw, ch, app.bl.scroll, max_s);
+    }
   }
 }
 
@@ -2822,36 +2421,9 @@ void draw_help_window(App& app) {
       if (app.help.scroll > max_s) app.help.scroll = max_s;
     }
 
-    // Frame + title bar
-    SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(app.sdl, 0, 0, 0, 40);
-    SDL_Rect shadow{app.help.x + 3, app.help.y + 3, app.help.w, app.help.h};
-    SDL_RenderFillRect(app.sdl, &shadow);
-    SDL_SetRenderDrawColor(app.sdl, 246, 245, 244, 255);
-    SDL_Rect frame{app.help.x, app.help.y, app.help.w, app.help.h};
-    SDL_RenderFillRect(app.sdl, &frame);
-    SDL_SetRenderDrawColor(app.sdl, 156, 154, 151, 255);
-    SDL_RenderDrawRect(app.sdl, &frame);
-    // Title bar (Clearlooks-ish blue-grey)
-    SDL_SetRenderDrawColor(app.sdl, 200, 212, 232, 255);
-    SDL_Rect title{app.help.x + 1, app.help.y + 1, app.help.w - 2,
-                   help_title_h};
-    SDL_RenderFillRect(app.sdl, &title);
-    SDL_SetRenderDrawColor(app.sdl, 156, 154, 151, 255);
-    SDL_RenderDrawLine(app.sdl, app.help.x, app.help.y + help_title_h,
-                       app.help.x + app.help.w, app.help.y + help_title_h);
-    SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
-
-    const char* title_txt = "Help — xanatoo";
-    app.renderer.draw_text(
-        app.fonts.regular, static_cast<float>(app.help.x + 10),
-        static_cast<float>(app.help.y + 6 + app.fonts.regular.ascender()),
-        title_txt, 46, 52, 54);
-    // Close affordance
-    app.renderer.draw_text(
-        app.fonts.regular, static_cast<float>(app.help.x + app.help.w - 22),
-        static_cast<float>(app.help.y + 6 + app.fonts.regular.ascender()), "×",
-        80, 40, 40);
+    draw_floating_frame(
+        app, SDL_Rect{app.help.x, app.help.y, app.help.w, app.help.h},
+        "Help — xanatoo", true);
 
     auto [cx, cy, cw, ch] = help_client_rect(app);
     SDL_Rect clip{cx, cy, cw, ch};
@@ -2863,35 +2435,10 @@ void draw_help_window(App& app) {
                       static_cast<float>(cx));
     SDL_RenderSetClipRect(app.sdl, nullptr);
 
-    // Client scrollbar when content overflows
     {
-      float max_s = std::max(
+      const float max_s = std::max(
           0.f, app.help_layout.content_height - static_cast<float>(ch) + 40.f);
-      if (max_s > 1.f) {
-        const int sb_w = 8;
-        float view_h = static_cast<float>(ch);
-        float thumb_h = std::max(20.f, view_h * (view_h / (view_h + max_s)));
-        float track = std::max(0.f, view_h - thumb_h);
-        float ratio = app.help.scroll / max_s;
-        int thumb_y = cy + static_cast<int>(ratio * track);
-        int sx = cx + cw - sb_w;
-        SDL_SetRenderDrawColor(app.sdl, 220, 218, 212, 255);
-        SDL_Rect track_r{sx, cy, sb_w, ch};
-        SDL_RenderFillRect(app.sdl, &track_r);
-        SDL_SetRenderDrawColor(app.sdl, 140, 138, 130, 255);
-        SDL_Rect thumb{sx, thumb_y, sb_w, static_cast<int>(thumb_h)};
-        SDL_RenderFillRect(app.sdl, &thumb);
-      }
-    }
-
-    // SE resize grip (classic desktop affordance)
-    {
-      const int gx = app.help.x + app.help.w - 3;
-      const int gy = app.help.y + app.help.h - 3;
-      SDL_SetRenderDrawColor(app.sdl, 120, 118, 110, 255);
-      for (int i = 0; i < 3; ++i) {
-        SDL_RenderDrawLine(app.sdl, gx - i * 3, gy, gx, gy - i * 3);
-      }
+      draw_client_scrollbar(app, cx, cy, cw, ch, app.help.scroll, max_s);
     }
   }
 }
@@ -2915,63 +2462,17 @@ void draw_soft_windows(App& app) {
           0.f, sw.layout.content_height - static_cast<float>(ch) + 40.f);
       if (sw.scroll > max_s) sw.scroll = max_s;
     }
-    SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(app.sdl, 0, 0, 0, 40);
-    SDL_Rect shadow{sw.x + 3, sw.y + 3, sw.w, sw.h};
-    SDL_RenderFillRect(app.sdl, &shadow);
-    SDL_SetRenderDrawColor(app.sdl, 246, 245, 244, 255);
-    SDL_Rect frame{sw.x, sw.y, sw.w, sw.h};
-    SDL_RenderFillRect(app.sdl, &frame);
-    SDL_SetRenderDrawColor(app.sdl, 120, 140, 100, 255);
-    SDL_RenderDrawRect(app.sdl, &frame);
-    SDL_SetRenderDrawColor(app.sdl, 210, 225, 190, 255);
-    SDL_Rect title{sw.x + 1, sw.y + 1, sw.w - 2, help_title_h};
-    SDL_RenderFillRect(app.sdl, &title);
-    SDL_SetRenderDrawColor(app.sdl, 120, 140, 100, 255);
-    SDL_RenderDrawLine(app.sdl, sw.x, sw.y + help_title_h, sw.x + sw.w,
-                       sw.y + help_title_h);
-    SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
-    {
-      const std::string stitle = soft_title(app, sw);
-      app.renderer.draw_text(
-          app.fonts.regular, static_cast<float>(sw.x + 10),
-          static_cast<float>(sw.y + 6 + app.fonts.regular.ascender()),
-          stitle.c_str(), 40, 55, 35);
-    }
-    app.renderer.draw_text(
-        app.fonts.regular, static_cast<float>(sw.x + sw.w - 22),
-        static_cast<float>(sw.y + 6 + app.fonts.regular.ascender()), "×", 80,
-        40, 40);
+    draw_floating_frame(app, SDL_Rect{sw.x, sw.y, sw.w, sw.h},
+                        soft_title(app, sw), &sw == &app.soft_wins.back());
     SDL_Rect clip{cx, cy, cw, ch};
     SDL_RenderSetClipRect(app.sdl, &clip);
     app.renderer.draw(sw.layout, sw.scroll - static_cast<float>(cy),
                       static_cast<float>(cx));
     SDL_RenderSetClipRect(app.sdl, nullptr);
     {
-      float max_s = std::max(
+      const float max_s = std::max(
           0.f, sw.layout.content_height - static_cast<float>(ch) + 40.f);
-      if (max_s > 1.f) {
-        const int sb_w = 8;
-        float view_h = static_cast<float>(ch);
-        float thumb_h = std::max(20.f, view_h * (view_h / (view_h + max_s)));
-        float track = std::max(0.f, view_h - thumb_h);
-        float ratio = sw.scroll / max_s;
-        int thumb_y = cy + static_cast<int>(ratio * track);
-        int sx = cx + cw - sb_w;
-        SDL_SetRenderDrawColor(app.sdl, 220, 218, 212, 255);
-        SDL_Rect track_r{sx, cy, sb_w, ch};
-        SDL_RenderFillRect(app.sdl, &track_r);
-        SDL_SetRenderDrawColor(app.sdl, 100, 130, 80, 255);
-        SDL_Rect thumb{sx, thumb_y, sb_w, static_cast<int>(thumb_h)};
-        SDL_RenderFillRect(app.sdl, &thumb);
-      }
-    }
-    {
-      const int gx = sw.x + sw.w - 3;
-      const int gy = sw.y + sw.h - 3;
-      SDL_SetRenderDrawColor(app.sdl, 100, 130, 80, 255);
-      for (int i = 0; i < 3; ++i)
-        SDL_RenderDrawLine(app.sdl, gx - i * 3, gy, gx, gy - i * 3);
+      draw_client_scrollbar(app, cx, cy, cw, ch, sw.scroll, max_s);
     }
   }
 }

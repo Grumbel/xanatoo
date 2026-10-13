@@ -124,6 +124,14 @@ struct Hover {
   std::string transclude_src;
 };
 
+// What the status bar says this frame (derived from world state each frame).
+enum class StatusTone { Hint, Info, Browse, Warn, Prompt, Notice };
+struct StatusLine {
+  std::string text;   // left panel: hint, hover target, prompt, notice
+  std::string stats;  // right panel: word / selection counts (may be empty)
+  StatusTone tone = StatusTone::Hint;
+};
+
 struct App {
   App(SDL_Window* w, SDL_Renderer* r)
       : window(w),
@@ -375,6 +383,14 @@ const std::string& soft_path(App& app, const SoftWindow& sw);
 std::string soft_title(App& app, const SoftWindow& sw);
 void layout_soft(App& app, SoftWindow& sw);
 void raise_soft(App& app, size_t i);
+
+// ---- chrome (theme-based canvas widgets) ----
+StatusLine compute_status(App& app);
+void draw_floating_frame(App& app, const SDL_Rect& outer,
+                         const std::string& title, bool active,
+                         bool resizable = true);
+void draw_client_scrollbar(App& app, int cx, int cy, int cw, int ch,
+                           float scroll, float max_scroll);
 
 // ---- frame stages ----
 void sync_window_size(App& app);

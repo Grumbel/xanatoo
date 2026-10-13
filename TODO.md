@@ -8,6 +8,22 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-13)
+
+Architecture + look pass:
+- `main()` (8.6k lines of lambdas) split into `App` data + `src/app_*.cpp`
+  systems; events dispatched per SDL event type; `execute_command` shared by
+  menus/toolbar; status line computed as data (`compute_status`).
+- New `theme.hpp/.cpp`: classic BeOS/GNOME2 palette + bevel/gradient/window
+  primitives. Floating windows (help, outline, backlinks, document windows)
+  share one yellow-tab frame; status bar = sunken panels (no more overlapping
+  hint/stats, readable notices); scrollbar uses bevelled buttons + grip.
+- Ctrl+Tab no longer opens ImGui's window-switcher popup.
+- Follow-ups: key handling (`on_keydown`, ~1800 lines) still inline — move to
+  a key→UiCommand table; unify the nine `*_mode` prompt flags into one
+  `Prompt` component; `draw_pane` (~750 lines) and `on_mousebuttondown` /
+  `on_mousemotion` could be split into hit-test + action systems.
+
 ## Status (2026-10-12)
 
 Right-click context menu no longer clears the selection when the click is
