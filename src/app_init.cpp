@@ -89,8 +89,9 @@ bool app_init(App& app) {
   if (!app.ui.init(app.window, app.sdl, app.opt.ui_scale)) {
     std::cerr << "Warning: ImGui UI failed to init; continuing without menus\n";
   }
-  app.panes[0].buf = app.buffers[0].id;
-  app.panes[1].buf = app.buffers[app.buffers.size() > 1 ? 1 : 0].id;
+  app.panes[0].buf = app.buffers.front().id;
+  app.panes[1].buf = app.buffers.size() > 1 ? app.buffers.back().id
+                                            : app.buffers.front().id;
   for (int pi = 0; pi < 2; ++pi) {
     Pane& p = app.panes[pi];
     xanatoo::ensure_valid_caret(buf(app, p.buf).doc, p.sel.focus);
@@ -115,18 +116,18 @@ bool app_init(App& app) {
   for (const auto& b : app.buffers) {
     if (!b.path.empty()) push_nav_history(app, b.path);
   }
-  if (!app.buffers.empty() && is_in_app_remote_url(app.buffers[0].path)) {
-    std::string u = app.buffers[0].path;
-    app.buffers[0].path.clear();
+  // A remote URL given on the command line loads through the navigator
+  // (the pane's buffer starts as a "Loading…" placeholder).
+  for (int pi = 0; pi < (app.buffers.size() > 1 ? 2 : 1); ++pi) {
+    DocBuffer& b = buf(app, app.panes[pi].buf);
+    if (!is_in_app_remote_url(b.path)) continue;
+    std::string u = std::move(b.path);
+    b.path.clear();
+    app.focus = pi;
     navigate_to_url(app, std::move(u));
-  } else if (app.buffers.size() > 1 &&
-             is_in_app_remote_url(app.buffers[1].path)) {
-    std::string u = app.buffers[1].path;
-    app.buffers[1].path.clear();
-    app.focus = 1;
-    navigate_to_url(app, std::move(u));
-    app.focus = 0;
+    break;
   }
+  app.focus = 0;
   app.split = app.buffers.size() > 1;  // auto-split when two files given
   return true;
 }

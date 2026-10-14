@@ -168,12 +168,8 @@ static void on_mousewheel(App& app, SDL_Event& ev, bool imgui_mouse,
   return;
 }
 
-static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
-                               bool imgui_keys) {
-  if (static_cast<float>(ev.button.y) < app.ui_top) return;
-  if (ev.button.y >= app.win_h - status_bar_h) return;
-
-  if (ev.button.button == SDL_BUTTON_LEFT) {
+// Left press: floats, scrollbar, split gutter, then document hit-tests.
+static void mouse_left_down(App& app, SDL_Event& ev, bool imgui_mouse) {
     const int mxw = ev.button.x, myw = ev.button.y;
 
     // Floating windows are custom-drawn (not ImGui). Hit-test them
@@ -509,7 +505,10 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
       p.preferred_x = lx;
       reset_blink(app);
     }
-  } else if (ev.button.button == SDL_BUTTON_MIDDLE) {
+}
+
+// Middle press: paste at the pointer (unless over a float).
+static void mouse_middle_down(App& app, SDL_Event& ev, bool imgui_mouse) {
     // Middle-click paste at caret (common on Linux).
     if (app.browse_mode) return;
     if (imgui_mouse) return;
@@ -535,7 +534,10 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
       }
       if (clip) SDL_free(clip);
     }
-  } else if (ev.button.button == SDL_BUTTON_RIGHT) {
+}
+
+// Right press: floats absorb it; otherwise open the context menu.
+static void mouse_right_down(App& app, SDL_Event& ev, bool imgui_mouse) {
     // Soft windows / outline / help absorb right-clicks (no doc menu under
     // them).
     const int rx = ev.button.x, ry = ev.button.y;
@@ -570,8 +572,25 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
       app.ui.open_context_menu(static_cast<float>(ev.button.x),
                                static_cast<float>(ev.button.y));
     }
+}
+
+static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
+                               bool imgui_keys) {
+  if (static_cast<float>(ev.button.y) < app.ui_top) return;
+  if (ev.button.y >= app.win_h - status_bar_h) return;
+  switch (ev.button.button) {
+    case SDL_BUTTON_LEFT:
+      mouse_left_down(app, ev, imgui_mouse);
+      break;
+    case SDL_BUTTON_MIDDLE:
+      mouse_middle_down(app, ev, imgui_mouse);
+      break;
+    case SDL_BUTTON_RIGHT:
+      mouse_right_down(app, ev, imgui_mouse);
+      break;
+    default:
+      break;
   }
-  return;
 }
 
 static void on_mousebuttonup(App& app, SDL_Event& ev, bool imgui_mouse,
