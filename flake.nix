@@ -33,6 +33,7 @@
               sdl3
               freetype
               fontconfig
+              expat # fontconfig.pc Requires: expat
               openssl
               sqlite
               # Prefer top-level libx11; xorg.* package set is deprecated.

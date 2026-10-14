@@ -90,10 +90,22 @@ target_include_directories(xanatoo PRIVATE
 )
 
 find_package(SQLite3 REQUIRED)
+# Imported target name differs by CMake version: SQLite::SQLite3 (some
+# CMake versions) vs SQLite3::SQLite3. Normalise to xanatoo_sqlite3.
+if(TARGET SQLite3::SQLite3)
+  add_library(xanatoo_sqlite3 ALIAS SQLite3::SQLite3)
+elseif(TARGET SQLite::SQLite3)
+  add_library(xanatoo_sqlite3 ALIAS SQLite::SQLite3)
+else()
+  add_library(xanatoo_sqlite3 UNKNOWN IMPORTED)
+  set_target_properties(xanatoo_sqlite3 PROPERTIES
+    IMPORTED_LOCATION "${SQLite3_LIBRARIES}"
+    INTERFACE_INCLUDE_DIRECTORIES "${SQLite3_INCLUDE_DIRS}")
+endif()
 
 target_link_libraries(xanatoo PRIVATE
   ${SDL2_LIBRARIES}
-  SQLite3::SQLite3
+  xanatoo_sqlite3
   Freetype::Freetype
   ${FONTCONFIG_LIBRARIES}
 )
