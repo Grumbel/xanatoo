@@ -77,7 +77,7 @@ void invalidate_height_around(App& app, Pane& pane, xanatoo::NodeId id) {
   }
 }
 
-void drop_height_hints_for_buf(App& app, int bi) {
+void drop_height_hints_for_buf(App& app, BufferId bi) {
   for (int pi = 0; pi < 2; ++pi) {
     if (app.panes[pi].buf != bi) continue;
     app.panes[pi].height_cache.clear();
@@ -183,12 +183,10 @@ void refresh_diff(App& app) {
   app.diff_words[0].clear();
   app.diff_words[1].clear();
   if (!app.diff_mode || shared_doc(app)) return;
-  const int b0 = app.panes[0].buf, b1 = app.panes[1].buf;
-  if (b0 < 0 || b1 < 0 || b0 >= static_cast<int>(app.buffers.size()) ||
-      b1 >= static_cast<int>(app.buffers.size()) || b0 == b1)
-    return;
-  xanatoo::compute_diff_marks(app.buffers[static_cast<size_t>(b0)].doc,
-                              app.buffers[static_cast<size_t>(b1)].doc,
+  const BufferId b0 = app.panes[0].buf, b1 = app.panes[1].buf;
+  if (!find_buf(app, b0) || !find_buf(app, b1) || b0 == b1) return;
+  xanatoo::compute_diff_marks(buf(app, b0).doc,
+                              buf(app, b1).doc,
                               app.diff_marks[0], app.diff_marks[1],
                               &app.diff_words[0], &app.diff_words[1]);
 }
@@ -244,9 +242,8 @@ void layout_panes(App& app) {
   }
   // Clamp pane buffer indices if tabs were closed out from under them.
   for (int pi = 0; pi < 2; ++pi) {
-    if (app.panes[pi].buf < 0 ||
-        app.panes[pi].buf >= static_cast<int>(app.buffers.size())) {
-      app.panes[pi].buf = app.tab_order.empty() ? 0 : app.tab_order.front();
+    if (!find_buf(app, app.panes[pi].buf) && !app.tab_order.empty()) {
+      app.panes[pi].buf = app.tab_order.front();
     }
   }
   // Block heights depend on width; drop hints when this pane's width changed.

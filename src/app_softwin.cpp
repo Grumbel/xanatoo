@@ -175,25 +175,16 @@ void clamp_all_floating(App& app) {
 }
 
 xanatoo::Document& soft_doc(App& app, SoftWindow& sw) {
-  if (app.buffers.empty()) {
-    DocBuffer empty;
-    empty.doc = xanatoo::parse_document(xanatoo::fallback_document(), {});
-    app.buffers.push_back(std::move(empty));
-    app.tab_order.push_back(0);
-    app.panes[0].buf = app.panes[1].buf = 0;
-    app.buffers[0].history.reset(app.buffers[0].doc, app.panes[0].sel);
-  }
-  if (sw.buf < 0 || sw.buf >= static_cast<int>(app.buffers.size()))
-    return app.buffers[0].doc;
-  return app.buffers[static_cast<size_t>(sw.buf)].doc;
+  return buf(app, sw.buf).doc;
 }
 
 const std::string& soft_path(App& app, const SoftWindow& sw) {
-  if (sw.buf < 0 || sw.buf >= static_cast<int>(app.buffers.size())) {
+  const DocBuffer* b = find_buf(app, sw.buf);
+  if (!b) {
     static const std::string empty;
     return empty;
   }
-  return app.buffers[static_cast<size_t>(sw.buf)].path;
+  return b->path;
 }
 
 std::string soft_title(App& app, const SoftWindow& sw) {

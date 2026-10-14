@@ -58,29 +58,30 @@ bool app_init(App& app) {
       if (p0.empty())
         std::cerr << "Note: examples/welcome.md not found; starting empty.\n";
     }
-    DocBuffer b0;
+    std::string b0_path;
+    xanatoo::Document b0_doc;
     {
       std::string r0 = resolve_open_path(app, p0);
-      b0.path = r0.empty() ? p0 : r0;
-      b0.doc = load_doc_or_placeholder(app, b0.path.empty() ? p0 : b0.path);
+      b0_path = r0.empty() ? p0 : r0;
+      b0_doc = load_doc_or_placeholder(app, b0_path.empty() ? p0 : b0_path);
       // If EPUB resolve failed, still attempt load_doc on original for error
       // page.
-      if (xanatoo::is_epub_path(p0) && r0.empty()) b0.doc = load_doc(app, p0);
+      if (xanatoo::is_epub_path(p0) && r0.empty()) b0_doc = load_doc(app, p0);
     }
-    app.buffers.push_back(std::move(b0));
+    add_buffer(app, std::move(b0_doc), std::move(b0_path));
     if (!p1.empty()) {
-      DocBuffer b1;
+      std::string b1_path;
+      xanatoo::Document b1_doc;
       {
         std::string r1 = resolve_open_path(app, p1);
-        b1.path = r1.empty() ? p1 : r1;
-        b1.doc = load_doc_or_placeholder(app, b1.path);
-        if (xanatoo::is_epub_path(p1) && r1.empty()) b1.doc = load_doc(app, p1);
+        b1_path = r1.empty() ? p1 : r1;
+        b1_doc = load_doc_or_placeholder(app, b1_path);
+        if (xanatoo::is_epub_path(p1) && r1.empty()) b1_doc = load_doc(app, p1);
       }
-      app.buffers.push_back(std::move(b1));
+      add_buffer(app, std::move(b1_doc), std::move(b1_path));
     }
   }
-  for (int i = 0; i < static_cast<int>(app.buffers.size()); ++i)
-    app.tab_order.push_back(i);
+  for (const auto& b : app.buffers) app.tab_order.push_back(b.id);
   update_title(app);
   xanatoo::load_view_settings(app.view_settings);
   app.layout_engine.set_options(
@@ -88,17 +89,14 @@ bool app_init(App& app) {
   if (!app.ui.init(app.window, app.sdl, app.opt.ui_scale)) {
     std::cerr << "Warning: ImGui UI failed to init; continuing without menus\n";
   }
-  app.panes[0].buf = 0;
-  app.panes[1].buf = (app.buffers.size() > 1) ? 1 : 0;
-  xanatoo::ensure_valid_caret(app.buffers[0].doc, app.panes[0].sel.focus);
-  app.panes[0].sel.anchor = app.panes[0].sel.focus;
-  xanatoo::ensure_valid_caret(
-      app.buffers[static_cast<size_t>(app.panes[1].buf)].doc,
-      app.panes[1].sel.focus);
-  app.panes[1].sel.anchor = app.panes[1].sel.focus;
-  app.buffers[0].history.reset(app.buffers[0].doc, app.panes[0].sel);
-  if (app.buffers.size() > 1)
-    app.buffers[1].history.reset(app.buffers[1].doc, app.panes[1].sel);
+  app.panes[0].buf = app.buffers[0].id;
+  app.panes[1].buf = app.buffers[app.buffers.size() > 1 ? 1 : 0].id;
+  for (int pi = 0; pi < 2; ++pi) {
+    Pane& p = app.panes[pi];
+    xanatoo::ensure_valid_caret(buf(app, p.buf).doc, p.sel.focus);
+    p.sel.anchor = p.sel.focus;
+    buf(app, p.buf).history.reset(buf(app, p.buf).doc, p.sel);
+  }
   {
     int nw = 0, nh = 0;
     SDL_GetWindowSize(app.window, &nw, &nh);

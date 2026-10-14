@@ -8,6 +8,13 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-14) — ECS-lite refactor (docs/PLAN-ecs-lite.md)
+
+- Phase A done: stable `BufferId`s (`buf`/`find_buf`/`add_buffer`/`remove_buffer`/`close_tab`).
+  Behaviour notes: closing a tab now frees its buffer (unless a floating window still
+  shows it); diff marks are indexed by pane, not by buffer.
+- Phase B (Window record) and C (Prompt) pending.
+
 ## Status (2026-10-13)
 
 Architecture + look pass:

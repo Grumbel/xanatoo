@@ -41,7 +41,12 @@ constexpr int help_title_h = 28;
 constexpr int help_pad = 12;
 constexpr int help_edge = 6;
 
+// Stable identity of a document buffer; never reused, 0 = none.
+using BufferId = uint32_t;
+constexpr BufferId kNoBuffer = 0;
+
 struct DocBuffer {
+  BufferId id = kNoBuffer;
   xanatoo::Document doc;
   std::string path;
   bool dirty = false;
@@ -49,7 +54,7 @@ struct DocBuffer {
 };
 
 struct Pane {
-  int buf = 0;  // index into buffers
+  BufferId buf = kNoBuffer;
   xanatoo::Selection sel{};
   float scroll_y = 0.f;
   float preferred_x = 0.f;
@@ -67,7 +72,7 @@ struct Pane {
 enum class SoftDock { None = 0, Left, Right, Top, Bottom, Max };
 
 struct SoftWindow {
-  int buf = -1;       // index into buffers (−1 = unused)
+  BufferId buf = kNoBuffer;
   std::string title;  // display override; empty → derive from path
   xanatoo::Selection sel{};
   xanatoo::LayoutResult layout;
@@ -149,8 +154,9 @@ struct App {
   int body_px = 17;
   int heading_px = 26;
   xanatoo::FontSet fonts;
-  std::vector<DocBuffer> buffers;
-  std::vector<int> tab_order;
+  std::vector<DocBuffer> buffers;  // dense storage; address by BufferId
+  BufferId next_buffer_id = 1;
+  std::vector<BufferId> tab_order;
   ImageCache images;
   LayoutEngine layout_engine;
   xanatoo::ViewSettings view_settings;
@@ -285,7 +291,7 @@ xanatoo::Document load_doc(App& app, std::string path);
 std::string parent_dir(const std::string& path);
 bool is_in_app_remote_url(std::string_view s);
 xanatoo::Document load_doc_or_placeholder(App& app, const std::string& path);
-std::string buffer_tab_label(App& app, int bi);
+std::string buffer_tab_label(App& app, BufferId bi);
 void update_title(App& app);
 xanatoo::Document& doc_of(App& app, Pane& p);
 std::string& path_of(App& app, Pane& p);
@@ -295,13 +301,23 @@ Pane& focused_pane(App& app);
 void checkpoint(App& app);
 void mark_dirty(App& app);
 bool any_dirty(App& app);
-bool allow_discard_dirty(App& app, int di);
+bool allow_discard_dirty(App& app, BufferId di);
 void edit(App& app);
 std::string find_help_path(App& app);
 std::string find_repo_file(App& app, const char* name);
 std::string canon_path(App& app, const std::string& path);
-int find_buffer(App& app, const std::string& path);
-int ensure_buffer(App& app, const std::string& path);
+BufferId find_buffer(App& app, const std::string& path);
+BufferId ensure_buffer(App& app, const std::string& path);
+// Buffer accessors. Never hold a DocBuffer& across add_buffer/remove_buffer.
+DocBuffer* find_buf(App& app, BufferId id);
+DocBuffer& buf(App& app, BufferId id);  // asserts the buffer exists
+BufferId add_buffer(App& app, xanatoo::Document doc, std::string path);
+// Removes the buffer and every pane / float / tab reference to it
+// (repoints panes at the next tab; creates an untitled buffer if none left).
+void remove_buffer(App& app, BufferId id);
+// Close a tab: like remove_buffer, but keeps the buffer while a floating
+// window still shows it.
+void close_tab(App& app, BufferId id);
 void pop_out_focused(App& app);
 void pop_in_soft(App& app, size_t si);
 void open_browse(App& app, const std::string& path, const std::string& title);
@@ -314,7 +330,7 @@ void apply_view_settings(App& app);
 void refresh_outline(App& app);
 void refresh_backlinks(App& app);
 void invalidate_height_around(App& app, Pane& pane, xanatoo::NodeId id);
-void drop_height_hints_for_buf(App& app, int bi);
+void drop_height_hints_for_buf(App& app, BufferId bi);
 xanatoo::NodeId active_focus_section(App& app);
 void toggle_section_fold(App& app, xanatoo::NodeId section);
 void toggle_section_focus_mode(App& app);

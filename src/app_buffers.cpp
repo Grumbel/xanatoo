@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include <algorithm>
+#include <cassert>
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
@@ -79,11 +80,97 @@ xanatoo::Document load_doc_or_placeholder(App& app, const std::string& path) {
   return load_doc(app, path);
 }
 
-std::string buffer_tab_label(App& app, int bi) {
-  if (bi < 0 || bi >= static_cast<int>(app.buffers.size())) return "?";
+DocBuffer* find_buf(App& app, BufferId id) {
+  if (id == kNoBuffer) return nullptr;
+  for (auto& b : app.buffers)
+    if (b.id == id) return &b;
+  return nullptr;
+}
+
+BufferId add_buffer(App& app, xanatoo::Document doc, std::string path) {
+  DocBuffer b;
+  b.id = app.next_buffer_id++;
+  b.doc = std::move(doc);
+  b.path = std::move(path);
+  app.buffers.push_back(std::move(b));
+  return app.buffers.back().id;
+}
+
+DocBuffer& buf(App& app, BufferId id) {
+  DocBuffer* b = find_buf(app, id);
+  assert(b && "buffer id not found");
+  if (!b) {
+    // Release-build safety net: never crash on a stale id.
+    if (app.buffers.empty()) {
+      add_buffer(app, xanatoo::parse_document(xanatoo::fallback_document(), {}),
+                 {});
+    }
+    return app.buffers.front();
+  }
+  return *b;
+}
+
+// Drop `id` from the tab strip (keeping at least one tab) and repoint panes
+// that showed it at the neighbouring tab. The buffer itself is untouched.
+static void leave_tab(App& app, BufferId id) {
+  auto tab = std::find(app.tab_order.begin(), app.tab_order.end(), id);
+  const size_t tab_i = tab == app.tab_order.end()
+                           ? 0
+                           : static_cast<size_t>(tab - app.tab_order.begin());
+  if (tab != app.tab_order.end()) app.tab_order.erase(tab);
+  if (app.tab_order.empty()) {
+    BufferId nb = add_buffer(
+        app, xanatoo::parse_document(xanatoo::fallback_document(), {}), {});
+    buf(app, nb).history.reset(buf(app, nb).doc, xanatoo::Selection{});
+    app.tab_order.push_back(nb);
+  }
+  const BufferId next =
+      app.tab_order[std::min(tab_i, app.tab_order.size() - 1)];
+  for (int pi = 0; pi < 2; ++pi) {
+    Pane& p = app.panes[pi];
+    if (p.buf != id && find_buf(app, p.buf)) continue;
+    p.buf = next;
+    p.sel = {};
+    p.scroll_y = 0.f;
+    p.layout = {};
+    p.height_cache.clear();
+    xanatoo::ensure_valid_caret(buf(app, next).doc, p.sel.focus);
+    p.sel.anchor = p.sel.focus;
+  }
+  app.needs_layout = true;
+  update_title(app);
+}
+
+void remove_buffer(App& app, BufferId id) {
+  if (!find_buf(app, id)) return;
+  app.soft_wins.erase(
+      std::remove_if(app.soft_wins.begin(), app.soft_wins.end(),
+                     [&](const SoftWindow& sw) { return sw.buf == id; }),
+      app.soft_wins.end());
+  leave_tab(app, id);
+  app.buffers.erase(
+      std::remove_if(app.buffers.begin(), app.buffers.end(),
+                     [&](const DocBuffer& b) { return b.id == id; }),
+      app.buffers.end());
+  update_title(app);
+}
+
+void close_tab(App& app, BufferId id) {
+  const bool floated =
+      std::any_of(app.soft_wins.begin(), app.soft_wins.end(),
+                  [&](const SoftWindow& sw) { return sw.buf == id; });
+  if (floated)
+    leave_tab(app, id);  // MDI: floating windows keep the buffer alive
+  else
+    remove_buffer(app, id);
+}
+
+std::string buffer_tab_label(App& app, BufferId bi) {
+  const DocBuffer* b = find_buf(app, bi);
+  if (!b) return "?";
   std::string s;
-  if (app.buffers[static_cast<size_t>(bi)].dirty) s += "*";
-  const std::string& path = app.buffers[static_cast<size_t>(bi)].path;
+  if (b->dirty) s += "*";
+  const std::string& path = b->path;
   if (path.empty()) {
     s += "untitled";
   } else {
@@ -100,7 +187,7 @@ void update_title(App& app) {
   std::string title = "xanatoo";
   if (!app.buffers.empty()) {
     title += " — ";
-    title += buffer_tab_label(app, 0);
+    title += buffer_tab_label(app, app.buffers.front().id);
     if (app.buffers.size() > 1) {
       title += " (+";
       title += std::to_string(app.buffers.size() - 1);
@@ -110,16 +197,12 @@ void update_title(App& app) {
   SDL_SetWindowTitle(app.window, title.c_str());
 }
 
-xanatoo::Document& doc_of(App& app, Pane& p) {
-  return app.buffers[static_cast<size_t>(p.buf)].doc;
-}
+xanatoo::Document& doc_of(App& app, Pane& p) { return buf(app, p.buf).doc; }
 
-std::string& path_of(App& app, Pane& p) {
-  return app.buffers[static_cast<size_t>(p.buf)].path;
-}
+std::string& path_of(App& app, Pane& p) { return buf(app, p.buf).path; }
 
 std::string base_of(App& app, Pane& p) {
-  return parent_dir(app.buffers[static_cast<size_t>(p.buf)].path);
+  return parent_dir(buf(app, p.buf).path);
 }
 
 bool shared_doc(App& app) { return app.panes[0].buf == app.panes[1].buf; }
@@ -128,15 +211,15 @@ Pane& focused_pane(App& app) { return app.panes[app.focus]; }
 
 void checkpoint(App& app) {
   Pane& p = focused_pane(app);
-  app.buffers[static_cast<size_t>(p.buf)].history.push(doc_of(app, p), p.sel);
+  buf(app, p.buf).history.push(doc_of(app, p), p.sel);
 }
 
 void mark_dirty(App& app) {
-  int di = focused_pane(app).buf;
+  const BufferId di = focused_pane(app).buf;
   app.discard_armed = false;  // new edits require a fresh discard warning
-  if (di >= 0 && di < static_cast<int>(app.buffers.size())) {
-    if (!app.buffers[static_cast<size_t>(di)].dirty) {
-      app.buffers[static_cast<size_t>(di)].dirty = true;
+  if (find_buf(app, di)) {
+    if (!buf(app, di).dirty) {
+      buf(app, di).dirty = true;
       update_title(app);
     }
     // Soft windows sharing this buffer must re-layout.
@@ -158,9 +241,9 @@ bool any_dirty(App& app) {
   return false;
 }
 
-bool allow_discard_dirty(App& app, int di) {
-  if (di < 0 || di >= static_cast<int>(app.buffers.size())) return true;
-  if (!app.buffers[static_cast<size_t>(di)].dirty) return true;
+bool allow_discard_dirty(App& app, BufferId di) {
+  const DocBuffer* b = find_buf(app, di);
+  if (!b || !b->dirty) return true;
   if (app.discard_armed) {
     app.discard_armed = false;
     return true;
@@ -256,30 +339,25 @@ std::string canon_path(App& app, const std::string& path) {
   }
 }
 
-int find_buffer(App& app, const std::string& path) {
-  if (path.empty()) return -1;
+BufferId find_buffer(App& app, const std::string& path) {
+  if (path.empty()) return kNoBuffer;
   std::string c = canon_path(app, path);
-  for (int i = 0; i < static_cast<int>(app.buffers.size()); ++i) {
-    if (app.buffers[static_cast<size_t>(i)].path.empty()) continue;
-    if (canon_path(app, app.buffers[static_cast<size_t>(i)].path) == c)
-      return i;
+  for (const auto& b : app.buffers) {
+    if (b.path.empty()) continue;
+    if (canon_path(app, b.path) == c) return b.id;
   }
-  return -1;
+  return kNoBuffer;
 }
 
-int ensure_buffer(App& app, const std::string& path) {
-  int bi = find_buffer(app, path);
-  if (bi >= 0) {
+BufferId ensure_buffer(App& app, const std::string& path) {
+  BufferId bi = find_buffer(app, path);
+  if (bi != kNoBuffer) {
     if (std::find(app.tab_order.begin(), app.tab_order.end(), bi) ==
         app.tab_order.end())
       app.tab_order.push_back(bi);
     return bi;
   }
-  DocBuffer b;
-  b.path = path;
-  b.doc = load_doc(app, path);
-  bi = static_cast<int>(app.buffers.size());
-  app.buffers.push_back(std::move(b));
+  bi = add_buffer(app, load_doc(app, path), path);
   app.tab_order.push_back(bi);
   update_title(app);
   return bi;
@@ -287,7 +365,7 @@ int ensure_buffer(App& app, const std::string& path) {
 
 void pop_out_focused(App& app) {
   Pane& p = focused_pane(app);
-  int bi = p.buf;
+  const BufferId bi = p.buf;
   for (size_t i = 0; i < app.soft_wins.size(); ++i) {
     if (app.soft_wins[i].buf == bi) {
       raise_soft(app, i);
@@ -314,8 +392,8 @@ void pop_out_focused(App& app) {
 
 void pop_in_soft(App& app, size_t si) {
   if (si >= app.soft_wins.size()) return;
-  int bi = app.soft_wins[si].buf;
-  if (bi < 0 || bi >= static_cast<int>(app.buffers.size())) {
+  const BufferId bi = app.soft_wins[si].buf;
+  if (!find_buf(app, bi)) {
     app.soft_wins.erase(app.soft_wins.begin() +
                         static_cast<std::ptrdiff_t>(si));
     return;
@@ -338,7 +416,7 @@ void open_browse(App& app, const std::string& path, const std::string& title) {
     std::cerr << "Cannot open in window: " << path << "\n";
     return;
   }
-  int bi = ensure_buffer(app, path);
+  const BufferId bi = ensure_buffer(app, path);
   // Focus existing floating window for this buffer.
   for (size_t i = 0; i < app.soft_wins.size(); ++i) {
     if (app.soft_wins[i].buf == bi) {
@@ -352,8 +430,7 @@ void open_browse(App& app, const std::string& path, const std::string& title) {
   if (!title.empty()) sw.title = title;
   sw.needs_layout = true;
   sw.scroll = 0.f;
-  xanatoo::ensure_valid_caret(app.buffers[static_cast<size_t>(bi)].doc,
-                              sw.sel.focus);
+  xanatoo::ensure_valid_caret(buf(app, bi).doc, sw.sel.focus);
   sw.sel.anchor = sw.sel.focus;
   const int cascade = static_cast<int>(app.soft_wins.size()) * 28;
   const int top = static_cast<int>(app.ui_top);

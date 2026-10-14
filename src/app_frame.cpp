@@ -62,7 +62,7 @@ void relayout_if_needed(App& app) {
 // software gamepad pointer, which synthesises mouse events).
 static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.dirty =
-      app.buffers[static_cast<size_t>(focused_pane(app).buf)].dirty;
+      buf(app, focused_pane(app).buf).dirty;
   ui_state.has_path = !path_of(app, focused_pane(app)).empty();
   ui_state.split = app.split;
   ui_state.outline = app.outline_mode;
@@ -71,8 +71,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.backlinks = app.backlinks_mode;
   ui_state.diff = app.diff_mode;
   ui_state.can_diff = !shared_doc(app) &&
-                      app.panes[0].buf != app.panes[1].buf &&
-                      app.panes[0].buf >= 0 && app.panes[1].buf >= 0;
+                      app.panes[0].buf != app.panes[1].buf;
   ui_state.structure = app.structure_mode;
   ui_state.view_line_spacing = app.view_settings.line_spacing;
   ui_state.view_margin_x = app.view_settings.margin_x;
@@ -125,7 +124,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.tab_labels.clear();
   ui_state.active_tab = 0;
   for (int ti = 0; ti < static_cast<int>(app.tab_order.size()); ++ti) {
-    int bi = app.tab_order[static_cast<size_t>(ti)];
+    const BufferId bi = app.tab_order[static_cast<size_t>(ti)];
     ui_state.tab_labels.push_back(buffer_tab_label(app, bi));
     if (bi == app.panes[app.focus].buf) ui_state.active_tab = ti;
   }
@@ -251,18 +250,18 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     }
     case C::NewDocument: {
       if (!allow_discard_dirty(app, p.buf)) break;
-      app.buffers[static_cast<size_t>(p.buf)].doc =
+      buf(app, p.buf).doc =
           xanatoo::parse_document(xanatoo::fallback_document(), {});
       path_of(app, p).clear();
-      app.buffers[static_cast<size_t>(p.buf)].dirty = false;
-      xanatoo::ensure_valid_caret(app.buffers[static_cast<size_t>(p.buf)].doc,
+      buf(app, p.buf).dirty = false;
+      xanatoo::ensure_valid_caret(buf(app, p.buf).doc,
                                   p.sel.focus);
       p.sel.anchor = p.sel.focus;
       p.scroll_y = 0.f;
       p.layout = {};
       drop_height_hints_for_buf(app, p.buf);
-      app.buffers[static_cast<size_t>(p.buf)].history.reset(
-          app.buffers[static_cast<size_t>(p.buf)].doc, p.sel);
+      buf(app, p.buf).history.reset(
+          buf(app, p.buf).doc, p.sel);
       if (app.panes[0].buf == app.panes[1].buf) {
         app.panes[1 - app.focus].sel = p.sel;
         app.panes[1 - app.focus].scroll_y = 0.f;
@@ -320,19 +319,17 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       }
       break;
     case C::NewTab: {
-      DocBuffer b;
-      b.doc = xanatoo::parse_document(xanatoo::fallback_document(), {});
-      int bi = static_cast<int>(app.buffers.size());
-      app.buffers.push_back(std::move(b));
+      const BufferId bi = add_buffer(
+          app, xanatoo::parse_document(xanatoo::fallback_document(), {}), {});
       app.tab_order.push_back(bi);
       app.panes[app.focus].buf = bi;
       app.panes[app.focus].sel = {};
-      xanatoo::ensure_valid_caret(app.buffers[static_cast<size_t>(bi)].doc,
+      xanatoo::ensure_valid_caret(buf(app, bi).doc,
                                   app.panes[app.focus].sel.focus);
       app.panes[app.focus].sel.anchor = app.panes[app.focus].sel.focus;
       app.panes[app.focus].scroll_y = 0.f;
-      app.buffers[static_cast<size_t>(bi)].history.reset(
-          app.buffers[static_cast<size_t>(bi)].doc, app.panes[app.focus].sel);
+      buf(app, bi).history.reset(
+          buf(app, bi).doc, app.panes[app.focus].sel);
       app.needs_layout = true;
       update_title(app);
       flash_status(app, "New tab");
@@ -358,26 +355,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         }
       }
       if (tab_i < 0 || app.tab_order.empty()) break;
-      int bi = app.tab_order[static_cast<size_t>(tab_i)];
+      const BufferId bi = app.tab_order[static_cast<size_t>(tab_i)];
       if (!allow_discard_dirty(app, bi)) break;
-      // Keep floating windows that still show this buffer (MDI).
-      app.tab_order.erase(app.tab_order.begin() + tab_i);
-      // If no tabs left, create empty one
-      if (app.tab_order.empty()) {
-        DocBuffer b;
-        b.doc = xanatoo::parse_document(xanatoo::fallback_document(), {});
-        app.buffers.push_back(std::move(b));
-        int nbi = static_cast<int>(app.buffers.size()) - 1;
-        app.tab_order.push_back(nbi);
-        app.panes[0].buf = app.panes[1].buf = nbi;
-      } else {
-        int next = app.tab_order[static_cast<size_t>(
-            std::min(tab_i, static_cast<int>(app.tab_order.size()) - 1))];
-        if (app.panes[0].buf == bi) app.panes[0].buf = next;
-        if (app.panes[1].buf == bi) app.panes[1].buf = next;
-      }
-      app.needs_layout = true;
-      update_title(app);
+      close_tab(app, bi);
       flash_status(app, "Tab closed");
       break;
     }
@@ -389,7 +369,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         break;
       }
       if (tab_i < 0 || tab_i >= static_cast<int>(app.tab_order.size())) break;
-      const int bi = app.tab_order[static_cast<size_t>(tab_i)];
+      const BufferId bi = app.tab_order[static_cast<size_t>(tab_i)];
       if (app.panes[app.focus].buf == bi) break;  // already showing
       app.panes[app.focus].buf = bi;
       // Fresh layout + caret for the newly focused buffer.
@@ -466,7 +446,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         std::ofstream out(spath);
         if (out) {
           out << text;
-          app.buffers[static_cast<size_t>(p.buf)].dirty = false;
+          buf(app, p.buf).dirty = false;
           app.discard_armed = false;
           update_title(app);
           flash_status(app, "Saved " + spath);
@@ -505,7 +485,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::ForceReload: {
       std::string& rpath = path_of(app, p);
       if (rpath.empty()) break;
-      if (app.buffers[static_cast<size_t>(p.buf)].dirty && cmd == C::Reload) {
+      if (buf(app, p.buf).dirty && cmd == C::Reload) {
         flash_status(app, "Unsaved changes — use Force Reload");
         break;
       }
@@ -514,14 +494,14 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         break;
       }
       xanatoo::clear_external_doc_cache();
-      app.buffers[static_cast<size_t>(p.buf)].doc = load_doc(app, rpath);
-      app.buffers[static_cast<size_t>(p.buf)].dirty = false;
-      app.buffers[static_cast<size_t>(p.buf)].history.reset(
-          app.buffers[static_cast<size_t>(p.buf)].doc, p.sel);
+      buf(app, p.buf).doc = load_doc(app, rpath);
+      buf(app, p.buf).dirty = false;
+      buf(app, p.buf).history.reset(
+          buf(app, p.buf).doc, p.sel);
       for (int pi = 0; pi < 2; ++pi) {
         Pane& rp = app.panes[pi];
         if (rp.buf != p.buf) continue;
-        xanatoo::ensure_valid_caret(app.buffers[static_cast<size_t>(p.buf)].doc,
+        xanatoo::ensure_valid_caret(buf(app, p.buf).doc,
                                     rp.sel.focus);
         rp.sel.anchor = rp.sel.focus;
         rp.scroll_y = 0.f;
@@ -542,7 +522,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     }
     case C::Undo:
-      if (app.buffers[static_cast<size_t>(p.buf)].history.undo(d, p.sel)) {
+      if (buf(app, p.buf).history.undo(d, p.sel)) {
         xanatoo::ensure_valid_caret(d, p.sel.focus);
         p.sel.anchor = p.sel.focus;
         p.layout = {};
@@ -563,7 +543,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       }
       break;
     case C::Redo:
-      if (app.buffers[static_cast<size_t>(p.buf)].history.redo(d, p.sel)) {
+      if (buf(app, p.buf).history.redo(d, p.sel)) {
         xanatoo::ensure_valid_caret(d, p.sel.focus);
         p.sel.anchor = p.sel.focus;
         p.layout = {};
@@ -1191,33 +1171,25 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         std::cerr << "Diff demo: examples/diff-v1.md and diff-v2.md required\n";
         break;
       }
-      // Drop floats — their buf indices and layouts refer to old trees.
+      // Drop floats — their layouts refer to old trees.
       app.soft_wins.clear();
       clear_interaction_hover(app);
       app.buffers.clear();
-      {
-        DocBuffer b0;
-        b0.path = p0;
-        b0.doc = load_doc(app, p0);
-        app.buffers.push_back(std::move(b0));
-        DocBuffer b1;
-        b1.path = p1;
-        b1.doc = load_doc(app, p1);
-        app.buffers.push_back(std::move(b1));
-      }
-      app.tab_order = {0, 1};
-      app.panes[0].buf = 0;
-      app.panes[1].buf = 1;
+      const BufferId d0 = add_buffer(app, load_doc(app, p0), p0);
+      const BufferId d1 = add_buffer(app, load_doc(app, p1), p1);
+      app.tab_order = {d0, d1};
+      app.panes[0].buf = d0;
+      app.panes[1].buf = d1;
       app.split = true;
       app.focus = 0;
-      xanatoo::ensure_valid_caret(app.buffers[0].doc, app.panes[0].sel.focus);
-      app.panes[0].sel.anchor = app.panes[0].sel.focus;
-      app.panes[0].scroll_y = 0.f;
-      xanatoo::ensure_valid_caret(app.buffers[1].doc, app.panes[1].sel.focus);
-      app.panes[1].sel.anchor = app.panes[1].sel.focus;
-      app.panes[1].scroll_y = 0.f;
-      app.buffers[0].history.reset(app.buffers[0].doc, app.panes[0].sel);
-      app.buffers[1].history.reset(app.buffers[1].doc, app.panes[1].sel);
+      for (int pi = 0; pi < 2; ++pi) {
+        Pane& dp = app.panes[pi];
+        DocBuffer& db = buf(app, dp.buf);
+        xanatoo::ensure_valid_caret(db.doc, dp.sel.focus);
+        dp.sel.anchor = dp.sel.focus;
+        dp.scroll_y = 0.f;
+        db.history.reset(db.doc, dp.sel);
+      }
       app.diff_mode = true;
       refresh_diff(app);
       app.needs_layout = true;
@@ -1463,7 +1435,7 @@ void draw_pane(App& app, int i) {
         // Only the header line for expanded stretches is interactive;
         // wash the first line-height of the box when expanded.
         float h = box.height;
-        auto& hdoc = app.buffers[static_cast<size_t>(pane.buf)].doc;
+        auto& hdoc = buf(app, pane.buf).doc;
         if (app.hover.stretch == xanatoo::INVALID_NODE ||
             app.hover.stretch >= hdoc.next_id ||
             static_cast<size_t>(app.hover.stretch - 1) >= hdoc.nodes.size())
@@ -1588,7 +1560,7 @@ void draw_pane(App& app, int i) {
   // Logical structure overlay: colour bars + wash by NodeKind + right labels
   if (app.structure_mode) {
     SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
-    const auto& ddoc = app.buffers[static_cast<size_t>(pane.buf)].doc;
+    const auto& ddoc = buf(app, pane.buf).doc;
     auto kind_label = [&ddoc](const xanatoo::Node& n) -> const char* {
       using K = xanatoo::NodeKind;
       switch (n.kind) {
@@ -1862,8 +1834,7 @@ void draw_pane(App& app, int i) {
 
   // Version-diff marks (orange bars on changed text blocks)
   if (app.diff_mode && !shared_doc(app)) {
-    int di = pane.buf;
-    const auto& marks = app.diff_marks[di];
+    const auto& marks = app.diff_marks[i];
     if (!marks.empty()) {
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
       for (const auto& box : pane.layout.boxes) {
@@ -1889,10 +1860,10 @@ void draw_pane(App& app, int i) {
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
     }
     // Intra-block word-level highlights for modified (similar) blocks
-    const auto& words = app.diff_words[di];
+    const auto& words = app.diff_words[i];
     if (!words.empty()) {
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
-      const auto& ddoc = app.buffers[static_cast<size_t>(di)].doc;
+      const auto& ddoc = buf(app, pane.buf).doc;
       for (const auto& g : pane.layout.glyphs) {
         if (g.node == xanatoo::INVALID_NODE) continue;
         // Map glyph to plain-text character index within its node
@@ -2470,8 +2441,7 @@ void draw_soft_windows(App& app) {
   app.soft_wins.erase(
       std::remove_if(app.soft_wins.begin(), app.soft_wins.end(),
                      [&](const SoftWindow& sw) {
-                       return sw.buf < 0 ||
-                              sw.buf >= static_cast<int>(app.buffers.size());
+                       return !find_buf(app, sw.buf);
                      }),
       app.soft_wins.end());
   for (auto& sw : app.soft_wins) {

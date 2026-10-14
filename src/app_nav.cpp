@@ -116,10 +116,10 @@ bool navigate_to_url(App& app, std::string target, bool record_history) {
   Pane& p = focused_pane(app);
 
   auto load_into_pane = [&](xanatoo::Document doc, const std::string& label) {
-    app.buffers[static_cast<size_t>(p.buf)].doc = std::move(doc);
+    buf(app, p.buf).doc = std::move(doc);
     path_of(app, p) = label;
-    app.buffers[static_cast<size_t>(p.buf)].dirty = false;
-    xanatoo::Document& nd = app.buffers[static_cast<size_t>(p.buf)].doc;
+    buf(app, p.buf).dirty = false;
+    xanatoo::Document& nd = buf(app, p.buf).doc;
     xanatoo::ensure_valid_caret(nd, p.sel.focus);
     p.sel.anchor = p.sel.focus;
     p.scroll_y = 0.f;
@@ -127,7 +127,7 @@ bool navigate_to_url(App& app, std::string target, bool record_history) {
     // otherwise the next frame can call doc.get() with dead node ids.
     p.layout = {};
     drop_height_hints_for_buf(app, p.buf);
-    app.buffers[static_cast<size_t>(p.buf)].history.reset(nd, p.sel);
+    buf(app, p.buf).history.reset(nd, p.sel);
     if (app.panes[0].buf == app.panes[1].buf) {
       app.panes[1 - app.focus].sel = p.sel;
       app.panes[1 - app.focus].scroll_y = 0.f;
@@ -302,9 +302,10 @@ bool navigate_to_url(App& app, std::string target, bool record_history) {
       canon = fs::weakly_canonical(path).string();
     } catch (...) {
     }
-    for (int i = 0; i < static_cast<int>(app.buffers.size()); ++i) {
-      if (app.buffers[static_cast<size_t>(i)].path.empty()) continue;
-      std::string bp = app.buffers[static_cast<size_t>(i)].path;
+    for (const DocBuffer& b : app.buffers) {
+      if (b.path.empty()) continue;
+      const BufferId i = b.id;
+      std::string bp = b.path;
       try {
         bp = fs::weakly_canonical(bp).string();
       } catch (...) {

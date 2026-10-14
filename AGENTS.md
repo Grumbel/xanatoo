@@ -33,6 +33,11 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_buffers.cpp` / `app_view.cpp` / `app_nav.cpp` / `app_softwin.cpp` / `app_prompts.cpp` / `app_pointer.cpp` | document buffers, scroll/fold/outline, URL history + bookmarks, floating windows, minibuffer, cursor/gamepad |
 | `theme.cpp` | classic palette (`Palette`) + stateless bevel/gradient/window primitives shared with the ImGui theme |
 
+Buffers are addressed by stable `BufferId` (`DocBuffer::id`, never reused,
+`kNoBuffer` = 0): use `buf(app, id)` / `find_buf` / `add_buffer` /
+`remove_buffer` / `close_tab` (`app_buffers.cpp`); never index
+`app.buffers` directly and never hold a `DocBuffer&` across add/remove.
+
 Rules: no behaviour on data types; new modal state goes in `App` (group
 related fields into small records like `FloatPanel` / `Hover`); menus,
 toolbar and shortcuts should route through `execute_command`.

@@ -412,13 +412,13 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
                     xanatoo::hit_test_stretch(top.layout, lx, ly, top.scroll)) {
               if (sdoc.get(*sid).kind == xanatoo::NodeKind::Stretch) {
                 // Shared buffer: stretch state is document-owned.
-                int bi = top.buf;
-                if (bi >= 0 && bi < static_cast<int>(app.buffers.size())) {
+                const BufferId bi = top.buf;
+                if (find_buf(app, bi)) {
                   // Snapshot for undo (view-independent history).
-                  app.buffers[static_cast<size_t>(bi)].history.push(sdoc,
+                  buf(app, bi).history.push(sdoc,
                                                                     top.sel);
                   sdoc.get(*sid).expanded = !sdoc.get(*sid).expanded;
-                  app.buffers[static_cast<size_t>(bi)].dirty = true;
+                  buf(app, bi).dirty = true;
                   update_title(app);
                 } else {
                   sdoc.get(*sid).expanded = !sdoc.get(*sid).expanded;
@@ -2205,25 +2205,9 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
             }
           if (tab_i >= 0) {
             // Reuse CloseTab logic via command path is heavy; inline.
-            int bi = app.tab_order[static_cast<size_t>(tab_i)];
+            const BufferId bi = app.tab_order[static_cast<size_t>(tab_i)];
             if (allow_discard_dirty(app, bi)) {
-              app.tab_order.erase(app.tab_order.begin() + tab_i);
-              if (app.tab_order.empty()) {
-                DocBuffer b;
-                b.doc =
-                    xanatoo::parse_document(xanatoo::fallback_document(), {});
-                app.buffers.push_back(std::move(b));
-                int nbi = static_cast<int>(app.buffers.size()) - 1;
-                app.tab_order.push_back(nbi);
-                app.panes[0].buf = app.panes[1].buf = nbi;
-              } else {
-                int next = app.tab_order[static_cast<size_t>(std::min(
-                    tab_i, static_cast<int>(app.tab_order.size()) - 1))];
-                if (app.panes[0].buf == bi) app.panes[0].buf = next;
-                if (app.panes[1].buf == bi) app.panes[1].buf = next;
-              }
-              app.needs_layout = true;
-              update_title(app);
+              close_tab(app, bi);
               flash_status(app, "Tab closed");
             }
           }
@@ -2585,8 +2569,8 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
             flash_status(app, "Open: file not found");
             std::cerr << "Open: file not found: " << path << "\n";
           } else {
-            int existing = find_buffer(app, path);
-            if (existing >= 0) {
+            const BufferId existing = find_buffer(app, path);
+            if (existing != kNoBuffer) {
               // Already open — switch the focused pane to that tab.
               p.buf = existing;
               app.needs_layout = true;
@@ -2602,15 +2586,15 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
                            "Unsaved changes — Enter again to discard and open");
               break;
             } else {
-              app.buffers[static_cast<size_t>(p.buf)].doc = load_doc(app, path);
+              buf(app, p.buf).doc = load_doc(app, path);
               path_of(app, p) = path;
-              app.buffers[static_cast<size_t>(p.buf)].dirty = false;
+              buf(app, p.buf).dirty = false;
               xanatoo::ensure_valid_caret(
-                  app.buffers[static_cast<size_t>(p.buf)].doc, p.sel.focus);
+                  buf(app, p.buf).doc, p.sel.focus);
               p.sel.anchor = p.sel.focus;
               p.scroll_y = 0.f;
-              app.buffers[static_cast<size_t>(p.buf)].history.reset(
-                  app.buffers[static_cast<size_t>(p.buf)].doc, p.sel);
+              buf(app, p.buf).history.reset(
+                  buf(app, p.buf).doc, p.sel);
               if (app.panes[0].buf == app.panes[1].buf) {
                 app.panes[1 - app.focus].sel = p.sel;
                 app.panes[1 - app.focus].scroll_y = 0.f;
@@ -2646,7 +2630,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
           } else {
             out << text;
             path_of(app, p) = app.save_as_path;
-            app.buffers[static_cast<size_t>(p.buf)].dirty = false;
+            buf(app, p.buf).dirty = false;
             app.discard_armed = false;
             update_title(app);
             flash_status(app, "Saved as " + app.save_as_path);
@@ -3153,19 +3137,17 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         }
       } else if (ctrl) {
         // New tab
-        DocBuffer b;
-        b.doc = xanatoo::parse_document(xanatoo::fallback_document(), {});
-        int bi = static_cast<int>(app.buffers.size());
-        app.buffers.push_back(std::move(b));
+        const BufferId bi = add_buffer(
+            app, xanatoo::parse_document(xanatoo::fallback_document(), {}), {});
         app.tab_order.push_back(bi);
         p.buf = bi;
         p.sel = {};
-        xanatoo::ensure_valid_caret(app.buffers[static_cast<size_t>(bi)].doc,
+        xanatoo::ensure_valid_caret(buf(app, bi).doc,
                                     p.sel.focus);
         p.sel.anchor = p.sel.focus;
         p.scroll_y = 0.f;
-        app.buffers[static_cast<size_t>(bi)].history.reset(
-            app.buffers[static_cast<size_t>(bi)].doc, p.sel);
+        buf(app, bi).history.reset(
+            buf(app, bi).doc, p.sel);
         app.needs_layout = true;
         update_title(app);
         flash_status(app, "New tab");
