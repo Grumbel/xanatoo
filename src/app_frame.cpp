@@ -1302,37 +1302,15 @@ void poll_gamepad_axes(App& app) {
   }
 }
 
-void draw_pane(App& app, int i) {
-  const float lh = static_cast<float>(app.fonts.regular.line_height());
-  Pane& pane = app.panes[i];
-  float view_h_pane =
-      static_cast<float>(app.win_h - status_bar_h) - app.ui_top - app.ui_bottom;
-  float max_scroll =
-      std::max(0.f, pane.layout.content_height - view_h_pane + 40.f);
-  if (pane.scroll_y > max_scroll) pane.scroll_y = max_scroll;
-
-  const int clip_y = static_cast<int>(app.ui_top);
-  SDL_Rect clip{
-      pane.x, clip_y, std::max(1, pane.w - kSbW),
-      app.win_h - status_bar_h - clip_y - static_cast<int>(app.ui_bottom)};
-  SDL_RenderSetClipRect(app.sdl, &clip);
-
-  float ox = static_cast<float>(pane.x);
-  // screen_y = content_y - scroll_y + ui_top = content_y - (scroll_y - ui_top)
-  const float draw_scroll = pane.scroll_y - app.ui_top;
-
-  if (!pane.sel.empty()) {
-    auto rects =
-        xanatoo::selection_rects(pane.layout, pane.sel, draw_scroll, lh);
-    // Leap-search match uses amber so it is distinct from a user selection.
-    if (prompt_is_search(app) && i == app.focus)
-      app.renderer.draw_selection(rects, ox, 230, 190, 70, 150);
-    else
-      app.renderer.draw_selection(rects, ox);
-  }
-
-  app.renderer.draw(pane.layout, draw_scroll, ox);
-
+// Hover affordances, caret, focus bar, diff marks, structure overlay, drop
+// indicators — everything drawn over the text inside the pane clip.
+static void draw_pane_overlays(App& app, int i) {
+  [[maybe_unused]] const float lh =
+      static_cast<float>(app.fonts.regular.line_height());
+  [[maybe_unused]] Pane& pane = app.panes[i];
+  [[maybe_unused]] const int clip_y = static_cast<int>(app.ui_top);
+  [[maybe_unused]] const float ox = static_cast<float>(pane.x);
+  [[maybe_unused]] const float draw_scroll = pane.scroll_y - app.ui_top;
   // Hover affordances for interactive elements in this pane
   {
     SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
@@ -1942,10 +1920,17 @@ void draw_pane(App& app, int i) {
       break;
     }
   }
+}
 
-  // Scrollbar lives in the strip excluded from the content clip.
-  SDL_RenderSetClipRect(app.sdl, nullptr);
-
+// Classic scrollbar in the strip excluded from the content clip.
+static void draw_pane_scrollbar(App& app, int i) {
+  [[maybe_unused]] const float lh =
+      static_cast<float>(app.fonts.regular.line_height());
+  [[maybe_unused]] Pane& pane = app.panes[i];
+  const float view_h_pane =
+      static_cast<float>(app.win_h - status_bar_h) - app.ui_top - app.ui_bottom;
+  const float max_scroll =
+      std::max(0.f, pane.layout.content_height - view_h_pane + 40.f);
   // Classic scrollbar: track, ↑/↓, chapter/search markers, thumb.
   {
     float view_h = static_cast<float>(app.win_h - status_bar_h) - app.ui_top -
@@ -2137,6 +2122,46 @@ void draw_pane(App& app, int i) {
       }
     }
   }
+}
+
+// Text, selection and the three layers above, then the scrollbar.
+void draw_pane(App& app, int i) {
+  const float lh = static_cast<float>(app.fonts.regular.line_height());
+  Pane& pane = app.panes[i];
+  float view_h_pane =
+      static_cast<float>(app.win_h - status_bar_h) - app.ui_top - app.ui_bottom;
+  float max_scroll =
+      std::max(0.f, pane.layout.content_height - view_h_pane + 40.f);
+  if (pane.scroll_y > max_scroll) pane.scroll_y = max_scroll;
+
+  const int clip_y = static_cast<int>(app.ui_top);
+  SDL_Rect clip{
+      pane.x, clip_y, std::max(1, pane.w - kSbW),
+      app.win_h - status_bar_h - clip_y - static_cast<int>(app.ui_bottom)};
+  SDL_RenderSetClipRect(app.sdl, &clip);
+
+  float ox = static_cast<float>(pane.x);
+  // screen_y = content_y - scroll_y + ui_top = content_y - (scroll_y - ui_top)
+  const float draw_scroll = pane.scroll_y - app.ui_top;
+
+  if (!pane.sel.empty()) {
+    auto rects =
+        xanatoo::selection_rects(pane.layout, pane.sel, draw_scroll, lh);
+    // Leap-search match uses amber so it is distinct from a user selection.
+    if (prompt_is_search(app) && i == app.focus)
+      app.renderer.draw_selection(rects, ox, 230, 190, 70, 150);
+    else
+      app.renderer.draw_selection(rects, ox);
+  }
+
+  app.renderer.draw(pane.layout, draw_scroll, ox);
+
+  draw_pane_overlays(app, i);
+
+  // Scrollbar lives in the strip excluded from the content clip.
+  SDL_RenderSetClipRect(app.sdl, nullptr);
+
+  draw_pane_scrollbar(app, i);
 }
 
 void draw_panes(App& app) {

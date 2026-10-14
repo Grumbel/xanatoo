@@ -24,7 +24,8 @@ Next bundle number: **263** (this delivery is **262**)
   opened prompt now simply wins. Behaviour changes: Gemini input prompt seeds
   the minibuffer with the final URL (was stale); Ctrl+V into path prompts goes
   through the minibuffer (was desynced); stats panel hidden for every prompt.
-- Phase D (optional) not started.
+- Phase D partial: `draw_pane` split into `draw_pane_overlays` + `draw_pane_scrollbar`.
+  Per-context key handlers (`handle_outline_key` etc.) still pending.
 
 ## Status (2026-10-13)
 
