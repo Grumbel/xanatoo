@@ -25,7 +25,8 @@ Next bundle number: **263** (this delivery is **262**)
   the minibuffer with the final URL (was stale); Ctrl+V into path prompts goes
   through the minibuffer (was desynced); stats panel hidden for every prompt.
 - Phase D partial: `draw_pane` split into `draw_pane_overlays` + `draw_pane_scrollbar`.
-  Per-context key handlers (`handle_outline_key` etc.) still pending.
+  Outline + backlinks keys extracted to `handle_outline_key` / `handle_backlinks_key`;
+  `handle_nav_key` (document nav keys in the big switch) still pending.
 
 ## Status (2026-10-13)
 

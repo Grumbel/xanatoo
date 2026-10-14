@@ -1160,6 +1160,116 @@ static void on_controllerbuttonup(App& app, SDL_Event& ev, bool imgui_mouse,
   return;
 }
 
+// Backlinks panel: Esc/toggle close, Up/Down/Enter navigate. True = consumed.
+static bool handle_backlinks_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
+                       bool alt) {
+  if (app.backlinks_mode) {
+    if (ev.key.keysym.sym == SDLK_ESCAPE ||
+        (ev.key.keysym.sym == SDLK_b && ctrl && alt)) {
+      app.backlinks_mode = false;
+      return true;
+    }
+    if (ev.key.keysym.sym == SDLK_UP) {
+      if (app.backlinks_sel > 0) --app.backlinks_sel;
+      return true;
+    }
+    if (ev.key.keysym.sym == SDLK_DOWN) {
+      if (app.backlinks_sel + 1 < static_cast<int>(app.backlinks.size()))
+        ++app.backlinks_sel;
+      return true;
+    }
+    if (ev.key.keysym.sym == SDLK_RETURN ||
+        ev.key.keysym.sym == SDLK_KP_ENTER) {
+      if (app.backlinks_sel >= 0 &&
+          app.backlinks_sel < static_cast<int>(app.backlinks.size())) {
+        auto& p = focused_pane(app);
+        p.sel.focus = {
+            app.backlinks[static_cast<size_t>(app.backlinks_sel)].source, 0, 0};
+        p.sel.anchor = p.sel.focus;
+        scroll_caret_into_view(app, p);
+        reset_blink(app);
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+// Outline panel: Esc/toggle close; arrows, 1-9, Enter navigate without
+// eating other document keys. True = consumed.
+static bool handle_outline_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
+                       bool alt) {
+  // Outline software window: Esc/toggle close; arrows + 1-9 + Enter
+  // navigate without eating other document keys.
+  if (app.outline_mode) {
+    if (ev.key.keysym.sym == SDLK_ESCAPE ||
+        (ev.key.keysym.sym == SDLK_o && ctrl && shift)) {
+      app.outline_mode = false;
+      app.ol.dragging = false;
+      app.ol.resize = 0;
+      return true;
+    }
+    bool outline_consumed = false;
+    switch (ev.key.keysym.sym) {
+      case SDLK_UP:
+        if (app.outline_sel > 0) --app.outline_sel;
+        outline_consumed = true;
+        break;
+      case SDLK_DOWN:
+        if (app.outline_sel + 1 < static_cast<int>(app.outline.size()))
+          ++app.outline_sel;
+        outline_consumed = true;
+        break;
+      case SDLK_HOME:
+        app.outline_sel = 0;
+        outline_consumed = true;
+        break;
+      case SDLK_END:
+        if (!app.outline.empty())
+          app.outline_sel = static_cast<int>(app.outline.size()) - 1;
+        outline_consumed = true;
+        break;
+      case SDLK_LEFT: {
+        if (app.outline_sel >= 0 &&
+            app.outline_sel < static_cast<int>(app.outline.size())) {
+          const auto& er = app.outline[static_cast<size_t>(app.outline_sel)];
+          if (er.section != xanatoo::INVALID_NODE && !er.folded)
+            toggle_section_fold(app, er.section);
+        }
+        outline_consumed = true;
+        break;
+      }
+      case SDLK_RIGHT: {
+        if (app.outline_sel >= 0 &&
+            app.outline_sel < static_cast<int>(app.outline.size())) {
+          const auto& er = app.outline[static_cast<size_t>(app.outline_sel)];
+          if (er.section != xanatoo::INVALID_NODE && er.folded)
+            toggle_section_fold(app, er.section);
+        }
+        outline_consumed = true;
+        break;
+      }
+      case SDLK_RETURN:
+      case SDLK_KP_ENTER:
+        jump_outline_sel(app);
+        outline_consumed = true;
+        break;
+      default:
+        if (ev.key.keysym.sym >= SDLK_1 && ev.key.keysym.sym <= SDLK_9) {
+          int idx = static_cast<int>(ev.key.keysym.sym - SDLK_1);
+          if (idx < static_cast<int>(app.outline.size())) {
+            app.outline_sel = idx;
+            jump_outline_sel(app);
+            outline_consumed = true;
+          }
+        }
+        break;
+    }
+    if (outline_consumed) return true;
+  }
+  return false;
+}
+
 static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
                        bool imgui_keys) {
   bool shift = (ev.key.keysym.mod & KMOD_SHIFT) != 0;
@@ -1328,104 +1438,8 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
     if (used) return;
   }
 
-  if (app.backlinks_mode) {
-    if (ev.key.keysym.sym == SDLK_ESCAPE ||
-        (ev.key.keysym.sym == SDLK_b && ctrl && alt)) {
-      app.backlinks_mode = false;
-      return;
-    }
-    if (ev.key.keysym.sym == SDLK_UP) {
-      if (app.backlinks_sel > 0) --app.backlinks_sel;
-      return;
-    }
-    if (ev.key.keysym.sym == SDLK_DOWN) {
-      if (app.backlinks_sel + 1 < static_cast<int>(app.backlinks.size()))
-        ++app.backlinks_sel;
-      return;
-    }
-    if (ev.key.keysym.sym == SDLK_RETURN ||
-        ev.key.keysym.sym == SDLK_KP_ENTER) {
-      if (app.backlinks_sel >= 0 &&
-          app.backlinks_sel < static_cast<int>(app.backlinks.size())) {
-        auto& p = focused_pane(app);
-        p.sel.focus = {
-            app.backlinks[static_cast<size_t>(app.backlinks_sel)].source, 0, 0};
-        p.sel.anchor = p.sel.focus;
-        scroll_caret_into_view(app, p);
-        reset_blink(app);
-      }
-      return;
-    }
-  }
-
-  // Outline software window: Esc/toggle close; arrows + 1-9 + Enter
-  // navigate without eating other document keys.
-  if (app.outline_mode) {
-    if (ev.key.keysym.sym == SDLK_ESCAPE ||
-        (ev.key.keysym.sym == SDLK_o && ctrl && shift)) {
-      app.outline_mode = false;
-      app.ol.dragging = false;
-      app.ol.resize = 0;
-      return;
-    }
-    bool outline_consumed = false;
-    switch (ev.key.keysym.sym) {
-      case SDLK_UP:
-        if (app.outline_sel > 0) --app.outline_sel;
-        outline_consumed = true;
-        break;
-      case SDLK_DOWN:
-        if (app.outline_sel + 1 < static_cast<int>(app.outline.size()))
-          ++app.outline_sel;
-        outline_consumed = true;
-        break;
-      case SDLK_HOME:
-        app.outline_sel = 0;
-        outline_consumed = true;
-        break;
-      case SDLK_END:
-        if (!app.outline.empty())
-          app.outline_sel = static_cast<int>(app.outline.size()) - 1;
-        outline_consumed = true;
-        break;
-      case SDLK_LEFT: {
-        if (app.outline_sel >= 0 &&
-            app.outline_sel < static_cast<int>(app.outline.size())) {
-          const auto& er = app.outline[static_cast<size_t>(app.outline_sel)];
-          if (er.section != xanatoo::INVALID_NODE && !er.folded)
-            toggle_section_fold(app, er.section);
-        }
-        outline_consumed = true;
-        break;
-      }
-      case SDLK_RIGHT: {
-        if (app.outline_sel >= 0 &&
-            app.outline_sel < static_cast<int>(app.outline.size())) {
-          const auto& er = app.outline[static_cast<size_t>(app.outline_sel)];
-          if (er.section != xanatoo::INVALID_NODE && er.folded)
-            toggle_section_fold(app, er.section);
-        }
-        outline_consumed = true;
-        break;
-      }
-      case SDLK_RETURN:
-      case SDLK_KP_ENTER:
-        jump_outline_sel(app);
-        outline_consumed = true;
-        break;
-      default:
-        if (ev.key.keysym.sym >= SDLK_1 && ev.key.keysym.sym <= SDLK_9) {
-          int idx = static_cast<int>(ev.key.keysym.sym - SDLK_1);
-          if (idx < static_cast<int>(app.outline.size())) {
-            app.outline_sel = idx;
-            jump_outline_sel(app);
-            outline_consumed = true;
-          }
-        }
-        break;
-    }
-    if (outline_consumed) return;
-  }
+  if (handle_backlinks_key(app, ev, ctrl, shift, alt)) return;
+  if (handle_outline_key(app, ev, ctrl, shift, alt)) return;
 
   // Table-driven shortcuts share the menu/toolbar command implementations.
   if (auto bound = keymap_lookup(ev.key.keysym.sym, ctrl, shift)) {
