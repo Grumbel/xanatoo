@@ -1270,6 +1270,208 @@ static bool handle_outline_key(App& app, const SDL_Event& ev, bool ctrl, bool sh
   return false;
 }
 
+// Caret / viewport navigation keys (arrows, Home/End, PageUp/Down, Alt+arrow
+// history and block moves). True when the key was one of these.
+static bool handle_nav_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
+                           bool alt) {
+  Pane& p = focused_pane(app);
+  xanatoo::Document& d = doc_of(app, p);
+  auto move_and_sel = [&](auto mover) {
+    if (!shift) p.sel.anchor = p.sel.focus;
+    mover();
+    if (!shift) p.sel.anchor = p.sel.focus;
+  };
+  switch (ev.key.keysym.sym) {
+    case SDLK_LEFT:
+      if (alt && !ctrl) {
+        // Capsule history back
+        if (app.nav_hist_pos > 0) {
+          --app.nav_hist_pos;
+          navigate_to_url(
+              app, app.nav_history[static_cast<size_t>(app.nav_hist_pos)],
+              /*record_history=*/false);
+        } else {
+          flash_status(app, "No previous page");
+        }
+        return true;
+      }
+      move_and_sel([&] {
+        if (ctrl) {
+          xanatoo::move_word_left(d, p.sel.focus);
+        } else if (!xanatoo::move_left(d, p.sel.focus)) {
+          xanatoo::move_to_prev_node(d, p.sel.focus);
+        }
+      });
+      scroll_caret_into_view(app, p);
+      reset_blink(app);
+      return true;
+
+    case SDLK_RIGHT:
+      if (alt && !ctrl) {
+        // Capsule history forward
+        if (app.nav_hist_pos + 1 < static_cast<int>(app.nav_history.size())) {
+          ++app.nav_hist_pos;
+          navigate_to_url(
+              app, app.nav_history[static_cast<size_t>(app.nav_hist_pos)],
+              /*record_history=*/false);
+        } else {
+          flash_status(app, "No next page");
+        }
+        return true;
+      }
+      move_and_sel([&] {
+        if (ctrl) {
+          xanatoo::move_word_right(d, p.sel.focus);
+        } else if (!xanatoo::move_right(d, p.sel.focus)) {
+          xanatoo::move_to_next_node(d, p.sel.focus);
+        }
+      });
+      scroll_caret_into_view(app, p);
+      reset_blink(app);
+      return true;
+
+    case SDLK_UP:
+      if ((ev.key.keysym.mod & KMOD_ALT) != 0 &&
+          (ev.key.keysym.mod & KMOD_SHIFT) != 0) {
+        edit(app);
+        if (xanatoo::move_section_up(d, p.sel.focus)) {
+          app.needs_layout = true;
+          reset_blink(app);
+          flash_status(app, "Section moved up");
+        }
+      } else if ((ev.key.keysym.mod & KMOD_ALT) != 0) {
+        edit(app);
+        if (xanatoo::move_block_up(d, p.sel.focus.node)) {
+          app.needs_layout = true;
+          reset_blink(app);
+        }
+      } else {
+        move_and_sel([&] {
+          if (!xanatoo::move_up(p.layout, p.sel.focus, p.preferred_x))
+            xanatoo::move_to_prev_node(d, p.sel.focus);
+        });
+        scroll_caret_into_view(app, p);
+        reset_blink(app);
+      }
+      return true;
+
+    case SDLK_DOWN:
+      if ((ev.key.keysym.mod & KMOD_ALT) != 0) {
+        edit(app);
+        if (xanatoo::move_block_down(d, p.sel.focus.node)) {
+          app.needs_layout = true;
+          reset_blink(app);
+        }
+      } else {
+        move_and_sel([&] {
+          if (!xanatoo::move_down(p.layout, p.sel.focus, p.preferred_x))
+            xanatoo::move_to_next_node(d, p.sel.focus);
+        });
+        scroll_caret_into_view(app, p);
+        reset_blink(app);
+      }
+      return true;
+
+    case SDLK_PAGEUP:
+    case SDLK_PAGEDOWN: {
+      const bool up = (ev.key.keysym.sym == SDLK_PAGEUP);
+      // When the pointer is over soft chrome, page that surface instead
+      // of the document (matches wheel routing).
+      int mxk = 0, myk = 0;
+      SDL_GetMouseState(&mxk, &myk);
+      if (float_page_scroll(app, mxk, myk, up)) break;
+      const float view_h = static_cast<float>(app.win_h - status_bar_h) -
+                           app.ui_top - app.ui_bottom;
+      const float step = view_h * 0.85f;
+      float max_s = std::max(0.f, p.layout.content_height - view_h + 40.f);
+      if (up)
+        p.scroll_y = std::max(0.f, p.scroll_y - step);
+      else
+        p.scroll_y = std::min(max_s, p.scroll_y + step);
+      ensure_virtual_layout(app, p);
+      // Move caret to a glyph near the top of the new viewport
+      move_and_sel([&] {
+        if (p.layout.glyphs.empty()) return;
+        float target_y = p.scroll_y + view_h * 0.15f;
+        float best = 1e9f;
+        xanatoo::Caret best_c = p.sel.focus;
+        for (const auto& g : p.layout.glyphs) {
+          float dy = std::abs(g.y - target_y);
+          if (dy < best) {
+            best = dy;
+            best_c = {g.node, g.span_index, g.char_index};
+          }
+        }
+        p.sel.focus = best_c;
+      });
+      reset_blink(app);
+      return true;
+    }
+
+    case SDLK_HOME:
+      move_and_sel([&] {
+        if (ctrl) {
+          xanatoo::move_to_document_start(d, p.sel.focus);
+        } else {
+          // Line start via layout: find leftmost glyph on same baseline
+          auto cpos = xanatoo::caret_screen_pos(
+              p.layout, p.sel.focus, p.scroll_y,
+              static_cast<float>(app.fonts.regular.line_height()));
+          if (cpos.valid) {
+            float best_x = 1e9f;
+            xanatoo::Caret best = p.sel.focus;
+            for (const auto& g : p.layout.glyphs) {
+              if (g.node != p.sel.focus.node) continue;
+              if (std::abs(g.y - (cpos.y + p.scroll_y)) > 2.f) continue;
+              if (g.x < best_x) {
+                best_x = g.x;
+                best = {g.node, g.span_index, g.char_index};
+              }
+            }
+            p.sel.focus = best;
+          } else {
+            p.sel.focus.span_index = 0;
+            p.sel.focus.char_index = 0;
+          }
+        }
+      });
+      scroll_caret_into_view(app, p);
+      reset_blink(app);
+      return true;
+
+    case SDLK_END:
+      move_and_sel([&] {
+        if (ctrl) {
+          xanatoo::move_to_document_end(d, p.sel.focus);
+        } else {
+          auto cpos = xanatoo::caret_screen_pos(
+              p.layout, p.sel.focus, p.scroll_y,
+              static_cast<float>(app.fonts.regular.line_height()));
+          if (cpos.valid) {
+            float best_x = -1e9f;
+            xanatoo::Caret best = p.sel.focus;
+            for (const auto& g : p.layout.glyphs) {
+              if (g.node != p.sel.focus.node) continue;
+              if (std::abs(g.y - (cpos.y + p.scroll_y)) > 2.f) continue;
+              if (g.x >= best_x) {
+                best_x = g.x;
+                best = {g.node, g.span_index, g.char_index + 1};
+              }
+            }
+            p.sel.focus = best;
+          }
+        }
+      });
+      scroll_caret_into_view(app, p);
+      reset_blink(app);
+      return true;
+
+    default:
+      break;
+  }
+  return false;
+}
+
 static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
                        bool imgui_keys) {
   bool shift = (ev.key.keysym.mod & KMOD_SHIFT) != 0;
@@ -1446,13 +1648,6 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
     execute_command(app, *bound);
     return;
   }
-
-  auto clear_sel = [&]() { p.sel.anchor = p.sel.focus; };
-  auto move_and_sel = [&](auto mover) {
-    if (!shift) clear_sel();
-    mover();
-    if (!shift) p.sel.anchor = p.sel.focus;
-  };
 
   switch (ev.key.keysym.sym) {
     case SDLK_ESCAPE:
@@ -1772,187 +1967,14 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       break;
 
     case SDLK_LEFT:
-      if (alt && !ctrl) {
-        // Capsule history back
-        if (app.nav_hist_pos > 0) {
-          --app.nav_hist_pos;
-          navigate_to_url(
-              app, app.nav_history[static_cast<size_t>(app.nav_hist_pos)],
-              /*record_history=*/false);
-        } else {
-          flash_status(app, "No previous page");
-        }
-        break;
-      }
-      move_and_sel([&] {
-        if (ctrl) {
-          xanatoo::move_word_left(d, p.sel.focus);
-        } else if (!xanatoo::move_left(d, p.sel.focus)) {
-          xanatoo::move_to_prev_node(d, p.sel.focus);
-        }
-      });
-      scroll_caret_into_view(app, p);
-      reset_blink(app);
-      break;
-
     case SDLK_RIGHT:
-      if (alt && !ctrl) {
-        // Capsule history forward
-        if (app.nav_hist_pos + 1 < static_cast<int>(app.nav_history.size())) {
-          ++app.nav_hist_pos;
-          navigate_to_url(
-              app, app.nav_history[static_cast<size_t>(app.nav_hist_pos)],
-              /*record_history=*/false);
-        } else {
-          flash_status(app, "No next page");
-        }
-        break;
-      }
-      move_and_sel([&] {
-        if (ctrl) {
-          xanatoo::move_word_right(d, p.sel.focus);
-        } else if (!xanatoo::move_right(d, p.sel.focus)) {
-          xanatoo::move_to_next_node(d, p.sel.focus);
-        }
-      });
-      scroll_caret_into_view(app, p);
-      reset_blink(app);
-      break;
-
     case SDLK_UP:
-      if ((ev.key.keysym.mod & KMOD_ALT) != 0 &&
-          (ev.key.keysym.mod & KMOD_SHIFT) != 0) {
-        edit(app);
-        if (xanatoo::move_section_up(d, p.sel.focus)) {
-          app.needs_layout = true;
-          reset_blink(app);
-          flash_status(app, "Section moved up");
-        }
-      } else if ((ev.key.keysym.mod & KMOD_ALT) != 0) {
-        edit(app);
-        if (xanatoo::move_block_up(d, p.sel.focus.node)) {
-          app.needs_layout = true;
-          reset_blink(app);
-        }
-      } else {
-        move_and_sel([&] {
-          if (!xanatoo::move_up(p.layout, p.sel.focus, p.preferred_x))
-            xanatoo::move_to_prev_node(d, p.sel.focus);
-        });
-        scroll_caret_into_view(app, p);
-        reset_blink(app);
-      }
-      break;
-
     case SDLK_DOWN:
-      if ((ev.key.keysym.mod & KMOD_ALT) != 0) {
-        edit(app);
-        if (xanatoo::move_block_down(d, p.sel.focus.node)) {
-          app.needs_layout = true;
-          reset_blink(app);
-        }
-      } else {
-        move_and_sel([&] {
-          if (!xanatoo::move_down(p.layout, p.sel.focus, p.preferred_x))
-            xanatoo::move_to_next_node(d, p.sel.focus);
-        });
-        scroll_caret_into_view(app, p);
-        reset_blink(app);
-      }
-      break;
-
     case SDLK_PAGEUP:
-    case SDLK_PAGEDOWN: {
-      const bool up = (ev.key.keysym.sym == SDLK_PAGEUP);
-      // When the pointer is over soft chrome, page that surface instead
-      // of the document (matches wheel routing).
-      int mxk = 0, myk = 0;
-      SDL_GetMouseState(&mxk, &myk);
-      if (float_page_scroll(app, mxk, myk, up)) break;
-      const float view_h = static_cast<float>(app.win_h - status_bar_h) -
-                           app.ui_top - app.ui_bottom;
-      const float step = view_h * 0.85f;
-      float max_s = std::max(0.f, p.layout.content_height - view_h + 40.f);
-      if (up)
-        p.scroll_y = std::max(0.f, p.scroll_y - step);
-      else
-        p.scroll_y = std::min(max_s, p.scroll_y + step);
-      ensure_virtual_layout(app, p);
-      // Move caret to a glyph near the top of the new viewport
-      move_and_sel([&] {
-        if (p.layout.glyphs.empty()) return;
-        float target_y = p.scroll_y + view_h * 0.15f;
-        float best = 1e9f;
-        xanatoo::Caret best_c = p.sel.focus;
-        for (const auto& g : p.layout.glyphs) {
-          float dy = std::abs(g.y - target_y);
-          if (dy < best) {
-            best = dy;
-            best_c = {g.node, g.span_index, g.char_index};
-          }
-        }
-        p.sel.focus = best_c;
-      });
-      reset_blink(app);
-      break;
-    }
-
+    case SDLK_PAGEDOWN:
     case SDLK_HOME:
-      move_and_sel([&] {
-        if (ctrl) {
-          xanatoo::move_to_document_start(d, p.sel.focus);
-        } else {
-          // Line start via layout: find leftmost glyph on same baseline
-          auto cpos = xanatoo::caret_screen_pos(
-              p.layout, p.sel.focus, p.scroll_y,
-              static_cast<float>(app.fonts.regular.line_height()));
-          if (cpos.valid) {
-            float best_x = 1e9f;
-            xanatoo::Caret best = p.sel.focus;
-            for (const auto& g : p.layout.glyphs) {
-              if (g.node != p.sel.focus.node) continue;
-              if (std::abs(g.y - (cpos.y + p.scroll_y)) > 2.f) continue;
-              if (g.x < best_x) {
-                best_x = g.x;
-                best = {g.node, g.span_index, g.char_index};
-              }
-            }
-            p.sel.focus = best;
-          } else {
-            p.sel.focus.span_index = 0;
-            p.sel.focus.char_index = 0;
-          }
-        }
-      });
-      scroll_caret_into_view(app, p);
-      reset_blink(app);
-      break;
-
     case SDLK_END:
-      move_and_sel([&] {
-        if (ctrl) {
-          xanatoo::move_to_document_end(d, p.sel.focus);
-        } else {
-          auto cpos = xanatoo::caret_screen_pos(
-              p.layout, p.sel.focus, p.scroll_y,
-              static_cast<float>(app.fonts.regular.line_height()));
-          if (cpos.valid) {
-            float best_x = -1e9f;
-            xanatoo::Caret best = p.sel.focus;
-            for (const auto& g : p.layout.glyphs) {
-              if (g.node != p.sel.focus.node) continue;
-              if (std::abs(g.y - (cpos.y + p.scroll_y)) > 2.f) continue;
-              if (g.x >= best_x) {
-                best_x = g.x;
-                best = {g.node, g.span_index, g.char_index + 1};
-              }
-            }
-            p.sel.focus = best;
-          }
-        }
-      });
-      scroll_caret_into_view(app, p);
-      reset_blink(app);
+      handle_nav_key(app, ev, ctrl, shift, alt);
       break;
 
     case SDLK_c:

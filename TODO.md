@@ -26,7 +26,8 @@ Next bundle number: **263** (this delivery is **262**)
   through the minibuffer (was desynced); stats panel hidden for every prompt.
 - Phase D partial: `draw_pane` split into `draw_pane_overlays` + `draw_pane_scrollbar`.
   Outline + backlinks keys extracted to `handle_outline_key` / `handle_backlinks_key`;
-  `handle_nav_key` (document nav keys in the big switch) still pending.
+  Arrow/Home/End/Page keys extracted to `handle_nav_key`. Phase D complete
+  (Node payload split intentionally left for a design note).
 
 ## Status (2026-10-13)
 
