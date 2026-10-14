@@ -18,7 +18,13 @@ Next bundle number: **263** (this delivery is **262**)
   (docs → help → backlinks → outline); backlinks gained wheel + scrollbar drag;
   Ctrl+W closes docs → help → backlinks → outline. Panels stay persistent
   members (`help/ol/bl` + mode bools), not entries of a `floats` vector.
-- Phase C (Prompt) pending.
+- Phase C done: single `Prompt` (`open_prompt`/`close_prompt`/`commit_prompt`);
+  the ten `*_mode` flags and their buffers are gone. Pre-check: flags could
+  coexist only through odd transitions (e.g. URL bar then Ctrl+K); the last
+  opened prompt now simply wins. Behaviour changes: Gemini input prompt seeds
+  the minibuffer with the final URL (was stale); Ctrl+V into path prompts goes
+  through the minibuffer (was desynced); stats panel hidden for every prompt.
+- Phase D (optional) not started.
 
 ## Status (2026-10-13)
 

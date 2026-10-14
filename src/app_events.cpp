@@ -184,27 +184,7 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
     if (imgui_mouse) return;
 
     // Clicking the document dismisses status-bar prompts (Esc also works).
-    if (app.save_as_mode || app.path_in_window_mode || app.open_file_mode ||
-        app.url_bar_mode || app.image_insert_mode || app.include_insert_mode ||
-        app.link_edit_mode || app.summary_edit_mode) {
-      app.save_as_mode = false;
-      app.save_as_path.clear();
-      app.path_in_window_mode = false;
-      app.path_in_window_buf.clear();
-      app.open_file_mode = false;
-      app.open_file_buf.clear();
-      app.url_bar_mode = false;
-      app.url_bar_buf.clear();
-      app.image_insert_mode = false;
-      app.image_insert_path.clear();
-      app.image_insert_as_figure = false;
-      app.include_insert_mode = false;
-      app.include_insert_src.clear();
-      app.link_edit_mode = false;
-      app.link_edit_href.clear();
-      app.summary_edit_mode = false;
-      app.summary_edit_text.clear();
-    }
+    if (prompt_active(app) && !prompt_is_search(app)) close_prompt(app);
 
     float mx = static_cast<float>(ev.button.x);
     float my = content_y(app, static_cast<float>(ev.button.y));
@@ -937,26 +917,22 @@ static void on_textinput(App& app, SDL_Event& ev, bool imgui_mouse,
     return;
   }
 
-  if (app.link_edit_mode) {
-    app.link_edit_href += ev.text.text;
-    return;
-  }
-  if (app.summary_edit_mode) {
-    app.summary_edit_text += ev.text.text;
-    return;
-  }
-  if (app.search_mode) {
-    if (app.replace_mode && !app.search_query.empty() && app.replace_focus) {
-      app.replace_text += ev.text.text;
+  if (prompt_active(app)) {
+    Prompt& pr = app.prompt;
+    if (!prompt_is_search(app)) {
+      pr.text += ev.text.text;
       return;
     }
-    app.search_query += ev.text.text;
+    if (pr.kind == PromptKind::Replace && !pr.text.empty() && pr.focus_second) {
+      pr.text2 += ev.text.text;
+      return;
+    }
+    pr.text += ev.text.text;
     Pane& p = focused_pane(app);
     size_t mlen = 0;
     xanatoo::Caret from = p.sel.focus;
     if (from.char_index > 0) from.char_index -= 1;
-    if (auto hit =
-            xanatoo::find_next(doc_of(app, p), app.search_query, from, mlen)) {
+    if (auto hit = xanatoo::find_next(doc_of(app, p), pr.text, from, mlen)) {
       p.sel.anchor = *hit;
       p.sel.focus = *hit;
       xanatoo::advance_caret(doc_of(app, p), p.sel.focus, mlen);
@@ -1232,24 +1208,19 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   // arrows do not move the caret while typing a path or query.
   // Path/URL minibuffer also needs Tab (complete), arrows (cursor /
   // history), Home/End, Delete, and C-a/e/k/u/w.
-  const bool status_prompt =
-      app.save_as_mode || app.path_in_window_mode || app.open_file_mode ||
-      app.url_bar_mode || app.image_insert_mode || app.include_insert_mode ||
-      app.link_edit_mode || app.summary_edit_mode || app.search_mode;
+  const bool status_prompt = prompt_active(app);
   if (status_prompt) {
     const SDL_Keycode k = ev.key.keysym.sym;
-    const bool minibuf_path = app.open_file_mode || app.save_as_mode ||
-                              app.path_in_window_mode || app.url_bar_mode ||
-                              app.image_insert_mode || app.include_insert_mode;
+    const bool minibuf_path = minibuf_active(app);
     const bool prompt_key =
         k == SDLK_ESCAPE || k == SDLK_BACKSPACE || k == SDLK_RETURN ||
         k == SDLK_KP_ENTER || k == SDLK_DELETE ||
         // Paste into the status-bar buffer
         (ctrl && k == SDLK_v) ||
         // Search: F3 / Shift+F3 still jump matches while the query is open
-        (app.search_mode && (k == SDLK_F3 || k == SDLK_g)) ||
+        (prompt_is_search(app) && (k == SDLK_F3 || k == SDLK_g)) ||
         // Allow Tab to switch replace-field focus when replace is open
-        (app.search_mode && app.replace_mode && k == SDLK_TAB) ||
+        (app.prompt.kind == PromptKind::Replace && k == SDLK_TAB) ||
         // Path minibuffer: completion + cursor + history
         (minibuf_path &&
          (k == SDLK_TAB || k == SDLK_UP || k == SDLK_DOWN || k == SDLK_LEFT ||
@@ -1300,21 +1271,9 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
     const SDL_Keycode k = ev.key.keysym.sym;
     bool used = true;
     if (k == SDLK_ESCAPE) {
-      app.open_file_mode = false;
-      app.save_as_mode = false;
-      app.path_in_window_mode = false;
-      app.url_bar_mode = false;
-      app.image_insert_mode = false;
-      app.include_insert_mode = false;
-      app.open_file_buf.clear();
-      app.save_as_path.clear();
-      app.path_in_window_buf.clear();
-      app.url_bar_buf.clear();
-      app.image_insert_path.clear();
-      app.include_insert_src.clear();
-      app.minibuf.clear();
+      close_prompt(app);
     } else if (k == SDLK_TAB) {
-      if (app.url_bar_mode &&
+      if (app.prompt.kind == PromptKind::UrlBar &&
           (app.minibuf.text.find("://") != std::string::npos)) {
         // no filesystem completion for remote schemes
         used = false;
@@ -1324,13 +1283,13 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         minibuf_sync_out(app);
       }
     } else if (k == SDLK_UP) {
-      if (app.url_bar_mode)
+      if (app.prompt.kind == PromptKind::UrlBar)
         app.minibuf.history_older(app.minibuf_hist_url);
       else
         app.minibuf.history_older(app.minibuf_hist_path);
       minibuf_sync_out(app);
     } else if (k == SDLK_DOWN) {
-      if (app.url_bar_mode)
+      if (app.prompt.kind == PromptKind::UrlBar)
         app.minibuf.history_newer(app.minibuf_hist_url);
       else
         app.minibuf.history_newer(app.minibuf_hist_path);
@@ -1485,39 +1444,10 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
     case SDLK_ESCAPE:
       if (app.outline_mode) {
         app.outline_mode = false;
-      } else if (app.save_as_mode) {
-        app.save_as_mode = false;
-        app.save_as_path.clear();
-      } else if (app.path_in_window_mode) {
-        app.path_in_window_mode = false;
-        app.path_in_window_buf.clear();
-      } else if (app.open_file_mode) {
-        app.open_file_mode = false;
-        app.open_file_buf.clear();
-      } else if (app.url_bar_mode) {
-        app.url_bar_mode = false;
-        app.url_bar_buf.clear();
-      } else if (app.image_insert_mode) {
-        app.image_insert_mode = false;
-        app.image_insert_as_figure = false;
-        app.image_insert_path.clear();
-      } else if (app.include_insert_mode) {
-        app.include_insert_mode = false;
-        app.include_insert_src.clear();
-      } else if (app.link_edit_mode) {
-        app.link_edit_mode = false;
-        app.link_edit_is_cite = false;
-        app.link_edit_href.clear();
-      } else if (app.summary_edit_mode) {
-        app.summary_edit_mode = false;
-        app.summary_edit_text.clear();
-      } else if (app.search_mode) {
-        app.search_mode = false;
-        app.replace_mode = false;
-        app.replace_focus = false;
-        app.search_query.clear();
-        app.replace_text.clear();
-        reset_blink(app);
+      } else if (prompt_active(app)) {
+        const bool was_search = prompt_is_search(app);
+        close_prompt(app, /*forget_search=*/true);
+        if (was_search) reset_blink(app);
       } else if (app.help_mode) {
         app.help_mode = false;
       } else if (!app.soft_wins.empty()) {
@@ -1540,10 +1470,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
     case SDLK_F2:
       app.browse_mode = !app.browse_mode;
       if (app.browse_mode) {
-        app.search_mode = false;
-        app.save_as_mode = false;
-        app.open_file_mode = false;
-        app.link_edit_mode = false;
+        close_prompt(app);
         flash_status(app,
                      "Browse mode — read-only · gamepad navigate · F2 edits");
       } else {
@@ -1652,9 +1579,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         break;
       }
       if (ctrl) {
-        app.search_mode = true;
-        app.replace_mode = false;
-        app.search_query.clear();
+        open_prompt(app, PromptKind::Search);
         std::cout << "Leap search: type to find, F3 next, Esc cancel\n";
         reset_blink(app);
       }
@@ -1668,15 +1593,14 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       if (ctrl) {
         // Leap replace: find with current query (or enter search), then type
         // replacement
-        app.search_mode = true;
-        app.replace_mode = true;
-        app.replace_text.clear();
-        if (app.search_query.empty()) {
+        open_search(app, true);
+        app.prompt.text2.clear();
+        if (app.prompt.text.empty()) {
           std::cout << "Leap replace: type find text, Tab to edit replacement, "
                        "Enter replaces\n";
         } else {
           std::cout << "Leap replace: type replacement for \""
-                    << app.search_query << "\"\n";
+                    << app.prompt.text << "\"\n";
         }
         reset_blink(app);
       }
@@ -1685,15 +1609,17 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
     case SDLK_F3:
     case SDLK_g:
       if (ev.key.keysym.sym == SDLK_F3 || ctrl) {
-        if (app.search_query.empty() && !app.search_mode) break;
-        app.search_mode = true;
+        if (!prompt_is_search(app)) {
+          if (app.last_search.empty()) break;
+          open_search(app, false);
+        }
         Pane& pp = focused_pane(app);
         size_t mlen = 0;
         const bool backward = shift || (ev.key.keysym.mod & KMOD_SHIFT) != 0;
         auto hit = backward
-                       ? xanatoo::find_prev(doc_of(app, pp), app.search_query,
+                       ? xanatoo::find_prev(doc_of(app, pp), app.prompt.text,
                                             pp.sel.focus, mlen)
-                       : xanatoo::find_next(doc_of(app, pp), app.search_query,
+                       : xanatoo::find_next(doc_of(app, pp), app.prompt.text,
                                             pp.sel.focus, mlen);
         if (hit) {
           pp.sel.anchor = *hit;
@@ -1706,8 +1632,8 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       break;
 
     case SDLK_TAB:
-      if (app.replace_mode) {
-        app.replace_focus = !app.replace_focus;
+      if (app.prompt.kind == PromptKind::Replace) {
+        app.prompt.focus_second = !app.prompt.focus_second;
         break;
       }
       // Ctrl+Tab / Ctrl+Shift+Tab — cycle document tabs
@@ -1777,48 +1703,13 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       break;
 
     case SDLK_BACKSPACE:
-      if (app.path_in_window_mode) {
-        xanatoo::utf8_pop_back(app.path_in_window_buf);
-        break;
-      }
-      if (app.open_file_mode) {
-        xanatoo::utf8_pop_back(app.open_file_buf);
-        break;
-      }
-      if (app.url_bar_mode) {
-        xanatoo::utf8_pop_back(app.url_bar_buf);
-        break;
-      }
-      if (app.save_as_mode) {
-        minibuf_sync_out(app);
-        if (!app.save_as_path.empty()) {
-          app.save_as_path = xanatoo::expand_user_path(app.save_as_path);
-          xanatoo::utf8_pop_back(app.save_as_path);
-        }
-        break;
-      }
-      if (app.image_insert_mode) {
-        xanatoo::utf8_pop_back(app.image_insert_path);
-        break;
-      }
-      if (app.include_insert_mode) {
-        xanatoo::utf8_pop_back(app.include_insert_src);
-        break;
-      }
-      if (app.link_edit_mode) {
-        xanatoo::utf8_pop_back(app.link_edit_href);
-        break;
-      }
-      if (app.summary_edit_mode) {
-        xanatoo::utf8_pop_back(app.summary_edit_text);
-        break;
-      }
-      if (app.search_mode) {
-        std::string& target = (app.replace_mode && app.replace_focus)
-                                  ? app.replace_text
-                                  : app.search_query;
+      if (prompt_active(app)) {
+        std::string& target = (app.prompt.kind == PromptKind::Replace &&
+                               app.prompt.focus_second)
+                                  ? app.prompt.text2
+                                  : app.prompt.text;
         xanatoo::utf8_pop_back(target);
-        reset_blink(app);
+        if (prompt_is_search(app)) reset_blink(app);
         break;
       }
       edit(app);
@@ -1846,277 +1737,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
 
     case SDLK_RETURN:
     case SDLK_KP_ENTER:
-      if (app.replace_mode && app.search_mode && !app.search_query.empty()) {
-        Pane& pp = focused_pane(app);
-        xanatoo::Document& dd = doc_of(app, pp);
-        if (ctrl && shift) {
-          // Replace all occurrences
-          edit(app);
-          size_t n =
-              xanatoo::replace_all(dd, app.search_query, app.replace_text);
-          app.needs_layout = true;
-          std::cout << "Replace all: " << n << " substitution(s)\n";
-          reset_blink(app);
-          break;
-        }
-        if (!pp.sel.empty()) {
-          edit(app);
-          xanatoo::delete_selection(dd, pp.sel);
-          if (!app.replace_text.empty()) {
-            xanatoo::insert_text(dd, pp.sel.focus, app.replace_text);
-            pp.sel.anchor = pp.sel.focus;
-          }
-          app.needs_layout = true;
-        }
-        // Find next
-        size_t mlen = 0;
-        if (auto hit =
-                xanatoo::find_next(dd, app.search_query, pp.sel.focus, mlen)) {
-          pp.sel.anchor = *hit;
-          pp.sel.focus = *hit;
-          xanatoo::advance_caret(dd, pp.sel.focus, mlen);
-          scroll_caret_into_view(app, pp);
-        }
-        reset_blink(app);
-        break;
-      }
-      if (app.link_edit_mode) {
-        if (app.link_edit_node != xanatoo::INVALID_NODE) {
-          auto& node = d.get(app.link_edit_node);
-          // BiblioEntry: edit the entry's label (cite target key)
-          if (node.kind == xanatoo::NodeKind::BiblioEntry &&
-              app.link_edit_is_cite) {
-            std::string key = app.link_edit_href;
-            if (key.rfind("cite:", 0) == 0) key = key.substr(5);
-            if (!key.empty() && key[0] == '#') key = key.substr(1);
-            if (key.empty()) key = "key";
-            node.label = key;
-            mark_dirty(app);
-            app.needs_layout = true;
-            std::cout << "Bibliography key: " << key << "\n";
-          } else if (app.link_edit_span < node.spans.size()) {
-            auto& sp = node.spans[app.link_edit_span];
-            if (app.link_edit_is_cite) {
-              // Strip optional cite: / # prefix from the typed key
-              std::string key = app.link_edit_href;
-              if (key.rfind("cite:", 0) == 0) key = key.substr(5);
-              if (!key.empty() && key[0] == '#') key = key.substr(1);
-              sp.href = key;
-              sp.kind = xanatoo::InlineKind::Cite;
-              std::cout << "Citation key: " << key << "\n";
-            } else {
-              // Accept "href rel=glossary" or "href {rel=glossary}"
-              std::string raw = app.link_edit_href;
-              std::string rel;
-              auto strip_rel = [&](std::string& s) {
-                auto rpos = s.find("rel=");
-                if (rpos == std::string::npos) return;
-                size_t after = rpos + 4;
-                while (after < s.size() &&
-                       (s[after] == ' ' || s[after] == '\t'))
-                  ++after;
-                size_t end = after;
-                while (end < s.size() && s[end] != ' ' && s[end] != '\t' &&
-                       s[end] != '}')
-                  ++end;
-                rel = s.substr(after, end - after);
-                // Remove the rel clause (and optional braces) from href
-                size_t cut = rpos;
-                while (cut > 0 && (s[cut - 1] == ' ' || s[cut - 1] == '\t' ||
-                                   s[cut - 1] == '{'))
-                  --cut;
-                s = s.substr(0, cut);
-                while (!s.empty() && (s.back() == ' ' || s.back() == '\t'))
-                  s.pop_back();
-              };
-              strip_rel(raw);
-              sp.href = raw;
-              if (!rel.empty()) sp.rel = rel;
-              sp.kind = xanatoo::InlineKind::Link;
-              std::cout << "Link href: " << sp.href;
-              if (!sp.rel.empty()) std::cout << " rel=" << sp.rel;
-              std::cout << "\n";
-            }
-            mark_dirty(app);
-            app.needs_layout = true;
-          }
-        }
-        app.link_edit_mode = false;
-        app.link_edit_is_cite = false;
-        app.link_edit_href.clear();
-        break;
-      }
-      if (app.summary_edit_mode) {
-        if (app.summary_edit_node != xanatoo::INVALID_NODE) {
-          d.get(app.summary_edit_node).summary = app.summary_edit_text;
-          mark_dirty(app);
-          app.needs_layout = true;
-        }
-        app.summary_edit_mode = false;
-        app.summary_edit_text.clear();
-        break;
-      }
-      if (app.path_in_window_mode) {
-        minibuf_sync_out(app);
-        if (!app.path_in_window_buf.empty()) {
-          std::string path = xanatoo::expand_user_path(app.path_in_window_buf);
-          if (!fs::exists(path)) {
-            std::string found = find_repo_file(app, path.c_str());
-            if (!found.empty()) path = found;
-          }
-          open_browse(app, path, path);
-          minibuf_commit_path_hist(app);
-        }
-        app.path_in_window_mode = false;
-        app.path_in_window_buf.clear();
-        app.minibuf.clear();
-        break;
-      }
-      if (app.url_bar_mode) {
-        minibuf_sync_out(app);
-        std::string target = app.url_bar_buf;
-        app.url_bar_mode = false;
-        app.url_bar_buf.clear();
-        if (!target.empty()) minibuf_commit_url_hist(app);
-        app.minibuf.clear();
-        navigate_to_url(app, std::move(target));
-        break;
-      }
-      if (app.open_file_mode) {
-        minibuf_sync_out(app);
-        if (!app.open_file_buf.empty()) {
-          std::string path = xanatoo::expand_user_path(app.open_file_buf);
-          if (!fs::exists(path)) {
-            std::string found = find_repo_file(app, path.c_str());
-            if (!found.empty()) path = found;
-          }
-          if (!fs::exists(path)) {
-            flash_status(app, "Open: file not found");
-            std::cerr << "Open: file not found: " << path << "\n";
-          } else {
-            const BufferId existing = find_buffer(app, path);
-            if (existing != kNoBuffer) {
-              // Already open — switch the focused pane to that tab.
-              p.buf = existing;
-              app.needs_layout = true;
-              update_title(app);
-              push_nav_history(app, path);
-              flash_status(app, "Switched to " + path);
-              minibuf_commit_path_hist(app);
-              app.open_file_mode = false;
-              app.open_file_buf.clear();
-              app.minibuf.clear();
-            } else if (!allow_discard_dirty(app, p.buf)) {
-              flash_status(app,
-                           "Unsaved changes — Enter again to discard and open");
-              break;
-            } else {
-              buf(app, p.buf).doc = load_doc(app, path);
-              path_of(app, p) = path;
-              buf(app, p.buf).dirty = false;
-              xanatoo::ensure_valid_caret(
-                  buf(app, p.buf).doc, p.sel.focus);
-              p.sel.anchor = p.sel.focus;
-              p.scroll_y = 0.f;
-              buf(app, p.buf).history.reset(
-                  buf(app, p.buf).doc, p.sel);
-              if (app.panes[0].buf == app.panes[1].buf) {
-                app.panes[1 - app.focus].sel = p.sel;
-                app.panes[1 - app.focus].scroll_y = 0.f;
-              }
-              // Ensure path is on the tab strip
-              if (std::find(app.tab_order.begin(), app.tab_order.end(),
-                            p.buf) == app.tab_order.end())
-                app.tab_order.push_back(p.buf);
-              app.needs_layout = true;
-              update_title(app);
-              push_nav_history(app, path);
-              flash_status(app, "Opened " + path);
-              std::cout << "Opened: " << path << "\n";
-              minibuf_commit_path_hist(app);
-              app.open_file_mode = false;
-              app.open_file_buf.clear();
-            }
-          }
-        } else {
-          app.open_file_mode = false;
-          app.open_file_buf.clear();
-        }
-        break;
-      }
-      if (app.save_as_mode) {
-        minibuf_sync_out(app);
-        if (!app.save_as_path.empty()) {
-          app.save_as_path = xanatoo::expand_user_path(app.save_as_path);
-          std::string text = xanatoo::serialize_document(d, app.save_as_path);
-          std::ofstream out(app.save_as_path);
-          if (!out) {
-            std::cerr << "Failed to save: " << app.save_as_path << "\n";
-          } else {
-            out << text;
-            path_of(app, p) = app.save_as_path;
-            buf(app, p.buf).dirty = false;
-            app.discard_armed = false;
-            update_title(app);
-            flash_status(app, "Saved as " + app.save_as_path);
-            std::cout << "Saved as: " << app.save_as_path << "\n";
-            minibuf_commit_path_hist(app);
-          }
-        }
-        app.save_as_mode = false;
-        app.save_as_path.clear();
-        app.minibuf.clear();
-        break;
-      }
-      if (app.image_insert_mode) {
-        minibuf_sync_out(app);
-        if (!app.image_insert_path.empty()) {
-          app.image_insert_path =
-              xanatoo::expand_user_path(app.image_insert_path);
-          edit(app);
-          bool ok = false;
-          if (app.image_insert_as_figure) {
-            ok = static_cast<bool>(
-                xanatoo::insert_figure(d, p.sel.focus, app.image_insert_path));
-            if (ok)
-              std::cout << "Inserted figure: " << app.image_insert_path << "\n";
-          } else {
-            ok = static_cast<bool>(
-                xanatoo::insert_image(d, p.sel.focus, app.image_insert_path));
-            if (ok)
-              std::cout << "Inserted image: " << app.image_insert_path << "\n";
-          }
-          if (ok) {
-            p.sel.anchor = p.sel.focus;
-            app.needs_layout = true;
-            reset_blink(app);
-            minibuf_commit_path_hist(app);
-          }
-        }
-        app.image_insert_mode = false;
-        app.image_insert_as_figure = false;
-        app.image_insert_path.clear();
-        app.minibuf.clear();
-        break;
-      }
-      if (app.include_insert_mode) {
-        minibuf_sync_out(app);
-        if (!app.include_insert_src.empty()) {
-          edit(app);
-          if (xanatoo::insert_transclude(d, p.sel.focus,
-                                         app.include_insert_src)) {
-            p.sel.anchor = p.sel.focus;
-            app.needs_layout = true;
-            reset_blink(app);
-            std::cout << "Inserted include: " << app.include_insert_src << "\n";
-            minibuf_commit_path_hist(app);
-          }
-        }
-        app.include_insert_mode = false;
-        app.include_insert_src.clear();
-        app.minibuf.clear();
-        break;
-      }
+      if (commit_prompt(app, ctrl, shift)) break;
       // Ctrl+Enter: new empty paragraph after current block
       if (ctrl) {
         edit(app);
@@ -2338,13 +1959,9 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         edit(app);
         xanatoo::apply_style_to_selection(d, p.sel, xanatoo::InlineKind::Cite,
                                           key);
-        app.link_edit_mode = true;
-        app.link_edit_is_cite = true;
-        app.search_mode = false;
-        app.save_as_mode = false;
-        app.link_edit_node = p.sel.focus.node;
-        app.link_edit_span = p.sel.focus.span_index;
-        app.link_edit_href = key;
+        open_prompt(app, PromptKind::EditCite, key);
+        app.prompt.node = p.sel.focus.node;
+        app.prompt.span = p.sel.focus.span_index;
         app.needs_layout = true;
         reset_blink(app);
       }
@@ -2368,34 +1985,20 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
           char* clip = SDL_GetClipboardText();
           if (clip && clip[0]) {
             // Status-bar prompts: paste into the active buffer, not the doc.
-            auto append_clip = [&](std::string& buf) {
+            if (prompt_active(app)) {
               // Single-line prompts: strip newlines.
-              for (const char* s = clip; *s; ++s) {
-                if (*s == '\n' || *s == '\r') continue;
-                buf.push_back(*s);
+              std::string clean;
+              for (const char* c = clip; *c; ++c)
+                if (*c != '\n' && *c != '\r') clean.push_back(*c);
+              if (minibuf_active(app)) {
+                app.minibuf.insert_utf8(clean);
+                minibuf_sync_out(app);
+              } else if (app.prompt.kind == PromptKind::Replace &&
+                         app.prompt.focus_second) {
+                app.prompt.text2 += clean;
+              } else {
+                app.prompt.text += clean;
               }
-            };
-            if (app.save_as_mode) {
-              append_clip(app.save_as_path);
-            } else if (app.path_in_window_mode) {
-              append_clip(app.path_in_window_buf);
-            } else if (app.open_file_mode) {
-              append_clip(app.open_file_buf);
-            } else if (app.url_bar_mode) {
-              append_clip(app.url_bar_buf);
-            } else if (app.image_insert_mode) {
-              append_clip(app.image_insert_path);
-            } else if (app.include_insert_mode) {
-              append_clip(app.include_insert_src);
-            } else if (app.link_edit_mode) {
-              append_clip(app.link_edit_href);
-            } else if (app.summary_edit_mode) {
-              append_clip(app.summary_edit_text);
-            } else if (app.search_mode) {
-              if (app.replace_mode && app.replace_focus)
-                append_clip(app.replace_text);
-              else
-                append_clip(app.search_query);
             } else {
               edit(app);
               if (!p.sel.empty()) xanatoo::delete_selection(d, p.sel);
@@ -2440,12 +2043,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         break;
       }
       if (ctrl) {
-        app.open_file_mode = true;
-        minibuf_begin(app);
-        app.open_file_buf.clear();
-        app.path_in_window_mode = false;
-        app.save_as_mode = false;
-        app.search_mode = false;
+        open_prompt(app, PromptKind::OpenFile);
       }
       break;
 
@@ -2481,11 +2079,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
                                          : "Structure highlight off\n");
       } else if (ctrl && !shift) {
         // Focus interactive toolbar URL bar
-        app.search_mode = false;
-        app.save_as_mode = false;
-        app.open_file_mode = false;
-        app.path_in_window_mode = false;
-        app.url_bar_mode = false;
+        close_prompt(app);
         app.ui.focus_url_bar();
       }
       break;
@@ -2579,13 +2173,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
     case SDLK_i:
       if (ctrl && shift) {
         // Insert image — prompt for path in status bar
-        app.image_insert_mode = true;
-        minibuf_begin(app);
-        app.image_insert_path.clear();
-        app.save_as_mode = false;
-        app.search_mode = false;
-        app.link_edit_mode = false;
-        app.summary_edit_mode = false;
+        open_prompt(app, PromptKind::InsertImage);
         break;
       }
       if (ctrl && !p.sel.empty()) {
@@ -2613,13 +2201,9 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         edit(app);
         xanatoo::apply_style_to_selection(d, p.sel, xanatoo::InlineKind::Link,
                                           href);
-        app.link_edit_mode = true;
-        app.link_edit_is_cite = false;
-        app.search_mode = false;
-        app.save_as_mode = false;
-        app.link_edit_node = p.sel.focus.node;
-        app.link_edit_span = p.sel.focus.span_index;
-        app.link_edit_href = href;
+        open_prompt(app, PromptKind::EditLink, href);
+        app.prompt.node = p.sel.focus.node;
+        app.prompt.span = p.sel.focus.span_index;
         app.needs_layout = true;
         reset_blink(app);
       }
@@ -2630,12 +2214,8 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         // Edit summary of enclosing stretch
         xanatoo::NodeId sid = xanatoo::enclosing_stretch(d, p.sel.focus.node);
         if (sid != xanatoo::INVALID_NODE) {
-          app.summary_edit_mode = true;
-          app.summary_edit_node = sid;
-          app.summary_edit_text = d.get(sid).summary;
-          app.search_mode = false;
-          app.save_as_mode = false;
-          app.link_edit_mode = false;
+          open_prompt(app, PromptKind::EditSummary, d.get(sid).summary);
+          app.prompt.node = sid;
         }
       } else if (ctrl) {
         edit(app);

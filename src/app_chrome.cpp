@@ -58,70 +58,59 @@ StatusLine compute_status(App& app) {
   std::string& label = st.text;
   StatusTone& tone = st.tone;
   tone = StatusTone::Hint;
-  if (app.path_in_window_mode) {
-    label = "Open in window: ";
-    label += app.minibuf.display_with_cursor();
-    label += "    Tab complete · ↑↓ history · Enter · Esc";
-    label += app.minibuf.status_hint();
+  if (prompt_active(app)) {
+    const Prompt& pr = app.prompt;
     tone = StatusTone::Prompt;
-  } else if (app.open_file_mode) {
-    label = "Open file: ";
-    label += app.minibuf.display_with_cursor();
-    label += "    Tab complete · ↑↓ history · Enter · Esc";
-    label += app.minibuf.status_hint();
-    tone = StatusTone::Prompt;
-  } else if (app.url_bar_mode) {
-    label = "URL: ";
-    label += app.minibuf.display_with_cursor();
-    label += "    ↑↓ history · Enter · Esc · gemini:// or path";
-    label += app.minibuf.status_hint();
-    tone = StatusTone::Prompt;
-  } else if (app.save_as_mode) {
-    label = "Save as: ";
-    label += app.minibuf.display_with_cursor();
-    label += "    Tab complete · ↑↓ history · Enter · Esc";
-    label += app.minibuf.status_hint();
-    tone = StatusTone::Prompt;
-  } else if (app.image_insert_mode) {
-    label = app.image_insert_as_figure ? "Figure image path: " : "Image path: ";
-    label += app.minibuf.display_with_cursor();
-    label += "    Tab complete · ↑↓ history · Enter · Esc";
-    label += app.minibuf.status_hint();
-    tone = StatusTone::Prompt;
-  } else if (app.include_insert_mode) {
-    label = "Include: ";
-    label += app.minibuf.display_with_cursor();
-    label += "    Tab · ↑↓ · Enter · Esc  (#H · file.md · file.md#H) · Esc";
-    tone = StatusTone::Prompt;
-  } else if (app.link_edit_mode) {
-    if (app.link_edit_is_cite) {
-      label = "Citation key: ";
-      label += app.link_edit_href.empty() ? "…" : app.link_edit_href;
-    } else {
-      label = "Link: ";
-      label += app.link_edit_href.empty() ? "…" : app.link_edit_href;
-      label += "    (optional: href rel=glossary)";
+    const std::string shown_or_dots = pr.text.empty() ? "…" : pr.text;
+    switch (pr.kind) {
+      case PromptKind::OpenInWindow:
+      case PromptKind::OpenFile:
+      case PromptKind::SaveAs:
+      case PromptKind::InsertImage:
+      case PromptKind::InsertFigure:
+        label = prompt_label(pr.kind);
+        label += app.minibuf.display_with_cursor();
+        label += "    Tab complete · ↑↓ history · Enter · Esc";
+        label += app.minibuf.status_hint();
+        break;
+      case PromptKind::UrlBar:
+        label = prompt_label(pr.kind);
+        label += app.minibuf.display_with_cursor();
+        label += "    ↑↓ history · Enter · Esc · gemini:// or path";
+        label += app.minibuf.status_hint();
+        break;
+      case PromptKind::InsertInclude:
+        label = "Include: ";
+        label += app.minibuf.display_with_cursor();
+        label += "    Tab · ↑↓ · Enter · Esc  (#H · file.md · file.md#H) · Esc";
+        break;
+      case PromptKind::EditCite:
+        label = "Citation key: " + shown_or_dots;
+        label += "    Enter confirm · Esc cancel";
+        break;
+      case PromptKind::EditLink:
+        label = "Link: " + shown_or_dots;
+        label += "    (optional: href rel=glossary)";
+        label += "    Enter confirm · Esc cancel";
+        break;
+      case PromptKind::EditSummary:
+        label = "Stretch summary: " + shown_or_dots;
+        label += "    Enter confirm · Esc cancel";
+        break;
+      case PromptKind::Replace:
+        label = "Find: " + shown_or_dots;
+        label += "  →  Replace: ";
+        label += pr.text2.empty() ? "…" : pr.text2;
+        label += pr.focus_second ? "  [repl] " : "  [find] ";
+        label += " Tab switch · Enter replace · Ctrl+Shift+Enter all · Esc";
+        break;
+      case PromptKind::Search:
+        label = "Leap: " + shown_or_dots;
+        label += "    F3 next · Shift+F3 prev · Esc cancel";
+        break;
+      case PromptKind::None:
+        break;
     }
-    label += "    Enter confirm · Esc cancel";
-    tone = StatusTone::Prompt;
-  } else if (app.summary_edit_mode) {
-    label = "Stretch summary: ";
-    label += app.summary_edit_text.empty() ? "…" : app.summary_edit_text;
-    label += "    Enter confirm · Esc cancel";
-    tone = StatusTone::Prompt;
-  } else if (app.search_mode && app.replace_mode) {
-    label = "Find: ";
-    label += app.search_query.empty() ? "…" : app.search_query;
-    label += "  →  Replace: ";
-    label += app.replace_text.empty() ? "…" : app.replace_text;
-    label += app.replace_focus ? "  [repl] " : "  [find] ";
-    label += " Tab switch · Enter replace · Ctrl+Shift+Enter all · Esc";
-    tone = StatusTone::Prompt;
-  } else if (app.search_mode) {
-    label = "Leap: ";
-    label += app.search_query.empty() ? "…" : app.search_query;
-    label += "    F3 next · Shift+F3 prev · Esc cancel";
-    tone = StatusTone::Prompt;
   } else if (!app.status_notice.empty() &&
              SDL_GetTicks() < app.status_notice_until) {
     label = app.status_notice;
@@ -266,10 +255,7 @@ StatusLine compute_status(App& app) {
 
   // Selection / document statistics shown in the right-hand panel
   // (idle status only).
-  if (!app.search_mode && !app.save_as_mode && !app.link_edit_mode &&
-      !app.summary_edit_mode && !app.help_mode && !app.outline_mode &&
-      !app.image_insert_mode && !app.include_insert_mode &&
-      !app.path_in_window_mode && !app.open_file_mode) {
+  if (!prompt_active(app) && !app.help_mode && !app.outline_mode) {
     Pane& fp = focused_pane(app);
     if (!fp.sel.empty()) {
       const std::string t = xanatoo::selected_text(doc_of(app, fp), fp.sel);

@@ -142,6 +142,33 @@ struct StatusLine {
   StatusTone tone = StatusTone::Hint;
 };
 
+// The single active status-bar prompt (at most one at a time).
+enum class PromptKind : uint8_t {
+  None,
+  Search,
+  Replace,  // search + replacement fields
+  SaveAs,
+  OpenFile,
+  OpenInWindow,
+  UrlBar,
+  InsertImage,
+  InsertFigure,
+  InsertInclude,
+  EditLink,
+  EditCite,
+  EditSummary,
+};
+
+struct Prompt {
+  PromptKind kind = PromptKind::None;
+  std::string text;           // find text / path / URL / href / summary …
+  std::string text2;          // replacement text (Replace only)
+  bool focus_second = false;  // Replace: editing text2
+  // Target of EditLink / EditCite / EditSummary.
+  xanatoo::NodeId node = xanatoo::INVALID_NODE;
+  size_t span = 0;
+};
+
 struct App {
   App(SDL_Window* w, SDL_Renderer* r)
       : window(w),
@@ -204,34 +231,12 @@ struct App {
   bool needs_layout = true;
   int last_layout_w = 0;
   int last_layout_h = 0;
-  bool search_mode = false;
-  std::string search_query;
-  bool replace_mode = false;
-  bool replace_focus = false;
-  std::string replace_text;
-  bool save_as_mode = false;
-  std::string save_as_path;
-  bool image_insert_mode = false;
-  bool image_insert_as_figure = false;
-  std::string image_insert_path;
-  bool include_insert_mode = false;
-  std::string include_insert_src;
-  bool link_edit_mode = false;
-  bool link_edit_is_cite = false;
-  std::string link_edit_href;
-  xanatoo::NodeId link_edit_node = xanatoo::INVALID_NODE;
-  size_t link_edit_span = 0;
-  bool summary_edit_mode = false;
-  std::string summary_edit_text;
-  xanatoo::NodeId summary_edit_node = xanatoo::INVALID_NODE;
   std::vector<FloatWindow> soft_wins;  // Document-role floats, back→front
   SoftDock dock_preview = SoftDock::None;
-  bool path_in_window_mode = false;
-  std::string path_in_window_buf;
-  bool open_file_mode = false;
-  std::string open_file_buf;
-  bool url_bar_mode = false;
-  std::string url_bar_buf;
+  Prompt prompt;
+  // Last find / replace text, kept when another prompt displaces a search
+  // so F3 / Replace All keep working.
+  std::string last_search, last_replace;
   xanatoo::Minibuffer minibuf;
   std::vector<std::string> minibuf_hist_path;
   std::vector<std::string> minibuf_hist_url;
@@ -363,6 +368,27 @@ std::tuple<int, int, int, int> outline_client_rect(App& app);
 float outline_row_step(App& app);
 
 // ---- prompts ----
+// ---- prompts ----
+inline bool prompt_active(const App& app) {
+  return app.prompt.kind != PromptKind::None;
+}
+inline bool prompt_is_search(const App& app) {
+  return app.prompt.kind == PromptKind::Search ||
+         app.prompt.kind == PromptKind::Replace;
+}
+// Path/URL kinds edited through the Minibuffer (Tab completion, history).
+bool prompt_uses_minibuf(PromptKind k);
+// Opens `kind` (closing any prompt that was open); `initial` seeds the text.
+void open_prompt(App& app, PromptKind kind, std::string initial = {});
+// Closes the prompt and clears its text. Search text survives in last_search
+// unless `forget_search` (Esc).
+void close_prompt(App& app, bool forget_search = false);
+// Opens the Find (or Find+Replace) prompt, keeping the current / last query.
+void open_search(App& app, bool replace);
+const char* prompt_label(PromptKind k);
+// Enter pressed: commit the active prompt. Returns false when the key should
+// fall through to the document (no prompt, or an empty/plain find).
+bool commit_prompt(App& app, bool ctrl, bool shift);
 bool minibuf_active(App& app);
 void minibuf_begin(App& app, const std::string& initial = {});
 void minibuf_commit_path_hist(App& app);
@@ -390,7 +416,8 @@ void open_transclude_in_other_pane(App& app);
 void activate_at_caret(App& app);
 
 // ---- softwin ----
-std::tuple<int, int, int, int> soft_client_rect(App& app, const FloatWindow& sw);
+std::tuple<int, int, int, int> soft_client_rect(App& app,
+                                                const FloatWindow& sw);
 void snap_soft_geom(App& app, int& x, int& y, int w, int h);
 std::tuple<int, int, int> soft_client_bounds(App& app);
 SoftDock compute_dock_zone(App& app, int mx, int my);
@@ -412,7 +439,7 @@ FloatWindow* float_at(App& app, int x, int y);  // topmost window under (x,y)
 std::tuple<int, int, int, int> float_client_rect(App& app,
                                                  const FloatWindow& w);
 float float_max_scroll(App& app, const FloatWindow& w);
-bool float_press(App& app, int x, int y);  // true = click consumed
+bool float_press(App& app, int x, int y);   // true = click consumed
 bool float_motion(App& app, int x, int y);  // true = drag/resize/scroll active
 void float_release(App& app, int x, int y);
 bool float_wheel(App& app, int x, int y, int wheel_y);

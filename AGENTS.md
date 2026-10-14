@@ -39,6 +39,13 @@ Buffers are addressed by stable `BufferId` (`DocBuffer::id`, never reused,
 `remove_buffer` / `close_tab` (`app_buffers.cpp`); never index
 `app.buffers` directly and never hold a `DocBuffer&` across add/remove.
 
+Status-bar prompts are one `Prompt` record (`App::prompt`: `PromptKind`,
+`text`, `text2` for Replace, `node`/`span` for Edit*): open with
+`open_prompt` / `open_search`, close with `close_prompt`, Enter dispatches
+through `commit_prompt` (`app_prompts.cpp`). At most one prompt is active;
+path/URL kinds edit through `App::minibuf` (`prompt_uses_minibuf`), and
+`last_search`/`last_replace` keep a displaced find for F3 / Replace All.
+
 Rules: no behaviour on data types; new modal state goes in `App` (group
 related fields into small records like `FloatPanel` / `Hover`); menus,
 toolbar and shortcuts should route through `execute_command`.

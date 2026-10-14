@@ -279,20 +279,10 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     }
     case C::OpenDocument:
-      app.open_file_mode = true;
-      minibuf_begin(app);
-      app.open_file_buf.clear();
-      app.path_in_window_mode = false;
-      app.save_as_mode = false;
-      app.search_mode = false;
-      app.url_bar_mode = false;
+      open_prompt(app, PromptKind::OpenFile);
       break;
     case C::OpenUrlBar:
-      app.search_mode = false;
-      app.save_as_mode = false;
-      app.open_file_mode = false;
-      app.path_in_window_mode = false;
-      app.url_bar_mode = false;
+      close_prompt(app);
       app.ui.focus_url_bar();
       break;
     case C::NavigateUrl:
@@ -438,9 +428,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::Save: {
       std::string& spath = path_of(app, p);
       if (spath.empty()) {
-        app.save_as_mode = true;
-        app.save_as_path = "untitled.md";
-        minibuf_begin(app, app.save_as_path);
+        open_prompt(app, PromptKind::SaveAs, "untitled.md");
       } else {
         std::string text = xanatoo::serialize_document(d, spath);
         std::ofstream out(spath);
@@ -456,29 +444,24 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     }
     case C::SaveAs:
-      app.save_as_mode = true;
-      app.search_mode = false;
-      app.save_as_path =
-          path_of(app, p).empty() ? "untitled.md" : path_of(app, p);
-      minibuf_begin(app, app.save_as_path);
+      open_prompt(app, PromptKind::SaveAs,
+                  path_of(app, p).empty() ? "untitled.md" : path_of(app, p));
       break;
     case C::ExportSexpr:
     case C::ExportMarkdown: {
-      app.save_as_mode = true;
-      app.search_mode = false;
       const bool as_sexp = (cmd == C::ExportSexpr);
       const char* ext = as_sexp ? ".sexp" : ".md";
       std::string cur = path_of(app, p);
+      std::string target;
       if (cur.empty()) {
-        app.save_as_path = as_sexp ? "untitled.sexp" : "untitled.md";
+        target = as_sexp ? "untitled.sexp" : "untitled.md";
       } else {
         std::filesystem::path fp(cur);
-        app.save_as_path = fp.stem().string() + ext;
+        target = fp.stem().string() + ext;
         if (fp.has_parent_path() && !fp.parent_path().empty())
-          app.save_as_path =
-              (fp.parent_path() / (fp.stem().string() + ext)).string();
+          target = (fp.parent_path() / (fp.stem().string() + ext)).string();
       }
-      minibuf_begin(app, app.save_as_path);
+      open_prompt(app, PromptKind::SaveAs, std::move(target));
       break;
     }
     case C::Reload:
@@ -636,24 +619,26 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       }
       break;
     case C::Find:
-      app.search_mode = true;
-      app.replace_mode = false;
+      open_search(app, false);
       break;
     case C::Replace:
-      app.search_mode = true;
-      app.replace_mode = true;
+      open_search(app, true);
       break;
-    case C::ReplaceAll:
-      if (!app.search_query.empty()) {
+    case C::ReplaceAll: {
+      const std::string& query =
+          prompt_is_search(app) ? app.prompt.text : app.last_search;
+      const std::string& repl =
+          prompt_is_search(app) ? app.prompt.text2 : app.last_replace;
+      if (!query.empty()) {
         edit(app);
-        size_t n = xanatoo::replace_all(d, app.search_query, app.replace_text);
+        size_t n = xanatoo::replace_all(d, query, repl);
         app.needs_layout = true;
         std::cout << "Replace all: " << n << " substitution(s)\n";
       } else {
-        app.search_mode = true;
-        app.replace_mode = true;
+        open_search(app, true);
       }
       break;
+    }
     case C::Bold:
       if (!p.sel.empty()) {
         edit(app);
@@ -691,11 +676,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         edit(app);
         xanatoo::apply_style_to_selection(d, p.sel, xanatoo::InlineKind::Link,
                                           "#" + text);
-        app.link_edit_mode = true;
-        app.link_edit_is_cite = false;
-        app.link_edit_node = p.sel.focus.node;
-        app.link_edit_span = p.sel.focus.span_index;
-        app.link_edit_href = "#" + text;
+        open_prompt(app, PromptKind::EditLink, "#" + text);
+        app.prompt.node = p.sel.focus.node;
+        app.prompt.span = p.sel.focus.span_index;
         app.needs_layout = true;
       }
       break;
@@ -716,11 +699,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         edit(app);
         xanatoo::apply_style_to_selection(d, p.sel, xanatoo::InlineKind::Cite,
                                           key);
-        app.link_edit_mode = true;
-        app.link_edit_is_cite = true;
-        app.link_edit_node = p.sel.focus.node;
-        app.link_edit_span = p.sel.focus.span_index;
-        app.link_edit_href = key;
+        open_prompt(app, PromptKind::EditCite, key);
+        app.prompt.node = p.sel.focus.node;
+        app.prompt.span = p.sel.focus.span_index;
         app.needs_layout = true;
       }
       break;
@@ -732,11 +713,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         // Open key-edit on the entry label via status: reuse link_edit for
         // label (label is not a span; set it when Enter confirms after
         // typing).
-        app.link_edit_mode = true;
-        app.link_edit_is_cite = true;
-        app.link_edit_node = p.sel.focus.node;
-        app.link_edit_span = 0;
-        app.link_edit_href = key;
+        open_prompt(app, PromptKind::EditCite, key);
+        app.prompt.node = p.sel.focus.node;
+        app.prompt.span = 0;
         app.needs_layout = true;
       }
       break;
@@ -795,27 +774,19 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       }
       break;
     case C::InsertTransclude: {
-      app.include_insert_mode = true;
-      minibuf_begin(app);
-      app.include_insert_src.clear();
+      std::string t;
       if (!p.sel.empty()) {
-        std::string t = xanatoo::selected_text(d, p.sel);
+        t = xanatoo::selected_text(d, p.sel);
         if (!t.empty() && t[0] != '#') t = "#" + t;
-        app.include_insert_src = t;
       }
+      open_prompt(app, PromptKind::InsertInclude, std::move(t));
       break;
     }
     case C::InsertImage:
-      app.image_insert_mode = true;
-      minibuf_begin(app);
-      app.image_insert_as_figure = false;
-      app.image_insert_path.clear();
+      open_prompt(app, PromptKind::InsertImage);
       break;
     case C::InsertFigure:
-      app.image_insert_mode = true;
-      minibuf_begin(app);
-      app.image_insert_as_figure = true;
-      app.image_insert_path.clear();
+      open_prompt(app, PromptKind::InsertFigure);
       break;
     case C::Heading1:
       edit(app);
@@ -965,12 +936,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::EditStretchSummary: {
       xanatoo::NodeId sid = xanatoo::enclosing_stretch(d, p.sel.focus.node);
       if (sid != xanatoo::INVALID_NODE) {
-        app.summary_edit_mode = true;
-        app.summary_edit_node = sid;
-        app.summary_edit_text = d.get(sid).summary;
-        app.search_mode = false;
-        app.save_as_mode = false;
-        app.link_edit_mode = false;
+        open_prompt(app, PromptKind::EditSummary, d.get(sid).summary);
+        app.prompt.node = sid;
       }
       break;
     }
@@ -1036,10 +1003,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       app.browse_mode = !app.browse_mode;
       if (app.browse_mode) {
         // Clear any status prompts so they do not trap keys
-        app.search_mode = false;
-        app.save_as_mode = false;
-        app.open_file_mode = false;
-        app.link_edit_mode = false;
+        close_prompt(app);
         flash_status(
             app,
             "Browse mode — read-only · F2 exits · gamepad: D-pad move, "
@@ -1119,9 +1083,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     }
     case C::OpenInWindow:
-      app.path_in_window_mode = true;
-      minibuf_begin(app);
-      app.path_in_window_buf.clear();
+      open_prompt(app, PromptKind::OpenInWindow);
       break;
     case C::OpenExample: {
       std::string name = arg;
@@ -1363,7 +1325,7 @@ void draw_pane(App& app, int i) {
     auto rects =
         xanatoo::selection_rects(pane.layout, pane.sel, draw_scroll, lh);
     // Leap-search match uses amber so it is distinct from a user selection.
-    if (app.search_mode && i == app.focus)
+    if (prompt_is_search(app) && i == app.focus)
       app.renderer.draw_selection(rects, ox, 230, 190, 70, 150);
     else
       app.renderer.draw_selection(rects, ox);
@@ -2111,13 +2073,13 @@ void draw_pane(App& app, int i) {
       }
     }
     // Search hits (cheap capped scan while leap search is active).
-    if (app.search_mode && !app.search_query.empty() &&
+    if (prompt_is_search(app) && !app.prompt.text.empty() &&
         &pane == &app.panes[app.focus]) {
       xanatoo::Caret from{};
       size_t mlen = 0;
       for (int n = 0; n < 48; ++n) {
         auto hit =
-            xanatoo::find_next(doc_of(app, pane), app.search_query, from, mlen);
+            xanatoo::find_next(doc_of(app, pane), app.prompt.text, from, mlen);
         if (!hit) break;
         auto cpos = xanatoo::caret_screen_pos(
             pane.layout, *hit, 0.f,
@@ -2479,11 +2441,7 @@ void draw_dock_preview(App& app) {
 
 void draw_hover_tooltip(App& app) {
   {
-    const bool prompt = app.search_mode || app.save_as_mode ||
-                        app.link_edit_mode || app.summary_edit_mode ||
-                        app.help_mode || app.url_bar_mode ||
-                        app.open_file_mode || app.path_in_window_mode ||
-                        app.image_insert_mode || app.include_insert_mode;
+    const bool prompt = prompt_active(app) || app.help_mode;
     std::string tip;
     if (!prompt) {
       if (app.hover.stretch != xanatoo::INVALID_NODE) {

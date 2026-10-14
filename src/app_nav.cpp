@@ -178,11 +178,9 @@ bool navigate_to_url(App& app, std::string target, bool record_history) {
     }
     if (resp->status == 10 || resp->status == 11) {
       // Input request — open URL bar with query for the user to complete.
-      app.url_bar_mode = true;
-      minibuf_begin(app, app.url_bar_buf);
-      app.url_bar_buf = resp->final_url;
-      if (!app.url_bar_buf.empty() && app.url_bar_buf.back() != '?')
-        app.url_bar_buf.push_back('?');
+      std::string q = resp->final_url;
+      if (!q.empty() && q.back() != '?') q.push_back('?');
+      open_prompt(app, PromptKind::UrlBar, std::move(q));
       flash_status(app, std::string(resp->status == 11 ? "Sensitive input: "
                                                        : "Input: ") +
                             resp->meta);
