@@ -13,7 +13,12 @@ Next bundle number: **263** (this delivery is **262**)
 - Phase A done: stable `BufferId`s (`buf`/`find_buf`/`add_buffer`/`remove_buffer`/`close_tab`).
   Behaviour notes: closing a tab now frees its buffer (unless a floating window still
   shows it); diff marks are indexed by pane, not by buffer.
-- Phase B (Window record) and C (Prompt) pending.
+- Phase B done: `FloatWindow` + `app_windows.cpp` (`float_press/motion/release/wheel`,
+  `draw_floats`). Behaviour changes: hit-test order now matches paint order
+  (docs → help → backlinks → outline); backlinks gained wheel + scrollbar drag;
+  Ctrl+W closes docs → help → backlinks → outline. Panels stay persistent
+  members (`help/ol/bl` + mode bools), not entries of a `floats` vector.
+- Phase C (Prompt) pending.
 
 ## Status (2026-10-13)
 

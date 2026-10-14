@@ -30,6 +30,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_events.cpp` | `handle_event` → one `on_<sdl_event>` per event type |
 | `app_frame.cpp` | frame stages: sync size, relayout, `run_chrome` (UiState + `execute_command`), draw panes, overlays |
 | `app_chrome.cpp` | status line (`compute_status` is pure data → `draw_status_bar`), floating window frame, client scrollbar |
+| `app_windows.cpp` | floating windows (`FloatWindow`, role = Help/Outline/Backlinks/Document): one z-stack, shared hit-test / drag / resize / scroll / draw |
 | `app_buffers.cpp` / `app_view.cpp` / `app_nav.cpp` / `app_softwin.cpp` / `app_prompts.cpp` / `app_pointer.cpp` | document buffers, scroll/fold/outline, URL history + bookmarks, floating windows, minibuffer, cursor/gamepad |
 | `theme.cpp` | classic palette (`Palette`) + stateless bevel/gradient/window primitives shared with the ImGui theme |
 

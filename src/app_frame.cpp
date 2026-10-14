@@ -2436,39 +2436,6 @@ void draw_help_window(App& app) {
   }
 }
 
-void draw_soft_windows(App& app) {
-  clamp_all_floating(app);
-  app.soft_wins.erase(
-      std::remove_if(app.soft_wins.begin(), app.soft_wins.end(),
-                     [&](const FloatWindow& sw) {
-                       return !find_buf(app, sw.buf);
-                     }),
-      app.soft_wins.end());
-  for (auto& sw : app.soft_wins) {
-    if (sw.w < 280) sw.w = 280;
-    if (sw.h < 200) sw.h = 200;
-    if (sw.needs_layout) layout_soft(app, sw);
-    auto [cx, cy, cw, ch] = soft_client_rect(app, sw);
-    {
-      float max_s = std::max(
-          0.f, sw.layout.content_height - static_cast<float>(ch) + 40.f);
-      if (sw.scroll > max_s) sw.scroll = max_s;
-    }
-    draw_floating_frame(app, SDL_Rect{sw.x, sw.y, sw.w, sw.h},
-                        soft_title(app, sw), &sw == &app.soft_wins.back());
-    SDL_Rect clip{cx, cy, cw, ch};
-    SDL_RenderSetClipRect(app.sdl, &clip);
-    app.renderer.draw(sw.layout, sw.scroll - static_cast<float>(cy),
-                      static_cast<float>(cx));
-    SDL_RenderSetClipRect(app.sdl, nullptr);
-    {
-      const float max_s = std::max(
-          0.f, sw.layout.content_height - static_cast<float>(ch) + 40.f);
-      draw_client_scrollbar(app, cx, cy, cw, ch, sw.scroll, max_s);
-    }
-  }
-}
-
 void draw_dock_preview(App& app) {
   if (app.dock_preview != SoftDock::None) {
     auto [dx, dy, dw, dh] = dock_rect(app, app.dock_preview);
@@ -2618,10 +2585,7 @@ void run_frame(App& app) {
   draw_panes(app);
   draw_split_chrome(app);
   draw_status_bar(app);
-  draw_outline_panel(app);
-  draw_backlinks_panel(app);
-  draw_help_window(app);
-  draw_soft_windows(app);
+  draw_floats(app);
   draw_dock_preview(app);
   draw_hover_tooltip(app);
   present_frame(app);

@@ -150,33 +150,8 @@ static void on_mousewheel(App& app, SDL_Event& ev, bool imgui_mouse,
                           bool imgui_keys) {
   int mxw = 0, myw = 0;
   SDL_GetMouseState(&mxw, &myw);
-  // Soft windows first (match paint z-order: outline → browse → help).
-  if (app.outline_mode && mxw >= app.ol.x && mxw < app.ol.x + app.ol.w &&
-      myw >= app.ol.y && myw < app.ol.y + app.ol.h) {
-    app.ol.scroll -= static_cast<float>(ev.wheel.y) * 40.f;
-    if (app.ol.scroll < 0.f) app.ol.scroll = 0.f;
-    return;
-  }
-  {
-    bool handled = false;
-    for (int i = static_cast<int>(app.soft_wins.size()) - 1; i >= 0; --i) {
-      FloatWindow& sw = app.soft_wins[static_cast<size_t>(i)];
-      if (mxw >= sw.x && mxw < sw.x + sw.w && myw >= sw.y &&
-          myw < sw.y + sw.h) {
-        sw.scroll -= static_cast<float>(ev.wheel.y) * 40.f;
-        if (sw.scroll < 0.f) sw.scroll = 0.f;
-        handled = true;
-        break;
-      }
-    }
-    if (handled) return;
-  }
-  if (app.help_mode && mxw >= app.help.x && mxw < app.help.x + app.help.w &&
-      myw >= app.help.y && myw < app.help.y + app.help.h) {
-    app.help.scroll -= static_cast<float>(ev.wheel.y) * 48.f;
-    if (app.help.scroll < 0.f) app.help.scroll = 0.f;
-    return;
-  }
+  // Floating windows first (topmost under the pointer).
+  if (float_wheel(app, mxw, myw, ev.wheel.y)) return;
   if (imgui_mouse) return;
   if (myw >= app.win_h - status_bar_h) return;
   int pi = pane_at(app, static_cast<float>(mxw));
@@ -201,346 +176,9 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
   if (ev.button.button == SDL_BUTTON_LEFT) {
     const int mxw = ev.button.x, myw = ev.button.y;
 
-    // Software windows are custom-drawn (not ImGui). Hit-test them
+    // Floating windows are custom-drawn (not ImGui). Hit-test them
     // before the ImGui capture check and before the document panes.
-    // Z-order matches paint order: outline → browse → help.
-
-    // ---- Backlinks software window ----
-    if (app.backlinks_mode && mxw >= app.bl.x - help_edge &&
-        mxw <= app.bl.x + app.bl.w + help_edge && myw >= app.bl.y - help_edge &&
-        myw <= app.bl.y + app.bl.h + help_edge) {
-      const bool inside = mxw >= app.bl.x && mxw < app.bl.x + app.bl.w &&
-                          myw >= app.bl.y && myw < app.bl.y + app.bl.h;
-      if (inside && myw < app.bl.y + help_title_h) {
-        if (mxw >= app.bl.x + app.bl.w - 28) {
-          app.backlinks_mode = false;
-          app.bl.dragging = false;
-        } else {
-          app.bl.dragging = true;
-          app.bl.drag_dx = mxw - app.bl.x;
-          app.bl.drag_dy = myw - app.bl.y;
-        }
-        return;
-      }
-      if (inside) {
-        const int title_h = help_title_h;
-        const int cy = app.bl.y + title_h + 4;
-        const float step = 22.f;
-        int row = static_cast<int>(
-            (static_cast<float>(myw - cy) + app.bl.scroll) / step);
-        if (row >= 0 && row < static_cast<int>(app.backlinks.size())) {
-          app.backlinks_sel = row;
-          auto& pp = focused_pane(app);
-          pp.sel.focus = {app.backlinks[static_cast<size_t>(row)].source, 0, 0};
-          pp.sel.anchor = pp.sel.focus;
-          expand_ancestors_for_node(app, pp.sel.focus.node);
-          scroll_caret_into_view(app, pp);
-          reset_blink(app);
-        }
-        return;
-      }
-    }
-
-    // ---- Outline software window ----
-    if (app.outline_mode && mxw >= app.ol.x - help_edge &&
-        mxw <= app.ol.x + app.ol.w + help_edge && myw >= app.ol.y - help_edge &&
-        myw <= app.ol.y + app.ol.h + help_edge) {
-      const bool inside = mxw >= app.ol.x && mxw < app.ol.x + app.ol.w &&
-                          myw >= app.ol.y && myw < app.ol.y + app.ol.h;
-      {
-        const bool on_r = mxw >= app.ol.x + app.ol.w - help_edge &&
-                          myw >= app.ol.y + help_title_h &&
-                          myw <= app.ol.y + app.ol.h + help_edge;
-        const bool on_b = myw >= app.ol.y + app.ol.h - help_edge &&
-                          mxw >= app.ol.x &&
-                          mxw <= app.ol.x + app.ol.w + help_edge;
-        if (on_r || on_b) {
-          if (app.outline_docked) {
-            // Docked: only horizontal resize (dock width).
-            app.ol.resize = 1;
-          } else {
-            app.ol.resize = (on_r ? 1 : 0) | (on_b ? 2 : 0);
-          }
-          app.ol.resize_start_x = mxw;
-          app.ol.resize_start_y = myw;
-          app.ol.resize_start_w = app.ol.w;
-          app.ol.resize_start_h = app.ol.h;
-          app.ol.dragging = false;
-          return;
-        }
-      }
-      if (inside && myw < app.ol.y + help_title_h) {
-        if (mxw >= app.ol.x + app.ol.w - 28) {
-          app.outline_mode = false;
-          app.ol.dragging = false;
-          app.ol.resize = 0;
-        } else {
-          // Focus chip sits just left of ×.
-          const char* flab = app.section_focus_mode ? "Focus●" : "Focus";
-          int fw = app.fonts.regular.measure(flab);
-          int fx = app.ol.x + app.ol.w - 28 - fw - 10;
-          if (mxw >= fx - 4 && mxw < app.ol.x + app.ol.w - 28) {
-            toggle_section_focus_mode(app);
-            app.ol.dragging = false;
-          } else {
-            app.ol.dragging = true;
-            app.ol.drag_dx = mxw - app.ol.x;
-            app.ol.drag_dy = myw - app.ol.y;
-          }
-        }
-        return;
-      }
-      if (inside) {
-        auto [cx, cy, cw, ch] = outline_client_rect(app);
-        const float step = outline_row_step(app);
-        const int sb_w = 10;
-        if (mxw >= cx + cw - sb_w && mxw <= cx + cw + 2 && myw >= cy &&
-            myw <= cy + ch) {
-          float content_h = static_cast<float>(app.outline.size()) * step + 8.f;
-          float max_s = std::max(0.f, content_h - static_cast<float>(ch));
-          float view_h = static_cast<float>(std::max(1, ch));
-          float ratio = (static_cast<float>(myw - cy) / view_h);
-          ratio = std::max(0.f, std::min(1.f, ratio));
-          app.ol.scroll = ratio * max_s;
-          app.ol.scroll_dragging = true;
-          return;
-        }
-        if (mxw >= cx && mxw < cx + cw && myw >= cy && myw < cy + ch) {
-          int row = static_cast<int>(
-              (static_cast<float>(myw - cy) + app.ol.scroll) / step);
-          if (row >= 0 && row < static_cast<int>(app.outline.size())) {
-            app.outline_sel = row;
-            const auto& er = app.outline[static_cast<size_t>(row)];
-            // Disclosure hit only on the ▸/▾ glyph, not the heading
-            // text (old 48+level*12 zone stole clicks into fold).
-            float local_x = static_cast<float>(mxw - cx);
-            const float indent_px =
-                static_cast<float>(std::max(0, er.level - 1)) * 12.f;
-            // Paint draws at cx+8 with level spaces then the twisty.
-            const float twist_x0 = 8.f + indent_px;
-            const float twist_x1 = twist_x0 + 22.f;
-            const bool on_twist = er.has_children &&
-                                  local_x >= twist_x0 - 2.f &&
-                                  local_x < twist_x1;
-            if (on_twist && er.section != xanatoo::INVALID_NODE) {
-              toggle_section_fold(app, er.section);
-            } else {
-              jump_outline_sel(app);
-            }
-          }
-        }
-        return;
-      }
-    }
-
-    // ---- Document software windows (topmost first) ----
-    {
-      bool soft_hit = false;
-      for (int ii = static_cast<int>(app.soft_wins.size()) - 1; ii >= 0; --ii) {
-        const size_t i = static_cast<size_t>(ii);
-        FloatWindow& sw = app.soft_wins[i];
-        if (mxw < sw.x - help_edge || mxw > sw.x + sw.w + help_edge ||
-            myw < sw.y - help_edge || myw > sw.y + sw.h + help_edge)
-          continue;
-        const bool inside = mxw >= sw.x && mxw < sw.x + sw.w && myw >= sw.y &&
-                            myw < sw.y + sw.h;
-        const bool on_r = mxw >= sw.x + sw.w - help_edge &&
-                          myw >= sw.y + help_title_h &&
-                          myw <= sw.y + sw.h + help_edge;
-        const bool on_b = myw >= sw.y + sw.h - help_edge && mxw >= sw.x &&
-                          mxw <= sw.x + sw.w + help_edge;
-        if (on_r || on_b) {
-          raise_soft(app, i);
-          FloatWindow& top = app.soft_wins.back();
-          top.resize = (on_r ? 1 : 0) | (on_b ? 2 : 0);
-          top.resize_start_x = mxw;
-          top.resize_start_y = myw;
-          top.resize_start_w = top.w;
-          top.resize_start_h = top.h;
-          top.dragging = false;
-          soft_hit = true;
-          break;
-        }
-        if (inside && myw < sw.y + help_title_h) {
-          if (mxw >= sw.x + sw.w - 28) {
-            app.soft_wins.erase(app.soft_wins.begin() +
-                                static_cast<std::ptrdiff_t>(i));
-          } else {
-            raise_soft(app, i);
-            FloatWindow& top = app.soft_wins.back();
-            const Uint32 now = SDL_GetTicks();
-            if (top.last_title_click != 0 && now - top.last_title_click < 400) {
-              maximize_soft(app, top);
-              top.last_title_click = 0;
-              top.dragging = false;
-            } else {
-              top.last_title_click = now;
-              // Dragging a tiled/maximized window restores float first.
-              if (top.maximized || top.dock != SoftDock::None)
-                restore_soft_float(app, top, mxw, myw);
-              top.dragging = true;
-              top.drag_dx = mxw - top.x;
-              top.drag_dy = myw - top.y;
-              app.dock_preview = SoftDock::None;
-            }
-          }
-          soft_hit = true;
-          break;
-        }
-        if (inside) {
-          raise_soft(app, i);
-          FloatWindow& top = app.soft_wins.back();
-          auto [cx, cy, cw, ch] = soft_client_rect(app, top);
-          const int sb_w = 10;
-          if (mxw >= cx + cw - sb_w && mxw <= cx + cw + 2 && myw >= cy &&
-              myw <= cy + ch) {
-            float max_s = std::max(
-                0.f, top.layout.content_height - static_cast<float>(ch) + 40.f);
-            float view_h = static_cast<float>(std::max(1, ch));
-            float ratio = (static_cast<float>(myw - cy) / view_h);
-            ratio = std::max(0.f, std::min(1.f, ratio));
-            top.scroll = ratio * max_s;
-            top.scroll_dragging = true;
-            soft_hit = true;
-            break;
-          }
-          float lx = static_cast<float>(mxw - cx);
-          float ly = static_cast<float>(myw - cy);
-          if (lx >= 0 && ly >= 0 && lx <= cw && ly <= ch) {
-            auto& sdoc = soft_doc(app, top);
-            if (auto sid =
-                    xanatoo::hit_test_stretch(top.layout, lx, ly, top.scroll)) {
-              if (sdoc.get(*sid).kind == xanatoo::NodeKind::Stretch) {
-                // Shared buffer: stretch state is document-owned.
-                const BufferId bi = top.buf;
-                if (find_buf(app, bi)) {
-                  // Snapshot for undo (view-independent history).
-                  buf(app, bi).history.push(sdoc,
-                                                                    top.sel);
-                  sdoc.get(*sid).expanded = !sdoc.get(*sid).expanded;
-                  buf(app, bi).dirty = true;
-                  update_title(app);
-                } else {
-                  sdoc.get(*sid).expanded = !sdoc.get(*sid).expanded;
-                }
-                top.needs_layout = true;
-                app.needs_layout = true;
-                for (auto& osw : app.soft_wins)
-                  if (osw.buf == top.buf) osw.needs_layout = true;
-              }
-            }
-            if (auto href = xanatoo::hit_test_link(sdoc, top.layout, lx, ly,
-                                                   top.scroll)) {
-              if (!href->empty() && (*href)[0] == '#') {
-                if (auto dest = xanatoo::jump_to_href(sdoc, *href)) {
-                  auto cpos = xanatoo::caret_screen_pos(
-                      top.layout, *dest, 0.f,
-                      static_cast<float>(app.fonts.regular.line_height()));
-                  if (cpos.valid) top.scroll = std::max(0.f, cpos.y - 24.f);
-                }
-              } else if (!href->empty()) {
-                // Follow file / gemini / external from soft window.
-                // Always load into the focused pane (same as main-pane
-                // clicks). open_browse here left stale soft layouts and
-                // carets that later threw "invalid node id".
-                std::string abs = *href;
-                if (is_in_app_remote_url(abs)) {
-                  navigate_to_url(app, abs);
-                } else if (is_inapp_doc_href(app, abs)) {
-                  std::string resolved =
-                      resolve_doc_href(app, abs, soft_path(app, top));
-                  navigate_to_url(app, resolved.empty() ? abs : resolved);
-                } else if (abs[0] != '#') {
-                  xanatoo::open_external_url(abs);
-                  flash_status(app, "Opening " + abs);
-                }
-              }
-            }
-          }
-          soft_hit = true;
-          break;
-        }
-      }
-      if (soft_hit) return;
-    }
-
-    // ---- Help software window ----
-    if (app.help_mode && mxw >= app.help.x - help_edge &&
-        mxw <= app.help.x + app.help.w + help_edge &&
-        myw >= app.help.y - help_edge &&
-        myw <= app.help.y + app.help.h + help_edge) {
-      const bool inside = mxw >= app.help.x && mxw < app.help.x + app.help.w &&
-                          myw >= app.help.y && myw < app.help.y + app.help.h;
-      {
-        const bool on_right = mxw >= app.help.x + app.help.w - help_edge &&
-                              myw >= app.help.y + help_title_h &&
-                              myw <= app.help.y + app.help.h + help_edge;
-        const bool on_bottom = myw >= app.help.y + app.help.h - help_edge &&
-                               mxw >= app.help.x &&
-                               mxw <= app.help.x + app.help.w + help_edge;
-        if (on_right || on_bottom) {
-          app.help.resize = (on_right ? 1 : 0) | (on_bottom ? 2 : 0);
-          app.help.resize_start_x = mxw;
-          app.help.resize_start_y = myw;
-          app.help.resize_start_w = app.help.w;
-          app.help.resize_start_h = app.help.h;
-          app.help.dragging = false;
-          return;
-        }
-      }
-      if (inside && myw < app.help.y + help_title_h) {
-        if (mxw >= app.help.x + app.help.w - 28) {
-          app.help_mode = false;
-          app.help.dragging = false;
-          app.help.resize = 0;
-        } else {
-          app.help.dragging = true;
-          app.help.drag_dx = mxw - app.help.x;
-          app.help.drag_dy = myw - app.help.y;
-        }
-        return;
-      }
-      if (inside) {
-        auto [cx, cy, cw, ch] = help_client_rect(app);
-        const int sb_w = 10;
-        if (mxw >= cx + cw - sb_w && mxw <= cx + cw + 2 && myw >= cy &&
-            myw <= cy + ch) {
-          float max_s = std::max(0.f, app.help_layout.content_height -
-                                          static_cast<float>(ch) + 40.f);
-          float view_h = static_cast<float>(std::max(1, ch));
-          float ratio = (static_cast<float>(myw - cy) / view_h);
-          ratio = std::max(0.f, std::min(1.f, ratio));
-          app.help.scroll = ratio * max_s;
-          app.help.scroll_dragging = true;
-          return;
-        }
-        float lx = static_cast<float>(mxw - cx);
-        float ly = static_cast<float>(myw - cy);
-        if (lx >= 0 && ly >= 0 && lx <= cw && ly <= ch) {
-          if (auto sid = xanatoo::hit_test_stretch(app.help_layout, lx, ly,
-                                                   app.help.scroll)) {
-            if (app.help_doc.get(*sid).kind == xanatoo::NodeKind::Stretch) {
-              app.help_doc.get(*sid).expanded =
-                  !app.help_doc.get(*sid).expanded;
-              app.help_needs_layout = true;
-              return;
-            }
-          }
-          if (auto href = xanatoo::hit_test_link(app.help_doc, app.help_layout,
-                                                 lx, ly, app.help.scroll)) {
-            if (!href->empty() && (*href)[0] == '#') {
-              if (auto dest = xanatoo::jump_to_href(app.help_doc, *href)) {
-                auto cpos = xanatoo::caret_screen_pos(
-                    app.help_layout, *dest, 0.f,
-                    static_cast<float>(app.fonts.regular.line_height()));
-                if (cpos.valid) app.help.scroll = std::max(0.f, cpos.y - 24.f);
-              }
-            }
-          }
-        }
-        return;  // absorb click even if no hit target
-      }
-    }
+    if (float_press(app, mxw, myw)) return;
 
     // Below soft windows: let ImGui keep the event if it wants it.
     if (imgui_mouse) return;
@@ -896,24 +534,7 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
     if (app.browse_mode) return;
     if (imgui_mouse) return;
     const int mxw = ev.button.x, myw = ev.button.y;
-    bool over_soft = false;
-    if (app.outline_mode && mxw >= app.ol.x && mxw < app.ol.x + app.ol.w &&
-        myw >= app.ol.y && myw < app.ol.y + app.ol.h)
-      over_soft = true;
-    if (!over_soft && app.help_mode && mxw >= app.help.x &&
-        mxw < app.help.x + app.help.w && myw >= app.help.y &&
-        myw < app.help.y + app.help.h)
-      over_soft = true;
-    if (!over_soft) {
-      for (int i = static_cast<int>(app.soft_wins.size()) - 1; i >= 0; --i) {
-        const FloatWindow& sw = app.soft_wins[static_cast<size_t>(i)];
-        if (mxw >= sw.x && mxw < sw.x + sw.w && myw >= sw.y &&
-            myw < sw.y + sw.h) {
-          over_soft = true;
-          break;
-        }
-      }
-    }
+    const bool over_soft = float_at(app, mxw, myw) != nullptr;
     if (!over_soft && SDL_HasClipboardText()) {
       float mx = static_cast<float>(mxw);
       float my = content_y(app, static_cast<float>(myw));
@@ -938,23 +559,7 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
     // Soft windows / outline / help absorb right-clicks (no doc menu under
     // them).
     const int rx = ev.button.x, ry = ev.button.y;
-    bool over_soft = false;
-    if (app.outline_mode && rx >= app.ol.x && rx < app.ol.x + app.ol.w &&
-        ry >= app.ol.y && ry < app.ol.y + app.ol.h)
-      over_soft = true;
-    if (!over_soft && app.help_mode && rx >= app.help.x &&
-        rx < app.help.x + app.help.w && ry >= app.help.y &&
-        ry < app.help.y + app.help.h)
-      over_soft = true;
-    if (!over_soft) {
-      for (int i = static_cast<int>(app.soft_wins.size()) - 1; i >= 0; --i) {
-        const FloatWindow& sw = app.soft_wins[static_cast<size_t>(i)];
-        if (rx >= sw.x && rx < sw.x + sw.w && ry >= sw.y && ry < sw.y + sw.h) {
-          over_soft = true;
-          break;
-        }
-      }
-    }
+    const bool over_soft = float_at(app, rx, ry) != nullptr;
     // Document context menu (ImGui popup).
     if (!over_soft && !imgui_mouse) {
       float mx = static_cast<float>(ev.button.x);
@@ -992,36 +597,7 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
 static void on_mousebuttonup(App& app, SDL_Event& ev, bool imgui_mouse,
                              bool imgui_keys) {
   if (ev.button.button == SDL_BUTTON_LEFT) {
-    for (auto& sw : app.soft_wins) {
-      if (sw.dragging) {
-        SoftDock zone = compute_dock_zone(app, ev.button.x, ev.button.y);
-        if (zone != SoftDock::None) {
-          apply_soft_dock(app, sw, zone);
-        } else {
-          snap_soft_geom(app, sw.x, sw.y, sw.w, sw.h);
-        }
-      } else if (sw.resize) {
-        snap_soft_geom(app, sw.x, sw.y, sw.w, sw.h);
-        sw.needs_layout = true;
-      }
-      sw.dragging = false;
-      sw.resize = 0;
-      sw.scroll_dragging = false;
-    }
-    app.dock_preview = SoftDock::None;
-    if (app.help.dragging || app.help.resize) {
-      snap_soft_geom(app, app.help.x, app.help.y, app.help.w, app.help.h);
-      if (app.help.resize) app.help_needs_layout = true;
-    }
-    app.help.dragging = false;
-    app.help.resize = 0;
-    app.help.scroll_dragging = false;
-    if (app.ol.dragging || app.ol.resize)
-      snap_soft_geom(app, app.ol.x, app.ol.y, app.ol.w, app.ol.h);
-    app.ol.dragging = false;
-    app.ol.resize = 0;
-    app.ol.scroll_dragging = false;
-    app.bl.dragging = false;
+    float_release(app, ev.button.x, ev.button.y);
     if (app.dragging_block && app.drag_block_id != xanatoo::INVALID_NODE &&
         app.drop_target_id != xanatoo::INVALID_NODE &&
         app.drop_target_id != app.drag_block_id) {
@@ -1060,138 +636,9 @@ static void on_mousemotion(App& app, SDL_Event& ev, bool imgui_mouse,
     const int mx_i = static_cast<int>(app.mouse_x);
     const int my_i = static_cast<int>(app.mouse_y);
 
-    // Soft-window drag/resize continue even if ImGui wants the mouse
+    // Float drag/resize continue even if ImGui wants the mouse
     // (capture flag can lag one frame after a title-bar grab).
-    if (app.ol.dragging) {
-      app.ol.x = mx_i - app.ol.drag_dx;
-      app.ol.y = my_i - app.ol.drag_dy;
-      if (app.ol.x < 0) app.ol.x = 0;
-      if (app.ol.y < static_cast<int>(app.ui_top))
-        app.ol.y = static_cast<int>(app.ui_top);
-      return;
-    }
-    if (app.ol.scroll_dragging) {
-      auto [cx, cy, cw, ch] = outline_client_rect(app);
-      float step = outline_row_step(app);
-      float content_h = static_cast<float>(app.outline.size()) * step + 8.f;
-      float max_s = std::max(0.f, content_h - static_cast<float>(ch));
-      float view_h = static_cast<float>(std::max(1, ch));
-      float ratio = (app.mouse_y - static_cast<float>(cy)) / view_h;
-      ratio = std::max(0.f, std::min(1.f, ratio));
-      app.ol.scroll = ratio * max_s;
-      return;
-    }
-    if (app.ol.resize) {
-      int dx = mx_i - app.ol.resize_start_x;
-      int dy = my_i - app.ol.resize_start_y;
-      if (app.ol.resize & 1) {
-        app.ol.w = app.ol.resize_start_w + dx;
-        if (app.outline_docked) {
-          if (app.ol.w < 160) app.ol.w = 160;
-          if (app.ol.w > app.win_w / 2) app.ol.w = app.win_w / 2;
-          if (app.ol.w != app.outline_dock_w) {
-            app.outline_dock_w = app.ol.w;
-            app.needs_layout = true;
-            layout_panes(app);
-          }
-        } else {
-          if (app.ol.w < 200) app.ol.w = 200;
-          if (app.ol.w > app.win_w - 20) app.ol.w = app.win_w - 20;
-        }
-      }
-      if (app.ol.resize & 2 && !app.outline_docked) {
-        app.ol.h = app.ol.resize_start_h + dy;
-        if (app.ol.h < 140) app.ol.h = 140;
-        if (app.ol.h > app.win_h - 40) app.ol.h = app.win_h - 40;
-      }
-      return;
-    }
-    if (app.bl.dragging) {
-      app.bl.x = mx_i - app.bl.drag_dx;
-      app.bl.y = my_i - app.bl.drag_dy;
-      if (app.bl.x < 0) app.bl.x = 0;
-      if (app.bl.y < static_cast<int>(app.ui_top))
-        app.bl.y = static_cast<int>(app.ui_top);
-      return;
-    }
-    {
-      bool soft_motion = false;
-      for (auto& sw : app.soft_wins) {
-        if (sw.dragging) {
-          sw.x = mx_i - sw.drag_dx;
-          sw.y = my_i - sw.drag_dy;
-          if (sw.x < 0) sw.x = 0;
-          if (sw.y < static_cast<int>(app.ui_top))
-            sw.y = static_cast<int>(app.ui_top);
-          app.dock_preview = compute_dock_zone(app, mx_i, my_i);
-          soft_motion = true;
-          break;
-        }
-        if (sw.scroll_dragging) {
-          auto [cx, cy, cw, ch] = soft_client_rect(app, sw);
-          float max_s = std::max(
-              0.f, sw.layout.content_height - static_cast<float>(ch) + 40.f);
-          float view_h = static_cast<float>(std::max(1, ch));
-          float ratio = (app.mouse_y - static_cast<float>(cy)) / view_h;
-          ratio = std::max(0.f, std::min(1.f, ratio));
-          sw.scroll = ratio * max_s;
-          soft_motion = true;
-          break;
-        }
-        if (sw.resize) {
-          int dx = mx_i - sw.resize_start_x;
-          int dy = my_i - sw.resize_start_y;
-          if (sw.resize & 1) {
-            sw.w = sw.resize_start_w + dx;
-            if (sw.w < 280) sw.w = 280;
-            if (sw.w > app.win_w - 20) sw.w = app.win_w - 20;
-            sw.needs_layout = true;
-          }
-          if (sw.resize & 2) {
-            sw.h = sw.resize_start_h + dy;
-            if (sw.h < 160) sw.h = 160;
-            if (sw.h > app.win_h - 40) sw.h = app.win_h - 40;
-          }
-          soft_motion = true;
-          break;
-        }
-      }
-      if (soft_motion) return;
-    }
-    if (app.help.dragging) {
-      app.help.x = mx_i - app.help.drag_dx;
-      app.help.y = my_i - app.help.drag_dy;
-      if (app.help.x < 0) app.help.x = 0;
-      if (app.help.y < static_cast<int>(app.ui_top))
-        app.help.y = static_cast<int>(app.ui_top);
-      return;
-    }
-    if (app.help.scroll_dragging) {
-      auto [cx, cy, cw, ch] = help_client_rect(app);
-      float max_s = std::max(
-          0.f, app.help_layout.content_height - static_cast<float>(ch) + 40.f);
-      float view_h = static_cast<float>(std::max(1, ch));
-      float ratio = (app.mouse_y - static_cast<float>(cy)) / view_h;
-      ratio = std::max(0.f, std::min(1.f, ratio));
-      app.help.scroll = ratio * max_s;
-      return;
-    }
-    if (app.help.resize) {
-      int dx = mx_i - app.help.resize_start_x;
-      int dy = my_i - app.help.resize_start_y;
-      if (app.help.resize & 1) {
-        app.help.w = app.help.resize_start_w + dx;
-        if (app.help.w < 280) app.help.w = 280;
-        if (app.help.w > app.win_w - 20) app.help.w = app.win_w - 20;
-        app.help_needs_layout = true;
-      }
-      if (app.help.resize & 2) {
-        app.help.h = app.help.resize_start_h + dy;
-        if (app.help.h < 160) app.help.h = 160;
-        if (app.help.h > app.win_h - 40) app.help.h = app.win_h - 40;
-      }
-      return;
-    }
+    if (float_motion(app, mx_i, my_i)) return;
     // Soft-window interactions handled; rest of motion is for panes.
     if (imgui_mouse) return;
 
@@ -1207,23 +654,7 @@ static void on_mousemotion(App& app, SDL_Event& ev, bool imgui_mouse,
     if (!app.dragging_sel && !app.dragging_scroll && !app.dragging_split &&
         !app.dragging_image && !app.dragging_block && !app.dragging_col_gap) {
       const int mxw = mx_i, myw = my_i;
-      bool over_soft = false;
-      if (app.outline_mode && mxw >= app.ol.x && mxw < app.ol.x + app.ol.w &&
-          myw >= app.ol.y && myw < app.ol.y + app.ol.h)
-        over_soft = true;
-      if (!over_soft && app.help_mode && mxw >= app.help.x &&
-          mxw < app.help.x + app.help.w && myw >= app.help.y &&
-          myw < app.help.y + app.help.h)
-        over_soft = true;
-      if (!over_soft) {
-        for (const auto& sw : app.soft_wins) {
-          if (mxw >= sw.x && mxw < sw.x + sw.w && myw >= sw.y &&
-              myw < sw.y + sw.h) {
-            over_soft = true;
-            break;
-          }
-        }
-      }
+      const bool over_soft = float_at(app, mxw, myw) != nullptr;
       if (over_soft) return;
     }
 
@@ -2188,13 +1619,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         if (!app.soft_wins.empty()) {
           app.soft_wins.pop_back();
           flash_status(app, "Closed window");
-        } else if (app.help_mode) {
-          app.help_mode = false;
-          app.help.dragging = false;
-        } else if (app.outline_mode) {
-          app.outline_mode = false;
-          app.ol.dragging = false;
-          app.ol.resize = 0;
+        } else if (close_top_float(app)) {
         } else {
           // Close focused tab
           int tab_i = -1;
@@ -2808,44 +2233,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       // of the document (matches wheel routing).
       int mxk = 0, myk = 0;
       SDL_GetMouseState(&mxk, &myk);
-      auto page_scroll = [&](float& scroll, float content_h, float view_h) {
-        if (view_h < 1.f) view_h = 1.f;
-        const float step = view_h * 0.85f;
-        float max_s = std::max(0.f, content_h - view_h + 40.f);
-        if (up)
-          scroll = std::max(0.f, scroll - step);
-        else
-          scroll = std::min(max_s, scroll + step);
-      };
-      if (app.outline_mode && mxk >= app.ol.x && mxk < app.ol.x + app.ol.w &&
-          myk >= app.ol.y && myk < app.ol.y + app.ol.h) {
-        page_scroll(app.ol.scroll,
-                    static_cast<float>(app.outline.size()) * 22.f,
-                    static_cast<float>(app.ol.h - help_title_h - 8));
-        break;
-      }
-      {
-        bool soft_paged = false;
-        for (int i = static_cast<int>(app.soft_wins.size()) - 1; i >= 0; --i) {
-          FloatWindow& sw = app.soft_wins[static_cast<size_t>(i)];
-          if (mxk >= sw.x && mxk < sw.x + sw.w && myk >= sw.y &&
-              myk < sw.y + sw.h) {
-            auto [cx, cy, cw, ch] = soft_client_rect(app, sw);
-            page_scroll(sw.scroll, sw.layout.content_height,
-                        static_cast<float>(std::max(1, ch)));
-            soft_paged = true;
-            break;
-          }
-        }
-        if (soft_paged) break;
-      }
-      if (app.help_mode && mxk >= app.help.x && mxk < app.help.x + app.help.w &&
-          myk >= app.help.y && myk < app.help.y + app.help.h) {
-        auto [cx, cy, cw, ch] = help_client_rect(app);
-        page_scroll(app.help.scroll, app.help_layout.content_height,
-                    static_cast<float>(std::max(1, ch)));
-        break;
-      }
+      if (float_page_scroll(app, mxk, myk, up)) break;
       const float view_h = static_cast<float>(app.win_h - status_bar_h) -
                            app.ui_top - app.ui_bottom;
       const float step = view_h * 0.85f;

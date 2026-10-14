@@ -405,6 +405,20 @@ std::string soft_title(App& app, const FloatWindow& sw);
 void layout_soft(App& app, FloatWindow& sw);
 void raise_soft(App& app, size_t i);
 
+// ---- floating windows (app_windows.cpp) ----
+// z-order, back→front: outline, backlinks, help, document windows.
+std::vector<FloatWindow*> float_stack(App& app);
+FloatWindow* float_at(App& app, int x, int y);  // topmost window under (x,y)
+std::tuple<int, int, int, int> float_client_rect(App& app,
+                                                 const FloatWindow& w);
+float float_max_scroll(App& app, const FloatWindow& w);
+bool float_press(App& app, int x, int y);  // true = click consumed
+bool float_motion(App& app, int x, int y);  // true = drag/resize/scroll active
+void float_release(App& app, int x, int y);
+bool float_wheel(App& app, int x, int y, int wheel_y);
+bool float_page_scroll(App& app, int x, int y, bool up);
+bool close_top_float(App& app);  // closes the topmost window, if any
+
 // ---- keymap ----
 // Ctrl+<key> chord → command (nullopt = not a table binding).
 std::optional<xanatoo::UiCommand> keymap_lookup(SDL_Keycode sym, bool ctrl,
@@ -430,7 +444,7 @@ void draw_status_bar(App& app);
 void draw_outline_panel(App& app);
 void draw_backlinks_panel(App& app);
 void draw_help_window(App& app);
-void draw_soft_windows(App& app);
+void draw_floats(App& app);  // all floating windows, back→front
 void draw_dock_preview(App& app);
 void draw_hover_tooltip(App& app);
 void present_frame(App& app);
