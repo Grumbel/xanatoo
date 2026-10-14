@@ -71,38 +71,43 @@ struct Pane {
 
 enum class SoftDock { None = 0, Left, Right, Top, Bottom, Max };
 
-struct SoftWindow {
+enum class WindowRole : uint8_t { Help, Outline, Backlinks, Document };
+
+// One floating window: help / outline / backlinks panels and document
+// windows share geometry + interaction state; role picks the content.
+struct FloatWindow {
+  WindowRole role = WindowRole::Document;
+  // Document role only:
   BufferId buf = kNoBuffer;
   std::string title;  // display override; empty → derive from path
   xanatoo::Selection sel{};
   xanatoo::LayoutResult layout;
-  float scroll = 0.f;
   bool needs_layout = true;
-  int x = 120, y = 70, w = 540, h = 440;
-  bool dragging = false;
-  int drag_dx = 0, drag_dy = 0;
-  int resize = 0;  // 1=right, 2=bottom
-  bool scroll_dragging = false;
-  int resize_start_x = 0, resize_start_y = 0;
-  int resize_start_w = 0, resize_start_h = 0;
-  // Docking / maximize
   bool maximized = false;
   SoftDock dock = SoftDock::None;
   int restore_x = 120, restore_y = 70, restore_w = 540, restore_h = 440;
   Uint32 last_title_click = 0;
-};
-
-// Geometry + interaction state of a floating panel (help, outline, backlinks).
-struct FloatPanel {
-  int x = 0, y = 0, w = 0, h = 0;
+  // Geometry + interaction (all roles):
+  int x = 120, y = 70, w = 540, h = 440;
   bool dragging = false;
   int drag_dx = 0, drag_dy = 0;
-  int resize = 0;  // 1=right, 2=bottom
+  int resize = 0;  // bit 1=right, 2=bottom
   int resize_start_x = 0, resize_start_y = 0;
   int resize_start_w = 0, resize_start_h = 0;
   float scroll = 0.f;
   bool scroll_dragging = false;
 };
+
+inline FloatWindow make_float_panel(WindowRole role, int x, int y, int w,
+                                    int h) {
+  FloatWindow f;
+  f.role = role;
+  f.x = x;
+  f.y = y;
+  f.w = w;
+  f.h = h;
+  return f;
+}
 
 // What the pointer is currently over (rebuilt on every mouse move).
 struct Hover {
@@ -219,7 +224,7 @@ struct App {
   bool summary_edit_mode = false;
   std::string summary_edit_text;
   xanatoo::NodeId summary_edit_node = xanatoo::INVALID_NODE;
-  std::vector<SoftWindow> soft_wins;
+  std::vector<FloatWindow> soft_wins;  // Document-role floats, back→front
   SoftDock dock_preview = SoftDock::None;
   bool path_in_window_mode = false;
   std::string path_in_window_buf;
@@ -279,9 +284,9 @@ struct App {
   SDL_Cursor* cursor_sizeall = nullptr;
   SDL_Cursor* cursor_current = nullptr;
   Uint32 caret_blink_start = 0;
-  FloatPanel help{80, 100, 560, 480};
-  FloatPanel bl{80, 120, 360, 320};
-  FloatPanel ol{40, 100, 320, 420};
+  FloatWindow help = make_float_panel(WindowRole::Help, 80, 100, 560, 480);
+  FloatWindow bl = make_float_panel(WindowRole::Backlinks, 80, 120, 360, 320);
+  FloatWindow ol = make_float_panel(WindowRole::Outline, 40, 100, 320, 420);
   Hover hover;
 };
 
@@ -385,19 +390,19 @@ void open_transclude_in_other_pane(App& app);
 void activate_at_caret(App& app);
 
 // ---- softwin ----
-std::tuple<int, int, int, int> soft_client_rect(App& app, const SoftWindow& sw);
+std::tuple<int, int, int, int> soft_client_rect(App& app, const FloatWindow& sw);
 void snap_soft_geom(App& app, int& x, int& y, int w, int h);
 std::tuple<int, int, int> soft_client_bounds(App& app);
 SoftDock compute_dock_zone(App& app, int mx, int my);
 std::tuple<int, int, int, int> dock_rect(App& app, SoftDock d);
-void apply_soft_dock(App& app, SoftWindow& sw, SoftDock d);
-void restore_soft_float(App& app, SoftWindow& sw, int mx, int my);
-void maximize_soft(App& app, SoftWindow& sw);
+void apply_soft_dock(App& app, FloatWindow& sw, SoftDock d);
+void restore_soft_float(App& app, FloatWindow& sw, int mx, int my);
+void maximize_soft(App& app, FloatWindow& sw);
 void clamp_all_floating(App& app);
-xanatoo::Document& soft_doc(App& app, SoftWindow& sw);
-const std::string& soft_path(App& app, const SoftWindow& sw);
-std::string soft_title(App& app, const SoftWindow& sw);
-void layout_soft(App& app, SoftWindow& sw);
+xanatoo::Document& soft_doc(App& app, FloatWindow& sw);
+const std::string& soft_path(App& app, const FloatWindow& sw);
+std::string soft_title(App& app, const FloatWindow& sw);
+void layout_soft(App& app, FloatWindow& sw);
 void raise_soft(App& app, size_t i);
 
 // ---- keymap ----

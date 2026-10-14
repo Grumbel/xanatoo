@@ -145,7 +145,7 @@ void remove_buffer(App& app, BufferId id) {
   if (!find_buf(app, id)) return;
   app.soft_wins.erase(
       std::remove_if(app.soft_wins.begin(), app.soft_wins.end(),
-                     [&](const SoftWindow& sw) { return sw.buf == id; }),
+                     [&](const FloatWindow& sw) { return sw.buf == id; }),
       app.soft_wins.end());
   leave_tab(app, id);
   app.buffers.erase(
@@ -158,7 +158,7 @@ void remove_buffer(App& app, BufferId id) {
 void close_tab(App& app, BufferId id) {
   const bool floated =
       std::any_of(app.soft_wins.begin(), app.soft_wins.end(),
-                  [&](const SoftWindow& sw) { return sw.buf == id; });
+                  [&](const FloatWindow& sw) { return sw.buf == id; });
   if (floated)
     leave_tab(app, id);  // MDI: floating windows keep the buffer alive
   else
@@ -373,7 +373,7 @@ void pop_out_focused(App& app) {
       return;
     }
   }
-  SoftWindow sw;
+  FloatWindow sw;
   sw.buf = bi;
   sw.sel = p.sel;
   sw.scroll = p.scroll_y;
@@ -425,7 +425,7 @@ void open_browse(App& app, const std::string& path, const std::string& title) {
       return;
     }
   }
-  SoftWindow sw;
+  FloatWindow sw;
   sw.buf = bi;
   if (!title.empty()) sw.title = title;
   sw.needs_layout = true;

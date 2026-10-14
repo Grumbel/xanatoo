@@ -2440,7 +2440,7 @@ void draw_soft_windows(App& app) {
   clamp_all_floating(app);
   app.soft_wins.erase(
       std::remove_if(app.soft_wins.begin(), app.soft_wins.end(),
-                     [&](const SoftWindow& sw) {
+                     [&](const FloatWindow& sw) {
                        return !find_buf(app, sw.buf);
                      }),
       app.soft_wins.end());

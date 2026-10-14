@@ -160,7 +160,7 @@ static void on_mousewheel(App& app, SDL_Event& ev, bool imgui_mouse,
   {
     bool handled = false;
     for (int i = static_cast<int>(app.soft_wins.size()) - 1; i >= 0; --i) {
-      SoftWindow& sw = app.soft_wins[static_cast<size_t>(i)];
+      FloatWindow& sw = app.soft_wins[static_cast<size_t>(i)];
       if (mxw >= sw.x && mxw < sw.x + sw.w && myw >= sw.y &&
           myw < sw.y + sw.h) {
         sw.scroll -= static_cast<float>(ev.wheel.y) * 40.f;
@@ -338,7 +338,7 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
       bool soft_hit = false;
       for (int ii = static_cast<int>(app.soft_wins.size()) - 1; ii >= 0; --ii) {
         const size_t i = static_cast<size_t>(ii);
-        SoftWindow& sw = app.soft_wins[i];
+        FloatWindow& sw = app.soft_wins[i];
         if (mxw < sw.x - help_edge || mxw > sw.x + sw.w + help_edge ||
             myw < sw.y - help_edge || myw > sw.y + sw.h + help_edge)
           continue;
@@ -351,7 +351,7 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
                           mxw <= sw.x + sw.w + help_edge;
         if (on_r || on_b) {
           raise_soft(app, i);
-          SoftWindow& top = app.soft_wins.back();
+          FloatWindow& top = app.soft_wins.back();
           top.resize = (on_r ? 1 : 0) | (on_b ? 2 : 0);
           top.resize_start_x = mxw;
           top.resize_start_y = myw;
@@ -367,7 +367,7 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
                                 static_cast<std::ptrdiff_t>(i));
           } else {
             raise_soft(app, i);
-            SoftWindow& top = app.soft_wins.back();
+            FloatWindow& top = app.soft_wins.back();
             const Uint32 now = SDL_GetTicks();
             if (top.last_title_click != 0 && now - top.last_title_click < 400) {
               maximize_soft(app, top);
@@ -389,7 +389,7 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
         }
         if (inside) {
           raise_soft(app, i);
-          SoftWindow& top = app.soft_wins.back();
+          FloatWindow& top = app.soft_wins.back();
           auto [cx, cy, cw, ch] = soft_client_rect(app, top);
           const int sb_w = 10;
           if (mxw >= cx + cw - sb_w && mxw <= cx + cw + 2 && myw >= cy &&
@@ -906,7 +906,7 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
       over_soft = true;
     if (!over_soft) {
       for (int i = static_cast<int>(app.soft_wins.size()) - 1; i >= 0; --i) {
-        const SoftWindow& sw = app.soft_wins[static_cast<size_t>(i)];
+        const FloatWindow& sw = app.soft_wins[static_cast<size_t>(i)];
         if (mxw >= sw.x && mxw < sw.x + sw.w && myw >= sw.y &&
             myw < sw.y + sw.h) {
           over_soft = true;
@@ -948,7 +948,7 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
       over_soft = true;
     if (!over_soft) {
       for (int i = static_cast<int>(app.soft_wins.size()) - 1; i >= 0; --i) {
-        const SoftWindow& sw = app.soft_wins[static_cast<size_t>(i)];
+        const FloatWindow& sw = app.soft_wins[static_cast<size_t>(i)];
         if (rx >= sw.x && rx < sw.x + sw.w && ry >= sw.y && ry < sw.y + sw.h) {
           over_soft = true;
           break;
@@ -2827,7 +2827,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       {
         bool soft_paged = false;
         for (int i = static_cast<int>(app.soft_wins.size()) - 1; i >= 0; --i) {
-          SoftWindow& sw = app.soft_wins[static_cast<size_t>(i)];
+          FloatWindow& sw = app.soft_wins[static_cast<size_t>(i)];
           if (mxk >= sw.x && mxk < sw.x + sw.w && myk >= sw.y &&
               myk < sw.y + sw.h) {
             auto [cx, cy, cw, ch] = soft_client_rect(app, sw);

@@ -27,7 +27,7 @@ namespace fs = std::filesystem;
 namespace xanatoo::app {
 
 std::tuple<int, int, int, int> soft_client_rect(App& app,
-                                                const SoftWindow& sw) {
+                                                const FloatWindow& sw) {
   return std::tuple{sw.x + help_pad, sw.y + help_title_h + 4,
                     sw.w - help_pad * 2, sw.h - help_title_h - help_pad - 4};
 }
@@ -97,7 +97,7 @@ std::tuple<int, int, int, int> dock_rect(App& app, SoftDock d) {
   }
 }
 
-void apply_soft_dock(App& app, SoftWindow& sw, SoftDock d) {
+void apply_soft_dock(App& app, FloatWindow& sw, SoftDock d) {
   if (d == SoftDock::None) return;
   // Save floating geometry once when leaving free placement
   if (sw.dock == SoftDock::None && !sw.maximized) {
@@ -116,7 +116,7 @@ void apply_soft_dock(App& app, SoftWindow& sw, SoftDock d) {
   sw.needs_layout = true;
 }
 
-void restore_soft_float(App& app, SoftWindow& sw, int mx, int my) {
+void restore_soft_float(App& app, FloatWindow& sw, int mx, int my) {
   if (sw.dock == SoftDock::None && !sw.maximized) return;
   sw.w = sw.restore_w;
   sw.h = sw.restore_h;
@@ -129,7 +129,7 @@ void restore_soft_float(App& app, SoftWindow& sw, int mx, int my) {
   sw.needs_layout = true;
 }
 
-void maximize_soft(App& app, SoftWindow& sw) {
+void maximize_soft(App& app, FloatWindow& sw) {
   if (!sw.maximized && sw.dock == SoftDock::None) {
     sw.restore_x = sw.x;
     sw.restore_y = sw.y;
@@ -174,11 +174,11 @@ void clamp_all_floating(App& app) {
   if (app.ol.y < top) app.ol.y = top;
 }
 
-xanatoo::Document& soft_doc(App& app, SoftWindow& sw) {
+xanatoo::Document& soft_doc(App& app, FloatWindow& sw) {
   return buf(app, sw.buf).doc;
 }
 
-const std::string& soft_path(App& app, const SoftWindow& sw) {
+const std::string& soft_path(App& app, const FloatWindow& sw) {
   const DocBuffer* b = find_buf(app, sw.buf);
   if (!b) {
     static const std::string empty;
@@ -187,7 +187,7 @@ const std::string& soft_path(App& app, const SoftWindow& sw) {
   return b->path;
 }
 
-std::string soft_title(App& app, const SoftWindow& sw) {
+std::string soft_title(App& app, const FloatWindow& sw) {
   if (!sw.title.empty()) return sw.title;
   const auto& path = soft_path(app, sw);
   if (path.empty()) return "untitled";
@@ -198,7 +198,7 @@ std::string soft_title(App& app, const SoftWindow& sw) {
   }
 }
 
-void layout_soft(App& app, SoftWindow& sw) {
+void layout_soft(App& app, FloatWindow& sw) {
   float mw = static_cast<float>(std::max(120, sw.w - help_pad * 2));
   std::string base = parent_dir(soft_path(app, sw));
   try {
@@ -215,7 +215,7 @@ void layout_soft(App& app, SoftWindow& sw) {
 
 void raise_soft(App& app, size_t i) {
   if (i + 1 >= app.soft_wins.size()) return;
-  SoftWindow sw = std::move(app.soft_wins[i]);
+  FloatWindow sw = std::move(app.soft_wins[i]);
   app.soft_wins.erase(app.soft_wins.begin() + static_cast<std::ptrdiff_t>(i));
   app.soft_wins.push_back(std::move(sw));
 }
