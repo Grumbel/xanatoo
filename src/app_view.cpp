@@ -414,6 +414,26 @@ void scroll_caret_to_top(App& app, Pane& p) {
   ensure_virtual_layout(app, p);
 }
 
+float pane_max_scroll(App& app, const Pane& p) {
+  const float view_h =
+      static_cast<float>(app.win_h - status_bar_h) - app.ui_top - app.ui_bottom;
+  return std::max(0.f, p.layout.content_height - view_h + 40.f);
+}
+
+void zoom_by(App& app, int steps) {
+  if (steps == 0) return;
+  for (; steps > 0; --steps) {
+    app.body_px = std::min(48, app.body_px + 1);
+    app.heading_px = std::min(64, app.heading_px + 2);
+  }
+  for (; steps < 0; ++steps) {
+    app.body_px = std::max(10, app.body_px - 1);
+    app.heading_px = std::max(14, app.heading_px - 2);
+  }
+  app.fonts.set_sizes(app.body_px, app.heading_px);
+  app.needs_layout = true;
+}
+
 void nav_page(App& app, bool up) {
   Pane& p = focused_pane(app);
   const float view_h =

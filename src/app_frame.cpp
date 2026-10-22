@@ -1161,16 +1161,10 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     }
     case C::ZoomIn:
-      app.body_px = std::min(48, app.body_px + 1);
-      app.heading_px = std::min(64, app.heading_px + 2);
-      app.fonts.set_sizes(app.body_px, app.heading_px);
-      app.needs_layout = true;
+      zoom_by(app, 1);
       break;
     case C::ZoomOut:
-      app.body_px = std::max(10, app.body_px - 1);
-      app.heading_px = std::max(14, app.heading_px - 2);
-      app.fonts.set_sizes(app.body_px, app.heading_px);
-      app.needs_layout = true;
+      zoom_by(app, -1);
       break;
     case C::ViewLineSpacingTight:
       app.view_settings.line_spacing = xanatoo::ViewSettings::kLineTight;
@@ -2557,6 +2551,7 @@ void present_frame(App& app) {
 void run_frame(App& app) {
   SDL_Event ev;
   while (SDL_PollEvent(&ev)) handle_event(app, ev);
+  update_touch(app);
   sync_window_size(app);
   relayout_if_needed(app);
   run_chrome(app);

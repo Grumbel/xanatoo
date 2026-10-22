@@ -169,8 +169,8 @@ static void on_mousewheel(App& app, SDL_Event& ev, bool imgui_mouse,
 }
 
 // Left press: floats, scrollbar, split gutter, then document hit-tests.
-static void mouse_left_down(App& app, SDL_Event& ev, bool imgui_mouse) {
-    const int mxw = ev.button.x, myw = ev.button.y;
+void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
+    const int mxw = x, myw = y;
 
     // Floating windows are custom-drawn (not ImGui). Hit-test them
     // before the ImGui capture check and before the document panes.
@@ -182,8 +182,8 @@ static void mouse_left_down(App& app, SDL_Event& ev, bool imgui_mouse) {
     // Clicking the document dismisses status-bar prompts (Esc also works).
     if (prompt_active(app) && !prompt_is_search(app)) close_prompt(app);
 
-    float mx = static_cast<float>(ev.button.x);
-    float my = content_y(app, static_cast<float>(ev.button.y));
+    float mx = static_cast<float>(x);
+    float my = content_y(app, static_cast<float>(y));
 
     // Classic scrollbar (right edge): arrows page, track jumps/drags.
     {
@@ -580,7 +580,7 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
   if (ev.button.y >= app.win_h - status_bar_h) return;
   switch (ev.button.button) {
     case SDL_BUTTON_LEFT:
-      mouse_left_down(app, ev, imgui_mouse);
+      pointer_left_down(app, ev.button.x, ev.button.y, imgui_mouse);
       break;
     case SDL_BUTTON_MIDDLE:
       mouse_middle_down(app, ev, imgui_mouse);
@@ -593,44 +593,45 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
   }
 }
 
-static void on_mousebuttonup(App& app, SDL_Event& ev, bool imgui_mouse,
-                             bool imgui_keys) {
-  if (ev.button.button == SDL_BUTTON_LEFT) {
-    float_release(app, ev.button.x, ev.button.y);
-    if (app.dragging_block && app.drag_block_id != xanatoo::INVALID_NODE &&
-        app.drop_target_id != xanatoo::INVALID_NODE &&
-        app.drop_target_id != app.drag_block_id) {
-      edit(app);
-      if (xanatoo::relocate_block(doc_of(app, focused_pane(app)),
-                                  app.drag_block_id, app.drop_target_id,
-                                  app.drop_before)) {
-        app.needs_layout = true;
-        focused_pane(app).sel.focus.node = app.drag_block_id;
-        focused_pane(app).sel.focus.span_index = 0;
-        focused_pane(app).sel.focus.char_index = 0;
-        focused_pane(app).sel.anchor = focused_pane(app).sel.focus;
-      }
+void pointer_left_up(App& app, int x, int y) {
+  float_release(app, x, y);
+  if (app.dragging_block && app.drag_block_id != xanatoo::INVALID_NODE &&
+      app.drop_target_id != xanatoo::INVALID_NODE &&
+      app.drop_target_id != app.drag_block_id) {
+    edit(app);
+    if (xanatoo::relocate_block(doc_of(app, focused_pane(app)),
+                                app.drag_block_id, app.drop_target_id,
+                                app.drop_before)) {
+      app.needs_layout = true;
+      focused_pane(app).sel.focus.node = app.drag_block_id;
+      focused_pane(app).sel.focus.span_index = 0;
+      focused_pane(app).sel.focus.char_index = 0;
+      focused_pane(app).sel.anchor = focused_pane(app).sel.focus;
     }
-    app.dragging_sel = false;
-    app.dragging_split = false;
-    app.dragging_scroll = false;
-    app.dragging_image = false;
-    app.dragging_block = false;
-    app.drag_block_id = xanatoo::INVALID_NODE;
-    app.drop_target_id = xanatoo::INVALID_NODE;
-    app.drop_line_y = -1.f;
-    app.dragging_col_gap = false;
-    app.col_gap_left = xanatoo::INVALID_NODE;
-    app.col_gap_right = xanatoo::INVALID_NODE;
-    app.resize_image = xanatoo::INVALID_NODE;
   }
-  return;
+  app.dragging_sel = false;
+  app.dragging_split = false;
+  app.dragging_scroll = false;
+  app.dragging_image = false;
+  app.dragging_block = false;
+  app.drag_block_id = xanatoo::INVALID_NODE;
+  app.drop_target_id = xanatoo::INVALID_NODE;
+  app.drop_line_y = -1.f;
+  app.dragging_col_gap = false;
+  app.col_gap_left = xanatoo::INVALID_NODE;
+  app.col_gap_right = xanatoo::INVALID_NODE;
+  app.resize_image = xanatoo::INVALID_NODE;
 }
 
-static void on_mousemotion(App& app, SDL_Event& ev, bool imgui_mouse,
-                           bool imgui_keys) {
-  app.mouse_x = static_cast<float>(ev.motion.x);
-  app.mouse_y = static_cast<float>(ev.motion.y);
+static void on_mousebuttonup(App& app, SDL_Event& ev, bool imgui_mouse,
+                             bool imgui_keys) {
+  if (ev.button.button == SDL_BUTTON_LEFT)
+    pointer_left_up(app, ev.button.x, ev.button.y);
+}
+
+void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
+  app.mouse_x = static_cast<float>(x);
+  app.mouse_y = static_cast<float>(y);
   {
     const int mx_i = static_cast<int>(app.mouse_x);
     const int my_i = static_cast<int>(app.mouse_y);
@@ -923,7 +924,11 @@ static void on_mousemotion(App& app, SDL_Event& ev, bool imgui_mouse,
       }
     }
   }  // mx_i / my_i scope
-  return;
+}
+
+static void on_mousemotion(App& app, SDL_Event& ev, bool imgui_mouse,
+                           bool imgui_keys) {
+  pointer_motion(app, ev.motion.x, ev.motion.y, imgui_mouse);
 }
 
 static void on_textinput(App& app, SDL_Event& ev, bool imgui_mouse,
@@ -2406,6 +2411,9 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
 
 void handle_event(App& app, SDL_Event& ev) {
   app.ui.process_event(ev);
+  // Mouse events SDL synthesises from touches only drive ImGui chrome; the
+  // document surface gets the raw finger events (app_touch.cpp).
+  if (is_touch_mouse_event(ev)) return;
   // Let ImGui consume mouse/keyboard when interacting with menus
   const bool imgui_mouse = app.ui.want_capture_mouse();
   const bool imgui_keys = app.ui.want_capture_keyboard();
@@ -2433,6 +2441,15 @@ void handle_event(App& app, SDL_Event& ev) {
       break;
     case SDL_TEXTINPUT:
       on_textinput(app, ev, imgui_mouse, imgui_keys);
+      break;
+    case SDL_FINGERDOWN:
+      touch_finger_down(app, ev.tfinger);
+      break;
+    case SDL_FINGERMOTION:
+      touch_finger_motion(app, ev.tfinger);
+      break;
+    case SDL_FINGERUP:
+      touch_finger_up(app, ev.tfinger);
       break;
     case SDL_CONTROLLERDEVICEADDED:
       on_controllerdeviceadded(app, ev, imgui_mouse, imgui_keys);

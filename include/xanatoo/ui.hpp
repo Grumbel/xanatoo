@@ -206,6 +206,10 @@ public:
 
   bool want_capture_keyboard() const;
   bool want_capture_mouse() const;
+  // True when ImGui chrome (any window from the last frame, or an open popup)
+  // owns window point (x, y). Unlike want_capture_mouse() this does not
+  // depend on where the mouse was last frame, so touches can be routed.
+  bool captures_point(float x, float y) const;
 
   // After a menu/toolbar command, drop ImGui's active widget so the next
   // keystroke goes to the document instead of the chrome.

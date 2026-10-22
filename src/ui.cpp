@@ -512,6 +512,16 @@ bool Ui::want_capture_mouse() const {
   return ImGui::GetIO().WantCaptureMouse;
 }
 
+bool Ui::captures_point(float x, float y) const {
+  if (!ready_) return false;
+  if (ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId |
+                                 ImGuiPopupFlags_AnyPopupLevel))
+    return true;
+  ImGuiWindow* hovered = nullptr;
+  ImGui::FindHoveredWindowEx(ImVec2(x, y), true, &hovered, nullptr);
+  return hovered != nullptr;
+}
+
 void Ui::release_input_capture() {
   if (!ready_) return;
   // Drop the active widget (menu item / toolbar button) and clear keyboard

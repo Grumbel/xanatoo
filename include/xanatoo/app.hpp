@@ -134,6 +134,43 @@ struct Hover {
   std::string transclude_src;
 };
 
+// Touchscreen gestures (app_touch.cpp). Fingers on the document surface
+// become taps (left click), pans with momentum, long-press selection and
+// two-finger pinch zoom; touches on ImGui chrome are left to ImGui.
+enum class TouchMode : uint8_t {
+  Idle,     // no finger down
+  Pending,  // one finger down: not yet a tap, pan or long press
+  Pan,      // dragging scrolls the target
+  Select,   // after a long press: dragging extends the selection
+  Direct,   // scrollbar / float frame / split gutter: plain pointer drag
+  Pinch,    // two fingers: zoom
+  Ignored,  // ImGui's touch or a finished pinch; wait for all fingers up
+};
+
+struct TouchPoint {
+  SDL_FingerID id = 0;
+  float x = 0.f, y = 0.f;  // window pixels
+};
+
+struct Touch {
+  TouchMode mode = TouchMode::Idle;
+  TouchPoint fingers[2];  // tracked fingers; further ones are ignored
+  int count = 0;
+  // Gesture origin; its float window (if any) or pane is the scroll target.
+  float start_x = 0.f, start_y = 0.f;
+  Uint32 start_ticks = 0;
+  bool on_float = false;
+  int pane = 0;
+  // Pan velocity (scroll px/s) and the fling that continues it.
+  float velocity = 0.f;
+  Uint32 last_move_ticks = 0;
+  bool flinging = false;
+  Uint32 fling_ticks = 0;
+  // Pinch: finger distance and body size when the second finger landed.
+  float pinch_dist = 0.f;
+  int pinch_body_px = 0;
+};
+
 // What the status bar says this frame (derived from world state each frame).
 enum class StatusTone { Hint, Info, Browse, Warn, Prompt, Notice };
 struct StatusLine {
@@ -293,6 +330,7 @@ struct App {
   FloatWindow bl = make_float_panel(WindowRole::Backlinks, 80, 120, 360, 320);
   FloatWindow ol = make_float_panel(WindowRole::Outline, 40, 100, 320, 420);
   Hover hover;
+  Touch touch;
 };
 
 // ---- buffers ----
@@ -354,6 +392,9 @@ std::optional<float> caret_doc_y(App& app, Pane& p);
 void force_full_pane_layout(App& app, Pane& p);
 void scroll_caret_into_view(App& app, Pane& p);
 void scroll_caret_to_top(App& app, Pane& p);
+float pane_max_scroll(App& app, const Pane& p);
+// Body/heading font size ± `steps` points (View → Zoom, pinch).
+void zoom_by(App& app, int steps);
 void nav_page(App& app, bool up);
 void nav_move_block(App& app, bool prev);
 void nav_move_line(App& app, bool up);
@@ -402,6 +443,21 @@ void clear_interaction_hover(App& app);
 void draw_stick_cursor(App& app, SDL_Renderer* r, int cx, int cy, bool pressed);
 void set_cursor(App& app, SDL_Cursor* c);
 void reset_blink(App& app);
+
+// Left-button press / drag / release at window point (x, y); the mouse
+// handlers and touch taps share these (app_events.cpp).
+void pointer_left_down(App& app, int x, int y, bool imgui_mouse);
+void pointer_motion(App& app, int x, int y, bool imgui_mouse);
+void pointer_left_up(App& app, int x, int y);
+
+// ---- touch (app_touch.cpp) ----
+// Mouse events SDL synthesises from a touchscreen (which == SDL_TOUCH_MOUSEID).
+bool is_touch_mouse_event(const SDL_Event& ev);
+void touch_finger_down(App& app, const SDL_TouchFingerEvent& tf);
+void touch_finger_motion(App& app, const SDL_TouchFingerEvent& tf);
+void touch_finger_up(App& app, const SDL_TouchFingerEvent& tf);
+// Per frame: long-press timer and fling momentum.
+void update_touch(App& app);
 
 // ---- nav ----
 void push_nav_history(App& app, const std::string& url);

@@ -8,6 +8,22 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-22) — touchscreen
+
+- `app_touch.cpp`: SDL finger events on the document surface (direct
+  touchscreens only). Tap = left click (links, caret, stretch, tasks); drag
+  scrolls the pane / float client with fling momentum; long press (500 ms)
+  selects a word and the drag extends it; two-finger pinch zooms
+  (`zoom_by`, shared with View → Zoom). Scrollbars, float title/frame and
+  the split gutter take touch as a plain pointer drag.
+- Touch-synthesised mouse events (`SDL_TOUCH_MOUSEID`) now only feed ImGui;
+  `Ui::captures_point` decides ImGui ownership by hit-testing last frame's
+  windows/popups (WantCaptureMouse lags a frame behind a jumping touch).
+- Left-button mouse paths are `pointer_left_down/motion/left_up(x, y)`.
+- Not tested on real touch hardware yet. Possible follow-ups: keep the
+  pinch centre anchored while zooming; autoscroll when a selection drag
+  reaches the pane edge; selection handles.
+
 ## Status (2026-10-14) — ECS-lite refactor (docs/PLAN-ecs-lite.md)
 
 - Phase A done: stable `BufferId`s (`buf`/`find_buf`/`add_buffer`/`remove_buffer`/`close_tab`).
