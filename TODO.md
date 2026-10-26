@@ -8,6 +8,21 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-26) — scroll blitting
+
+- Each pane caches its document layer (paper, selection, text) in a
+  `PaneRaster` (two render-target textures, ping-pong). A pure scroll shifts
+  the old pixels and draws only the exposed strip; layout generation
+  (`LayoutResult::generation`), selection, search tint or size changes redraw
+  the whole raster. Overlays + scrollbar are still drawn every frame on top.
+- Panes draw at a whole-pixel scroll (fraction kept in `scroll_y`);
+  `render.cpp` floors y positions so a 1px scroll shifts everything by 1px.
+- Verified pixel-identical against full redraws (software + GPU renderer).
+- Falls back to direct drawing when render targets are unsupported; rasters
+  are dropped on `SDL_RENDER_TARGETS_RESET` / `DEVICE_RESET`.
+- Not yet: soft-window / help documents, skipping the frame entirely when
+  nothing changed.
+
 ## Status (2026-10-22) — touchscreen
 
 - `app_touch.cpp`: SDL finger events on the document surface (direct

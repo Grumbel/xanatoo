@@ -53,6 +53,22 @@ struct DocBuffer {
   xanatoo::History history;
 };
 
+// Cached raster of a pane's document layer (background, selection, text) so
+// scrolling only shifts the old pixels and draws the newly exposed strip.
+// Two render-target textures ping-pong because SDL cannot copy a texture onto
+// itself. Overlays (caret, hover, focus bar, …) are drawn on top every frame.
+struct PaneRaster {
+  SDL_Texture* tex[2] = {nullptr, nullptr};
+  int cur = 0;  // index of the texture holding the current image
+  int w = 0, h = 0;
+  bool valid = false;
+  // What the current image was drawn from:
+  uint64_t layout_gen = 0;
+  float scroll = 0.f;  // integer-valued texture-space scroll
+  xanatoo::Selection sel{};
+  bool search_tint = false;
+};
+
 struct Pane {
   BufferId buf = kNoBuffer;
   xanatoo::Selection sel{};
@@ -67,6 +83,7 @@ struct Pane {
   // Content-Y band last materialised (including overscan).
   float materialised_top = 0.f;
   float materialised_bottom = 0.f;
+  PaneRaster raster;
 };
 
 enum class SoftDock { None = 0, Left, Right, Top, Bottom, Max };
@@ -522,6 +539,8 @@ void run_chrome(App& app);
 void poll_gamepad_axes(App& app);
 void draw_pane(App& app, int i);
 void draw_panes(App& app);
+// Drop cached pane rasters (render-target reset / shutdown).
+void release_pane_rasters(App& app);
 void draw_split_chrome(App& app);
 void draw_status_bar(App& app);
 void draw_outline_panel(App& app);

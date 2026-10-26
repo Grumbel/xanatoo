@@ -139,7 +139,9 @@ LayoutResult LayoutEngine::layout(
     const std::unordered_map<NodeId, float>* height_hints,
     const std::unordered_set<NodeId>* folded_sections,
     NodeId focus_section) {
+  static uint64_t next_generation = 0;
   LayoutResult result;
+  result.generation = ++next_generation;
   image_base_ = image_base;
   viewport_ = viewport;
   height_hints_ = height_hints;

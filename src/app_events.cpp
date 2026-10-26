@@ -2466,6 +2466,10 @@ void handle_event(App& app, SDL_Event& ev) {
     case SDL_KEYDOWN:
       on_keydown(app, ev, imgui_mouse, imgui_keys);
       break;
+    case SDL_RENDER_TARGETS_RESET:
+    case SDL_RENDER_DEVICE_RESET:
+      release_pane_rasters(app);
+      break;
     default:
       break;
   }

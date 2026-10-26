@@ -5,6 +5,7 @@
 #include "xanatoo/types.hpp"
 #include "xanatoo/font.hpp"
 #include "xanatoo/images.hpp"
+#include <cstdint>
 #include <vector>
 #include <string>
 #include <unordered_map>
@@ -79,6 +80,9 @@ struct LayoutResult {
   // Document Y band that was fully materialised (top − overscan … bottom + overscan).
   float materialised_top = 0.f;
   float materialised_bottom = 0.f;
+  // Unique per LayoutEngine::layout call (0 = empty/default). Lets the pane
+  // raster cache tell a fresh layout from the one it last drew.
+  uint64_t generation = 0;
 };
 
 // Optional viewport for large-document virtualization.

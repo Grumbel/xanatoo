@@ -6,6 +6,11 @@
 
 namespace xanatoo {
 
+// Vertical positions floor (not truncate) so that shifting scroll_y by a
+// whole pixel shifts every element by exactly that pixel, also above the
+// clip top — the pane raster cache relies on this to blit scrolled content.
+static int px(float v) { return static_cast<int>(std::floor(v)); }
+
 Renderer::Renderer(SDL_Renderer* sdl, FontSet& fonts, ImageCache* images)
     : sdl_(sdl), fonts_(fonts), images_(images) {}
 
@@ -31,7 +36,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
       const Image& img = images_->get(pi.src, pi.base);
       SDL_Rect dst{
           static_cast<int>(pi.x + origin_x),
-          static_cast<int>(pi.y - scroll_y),
+          px(pi.y - scroll_y),
           static_cast<int>(pi.width),
           static_cast<int>(pi.height)};
       if (!visible(dst.x, dst.y, dst.w, dst.h)) continue;
@@ -58,7 +63,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
       SDL_SetRenderDrawColor(sdl_, 230, 235, 245, 220);
       SDL_Rect r{
           static_cast<int>(fill.x + origin_x),
-          static_cast<int>(fill.y - scroll_y),
+          px(fill.y - scroll_y),
           static_cast<int>(fill.width),
           static_cast<int>(fill.height)};
       SDL_RenderFillRect(sdl_, &r);
@@ -73,7 +78,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
       SDL_SetRenderDrawColor(sdl_, 245, 240, 230, 210);
       SDL_Rect r{
           static_cast<int>(cb.x + origin_x),
-          static_cast<int>(cb.y - scroll_y),
+          px(cb.y - scroll_y),
           static_cast<int>(cb.width),
           static_cast<int>(cb.height)};
       SDL_RenderFillRect(sdl_, &r);
@@ -90,7 +95,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
     if (bw < 2) bw = 2;
     SDL_Rect bar{
         static_cast<int>(qb.x + origin_x),
-        static_cast<int>(qb.y - scroll_y),
+        px(qb.y - scroll_y),
         bw,
         static_cast<int>(qb.height)};
     SDL_RenderFillRect(sdl_, &bar);
@@ -103,7 +108,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
     if (bw < 2) bw = 2;
     SDL_Rect bar{
         static_cast<int>(nb.x + origin_x),
-        static_cast<int>(nb.y - scroll_y),
+        px(nb.y - scroll_y),
         bw,
         static_cast<int>(nb.height)};
     SDL_RenderFillRect(sdl_, &bar);
@@ -116,7 +121,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
     if (bw < 2) bw = 2;
     SDL_Rect bar{
         static_cast<int>(mb.x + origin_x),
-        static_cast<int>(mb.y - scroll_y),
+        px(mb.y - scroll_y),
         bw,
         static_cast<int>(mb.height)};
     SDL_RenderFillRect(sdl_, &bar);
@@ -131,7 +136,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
     if (h < 1) h = 1;
     SDL_Rect line{
         static_cast<int>(tl.x + origin_x),
-        static_cast<int>(tl.y - scroll_y),
+        px(tl.y - scroll_y),
         w, h};
     SDL_RenderFillRect(sdl_, &line);
   }
@@ -143,7 +148,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
     if (th < 1) th = 1;
     SDL_Rect line{
         static_cast<int>(hr.x + origin_x),
-        static_cast<int>(hr.y - scroll_y),
+        px(hr.y - scroll_y),
         static_cast<int>(hr.width),
         th};
     SDL_RenderFillRect(sdl_, &line);
@@ -157,7 +162,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
     auto flush_run = [&]() {
       if (!in_run) return;
       int x = static_cast<int>(run_x0 + origin_x) - 2;
-      int y = static_cast<int>(run_y - scroll_y) - 2;
+      int y = px(run_y - scroll_y) - 2;
       int w = static_cast<int>(run_x1 - run_x0) + 4;
       int h = fonts_.pick(FontRole::Code).line_height() + 2;
       SDL_SetRenderDrawColor(sdl_, 245, 235, 220, 200);
@@ -201,7 +206,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
 
     SDL_Rect dst;
     dst.x = static_cast<int>(pg.x + origin_x);
-    dst.y = static_cast<int>(pg.y - g.bearing_y - scroll_y);
+    dst.y = px(pg.y - g.bearing_y - scroll_y);
     dst.w = g.width;
     dst.h = g.height;
     if (!visible(dst.x, dst.y, dst.w, dst.h)) continue;
@@ -231,15 +236,14 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
         SDL_SetRenderDrawColor(sdl_, 90, 50, 140, 255);
       else
         SDL_SetRenderDrawColor(sdl_, 30, 90, 180, 255);
-      int uy = static_cast<int>(pg.y + 2.f - scroll_y);
+      int uy = px(pg.y + 2.f - scroll_y);
       int ux = static_cast<int>(pg.x + origin_x);
       int uw = static_cast<int>((g.advance >> 6) > 0 ? (g.advance >> 6) : (g.width + 1));
       SDL_RenderDrawLine(sdl_, ux, uy, ux + uw, uy);
     }
     if (pg.kind == InlineKind::Strike) {
       SDL_SetRenderDrawColor(sdl_, 90, 90, 95, 255);
-      int mid = static_cast<int>(pg.y - static_cast<float>(g.bearing_y) * 0.35f -
-                                 scroll_y);
+      int mid = px(pg.y - static_cast<float>(g.bearing_y) * 0.35f - scroll_y);
       int ux = static_cast<int>(pg.x + origin_x);
       int uw = static_cast<int>((g.advance >> 6) > 0 ? (g.advance >> 6)
                                                     : (g.width + 1));
@@ -258,7 +262,7 @@ void Renderer::draw_selection(const std::vector<SelRect>& rects, float origin_x,
   SDL_SetRenderDrawColor(sdl_, r, g, b, a);
   for (const auto& rect : rects) {
     SDL_Rect sr{
-        static_cast<int>(rect.x + origin_x), static_cast<int>(rect.y),
+        static_cast<int>(rect.x + origin_x), px(rect.y),
         static_cast<int>(rect.w), static_cast<int>(rect.h)};
     SDL_RenderFillRect(sdl_, &sr);
   }

@@ -2118,9 +2118,112 @@ static void draw_pane_scrollbar(App& app, int i) {
   }
 }
 
+// Pane paper colour (also the window clear colour behind the panes).
+constexpr uint8_t kPaperR = 248, kPaperG = 246, kPaperB = 240;
+
+// Document layer of pane i — paper, selection, text — into the current render
+// target, clipped to `area`. Content y maps to target y - `scroll`.
+static void draw_pane_layer(App& app, int i, const SDL_Rect& area, float ox,
+                            float scroll) {
+  const float lh = static_cast<float>(app.fonts.regular.line_height());
+  Pane& pane = app.panes[i];
+  SDL_RenderSetClipRect(app.sdl, &area);
+  SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
+  SDL_SetRenderDrawColor(app.sdl, kPaperR, kPaperG, kPaperB, 255);
+  SDL_RenderFillRect(app.sdl, &area);
+  if (!pane.sel.empty()) {
+    auto rects = xanatoo::selection_rects(pane.layout, pane.sel, scroll, lh);
+    // Leap-search match uses amber so it is distinct from a user selection.
+    if (prompt_is_search(app) && i == app.focus)
+      app.renderer.draw_selection(rects, ox, 230, 190, 70, 150);
+    else
+      app.renderer.draw_selection(rects, ox);
+  }
+  app.renderer.draw(pane.layout, scroll, ox);
+}
+
+static void release_raster(PaneRaster& r) {
+  for (SDL_Texture*& t : r.tex) {
+    if (t) SDL_DestroyTexture(t);
+    t = nullptr;
+  }
+  r.w = r.h = 0;
+  r.valid = false;
+}
+
+void release_pane_rasters(App& app) {
+  for (Pane& p : app.panes) release_raster(p.raster);
+}
+
+static bool ensure_raster_textures(App& app, PaneRaster& r, int w, int h) {
+  if (r.tex[0] && r.tex[1] && r.w == w && r.h == h) return true;
+  release_raster(r);
+  for (SDL_Texture*& t : r.tex) {
+    t = SDL_CreateTexture(app.sdl, SDL_PIXELFORMAT_ARGB8888,
+                          SDL_TEXTUREACCESS_TARGET, w, h);
+    if (!t) {
+      release_raster(r);
+      return false;
+    }
+    SDL_SetTextureBlendMode(t, SDL_BLENDMODE_NONE);
+  }
+  r.w = w;
+  r.h = h;
+  return true;
+}
+
+// Bring pane i's raster up to date for texture-space `scroll` (content y −
+// scroll = texture y). Unchanged content scrolled by whole pixels is shifted
+// into the other texture and only the exposed strip is drawn; anything else
+// redraws the whole texture. False → render targets unavailable.
+static bool update_pane_raster(App& app, int i, int w, int h, float scroll) {
+  if (!SDL_RenderTargetSupported(app.sdl)) return false;
+  Pane& pane = app.panes[i];
+  PaneRaster& r = pane.raster;
+  if (!ensure_raster_textures(app, r, w, h)) return false;
+
+  const xanatoo::Selection sel = pane.sel.empty() ? xanatoo::Selection{}
+                                                  : pane.sel;
+  const bool tint = !sel.empty() && prompt_is_search(app) && i == app.focus;
+  const bool same_content = r.valid &&
+                            r.layout_gen == pane.layout.generation &&
+                            r.sel.anchor == sel.anchor &&
+                            r.sel.focus == sel.focus && r.search_tint == tint;
+  if (same_content && r.scroll == scroll) return true;
+
+  SDL_Texture* prev_target = SDL_GetRenderTarget(app.sdl);
+  const float d = scroll - r.scroll;
+  const int dy = static_cast<int>(d);
+  if (same_content && d == static_cast<float>(dy) && std::abs(dy) < r.h) {
+    // dy > 0: content moved up, keep the lower part and expose the bottom.
+    SDL_Texture* src = r.tex[r.cur];
+    r.cur ^= 1;
+    SDL_SetRenderTarget(app.sdl, r.tex[r.cur]);
+    SDL_RenderSetClipRect(app.sdl, nullptr);
+    const int keep = r.h - std::abs(dy);
+    const SDL_Rect from{0, std::max(dy, 0), r.w, keep};
+    const SDL_Rect to{0, std::max(-dy, 0), r.w, keep};
+    SDL_RenderCopy(app.sdl, src, &from, &to);
+    const SDL_Rect strip = dy > 0 ? SDL_Rect{0, keep, r.w, dy}
+                                  : SDL_Rect{0, 0, r.w, -dy};
+    draw_pane_layer(app, i, strip, 0.f, scroll);
+  } else {
+    SDL_SetRenderTarget(app.sdl, r.tex[r.cur]);
+    draw_pane_layer(app, i, SDL_Rect{0, 0, r.w, r.h}, 0.f, scroll);
+  }
+  SDL_RenderSetClipRect(app.sdl, nullptr);
+  SDL_SetRenderTarget(app.sdl, prev_target);
+
+  r.valid = true;
+  r.layout_gen = pane.layout.generation;
+  r.scroll = scroll;
+  r.sel = sel;
+  r.search_tint = tint;
+  return true;
+}
+
 // Text, selection and the three layers above, then the scrollbar.
 void draw_pane(App& app, int i) {
-  const float lh = static_cast<float>(app.fonts.regular.line_height());
   Pane& pane = app.panes[i];
   float view_h_pane =
       static_cast<float>(app.win_h - status_bar_h) - app.ui_top - app.ui_bottom;
@@ -2131,24 +2234,25 @@ void draw_pane(App& app, int i) {
   const int clip_y = static_cast<int>(app.ui_top);
   SDL_Rect clip{
       pane.x, clip_y, std::max(1, pane.w - kSbW),
-      app.win_h - status_bar_h - clip_y - static_cast<int>(app.ui_bottom)};
-  SDL_RenderSetClipRect(app.sdl, &clip);
+      std::max(1, app.win_h - status_bar_h - clip_y -
+                      static_cast<int>(app.ui_bottom))};
 
-  float ox = static_cast<float>(pane.x);
+  // Draw at a whole-pixel scroll so the cached raster can be blitted; the
+  // fractional part (touch / fling / scrollbar drag) stays in pane.scroll_y.
+  const float exact_scroll = pane.scroll_y;
+  pane.scroll_y = std::round(exact_scroll);
+
   // screen_y = content_y - scroll_y + ui_top = content_y - (scroll_y - ui_top)
   const float draw_scroll = pane.scroll_y - app.ui_top;
-
-  if (!pane.sel.empty()) {
-    auto rects =
-        xanatoo::selection_rects(pane.layout, pane.sel, draw_scroll, lh);
-    // Leap-search match uses amber so it is distinct from a user selection.
-    if (prompt_is_search(app) && i == app.focus)
-      app.renderer.draw_selection(rects, ox, 230, 190, 70, 150);
-    else
-      app.renderer.draw_selection(rects, ox);
+  // Same mapping relative to the clip top (texture space).
+  const float tex_scroll = draw_scroll + static_cast<float>(clip_y);
+  if (update_pane_raster(app, i, clip.w, clip.h, tex_scroll)) {
+    SDL_RenderSetClipRect(app.sdl, nullptr);
+    SDL_RenderCopy(app.sdl, pane.raster.tex[pane.raster.cur], nullptr, &clip);
+    SDL_RenderSetClipRect(app.sdl, &clip);
+  } else {
+    draw_pane_layer(app, i, clip, static_cast<float>(pane.x), draw_scroll);
   }
-
-  app.renderer.draw(pane.layout, draw_scroll, ox);
 
   draw_pane_overlays(app, i);
 
@@ -2156,10 +2260,11 @@ void draw_pane(App& app, int i) {
   SDL_RenderSetClipRect(app.sdl, nullptr);
 
   draw_pane_scrollbar(app, i);
+  pane.scroll_y = exact_scroll;
 }
 
 void draw_panes(App& app) {
-  app.renderer.clear(248, 246, 240);
+  app.renderer.clear(kPaperR, kPaperG, kPaperB);
   int pane_count = app.split ? 2 : 1;
   for (int i = 0; i < pane_count; ++i) draw_pane(app, i);
 }

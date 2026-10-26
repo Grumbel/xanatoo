@@ -134,6 +134,7 @@ bool app_init(App& app) {
 
 void app_shutdown(App& app) {
   SDL_StopTextInput();
+  release_pane_rasters(app);
   app.ui.shutdown();
   if (app.gamepad) {
     SDL_GameControllerClose(app.gamepad);
