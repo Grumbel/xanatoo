@@ -22,19 +22,34 @@ namespace fs = std::filesystem;
 namespace xanatoo::app {
 
 bool app_init(App& app) {
-  std::string font_path = app.opt.font_path;
-  if (font_path.empty()) {
-    if (const char* env = std::getenv("XANATOO_FONT")) {
-      if (env[0] != '\0') font_path = env;
+  // Preferred paths are optional — FontConfig resolves a full family set.
+  auto existing_font = [](std::string path) {
+    if (!path.empty() && !fs::exists(path)) {
+      std::cerr << "Font file does not exist: " << path
+                << " (falling back to FontConfig)\n";
+      path.clear();
     }
+    return path;
+  };
+  app.font_path = existing_font(app.opt.font_path);
+  if (const char* env = std::getenv("XANATOO_FONT"); env && env[0] != '\0')
+    app.env_font_path = existing_font(env);
+  // View prefs first: they name the style sheet, which picks the fonts.
+  xanatoo::load_view_settings(app.view_settings);
+  app.styles = xanatoo::list_styles();
+  {
+    std::string err;
+    if (!xanatoo::load_style(app.view_settings.style, app.style, &err)) {
+      std::cerr << "Style: " << err << " (using default)\n";
+      app.view_settings.style = "default";
+    }
+    for (const std::string& w : app.style.warnings)
+      std::cerr << "style warning: " << w << "\n";
   }
-  // Preferred path is optional — FontConfig resolves a full family set.
-  if (!font_path.empty() && !fs::exists(font_path)) {
-    std::cerr << "Font file does not exist: " << font_path
-              << " (falling back to FontConfig)\n";
-    font_path.clear();
-  }
-  if (!app.fonts.load(app.sdl, font_path, app.body_px, app.heading_px)) {
+  app.layout_engine.set_style(&app.style);
+  app.renderer.set_style(&app.style);
+  if (!app.fonts.load(app.sdl, body_font_path(app), app.body_px,
+                      app.heading_px, app.style.fonts)) {
     std::cerr << "Failed to load fonts via FontConfig. "
                  "Pass a TTF with --font or install DejaVu/Liberation.\n";
     return false;
@@ -83,7 +98,6 @@ bool app_init(App& app) {
   }
   for (const auto& b : app.buffers) app.tab_order.push_back(b.id);
   update_title(app);
-  xanatoo::load_view_settings(app.view_settings);
   app.layout_engine.set_options(
       xanatoo::LayoutOptions::from_view(app.view_settings));
   if (!app.ui.init(app.window, app.sdl, app.opt.ui_scale)) {
@@ -109,8 +123,8 @@ bool app_init(App& app) {
   if (app.win_w > 0 && app.win_w <= 720 && app.body_px < 20) {
     app.body_px = 20;
     app.heading_px = 28;
-    app.fonts.set_sizes(app.body_px, app.heading_px);
   }
+  apply_font_sizes(app);
   open_first_gamepad(app);
   if (app.gamepad) app.stick_cursor_on = true;
   for (const auto& b : app.buffers) {

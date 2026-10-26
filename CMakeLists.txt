@@ -66,6 +66,7 @@ add_executable(xanatoo
   src/sidestore.cpp
   src/epub_import.cpp
   src/view_settings.cpp
+  src/style.cpp
   src/cli.cpp
   src/gemini.cpp
   src/nostr.cpp
@@ -181,7 +182,8 @@ add_dependencies(xanatoo xanatoo_icons)
 # Build-tree path for dev runs. Installed layout is found at runtime via
 # XANATOO_ICON_DIR env or <exe>/../share/xanatoo/icons (see Ui::load_icons).
 target_compile_definitions(xanatoo PRIVATE
-  "XANATOO_ICON_DIR=\"${XANATOO_ICON_DIR}\"")
+  "XANATOO_ICON_DIR=\"${XANATOO_ICON_DIR}\""
+  "XANATOO_STYLE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/styles\"")
 
 install(DIRECTORY ${XANATOO_ICON_DIR}/
         DESTINATION share/xanatoo/icons
@@ -190,6 +192,9 @@ install(DIRECTORY ${XANATOO_ICON_DIR}/
 install(DIRECTORY icons/svg/
         DESTINATION share/xanatoo/icons/svg
         FILES_MATCHING PATTERN "*.svg")
+install(DIRECTORY styles/
+        DESTINATION share/xanatoo/styles
+        FILES_MATCHING PATTERN "*.xss")
 install(DIRECTORY examples/
         DESTINATION share/xanatoo/examples
         FILES_MATCHING
@@ -221,6 +226,7 @@ add_executable(xanatoo_tests
   src/gemini.cpp
   src/epub_import.cpp
   src/view_settings.cpp
+  src/style.cpp
   src/layout.cpp
   src/font.cpp
   src/images.cpp
@@ -243,6 +249,7 @@ target_compile_definitions(xanatoo_tests PRIVATE
   XANATOO_NOSTR=0
   XANATOO_REDDIT=0
   XANATOO_LEMMY=0
+  "XANATOO_STYLE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/styles\""
 )
 enable_testing()
 add_test(NAME unit_tests COMMAND xanatoo_tests)

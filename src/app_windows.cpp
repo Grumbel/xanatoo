@@ -487,6 +487,7 @@ static void draw_soft_window(App& app, FloatWindow& sw, bool active) {
                       soft_title(app, sw), active);
   SDL_Rect clip{cx, cy, cw, ch};
   SDL_RenderSetClipRect(app.sdl, &clip);
+  fill_doc_paper(app, clip);
   app.renderer.draw(sw.layout, sw.scroll - static_cast<float>(cy),
                     static_cast<float>(cx));
   SDL_RenderSetClipRect(app.sdl, nullptr);

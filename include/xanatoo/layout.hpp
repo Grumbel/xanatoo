@@ -5,6 +5,7 @@
 #include "xanatoo/types.hpp"
 #include "xanatoo/font.hpp"
 #include "xanatoo/images.hpp"
+#include "xanatoo/style.hpp"
 #include <cstdint>
 #include <vector>
 #include <string>
@@ -24,6 +25,7 @@ struct PositionedGlyph {
   size_t char_index = 0;
   InlineKind kind = InlineKind::Text;
   FontRole font = FontRole::Body;
+  Rgba color;  // computed from the style sheet (block role + inline kind)
 };
 
 struct LayoutBox {
@@ -124,6 +126,10 @@ public:
 
   void set_options(const LayoutOptions& o) { options_ = o; }
   const LayoutOptions& options() const { return options_; }
+  // Style sheet for spacing / fonts / glyph colours; must outlive the
+  // engine. nullptr = built-in default.
+  void set_style(const DocStyle* style);
+  const DocStyle& style() const { return *style_; }
 
   // height_hints: optional prior block heights (from a previous LayoutResult's
   // boxes). Used only when viewport is active to skip off-screen sequential
@@ -144,6 +150,7 @@ private:
   FontSet& fonts_;
   ImageCache* images_;
   LayoutOptions options_{};
+  const DocStyle* style_;
 
   std::string image_base_;
   LayoutViewport viewport_;
@@ -167,7 +174,11 @@ private:
                    LayoutResult& out);
   void layout_paragraph(const Document& doc, const Node& node,
                         float x, float& y, float max_width,
-                        LayoutResult& out, FontRole base_role);
+                        LayoutResult& out, FontRole base_role,
+                        BlockRole block = BlockRole::Paragraph);
+  // Paragraph in the role's font.
+  void layout_role_text(const Document& doc, const Node& node, BlockRole role,
+                        float x, float& y, float max_width, LayoutResult& out);
 };
 
 }  // namespace xanatoo

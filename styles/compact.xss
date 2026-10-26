@@ -1,0 +1,20 @@
+;; SPDX-License-Identifier: GPL-3.0-or-later
+;;
+;; Compact — the default look with tight spacing, for reference material
+;; and long threads. Shows that a sheet only needs the values it changes.
+
+(stylesheet
+  (name "Compact")
+  (description "Default colours, tight block spacing")
+
+  (role paragraph  (space-after 0.35em))
+  (role header     (space-before 0.4em) (space-after 0.3em))
+  (role section    (space-before 0) (space-after 0.2em) (indent 0))
+  (role list       (space-after 0.3em))
+  (role list-item  (indent 1.3em) (space-after 0.1em))
+  (role block-quote (space-after 0.4em))
+  (role note       (space-after 0.4em))
+  (role code-block (space-after 0.4em))
+  (role definition (space-after 0.3em))
+  (role message    (space-after 0.4em))
+  (role rule       (space-before 0.3em) (space-after 0.3em)))

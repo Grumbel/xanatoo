@@ -312,6 +312,15 @@ def draw_icon(name: str, size: int = 20) -> bytes:
         line(buf, size, size, S(14), S(3), S(14), S(17), ACCENT, 1)
         for yy in (6, 9, 12, 15):
             line(buf, size, size, S(7), S(yy), S(13), S(yy), INK, 1)
+    elif name == "style":
+        rect(buf, size, size, S(3), S(3), S(14), S(14), INK, SOFT)
+        line(buf, size, size, S(5), S(11), S(7), S(5), INK, 1)
+        line(buf, size, size, S(7), S(5), S(10), S(11), INK, 1)
+        line(buf, size, size, S(6), S(9), S(9), S(9), INK, 1)
+        circle(buf, size, size, S(13), S(9), S(2), ACCENT)
+        for i, col in enumerate(((0xC4, 0xA0, 0x00, 255), ACCENT,
+                                 (0xCC, 0x00, 0x00, 255))):
+            rect(buf, size, size, S(5 + 4 * i), S(13), S(3), S(3), col, col)
     else:
         rect(buf, size, size, S(4), S(4), S(12), S(12), INK, ACCENT)
     return bytes(buf)

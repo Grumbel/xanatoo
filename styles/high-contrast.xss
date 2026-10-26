@@ -1,0 +1,31 @@
+;; SPDX-License-Identifier: GPL-3.0-or-later
+;;
+;; High Contrast — black on white, heavier rules, generous spacing and
+;; strongly marked links for low-vision reading.
+
+(stylesheet
+  (name "High Contrast")
+  (description "Black on white, bold rules, larger spacing")
+
+  (define strong-line "#000000")
+
+  (page (background "#ffffff") (color "#000000") (selection (rgba 255 220 0 160)))
+
+  (fonts (body "Atkinson Hyperlegible" "Verdana" "DejaVu Sans" "sans-serif")
+         (heading-scale 1.7))
+
+  (role paragraph   (space-after 1.1em))
+  (role header      (space-before 1em) (space-after 0.8em))
+  (role list-item   (space-after 0.6em))
+  (role block-quote (border strong-line))
+  (role note        (border "#b35900"))
+  (role code-block  (background "#f0f0f0") (border strong-line))
+  (role message     (border strong-line))
+  (role table       (border strong-line) (background "#e0e0e0"))
+  (role rule        (border strong-line))
+  (role transclusion (border strong-line))
+
+  (role link   (color "#0000c8") (underline #t))
+  (role cite   (color "#6a00a8") (underline #t))
+  (role code   (color "#000000") (background "#e6e6e6"))
+  (role strike (color "#444444")))

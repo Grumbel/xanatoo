@@ -20,6 +20,8 @@ struct ViewSettings {
   float max_content_width = 0.f;
   // Justify wrapped body lines (not last line / headings / code).
   bool justify = false;
+  // Document style sheet (styles/<name>.xss); "default" = built in.
+  std::string style = "default";
 
   static constexpr float kLineTight = 1.10f;
   static constexpr float kLineNormal = 1.30f;

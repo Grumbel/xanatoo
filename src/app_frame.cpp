@@ -76,6 +76,9 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.view_line_spacing = app.view_settings.line_spacing;
   ui_state.view_margin_x = app.view_settings.margin_x;
   ui_state.view_max_content_width = app.view_settings.max_content_width;
+  ui_state.styles.clear();
+  for (const auto& e : app.styles) ui_state.styles.emplace_back(e.name, e.title);
+  ui_state.style = app.style.name;
   ui_state.browse = app.browse_mode;
   ui_state.virtual_keyboard = app.virtual_keyboard;
   ui_state.help = app.help_mode;
@@ -229,7 +232,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::ViewMarginsNormal || c == C::ViewMarginsWide ||
         c == C::ViewMarginsExtra || c == C::ViewMeasureFull ||
         c == C::ViewMeasureComfortable || c == C::ViewMeasureWide ||
-        c == C::ToggleSectionFocus || c == C::ToggleJustify;
+        c == C::ToggleSectionFocus || c == C::ToggleJustify ||
+        c == C::SelectStyle || c == C::ReloadStyles;
     if (!allowed) {
       flash_status(app, "Browse mode — F2 to edit");
       cmd = C::None;
@@ -1225,6 +1229,12 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::ToggleSectionFocus:
       toggle_section_focus_mode(app);
       break;
+    case C::SelectStyle:
+      if (!arg.empty()) apply_style(app, arg);
+      break;
+    case C::ReloadStyles:
+      reload_styles(app);
+      break;
     case C::ToggleJustify:
       app.view_settings.justify = !app.view_settings.justify;
       apply_view_settings(app);
@@ -2118,9 +2128,6 @@ static void draw_pane_scrollbar(App& app, int i) {
   }
 }
 
-// Pane paper colour (also the window clear colour behind the panes).
-constexpr uint8_t kPaperR = 248, kPaperG = 246, kPaperB = 240;
-
 // Document layer of pane i — paper, selection, text — into the current render
 // target, clipped to `area`. Content y maps to target y - `scroll`.
 static void draw_pane_layer(App& app, int i, const SDL_Rect& area, float ox,
@@ -2129,7 +2136,8 @@ static void draw_pane_layer(App& app, int i, const SDL_Rect& area, float ox,
   Pane& pane = app.panes[i];
   SDL_RenderSetClipRect(app.sdl, &area);
   SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
-  SDL_SetRenderDrawColor(app.sdl, kPaperR, kPaperG, kPaperB, 255);
+  const xanatoo::Rgba paper = app.style.paper;
+  SDL_SetRenderDrawColor(app.sdl, paper.r, paper.g, paper.b, 255);
   SDL_RenderFillRect(app.sdl, &area);
   if (!pane.sel.empty()) {
     auto rects = xanatoo::selection_rects(pane.layout, pane.sel, scroll, lh);
@@ -2264,7 +2272,8 @@ void draw_pane(App& app, int i) {
 }
 
 void draw_panes(App& app) {
-  app.renderer.clear(kPaperR, kPaperG, kPaperB);
+  // Style paper is also the window clear colour behind the panes.
+  app.renderer.clear(app.style.paper.r, app.style.paper.g, app.style.paper.b);
   int pane_count = app.split ? 2 : 1;
   for (int i = 0; i < pane_count; ++i) draw_pane(app, i);
 }
@@ -2507,6 +2516,7 @@ void draw_help_window(App& app) {
     auto [cx, cy, cw, ch] = help_client_rect(app);
     SDL_Rect clip{cx, cy, cw, ch};
     SDL_RenderSetClipRect(app.sdl, &clip);
+    fill_doc_paper(app, clip);
     // screen_y = content_y - scroll + client_y  ⇒  draw_scroll = scroll -
     // client_y (mirrors pane path: draw_scroll = scroll_y - ui_top)
     const float help_draw_scroll = app.help.scroll - static_cast<float>(cy);

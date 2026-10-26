@@ -1714,12 +1714,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
     case SDLK_EQUALS:
     case SDLK_PLUS:
     case SDLK_KP_PLUS:
-      if (ctrl) {
-        app.body_px = std::min(48, app.body_px + 1);
-        app.heading_px = std::min(64, app.heading_px + 2);
-        app.fonts.set_sizes(app.body_px, app.heading_px);
-        app.needs_layout = true;
-      }
+      if (ctrl) zoom_by(app, 1);
       break;
 
     case SDLK_MINUS:
@@ -1735,12 +1730,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         }
         break;
       }
-      if (ctrl) {
-        app.body_px = std::max(10, app.body_px - 1);
-        app.heading_px = std::max(14, app.heading_px - 2);
-        app.fonts.set_sizes(app.body_px, app.heading_px);
-        app.needs_layout = true;
-      }
+      if (ctrl) zoom_by(app, -1);
       break;
 
     case SDLK_q:

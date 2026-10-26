@@ -131,6 +131,8 @@ enum class UiCommand {
   ViewMeasureWide,          // ~960px
   ToggleSectionFocus,       // outline: body shows one section only
   ToggleJustify,            // view: justify wrapped lines
+  SelectStyle,              // arg = style sheet name (styles/<name>.xss)
+  ReloadStyles,             // rescan styles/ and re-read the active sheet
 };
 
 
@@ -150,6 +152,9 @@ struct UiState {
   float view_line_spacing = 1.30f;
   float view_margin_x = 32.f;
   float view_max_content_width = 0.f;
+  // Style sheets: (name, title) pairs and the active name.
+  std::vector<std::pair<std::string, std::string>> styles;
+  std::string style;
   bool browse = false;  // read-only navigation
   bool virtual_keyboard = false;
   // Gamepad right-stick software pointer (extra; real mouse stays separate)

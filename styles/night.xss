@@ -1,0 +1,35 @@
+;; SPDX-License-Identifier: GPL-3.0-or-later
+;;
+;; Night — light text on a dark slate page for low-light reading.
+;; The colours are tokens so variants can (inherit "night") and redefine
+;; only `accent` / `paper` (see night-amber.xss).
+
+(stylesheet
+  (name "Night")
+  (description "Dark slate page, soft light text")
+
+  (define paper   "#1e2228")
+  (define ink     "#d4d7dc")
+  (define dim     "#8b929c")
+  (define accent  "#7fb4ff")
+  (define accent2 "#c59cff")
+  (define panel   (rgba 255 255 255 18))
+  (define line    "#3b424c")
+
+  (page (background paper) (color ink) (selection (rgba 90 130 200 110)))
+
+  (role header      (color "#eef1f5"))
+  (role thread      (color "#eef1f5"))
+  (role block-quote (color "#b7bcc4") (border dim))
+  (role note        (border "#d9a441"))
+  (role code-block  (background panel) (border line))
+  (role caption     (color dim))
+  (role message     (border "#4fb3a9"))
+  (role table       (border line) (background panel))
+  (role rule        (border line))
+  (role transclusion (border dim))
+
+  (role link   (color accent) (underline #t))
+  (role cite   (color accent2) (underline #t))
+  (role code   (color "#f0b27a") (background panel))
+  (role strike (color dim)))

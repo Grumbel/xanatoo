@@ -1,0 +1,26 @@
+;; SPDX-License-Identifier: GPL-3.0-or-later
+;;
+;; Typewriter — a manuscript draft: everything monospaced on plain paper,
+;; no extra heading size, emphasis carried by colour and weight only.
+
+(stylesheet
+  (name "Typewriter")
+  (description "Monospaced draft manuscript")
+
+  (fonts (body "Courier Prime" "Courier New" "Fira Mono" "DejaVu Sans Mono"
+               "monospace")
+         (heading "Courier Prime" "Courier New" "Fira Mono" "DejaVu Sans Mono"
+                  "monospace")
+         (heading-scale 1.15)
+         (code "Courier Prime" "Courier New" "Fira Mono" "DejaVu Sans Mono"
+               "monospace"))
+
+  (page (background "#fbfbf7") (color "#222222"))
+
+  (role paragraph  (space-after 1em))
+  (role header     (space-before 1.5em) (space-after 1em))
+  (role code-block (background none) (border "#999999"))
+  (role table      (background none))
+  (role link       (color "#222222") (underline #t))
+  (role cite       (color "#222222") (underline #t))
+  (role code       (color "#222222") (background none)))

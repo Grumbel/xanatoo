@@ -1,0 +1,14 @@
+;; SPDX-License-Identifier: GPL-3.0-or-later
+;;
+;; Night Amber — Night with warmer tokens. Defines are late-bound across
+;; (inherit …), so redefining a token here recolours every Night rule that
+;; uses it without copying those rules.
+
+(stylesheet
+  (name "Night Amber")
+  (description "Night, with an amber accent on a warmer page")
+  (inherit "night")
+
+  (define paper  "#221d18")
+  (define ink    "#e6d9c3")
+  (define accent "#ffb454"))

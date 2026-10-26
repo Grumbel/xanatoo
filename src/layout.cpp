@@ -84,14 +84,29 @@ void clear_external_doc_cache() {
   clear_external_doc_cache_impl();
 }
 
-LayoutEngine::LayoutEngine(FontSet& fonts, ImageCache* images)
-    : fonts_(fonts), images_(images) {}
+static const DocStyle& default_style() {
+  static const DocStyle style = builtin_style();
+  return style;
+}
 
+LayoutEngine::LayoutEngine(FontSet& fonts, ImageCache* images)
+    : fonts_(fonts), images_(images), style_(&default_style()) {}
+
+void LayoutEngine::set_style(const DocStyle* style) {
+  style_ = style ? style : &default_style();
+}
+
+// Face for an inline span inside a block set in `base` (a bold / italic
+// block face combines with the span's own emphasis).
 static FontRole style_role(FontRole base, InlineKind kind) {
-  if (kind == InlineKind::Code) return FontRole::Code;
+  if (kind == InlineKind::Code || base == FontRole::Code) return FontRole::Code;
   if (base == FontRole::Heading) return FontRole::Heading;
-  const bool strong = (kind == InlineKind::Strong);
-  const bool emph = (kind == InlineKind::Emphasis);
+  const bool strong = kind == InlineKind::Strong ||
+                      base == FontRole::BodyBold ||
+                      base == FontRole::BodyBoldItalic;
+  const bool emph = kind == InlineKind::Emphasis ||
+                    base == FontRole::BodyItalic ||
+                    base == FontRole::BodyBoldItalic;
   if (strong && emph) return FontRole::BodyBoldItalic;
   if (strong) return FontRole::BodyBold;
   if (emph) return FontRole::BodyItalic;
@@ -191,6 +206,13 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
   const Node& node = doc.get(id);
   if (node.id != id) return;  // stale child id → invalid-node sentinel
 
+  // Role spacing from the style sheet; em follows the body size (zoom).
+  const DocStyle& st = *style_;
+  const float em = static_cast<float>(fonts_.regular.pixel_size());
+  auto before = [&](BlockRole r) { return st[r].space_before.px(em); };
+  auto after = [&](BlockRole r) { return st[r].space_after.px(em); };
+  auto indent = [&](BlockRole r) { return st[r].indent.px(em); };
+
   switch (node.kind) {
     case NodeKind::Document:
       if (focus_section_ != INVALID_NODE) {
@@ -206,8 +228,9 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       break;
 
     case NodeKind::List:
+      y += before(BlockRole::List);
       layout_children_sequential(doc, node.children, x, y, max_width, out);
-      y += 8.f;  // trailing gap after the list block
+      y += after(BlockRole::List);  // trailing gap after the list block
       break;
 
     case NodeKind::Column:
@@ -364,7 +387,8 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       FontRole role = (node.level <= 2) ? FontRole::Heading : FontRole::Body;
       float start_y = y;
       y += (node.level == 1) ? 12.f : 8.f;
-      layout_paragraph(doc, node, x, y, max_width, out, role);
+      layout_paragraph(doc, node, x, y, max_width, out, role,
+                       BlockRole::Header);
       y += (node.level == 1) ? 14.f : 10.f;
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
@@ -372,7 +396,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
     case NodeKind::Header: {
       float start_y = y;
-      y += 10.f;
+      y += before(BlockRole::Header);
       // Org TODO / :tags: live in src + tags. Show them as decoration glyphs
       // that do not own a real span index (node = INVALID) so caret/edit stay
       // on the title text only.
@@ -396,7 +420,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           tg.text = "  :" + node.tags + ":";
           vis.spans.push_back(std::move(tg));
         }
-        layout_paragraph(doc, vis, x, y, max_width, out, FontRole::Heading);
+        layout_role_text(doc, vis, BlockRole::Header, x, y, max_width, out);
         for (size_t gi = glyph0; gi < out.glyphs.size(); ++gi) {
           auto& g = out.glyphs[gi];
           g.node = id;
@@ -409,9 +433,9 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           }
         }
       } else {
-        layout_paragraph(doc, node, x, y, max_width, out, FontRole::Heading);
+        layout_role_text(doc, node, BlockRole::Header, x, y, max_width, out);
       }
-      y += 12.f;
+      y += after(BlockRole::Header);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
@@ -428,8 +452,9 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           break;  // sibling / other branch — omit entirely
         if (is_ancestor && !is_focus && !under_focus) {
           float start_y = y;
-          float inset = (node.kind == NodeKind::Section) ? 8.f : 0.f;
-          y += 6.f;
+          float inset =
+              (node.kind == NodeKind::Section) ? indent(BlockRole::Section) : 0.f;
+          y += before(BlockRole::Section);
           for (NodeId child : node.children) {
             const Node& ch = doc.get(child);
             if (ch.kind == NodeKind::Header || ch.kind == NodeKind::Heading)
@@ -441,7 +466,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
             if (ch.kind == NodeKind::Section || ch.kind == NodeKind::Article)
               layout_node(doc, child, x + inset, y, max_width - inset, out);
           }
-          y += 6.f;
+          y += before(BlockRole::Section);
           out.boxes.push_back({id, x, start_y, max_width, y - start_y});
           break;
         }
@@ -449,8 +474,9 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       }
       float start_y = y;
       // Nested sections indent slightly; articles keep full width.
-      float inset = (node.kind == NodeKind::Section) ? 8.f : 0.f;
-      y += 6.f;
+      float inset =
+          (node.kind == NodeKind::Section) ? indent(BlockRole::Section) : 0.f;
+      y += before(BlockRole::Section);
       const bool folded =
           folded_sections_ && folded_sections_->find(id) != folded_sections_->end();
       // Always materialise title headers so fold state stays visible.
@@ -465,53 +491,56 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       }
       if (folded) {
         // Compact cue under the header (view-local fold; not Stretch).
-        y += 6.f;
+        y += before(BlockRole::Section);
         out.boxes.push_back({id, x, start_y, max_width, y - start_y});
         break;
       }
       layout_children_sequential(doc, body, x + inset, y, max_width - inset, out);
-      y += 8.f;
+      y += after(BlockRole::Section);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
 
     case NodeKind::Paragraph: {
       float start_y = y;
-      layout_paragraph(doc, node, x, y, max_width, out, FontRole::Body);
-      y += 14.f;
+      y += before(BlockRole::Paragraph);
+      layout_role_text(doc, node, BlockRole::Paragraph, x, y, max_width, out);
+      y += after(BlockRole::Paragraph);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
 
     case NodeKind::BlockQuote: {
+      y += before(BlockRole::BlockQuote);
       float start_y = y;
       const float bar_w = 3.f;
-      const float indent = 14.f;
-      float text_x = x + bar_w + indent;
-      float text_w = max_width - bar_w - indent;
+      const float inset = indent(BlockRole::BlockQuote);
+      float text_x = x + bar_w + inset;
+      float text_w = max_width - bar_w - inset;
       if (text_w < 40.f) {
         text_x = x + 8.f;
         text_w = max_width - 8.f;
       }
-      layout_paragraph(doc, node, text_x, y, text_w, out, FontRole::Body);
-      y += 12.f;
+      layout_role_text(doc, node, BlockRole::BlockQuote, text_x, y, text_w, out);
+      y += after(BlockRole::BlockQuote);
       out.quote_bars.push_back({id, x, start_y, bar_w, y - start_y});
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
 
     case NodeKind::Note: {
+      y += before(BlockRole::Note);
       float start_y = y;
       const float bar_w = 3.f;
-      const float indent = 14.f;
-      float text_x = x + bar_w + indent;
-      float text_w = max_width - bar_w - indent;
+      const float inset = indent(BlockRole::Note);
+      float text_x = x + bar_w + inset;
+      float text_w = max_width - bar_w - inset;
       if (text_w < 40.f) {
         text_x = x + 8.f;
         text_w = max_width - 8.f;
       }
-      layout_paragraph(doc, node, text_x, y, text_w, out, FontRole::Body);
-      y += 12.f;
+      layout_role_text(doc, node, BlockRole::Note, text_x, y, text_w, out);
+      y += after(BlockRole::Note);
       out.note_bars.push_back({id, x, start_y, bar_w, y - start_y});
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
@@ -531,18 +560,20 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         hs.text += node.label;
       }
       header.spans.push_back(std::move(hs));
-      layout_paragraph(doc, header, x, y, max_width, out, FontRole::Heading);
+      y += before(BlockRole::Thread);
+      layout_role_text(doc, header, BlockRole::Thread, x, y, max_width, out);
       for (auto& g : out.glyphs) {
         if (g.node == header.id) g.node = id;
       }
       y += 8.f;
       layout_children_sequential(doc, node.children, x, y, max_width, out);
-      y += 10.f;
+      y += after(BlockRole::Thread);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
 
     case NodeKind::Message: {
+      y += before(BlockRole::Message);
       float start_y = y;
       // Indent by reply depth (follow in-reply-to chain via labels).
       int depth = 0;
@@ -599,14 +630,14 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         }
         header.spans.push_back(std::move(r));
       }
-      layout_paragraph(doc, header, body_x, y, body_w, out, FontRole::Body);
+      layout_role_text(doc, header, BlockRole::Message, body_x, y, body_w, out);
       for (auto& g : out.glyphs) {
         if (g.node == header.id) g.node = id;
       }
       y += 4.f;
       for (NodeId child : node.children)
         layout_node(doc, child, body_x, y, body_w, out);
-      y += 10.f;
+      y += after(BlockRole::Message);
       out.message_bars.push_back(
           {id, x + indent, start_y, bar_w, y - start_y});
       out.boxes.push_back({id, x + indent, start_y, max_width - indent,
@@ -615,16 +646,17 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
     }
 
     case NodeKind::CodeBlock: {
+      y += before(BlockRole::CodeBlock);
       float start_y = y;
-      const float pad = 8.f;
+      const float pad = indent(BlockRole::CodeBlock);
       float text_x = x + pad;
       float text_w = max_width - pad * 2.f;
       if (text_w < 40.f) {
         text_x = x;
         text_w = max_width;
       }
-      layout_paragraph(doc, node, text_x, y, text_w, out, FontRole::Code);
-      y += 10.f;
+      layout_role_text(doc, node, BlockRole::CodeBlock, text_x, y, text_w, out);
+      y += after(BlockRole::CodeBlock);
       out.code_blocks.push_back({id, x, start_y, max_width, y - start_y});
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
@@ -633,49 +665,53 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
     case NodeKind::DefList: {
       float start_y = y;
       layout_children_sequential(doc, node.children, x, y, max_width, out);
-      y += 8.f;
+      y += after(BlockRole::List);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
 
     case NodeKind::Term: {
+      y += before(BlockRole::Term);
       float start_y = y;
-      layout_paragraph(doc, node, x, y, max_width, out, FontRole::Body);
-      y += 2.f;
+      layout_role_text(doc, node, BlockRole::Term, x, y, max_width, out);
+      y += after(BlockRole::Term);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
 
     case NodeKind::Definition: {
+      y += before(BlockRole::Definition);
       float start_y = y;
-      const float indent = 20.f;
-      float text_x = x + indent;
-      float text_w = max_width - indent;
+      const float inset = indent(BlockRole::Definition);
+      float text_x = x + inset;
+      float text_w = max_width - inset;
       if (text_w < 40.f) {
         text_x = x + 8.f;
         text_w = max_width - 8.f;
       }
-      layout_paragraph(doc, node, text_x, y, text_w, out, FontRole::Body);
-      y += 10.f;
+      layout_role_text(doc, node, BlockRole::Definition, text_x, y, text_w, out);
+      y += after(BlockRole::Definition);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
 
     case NodeKind::Figure: {
+      y += before(BlockRole::Figure);
       float start_y = y;
       for (NodeId c : node.children)
         layout_node(doc, c, x, y, max_width, out);
-      y += 10.f;
+      y += after(BlockRole::Figure);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
 
     case NodeKind::Caption: {
+      y += before(BlockRole::Caption);
       float start_y = y;
-      const float pad = 4.f;
-      layout_paragraph(doc, node, x + pad, y, max_width - pad * 2.f, out,
-                       FontRole::BodyItalic);
-      y += 6.f;
+      const float pad = 4.f + indent(BlockRole::Caption);
+      layout_role_text(doc, node, BlockRole::Caption, x + pad, y,
+                       max_width - pad * 2.f, out);
+      y += after(BlockRole::Caption);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
@@ -683,7 +719,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
     case NodeKind::Biblio: {
       float start_y = y;
       layout_children_sequential(doc, node.children, x, y, max_width, out);
-      y += 8.f;
+      y += after(BlockRole::List);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
@@ -691,15 +727,17 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
     case NodeKind::BiblioEntry: {
       float start_y = y;
       // Hanging indent style for references
-      const float hang = 16.f;
-      layout_paragraph(doc, node, x + hang, y, max_width - hang, out,
-                       FontRole::Body);
-      y += 8.f;
+      y += before(BlockRole::BiblioEntry);
+      const float hang = indent(BlockRole::BiblioEntry);
+      layout_role_text(doc, node, BlockRole::BiblioEntry, x + hang, y,
+                       max_width - hang, out);
+      y += after(BlockRole::BiblioEntry);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
 
     case NodeKind::Table: {
+      y += before(BlockRole::Table);
       float start_y = y;
       std::vector<NodeId> rows;
       for (NodeId c : node.children) {
@@ -781,7 +819,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           }
         }
       }
-      y += 10.f;
+      y += after(BlockRole::Table);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
@@ -886,7 +924,8 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         if (!node.spans.empty()) {
           FontRole role =
               (node.level > 0) ? FontRole::BodyBold : FontRole::Body;
-          layout_paragraph(doc, node, x, y, max_width, out, role);
+          layout_paragraph(doc, node, x, y, max_width, out, role,
+                           BlockRole::Table);
           y += 2.f;
         }
         for (NodeId c : node.children)
@@ -895,7 +934,8 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       } else {
         FontRole role =
             (node.level > 0) ? FontRole::BodyBold : FontRole::Body;
-        layout_paragraph(doc, node, x, y, max_width, out, role);
+        layout_paragraph(doc, node, x, y, max_width, out, role,
+                         BlockRole::Table);
         y += 4.f;
       }
       if (node.level > 0) {
@@ -908,8 +948,9 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
     }
 
     case NodeKind::ListItem: {
+      y += before(BlockRole::ListItem);
       float start_y = y;
-      const float bullet_slot = 28.f;
+      const float bullet_slot = indent(BlockRole::ListItem);
       // Marker: task checkbox, ordered "N.", or unordered "•"
       std::string marker;
       if (node.label == "task-done")
@@ -936,6 +977,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         pg.char_index = 0;
         pg.kind = InlineKind::Text;
         pg.font = FontRole::Body;
+        pg.color = st.text_color(BlockRole::ListItem, InlineKind::Text);
         out.glyphs.push_back(pg);
         mx += static_cast<float>(g.advance >> 6);
       }
@@ -945,7 +987,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         text_x = x + 16.f;
         text_w = max_width - 16.f;
       }
-      layout_paragraph(doc, node, text_x, y, text_w, out, FontRole::Body);
+      layout_role_text(doc, node, BlockRole::ListItem, text_x, y, text_w, out);
       // Nested lists under this item
       for (NodeId child : node.children) {
         if (doc.get(child).kind == NodeKind::List) {
@@ -953,7 +995,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
                       max_width - bullet_slot, out);
         }
       }
-      y += 8.f;  // tighter spacing between list items
+      y += after(BlockRole::ListItem);  // tighter spacing between list items
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
@@ -1005,10 +1047,10 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
     case NodeKind::HorizontalRule: {
       float start_y = y;
-      y += 10.f;
+      y += before(BlockRole::Rule);
       const float thickness = 2.f;
       out.hr_lines.push_back({id, x, y, max_width, thickness});
-      y += 10.f + thickness;
+      y += after(BlockRole::Rule) + thickness;
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
@@ -1018,8 +1060,9 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       // and layout a snapshot of the target's text (glyphs tagged with
       // this Transclude node). Cross-document paths are relative to the
       // host document directory (image_base_).
+      y += before(BlockRole::Transclusion);
       float start_y = y;
-      const float indent = 12.f;
+      const float inset = indent(BlockRole::Transclusion);
       const float bar_w = 3.f;
 
       std::string path_part, href_part;
@@ -1110,8 +1153,8 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         s.text = "↗ ";
         s.text += label_href;
         label.spans.push_back(std::move(s));
-        layout_paragraph(doc, label, x + bar_w + indent, y,
-                         max_width - bar_w - indent, out, FontRole::Body);
+        layout_role_text(doc, label, BlockRole::Transclusion, x + bar_w + inset,
+                         y, max_width - bar_w - inset, out);
         y += 4.f;
       }
 
@@ -1137,10 +1180,10 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           body.spans.push_back(std::move(s));
           body.id = id;  // missing marker is not writable
         }
-        layout_paragraph(doc, body, x + bar_w + indent, y,
-                         max_width - bar_w - indent, out, FontRole::Body);
+        layout_role_text(doc, body, BlockRole::Transclusion, x + bar_w + inset,
+                         y, max_width - bar_w - inset, out);
       }
-      y += 10.f;
+      y += after(BlockRole::Transclusion);
       out.quote_bars.push_back({id, x, start_y, bar_w, y - start_y});
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
@@ -1178,9 +1221,16 @@ static void decode_utf8(const std::string& text,
   }
 }
 
+void LayoutEngine::layout_role_text(const Document& doc, const Node& node,
+                                    BlockRole role, float x, float& y,
+                                    float max_width, LayoutResult& out) {
+  layout_paragraph(doc, node, x, y, max_width, out, (*style_)[role].font, role);
+}
+
 void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
                                     float x, float& y, float max_width,
-                                    LayoutResult& out, FontRole base_role) {
+                                    LayoutResult& out, FontRole base_role,
+                                    BlockRole block) {
   (void)doc;
   struct CharInfo {
     uint32_t cp;
@@ -1282,6 +1332,7 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
       pg.char_index = c.char_idx;
       pg.kind = c.kind;
       pg.font = c.role;
+      pg.color = style_->text_color(block, c.kind);
       out.glyphs.push_back(pg);
       lx += adv;
     }
@@ -1327,6 +1378,7 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
         pg.char_index = chars[i].char_idx;
         pg.kind = chars[i].kind;
         pg.font = chars[i].role;
+        pg.color = style_->text_color(block, chars[i].kind);
         out.glyphs.push_back(pg);
       }
       if (cp == '\r' && i + 1 < chars.size() && chars[i + 1].cp == '\n') ++i;

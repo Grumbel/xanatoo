@@ -11,6 +11,15 @@ namespace xanatoo {
 // clip top — the pane raster cache relies on this to blit scrolled content.
 static int px(float v) { return static_cast<int>(std::floor(v)); }
 
+static void set_color(SDL_Renderer* sdl, const Rgba& c) {
+  SDL_SetRenderDrawColor(sdl, c.r, c.g, c.b, c.a);
+}
+
+static const DocStyle& fallback_style() {
+  static const DocStyle style = builtin_style();
+  return style;
+}
+
 Renderer::Renderer(SDL_Renderer* sdl, FontSet& fonts, ImageCache* images)
     : sdl_(sdl), fonts_(fonts), images_(images) {}
 
@@ -20,6 +29,7 @@ void Renderer::clear(uint8_t r, uint8_t g, uint8_t b) {
 }
 
 void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) {
+  const DocStyle& st = style_ ? *style_ : fallback_style();
   // Cull against the active SDL clip rect (pane / soft-window client area).
   SDL_Rect clip{};
   const SDL_bool clipped = SDL_RenderIsClipEnabled(sdl_);
@@ -60,7 +70,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
   {
     SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
     for (const auto& fill : layout.table_header_fills) {
-      SDL_SetRenderDrawColor(sdl_, 230, 235, 245, 220);
+      set_color(sdl_, st[BlockRole::Table].background);
       SDL_Rect r{
           static_cast<int>(fill.x + origin_x),
           px(fill.y - scroll_y),
@@ -74,23 +84,25 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
   // Fenced code-block soft background
   {
     SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
+    const BlockStyle& code = st[BlockRole::CodeBlock];
     for (const auto& cb : layout.code_blocks) {
-      SDL_SetRenderDrawColor(sdl_, 245, 240, 230, 210);
+      set_color(sdl_, code.background);
       SDL_Rect r{
           static_cast<int>(cb.x + origin_x),
           px(cb.y - scroll_y),
           static_cast<int>(cb.width),
           static_cast<int>(cb.height)};
-      SDL_RenderFillRect(sdl_, &r);
-      SDL_SetRenderDrawColor(sdl_, 210, 200, 180, 255);
-      SDL_RenderDrawRect(sdl_, &r);
+      if (code.background.visible()) SDL_RenderFillRect(sdl_, &r);
+      set_color(sdl_, code.border);
+      if (code.border.visible()) SDL_RenderDrawRect(sdl_, &r);
     }
     SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
   }
 
-  // Block-quote left bars
+  SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
+  // Block-quote (and transclusion) left bars
   for (const auto& qb : layout.quote_bars) {
-    SDL_SetRenderDrawColor(sdl_, 140, 155, 180, 255);
+    set_color(sdl_, st[BlockRole::BlockQuote].border);
     int bw = static_cast<int>(qb.width);
     if (bw < 2) bw = 2;
     SDL_Rect bar{
@@ -103,7 +115,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
 
   // Note left bars (amber, distinct from quotes)
   for (const auto& nb : layout.note_bars) {
-    SDL_SetRenderDrawColor(sdl_, 200, 140, 40, 255);
+    set_color(sdl_, st[BlockRole::Note].border);
     int bw = static_cast<int>(nb.width);
     if (bw < 2) bw = 2;
     SDL_Rect bar{
@@ -116,7 +128,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
 
   // Message / comment bars (teal — discussion thread)
   for (const auto& mb : layout.message_bars) {
-    SDL_SetRenderDrawColor(sdl_, 40, 130, 140, 255);
+    set_color(sdl_, st[BlockRole::Message].border);
     int bw = static_cast<int>(mb.width);
     if (bw < 2) bw = 2;
     SDL_Rect bar{
@@ -129,7 +141,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
 
   // Table grid lines
   for (const auto& tl : layout.table_lines) {
-    SDL_SetRenderDrawColor(sdl_, 160, 165, 175, 255);
+    set_color(sdl_, st[BlockRole::Table].border);
     int w = static_cast<int>(tl.width);
     int h = static_cast<int>(tl.height);
     if (w < 1) w = 1;
@@ -143,7 +155,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
 
   // Horizontal rules
   for (const auto& hr : layout.hr_lines) {
-    SDL_SetRenderDrawColor(sdl_, 170, 168, 160, 255);
+    set_color(sdl_, st[BlockRole::Rule].border);
     int th = static_cast<int>(hr.height);
     if (th < 1) th = 1;
     SDL_Rect line{
@@ -153,9 +165,10 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
         th};
     SDL_RenderFillRect(sdl_, &line);
   }
+  SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
 
   // Soft background runs under inline code
-  {
+  if (st[InlineKind::Code].background.visible()) {
     SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
     float run_x0 = 0.f, run_y = 0.f, run_x1 = 0.f;
     bool in_run = false;
@@ -165,7 +178,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
       int y = px(run_y - scroll_y) - 2;
       int w = static_cast<int>(run_x1 - run_x0) + 4;
       int h = fonts_.pick(FontRole::Code).line_height() + 2;
-      SDL_SetRenderDrawColor(sdl_, 245, 235, 220, 200);
+      set_color(sdl_, st[InlineKind::Code].background);
       SDL_Rect r{x, y, w, h};
       SDL_RenderFillRect(sdl_, &r);
       in_run = false;
@@ -211,49 +224,32 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
     dst.h = g.height;
     if (!visible(dst.x, dst.y, dst.w, dst.h)) continue;
 
-    switch (pg.kind) {
-      case InlineKind::Link:
-        SDL_SetTextureColorMod(g.texture, 30, 90, 180);
-        break;
-      case InlineKind::Cite:
-        SDL_SetTextureColorMod(g.texture, 90, 50, 140);  // violet for citations
-        break;
-      case InlineKind::Code:
-        SDL_SetTextureColorMod(g.texture, 130, 55, 30);
-        break;
-      case InlineKind::Strike:
-        SDL_SetTextureColorMod(g.texture, 90, 90, 95);
-        break;
-      case InlineKind::Strong:
-      case InlineKind::Emphasis:
-      default:
-        SDL_SetTextureColorMod(g.texture, 28, 28, 32);
-        break;
-    }
+    SDL_SetTextureColorMod(g.texture, pg.color.r, pg.color.g, pg.color.b);
+    SDL_SetTextureAlphaMod(g.texture, pg.color.a);
     SDL_RenderCopy(sdl_, g.texture, nullptr, &dst);
-    if (pg.kind == InlineKind::Link || pg.kind == InlineKind::Cite) {
-      if (pg.kind == InlineKind::Cite)
-        SDL_SetRenderDrawColor(sdl_, 90, 50, 140, 255);
-      else
-        SDL_SetRenderDrawColor(sdl_, 30, 90, 180, 255);
-      int uy = px(pg.y + 2.f - scroll_y);
-      int ux = static_cast<int>(pg.x + origin_x);
-      int uw = static_cast<int>((g.advance >> 6) > 0 ? (g.advance >> 6) : (g.width + 1));
-      SDL_RenderDrawLine(sdl_, ux, uy, ux + uw, uy);
-    }
-    if (pg.kind == InlineKind::Strike) {
-      SDL_SetRenderDrawColor(sdl_, 90, 90, 95, 255);
-      int mid = px(pg.y - static_cast<float>(g.bearing_y) * 0.35f - scroll_y);
-      int ux = static_cast<int>(pg.x + origin_x);
-      int uw = static_cast<int>((g.advance >> 6) > 0 ? (g.advance >> 6)
-                                                    : (g.width + 1));
-      SDL_RenderDrawLine(sdl_, ux, mid, ux + uw, mid);
+    const bool underline = st[pg.kind].underline;
+    const bool strike = pg.kind == InlineKind::Strike;
+    if (underline || strike) {
+      SDL_SetRenderDrawColor(sdl_, pg.color.r, pg.color.g, pg.color.b, 255);
+      const int ux = static_cast<int>(pg.x + origin_x);
+      const int uw = static_cast<int>((g.advance >> 6) > 0 ? (g.advance >> 6)
+                                                           : (g.width + 1));
+      if (underline) {
+        const int uy = px(pg.y + 2.f - scroll_y);
+        SDL_RenderDrawLine(sdl_, ux, uy, ux + uw, uy);
+      }
+      if (strike) {
+        const int mid =
+            px(pg.y - static_cast<float>(g.bearing_y) * 0.35f - scroll_y);
+        SDL_RenderDrawLine(sdl_, ux, mid, ux + uw, mid);
+      }
     }
   }
 }
 
 void Renderer::draw_selection(const std::vector<SelRect>& rects, float origin_x) {
-  draw_selection(rects, origin_x, 160, 190, 230, 120);
+  const Rgba& c = (style_ ? *style_ : fallback_style()).selection;
+  draw_selection(rects, origin_x, c.r, c.g, c.b, c.a);
 }
 
 void Renderer::draw_selection(const std::vector<SelRect>& rects, float origin_x,
@@ -309,6 +305,7 @@ void Renderer::draw_text(Font& font, float x, float y_baseline,
     const Glyph& gl = font.glyph(cp);
     if (gl.texture) {
       SDL_SetTextureColorMod(gl.texture, r, g, b);
+      SDL_SetTextureAlphaMod(gl.texture, 255);  // glyphs share textures
       SDL_Rect dst{
           static_cast<int>(pen + gl.bearing_x),
           static_cast<int>(y_baseline - gl.bearing_y),

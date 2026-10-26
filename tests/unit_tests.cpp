@@ -16,6 +16,7 @@
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/layout.hpp"
 #include "xanatoo/font.hpp"
+#include "xanatoo/style.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -700,6 +701,93 @@ void test_atx_section_tree() {
 
 
 
+void test_style_sheet_parse() {
+  using namespace xanatoo;
+  DocStyle st = builtin_style();
+  apply_style_source(st, R"(
+    ; comment
+    (stylesheet
+      (name "Test")
+      (define accent "#102030")
+      (define gap 1.5em)
+      (page (background "#fff") (color (rgb 1 2 3)))
+      (fonts (body "Some Serif" "serif") (heading-weight regular)
+             (heading-scale 1.5))
+      (role paragraph (space-after gap) (space-before 4px))
+      (role header (color accent) (font code))
+      (role link (color accent) (underline #f))
+      (role code (background none))
+      (role bogus (color "#000"))
+      (role note (wobble 3) (border "nonsense")))
+  )",
+                     "test");
+  EXPECT_EQ(st.title, "Test");
+  EXPECT(st.paper == (Rgba{255, 255, 255, 255}));
+  EXPECT(st.ink == (Rgba{1, 2, 3, 255}));
+  EXPECT_EQ(st.fonts.body.size(), 2u);
+  EXPECT_EQ(st.fonts.body[0], "Some Serif");
+  EXPECT(!st.fonts.heading_bold);
+  EXPECT(st.heading_scale > 1.49f && st.heading_scale < 1.51f);
+  const BlockStyle& para = st[BlockRole::Paragraph];
+  EXPECT(para.space_after.em);
+  EXPECT(para.space_after.px(10.f) > 14.9f && para.space_after.px(10.f) < 15.1f);
+  EXPECT(!para.space_before.em);
+  EXPECT(para.space_before.px(10.f) == 4.f);
+  EXPECT(st[BlockRole::Header].font == FontRole::Code);
+  EXPECT(st.text_color(BlockRole::Header, InlineKind::Text) ==
+         (Rgba{0x10, 0x20, 0x30, 255}));
+  // Inline colour wins over block colour; plain text falls back to ink.
+  EXPECT(st.text_color(BlockRole::Header, InlineKind::Link) ==
+         (Rgba{0x10, 0x20, 0x30, 255}));
+  EXPECT(st.text_color(BlockRole::Paragraph, InlineKind::Strong) == st.ink);
+  EXPECT(!st[InlineKind::Link].underline);
+  EXPECT(!st[InlineKind::Code].background.visible());
+  // Untouched roles keep the built-in values.
+  EXPECT(st[BlockRole::ListItem].indent.px(10.f) == 28.f);
+  // bogus role, unknown property, bad colour
+  EXPECT_EQ(st.warnings.size(), 3u);
+}
+
+void test_style_sheets_shipped() {
+  using namespace xanatoo;
+  // Every sheet under styles/ loads without warnings.
+  const std::vector<StyleEntry> sheets = list_styles();
+  EXPECT(!sheets.empty());
+  EXPECT_EQ(sheets.front().name, "default");
+  for (const StyleEntry& e : sheets) {
+    DocStyle st;
+    std::string err;
+    EXPECT(load_style(e.name, st, &err));
+    if (!st.warnings.empty())
+      std::fprintf(stderr, "style %s: %s\n", e.name.c_str(),
+                   st.warnings.front().c_str());
+    EXPECT(st.warnings.empty());
+  }
+  // default.xss mirrors the built-in look.
+  DocStyle def;
+  EXPECT(load_style("default", def));
+  const DocStyle builtin = builtin_style();
+  EXPECT(def.paper == builtin.paper && def.ink == builtin.ink);
+  for (size_t i = 0; i < kBlockRoleCount; ++i) {
+    const BlockStyle& a = def.block[i];
+    const BlockStyle& b = builtin.block[i];
+    EXPECT(a.space_before.px(17.f) == b.space_before.px(17.f) &&
+           a.space_after.px(17.f) == b.space_after.px(17.f) &&
+           a.indent.px(17.f) == b.indent.px(17.f) && a.font == b.font &&
+           a.border == b.border && a.background == b.background);
+  }
+  // Late-bound tokens: night-amber only redefines tokens of night.
+  DocStyle night, amber;
+  if (load_style("night", night) && load_style("night-amber", amber)) {
+    EXPECT(!(night.paper == amber.paper));
+    EXPECT(!(night[InlineKind::Link].color == amber[InlineKind::Link].color));
+    EXPECT(night[BlockRole::Table].border == amber[BlockRole::Table].border);
+    EXPECT_EQ(amber.title, "Night Amber");
+  }
+  DocStyle missing;
+  EXPECT(!load_style("no-such-sheet", missing));
+}
+
 void test_layout_wrap_respects_max_width() {
   using namespace xanatoo;
   // Metrics-only: no SDL window. Font textures may be null; advances still work.
@@ -890,6 +978,8 @@ int main() {
   test_utf8_pop_back();
   test_sanitize_epub_markdown();
   test_layout_wrap_respects_max_width();
+  test_style_sheet_parse();
+  test_style_sheets_shipped();
 
   std::printf("%d passed, %d failed\n", g_passed, g_failed);
   return g_failed == 0 ? 0 : 1;

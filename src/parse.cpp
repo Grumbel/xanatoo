@@ -3,6 +3,7 @@
 
 #include "xanatoo/parse.hpp"
 #include "xanatoo/org.hpp"
+#include "xanatoo/sexpr.hpp"
 #include "xanatoo/util.hpp"
 #include <cctype>
 #include <algorithm>
@@ -1700,129 +1701,6 @@ std::string serialize_markup(const Document& doc) {
 // ---------------------------------------------------------------------------
 
 namespace {
-
-struct SExpr {
-  enum class Kind { List, Atom, String } kind = Kind::Atom;
-  std::string text;  // atom or string value
-  std::vector<SExpr> kids;
-};
-
-class SExprParser {
- public:
-  explicit SExprParser(std::string_view src) : s_(src) {}
-
-  SExpr parse_top() {
-    skip();
-    return parse_one();
-  }
-
- private:
-  std::string_view s_;
-  size_t i_ = 0;
-
-  void skip() {
-    while (i_ < s_.size()) {
-      char c = s_[i_];
-      if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
-        ++i_;
-        continue;
-      }
-      if (c == ';') {
-        while (i_ < s_.size() && s_[i_] != '\n') ++i_;
-        continue;
-      }
-      break;
-    }
-  }
-
-  SExpr parse_one() {
-    skip();
-    if (i_ >= s_.size()) return {};
-    if (s_[i_] == '(') {
-      ++i_;
-      SExpr list;
-      list.kind = SExpr::Kind::List;
-      for (;;) {
-        skip();
-        if (i_ >= s_.size()) break;
-        if (s_[i_] == ')') {
-          ++i_;
-          break;
-        }
-        list.kids.push_back(parse_one());
-      }
-      return list;
-    }
-    if (s_[i_] == '"') {
-      ++i_;
-      SExpr str;
-      str.kind = SExpr::Kind::String;
-      while (i_ < s_.size() && s_[i_] != '"') {
-        if (s_[i_] == '\\' && i_ + 1 < s_.size()) {
-          char e = s_[i_ + 1];
-          if (e == 'n')
-            str.text.push_back('\n');
-          else if (e == 't')
-            str.text.push_back('\t');
-          else
-            str.text.push_back(e);
-          i_ += 2;
-        } else {
-          str.text.push_back(s_[i_]);
-          ++i_;
-        }
-      }
-      if (i_ < s_.size() && s_[i_] == '"') ++i_;
-      return str;
-    }
-    SExpr atom;
-    atom.kind = SExpr::Kind::Atom;
-    while (i_ < s_.size()) {
-      char c = s_[i_];
-      if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '(' ||
-          c == ')' || c == ';')
-        break;
-      atom.text.push_back(c);
-      ++i_;
-    }
-    return atom;
-  }
-};
-
-bool is_atom(const SExpr& e, const char* name) {
-  return e.kind == SExpr::Kind::Atom && e.text == name;
-}
-
-std::string sexpr_text(const SExpr& e) {
-  if (e.kind == SExpr::Kind::String || e.kind == SExpr::Kind::Atom)
-    return e.text;
-  return {};
-}
-
-bool sexpr_bool(const SExpr& e, bool def = false) {
-  if (e.kind != SExpr::Kind::Atom) return def;
-  if (e.text == "#t" || e.text == "true") return true;
-  if (e.text == "#f" || e.text == "false") return false;
-  return def;
-}
-
-float sexpr_float(const SExpr& e, float def = 0.f) {
-  if (e.kind != SExpr::Kind::Atom && e.kind != SExpr::Kind::String) return def;
-  try {
-    return std::stof(e.text);
-  } catch (...) {
-    return def;
-  }
-}
-
-int sexpr_int(const SExpr& e, int def = 0) {
-  if (e.kind != SExpr::Kind::Atom && e.kind != SExpr::Kind::String) return def;
-  try {
-    return std::stoi(e.text);
-  } catch (...) {
-    return def;
-  }
-}
 
 size_t read_kwargs(const std::vector<SExpr>& kids, size_t start,
                    std::string* summary, bool* expanded, float* weight,

@@ -8,6 +8,25 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-26) — style sheets
+
+- `styles/*.xss`: S-expression document style sheets (docs/STYLESHEETS.md),
+  separate from markup. Roles (paragraph, header, note, code-block, link, …)
+  set spacing (px/em), indent, font face, text/background/border colours;
+  page paper/ink/selection; font families + heading scale/weight.
+  `(inherit …)` with late-bound `(define …)` tokens.
+- Shipped: Default (mirrors the built-in look), Compact, High Contrast,
+  Night, Night Amber (token-only variant of Night), Sepia Book, Typewriter.
+- Toolbar style dropdown + View → Style sheet; choice persisted as
+  `style=` in view.conf; "Reload style sheets" re-reads files.
+- Behaviour changes: block font faces now combine with span emphasis, so
+  code blocks render monospaced (they passed FontRole::Code but got the body
+  face) and captions italic. `XANATOO_FONT` now yields to a sheet's body
+  family (`--font` still wins).
+- SExpr reader moved from parse.cpp into header-only `sexpr.hpp`.
+- Next: per-document sheets, note kinds as roles, "why did this value win"
+  explanation, hot reload, glyph fallback for faces missing ☐/☑.
+
 ## Status (2026-10-26) — scroll blitting
 
 - Each pane caches its document layer (paper, selection, text) in a

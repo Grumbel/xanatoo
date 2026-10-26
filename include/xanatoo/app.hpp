@@ -246,6 +246,14 @@ struct App {
   ImageCache images;
   LayoutEngine layout_engine;
   xanatoo::ViewSettings view_settings;
+  // Active document style sheet (layout_engine / renderer point at it) and
+  // the sheets found in style_dirs() for the toolbar / View menu.
+  xanatoo::DocStyle style;
+  std::vector<xanatoo::StyleEntry> styles;
+  // Body font file: --font beats the sheet's body family, which beats
+  // XANATOO_FONT (a packaging default, e.g. the Nix wrapper).
+  std::string font_path;      // --font
+  std::string env_font_path;  // XANATOO_FONT
   Renderer renderer;
   xanatoo::Ui ui;
   float ui_top = 0.f;
@@ -412,6 +420,15 @@ void scroll_caret_to_top(App& app, Pane& p);
 float pane_max_scroll(App& app, const Pane& p);
 // Body/heading font size ± `steps` points (View → Zoom, pinch).
 void zoom_by(App& app, int steps);
+// Push body_px / heading_px (scaled by the style sheet) into the fonts.
+void apply_font_sizes(App& app);
+// Body font file for FontSet::load (see App::font_path), "" = families.
+std::string body_font_path(const App& app);
+// Load style sheet `name` (re-reading the file), reload fonts if its
+// families changed, relayout everything and remember it in view.conf.
+void apply_style(App& app, const std::string& name);
+// Rescan style_dirs() and re-read the active sheet (after editing a .xss).
+void reload_styles(App& app);
 void nav_page(App& app, bool up);
 void nav_move_block(App& app, bool prev);
 void nav_move_line(App& app, bool up);
@@ -526,6 +543,8 @@ std::optional<xanatoo::UiCommand> keymap_lookup(SDL_Keycode sym, bool ctrl,
 
 // ---- chrome (theme-based canvas widgets) ----
 StatusLine compute_status(App& app);
+// Fill a document client area with the style sheet's paper colour.
+void fill_doc_paper(App& app, const SDL_Rect& rect);
 void draw_floating_frame(App& app, const SDL_Rect& outer,
                          const std::string& title, bool active,
                          bool resizable = true);

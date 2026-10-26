@@ -211,10 +211,10 @@ std::vector<SelRect> selection_rects(const LayoutResult& layout,
     return std::tuple{g.node, g.span_index, g.char_index};
   };
 
-  auto a = glyph_key(PositionedGlyph{
-      0, 0, 0, sel.anchor.node, sel.anchor.span_index, sel.anchor.char_index});
-  auto b = glyph_key(PositionedGlyph{
-      0, 0, 0, sel.focus.node, sel.focus.span_index, sel.focus.char_index});
+  auto a = std::tuple{sel.anchor.node, sel.anchor.span_index,
+                      sel.anchor.char_index};
+  auto b = std::tuple{sel.focus.node, sel.focus.span_index,
+                      sel.focus.char_index};
   if (a > b) std::swap(a, b);
 
   // Group selected glyphs by baseline into runs

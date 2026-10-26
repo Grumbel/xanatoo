@@ -34,6 +34,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_touch.cpp` | touchscreen gestures: tap → click, drag/fling scroll, long-press select, pinch zoom |
 | `app_buffers.cpp` / `app_view.cpp` / `app_nav.cpp` / `app_softwin.cpp` / `app_prompts.cpp` / `app_pointer.cpp` | document buffers, scroll/fold/outline, URL history + bookmarks, floating windows, minibuffer, cursor/gamepad |
 | `theme.cpp` | classic palette (`Palette`) + stateless bevel/gradient/window primitives shared with the ImGui theme |
+| `style.cpp` | document style sheets (`styles/*.xss`, S-expressions): `DocStyle` roles → layout spacing/fonts/glyph colours + renderer decoration colours; `apply_style` in `app_view.cpp` |
 
 Buffers are addressed by stable `BufferId` (`DocBuffer::id`, never reused,
 `kNoBuffer` = 0): use `buf(app, id)` / `find_buf` / `add_buffer` /
@@ -64,6 +65,22 @@ toolbar and shortcuts should route through `execute_command`.
 
 - `include/xanatoo/https.hpp` + `src/https.cpp` — OpenSSL HTTPS GET/POST plus `ssl_library_init_once` / `tcp_connect_host` for Gemini TLS (linked when any OpenSSL feature is ON).
 - `include/xanatoo/json_min.hpp` — tiny JSON field/object helpers for read-only API clients (header-only).
+
+## Style sheets
+
+- `styles/*.xss` — S-expression sheets kept apart from the markup; they style
+  semantic roles (no selectors). See `docs/STYLESHEETS.md`.
+- Every sheet starts from `builtin_style()`; `styles/default.xss` mirrors it
+  (a unit test keeps them equal). `(inherit "x")` + late-bound `(define …)`.
+- Never hard-code document colours/spacing in layout/render; add a role or
+  property to `DocStyle` instead. UI chrome keeps using `theme.hpp`.
+- Selected sheet = `ViewSettings::style` (view.conf); toolbar style button and
+  View → Style sheet issue `UiCommand::SelectStyle` / `ReloadStyles`.
+
+## Shared S-expression reader (`sexpr.hpp`)
+
+- Header-only `SExprParser` (`parse_top` / `parse_all`) + `is_atom` /
+  `is_form` / `sexpr_*` helpers; used by the `.sexp` format and style sheets.
 
 ## Shared string helpers (`util.hpp`)
 

@@ -1,0 +1,39 @@
+;; SPDX-License-Identifier: GPL-3.0-or-later
+;;
+;; Sepia Book — long-form reading: serif text on warm paper, spacing in em
+;; so it scales with zoom, regular-weight headings set larger.
+
+(stylesheet
+  (name "Sepia Book")
+  (description "Serif body on warm paper, em-based spacing")
+
+  (define ink    "#3b2f22")
+  (define paper  "#f4ecd8")
+  (define accent "#8a4b16")
+  (define muted  "#b39a73")
+  (define gap    0.9em)
+
+  (page (background paper) (color ink) (selection (rgba 214 180 120 110)))
+
+  (fonts (body "Charter" "Bitstream Charter" "Gentium Book Plus" "Libertinus Serif"
+               "Bookerly" "Georgia" "DejaVu Serif" "serif")
+         (heading "Libertinus Serif" "Book Antiqua" "Palatino Linotype"
+                  "DejaVu Serif" "serif")
+         (heading-weight regular)
+         (heading-scale 1.6)
+         (code "Fira Mono" "DejaVu Sans Mono" "monospace"))
+
+  (role paragraph   (space-after gap))
+  (role header      (color accent) (space-before 1.1em) (space-after 0.5em))
+  (role section     (indent 0))
+  (role block-quote (indent 1.2em) (color "#5a4a36") (border muted))
+  (role note        (indent 1.2em) (border accent))
+  (role code-block  (background (rgba 234 222 196 255)) (border muted))
+  (role caption     (color "#6b5a44"))
+  (role table       (border muted) (background (rgba 232 218 188 255)))
+  (role rule        (border muted) (space-before 1.2em) (space-after 1.2em))
+  (role transclusion (border muted))
+
+  (role link   (color accent) (underline #t))
+  (role cite   (color "#6d3f6f"))
+  (role code   (color "#7a3412") (background (rgba 232 218 188 255))))

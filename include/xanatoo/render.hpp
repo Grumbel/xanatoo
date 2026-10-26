@@ -6,6 +6,7 @@
 #include "xanatoo/font.hpp"
 #include "xanatoo/editor.hpp"
 #include "xanatoo/images.hpp"
+#include "xanatoo/style.hpp"
 #include <SDL.h>
 #include <vector>
 
@@ -14,6 +15,10 @@ namespace xanatoo {
 class Renderer {
 public:
   Renderer(SDL_Renderer* sdl, FontSet& fonts, ImageCache* images = nullptr);
+
+  // Decoration colours (bars, rules, code fills, selection); glyph colours
+  // are already resolved by layout. Must outlive the renderer.
+  void set_style(const DocStyle* style) { style_ = style; }
 
   void clear(uint8_t r, uint8_t g, uint8_t b);
   // origin_x shifts all content horizontally (for multi-pane views).
@@ -35,6 +40,7 @@ private:
   SDL_Renderer* sdl_;
   FontSet& fonts_;
   ImageCache* images_;
+  const DocStyle* style_ = nullptr;
 };
 
 }  // namespace xanatoo

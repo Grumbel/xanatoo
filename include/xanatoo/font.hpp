@@ -74,6 +74,19 @@ std::string fontconfig_find(const std::string& family, int weight, int slant);
 // Infer a family name from a user-supplied TTF/OTF path (best-effort).
 std::string fontconfig_family_from_file(const std::string& path);
 
+// Preferred families per face, first installed one wins (generic names such
+// as "serif" / "monospace" always resolve). Empty = built-in candidates.
+struct FontFamilies {
+  std::vector<std::string> body;
+  std::vector<std::string> heading;  // empty = body family
+  std::vector<std::string> code;
+  bool heading_bold = true;
+  bool operator==(const FontFamilies&) const = default;
+};
+
+// First family of `names` that FontConfig has installed, else "".
+std::string fontconfig_pick_family(const std::vector<std::string>& names);
+
 // Body regular/bold/italic + heading + monospace for code.
 class FontSet {
 public:
@@ -84,9 +97,10 @@ public:
   Font heading;
   Font mono;
 
-  // preferred_path may be empty (FontConfig defaults) or a concrete .ttf.
+  // preferred_path may be empty (FontConfig defaults) or a concrete .ttf;
+  // it wins over families.body (reader choice beats the style sheet).
   bool load(SDL_Renderer* renderer, const std::string& preferred_path,
-            int body_px, int heading_px);
+            int body_px, int heading_px, const FontFamilies& families = {});
 
   void set_sizes(int body_px, int heading_px);
 

@@ -1,0 +1,50 @@
+;; SPDX-License-Identifier: GPL-3.0-or-later
+;;
+;; Default — the built-in look, spelled out as a reference sheet.
+;; Every other sheet starts from these values (whether or not this file
+;; exists), so a sheet only needs to state what it changes.
+
+(stylesheet
+  (name "Default")
+  (description "Warm off-white paper, sans body, blue links")
+
+  (page (background "#f8f6f0")
+        (color "#1c1c20")
+        (selection (rgba 160 190 230 120)))
+
+;; No (fonts …) here: without a body family, --font / XANATOO_FONT or the
+  ;; FontConfig defaults (DejaVu Sans, Liberation Sans, …) apply. A sheet
+  ;; that wants its own faces lists them, first installed one wins:
+  ;;   (fonts (body "Charter" "DejaVu Serif" "serif")
+  ;;          (heading "DejaVu Sans" "sans-serif")
+  ;;          (heading-weight bold)        ; or regular
+  ;;          (heading-scale 1.5)          ; heading px = body px × scale
+  ;;          (code "DejaVu Sans Mono" "monospace"))
+
+  ;; Blocks: space-before / space-after / indent are px or em.
+  (role paragraph   (space-after 14))
+  (role header      (font heading) (space-before 10) (space-after 12))
+  (role section     (space-before 6) (space-after 8) (indent 8))
+  (role list        (space-after 8))
+  (role list-item   (indent 28) (space-after 8))
+  (role block-quote (indent 14) (space-after 12) (border "#8c9bb4"))
+  (role note        (indent 14) (space-after 12) (border "#c88c28"))
+  (role code-block  (font code) (indent 8) (space-after 10)
+                    (background (rgba 245 240 230 210)) (border "#d2c8b4"))
+  (role term        (space-after 2))
+  (role definition  (indent 20) (space-after 10))
+  (role figure      (space-after 10))
+  (role caption     (font italic) (space-after 6))
+  (role bibliography-entry (indent 16) (space-after 8))
+  (role thread      (font heading) (space-after 10))
+  (role message     (space-after 10) (border "#28828c"))
+  (role table       (space-after 10) (border "#a0a5af")
+                    (background (rgba 230 235 245 220)))
+  (role rule        (space-before 10) (space-after 10) (border "#aaa8a0"))
+  (role transclusion (indent 12) (space-after 10) (border "#8c9bb4"))
+
+  ;; Inline roles.
+  (role link   (color "#1e5ab4") (underline #t))
+  (role cite   (color "#5a328c") (underline #t))
+  (role code   (color "#82371e") (background (rgba 245 235 220 200)))
+  (role strike (color "#5a5a5f")))

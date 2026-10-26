@@ -5,6 +5,7 @@
 #include <fontconfig/fontconfig.h>
 #include <iostream>
 #include <cstring>
+#include <strings.h>
 
 namespace xanatoo {
 
@@ -202,8 +203,40 @@ static bool try_load(Font& font, const std::string& path, int px,
   return false;
 }
 
+static bool is_generic_family(const std::string& name) {
+  return name == "serif" || name == "sans-serif" || name == "sans" ||
+         name == "monospace" || name == "mono";
+}
+
+std::string fontconfig_pick_family(const std::vector<std::string>& names) {
+  if (!FcInit()) return {};
+  for (const std::string& name : names) {
+    if (name.empty()) continue;
+    if (is_generic_family(name)) return name;
+    // FontConfig always returns *some* match; accept it only when the
+    // matched family is the requested one.
+    FcPattern* pat = FcPatternCreate();
+    if (!pat) continue;
+    FcPatternAddString(pat, FC_FAMILY,
+                       reinterpret_cast<const FcChar8*>(name.c_str()));
+    FcConfigSubstitute(nullptr, pat, FcMatchPattern);
+    FcDefaultSubstitute(pat);
+    FcResult result = FcResultNoMatch;
+    FcPattern* match = FcFontMatch(nullptr, pat, &result);
+    FcPatternDestroy(pat);
+    if (!match) continue;
+    FcChar8* fam = nullptr;
+    bool same = false;
+    if (FcPatternGetString(match, FC_FAMILY, 0, &fam) == FcResultMatch && fam)
+      same = strcasecmp(reinterpret_cast<const char*>(fam), name.c_str()) == 0;
+    FcPatternDestroy(match);
+    if (same) return name;
+  }
+  return {};
+}
+
 bool FontSet::load(SDL_Renderer* renderer, const std::string& preferred_path,
-                   int body_px, int heading_px) {
+                   int body_px, int heading_px, const FontFamilies& families) {
   std::string family;
   if (!preferred_path.empty()) {
     family = fontconfig_family_from_file(preferred_path);
@@ -213,6 +246,7 @@ bool FontSet::load(SDL_Renderer* renderer, const std::string& preferred_path,
       family = "DejaVu Sans";
     }
   }
+  if (family.empty()) family = fontconfig_pick_family(families.body);
   if (family.empty()) {
     // Prefer widely available families
     const char* candidates[] = {
@@ -254,20 +288,31 @@ bool FontSet::load(SDL_Renderer* renderer, const std::string& preferred_path,
       try_load(bold_italic, regular.path(), body_px, renderer, "bold-italic(fallback)");
   }
 
-  // Heading: same family, bold if available, larger size applied via set_sizes
-  std::string h = bold.loaded() ? bold.path() : regular.path();
+  // Heading: own family when the style names one, else the body family;
+  // bold unless the style asks for a regular weight.
+  std::string h;
+  const std::string heading_family = fontconfig_pick_family(families.heading);
+  if (!heading_family.empty())
+    h = fontconfig_find(heading_family, families.heading_bold ? 1 : 0, 0);
+  else if (families.heading_bold)
+    h = bold.loaded() ? bold.path() : regular.path();
+  else
+    h = regular.path();
   if (!try_load(heading, h, heading_px, renderer, "heading")) {
     try_load(heading, regular.path(), heading_px, renderer, "heading(fallback)");
   }
 
-  // Monospace for code
-  const char* mono_families[] = {
-      "DejaVu Sans Mono", "Liberation Mono", "FreeMono", "Noto Sans Mono",
-      "Ubuntu Mono", "Courier New", "monospace", nullptr};
+  // Monospace for code: the style's family first, then common ones.
+  std::vector<std::string> mono_families;
+  if (std::string f = fontconfig_pick_family(families.code); !f.empty())
+    mono_families.push_back(f);
+  for (const char* f : {"DejaVu Sans Mono", "Liberation Mono", "FreeMono",
+                        "Noto Sans Mono", "Ubuntu Mono", "Courier New",
+                        "monospace"})
+    mono_families.emplace_back(f);
   bool mono_ok = false;
-  for (const char** p = mono_families; *p; ++p) {
-    std::string mp = fontconfig_find(*p, 0, 0);
-    if (try_load(mono, mp, body_px, renderer, "mono")) {
+  for (const std::string& f : mono_families) {
+    if (try_load(mono, fontconfig_find(f, 0, 0), body_px, renderer, "mono")) {
       mono_ok = true;
       break;
     }

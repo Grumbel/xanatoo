@@ -72,6 +72,19 @@ void fill_measure_items(const UiState& state, UiCommand& cmd) {
     cmd = UiCommand::ViewMeasureWide;
 }
 
+// Document style sheets (styles/*.xss) — radio list + reload.
+void fill_style_items(const UiState& state, UiCommand& cmd, std::string& arg) {
+  for (const auto& [name, title] : state.styles) {
+    if (ImGui::MenuItem(title.c_str(), nullptr, name == state.style)) {
+      cmd = UiCommand::SelectStyle;
+      arg = name;
+    }
+  }
+  ImGui::Separator();
+  if (ImGui::MenuItem("Reload style sheets"))
+    cmd = UiCommand::ReloadStyles;
+}
+
 }  // namespace
 
 
@@ -206,7 +219,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
       "figure", "note", "replace", "outline", "paste", "copy", "new", "open",
       "zoomin", "zoomout", "structure", "diff",
       "back", "forward", "reload", "bookmark", "history", "browse",
-      "linespacing", "measure",
+      "linespacing", "measure", "style",
       "format", "insert", "view", "lists",
   };
 
@@ -346,7 +359,7 @@ bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip)
         {"format", "Aa"}, {"insert", "+"}, {"view", "View"}, {"lists", "List"},
         {"structure", "Struct"}, {"list", "List"}, {"code", "Aa"},
         {"table", "+"}, {"h1", "H"}, {"outline", "View"},
-        {"linespacing", "Sp"}, {"measure", "Me"},
+        {"linespacing", "Sp"}, {"measure", "Me"}, {"style", "Style"},
     };
     std::string label;
     auto it = kShort.find(icon_name ? icon_name : "");
@@ -750,6 +763,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       }
       if (ImGui::MenuItem("Justify lines", nullptr, state.justify))
         cmd = UiCommand::ToggleJustify;
+      if (ImGui::BeginMenu("Style sheet")) {
+        fill_style_items(state, cmd, result.arg);
+        ImGui::EndMenu();
+      }
       ImGui::Separator();
       menu_item_cmd("FORMAT.md in window", UiCommand::OpenFormatDoc, cmd);
       menu_item_cmd("semantic.sexp in window", UiCommand::OpenSemanticDoc, cmd);
@@ -940,6 +957,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::Separator();
       ImGui::TextDisabled("Margins");
       fill_margins_items(state, cmd);
+      tool_menu_end();
+    }
+    if (tool_menu_begin("tb_style", "style", "Style sheet (view)")) {
+      fill_style_items(state, cmd, result.arg);
       tool_menu_end();
     }
     {

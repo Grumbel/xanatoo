@@ -69,6 +69,8 @@ bool load_view_settings(ViewSettings& out) {
         out.max_content_width = std::stof(val);
       else if (key == "justify")
         out.justify = (val == "1" || val == "true" || val == "yes");
+      else if (key == "style" && !val.empty())
+        out.style = val;
     } catch (...) {
     }
   }
@@ -93,6 +95,7 @@ bool save_view_settings(const ViewSettings& in) {
   out << "margin_y=" << v.margin_y << "\n";
   out << "max_content_width=" << v.max_content_width << "\n";
   out << "justify=" << (v.justify ? "1" : "0") << "\n";
+  out << "style=" << v.style << "\n";
   return static_cast<bool>(out);
 }
 

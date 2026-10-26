@@ -430,8 +430,56 @@ void zoom_by(App& app, int steps) {
     app.body_px = std::max(10, app.body_px - 1);
     app.heading_px = std::max(14, app.heading_px - 2);
   }
-  app.fonts.set_sizes(app.body_px, app.heading_px);
+  apply_font_sizes(app);
   app.needs_layout = true;
+}
+
+void apply_font_sizes(App& app) {
+  const int heading =
+      app.style.heading_scale > 0.f
+          ? static_cast<int>(std::lround(app.body_px * app.style.heading_scale))
+          : app.heading_px;
+  app.fonts.set_sizes(app.body_px, heading);
+}
+
+std::string body_font_path(const App& app) {
+  if (!app.font_path.empty()) return app.font_path;
+  return app.style.fonts.body.empty() ? app.env_font_path : std::string{};
+}
+
+void apply_style(App& app, const std::string& name) {
+  xanatoo::DocStyle next;
+  std::string err;
+  if (!xanatoo::load_style(name, next, &err)) {
+    flash_status(app, "Style: " + err);
+    return;
+  }
+  for (const std::string& w : next.warnings)
+    std::cerr << "style warning: " << w << "\n";
+  const bool fonts_changed = !(next.fonts == app.style.fonts);
+  app.style = std::move(next);
+  if (fonts_changed &&
+      !app.fonts.load(app.sdl, body_font_path(app), app.body_px,
+                      app.heading_px, app.style.fonts)) {
+    std::cerr << "Style fonts failed to load; using defaults\n";
+    app.style.fonts = {};
+    app.fonts.load(app.sdl, body_font_path(app), app.body_px, app.heading_px);
+  }
+  apply_font_sizes(app);
+  app.help_needs_layout = true;
+  for (FloatWindow& sw : app.soft_wins) sw.needs_layout = true;
+  app.view_settings.style = app.style.name;
+  apply_view_settings(app);  // drops height hints, relayouts, saves view.conf
+  std::string msg = "Style: " + app.style.title;
+  if (!app.style.warnings.empty())
+    msg += " (" + std::to_string(app.style.warnings.size()) +
+           " warning(s), see stderr)";
+  flash_status(app, msg);
+}
+
+void reload_styles(App& app) {
+  app.styles = xanatoo::list_styles();
+  apply_style(app, app.style.name);
 }
 
 void nav_page(App& app, bool up) {

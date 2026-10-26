@@ -18,6 +18,13 @@
 
 namespace xanatoo::app {
 
+void fill_doc_paper(App& app, const SDL_Rect& rect) {
+  const xanatoo::Rgba& c = app.style.paper;
+  SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
+  SDL_SetRenderDrawColor(app.sdl, c.r, c.g, c.b, 255);
+  SDL_RenderFillRect(app.sdl, &rect);
+}
+
 void draw_floating_frame(App& app, const SDL_Rect& outer,
                          const std::string& title, bool active,
                          bool resizable) {
