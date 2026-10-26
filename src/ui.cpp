@@ -897,9 +897,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ImGui::TextDisabled("*");
         ImGui::SameLine(0.f, 2.f);
       }
-      // Leave room for bookmark / history / browse buttons on the right.
-      float right_reserve = 168.f;
-      float field_w = ImGui::GetContentRegionAvail().x - right_reserve;
+      // Leave room for the buttons right of the field (measured last frame).
+      float field_w =
+          ImGui::GetContentRegionAvail().x - url_right_w_ - 6.f;
       if (field_w < 100.f) field_w = 100.f;
       ImGui::SetNextItemWidth(field_w);
 
@@ -935,6 +935,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       }
       ImGui::SameLine(0.f, 6.f);
     }
+    const float right_x0 = ImGui::GetCursorPosX();
 
     {
       const char* bm_tip =
@@ -985,6 +986,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                   UiCommand::ToggleBrowse, cmd);
       if (state.browse) ImGui::PopStyleColor(2);
     }
+    // tool_button ends with SameLine, so the cursor sits after the group.
+    url_right_w_ = ImGui::GetCursorPosX() - right_x0;
   }
   ImGui::End();
   ImGui::PopStyleVar(2);

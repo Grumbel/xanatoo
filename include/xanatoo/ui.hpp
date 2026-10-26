@@ -265,6 +265,9 @@ private:
   std::string url_synced_from_;  // last doc_label pushed into url_input_
   bool focus_url_bar_ = false;   // Ctrl+L / Open URL menu
   bool url_bar_editing_ = false;
+  // Width of the button group right of the URL field (last frame), so the
+  // field leaves exactly that much room.
+  float url_right_w_ = 200.f;
 
   // Tab bar: one-shot SetSelected so keyboard Next/Prev syncs ImGui without
   // fighting click selection every frame (which caused flicker).
