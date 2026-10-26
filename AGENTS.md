@@ -48,6 +48,11 @@ through `commit_prompt` (`app_prompts.cpp`). At most one prompt is active;
 path/URL kinds edit through `App::minibuf` (`prompt_uses_minibuf`), and
 `last_search`/`last_replace` keep a displaced find for F3 / Replace All.
 
+Keyboard focus: `App::key_focus` (`KeyFocus::Document/Outline/Backlinks`).
+Panels handle plain keys only while `panel_has_keys(app, …)`; opening or
+clicking a panel focuses it, a pane click / jump / unused plain key returns
+focus to the document. Never let a panel consume keys just because it is open.
+
 Rules: no behaviour on data types; new modal state goes in `App` (group
 related fields into small records like `FloatPanel` / `Hover`); menus,
 toolbar and shortcuts should route through `execute_command`.

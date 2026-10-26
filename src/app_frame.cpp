@@ -964,6 +964,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::ToggleOutline:
       app.outline_mode = !app.outline_mode;
       if (app.outline_mode) {
+        app.key_focus = KeyFocus::Outline;
         refresh_outline(app);
         app.outline_sel = 0;
         app.ol.scroll = 0.f;
@@ -974,6 +975,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::ToggleBacklinks:
       app.backlinks_mode = !app.backlinks_mode;
       if (app.backlinks_mode) {
+        app.key_focus = KeyFocus::Backlinks;
         refresh_backlinks(app);
         app.backlinks_sel = 0;
         app.bl.scroll = 0.f;
@@ -2363,7 +2365,9 @@ void draw_outline_panel(App& app) {
     }
     const SDL_Rect outer{app.ol.x, app.ol.y, app.ol.w, app.ol.h};
     const SDL_Rect fb = outline_focus_rect(app, outer);
-    draw_floating_frame(app, outer, ol_title, true, !app.outline_docked,
+    // Title tab + selection are lit only while the outline has the keyboard.
+    const bool keys = panel_has_keys(app, KeyFocus::Outline);
+    draw_floating_frame(app, outer, ol_title, keys, !app.outline_docked,
                         outer.x + outer.w - float_close_w - fb.x);
     // Focus toggle (section isolation): latched push button left of close.
     {
@@ -2394,10 +2398,12 @@ void draw_outline_panel(App& app) {
       const int ry = static_cast<int>(row_y);
       const int rh = static_cast<int>(step);
       const OutlineRowGeom g = outline_row_geom(app, e.level);
+      const bool lit = sel && keys;
       if (sel)
-        th::fill(app.sdl, SDL_Rect{cx + 1, ry, text_right - 1, rh}, pal.accent);
-      const th::Rgb ink = sel ? pal.highlight : pal.text;
-      const th::Rgb dim = sel ? pal.accent_soft : pal.text_dim;
+        th::fill(app.sdl, SDL_Rect{cx + 1, ry, text_right - 1, rh},
+                 keys ? pal.accent : pal.face_dark);
+      const th::Rgb ink = lit ? pal.highlight : pal.text;
+      const th::Rgb dim = lit ? pal.accent_soft : pal.text_dim;
 
       xanatoo::Font& f = e.level <= 1 ? bold : font;
       const float baseline = static_cast<float>(
@@ -2425,7 +2431,7 @@ void draw_outline_panel(App& app) {
         }
       }
       const int text_w = text_right - g.text_x - 4;
-      const th::Rgb tink = e.folded && !sel ? pal.text_dim : ink;
+      const th::Rgb tink = e.folded && !lit ? pal.text_dim : ink;
       app.renderer.draw_text(f, static_cast<float>(cx + g.text_x), baseline,
                              fit_text(f, e.text, text_w), tink.r, tink.g,
                              tink.b);
@@ -2466,7 +2472,7 @@ void draw_backlinks_panel(App& app) {
                         app.backlinks_label.empty()
                             ? "Backlinks (no label under caret)"
                             : ("Backlinks → #" + app.backlinks_label),
-                        true);
+                        panel_has_keys(app, KeyFocus::Backlinks));
     SDL_Rect clip{cx, cy, cw, ch};
     SDL_RenderSetClipRect(app.sdl, &clip);
     xanatoo::Font& font = app.ui_font;
@@ -2488,12 +2494,13 @@ void draw_backlinks_panel(App& app) {
         line += "  ";
         line += e.preview;
         const bool sel = i == app.backlinks_sel;
+        const bool lit = sel && panel_has_keys(app, KeyFocus::Backlinks);
         if (sel) {
           SDL_Rect hi{cx + 1, static_cast<int>(ty) - text_off, cw - 2,
                       static_cast<int>(step)};
-          xanatoo::theme::fill(app.sdl, hi, pal.accent);
+          xanatoo::theme::fill(app.sdl, hi, lit ? pal.accent : pal.face_dark);
         }
-        const auto ink = sel ? pal.highlight : pal.text;
+        const auto ink = lit ? pal.highlight : pal.text;
         app.renderer.draw_text(font, static_cast<float>(cx + 8), ty,
                                fit_text(font, line, cw - 28), ink.r, ink.g,
                                ink.b);

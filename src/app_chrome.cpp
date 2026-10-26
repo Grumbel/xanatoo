@@ -203,8 +203,9 @@ StatusLine compute_status(App& app) {
         "Focus section — body shows one section · outline picks target · "
         "Ctrl+Alt+F off";
     tone = StatusTone::Info;
-  } else if (app.outline_mode) {
-    label = "Outline — ↑/↓ · ←/→ fold · Enter jump · twisty · Esc";
+  } else if (panel_has_keys(app, KeyFocus::Outline)) {
+    label = "Outline — ↑/↓ · ←/→ fold · Enter / 1–9 jump · Esc close · "
+            "typing returns to the text";
     tone = StatusTone::Info;
   } else if (app.hover.col_gap) {
     label = "Column gutter — drag to adjust relative widths";

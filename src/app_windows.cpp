@@ -101,6 +101,7 @@ void click_backlinks(App& app, FloatWindow& w, int my) {
   expand_ancestors_for_node(app, pp.sel.focus.node);
   scroll_caret_into_view(app, pp);
   reset_blink(app);
+  app.key_focus = KeyFocus::Document;
 }
 
 void click_outline(App& app, FloatWindow& w, int mx, int my) {
@@ -117,10 +118,12 @@ void click_outline(App& app, FloatWindow& w, int mx, int my) {
   const OutlineRowGeom g = outline_row_geom(app, er.level);
   const bool on_twist = er.has_children && local_x >= g.twist_x - 4 &&
                         local_x < g.twist_x + kOutlineTwistW + 2;
-  if (on_twist && er.section != xanatoo::INVALID_NODE)
+  if (on_twist && er.section != xanatoo::INVALID_NODE) {
     toggle_section_fold(app, er.section);
-  else
+  } else {
     jump_outline_sel(app);
+    app.key_focus = KeyFocus::Document;  // clicked a heading: edit there
+  }
 }
 
 // Stretch toggle / link follow inside the Help client area.
@@ -335,6 +338,10 @@ bool float_press(App& app, int mx, int my) {
       bits = (on_r ? 1 : 0) | (on_b ? 2 : 0);
     }
     if (!bits && !inside) continue;
+    // Clicking a panel gives it the keyboard; any other window, the document.
+    app.key_focus = w->role == WindowRole::Outline     ? KeyFocus::Outline
+                    : w->role == WindowRole::Backlinks ? KeyFocus::Backlinks
+                                                       : KeyFocus::Document;
     if (w->role == WindowRole::Document) {
       // Raise to top of the document stack; `w` is stale afterwards.
       const size_t idx = static_cast<size_t>(w - app.soft_wins.data());

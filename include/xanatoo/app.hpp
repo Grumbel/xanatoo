@@ -200,6 +200,10 @@ struct StatusLine {
   StatusTone tone = StatusTone::Hint;
 };
 
+// Who receives plain keys (arrows, Enter, digits). Panels only while open;
+// see panel_has_keys(). Status prompts / minibuffer take precedence anyway.
+enum class KeyFocus : uint8_t { Document, Outline, Backlinks };
+
 // The single active status-bar prompt (at most one at a time).
 enum class PromptKind : uint8_t {
   None,
@@ -266,6 +270,10 @@ struct App {
   float ui_bottom = 0.f;
   Pane panes[2];
   int focus = 0;
+  KeyFocus key_focus = KeyFocus::Document;
+  // A panel consumed a printable key (outline 1–9): drop the TEXTINPUT
+  // SDL sends right after it so the digit is not typed into the document.
+  bool eat_text_input = false;
   bool split = false;  // auto-enabled when two files are given
   float split_ratio = 0.5f;
   bool dragging_sel = false;
@@ -459,6 +467,20 @@ OutlineRowGeom outline_row_geom(App& app, int level);
 
 // ---- prompts ----
 // ---- prompts ----
+// True when `panel` is open and has keyboard focus (a closed panel never
+// does, so closing needs no focus bookkeeping).
+inline bool panel_has_keys(const App& app, KeyFocus panel) {
+  if (app.key_focus != panel) return false;
+  switch (panel) {
+    case KeyFocus::Outline:
+      return app.outline_mode;
+    case KeyFocus::Backlinks:
+      return app.backlinks_mode;
+    default:
+      return true;
+  }
+}
+
 inline bool prompt_active(const App& app) {
   return app.prompt.kind != PromptKind::None;
 }

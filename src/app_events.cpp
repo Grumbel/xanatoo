@@ -178,6 +178,7 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
 
     // Below soft windows: let ImGui keep the event if it wants it.
     if (imgui_mouse) return;
+    app.key_focus = KeyFocus::Document;
 
     // Clicking the document dismisses status-bar prompts (Esc also works).
     if (prompt_active(app) && !prompt_is_search(app)) close_prompt(app);
@@ -933,6 +934,10 @@ static void on_mousemotion(App& app, SDL_Event& ev, bool imgui_mouse,
 
 static void on_textinput(App& app, SDL_Event& ev, bool imgui_mouse,
                          bool imgui_keys) {
+  if (app.eat_text_input) {  // the keydown went to a panel (outline 1–9)
+    app.eat_text_input = false;
+    return;
+  }
   // Status-bar prompts own typing even when ImGui still reports capture
   // (menu bar / toolbar focus must not steal path or search input).
   if (minibuf_active(app)) {
@@ -1091,6 +1096,7 @@ static void on_controllerbuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
     case SDL_CONTROLLER_BUTTON_X:
       app.outline_mode = !app.outline_mode;
       if (app.outline_mode) {
+        app.key_focus = KeyFocus::Outline;
         refresh_outline(app);
         app.outline_sel = 0;
       }
@@ -1184,12 +1190,31 @@ static void on_controllerbuttonup(App& app, SDL_Event& ev, bool imgui_mouse,
   return;
 }
 
-// Backlinks panel: Esc/toggle close, Up/Down/Enter navigate. True = consumed.
+// A panel with keyboard focus got a key it does not use: plain keys go back
+// to the document (type-through); shortcuts and bare modifiers keep focus.
+static void panel_key_unused(App& app, const SDL_Event& ev, bool ctrl,
+                             bool alt) {
+  switch (ev.key.keysym.sym) {
+    case SDLK_LSHIFT: case SDLK_RSHIFT: case SDLK_LCTRL: case SDLK_RCTRL:
+    case SDLK_LALT: case SDLK_RALT: case SDLK_LGUI: case SDLK_RGUI:
+    case SDLK_CAPSLOCK: case SDLK_MODE:
+      return;
+    default:
+      break;
+  }
+  if (!ctrl && !alt) app.key_focus = KeyFocus::Document;
+}
+
+// Backlinks panel (when it has keyboard focus): Esc/toggle close,
+// Up/Down/Enter navigate. True = consumed.
 static bool handle_backlinks_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
                        bool alt) {
-  if (app.backlinks_mode) {
-    if (ev.key.keysym.sym == SDLK_ESCAPE ||
-        (ev.key.keysym.sym == SDLK_b && ctrl && alt)) {
+  if (app.backlinks_mode && ev.key.keysym.sym == SDLK_b && ctrl && alt) {
+    app.backlinks_mode = false;
+    return true;
+  }
+  if (panel_has_keys(app, KeyFocus::Backlinks)) {
+    if (ev.key.keysym.sym == SDLK_ESCAPE) {
       app.backlinks_mode = false;
       return true;
     }
@@ -1212,20 +1237,21 @@ static bool handle_backlinks_key(App& app, const SDL_Event& ev, bool ctrl, bool 
         p.sel.anchor = p.sel.focus;
         scroll_caret_into_view(app, p);
         reset_blink(app);
+        app.key_focus = KeyFocus::Document;
       }
       return true;
     }
+    panel_key_unused(app, ev, ctrl, alt);
   }
   return false;
 }
 
-// Outline panel: Esc/toggle close; arrows, 1-9, Enter navigate without
-// eating other document keys. True = consumed.
+// Outline panel (when it has keyboard focus): Esc/toggle close; arrows,
+// 1-9, Enter navigate; Enter / 1-9 jump and hand focus to the document.
+// Other plain keys hand focus back and fall through. True = consumed.
 static bool handle_outline_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
                        bool alt) {
-  // Outline software window: Esc/toggle close; arrows + 1-9 + Enter
-  // navigate without eating other document keys.
-  if (app.outline_mode) {
+  if (panel_has_keys(app, KeyFocus::Outline)) {
     if (ev.key.keysym.sym == SDLK_ESCAPE ||
         (ev.key.keysym.sym == SDLK_o && ctrl && shift)) {
       app.outline_mode = false;
@@ -1276,20 +1302,25 @@ static bool handle_outline_key(App& app, const SDL_Event& ev, bool ctrl, bool sh
       case SDLK_RETURN:
       case SDLK_KP_ENTER:
         jump_outline_sel(app);
+        app.key_focus = KeyFocus::Document;
         outline_consumed = true;
         break;
       default:
-        if (ev.key.keysym.sym >= SDLK_1 && ev.key.keysym.sym <= SDLK_9) {
+        if (!ctrl && !alt && ev.key.keysym.sym >= SDLK_1 &&
+            ev.key.keysym.sym <= SDLK_9) {
           int idx = static_cast<int>(ev.key.keysym.sym - SDLK_1);
           if (idx < static_cast<int>(app.outline.size())) {
             app.outline_sel = idx;
             jump_outline_sel(app);
+            app.key_focus = KeyFocus::Document;
+            app.eat_text_input = true;
             outline_consumed = true;
           }
         }
         break;
     }
     if (outline_consumed) return true;
+    panel_key_unused(app, ev, ctrl, alt);
   }
   return false;
 }
@@ -1503,6 +1534,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   bool alt = (ev.key.keysym.mod & KMOD_ALT) != 0;
   Pane& p = focused_pane(app);
   xanatoo::Document& d = doc_of(app, p);
+  app.eat_text_input = false;
 
   // Alt+letter opens the matching top-level menu (Windows/GNOME style).
   // Handled before status-prompt isolation so chrome stays reachable.
@@ -2077,6 +2109,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       if (ctrl && shift) {
         app.outline_mode = !app.outline_mode;
         if (app.outline_mode) {
+          app.key_focus = KeyFocus::Outline;
           refresh_outline(app);
           app.outline_sel = 0;
           app.ol.scroll = 0.f;
@@ -2196,6 +2229,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       if (ctrl && alt) {
         app.backlinks_mode = !app.backlinks_mode;
         if (app.backlinks_mode) {
+          app.key_focus = KeyFocus::Backlinks;
           refresh_backlinks(app);
           app.backlinks_sel = 0;
           app.bl.scroll = 0.f;
