@@ -38,6 +38,10 @@ constexpr int soft_dock_zone = 36;
 constexpr int status_bar_h = 28;
 constexpr int kMaxNavHistory = 100;
 constexpr int help_title_h = 28;
+constexpr int float_close_w = 28;  // close box hit zone at the title's right
+// Canvas chrome text (status line, window titles, outline / backlinks);
+// matches the ImGui menu font and ignores document style + zoom.
+constexpr int kUiFontPx = 14;
 constexpr int help_pad = 12;
 constexpr int help_edge = 6;
 
@@ -240,6 +244,8 @@ struct App {
   int body_px = 17;
   int heading_px = 26;
   xanatoo::FontSet fonts;
+  xanatoo::Font ui_font;       // chrome text (see kUiFontPx)
+  xanatoo::Font ui_font_bold;  // outline top level, emphasis in chrome
   std::vector<DocBuffer> buffers;  // dense storage; address by BufferId
   BufferId next_buffer_id = 1;
   std::vector<BufferId> tab_order;
@@ -441,6 +447,15 @@ float local_x(App& app, float mx, int pi);
 float content_y(App& app, float window_y);
 std::tuple<int, int, int, int> outline_client_rect(App& app);
 float outline_row_step(App& app);
+// Horizontal layout of one outline row, relative to the client x: shortcut
+// number right edge, disclosure triangle box (kOutlineTwistW wide), text.
+constexpr int kOutlineTwistW = 14;
+struct OutlineRowGeom {
+  int num_right = 0;
+  int twist_x = 0;
+  int text_x = 0;
+};
+OutlineRowGeom outline_row_geom(App& app, int level);
 
 // ---- prompts ----
 // ---- prompts ----
@@ -545,9 +560,14 @@ std::optional<xanatoo::UiCommand> keymap_lookup(SDL_Keycode sym, bool ctrl,
 StatusLine compute_status(App& app);
 // Fill a document client area with the style sheet's paper colour.
 void fill_doc_paper(App& app, const SDL_Rect& rect);
+// `text` cut to `max_w` px in `font`, with a trailing "…" when shortened.
+std::string fit_text(xanatoo::Font& font, const std::string& text, int max_w);
+// Outline title-bar "Focus" toggle, left of the close box (paint + hit-test).
+SDL_Rect outline_focus_rect(App& app, const SDL_Rect& outer);
+// `title_reserve`: px kept free left of the close box (title buttons).
 void draw_floating_frame(App& app, const SDL_Rect& outer,
                          const std::string& title, bool active,
-                         bool resizable = true);
+                         bool resizable = true, int title_reserve = 0);
 void draw_client_scrollbar(App& app, int cx, int cy, int cw, int ch,
                            float scroll, float max_scroll);
 

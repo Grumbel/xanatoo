@@ -84,6 +84,10 @@ struct FontFamilies {
   bool operator==(const FontFamilies&) const = default;
 };
 
+// Face for UI chrome (menus, status line, panels): a GNOME 2–era sans
+// (DejaVu Sans / Vera / Liberation …), independent of document style sheets.
+std::string ui_font_path(bool bold = false);
+
 // First family of `names` that FontConfig has installed, else "".
 std::string fontconfig_pick_family(const std::vector<std::string>& names);
 

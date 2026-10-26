@@ -668,7 +668,15 @@ std::tuple<int, int, int, int> outline_client_rect(App& app) {
 }
 
 float outline_row_step(App& app) {
-  return static_cast<float>(std::max(16, app.fonts.regular.line_height() + 4));
+  return static_cast<float>(std::max(18, app.ui_font.line_height() + 7));
+}
+
+OutlineRowGeom outline_row_geom(App& app, int level) {
+  OutlineRowGeom g;
+  g.num_right = 6 + app.ui_font.measure("9");
+  g.twist_x = g.num_right + 6 + std::max(0, level - 1) * 14;
+  g.text_x = g.twist_x + kOutlineTwistW + 2;
+  return g;
 }
 
 }  // namespace xanatoo::app

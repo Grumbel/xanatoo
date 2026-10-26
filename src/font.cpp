@@ -4,7 +4,9 @@
 #include "xanatoo/font.hpp"
 #include <fontconfig/fontconfig.h>
 #include <iostream>
+#include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <strings.h>
 
 namespace xanatoo {
@@ -201,6 +203,47 @@ static bool try_load(Font& font, const std::string& path, int px,
     return true;
   }
   return false;
+}
+
+// Restored pre-R36S UI font path (commit before d55b74d UI-scale work).
+// GNOME 2–era faces: Bitstream Vera → DejaVu Sans.
+std::string ui_font_path(bool bold) {
+  const char* families[] = {
+      "DejaVu Sans",
+      "Bitstream Vera Sans",
+      "Liberation Sans",
+      "FreeSans",
+      "Nimbus Sans L",
+      "Sans",
+      nullptr,
+  };
+  for (const char** f = families; *f; ++f) {
+    std::string path = fontconfig_find(*f, bold ? 1 : 0, 0);
+    if (!path.empty()) return path;
+  }
+  if (bold) return ui_font_path(false);
+  const char* files[] = {
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/TTF/DejaVuSans.ttf",
+      "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+      "/usr/share/fonts/truetype/ttf-bitstream-vera/Vera.ttf",
+      "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+      nullptr,
+  };
+  for (const char** f = files; *f; ++f) {
+    if (std::filesystem::exists(*f)) return *f;
+  }
+  // PortMaster ships DejaVu next to the binary.
+  if (const char* data = std::getenv("XANATOO_DATA_DIR")) {
+    if (data[0] != '\0') {
+      std::filesystem::path p = std::filesystem::path(data) / "fonts" / "DejaVuSans.ttf";
+      if (std::filesystem::exists(p)) return p.string();
+    }
+  }
+  if (const char* body = std::getenv("XANATOO_FONT")) {
+    if (body[0] != '\0' && std::filesystem::exists(body)) return body;
+  }
+  return {};
 }
 
 static bool is_generic_family(const std::string& name) {

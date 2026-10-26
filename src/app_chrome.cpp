@@ -25,9 +25,41 @@ void fill_doc_paper(App& app, const SDL_Rect& rect) {
   SDL_RenderFillRect(app.sdl, &rect);
 }
 
+std::string fit_text(xanatoo::Font& font, const std::string& text,
+                     int max_w) {
+  if (max_w <= 0) return {};
+  if (font.measure(text) <= max_w) return text;
+  const std::string ell = "…";
+  const int budget = max_w - font.measure(ell);
+  std::string out;
+  int w = 0;
+  for (size_t i = 0; i < text.size();) {
+    size_t len = 1;
+    const unsigned char c = static_cast<unsigned char>(text[i]);
+    if (c >= 0xf0) len = 4;
+    else if (c >= 0xe0) len = 3;
+    else if (c >= 0xc0) len = 2;
+    const std::string cp = text.substr(i, len);
+    const int cw = font.measure(cp);
+    if (w + cw > budget) break;
+    out += cp;
+    w += cw;
+    i += len;
+  }
+  while (!out.empty() && out.back() == ' ') out.pop_back();
+  return out + ell;
+}
+
+SDL_Rect outline_focus_rect(App& app, const SDL_Rect& outer) {
+  const int w = app.ui_font.measure("Focus") + 16;
+  const int h = help_title_h - 10;
+  return SDL_Rect{outer.x + outer.w - float_close_w - 4 - w,
+                  outer.y + (help_title_h - h) / 2, w, h};
+}
+
 void draw_floating_frame(App& app, const SDL_Rect& outer,
                          const std::string& title, bool active,
-                         bool resizable) {
+                         bool resizable, int title_reserve) {
   namespace th = xanatoo::theme;
   th::WindowChrome w;
   w.outer = outer;
@@ -42,14 +74,16 @@ void draw_floating_frame(App& app, const SDL_Rect& outer,
   th::fill(app.sdl, well, p.paper);
   th::bevel(app.sdl, well, th::Bevel::Sunken);
   const th::Rgb ink = active ? p.tab_text : p.text_dim;
-  SDL_Rect clip{outer.x + 6, outer.y + 1, outer.w - 36, help_title_h - 2};
-  SDL_RenderSetClipRect(app.sdl, &clip);
-  const int ty = outer.y +
-                 (help_title_h - app.fonts.regular.line_height()) / 2 +
-                 app.fonts.regular.ascender();
-  app.renderer.draw_text(app.fonts.regular, static_cast<float>(outer.x + 10),
-                         static_cast<float>(ty), title, ink.r, ink.g, ink.b);
-  SDL_RenderSetClipRect(app.sdl, nullptr);
+  xanatoo::Font& font = app.ui_font_bold.loaded() ? app.ui_font_bold
+                                                  : app.ui_font;
+  const int title_x = outer.x + 10;
+  const int title_w =
+      outer.x + outer.w - float_close_w - title_reserve - 8 - title_x;
+  const int ty = outer.y + (help_title_h - font.line_height()) / 2 +
+                 font.ascender();
+  app.renderer.draw_text(font, static_cast<float>(title_x),
+                         static_cast<float>(ty), fit_text(font, title, title_w),
+                         ink.r, ink.g, ink.b);
 }
 
 void draw_client_scrollbar(App& app, int cx, int cy, int cw, int ch,
@@ -302,7 +336,7 @@ void draw_status_bar(App& app) {
   th::fill(app.sdl, bar, p.face);
   th::hline(app.sdl, bar.x, bar.x + bar.w - 1, bar.y, p.highlight);
 
-  Font& font = app.fonts.regular;
+  Font& font = app.ui_font;
   const int pad_x = 8;
   const int stats_w = st.stats.empty() ? 0 : font.measure(st.stats) + 2 * pad_x;
   SDL_Rect left{bar.x + 3, bar.y + 3, bar.w - 6 - (stats_w ? stats_w + 3 : 0),

@@ -74,6 +74,10 @@ toolbar and shortcuts should route through `execute_command`.
   (a unit test keeps them equal). `(inherit "x")` + late-bound `(define …)`.
 - Never hard-code document colours/spacing in layout/render; add a role or
   property to `DocStyle` instead. UI chrome keeps using `theme.hpp`.
+- Canvas chrome text (status line, window titles, outline, backlinks,
+  tooltips) uses `app.ui_font` / `app.ui_font_bold` (`ui_font_path()`, the
+  ImGui face at `kUiFontPx`), never `app.fonts` — those follow the style
+  sheet and zoom. Cut long labels with `fit_text`.
 - Selected sheet = `ViewSettings::style` (view.conf); toolbar style button and
   View → Style sheet issue `UiCommand::SelectStyle` / `ReloadStyles`.
 

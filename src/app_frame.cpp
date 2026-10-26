@@ -2348,82 +2348,94 @@ void draw_outline_panel(App& app) {
       if (app.ol.scroll > max_s) app.ol.scroll = max_s;
     }
 
-    std::string ol_title = app.outline_docked ? "Outline · body →" : "Outline";
-    if (app.section_focus_mode) {
-      ol_title = "Outline · Focus";
-      if (!app.outline.empty() && app.outline_sel >= 0 &&
-          app.outline_sel < static_cast<int>(app.outline.size())) {
-        const std::string& tx =
-            app.outline[static_cast<size_t>(app.outline_sel)].text;
-        if (!tx.empty()) {
-          ol_title += ": ";
-          ol_title += tx.size() > 18 ? tx.substr(0, 17) + "…" : tx;
-        }
-      }
+    namespace th = xanatoo::theme;
+    const th::Palette& pal = th::palette();
+    xanatoo::Font& font = app.ui_font;
+    xanatoo::Font& bold =
+        app.ui_font_bold.loaded() ? app.ui_font_bold : app.ui_font;
+
+    std::string ol_title = "Outline";
+    if (app.section_focus_mode && app.outline_sel >= 0 &&
+        app.outline_sel < static_cast<int>(app.outline.size())) {
+      const std::string& tx =
+          app.outline[static_cast<size_t>(app.outline_sel)].text;
+      if (!tx.empty()) ol_title += " — " + tx;
     }
-    draw_floating_frame(app, SDL_Rect{app.ol.x, app.ol.y, app.ol.w, app.ol.h},
-                        ol_title, true, !app.outline_docked);
-    // Focus toggle (section isolation) — a small push button left of close.
+    const SDL_Rect outer{app.ol.x, app.ol.y, app.ol.w, app.ol.h};
+    const SDL_Rect fb = outline_focus_rect(app, outer);
+    draw_floating_frame(app, outer, ol_title, true, !app.outline_docked,
+                        outer.x + outer.w - float_close_w - fb.x);
+    // Focus toggle (section isolation): latched push button left of close.
     {
-      namespace th = xanatoo::theme;
-      const char* flab = app.section_focus_mode ? "Focus ●" : "Focus";
-      const int fw = app.fonts.regular.measure(flab);
-      SDL_Rect fb{app.ol.x + app.ol.w - 28 - fw - 18, app.ol.y + 5, fw + 12,
-                  help_title_h - 10};
       th::draw_button_face(app.sdl, fb, app.section_focus_mode, false);
-      const th::Palette& pal = th::palette();
+      const th::Rgb ink = app.section_focus_mode ? pal.accent_dark : pal.text;
+      const int off = app.section_focus_mode ? 1 : 0;
       app.renderer.draw_text(
-          app.fonts.regular, static_cast<float>(fb.x + 6),
-          static_cast<float>(fb.y +
-                             (fb.h - app.fonts.regular.line_height()) / 2 +
-                             app.fonts.regular.ascender()),
-          flab, pal.text.r, pal.text.g, pal.text.b);
+          font,
+          static_cast<float>(fb.x + (fb.w - font.measure("Focus")) / 2 + off),
+          static_cast<float>(fb.y + (fb.h - font.line_height()) / 2 +
+                             font.ascender() + off),
+          "Focus", ink.r, ink.g, ink.b);
     }
 
     SDL_Rect clip{cx, cy, cw, ch};
     SDL_RenderSetClipRect(app.sdl, &clip);
-    float ty =
-        static_cast<float>(cy) + app.fonts.regular.ascender() - app.ol.scroll;
-    for (int i = 0; i < static_cast<int>(app.outline.size()); ++i) {
-      if (ty > static_cast<float>(cy + ch) + step) break;
-      if (ty + step < static_cast<float>(cy)) {
-        ty += step;
-        continue;
-      }
+    const bool scrolls =
+        static_cast<float>(app.outline.size()) * step + 8.f >
+        static_cast<float>(ch);
+    const int text_right = cw - (scrolls ? 16 : 4);
+    // Row i spans [cy + i·step − scroll, +step) — click_outline relies on it.
+    float row_y = static_cast<float>(cy) - app.ol.scroll;
+    for (int i = 0; i < static_cast<int>(app.outline.size()); ++i, row_y += step) {
+      if (row_y > static_cast<float>(cy + ch)) break;
+      if (row_y + step < static_cast<float>(cy)) continue;
       const auto& e = app.outline[static_cast<size_t>(i)];
-      std::string line;
+      const bool sel = i == app.outline_sel;
+      const int ry = static_cast<int>(row_y);
+      const int rh = static_cast<int>(step);
+      const OutlineRowGeom g = outline_row_geom(app, e.level);
+      if (sel)
+        th::fill(app.sdl, SDL_Rect{cx + 1, ry, text_right - 1, rh}, pal.accent);
+      const th::Rgb ink = sel ? pal.highlight : pal.text;
+      const th::Rgb dim = sel ? pal.accent_soft : pal.text_dim;
+
+      xanatoo::Font& f = e.level <= 1 ? bold : font;
+      const float baseline = static_cast<float>(
+          ry + (rh - f.line_height()) / 2 + f.ascender());
+      // Alt+1…9 / 1…9 shortcut column.
       if (i < 9) {
-        line += static_cast<char>('1' + i);
-        line += " ";
-      } else {
-        line += "  ";
+        const std::string num(1, static_cast<char>('1' + i));
+        app.renderer.draw_text(font,
+                               static_cast<float>(cx + g.num_right -
+                                                  font.measure(num)),
+                               baseline, num, dim.r, dim.g, dim.b);
       }
-      for (int ind = 1; ind < e.level; ++ind) line += "  ";
-      if (e.has_children)
-        line += e.folded ? "▸ " : "▾ ";
-      else
-        line += "  ";
-      line += e.text;
-      if (e.folded && e.has_children) line += " …";
-      if (i == app.outline_sel) {
-        const auto& pal = xanatoo::theme::palette();
-        SDL_Rect hi{cx + 2,
-                    static_cast<int>(ty - app.fonts.regular.ascender() - 2),
-                    cw - 4, static_cast<int>(step)};
-        xanatoo::theme::fill(app.sdl, hi, pal.accent);
-        app.renderer.draw_text(app.fonts.regular, static_cast<float>(cx + 8),
-                               ty, line, 255, 255, 255);
-      } else {
-        app.renderer.draw_text(app.fonts.regular, static_cast<float>(cx + 8),
-                               ty, line, 50, 48, 42);
+      // Disclosure triangle (drawn, so it never depends on font coverage).
+      if (e.has_children) {
+        const int tcx = cx + g.twist_x + kOutlineTwistW / 2;
+        const int tcy = ry + rh / 2;
+        SDL_SetRenderDrawColor(app.sdl, dim.r, dim.g, dim.b, 255);
+        for (int k = 0; k <= 4; ++k) {
+          if (e.folded)  // ▸ pointing right
+            SDL_RenderDrawLine(app.sdl, tcx - 2 + k, tcy - 4 + k, tcx - 2 + k,
+                               tcy + 4 - k);
+          else  // ▾ pointing down
+            SDL_RenderDrawLine(app.sdl, tcx - 4 + k, tcy - 2 + k, tcx + 4 - k,
+                               tcy - 2 + k);
+        }
       }
-      ty += step;
+      const int text_w = text_right - g.text_x - 4;
+      const th::Rgb tink = e.folded && !sel ? pal.text_dim : ink;
+      app.renderer.draw_text(f, static_cast<float>(cx + g.text_x), baseline,
+                             fit_text(f, e.text, text_w), tink.r, tink.g,
+                             tink.b);
     }
     if (app.outline.empty()) {
       app.renderer.draw_text(
-          app.fonts.regular, static_cast<float>(cx + 8),
-          static_cast<float>(cy) + app.fonts.regular.ascender(),
-          "(no headings in this document)", 120, 118, 110);
+          font, static_cast<float>(cx + 8),
+          static_cast<float>(cy + 6 + font.ascender()),
+          "No headings in this document", pal.text_dim.r, pal.text_dim.g,
+          pal.text_dim.b);
     }
     SDL_RenderSetClipRect(app.sdl, nullptr);
 
@@ -2457,11 +2469,15 @@ void draw_backlinks_panel(App& app) {
                         true);
     SDL_Rect clip{cx, cy, cw, ch};
     SDL_RenderSetClipRect(app.sdl, &clip);
-    float ty =
-        static_cast<float>(cy) + app.fonts.regular.ascender() - app.bl.scroll;
+    xanatoo::Font& font = app.ui_font;
+    const auto& pal = xanatoo::theme::palette();
+    const int text_off =
+        (static_cast<int>(step) - font.line_height()) / 2 + font.ascender();
+    float ty = static_cast<float>(cy + text_off) - app.bl.scroll;
     if (app.backlinks.empty()) {
-      app.renderer.draw_text(app.fonts.regular, static_cast<float>(cx + 8), ty,
-                             "(none in this document)", 120, 118, 110);
+      app.renderer.draw_text(font, static_cast<float>(cx + 8), ty,
+                             "No links to this label", pal.text_dim.r,
+                             pal.text_dim.g, pal.text_dim.b);
     }
     for (int i = 0; i < static_cast<int>(app.backlinks.size()); ++i) {
       if (ty > static_cast<float>(cy + ch) + step) break;
@@ -2473,14 +2489,14 @@ void draw_backlinks_panel(App& app) {
         line += e.preview;
         const bool sel = i == app.backlinks_sel;
         if (sel) {
-          SDL_Rect hi{cx + 2,
-                      static_cast<int>(ty - app.fonts.regular.ascender() - 2),
-                      cw - 4, static_cast<int>(step)};
-          xanatoo::theme::fill(app.sdl, hi, xanatoo::theme::palette().accent);
+          SDL_Rect hi{cx + 1, static_cast<int>(ty) - text_off, cw - 2,
+                      static_cast<int>(step)};
+          xanatoo::theme::fill(app.sdl, hi, pal.accent);
         }
-        app.renderer.draw_text(app.fonts.regular, static_cast<float>(cx + 8),
-                               ty, line, sel ? 255 : 40, sel ? 255 : 40,
-                               sel ? 255 : 45);
+        const auto ink = sel ? pal.highlight : pal.text;
+        app.renderer.draw_text(font, static_cast<float>(cx + 8), ty,
+                               fit_text(font, line, cw - 28), ink.r, ink.g,
+                               ink.b);
       }
       ty += step;
     }
@@ -2564,10 +2580,10 @@ void draw_dock_preview(App& app) {
           break;
       }
       if (label[0]) {
-        int tw = app.fonts.regular.measure(label);
+        int tw = app.ui_font.measure(label);
         float lx = static_cast<float>(dx + (dw - tw) / 2);
         float ly = static_cast<float>(dy + dh / 2);
-        app.renderer.draw_text(app.fonts.regular, lx, ly, label, 30, 60, 120);
+        app.renderer.draw_text(app.ui_font, lx, ly, label, 30, 60, 120);
       }
     }
   }
@@ -2606,10 +2622,10 @@ void draw_hover_tooltip(App& app) {
     }
     if (!tip.empty()) {
       if (tip.size() > 96) tip = tip.substr(0, 93) + "…";
-      int tw = app.fonts.regular.measure(tip);
+      int tw = app.ui_font.measure(tip);
       const int pad_x = 10, pad_y = 6;
       int box_w = tw + pad_x * 2;
-      int box_h = app.fonts.regular.line_height() + pad_y * 2;
+      int box_h = app.ui_font.line_height() + pad_y * 2;
       int bx = static_cast<int>(app.mouse_x) + 14;
       int by = static_cast<int>(app.mouse_y) - box_h - 10;
       if (bx + box_w > app.win_w - 4) bx = app.win_w - box_w - 4;
@@ -2632,8 +2648,8 @@ void draw_hover_tooltip(App& app) {
       SDL_RenderDrawRect(app.sdl, &box);
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
       float tip_baseline =
-          static_cast<float>(by + pad_y + app.fonts.regular.ascender());
-      app.renderer.draw_text(app.fonts.regular, static_cast<float>(bx + pad_x),
+          static_cast<float>(by + pad_y + app.ui_font.ascender());
+      app.renderer.draw_text(app.ui_font, static_cast<float>(bx + pad_x),
                              tip_baseline, tip, 235, 240, 250);
     }
   }

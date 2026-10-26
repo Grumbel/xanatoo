@@ -54,6 +54,13 @@ bool app_init(App& app) {
                  "Pass a TTF with --font or install DejaVu/Liberation.\n";
     return false;
   }
+  // Chrome text: same face/size as the ImGui menus, independent of the
+  // document style sheet and zoom.
+  if (const std::string ui = xanatoo::ui_font_path(); ui.empty() ||
+      !app.ui_font.load(ui, kUiFontPx, app.sdl))
+    app.ui_font.load(app.fonts.regular.path(), kUiFontPx, app.sdl);
+  if (const std::string ui = xanatoo::ui_font_path(true); !ui.empty())
+    app.ui_font_bold.load(ui, kUiFontPx, app.sdl);
   app.cursor_arrow = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
   app.cursor_hand = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
   app.cursor_sizewe = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE);

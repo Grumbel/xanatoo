@@ -15,7 +15,6 @@ namespace xanatoo::app {
 
 namespace {
 
-constexpr int kCloseW = 28;  // close box width at the title bar's right end
 constexpr int kBacklinkStep = 22;
 
 bool resizable(const FloatWindow& w) { return w.role != WindowRole::Backlinks; }
@@ -113,14 +112,11 @@ void click_outline(App& app, FloatWindow& w, int mx, int my) {
   if (row < 0 || row >= static_cast<int>(app.outline.size())) return;
   app.outline_sel = row;
   const auto& er = app.outline[static_cast<size_t>(row)];
-  // Disclosure hit only on the ▸/▾ glyph, not the heading text.
-  const float local_x = static_cast<float>(mx - cx);
-  const float indent_px = static_cast<float>(std::max(0, er.level - 1)) * 12.f;
-  // Paint draws at cx+8 with level spaces then the twisty.
-  const float twist_x0 = 8.f + indent_px;
-  const float twist_x1 = twist_x0 + 22.f;
-  const bool on_twist =
-      er.has_children && local_x >= twist_x0 - 2.f && local_x < twist_x1;
+  // Disclosure hit only on the triangle (a little slack), not the text.
+  const int local_x = mx - cx;
+  const OutlineRowGeom g = outline_row_geom(app, er.level);
+  const bool on_twist = er.has_children && local_x >= g.twist_x - 4 &&
+                        local_x < g.twist_x + kOutlineTwistW + 2;
   if (on_twist && er.section != xanatoo::INVALID_NODE)
     toggle_section_fold(app, er.section);
   else
@@ -202,17 +198,15 @@ void click_document(App& app, FloatWindow& w, int mx, int my) {
 }
 
 void press_title(App& app, FloatWindow& w, int mx, int my) {
-  if (mx >= w.x + w.w - kCloseW) {
+  if (mx >= w.x + w.w - float_close_w) {
     close_window(app, w);
     return;
   }
   switch (w.role) {
     case WindowRole::Outline: {
-      // Focus chip sits just left of ×.
-      const char* flab = app.section_focus_mode ? "Focus●" : "Focus";
-      const int fw = app.fonts.regular.measure(flab);
-      const int fx = w.x + w.w - kCloseW - fw - 10;
-      if (mx >= fx - 4 && mx < w.x + w.w - kCloseW) {
+      // Focus toggle sits just left of ×.
+      const SDL_Rect fb = outline_focus_rect(app, SDL_Rect{w.x, w.y, w.w, w.h});
+      if (mx >= fb.x - 2 && mx < fb.x + fb.w + 2) {
         toggle_section_focus_mode(app);
         w.dragging = false;
       } else {
@@ -452,18 +446,9 @@ bool float_wheel(App& app, int mx, int my, int wheel_y) {
 bool float_page_scroll(App& app, int mx, int my, bool up) {
   FloatWindow* w = float_at(app, mx, my);
   if (!w) return false;
-  float view_h;
-  float max_s;
-  if (w->role == WindowRole::Outline) {
-    // Matches the old keyboard path: rows are paged by a fixed 22px step.
-    view_h = static_cast<float>(w->h - help_title_h - 8);
-    max_s = std::max(0.f, static_cast<float>(app.outline.size()) * 22.f -
-                              std::max(1.f, view_h) + 40.f);
-  } else {
-    auto [cx, cy, cw, ch] = float_client_rect(app, *w);
-    view_h = static_cast<float>(std::max(1, ch));
-    max_s = float_max_scroll(app, *w);
-  }
+  auto [cx, cy, cw, ch] = float_client_rect(app, *w);
+  const float view_h = static_cast<float>(std::max(1, ch));
+  const float max_s = float_max_scroll(app, *w);
   const float step = std::max(1.f, view_h) * 0.85f;
   w->scroll =
       up ? std::max(0.f, w->scroll - step) : std::min(max_s, w->scroll + step);
