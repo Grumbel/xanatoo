@@ -531,6 +531,30 @@ static bool menu_item_cmd(const char* label, UiCommand c, UiCommand& out,
 }
 
 // Shared insert/format items used by Format menu and context menu.
+// Help → Examples: local pages under examples/ (OpenExample, arg = file).
+static void menu_example_items(UiCommand& cmd, std::string& arg) {
+  auto ex = [&](const char* label, const char* file) {
+    if (ImGui::MenuItem(label)) {
+      cmd = UiCommand::OpenExample;
+      arg = file;
+    }
+  };
+  ex("Welcome", "welcome.md");
+  ex("Keyboard reference", "help.md");
+  ImGui::Separator();
+  ex("Article / section / header", "sectioning.md");
+  ex("Thread / RFC discussion", "thread-rfc.md");
+  ex("Collections (image gallery)", "collection.md");
+  ImGui::Separator();
+  ex("Gemini gemtext", "gemini-sample.gmi");
+  ex("Org-mode", "sample.org");
+  ex("Semantic format (S-expression)", "semantic.sexp");
+  ex("Sample (S-expression)", "sample.sexp");
+  ImGui::Separator();
+  if (ImGui::MenuItem("Diff demo (v1 | v2, marks on)"))
+    cmd = UiCommand::LoadDiffDemo;
+}
+
 static void menu_insert_items(UiCommand& cmd) {
   menu_item_cmd("Paragraph", UiCommand::InsertParagraph, cmd);
   menu_item_cmd("Horizontal Rule", UiCommand::InsertHr, cmd);
@@ -647,6 +671,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("New Tab", UiCommand::NewTab, cmd, true, "Ctrl+T");
       menu_item_cmd("Close Tab", UiCommand::CloseTab, cmd, true, "Ctrl+W");
       ImGui::Separator();
+      menu_item_cmd("Open in Window…", UiCommand::OpenInWindow, cmd);
       menu_item_cmd("Pop Out to Window", UiCommand::PopOut, cmd, true,
                     "Ctrl+Shift+P");
       menu_item_cmd("Dock Window to Tab", UiCommand::PopIn, cmd, state.has_floating,
@@ -763,33 +788,6 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         fill_style_items(state, cmd, result.arg);
         ImGui::EndMenu();
       }
-      ImGui::Separator();
-      menu_item_cmd("FORMAT.md in window", UiCommand::OpenFormatDoc, cmd);
-      menu_item_cmd("semantic.sexp in window", UiCommand::OpenSemanticDoc, cmd);
-      menu_item_cmd("Open path in window…", UiCommand::OpenInWindow, cmd);
-      ImGui::Separator();
-      if (ImGui::BeginMenu("Examples")) {
-        auto ex = [&](const char* label, const char* file) {
-          if (ImGui::MenuItem(label)) {
-            cmd = UiCommand::OpenExample;
-            result.arg = file;
-          }
-        };
-        ex("Welcome", "welcome.md");
-        ex("Keyboard help", "help.md");
-        ex("Thread / RFC discussion", "thread-rfc.md");
-        ex("Article / section / header", "sectioning.md");
-        ex("Gemini gemtext sample", "gemini-sample.gmi");
-        ex("Org-mode sample", "sample.org");
-        ex("Semantic format (sexpr)", "semantic.sexp");
-        ex("Sample (sexpr)", "sample.sexp");
-        ex("Diff demo — left (v1)", "diff-v1.md");
-        ex("Diff demo — right (v2)", "diff-v2.md");
-        ImGui::Separator();
-        if (ImGui::MenuItem("Diff demo (v1 | v2, marks on)"))
-          cmd = UiCommand::LoadDiffDemo;
-        ImGui::EndMenu();
-      }
       ImGui::EndMenu();
     }
     force_menu("Bookmarks");
@@ -844,29 +842,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       if (ImGui::MenuItem("Keyboard Reference", "F1", state.help))
         cmd = UiCommand::ToggleHelp;
       ImGui::Separator();
-      menu_item_cmd("FORMAT.md", UiCommand::OpenFormatDoc, cmd);
-      menu_item_cmd("Semantic format demo", UiCommand::OpenSemanticDoc, cmd);
+      menu_item_cmd("Format Reference (FORMAT.md)", UiCommand::OpenFormatDoc, cmd);
       ImGui::Separator();
       if (ImGui::BeginMenu("Examples")) {
-        auto ex = [&](const char* label, const char* file) {
-          if (ImGui::MenuItem(label)) {
-            cmd = UiCommand::OpenExample;
-            result.arg = file;
-          }
-        };
-        ex("Welcome", "welcome.md");
-        ex("Keyboard help", "help.md");
-        ex("Thread / RFC discussion", "thread-rfc.md");
-        ex("Article / section / header", "sectioning.md");
-        ex("Gemini gemtext sample", "gemini-sample.gmi");
-        ex("Org-mode sample", "sample.org");
-        ex("Semantic format (sexpr)", "semantic.sexp");
-        ex("Sample (sexpr)", "sample.sexp");
-        ex("Diff demo — left (v1)", "diff-v1.md");
-        ex("Diff demo — right (v2)", "diff-v2.md");
-        ImGui::Separator();
-        if (ImGui::MenuItem("Diff demo (v1 | v2, marks on)"))
-          cmd = UiCommand::LoadDiffDemo;
+        menu_example_items(cmd, result.arg);
         ImGui::EndMenu();
       }
       ImGui::EndMenu();

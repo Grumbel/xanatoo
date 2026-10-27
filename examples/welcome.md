@@ -67,7 +67,7 @@ Open any of these from this page (links load in the same pane and join session h
 - [Diff demo — version 1](diff-v1.md)
 - [Diff demo — version 2](diff-v2.md)
 
-Or use **View → Examples → Diff demo (v1 \| v2, marks on)** to load both panes at once.
+Or use **Help → Examples → Diff demo (v1 \| v2, marks on)** to load both panes at once.
 
 :::columns
 :::column weight=1.1
@@ -186,4 +186,4 @@ A live embedding of another passage on this page:
 
 ---
 
-Open **View → Examples** any time, or return here by opening `welcome.md` from the Examples menu.
+Open **Help → Examples** any time, or return here by opening `welcome.md` from the Examples menu.

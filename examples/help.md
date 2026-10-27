@@ -68,7 +68,8 @@ Export via *File → Export as S-expression…* or *Export as Markdown…*.
 
 ## View & layout
 
-- **View → Examples** / **Help → Examples** — open sample documents in soft windows
+- **Help → Examples** — open sample documents in the current pane
+- **File → Open in Window…** — open a path in a floating window
 - **Examples → Diff demo (v1 | v2)** — dual-pane load of `diff-v1.md` and `diff-v2.md` with diff marks on
 - **Ctrl+Shift+D** — toggle diff marks (needs two independent files)
 
