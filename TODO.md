@@ -175,6 +175,16 @@ Next bundle number: **263** (this delivery is **262**)
 - Open: relative times ("3 h ago") would need layout to depend on the clock;
   score is still part of the meta string rather than its own span.
 
+## Status (2026-10-27) — Home button, directory listings
+
+- Home (toolbar house, View → Home, Alt+Home, `UiCommand::GoHome`) opens
+  `home_page(app)` = welcome.md; the hook for a user-chosen home page later.
+- Opening a directory no longer aborts (ifstream on a dir threw): `load_doc`
+  renders a read-only Markdown index (dirs first, absolute links, dot files
+  hidden); `navigate_pane` normalises to a trailing '/'.
+- Open: non-document files in a listing (images, …) still open as text.
+- `examples/footnotes.md` demos marks, notes and the overlay.
+
 ## Status (2026-10-27) — footnotes
 
 - New `Footnote` block (label = key, Paragraph children) and `FootnoteRef`

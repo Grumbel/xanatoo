@@ -191,11 +191,7 @@ std::string soft_title(App& app, const FloatWindow& sw) {
   if (!sw.title.empty()) return sw.title;
   const auto& path = soft_path(app, sw);
   if (path.empty()) return "untitled";
-  try {
-    return fs::path(path).filename().string();
-  } catch (...) {
-    return path;
-  }
+  return path_title(path);
 }
 
 void layout_soft(App& app, FloatWindow& sw) {

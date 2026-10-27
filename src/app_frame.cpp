@@ -284,6 +284,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     const bool allowed =
         c == C::Quit || c == C::OpenDocument || c == C::OpenUrlBar ||
         c == C::NavigateUrl || c == C::NavBack || c == C::NavForward ||
+        c == C::GoHome ||
         c == C::ToggleHistory || c == C::ToggleBookmarks ||
         c == C::AddBookmark || c == C::RemoveBookmark || c == C::NewTab ||
         c == C::CloseTab || c == C::NextTab || c == C::PrevTab ||
@@ -401,6 +402,14 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         flash_status(app, "No next page");
       }
       break;
+    case C::GoHome: {
+      const std::string home = home_page(app);
+      if (home.empty())
+        flash_status(app, "Home page not found (welcome.md)");
+      else
+        navigate_to_url(app, home);
+      break;
+    }
     case C::NewTab: {
       const BufferId bi = add_buffer(
           app, xanatoo::parse_document(xanatoo::fallback_document(), {}), {});

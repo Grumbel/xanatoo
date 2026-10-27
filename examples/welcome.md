@@ -23,6 +23,7 @@ Inspired by *Xanadu*, **HyperCard**, and the *Canon Cat*.
 | **Ctrl+T** / **Ctrl+W** | New tab / close tab |
 | **Ctrl+Shift+P** | Pop out to floating window |
 | **Alt+Left** / **Alt+Right** | History back / forward |
+| **Alt+Home** | Home (this page) |
 | **Ctrl+Shift+H** | Session history panel |
 | **Ctrl+Shift+B** | Bookmark this page |
 | **Ctrl+B** / **I** / **K** | Bold / italic / link |
@@ -43,6 +44,7 @@ Open any of these from this page (links load in the same pane and join session h
 
 - [Keyboard reference](help.md) — complete keybinding list (**F1**)
 - [Article / Section / Header](sectioning.md) — semantic sectioning model
+- [Footnotes](footnotes.md) — marks, notes and the footnote overlay
 
 ### Demos
 
@@ -50,8 +52,7 @@ Open any of these from this page (links load in the same pane and join session h
 - [Gemini gemtext sample](gemini-sample.gmi) — native gemtext layout
 - [Nostr discussions](nostr-sample.md) — relay-backed Thread/Message view
 - [Recent Nostr notes](nostr:recent) — live firehose sample from public relays
-- [r/GameDeals on Reddit](reddit:r/GameDeals/) — subreddit listing via `.json`
-- [r/linux on Reddit](reddit:r/linux/) — another public listing
+- [r/linux on Reddit](reddit:r/linux/) — subreddit listing via `.json`
 - [Ask Lemmy](lemmy:lemmy.world/c/asklemmy) — Lemmy community via API v3
 - [programming.dev /c/rust](lemmy:programming.dev/c/rust) — federated Lemmy community
 - [Hacker News](hn:) — front page and comment trees
@@ -92,7 +93,6 @@ Drag column gutters to reweight widths. Drag an image’s blue corner to resize 
 API (same Thread/Message layout as Nostr). The part after `reddit:` is the
 path on reddit.com.
 
-- [reddit:r/GameDeals/](reddit:r/GameDeals/)
 - [reddit:r/linux/](reddit:r/linux/)
 - Plain `https://www.reddit.com/…` links open as web pages; the **Native
   view** button next to Reload switches between the two
@@ -186,4 +186,4 @@ A live embedding of another passage on this page:
 
 ---
 
-Open **Help → Examples** any time, or return here by opening `welcome.md` from the Examples menu.
+Open **Help → Examples** any time, or return here with the **Home** button (**Alt+Home**).

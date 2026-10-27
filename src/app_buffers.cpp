@@ -43,6 +43,52 @@ std::string resolve_open_path(App& app, std::string path) {
   return imp.markdown_path;
 }
 
+// Read-only Markdown index of directory `dir`: parent link, then
+// sub-directories and files (dot files hidden), each linked by absolute path
+// so the links resolve whatever the buffer path looks like.
+static std::string directory_listing(const fs::path& dir) {
+  std::vector<std::pair<std::string, bool>> entries;  // name, is directory
+  std::error_code ec;
+  for (auto it = fs::directory_iterator(dir, ec);
+       !ec && it != fs::directory_iterator(); it.increment(ec)) {
+    std::string name = it->path().filename().string();
+    if (name.empty() || name[0] == '.') continue;
+    std::error_code ec2;
+    entries.emplace_back(std::move(name), it->is_directory(ec2));
+  }
+  std::sort(entries.begin(), entries.end(), [](const auto& a, const auto& b) {
+    if (a.second != b.second) return a.second;
+    return xanatoo::ascii_lower(a.first) < xanatoo::ascii_lower(b.first);
+  });
+  std::string md = "# " + dir.string() + "\n\n";
+  if (ec) md += "Cannot read directory: " + ec.message() + "\n\n";
+  const fs::path parent = dir.parent_path();
+  if (!parent.empty() && parent != dir)
+    md += "- [../](" + parent.string() + "/)\n";
+  for (const auto& [name, is_dir] : entries) {
+    const std::string label = is_dir ? name + "/" : name;
+    const std::string target = (dir / name).string() + (is_dir ? "/" : "");
+    // The link syntax has no escapes: such names are listed unlinked.
+    if (target.find_first_of("()[]") != std::string::npos)
+      md += "- `" + label + "`\n";
+    else
+      md += "- [" + label + "](" + target + ")\n";
+  }
+  if (entries.empty() && !ec) md += "*(empty)*\n";
+  return md;
+}
+
+std::string path_title(const std::string& path) {
+  try {
+    fs::path p(path);
+    if (p.has_filename()) return p.filename().string();
+    p = p.parent_path();
+    if (p.has_filename()) return p.filename().string() + "/";
+  } catch (...) {
+  }
+  return path;
+}
+
 xanatoo::Document load_doc(App& app, std::string path) {
   if (path.empty()) {
     return xanatoo::parse_document(xanatoo::fallback_document(), {});
@@ -57,6 +103,13 @@ xanatoo::Document load_doc(App& app, std::string path) {
           {});
     }
     path = std::move(md);
+  }
+  std::error_code ec;
+  if (fs::is_directory(path, ec)) {
+    fs::path dir = fs::weakly_canonical(path, ec);
+    if (ec) dir = fs::absolute(path);
+    std::cout << "Listed: " << dir.string() << "\n";
+    return xanatoo::parse_document(directory_listing(dir), {});
   }
   std::ifstream in(path);
   if (!in) {
@@ -101,6 +154,11 @@ bool is_foreign_path(std::string_view path) {
       xanatoo::starts_with(path, "https://"))
     return true;
   if (xanatoo::path_uses_html(path) || xanatoo::is_pandoc_path(path)) return true;
+  // Directory listings (navigate_pane gives them a trailing '/').
+  std::error_code ec;
+  if (xanatoo::ends_with(path, "/") ||
+      fs::is_directory(fs::path(std::string(path)), ec))
+    return true;
   const std::string cache = xanatoo::cache_dir();
   return !cache.empty() && xanatoo::starts_with(path, cache + "/");
 }
@@ -227,11 +285,7 @@ std::string buffer_tab_label(App& app, BufferId bi) {
     if (u.size() > 40) u = u.substr(0, 37) + "...";
     s += u;
   } else {
-    try {
-      s += fs::path(path).filename().string();
-    } catch (...) {
-      s += path;
-    }
+    s += path_title(path);
   }
   return s;
 }

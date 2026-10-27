@@ -20,6 +20,7 @@ enum class UiCommand {
   NavigateUrl,  // toolbar/menu URL field committed (arg = URL or path)
   NavBack,     // Alt+Left session history
   NavForward,  // Alt+Right
+  GoHome,      // Alt+Home: home page (welcome.md for now)
   StopLoading, // cancel running page fetches (toolbar Stop, Esc)
   ToggleHistory,   // View → History panel
   AddBookmark,     // bookmark current page URL/path

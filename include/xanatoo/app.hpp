@@ -497,6 +497,9 @@ inline constexpr const char* kReadOnlyNotice =
     "Read-only page (foreign content) — Ctrl+S saves an editable Markdown copy";
 xanatoo::Document load_doc_or_placeholder(App& app, const std::string& path);
 std::string buffer_tab_label(App& app, BufferId bi);
+// Last component of a local path for tabs / titles; "dir/" for a directory
+// listing (trailing '/').
+std::string path_title(const std::string& path);
 void update_title(App& app);
 xanatoo::Document& doc_of(App& app, Pane& p);
 std::string& path_of(App& app, Pane& p);
@@ -662,6 +665,8 @@ void remove_bookmark(App& app, const std::string& url);
 bool is_inapp_doc_href(App& app, const std::string& href);
 std::string resolve_doc_href(App& app, const std::string& href,
                              const std::string& base_path = {});
+// Page the Home button opens (welcome.md); empty when not found.
+std::string home_page(App& app);
 // Open `target` (path, gemini://, Nostr, Reddit, Lemmy) in the focused pane /
 // in pane `pi`. Remote pages load in the background; true = opened or started.
 bool navigate_to_url(App& app, std::string target, bool record_history = true);

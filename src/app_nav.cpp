@@ -166,6 +166,13 @@ void show_doc_in_pane(App& app, int pi, xanatoo::Document doc,
   update_title(app);
 }
 
+std::string home_page(App& app) {
+  // Fixed for now; a user-chosen home page will be looked up here first.
+  std::string p = find_repo_file(app, "welcome.md");
+  if (p.empty()) p = xanatoo::find_default_document();
+  return p;
+}
+
 bool navigate_to_url(App& app, std::string target, bool record_history) {
   return navigate_pane(app, app.focus, std::move(target), record_history);
 }
@@ -216,6 +223,13 @@ bool navigate_pane(App& app, int pi, std::string target, bool record_history) {
     return false;
   }
   app.gemini_current_url.clear();
+  // Directories open as a listing; one canonical spelling with a trailing
+  // '/' (marks the buffer read-only, see is_foreign_path).
+  if (std::error_code ec; fs::is_directory(path, ec)) {
+    std::string dir = fs::weakly_canonical(path, ec).string();
+    if (!ec) path = dir;
+    if (!xanatoo::ends_with(path, "/")) path += '/';
+  }
   // Prefer an already-open buffer for this path (avoid double-load).
   {
     std::string canon = path;

@@ -1482,6 +1482,10 @@ static bool handle_nav_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
     }
 
     case SDLK_HOME:
+      if (alt && !ctrl) {
+        execute_command(app, xanatoo::UiCommand::GoHome, {});
+        return true;
+      }
       move_and_sel([&] {
         if (ctrl) {
           xanatoo::move_to_document_start(d, p.sel.focus);
