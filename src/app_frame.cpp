@@ -129,6 +129,43 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
                            : path_of(app, focused_pane(app));
   ui_state.can_nav_back = app.nav_hist_pos > 0;
   ui_state.native_url = xanatoo::native_url_for(path_of(app, focused_pane(app)));
+  if (ui_state.services.empty()) {
+    // Front pages of the in-app clients; greyed out when not built in.
+    struct Entry {
+      const char* label;
+      const char* target;
+      bool example;
+      bool sep;
+    };
+    static const Entry kServices[] = {
+        {"Wikipedia", "wikipedia:Main_Page", false, false},
+        {"Wikipedia (Deutsch)", "wikipedia:de:Wikipedia:Hauptseite", false, false},
+        {"Hacker News", "https://news.ycombinator.com/", false, true},
+        {"Reddit (r/popular)", "https://www.reddit.com/r/popular/", false, false},
+        {"Lemmy (lemmy.world/c/technology)", "https://lemmy.world/c/technology",
+         false, false},
+        {"Nostr (recent notes)", "nostr:recent", false, false},
+        {"Gemini (geminiprotocol.net)", "gemini://geminiprotocol.net/", false,
+         true},
+        {"Standard Ebooks", "https://standardebooks.org/ebooks", false, true},
+        {"Books and long reads", "books.md", true, false},
+        {"Feeds (RSS / Atom)", "feeds.md", true, false},
+    };
+    for (const Entry& e : kServices) {
+      xanatoo::UiService s;
+      s.label = e.label;
+      s.target = e.target;
+      s.example = e.example;
+      s.separator_before = e.sep;
+      s.tip = e.target;
+      std::string why;
+      if (!e.example && !remote_fetch_supported(e.target, &why)) {
+        s.enabled = false;
+        s.tip = why;
+      }
+      ui_state.services.push_back(std::move(s));
+    }
+  }
   if (const auto coll = current_collection(app); coll != xanatoo::INVALID_NODE) {
     ui_state.collection = true;
     auto it = app.collection_views.find(coll);

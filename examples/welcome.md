@@ -33,6 +33,10 @@ Menus: **Alt+F** File · **E** Edit · **V** View · **B** Bookmarks · **H** He
 
 ## Example documents
 
+The **Services** menu opens the front page of every built-in client:
+Wikipedia, Hacker News, Reddit, Lemmy, Nostr, Gemini, Standard Ebooks,
+books and feeds.
+
 Open any of these from this page (links load in the same pane and join session history):
 
 ### Guides

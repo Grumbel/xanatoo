@@ -141,6 +141,16 @@ enum class UiCommand {
 
 
 
+// One entry of the Services menu (front pages of the built-in clients).
+struct UiService {
+  std::string label;
+  std::string target;    // URL / ref, or example file name when `example`
+  bool example = false;  // local page from examples/ (OpenExample)
+  bool enabled = true;
+  std::string tip;       // URL, or why the client is unavailable
+  bool separator_before = false;
+};
+
 struct UiState {
   bool dirty = false;
   bool has_path = false;
@@ -180,6 +190,7 @@ struct UiState {
   // Caret / right-click inside a Collection: its current view for the
   // Collection menus (layout 0 grid, 1 list, 2 full; sort 0 doc, 1 name,
   // 2 name reversed; card size in px).
+  std::vector<UiService> services;
   bool collection = false;
   int collection_layout = 0;
   int collection_sort = 0;

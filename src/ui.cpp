@@ -359,7 +359,7 @@ bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip)
     static const std::unordered_map<std::string, const char*> kShort = {
         {"format", "Aa"}, {"insert", "+"}, {"view", "View"}, {"lists", "List"},
         {"structure", "Struct"}, {"list", "List"}, {"code", "Aa"},
-        {"table", "+"}, {"h1", "H"}, {"outline", "View"},
+        {"table", "+"}, {"h1", "H"}, {"outline", "Outline"},
         {"linespacing", "Sp"}, {"measure", "Me"}, {"style", "Style"},
     };
     std::string label;
@@ -822,6 +822,23 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       }
       ImGui::EndMenu();
     }
+    force_menu("Services");
+    if (ImGui::BeginMenu("Services")) {
+      for (const UiService& s : state.services) {
+        if (s.separator_before) ImGui::Separator();
+        if (ImGui::MenuItem(s.label.c_str(), nullptr, false, s.enabled)) {
+          cmd = s.example ? UiCommand::OpenExample : UiCommand::NavigateUrl;
+          result.arg = s.target;
+        }
+        if (!s.tip.empty() &&
+            ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled |
+                                 ImGuiHoveredFlags_DelayShort))
+          ImGui::SetTooltip("%s", s.tip.c_str());
+      }
+      ImGui::Separator();
+      if (ImGui::MenuItem("Open URL…", "Ctrl+L")) cmd = UiCommand::OpenUrlBar;
+      ImGui::EndMenu();
+    }
     force_menu("Help");
     if (ImGui::BeginMenu("Help")) {
       if (ImGui::MenuItem("Keyboard Reference", "F1", state.help))
@@ -1100,14 +1117,25 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     ImGui::SameLine(0.f, 4.f);
 
     tool_button("tb_find", "find", "Find (Ctrl+F)", UiCommand::Find, cmd);
+    // Frequently used panel toggles: highlighted while on.
+    auto toggle_button = [&](const char* id, const char* icon, const char* tip,
+                             UiCommand c, bool on) {
+      if (on) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                              ImVec4(0.4f, 0.5f, 0.75f, 1.f));
+      }
+      tool_button(id, icon, tip, c, cmd);
+      if (on) ImGui::PopStyleColor(2);
+    };
+    toggle_button("tb_split", "split", "Split pane (Ctrl+\\)",
+                  UiCommand::ToggleSplit, state.split);
+    toggle_button("tb_outline", "outline",
+                  "Heading outline (Ctrl+Shift+O; Ctrl+Alt+O docks it)",
+                  UiCommand::ToggleOutline, state.outline);
     if (tool_menu_begin("tb_viewmenu", "view", "View tools")) {
       menu_item_cmd("Replace…", UiCommand::Replace, cmd, true, "Ctrl+H");
       ImGui::Separator();
-      if (ImGui::MenuItem("Split pane", "Ctrl+\\", state.split))
-        cmd = UiCommand::ToggleSplit;
-      if (ImGui::MenuItem("Heading outline", "Ctrl+Shift+O", state.outline))
-        cmd = UiCommand::ToggleOutline;
-      ImGui::TextDisabled("  Ctrl+Alt+O docks outline left (body right)");
       if (ImGui::MenuItem("Backlinks", "Ctrl+Alt+B", state.backlinks))
         cmd = UiCommand::ToggleBacklinks;
       menu_item_cmd("Open include → other pane", UiCommand::OpenTranscludeOther,

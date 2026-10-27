@@ -140,7 +140,8 @@ green. Use this for reading and navigating.
 
 - **Alt+Left** / **Alt+Right** — Back / Forward in session history
 - **Browse toolbar** — Back, Forward, Reload, Native view (web page → `wikipedia:` form), location field, Bookmark, History, Browse mode
-- **Edit toolbar** — file, clipboard, bold/italic/link; menus for more format, structure, lists, insert, and view tools
+- **Edit toolbar** — file, clipboard, bold/italic/link; menus for more format, structure, lists, insert; Find, Split pane and Heading outline toggles, and view tools
+- **Services menu** — front pages of the built-in clients: Wikipedia, Hacker News, Reddit, Lemmy, Nostr, Gemini, Standard Ebooks, books and feeds
 - **Ctrl+Shift+H** / **View → History** — session history panel (click to open)
 - **Ctrl+Shift+B** — Bookmark or un-bookmark the current page
 - **Bookmarks** menu — add/remove, list, open; **Show Bookmarks…** for the manager

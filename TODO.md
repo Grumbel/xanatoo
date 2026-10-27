@@ -8,6 +8,17 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-27) — Services menu, split / outline buttons
+
+- Services menu (between Bookmarks and Help): front pages of the in-app
+  clients (wikipedia:Main_Page, de Hauptseite, HN, r/popular,
+  lemmy.world/c/technology, nostr:recent, geminiprotocol.net, Standard
+  Ebooks, books.md, feeds.md) + Open URL. List built in
+  `build_ui_state` (`UiState::services`); entries whose client is not
+  compiled in are greyed out with the reason as tooltip.
+- Split pane and Heading outline moved from the "View tools" dropdown to
+  toggle buttons next to Find (highlighted while on); View menu unchanged.
+
 ## Status (2026-10-27) — collections (prototype, phase 1 + 2)
 
 - `Collection` node (docs/BRAINSTORM.md §4): `:::collection` /
