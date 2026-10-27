@@ -66,6 +66,7 @@ bool app_init(App& app) {
       std::cerr << "style warning: " << w << "\n";
   }
   app.layout_engine.set_style(&app.style);
+  app.layout_engine.set_collection_views(&app.collection_views);
   app.renderer.set_style(&app.style);
   if (!app.fonts.load(app.sdl, body_font_path(app), app.body_px,
                       app.heading_px, app.style.fonts)) {

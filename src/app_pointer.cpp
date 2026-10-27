@@ -53,6 +53,7 @@ void clear_interaction_hover(App& app) {
   app.hover.image = xanatoo::INVALID_NODE;
   app.hover.image_pane = -1;
   app.hover.image_handle = false;
+  app.hover.image_card = false;
   app.hover.col_gap = false;
   app.hover.col_gap_pane = -1;
   app.hover.task = xanatoo::INVALID_NODE;

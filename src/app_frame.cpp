@@ -129,6 +129,18 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
                            : path_of(app, focused_pane(app));
   ui_state.can_nav_back = app.nav_hist_pos > 0;
   ui_state.native_url = xanatoo::native_url_for(path_of(app, focused_pane(app)));
+  if (const auto coll = current_collection(app); coll != xanatoo::INVALID_NODE) {
+    ui_state.collection = true;
+    auto it = app.collection_views.find(coll);
+    const xanatoo::CollectionView v =
+        it != app.collection_views.end()
+            ? it->second
+            : xanatoo::default_collection_view(
+                  doc_of(app, focused_pane(app)).get(coll));
+    ui_state.collection_layout = static_cast<int>(v.layout);
+    ui_state.collection_sort = static_cast<int>(v.sort);
+    ui_state.collection_thumb = v.thumb_px;
+  }
   ui_state.can_nav_forward =
       app.nav_hist_pos + 1 < static_cast<int>(app.nav_history.size());
   ui_state.history_open = app.history_panel_open;
@@ -239,7 +251,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::Find || c == C::ToggleSplit || c == C::ToggleOutline ||
         c == C::ToggleBacklinks || c == C::OpenTranscludeOther ||
         c == C::ToggleDiff || c == C::ToggleStructure || c == C::ToggleBrowse ||
-        c == C::OpenNative ||
+        c == C::OpenNative || c == C::CollectionView ||
         c == C::ToggleHelp || c == C::ToggleVirtualKeyboard ||
         c == C::OpenFormatDoc || c == C::OpenSemanticDoc ||
         c == C::OpenInWindow || c == C::OpenExample || c == C::LoadDiffDemo ||
@@ -305,6 +317,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::OpenUrlBar:
       close_prompt(app);
       app.ui.focus_url_bar();
+      break;
+    case C::CollectionView:
+      collection_command(app, arg);
       break;
     case C::OpenNative: {
       // Explicit only: web pages never switch to the native form on their own.
@@ -1459,6 +1474,7 @@ static void draw_pane_overlays(App& app, int i) {
     if (app.hover.image_pane == i && app.hover.image != xanatoo::INVALID_NODE) {
       for (const auto& pi : pane.layout.images) {
         if (pi.node != app.hover.image) continue;
+        if (pi.thumb > 0) break;  // collection card: hand cursor only
         int ix = pane.x + static_cast<int>(pi.x);
         int iy = static_cast<int>(pi.y - pane.scroll_y + app.ui_top);
         int iw = static_cast<int>(pi.width);
@@ -1640,6 +1656,8 @@ static void draw_pane_overlays(App& app, int i) {
           return "image";
         case K::Figure:
           return "figure";
+        case K::Collection:
+          return "collection";
         case K::Caption:
           return "caption";
         case K::Biblio:
@@ -2737,6 +2755,7 @@ void present_frame(App& app) {
   else
     set_cursor(app, app.cursor_arrow);
   app.ui.end_frame(app.sdl);
+  draw_lightbox(app);
   if (app.stick_cursor_on) {
     draw_stick_cursor(app, app.sdl, static_cast<int>(app.stick_cx),
                       static_cast<int>(app.stick_cy),

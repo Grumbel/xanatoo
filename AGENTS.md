@@ -34,6 +34,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_touch.cpp` | touchscreen gestures: tap → click, drag/fling scroll, long-press select, pinch zoom |
 | `app_buffers.cpp` / `app_view.cpp` / `app_nav.cpp` / `app_softwin.cpp` / `app_prompts.cpp` / `app_pointer.cpp` | document buffers, scroll/fold/outline, URL history + bookmarks, floating windows, minibuffer, cursor/gamepad |
 | `app_fetch.cpp` | background page fetches (`FetchJob` on a worker thread → `poll_fetches`), page cache, loading indicator |
+| `app_collection.cpp` | collection view state (layout / size / sort), card clicks, fullscreen `Lightbox` viewer |
 | `app_footnotes.cpp` | footnote overlay: notes of on-screen `FootnoteRef` marks laid out in a strip at the pane bottom (`FootnoteOverlay` per pane), click jumps to the note |
 | `app_split.cpp` | split browsing: left links open right, right links shift left, hover previews (`SplitPreview`) |
 | `theme.cpp` | classic palette (`Palette`) + stateless bevel/gradient/window primitives shared with the ImGui theme |
@@ -212,6 +213,21 @@ mechanism; historical bundle numbers in TODO.md are archival).
   any `is_pandoc_path` file, anything under `cache_dir()`) makes `browsing(app)` true.
   Gate document edits on `browsing(app)`, never on `app.browse_mode`
   alone (that is only the user's global toggle).
+
+## Collections
+
+- `NodeKind::Collection` (`:::collection view=grid|list|full` or pandoc
+  `::: collection`; `.sexp` `(collection :view "grid" …)`): ordered Image /
+  Figure items rendered as cards. `summary` = default view hint only.
+- Layout / sort / card size are view state (`App::collection_views`,
+  `CollectionView`, passed via `LayoutEngine::set_collection_views`), never
+  written to the document. `collection_items` gives items in view order.
+- Card images are `PositionedImage` with `thumb > 0` (+ `group`): drawn
+  from `ImageCache::thumb` (box-filtered, cached as BMP under
+  `cache_dir()/thumbs/`, keyed by path + size + mtime); no resize handle.
+- `app_collection.cpp`: Collection menus (`UiCommand::CollectionView` +
+  arg, context menu and View menu), click on a card → `Lightbox` (full-
+  window viewer drawn after ImGui; `lightbox_event` takes all input first).
 
 ## Wikipedia (`wikipedia.hpp`)
 

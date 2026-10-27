@@ -53,6 +53,7 @@ Open any of these from this page (links load in the same pane and join session h
 - [Hacker News](https://news.ycombinator.com/) — front page and comment trees
 - [Books and long reads](books.md) — Standard Ebooks / Project Gutenberg EPUBs
 - [Feeds](feeds.md) — RSS / Atom: blogs, news, Mastodon, Reddit, arXiv
+- [Collections](collection.md) — image grids / lists with a fullscreen viewer
 - [Org-mode sample](sample.org) — headings, TODO, tags, source blocks
 - [Semantic format (S-expression)](semantic.sexp) — experimental sexpr form
 - [Sample (S-expression)](sample.sexp) — compact sexpr demo

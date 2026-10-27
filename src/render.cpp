@@ -62,7 +62,8 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
 
   if (images_) {
     for (const auto& pi : layout.images) {
-      const Image& img = images_->get(pi.src, pi.base);
+      const Image& img = pi.thumb > 0 ? images_->thumb(pi.src, pi.base, pi.thumb)
+                                      : images_->get(pi.src, pi.base);
       SDL_Rect dst{
           static_cast<int>(pi.x + origin_x),
           px(pi.y - scroll_y),
@@ -77,6 +78,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
         SDL_SetRenderDrawColor(sdl_, 230, 230, 235, 255);
         SDL_RenderFillRect(sdl_, &dst);
       }
+      if (pi.thumb > 0) continue;  // collection card: click opens the viewer
       // Resize handle (bottom-right corner)
       const int hs = 10;
       SDL_Rect handle{dst.x + dst.w - hs, dst.y + dst.h - hs, hs, hs};

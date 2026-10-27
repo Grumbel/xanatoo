@@ -33,6 +33,16 @@ public:
   // If base is non-empty, relative paths resolve against it instead of base_dir_.
   const Image& get(const std::string& path, const std::string& base = {});
 
+  // Downscaled copy whose longer edge is at most `max_px` (rounded up to
+  // 128 / 256 / 512). Thumbnails are a cache, never document data: built
+  // from the original on first use and kept under cache_dir()/thumbs/,
+  // keyed by path + size + mtime. width/height are the thumbnail's.
+  const Image& thumb(const std::string& path, const std::string& base,
+                     int max_px);
+
+  // Resolved filesystem path for `path` (relative → base or base_dir_).
+  std::string resolve(const std::string& path, const std::string& base = {}) const;
+
   void clear();
 
 private:
@@ -41,6 +51,8 @@ private:
   std::unordered_map<std::string, Image> cache_;
 
   Image load(const std::string& resolved_path);
+  Image load_thumb(const std::string& resolved_path, int edge);
+  Image to_texture(const unsigned char* rgba, int w, int h);
 };
 
 }  // namespace xanatoo

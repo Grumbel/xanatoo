@@ -901,6 +901,7 @@ void ser_node_org(const Document& doc, NodeId id, std::string& out,
     case NodeKind::Column:
     case NodeKind::Note:
     case NodeKind::Figure:
+    case NodeKind::Collection:
     case NodeKind::DefList:
     case NodeKind::Biblio:
     case NodeKind::Thread:

@@ -158,6 +158,19 @@ inline FloatWindow make_float_panel(WindowRole role, int x, int y, int w,
 }
 
 // What the pointer is currently over (rebuilt on every mouse move).
+// Fullscreen image viewer over the whole window (app_collection.cpp): a
+// snapshot of one Collection's items in view order.
+struct LightboxItem {
+  std::string src;
+  std::string caption;
+};
+struct Lightbox {
+  bool open = false;
+  std::vector<LightboxItem> items;
+  std::string base;  // directory for relative image paths
+  int index = 0;
+};
+
 struct Hover {
   std::string href;
   std::string rel;
@@ -171,6 +184,7 @@ struct Hover {
   xanatoo::NodeId image = xanatoo::INVALID_NODE;
   int image_pane = -1;
   bool image_handle = false;
+  bool image_card = false;  // collection card: click opens the viewer
   bool col_gap = false;
   int col_gap_pane = -1;
   xanatoo::NodeId task = xanatoo::INVALID_NODE;
@@ -426,6 +440,12 @@ struct App {
   int backlinks_sel = 0;
   std::string backlinks_label;
   std::unordered_set<xanatoo::NodeId> folded_sections;
+  // View-local Collection layouts (grid / list / full, sort, card size);
+  // missing entry = the node's default. Like folded_sections, keyed by node.
+  std::unordered_map<xanatoo::NodeId, xanatoo::CollectionView> collection_views;
+  // Collection the last right-click hit (context menu target).
+  xanatoo::NodeId collection_target = xanatoo::INVALID_NODE;
+  Lightbox lightbox;
   std::string last_fold_doc_key;
   bool section_focus_mode = false;
   xanatoo::NodeId section_focus_id = xanatoo::INVALID_NODE;
@@ -682,6 +702,20 @@ void draw_footnote_overlay(App& app, int pi, const SDL_Rect& clip);
 bool in_footnote_overlay(const App& app, int pi, float lx, float my);
 // Press on the strip: jump to the note under it. True = press consumed.
 bool click_footnote_overlay(App& app, int pi, float lx, float my);
+
+// ---- collections (app_collection.cpp) ----
+// Collection under the caret (or the last right-click target), else INVALID.
+xanatoo::NodeId current_collection(App& app);
+// UiCommand::CollectionView: "grid" / "list" / "full", "small" / "medium" /
+// "large", "sort-doc" / "sort-name" / "sort-name-desc", "view" (lightbox).
+void collection_command(App& app, const std::string& arg);
+// Press on a collection card in pane `pi`: open the lightbox at that item.
+bool click_collection_card(App& app, int pi, float lx, float my);
+// Right-click: remember the collection under the point for the menu.
+void note_collection_target(App& app, int pi, float lx, float my);
+// While the lightbox is open it takes every event. True = consumed.
+bool lightbox_event(App& app, const SDL_Event& ev);
+void draw_lightbox(App& app);
 
 // ---- split browsing (app_split.cpp) ----
 // Split view with independent panes (not diff mode): left links open on the

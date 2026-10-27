@@ -159,6 +159,205 @@ void LayoutEngine::layout_children_sequential(
   }
 }
 
+CollectionView default_collection_view(const Node& collection) {
+  CollectionView v;
+  const std::string hint = ascii_lower(collection.summary);
+  if (hint == "list") v.layout = CollectionLayout::List;
+  else if (hint == "full") v.layout = CollectionLayout::Full;
+  return v;
+}
+
+std::vector<CollectionItem> collection_items(const Document& doc,
+                                             NodeId collection,
+                                             CollectionSort sort) {
+  std::vector<CollectionItem> items;
+  const Node& coll = doc.get(collection);
+  if (coll.id != collection) return items;
+  auto plain = [](const Node& n) {
+    std::string t;
+    for (const auto& sp : n.spans) t += sp.text;
+    return t;
+  };
+  for (NodeId c : coll.children) {
+    const Node& ch = doc.get(c);
+    if (ch.id != c) continue;
+    CollectionItem it;
+    it.item = c;
+    if (ch.kind == NodeKind::Image) {
+      it.image = c;
+      it.src = ch.src;
+      it.caption = ch.alt;
+    } else if (ch.kind == NodeKind::Figure) {
+      for (NodeId g : ch.children) {
+        const Node& gn = doc.get(g);
+        if (gn.kind == NodeKind::Image && it.image == INVALID_NODE) {
+          it.image = g;
+          it.src = gn.src;
+          if (it.caption.empty()) it.caption = gn.alt;
+        } else if (gn.kind == NodeKind::Caption) {
+          it.caption = plain(gn);
+        }
+      }
+    } else {
+      continue;
+    }
+    items.push_back(std::move(it));
+  }
+  if (sort != CollectionSort::Document) {
+    auto name = [](const CollectionItem& it) {
+      return ascii_lower(std::filesystem::path(it.src).filename().string());
+    };
+    std::stable_sort(items.begin(), items.end(),
+                     [&](const CollectionItem& a, const CollectionItem& b) {
+                       return sort == CollectionSort::Name ? name(a) < name(b)
+                                                           : name(b) < name(a);
+                     });
+  }
+  return items;
+}
+
+// Cards for a Collection: a grid of thumbnails with captions, a list
+// (small thumbnail + caption), or the plain children (Full). Other
+// children (intro paragraphs, …) come first at full width.
+void LayoutEngine::layout_collection(const Document& doc, NodeId id, float x,
+                                     float& y, float max_width,
+                                     LayoutResult& out) {
+  const Node& node = doc.get(id);
+  const DocStyle& st = *style_;
+  const float em = static_cast<float>(fonts_.regular.pixel_size());
+  const float dp = options_.px_scale;
+  CollectionView view = default_collection_view(node);
+  if (collection_views_) {
+    auto it = collection_views_->find(id);
+    if (it != collection_views_->end()) view = it->second;
+  }
+  y += st[BlockRole::Figure].space_before.px(em, dp);
+  const float start_y = y;
+
+  if (view.layout == CollectionLayout::Full) {
+    for (NodeId c : node.children) layout_node(doc, c, x, y, max_width, out);
+  } else {
+    for (NodeId c : node.children) {
+      const NodeKind k = doc.get(c).kind;
+      if (k != NodeKind::Image && k != NodeKind::Figure)
+        layout_node(doc, c, x, y, max_width, out);
+    }
+    const auto items = collection_items(doc, id, view.sort);
+    const float gap = 12.f * dp;
+    const bool list = view.layout == CollectionLayout::List;
+    const float box = list ? std::max(48.f, view.thumb_px * 0.5f) * dp
+                           : std::max(48.f, view.thumb_px) * dp;
+    int cols = list ? 1 : std::max(1, static_cast<int>((max_width + gap) /
+                                                       (box + gap)));
+    cols = std::min<int>(cols, std::max<size_t>(1, items.size()));
+    const float cell_w =
+        list ? max_width : (max_width - gap * static_cast<float>(cols - 1)) /
+                               static_cast<float>(cols);
+    const float img_w = list ? box : cell_w;
+
+    // Caption text for one card (Figure caption node, else image alt).
+    auto caption = [&](const CollectionItem& it, float cx, float& cy,
+                       float w) {
+      const Node& item = doc.get(it.item);
+      for (NodeId g : item.children) {
+        const Node& gn = doc.get(g);
+        if (gn.kind == NodeKind::Caption) {
+          layout_role_text(doc, gn, BlockRole::Caption, cx, cy, w, out);
+          return;
+        }
+      }
+      if (it.image == INVALID_NODE || it.caption.empty()) return;
+      Node fake = doc.get(it.image);
+      fake.kind = NodeKind::Paragraph;
+      fake.spans.clear();
+      InlineSpan sp;
+      sp.kind = InlineKind::Emphasis;
+      sp.text = it.caption;
+      fake.spans.push_back(std::move(sp));
+      layout_role_text(doc, fake, BlockRole::Caption, cx, cy, w, out);
+    };
+
+    float row_y = y;
+    float row_h = 0.f;
+    for (size_t i = 0; i < items.size(); ++i) {
+      const auto& it = items[i];
+      const int col = static_cast<int>(i % static_cast<size_t>(cols));
+      if (col == 0 && i > 0) {
+        row_y += row_h + gap;
+        row_h = 0.f;
+      }
+      const float cx = x + static_cast<float>(col) * (cell_w + gap);
+      // Thumbnail fitted into img_w × box, centred.
+      float tw = img_w, th = box;
+      const int edge = static_cast<int>(std::max(img_w, box));
+      if (images_ && !it.src.empty()) {
+        const Image& img = images_->thumb(it.src, image_base_, edge);
+        if (img.ok && img.width > 0 && img.height > 0) {
+          const float sc = std::min(img_w / static_cast<float>(img.width),
+                                    box / static_cast<float>(img.height));
+          tw = static_cast<float>(img.width) * sc;
+          th = static_cast<float>(img.height) * sc;
+        }
+      }
+      const float ix = cx + (img_w - tw) * 0.5f;
+      const float iy = row_y + (box - th) * 0.5f;
+      if (it.image != INVALID_NODE) {
+        PositionedImage pi;
+        pi.node = it.image;
+        pi.x = ix;
+        pi.y = iy;
+        pi.width = tw;
+        pi.height = th;
+        pi.src = it.src;
+        pi.base = image_base_;
+        pi.thumb = edge;
+        pi.group = id;
+        out.images.push_back(std::move(pi));
+        out.boxes.push_back({it.image, ix, iy, tw, th});
+      }
+      float cy;
+      float text_x;
+      float text_w;
+      if (list) {
+        text_x = cx + box + gap;
+        text_w = std::max(40.f, cell_w - box - gap);
+        cy = row_y + 2.f;
+      } else {
+        text_x = cx;
+        text_w = cell_w;
+        cy = row_y + box + 4.f * dp;
+      }
+      const size_t first_glyph = out.glyphs.size();
+      caption(it, text_x, cy, text_w);
+      if (!list) {
+        // Centre each caption line under the thumbnail.
+        size_t a = first_glyph;
+        while (a < out.glyphs.size()) {
+          size_t b = a;
+          float right = text_x;
+          while (b < out.glyphs.size() && out.glyphs[b].y == out.glyphs[a].y) {
+            const auto& g = out.glyphs[b];
+            right = std::max(right, g.x + static_cast<float>(
+                                              fonts_.pick(g.font)
+                                                  .glyph(g.codepoint)
+                                                  .advance >> 6));
+            ++b;
+          }
+          const float shift = std::max(0.f, (text_w - (right - text_x)) * 0.5f);
+          for (size_t k = a; k < b; ++k) out.glyphs[k].x += shift;
+          a = b;
+        }
+      }
+      const float h = std::max(box, cy - row_y);
+      row_h = std::max(row_h, h);
+      out.boxes.push_back({it.item, cx, row_y, cell_w, h});
+    }
+    if (!items.empty()) y = row_y + row_h;
+  }
+  y += st[BlockRole::Figure].space_after.px(em, dp);
+  out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+}
+
 LayoutResult LayoutEngine::layout(
     const Document& doc, float max_width, const std::string& image_base,
     const LayoutViewport& viewport,
@@ -744,6 +943,10 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
+
+    case NodeKind::Collection:
+      layout_collection(doc, id, x, y, max_width, out);
+      break;
 
     case NodeKind::Figure: {
       y += before(BlockRole::Figure);

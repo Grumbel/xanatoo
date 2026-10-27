@@ -8,6 +8,25 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-27) — collections (prototype, phase 1 + 2)
+
+- `Collection` node (docs/BRAINSTORM.md §4): `:::collection` /
+  `::: collection` with Image / Figure items, `view=` default hint; md /
+  sexp / org round-trip. Grid (centred captions), List, Full layouts;
+  card size S / M / L; sort document / name / name reversed — all
+  view-local (`App::collection_views`) via right-click → Collection or
+  View → Collection. Click a card → fullscreen viewer (←/→, wheel,
+  click halves, F window fullscreen, Esc). Thumbnails generated and
+  cached under `cache_dir()/thumbs/` (BMP, box filter).
+- Parser fix: heading sections are restored after a `:::` fence closes,
+  so "## B" after a fenced block nests under "# Top" again.
+- Example: `examples/collection.md` (+ generated images).
+- Open: thumbnails are built synchronously on first layout (slow for big
+  folders — move to a worker); view state is keyed by NodeId across
+  documents like folded_sections; derived sources (directory / glob →
+  directory browsing), document / passage cards, remote images, card
+  frames / selection highlight via the style sheet.
+
 ## Status (2026-10-27) — web pages as reader views, wikipedia:, pandoc formats
 
 - `html_page.cpp` (`XANATOO_WEB`): any other http(s) link opens in-app.

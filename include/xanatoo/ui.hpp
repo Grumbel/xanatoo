@@ -109,6 +109,7 @@ enum class UiCommand {
   ToggleStructure,
   ToggleBrowse,  // read-only navigation mode
   OpenNative,    // web page → its native xanatoo form (wikipedia:…)
+  CollectionView,  // arg: layout / size / sort / "view" for the collection
   ToggleHelp,
   ToggleVirtualKeyboard,  // F3 / View — on-screen keyboard
   VirtualKey,             // arg = UTF-8 key ("a", "\n", "\b", " ")
@@ -176,6 +177,13 @@ struct UiState {
   bool can_nav_forward = false;
   // Native form of the focused web page ("" = none), e.g. wikipedia:Title.
   std::string native_url;
+  // Caret / right-click inside a Collection: its current view for the
+  // Collection menus (layout 0 grid, 1 list, 2 full; sort 0 doc, 1 name,
+  // 2 name reversed; card size in px).
+  bool collection = false;
+  int collection_layout = 0;
+  int collection_sort = 0;
+  float collection_thumb = 160.f;
   bool loading = false;  // a page fetch is running (Reload becomes Stop)
   bool history_open = false;
   bool bookmarks_open = false;

@@ -44,6 +44,8 @@ struct PositionedImage {
   float height = 0.f;
   std::string src;
   std::string base;  // directory for relative path resolution
+  int thumb = 0;     // > 0: drawn from a thumbnail with this max edge (px)
+  NodeId group = INVALID_NODE;  // Collection the card belongs to
 };
 
 struct MessageCard {
@@ -94,6 +96,33 @@ struct LayoutResult {
   uint64_t generation = 0;
 };
 
+// View-local presentation of one Collection (not stored in the document;
+// the node's `summary` only gives the default layout).
+enum class CollectionLayout : uint8_t { Grid, List, Full };
+enum class CollectionSort : uint8_t { Document, Name, NameReverse };
+
+struct CollectionView {
+  CollectionLayout layout = CollectionLayout::Grid;
+  CollectionSort sort = CollectionSort::Document;
+  float thumb_px = 160.f;  // card size before px_scale
+};
+
+// One card of a Collection: the Image node (direct child or inside a
+// Figure), the item node itself and its caption text.
+struct CollectionItem {
+  NodeId item = INVALID_NODE;   // Image or Figure child of the collection
+  NodeId image = INVALID_NODE;  // the Image node (INVALID when none)
+  std::string src;
+  std::string caption;          // Figure caption, else image alt
+};
+
+// Default view from the node's hint ("grid" / "list" / "full").
+CollectionView default_collection_view(const Node& collection);
+// Items in display order (view sort applied). Non-item children skipped.
+std::vector<CollectionItem> collection_items(const Document& doc,
+                                             NodeId collection,
+                                             CollectionSort sort);
+
 // Optional viewport for large-document virtualization.
 // When bottom > top, sequential block children outside
 // [top − overscan, bottom + overscan] may be skipped if a height hint exists.
@@ -139,6 +168,12 @@ public:
   // Style sheet for spacing / fonts / glyph colours; must outlive the
   // engine. nullptr = built-in default.
   void set_style(const DocStyle* style);
+  // View-local Collection layouts keyed by node (nullptr / missing entry =
+  // the node's default). Must outlive layout() calls.
+  void set_collection_views(
+      const std::unordered_map<NodeId, CollectionView>* views) {
+    collection_views_ = views;
+  }
   const DocStyle& style() const { return *style_; }
 
   // height_hints: optional prior block heights (from a previous LayoutResult's
@@ -161,6 +196,7 @@ private:
   ImageCache* images_;
   LayoutOptions options_{};
   const DocStyle* style_;
+  const std::unordered_map<NodeId, CollectionView>* collection_views_ = nullptr;
 
   std::string image_base_;
   LayoutViewport viewport_;
@@ -188,6 +224,8 @@ private:
                         float x, float& y, float max_width,
                         LayoutResult& out, FontRole base_role,
                         BlockRole block = BlockRole::Paragraph);
+  void layout_collection(const Document& doc, NodeId id, float x, float& y,
+                         float max_width, LayoutResult& out);
   // Paragraph in the role's font.
   void layout_role_text(const Document& doc, const Node& node, BlockRole role,
                         float x, float& y, float max_width, LayoutResult& out);

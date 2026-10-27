@@ -545,6 +545,32 @@ static void menu_insert_items(UiCommand& cmd) {
   menu_item_cmd("Include / Transclude…", UiCommand::InsertTransclude, cmd);
 }
 
+// Collection view: layout, card size, sort, fullscreen viewer.
+static void menu_collection_items(const UiState& state, UiCommand& cmd,
+                                  std::string& arg) {
+  auto item = [&](const char* label, const char* a, bool checked,
+                  const char* shortcut = nullptr) {
+    if (ImGui::MenuItem(label, shortcut, checked, state.collection)) {
+      cmd = UiCommand::CollectionView;
+      arg = a;
+    }
+  };
+  item("View Fullscreen", "view", false);
+  ImGui::Separator();
+  item("Grid", "grid", state.collection_layout == 0);
+  item("List", "list", state.collection_layout == 1);
+  item("Full Size", "full", state.collection_layout == 2);
+  ImGui::Separator();
+  item("Small Cards", "small", state.collection_thumb < 140.f);
+  item("Medium Cards", "medium",
+       state.collection_thumb >= 140.f && state.collection_thumb < 200.f);
+  item("Large Cards", "large", state.collection_thumb >= 200.f);
+  ImGui::Separator();
+  item("Document Order", "sort-doc", state.collection_sort == 0);
+  item("Sort by Name", "sort-name", state.collection_sort == 1);
+  item("Sort by Name (Reverse)", "sort-name-desc", state.collection_sort == 2);
+}
+
 static void menu_structure_items(const UiState& state, UiCommand& cmd) {
   menu_item_cmd("Unordered List", UiCommand::ToggleUnorderedList, cmd, true,
                 "Ctrl+Shift+8");
@@ -692,6 +718,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                     "Alt+Right");
       menu_item_cmd("Native View", UiCommand::OpenNative, cmd,
                     !state.native_url.empty());
+      if (ImGui::BeginMenu("Collection", state.collection)) {
+        menu_collection_items(state, cmd, result.arg);
+        ImGui::EndMenu();
+      }
       ImGui::Separator();
       if (ImGui::MenuItem("Split Pane", "Ctrl+\\", state.split))
         cmd = UiCommand::ToggleSplit;
@@ -1167,6 +1197,13 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     context_open_ = false;
   }
   if (ImGui::BeginPopup("##doc_context")) {
+    if (state.collection) {
+      if (ImGui::BeginMenu("Collection")) {
+        menu_collection_items(state, cmd, result.arg);
+        ImGui::EndMenu();
+      }
+      ImGui::Separator();
+    }
     menu_item_cmd("Cut", UiCommand::Cut, cmd, state.selection, "Ctrl+X");
     menu_item_cmd("Copy", UiCommand::Copy, cmd, state.selection, "Ctrl+C");
     menu_item_cmd("Paste", UiCommand::Paste, cmd, true, "Ctrl+V");

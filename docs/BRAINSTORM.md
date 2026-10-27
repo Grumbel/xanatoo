@@ -139,6 +139,8 @@ looks is a view.
 
 ### Phases
 
+Phases 1 and 2 have a first prototype (see TODO.md).
+
 1. `Collection` node, `::: collection` parse, grid of local images,
    thumbnail cache, lightbox.
 2. View controls (layout / size / sort), stored view-local.

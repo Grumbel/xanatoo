@@ -274,7 +274,10 @@ StatusLine compute_status(App& app) {
     label += "    click to jump to source";
     tone = StatusTone::Info;
   } else if (app.hover.image != xanatoo::INVALID_NODE) {
-    if (app.hover.image_handle)
+    if (app.hover.image_card)
+      label = "Collection — click to view fullscreen · right-click for "
+              "layout / size / sort";
+    else if (app.hover.image_handle)
       label = "Image resize handle — drag corner to scale";
     else
       label = "Image — drag corner handle to resize · scale saved in markup";

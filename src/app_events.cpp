@@ -256,11 +256,15 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
       reset_blink(app);
       return;
     }
+    app.collection_target = xanatoo::INVALID_NODE;
+    // Collection card: open the fullscreen viewer at that image.
+    if (click_collection_card(app, app.focus, lx, my)) return;
 
     // Image resize handle (bottom-right 12px square)?
     {
       const float hs = 12.f;
       for (const auto& pi : p.layout.images) {
+        if (pi.thumb > 0) continue;  // collection cards are not resizable
         float hx = pi.x + pi.width - hs;
         float hy = pi.y + pi.height - hs - p.scroll_y;
         if (lx >= hx && lx <= hx + hs && my >= hy && my <= hy + hs) {
@@ -577,6 +581,7 @@ static void mouse_right_down(App& app, SDL_Event& ev, bool imgui_mouse) {
           if (!(SDL_GetModState() & KMOD_SHIFT)) p.sel.anchor = p.sel.focus;
         }
       }
+      note_collection_target(app, app.focus, lx, my);
       app.ui.open_context_menu(static_cast<float>(ev.button.x),
                                static_cast<float>(ev.button.y));
     }
@@ -801,6 +806,7 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
       app.hover.image = xanatoo::INVALID_NODE;
       app.hover.image_pane = -1;
       app.hover.image_handle = false;
+      app.hover.image_card = false;
       app.hover.col_gap = false;
       app.hover.col_gap_pane = -1;
       app.hover.task = xanatoo::INVALID_NODE;
@@ -831,8 +837,10 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
           if (lx >= ix0 && lx <= ix1 && my >= iy0 && my <= iy1) {
             app.hover.image = pi.node;
             app.hover.image_pane = hover_pane;
+            app.hover.image_card = pi.thumb > 0;
             const float hs = 12.f;
-            if (lx >= ix1 - hs && my >= iy1 - hs) app.hover.image_handle = true;
+            if (!app.hover.image_card && lx >= ix1 - hs && my >= iy1 - hs)
+              app.hover.image_handle = true;
             break;
           }
         }
@@ -2455,6 +2463,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
 }
 
 void handle_event(App& app, SDL_Event& ev) {
+  if (lightbox_event(app, ev)) return;  // fullscreen viewer owns the input
   app.ui.process_event(ev);
   // Mouse events SDL synthesises from touches only drive ImGui chrome; the
   // document surface gets the raw finger events (app_touch.cpp).

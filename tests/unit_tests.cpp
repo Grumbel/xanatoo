@@ -1515,7 +1515,55 @@ void test_pandoc_formats() {
   EXPECT(!is_pandoc_path("notes.org"));
 }
 
+void test_collection() {
+  using namespace xanatoo;
+  const char* md =
+      "# Top\n\n## A\n\n::: collection view=list\n"
+      "![Bee](img/b.jpg)\n![Ant](img/a.jpg)\n"
+      ":::figure\n![](img/c.jpg)\nCaption *c*\n:::\n"
+      ":::\n\n## B\n\nafter\n";
+  Document doc = parse_document(md, "x.md");
+  NodeId coll = INVALID_NODE;
+  for (const Node& n : doc.nodes)
+    if (n.kind == NodeKind::Collection) coll = n.id;
+  EXPECT(coll != INVALID_NODE);
+  if (coll == INVALID_NODE) return;
+  EXPECT_EQ(doc.get(coll).summary, "list");
+  EXPECT(default_collection_view(doc.get(coll)).layout ==
+         CollectionLayout::List);
+  auto items = collection_items(doc, coll, CollectionSort::Document);
+  EXPECT_EQ(items.size(), size_t(3));
+  if (items.size() == 3) {
+    EXPECT_EQ(items[0].caption, "Bee");
+    EXPECT_EQ(items[2].src, "img/c.jpg");
+    EXPECT_EQ(items[2].caption, "Caption c");
+  }
+  items = collection_items(doc, coll, CollectionSort::Name);
+  if (items.size() == 3) EXPECT_EQ(items[0].src, "img/a.jpg");
+  items = collection_items(doc, coll, CollectionSort::NameReverse);
+  if (items.size() == 3) EXPECT_EQ(items[0].src, "img/c.jpg");
+
+  // "## B" after the fence nests under "# Top" again (sibling of "## A").
+  const NodeId sec_a = doc.get(coll).parent;
+  EXPECT(doc.get(sec_a).kind == NodeKind::Section);
+  const NodeId top = doc.get(sec_a).parent;
+  EXPECT(doc.get(top).kind == NodeKind::Section);
+  EXPECT_EQ(doc.get(top).children.size(), size_t(3));  // header, A, B
+
+  const std::string out = serialize_markup(doc);
+  EXPECT(out.find(":::collection view=list\n") != std::string::npos);
+  Document again = parse_document(out, "x.md");
+  EXPECT_EQ(serialize_markup(again), out);
+
+  const std::string sx = serialize_sexpr(doc);
+  EXPECT(sx.find("(collection") != std::string::npos);
+  EXPECT(sx.find(":view \"list\"") != std::string::npos);
+  Document sdoc = parse_sexpr(sx);
+  EXPECT_EQ(serialize_sexpr(sdoc), sx);
+}
+
 int main() {
+  test_collection();
   test_wikipedia();
   test_pandoc_formats();
   test_html_min();

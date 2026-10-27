@@ -43,6 +43,7 @@ enum class NodeKind : uint8_t {
   Thread,          // discussion container (mailing list / forum thread)
   Message,         // one post or comment; may reply to another Message
   Footnote,        // note body (Paragraph children); label = key of its refs
+  Collection,      // ordered set of items (Image / Figure) shown as cards
 };
 
 enum class InlineKind : uint8_t {
@@ -86,6 +87,8 @@ struct Node {
   //          alt = in-reply-to id, or "about:#anchor" for passage comments
   // Header: text title (no rank); src may hold org TODO keyword; tags for org.
   // Footnote: label = key; body blocks are children (usually Paragraphs).
+  // Collection: summary = default view hint ("grid", "list", "full");
+  //             items are Image / Figure children (view-local layout).
   // Article/Section: containers grouping blocks.
 };
 

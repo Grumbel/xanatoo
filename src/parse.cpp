@@ -346,8 +346,8 @@ Document parse_markup(std::string_view source) {
   stack.push_back(root);
 
   // Implicit Section stack from ATX / setext headings. Body attaches to the
-  // innermost open section. Cleared when an explicit ::: fence opens or closes
-  // so fence structure stays the authority inside containers.
+  // innermost open section. Cleared inside an explicit ::: fence so fence
+  // structure stays the authority there; restored when the fence closes.
   struct AtxSec {
     NodeId section = INVALID_NODE;
     int depth = 0;
@@ -359,8 +359,13 @@ Document parse_markup(std::string_view source) {
     return stack.back();
   };
 
+  // Heading sections open around each fence, restored when it closes so
+  // "## …" after a ::: block still nests under the enclosing "# …".
+  std::vector<std::vector<AtxSec>> saved_atx;
+
   auto push_fence = [&](NodeId n) {
     stack.push_back(n);
+    saved_atx.push_back(std::move(atx_sec));
     atx_sec.clear();
   };
 
@@ -391,12 +396,24 @@ Document parse_markup(std::string_view source) {
     while (lead < t.size() && (t[lead] == ' ' || t[lead] == '\t')) ++lead;
     std::string_view trimmed = t.substr(lead);
 
+    // Pandoc-style "::: collection" opens (other "::: x" lines close).
+    std::string pandoc_open;
+    if (starts_with(trimmed, "::: ")) {
+      std::string_view rest = trimmed.substr(4);
+      trim_ascii(rest);
+      if (starts_with(rest, "collection")) {
+        pandoc_open = ":::" + std::string(rest);
+        trimmed = pandoc_open;
+      }
+    }
+
     // Closing fence
     if (trimmed == ":::" || starts_with(trimmed, "::: ")) {
       // Treat bare ::: as close of current container if possible
       if (stack.size() > 1) {
         stack.pop_back();
-        atx_sec.clear();
+        atx_sec = std::move(saved_atx.back());
+        saved_atx.pop_back();
       }
       ++i;
       continue;
@@ -659,6 +676,16 @@ Document parse_markup(std::string_view source) {
     }
     if (starts_with(trimmed, ":::deflist")) {
       NodeId n = doc.create(NodeKind::DefList, current_parent());
+      push_fence(n);
+      ++i;
+      continue;
+    }
+    if (starts_with(trimmed, ":::collection")) {
+      NodeId n = doc.create(NodeKind::Collection, current_parent());
+      doc.get(n).summary = fence_attr(trimmed, "view");
+      std::string id = fence_attr(trimmed, "id");
+      if (id.empty()) id = fence_attr(trimmed, "label");
+      if (!id.empty()) doc.get(n).label = id;
       push_fence(n);
       ++i;
       continue;
@@ -1464,6 +1491,19 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
       break;
     }
 
+    case NodeKind::Collection: {
+      out += pad;
+      out += ":::collection";
+      if (!node.summary.empty()) out += " view=" + node.summary;
+      if (!node.label.empty()) out += " id=" + node.label;
+      out += "\n";
+      for (NodeId c : node.children)
+        serialize_node(doc, c, out, indent);
+      out += pad;
+      out += ":::\n\n";
+      break;
+    }
+
     case NodeKind::Figure: {
       out += pad;
       out += ":::figure\n";
@@ -2234,6 +2274,22 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
     return;
   }
 
+  if (tag == "collection") {
+    NodeId n = doc.create(NodeKind::Collection, parent);
+    size_t i = 1;
+    std::string label;
+    while (i + 1 < e.kids.size() && e.kids[i].kind == SExpr::Kind::Atom &&
+           starts_with(e.kids[i].text, ":")) {
+      const std::string& k = e.kids[i].text;
+      if (k == ":view") doc.get(n).summary = sexpr_text(e.kids[i + 1]);
+      else if (k == ":label" || k == ":anchor") label = sexpr_text(e.kids[i + 1]);
+      i += 2;
+    }
+    if (!label.empty()) doc.get(n).label = label;
+    parse_sexpr_children(doc, n, e.kids, i);
+    return;
+  }
+
   if (tag == "figure") {
     NodeId n = doc.create(NodeKind::Figure, parent);
     std::string label;
@@ -2751,6 +2807,22 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
         serialize_sexpr_inlines(node, out);
       if (!node.children.empty())
         serialize_sexpr_children(doc, node, out, indent + 2);
+      out += ")";
+      break;
+    }
+
+    case NodeKind::Collection: {
+      out += pad;
+      out += "(collection";
+      emit_node_id(node, out);
+      emit_label(node, out);
+      if (!node.summary.empty()) {
+        out += " :view ";
+        escape_sexpr_string(node.summary, out);
+      }
+      serialize_sexpr_children(doc, node, out, indent + 2);
+      out.push_back('\n');
+      out += pad;
       out += ")";
       break;
     }
