@@ -27,25 +27,32 @@ namespace fs = std::filesystem;
 
 namespace xanatoo::app {
 
-void sync_window_size(App& app) {
-  {
-    int nw = 0, nh = 0;
-    SDL_GetWindowSize(app.window, &nw, &nh);
-    if (nw >= 64 && nh >= 64 && (nw != app.win_w || nh != app.win_h)) {
-      app.win_w = nw;
-      app.win_h = nh;
-      app.needs_layout = true;
-      for (auto& sw : app.soft_wins) {
-        if (sw.dock != SoftDock::None || sw.maximized)
-          apply_soft_dock(app, sw, sw.maximized ? SoftDock::Max : sw.dock);
-      }
-    }
+void apply_window_size(App& app, int nw, int nh) {
+  if (nw < 64 || nh < 64 || (nw == app.win_w && nh == app.win_h)) return;
+  if (nh < app.win_h) app.reveal_caret_after_layout = true;
+  app.win_w = nw;
+  app.win_h = nh;
+  app.needs_layout = true;
+  // Keep tiled/maximized soft windows filling the new client area.
+  for (auto& sw : app.soft_wins) {
+    if (sw.dock != SoftDock::None || sw.maximized)
+      apply_soft_dock(app, sw, sw.maximized ? SoftDock::Max : sw.dock);
   }
+}
+
+void sync_window_size(App& app) {
+  int nw = 0, nh = 0;
+  SDL_GetWindowSize(app.window, &nw, &nh);
+  apply_window_size(app, nw, nh);
 }
 
 void relayout_if_needed(App& app) {
   if (app.needs_layout && app.win_w >= 64 && app.win_h >= 64) {
     layout_panes(app);
+    if (app.reveal_caret_after_layout) {
+      app.reveal_caret_after_layout = false;
+      scroll_caret_into_view(app, focused_pane(app));
+    }
     {
       std::string dk = path_of(app, focused_pane(app));
       if (dk != app.last_fold_doc_key) {

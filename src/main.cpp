@@ -9,27 +9,14 @@
 
 #include "xanatoo/app.hpp"
 #include "xanatoo/cli.hpp"
+#include "xanatoo/platform.hpp"
 
 #include <SDL.h>
-#include <cstdlib>
-#include <string>
-#ifdef __ANDROID__
-#include <sys/stat.h>
-#endif
 #include <iostream>
 #include <utility>
 
 int main(int argc, char** argv) {
-#ifdef __ANDROID__
-  // No HOME / writable /tmp on Android: point them at the app's private
-  // storage so config_dir(), view.conf, history and caches just work.
-  if (const char* internal = SDL_AndroidGetInternalStoragePath()) {
-    setenv("HOME", internal, 1);
-    const std::string tmp = std::string(internal) + "/tmp";
-    mkdir(tmp.c_str(), 0700);
-    setenv("TMPDIR", tmp.c_str(), 1);
-  }
-#endif
+  xanatoo::platform_pre_init();
   xanatoo::CliOptions opt;
   if (!xanatoo::parse_cli(argc, argv, opt)) return 1;
 
@@ -39,12 +26,16 @@ int main(int argc, char** argv) {
     return 1;
   }
   SDL_GameControllerEventState(SDL_ENABLE);
-  SDL_StartTextInput();
+  xanatoo::platform_init();
+  if (xanatoo::platform_text_input_at_start())
+    SDL_StartTextInput();
+  else
+    SDL_StopTextInput();
 
+  // Android: not fullscreen, so the activity's adjustResize shrinks the
+  // surface when the on-screen keyboard opens (fullscreen windows ignore it)
+  // and the caret stays visible.
   Uint32 win_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN;
-#ifdef __ANDROID__
-  win_flags |= SDL_WINDOW_FULLSCREEN;  // the activity owns the whole screen
-#endif
   if (opt.fullscreen) win_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
   SDL_Window* window =
       SDL_CreateWindow("xanatoo", SDL_WINDOWPOS_CENTERED,

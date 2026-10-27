@@ -274,6 +274,9 @@ struct App {
   // A panel consumed a printable key (outline 1–9): drop the TEXTINPUT
   // SDL sends right after it so the digit is not typed into the document.
   bool eat_text_input = false;
+  // The window got shorter (on-screen keyboard opened): bring the caret back
+  // into view once the panes are laid out for the new size.
+  bool reveal_caret_after_layout = false;
   bool split = false;  // auto-enabled when two files are given
   float split_ratio = 0.5f;
   bool dragging_sel = false;
@@ -434,6 +437,9 @@ void scroll_caret_to_top(App& app, Pane& p);
 float pane_max_scroll(App& app, const Pane& p);
 // Body/heading font size ± `steps` points (View → Zoom, pinch).
 void zoom_by(App& app, int steps);
+// New window size (resize event / per-frame sync): relayout, re-dock floats,
+// and reveal the caret when the window got shorter (on-screen keyboard).
+void apply_window_size(App& app, int nw, int nh);
 // Push body_px / heading_px (scaled by the style sheet) into the fonts.
 void apply_font_sizes(App& app);
 // Body font file for FontSet::load (see App::font_path), "" = families.

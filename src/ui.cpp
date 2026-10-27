@@ -6,6 +6,7 @@
 #include "xanatoo/view_settings.hpp"
 #include <cmath>
 #include "xanatoo/font.hpp"
+#include "xanatoo/platform.hpp"
 
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -1379,6 +1380,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
 
 void Ui::end_frame(SDL_Renderer* renderer) {
   if (!ready_) return;
+  // A text field (URL bar) just took focus: on-screen keyboard (Android).
+  const bool wants_text = ImGui::GetIO().WantTextInput;
+  if (wants_text && !wanted_text_input_) platform_request_keyboard();
+  wanted_text_input_ = wants_text;
   ImGui::Render();
   ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
 }

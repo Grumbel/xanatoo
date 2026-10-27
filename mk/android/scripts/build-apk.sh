@@ -4,11 +4,16 @@
 #
 # Builds the APK: xanatoo's sources as libmain.so with ndk-build against the
 # prebuilt SDL2 and a static FreeType, packaged with SDL's Java side,
-# aligned and signed (after Kurvenrausch / Pingus; no data files yet).
+# aligned and signed (after Kurvenrausch / Pingus). Data files (examples,
+# FORMAT.md, style sheets, toolbar icons) go to assets/xanatoo/ with a
+# MANIFEST that platform.cpp unpacks into internal storage.
 #
 # Env: ANDROID_HOME, BUILD_TOOLS_VERSION, PACKAGE_PLATFORM, TARGET_ABIS,
 #      APP_NAME, APP_DIR (manifest, res/, jni/Android.mk), APP_SRC_DIR (the
-#      repository: src/, include/, external/), FREETYPE_SRC (tarball),
+#      repository: src/, include/, external/, examples/, styles/, icons/svg,
+#      scripts/rasterize_icons.py, FORMAT.md), DEJAVU_DIR (TTFs bundled as
+#      fonts/: same faces as desktop, and glyphs Roboto lacks — ▸ ▾ ☐ ☑),
+#      FREETYPE_SRC (tarball),
 #      FREETYPE_MK, APPLICATION_MK, TOP_ANDROID_MK, SDL_PREBUILT_MK,
 #      SDL_ANDROID_LIBS, KEYSTORE, APP_VERSION, VERSION_CODE
 set -euo pipefail
@@ -49,6 +54,26 @@ cp "$SDL_PREBUILT_MK" src/jni/SDL/Android.mk
 cp -r "$SDL_ANDROID_LIBS/include" src/jni/SDL/include/SDL2
 chmod -R u+rwX src
 
+# Data files → assets/xanatoo/ + MANIFEST (stamp line, then one path per
+# line; SDL can read assets but not list them).
+A=assets/xanatoo
+mkdir -p "$A/examples" "$A/styles" "$A/icons" "$A/fonts"
+for f in DejaVuSans DejaVuSans-Bold DejaVuSans-Oblique DejaVuSans-BoldOblique \
+         DejaVuSerif DejaVuSerif-Bold DejaVuSerif-Italic DejaVuSerif-BoldItalic \
+         DejaVuSansMono DejaVuSansMono-Bold DejaVuSansMono-Oblique \
+         DejaVuSansMono-BoldOblique; do
+  cp "$DEJAVU_DIR/$f.ttf" "$A/fonts/"
+done
+cp "$APP_SRC_DIR"/examples/* "$A/examples/"
+cp "$APP_SRC_DIR"/styles/*.xss "$A/styles/"
+cp "$APP_SRC_DIR"/FORMAT.md "$A/"
+python3 "$APP_SRC_DIR"/scripts/rasterize_icons.py "$APP_SRC_DIR"/icons/svg "$A/icons" 20
+chmod -R u+rwX assets
+files="$(cd "$A" && find . -type f ! -name MANIFEST | sed 's|^\./||' | LC_ALL=C sort)"
+hash="$(cd "$A" && printf '%s\n' "$files" | xargs sha256sum | sha256sum | cut -c1-16)"
+{ echo "xanatoo $APP_VERSION ($VERSION_CODE) $hash"; printf '%s\n' "$files"; } > "$A/MANIFEST"
+echo "==> $(printf '%s\n' "$files" | wc -l) data files in assets/xanatoo"
+
 "$NDK/ndk-build" \
   NDK_PROJECT_PATH="$PWD/src" \
   APP_BUILD_SCRIPT="$PWD/src/jni/Android.mk" \
@@ -56,7 +81,8 @@ chmod -R u+rwX src
   -j"${NIX_BUILD_CORES:-$(nproc)}"
 
 mkdir -p out
-"$BT/aapt" package -f -M src/AndroidManifest.xml -S src/res -I "$PACKAGE_JAR" -F out/base.apk
+"$BT/aapt" package -f -M src/AndroidManifest.xml -S src/res -A assets \
+  -I "$PACKAGE_JAR" -F out/base.apk
 cp "$SDL_ANDROID_LIBS/dex/classes.dex" out/classes.dex
 for abi in $TARGET_ABIS; do
   mkdir -p "out/lib/$abi"

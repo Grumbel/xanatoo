@@ -19,29 +19,51 @@ Targets Android 5.0+ (`minSdkVersion` 21), ABIs `armeabi-v7a arm64-v8a
 x86_64`, NDK 29. The launcher icon is `mk/android/app/ic_launcher.svg`,
 rasterized into `res/mipmap-*/`.
 
-## First port: what is off
+## Data files
 
-| Feature | Desktop | Android now |
-|---------|---------|-------------|
+`build-apk.sh` packs `examples/`, `FORMAT.md`, `styles/*.xss`, the toolbar
+icons (rasterized from `icons/svg` with `rsvg-convert`) and DejaVu
+Sans/Serif/Mono into `assets/xanatoo/` with a `MANIFEST` (stamp line, then
+one path per line: SDL can read assets but not list them).
+`platform_init()` (`src/platform.cpp`) copies them to
+`<internal storage>/data` whenever the stamp changed, `chdir`s there and sets
+`XANATOO_DATA_DIR` / `XANATOO_ICON_DIR`, so the desktop lookups
+(`examples/help.md`, `styles/`, `icons/`) work unchanged. Edits to shipped
+examples are overwritten by the next upgrade; other files are kept.
+
+DejaVu comes first in the font search (`data/fonts`), so documents look as on
+desktop and glyphs Roboto lacks (▸ ▾ ☐ ☑) render.
+
+## Platform behaviour
+
+- `HOME` / `TMPDIR` → internal storage: view.conf, history, bookmarks.
+- `std::cout` / `std::cerr` → logcat, tag `xanatoo`
+  (`adb logcat -s xanatoo`).
+- Back is trapped (`SDL_HINT_ANDROID_TRAP_BACK_BUTTON`) and acts like Esc,
+  so it never finishes the activity with unsaved edits.
+- On-screen keyboard: opens when a tap places the caret (not in browse
+  mode) or an ImGui text field (URL bar) takes focus. The window is not
+  fullscreen, so `adjustResize` shrinks it above the keyboard; when the
+  window gets shorter the caret is scrolled back into view.
+- External links: `SDL_OpenURL`.
+- versionCode = last commit time (`self.lastModified`), so dirty test builds
+  install over committed ones.
+
+Tested on a Fire 7 (KFAUWI, Fire OS 5 / Android 5.1.1, 600×1024 @160 dpi).
+
+Known: one SIGSEGV inside `SDL_RenderPresent` (SDL 2.30.3 GLES2) while the
+surface was resizing for the keyboard under fast input; not reproducible in
+a dozen further runs. If it returns, try SDL 2.32.x (Android surface
+lifecycle fixes).
+
+## Still off
+
+| Feature | Desktop | Android |
+|---------|---------|---------|
 | Gemini / Nostr / Reddit / Lemmy | OpenSSL | off (`XANATOO_*=0`) |
-| Font lookup | FontConfig | `XANATOO_FONTCONFIG=0`: generic families → `/system/fonts` (Roboto, Noto Serif, Droid Sans Mono) |
+| Font lookup | FontConfig | `XANATOO_FONTCONFIG=0`: generic families → `data/fonts`, `/system/fonts` |
 | Fold persistence | SQLite | `XANATOO_SQLITE=0`: per session |
-| Data (examples, help, icons, style sheets) | share/xanatoo | not packaged: built-in help, text toolbar buttons, Default style only |
-| External links | xdg-open | `SDL_OpenURL` |
-
-`main()` points `HOME` and `TMPDIR` at the app's internal storage, so
-`view.conf`, history and bookmarks land in the private app directory.
 
 The same switches work for desktop CMake builds (`-DXANATOO_FONTCONFIG=OFF
 -DXANATOO_SQLITE=OFF -DXANATOO_GEMINI=OFF …`), which is the quick way to
 check that the Android source set still compiles.
-
-## Next
-
-- Package `examples/`, `styles/` and the toolbar icons as APK assets and
-  copy them to internal storage on first start (code uses `std::filesystem`).
-- Scale chrome (ImGui + `ui_font`) by display density; 14 px is tiny on
-  phones.
-- Bring back SQLite (amalgamation as an ndk-build module) and OpenSSL.
-- Soft keyboard: `SDL_StartTextInput` is called once at start; show/hide
-  it with the caret.

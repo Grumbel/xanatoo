@@ -22,7 +22,7 @@
         <activity
             android:name="org.libsdl.app.SDLActivity"
             android:label="xanatoo"
-            android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+            android:theme="@android:style/Theme.NoTitleBar"
             android:configChanges="orientation|keyboardHidden|keyboard|navigation|screenSize|screenLayout|uiMode"
             android:windowSoftInputMode="adjustResize"
             android:launchMode="singleTask"

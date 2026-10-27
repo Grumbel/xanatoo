@@ -42,7 +42,9 @@
             includeSources = false;
           }).androidsdk;
           version = "0.1.0";
-          versionCode = self.revCount or 1;
+          # Last commit time: also set for dirty trees (revCount is not), so
+          # local test builds install over committed ones; < 2^31 until 2036.
+          versionCode = self.lastModified or 1;
         };
     in
     {

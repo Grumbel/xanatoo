@@ -13,6 +13,7 @@
 #include <optional>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/platform.hpp"
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/lemmy.hpp"
@@ -36,18 +37,7 @@ static void on_windowevent(App& app, SDL_Event& ev, bool imgui_mouse,
                            bool imgui_keys) {
   if (ev.window.event == SDL_WINDOWEVENT_SIZE_CHANGED ||
       ev.window.event == SDL_WINDOWEVENT_RESIZED) {
-    const int nw = ev.window.data1;
-    const int nh = ev.window.data2;
-    if (nw >= 64 && nh >= 64) {
-      app.win_w = nw;
-      app.win_h = nh;
-      // Keep tiled/maximized soft windows filling the new client area.
-      for (auto& sw : app.soft_wins) {
-        if (sw.dock != SoftDock::None || sw.maximized)
-          apply_soft_dock(app, sw, sw.maximized ? SoftDock::Max : sw.dock);
-      }
-      app.needs_layout = true;
-    }
+    apply_window_size(app, ev.window.data1, ev.window.data2);
   }
   return;
 }
@@ -505,6 +495,8 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
       }
       p.preferred_x = lx;
       reset_blink(app);
+      // Caret placed in the text: on-screen keyboard (Android).
+      if (!app.browse_mode) xanatoo::platform_request_keyboard();
     }
 }
 
@@ -1535,6 +1527,8 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   Pane& p = focused_pane(app);
   xanatoo::Document& d = doc_of(app, p);
   app.eat_text_input = false;
+  // Android Back (trapped, see platform_pre_init) acts like Escape.
+  if (ev.key.keysym.sym == SDLK_AC_BACK) ev.key.keysym.sym = SDLK_ESCAPE;
 
   // Alt+letter opens the matching top-level menu (Windows/GNOME style).
   // Handled before status-prompt isolation so chrome stays reachable.

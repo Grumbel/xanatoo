@@ -265,6 +265,7 @@ private:
   std::string url_synced_from_;  // last doc_label pushed into url_input_
   bool focus_url_bar_ = false;   // Ctrl+L / Open URL menu
   bool url_bar_editing_ = false;
+  bool wanted_text_input_ = false;  // io.WantTextInput last frame
   // Width of the button group right of the URL field (last frame), so the
   // field leaves exactly that much room.
   float url_right_w_ = 200.f;

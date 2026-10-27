@@ -8,7 +8,7 @@
 #
 # First port, bare bones: no OpenSSL clients (Gemini / Nostr / Reddit /
 # Lemmy), no FontConfig (fonts come from /system/fonts), no SQLite side
-# store, and no data files (examples, icons, style sheets) in the APK yet.
+# store. Data files ship as APK assets (see mk/android/scripts/build-apk.sh).
 #
 #   nix build .#xanatoo-android        the APK
 #   nix run .#install-android-xanatoo  install it with adb
@@ -78,7 +78,11 @@ let
   # The sources the APK is built from: no build directories, no .git.
   appSrc = pkgs.lib.fileset.toSource {
     root = ../.;
-    fileset = pkgs.lib.fileset.unions [ ../src ../include ../external ];
+    fileset = pkgs.lib.fileset.unions [
+      ../src ../include ../external
+      ../examples ../styles ../icons/svg ../scripts/rasterize_icons.py
+      ../FORMAT.md
+    ];
   };
 
   apkName = "xanatoo-${version}.apk";
@@ -87,7 +91,12 @@ let
     pname = "xanatoo-android";
     inherit version;
     dontUnpack = true;
-    nativeBuildInputs = [ androidSdk pkgs.jdk17 pkgs.zip pkgs.gnumake pkgs.xz ];
+    nativeBuildInputs = [
+      androidSdk pkgs.jdk17 pkgs.zip pkgs.gnumake pkgs.xz
+      # Toolbar icons: rasterize_icons.py uses rsvg-convert (else its
+      # built-in pixel fallback).
+      pkgs.python3 pkgs.librsvg
+    ];
     env = {
       BUILD_TOOLS_VERSION = buildToolsVersion;
       PACKAGE_PLATFORM = packagePlatform;
@@ -96,6 +105,7 @@ let
       APP_DIR = "${../mk/android/app}";
       APP_SRC_DIR = "${appSrc}";
       FREETYPE_SRC = "${pkgs.freetype.src}";
+      DEJAVU_DIR = "${pkgs.dejavu_fonts}/share/fonts/truetype";
       FREETYPE_MK = "${../mk/android/freetype/Android.mk}";
       APPLICATION_MK = applicationMk;
       TOP_ANDROID_MK = topAndroidMk;

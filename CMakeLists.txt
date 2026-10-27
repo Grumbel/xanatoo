@@ -76,6 +76,7 @@ add_executable(xanatoo
   src/epub_import.cpp
   src/view_settings.cpp
   src/style.cpp
+  src/platform.cpp
   src/cli.cpp
   src/gemini.cpp
   src/nostr.cpp
