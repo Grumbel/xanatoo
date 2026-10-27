@@ -609,6 +609,8 @@ std::optional<Document> feed_fetch(std::string_view url_in, std::string* err) {
       if (err) *err = "HTTP " + std::to_string(resp->status);
       return std::nullopt;
     }
+    const std::string charset = detect_charset(resp->content_type, resp->body);
+    resp->body = to_utf8(std::move(resp->body), charset);
     if (looks_like_feed(resp->body)) return parse_feed(resp->body, final_url, err);
     // An HTML page: follow its <link rel="alternate"> feed once.
     std::string alt = attempt == 0 ? feed_autodiscover(resp->body, final_url)

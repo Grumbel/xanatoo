@@ -13,6 +13,7 @@
 #include <optional>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/html_page.hpp"
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/lemmy.hpp"
@@ -316,6 +317,10 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
       minibuf_sync_out(app);
       if (!pr.text.empty()) {
         const std::string target = xanatoo::expand_user_path(pr.text);
+        if (xanatoo::path_uses_html(target)) {
+          flash_status(app, "Cannot write HTML — use .md, .org or .sexp");
+          return true;
+        }
         std::string text = xanatoo::serialize_document(d, target);
         std::ofstream out(target);
         if (!out) {

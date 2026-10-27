@@ -16,11 +16,13 @@
 #include "xanatoo/feed.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/hackernews.hpp"
+#include "xanatoo/html_page.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/parse.hpp"
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/theme.hpp"
+#include "xanatoo/util.hpp"
 
 namespace xanatoo::app {
 
@@ -109,9 +111,27 @@ void fetch_page(std::string url, std::shared_ptr<FetchShared> out) {
     out->doc = xanatoo::ebook_fetch(url, &out->error, &local);
     if (!local.empty()) out->final_url = local;
 #endif
+  } else if (xanatoo::is_web_url(url)) {
+#if defined(XANATOO_WEB) && XANATOO_WEB
+    out->service = "Web";
+    out->doc = xanatoo::web_fetch(url, &out->error, &out->final_url);
+#endif
   }
   if (!out->doc && out->error.empty()) out->error = "no client for " + url;
   out->done.store(true, std::memory_order_release);
+}
+
+// "page#id" → caret to the node labelled / titled "id".
+void jump_to_url_fragment(App& app, int pi, const std::string& url) {
+  const size_t hash = url.find('#');
+  if (hash == std::string::npos || hash + 1 == url.size()) return;
+  Pane& p = app.panes[pi];
+  if (auto dest = xanatoo::jump_to_href(doc_of(app, p), url.substr(hash))) {
+    expand_ancestors_for_node(app, dest->node);
+    p.sel.focus = *dest;
+    p.sel.anchor = *dest;
+    scroll_caret_into_view(app, p);
+  }
 }
 
 // Host (or a short prefix) of `url` for the loading label.
@@ -138,11 +158,13 @@ void show_load_error(App& app, const FetchJob& job) {
   Pane& p = app.panes[job.pane];
   const DocBuffer* b = find_buf(app, p.buf);
   if (!b || !b->placeholder) return;
-  show_doc_in_pane(app, job.pane,
-                   xanatoo::parse_document("# Could not load page\n\n`" +
-                                               job.url + "`\n\n" +
-                                               job.shared->error + "\n",
-                                           "error.md"),
+  std::string md = "# Could not load page\n\n`" + job.url + "`\n\n" +
+                   job.shared->error + "\n";
+  if (xanatoo::starts_with(job.url, "http://") ||
+      xanatoo::starts_with(job.url, "https://"))
+    md += "\n[Open in browser](" + std::string(xanatoo::kExternalPrefix) +
+          job.url + ")\n";
+  show_doc_in_pane(app, job.pane, xanatoo::parse_document(md, "error.md"),
                    job.url);
 }
 
@@ -168,6 +190,7 @@ void finish_navigate(App& app, const FetchJob& job) {
   }
   cache_page(app, job);
   show_doc_in_pane(app, job.pane, std::move(*r.doc), r.final_url);
+  jump_to_url_fragment(app, job.pane, job.url);
   if (xanatoo::is_gemini_url(r.final_url)) {
     app.gemini_current_url = r.final_url;
     app.browse_mode = true;
@@ -233,6 +256,13 @@ bool remote_fetch_supported(std::string_view url, std::string* why) {
     return true;
 #else
     return no("Ebook downloads need build with -DXANATOO_EBOOKS=ON");
+#endif
+  }
+  if (xanatoo::is_web_url(url)) {
+#if defined(XANATOO_WEB) && XANATOO_WEB
+    return true;
+#else
+    return no("Web pages need build with -DXANATOO_WEB=ON");
 #endif
   }
   return no("not a remote URL");

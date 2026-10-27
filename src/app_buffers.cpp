@@ -18,6 +18,7 @@
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/feed.hpp"
 #include "xanatoo/hackernews.hpp"
+#include "xanatoo/html_page.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/nostr.hpp"
@@ -70,11 +71,22 @@ std::string parent_dir(const std::string& path) {
   return {};
 }
 
+// Other http(s) pages open as reader views when built with XANATOO_WEB;
+// otherwise they go to the system browser.
+static bool web_in_app(std::string_view s) {
+#if defined(XANATOO_WEB) && XANATOO_WEB
+  return xanatoo::is_web_url(s);
+#else
+  (void)s;
+  return false;
+#endif
+}
+
 bool is_in_app_remote_url(std::string_view s) {
   return xanatoo::is_gemini_url(s) || xanatoo::is_reddit_url(s) ||
          xanatoo::is_lemmy_url(s) || xanatoo::is_nostr_ref(s) ||
          xanatoo::is_hn_url(s) || xanatoo::is_ebook_url(s) ||
-         xanatoo::is_feed_url(s);
+         xanatoo::is_feed_url(s) || web_in_app(s);
 }
 
 xanatoo::Document load_doc_or_placeholder(App& app, const std::string& path) {

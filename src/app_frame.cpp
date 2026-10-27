@@ -16,6 +16,7 @@
 #include "xanatoo/platform.hpp"
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/gemini.hpp"
+#include "xanatoo/html_page.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/parse.hpp"
@@ -450,6 +451,18 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       std::string& spath = path_of(app, p);
       if (spath.empty()) {
         open_prompt(app, PromptKind::SaveAs, "untitled.md");
+      } else if (xanatoo::path_uses_html(spath) || is_in_app_remote_url(spath)) {
+        // HTML is imported one way: writing Markdown over it would destroy
+        // the original, and a URL is not a file.
+        std::string stem =
+            fs::path(spath.substr(0, spath.find_first_of("?#"))).stem().string();
+        if (is_in_app_remote_url(spath))  // into the current directory
+          open_prompt(app, PromptKind::SaveAs,
+                      (stem.empty() ? std::string("page") : stem) + ".md");
+        else
+          open_prompt(app, PromptKind::SaveAs,
+                      fs::path(spath).replace_extension(".md").string());
+        flash_status(app, "Imported page — save as Markdown");
       } else {
         std::string text = xanatoo::serialize_document(d, spath);
         std::ofstream out(spath);

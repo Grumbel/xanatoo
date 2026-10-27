@@ -3,6 +3,7 @@
 
 #include "xanatoo/util.hpp"
 
+#include <cctype>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -242,6 +243,101 @@ uint32_t named_entity(std::string_view name) {
 
 }  // namespace
 
+namespace {
+
+void append_utf8(std::string& o, uint32_t cp) {
+  if (cp < 0x80) {
+    o.push_back(static_cast<char>(cp));
+  } else if (cp < 0x800) {
+    o.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+    o.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+  } else if (cp < 0x10000) {
+    o.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+    o.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+    o.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+  } else {
+    o.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+    o.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+    o.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+    o.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+  }
+}
+
+// Windows-1252 0x80–0x9F (unassigned bytes keep their C1 code point).
+constexpr uint32_t kCp1252[32] = {
+    0x20AC, 0x81,   0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
+    0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x8D,   0x017D, 0x8F,
+    0x90,   0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
+    0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x9D,   0x017E, 0x0178};
+
+bool valid_utf8(std::string_view s) {
+  for (size_t i = 0; i < s.size();) {
+    unsigned char c = static_cast<unsigned char>(s[i]);
+    size_t n = c < 0x80          ? 0
+               : (c >> 5) == 0x6 ? 1
+               : (c >> 4) == 0xE ? 2
+               : (c >> 3) == 0x1E ? 3
+                                  : 4;
+    if (n == 4 || i + n >= s.size() + (n == 0)) return n == 0;
+    for (size_t k = 1; k <= n; ++k)
+      if ((static_cast<unsigned char>(s[i + k]) & 0xC0) != 0x80) return false;
+    i += n + 1;
+  }
+  return true;
+}
+
+// Charset value at `at` ("utf-8", "ISO-8859-1"; quotes skipped), lower-case.
+std::string charset_token(std::string_view s, size_t at) {
+  while (at < s.size() && (s[at] == '"' || s[at] == '\'' || s[at] == ' '))
+    ++at;
+  size_t e = at;
+  while (e < s.size() &&
+         (std::isalnum(static_cast<unsigned char>(s[e])) || s[e] == '-' ||
+          s[e] == '_' || s[e] == '.' || s[e] == ':'))
+    ++e;
+  return ascii_lower(std::string(s.substr(at, e - at)));
+}
+
+}  // namespace
+
+std::string detect_charset(std::string_view content_type,
+                           std::string_view body) {
+  std::string ct = ascii_lower(std::string(content_type));
+  if (size_t p = ct.find("charset="); p != std::string::npos)
+    return charset_token(ct, p + 8);
+  // <meta charset=…>, <meta http-equiv … content="…; charset=…">,
+  // <?xml … encoding="…"?> all sit near the top.
+  std::string head = ascii_lower(std::string(body.substr(0, 4096)));
+  if (size_t p = head.find("charset="); p != std::string::npos)
+    return charset_token(head, p + 8);
+  if (starts_with(head, "<?xml"))
+    if (size_t p = head.find("encoding="); p != std::string::npos &&
+                                           p < head.find("?>"))
+      return charset_token(head, p + 9);
+  return {};
+}
+
+std::string to_utf8(std::string body, std::string_view charset) {
+  // Valid UTF-8 wins over the label: servers often send a stale
+  // "charset=ISO-8859-1" default for UTF-8 pages.
+  if (valid_utf8(body)) return body;
+  const bool western =
+      charset.empty() || charset == "utf-8" || charset == "utf8" ||
+      charset == "iso-8859-1" || charset == "iso8859-1" ||
+      charset == "latin1" || charset == "iso-8859-15" ||
+      charset == "windows-1252" || charset == "cp1252" ||
+      charset == "us-ascii" || charset == "ascii";
+  if (!western) return body;  // other code pages are not converted
+  std::string out;
+  out.reserve(body.size() + body.size() / 8);
+  for (char ch : body) {
+    unsigned char c = static_cast<unsigned char>(ch);
+    if (c < 0x80) out.push_back(ch);
+    else append_utf8(out, c < 0xA0 ? kCp1252[c - 0x80] : c);
+  }
+  return out;
+}
+
 std::string html_decode_entities(std::string_view s) {
   std::string o;
   o.reserve(s.size());
@@ -262,27 +358,15 @@ std::string html_decode_entities(std::string_view s) {
           std::strtoul(num.c_str() + (hex ? 1 : 0), nullptr, hex ? 16 : 10));
       if (cp == 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp < 0xE000))
         cp = 0xFFFD;
+      // &#150; and friends mean Windows-1252 (HTML5 does the same).
+      if (cp >= 0x80 && cp < 0xA0) cp = kCp1252[cp - 0x80];
     }
     if (cp == 0) cp = named_entity(name);
     if (cp == 0) {
       o.push_back(s[i]);
       continue;
     }
-    if (cp < 0x80) {
-      o.push_back(static_cast<char>(cp));
-    } else if (cp < 0x800) {
-      o.push_back(static_cast<char>(0xC0 | (cp >> 6)));
-      o.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
-    } else if (cp < 0x10000) {
-      o.push_back(static_cast<char>(0xE0 | (cp >> 12)));
-      o.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
-      o.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
-    } else {
-      o.push_back(static_cast<char>(0xF0 | (cp >> 18)));
-      o.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
-      o.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
-      o.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
-    }
+    append_utf8(o, cp);
     i = semi;
   }
   return o;

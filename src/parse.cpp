@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/parse.hpp"
+#include "xanatoo/html_page.hpp"
 #include "xanatoo/org.hpp"
 #include "xanatoo/sexpr.hpp"
 #include "xanatoo/util.hpp"
@@ -3359,6 +3360,8 @@ Document parse_document(std::string_view source, std::string_view path) {
     return parse_gemtext(source);
   if (path_uses_org(path))
     return parse_org(source);
+  if (path_uses_html(path))
+    return parse_html_page(source);
   return parse_markup(source);
 }
 

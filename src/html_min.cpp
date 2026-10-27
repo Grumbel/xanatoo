@@ -12,6 +12,8 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cstdlib>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -30,9 +32,9 @@ bool one_of(std::string_view t, const std::array<std::string_view, N>& set) {
 }
 
 // Dropped together with everything inside them.
-constexpr std::array<std::string_view, 11> kSkipTags = {
+constexpr std::array<std::string_view, 12> kSkipTags = {
     "script", "style",  "iframe", "noscript", "svg",     "template",
-    "head",   "object", "select", "textarea", "button"};
+    "head",   "object", "select", "textarea", "button",  "title"};
 
 constexpr std::array<std::string_view, 14> kVoidTags = {
     "br",   "hr",    "img",  "meta",  "link",   "input", "source",
@@ -44,6 +46,26 @@ constexpr std::array<std::string_view, 22> kBlockTags = {
     "aside",  "nav",    "main",    "figure",  "dl",      "dt",
     "dd",     "address", "center", "details", "summary", "fieldset",
     "legend", "caption", "body",   "html"};
+
+// Page chrome, dropped in drop_chrome mode.
+constexpr std::array<std::string_view, 5> kChromeTags = {
+    "nav", "aside", "form", "footer", "dialog"};
+
+// Class tokens of elements dropped in drop_chrome mode: screen-reader-only
+// text, edit links, navigation boxes, share / cookie banners.
+constexpr std::array<std::string_view, 9> kChromeClasses = {
+    "noprint", "navbox", "sidebar",     "share",        "social",
+    "hidden",  "metadata", "toc-toggle", "advertisement"};
+
+// Substrings of class tokens that mark chrome ("vector-dropdown",
+// "page-toolbar", "mw-editsection", "cookie-banner", …).
+constexpr std::array<std::string_view, 10> kChromeClassParts = {
+    "dropdown",   "toolbar", "navbar",       "breadcrumb",    "editsection",
+    "cookie",     "sr-only", "visually-hidden", "screen-reader", "skip-link"};
+
+// ARIA landmark roles that are not the content.
+constexpr std::array<std::string_view, 6> kChromeRoles = {
+    "navigation", "banner", "contentinfo", "search", "complementary", "dialog"};
 
 enum class FrameKind : uint8_t {
   Container,  // List / Table / TableRow: blocks go inside
@@ -57,6 +79,7 @@ struct Frame {
   NodeId node = INVALID_NODE;
   int items = 0;  // ordered list: last ordinal
   bool pre = false;
+  bool layout = false;  // layout <table>: rows / cells are just boundaries
   int strong_add = 0;
   int em_add = 0;
 };
@@ -67,6 +90,14 @@ class Builder {
       : doc_(doc), opt_(opt), root_(parent) {}
 
   void open(const std::string& tag, std::string_view attrs);
+  // A <table> used for page layout (nested tables, role=presentation).
+  void open_layout_table() {
+    block_boundary();
+    Frame f;
+    f.tag = "table";
+    f.layout = true;
+    push(std::move(f));
+  }
   void close(const std::string& tag);
   void text(std::string_view raw);
   void finish() {
@@ -75,6 +106,17 @@ class Builder {
   }
 
  private:
+  struct Sec {
+    NodeId node;
+    int level;
+  };
+
+  void open_tag(const std::string& tag, std::string_view attrs);
+  bool open_section(const std::string& tag);
+  void note_id(std::string id);
+  void take_pending_id(NodeId n);
+  bool in_container() const;
+  bool in_layout_table() const;
   NodeId owner() const;
   bool pre_mode() const;
   NodeId container() const;
@@ -90,6 +132,7 @@ class Builder {
   bool pop_to(std::string_view tag);
   void push(Frame f) {
     close_para();
+    if (f.kind == FrameKind::Leaf) take_pending_id(f.node);
     frames_.push_back(std::move(f));
   }
   void block_boundary() {
@@ -103,6 +146,8 @@ class Builder {
   const HtmlOptions& opt_;
   NodeId root_;
   std::vector<Frame> frames_;
+  std::vector<Sec> secs_;   // open Sections (sections mode)
+  std::string pending_id_;  // id= waiting for the next block (anchors mode)
   NodeId para_ = INVALID_NODE;
   int em_ = 0, strong_ = 0, code_ = 0, strike_ = 0;
   std::vector<std::string> links_;  // "" = <a> without href
@@ -128,7 +173,38 @@ bool Builder::pre_mode() const {
 NodeId Builder::container() const {
   for (auto it = frames_.rbegin(); it != frames_.rend(); ++it)
     if (it->kind == FrameKind::Container) return it->node;
-  return root_;
+  return secs_.empty() ? root_ : secs_.back().node;
+}
+
+// Innermost table frame is a layout table.
+bool Builder::in_layout_table() const {
+  for (auto it = frames_.rbegin(); it != frames_.rend(); ++it)
+    if (it->tag == "table") return it->layout;
+  return false;
+}
+
+bool Builder::in_container() const {
+  for (const Frame& f : frames_)
+    if (f.kind == FrameKind::Container) return true;
+  return false;
+}
+
+void Builder::take_pending_id(NodeId n) {
+  if (pending_id_.empty() || n == INVALID_NODE) return;
+  if (doc_.get(n).label.empty()) doc_.get(n).label = std::move(pending_id_);
+  pending_id_.clear();
+}
+
+// An element id becomes the label of the block it sits in (so "#id" links
+// jump there), or of the next block when none is open yet.
+void Builder::note_id(std::string id) {
+  // "task" / "task-done" labels draw list checkboxes.
+  if (id.empty() || id == "task" || id == "task-done") return;
+  NodeId t = target();
+  if (t != INVALID_NODE && doc_.get(t).label.empty())
+    doc_.get(t).label = std::move(id);
+  else
+    pending_id_ = std::move(id);
 }
 
 NodeId Builder::ensure_target() {
@@ -139,6 +215,7 @@ NodeId Builder::ensure_target() {
   para_ = doc_.create(ck == NodeKind::List ? NodeKind::ListItem
                                            : NodeKind::Paragraph,
                       c);
+  take_pending_id(para_);
   return para_;
 }
 
@@ -278,13 +355,53 @@ bool Builder::pop_to(std::string_view tag) {
 }
 
 void Builder::open(const std::string& tag, std::string_view attrs) {
+  if (!opt_.anchors) {
+    open_tag(tag, attrs);
+    return;
+  }
+  std::string id = html_attr(attrs, "id");
+  if (id.empty() && tag == "a") id = html_attr(attrs, "name");
+  // An element's own id beats a wrapper's (<section id=x><h2 id=Title>).
+  if (!id.empty()) pending_id_.clear();
+  open_tag(tag, attrs);
+  note_id(std::move(id));
+}
+
+// h1–h6 at block level in sections mode: close sections of the same or a
+// deeper level, open a Section with a Header title.
+bool Builder::open_section(const std::string& tag) {
+  if (!opt_.sections || owner() != INVALID_NODE || in_container()) return false;
+  const int level = tag[1] - '0';
+  close_para();
+  while (!secs_.empty() && secs_.back().level >= level) secs_.pop_back();
+  NodeId sec = doc_.create(NodeKind::Section, container());
+  doc_.get(sec).level = level;
+  secs_.push_back({sec, level});
+  Frame f;
+  f.tag = tag;
+  f.kind = FrameKind::Leaf;
+  f.node = doc_.create(NodeKind::Header, sec);
+  doc_.get(f.node).level = level;
+  push(std::move(f));
+  return true;
+}
+
+void Builder::open_tag(const std::string& tag, std::string_view attrs) {
   const bool in_leaf = owner() != INVALID_NODE;
 
   // Inline markup.
   if (tag == "a") {
     std::string href = html_attr(attrs, "href");
-    links_.push_back(href.empty() ? std::string{}
-                                  : resolve_url(opt_.base_url, href));
+    if (!href.empty()) href = resolve_url(opt_.base_url, href);
+    if (opt_.anchors && !href.empty() && href[0] != '#') {
+      // Same-page link → in-document "#id".
+      std::string_view page = opt_.base_url;
+      page = page.substr(0, page.find('#'));
+      if (!page.empty() && href.size() > page.size() &&
+          starts_with(href, page) && href[page.size()] == '#')
+        href.erase(0, page.size());
+    }
+    links_.push_back(std::move(href));
     return;
   }
   if (tag == "em" || tag == "i" || tag == "cite" || tag == "dfn" ||
@@ -306,12 +423,25 @@ void Builder::open(const std::string& tag, std::string_view attrs) {
   }
   if (tag == "br") {
     if (pre_mode()) emit("\n");
+    else if (!in_leaf && para_ != INVALID_NODE && last_char(para_) == '\n')
+      close_para();  // <br><br> separates paragraphs
     else add_break();
     return;
   }
   if (tag == "img") {
     std::string src = html_attr(attrs, "src");
     if (src.empty()) return;
+    // alt="" marks a decorative image.
+    if (opt_.drop_chrome && html_has_attr(attrs, "alt") &&
+        html_attr(attrs, "alt").empty())
+      return;
+    // 1×1 spacers / tracking pixels.
+    if (opt_.drop_chrome) {
+      std::string w = html_attr(attrs, "width"), h = html_attr(attrs, "height");
+      if ((!w.empty() && std::atoi(w.c_str()) <= 2) ||
+          (!h.empty() && std::atoi(h.c_str()) <= 2))
+        return;
+    }
     std::string alt = html_to_plain(html_attr(attrs, "alt"));
     NodeId t = ensure_target();
     if (t == INVALID_NODE) return;
@@ -363,6 +493,9 @@ void Builder::open(const std::string& tag, std::string_view attrs) {
   }
 
   // Quotes, code, headings.
+  if (tag.size() == 2 && tag[0] == 'h' && tag[1] >= '1' && tag[1] <= '6' &&
+      open_section(tag))
+    return;
   if (tag == "blockquote" || tag == "pre" ||
       (tag.size() == 2 && tag[0] == 'h' && tag[1] >= '1' && tag[1] <= '6')) {
     Frame f;
@@ -398,6 +531,10 @@ void Builder::open(const std::string& tag, std::string_view attrs) {
       f.node = doc_.create(NodeKind::Table, container());
     }
     push(std::move(f));
+    return;
+  }
+  if ((tag == "tr" || tag == "td" || tag == "th") && in_layout_table()) {
+    block_boundary();
     return;
   }
   if (tag == "tr" || tag == "td" || tag == "th") {
@@ -475,6 +612,10 @@ void Builder::close(const std::string& tag) {
     strike_ = std::max(0, strike_ - 1);
     return;
   }
+  if ((tag == "tr" || tag == "td" || tag == "th") && in_layout_table()) {
+    block_boundary();
+    return;
+  }
   if (tag == "ul" || tag == "ol" || tag == "li" || tag == "blockquote" ||
       tag == "pre" || tag == "table" || tag == "tr" || tag == "td" ||
       tag == "th" || tag == "figcaption" ||
@@ -514,6 +655,57 @@ size_t tag_end(std::string_view html, size_t lt) {
   return std::string_view::npos;
 }
 
+// "<br/>" / "<x a='b' />", but not the unquoted "<a href=x/>".
+bool ends_self_closed(std::string_view tag) {
+  if (tag.empty() || tag.back() != '/') return false;
+  if (tag.size() == 1) return true;
+  char c = tag[tag.size() - 2];
+  return is_space(c) || c == '"' || c == '\'' ||
+         tag.find('=') == std::string_view::npos;
+}
+
+// Hidden, aria-hidden or carrying a chrome class token.
+bool is_chrome(std::string_view attrs) {
+  if (html_has_attr(attrs, "hidden")) return true;
+  if (ascii_lower(html_attr(attrs, "aria-hidden")) == "true") return true;
+  std::string style = ascii_lower(html_attr(attrs, "style"));
+  style.erase(std::remove(style.begin(), style.end(), ' '), style.end());
+  if (style.find("display:none") != std::string::npos) return true;
+  if (one_of(std::string_view(ascii_lower(html_attr(attrs, "role"))), kChromeRoles))
+    return true;
+  std::string cls = ascii_lower(html_attr(attrs, "class"));
+  size_t p = 0;
+  while (p < cls.size()) {
+    size_t e = cls.find_first_of(" \t\n", p);
+    if (e == std::string::npos) e = cls.size();
+    std::string_view tok = std::string_view(cls).substr(p, e - p);
+    if (!tok.empty() && one_of(tok, kChromeClasses)) return true;
+    for (std::string_view part : kChromeClassParts)
+      if (tok.find(part) != std::string_view::npos) return true;
+    p = e + 1;
+  }
+  return false;
+}
+
+size_t find_ci(std::string_view hay, std::string_view needle, size_t from);
+
+// role=presentation, or a table that holds another table (old-school page
+// grids), or a lone big cell.
+bool is_layout_table(std::string_view html, size_t after_open,
+                     std::string_view attrs) {
+  if (ascii_lower(html_attr(attrs, "role")) == "presentation") return true;
+  size_t end = html_element_end(html, after_open, "table");
+  std::string_view inner = html.substr(after_open, end - after_open);
+  if (find_ci(inner, "<table", 0) != std::string_view::npos) return true;
+  // A single row: a frame around content, not data.
+  size_t rows = 0;
+  for (size_t p = 0; (p = find_ci(inner, "<tr", p)) != std::string_view::npos;
+       p += 3)
+    if (p + 3 < inner.size() && !std::isalnum(static_cast<unsigned char>(inner[p + 3])))
+      ++rows;
+  return rows <= 1;
+}
+
 size_t find_ci(std::string_view hay, std::string_view needle, size_t from) {
   for (size_t i = from; i + needle.size() <= hay.size(); ++i)
     if (starts_with_ci(hay.substr(i), needle)) return i;
@@ -522,7 +714,10 @@ size_t find_ci(std::string_view hay, std::string_view needle, size_t from) {
 
 }  // namespace
 
-std::string html_attr(std::string_view attrs, std::string_view name) {
+namespace {
+
+std::optional<std::string_view> find_attr(std::string_view attrs,
+                                          std::string_view name) {
   size_t i = 0;
   while (i < attrs.size()) {
     while (i < attrs.size() && (is_space(attrs[i]) || attrs[i] == '/')) ++i;
@@ -552,10 +747,54 @@ std::string html_attr(std::string_view attrs, std::string_view name) {
       if (i < attrs.size()) ++i;
       continue;
     }
-    if (key.size() == name.size() && starts_with_ci(key, name))
-      return html_decode_entities(value);
+    if (key.size() == name.size() && starts_with_ci(key, name)) return value;
   }
-  return {};
+  return std::nullopt;
+}
+
+}  // namespace
+
+std::string html_attr(std::string_view attrs, std::string_view name) {
+  auto v = find_attr(attrs, name);
+  return v ? html_decode_entities(*v) : std::string{};
+}
+
+size_t html_tag_end(std::string_view html, size_t lt) {
+  return tag_end(html, lt);
+}
+
+bool html_has_attr(std::string_view attrs, std::string_view name) {
+  return find_attr(attrs, name).has_value();
+}
+
+size_t html_element_end(std::string_view html, size_t after_open,
+                        std::string_view tag) {
+  if (tag == "script" || tag == "style") {
+    // Raw text: "a<b" in a script is not a tag.
+    size_t c = find_ci(html, "</" + std::string(tag), after_open);
+    size_t e = c == std::string_view::npos ? c : tag_end(html, c);
+    return e == std::string_view::npos ? html.size() : e + 1;
+  }
+  int depth = 1;
+  size_t i = after_open;
+  while (i < html.size()) {
+    size_t lt = html.find('<', i);
+    if (lt == std::string_view::npos) break;
+    const bool closing = lt + 1 < html.size() && html[lt + 1] == '/';
+    const size_t at = lt + 1 + (closing ? 1 : 0);
+    size_t e = tag_end(html, lt);
+    if (e == std::string_view::npos) break;
+    if (tag_name(html.substr(at)) == tag) {
+      const bool self_close = ends_self_closed(html.substr(lt, e - lt));
+      if (closing) {
+        if (--depth == 0) return e + 1;
+      } else if (!self_close) {
+        ++depth;
+      }
+    }
+    i = e + 1;
+  }
+  return html.size();
 }
 
 std::string resolve_url(std::string_view base, std::string_view href) {
@@ -694,13 +933,25 @@ void html_append_blocks(Document& doc, NodeId parent, std::string_view html,
       continue;
     }
     std::string_view attrs = inside.substr(name.size());
-    const bool self_close = !attrs.empty() && attrs.back() == '/';
+    const bool self_close = ends_self_closed(attrs);
     if (one_of(name, kSkipTags) && !self_close) {
       size_t c = find_ci(html, "</" + name, e + 1);
       size_t ce = c == std::string_view::npos ? std::string_view::npos
                                               : tag_end(html, c);
       i = ce == std::string_view::npos ? html.size() : ce + 1;
       text_start = i;
+      continue;
+    }
+    if (opt.drop_chrome && !self_close && !one_of(name, kVoidTags) &&
+        (one_of(name, kChromeTags) || is_chrome(attrs))) {
+      i = html_element_end(html, e + 1, name);
+      text_start = i;
+      continue;
+    }
+    if (opt.drop_chrome && name == "table" && !self_close &&
+        is_layout_table(html, e + 1, attrs)) {
+      b.open_layout_table();
+      i = e + 1;
       continue;
     }
     b.open(name, attrs);

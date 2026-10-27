@@ -125,6 +125,16 @@ search) and Project Gutenberg. A click downloads the book and imports it via
 with their HTML mapped to paragraphs, lists, quotes, code and tables.
 **Ctrl+L** takes any feed URL, or `feed:https://site/` to autodiscover.
 
+## Web pages
+
+Any other web link opens here too, as a reader view: the page's main
+content mapped to sections, paragraphs, lists, quotes, code and tables —
+no CSS, no scripts. Headings fill the outline, and the first line offers
+**Open in browser** for pages that need the real thing. Try
+[Hypertext on Wikipedia](https://en.wikipedia.org/wiki/Hypertext) or
+[How to Do Great Work](https://www.paulgraham.com/greatwork.html).
+Local `.html` files open the same way.
+
 ## Nostr
 
 Open [Recent Nostr notes](nostr:recent) or [Nostr discussions](nostr-sample.md).

@@ -146,7 +146,11 @@ bool parse_cli(int argc, char** argv, CliOptions& opt) {
   return true;
 }
 
-void open_external_url(const std::string& url) {
+void open_external_url(const std::string& url_in) {
+  // "external:https://…" forces the system browser for an in-app URL.
+  const std::string url = url_in.rfind("external:", 0) == 0
+                              ? url_in.substr(9)
+                              : url_in;
   if (url.rfind("http://", 0) != 0 && url.rfind("https://", 0) != 0 &&
       url.rfind("mailto:", 0) != 0) {
     std::cerr << "Refusing to open non-http(s)/mailto URL: " << url << "\n";

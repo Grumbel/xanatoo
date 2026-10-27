@@ -292,6 +292,8 @@ StatusLine compute_status(App& app) {
       label = "Cite: ";
     else if (app.hover.href[0] == '#')
       label = "Anchor: ";
+    else if (app.hover.href.rfind("external:", 0) == 0)
+      label = "System browser: ";
     else if (xanatoo::is_feed_url(app.hover.href))
       label = "Feed: ";
     else if (xanatoo::is_gemini_url(app.hover.href))
@@ -322,7 +324,10 @@ StatusLine compute_status(App& app) {
     }
     if (app.hover.href[0] == '#')
       label += "    click to jump";
-    else if (app.hover.href.rfind("http://", 0) == 0 ||
+    else if (is_in_app_remote_url(app.hover.href))
+      label += "    click to open";
+    else if (app.hover.href.rfind("external:", 0) == 0 ||
+             app.hover.href.rfind("http://", 0) == 0 ||
              app.hover.href.rfind("https://", 0) == 0 ||
              app.hover.href.rfind("mailto:", 0) == 0)
       label += "    click to open externally";

@@ -192,8 +192,22 @@ mechanism; historical bundle numbers in TODO.md are archival).
   wrappers unwrapped. BlockQuote, ListItem and TableCell are leaves, so
   nested blocks inside them flatten to line breaks / "• " lines.
 - Images become `[image: alt]` links (no remote image fetch yet).
-- Used by feeds and Hacker News (`gt_quotes` for HN's "> " convention);
-  also `html_to_plain`, `html_attr`, `resolve_url`.
+- Used by feeds and Hacker News (`gt_quotes` for HN's "> " convention)
+  and web pages (page-mode options below); also `html_to_plain`,
+  `html_attr`, `resolve_url`, `html_element_end`.
+
+## Web pages (`html_page.hpp`)
+
+- `src/html_page.cpp`, gated by `XANATOO_WEB` (default ON). Any http(s)
+  URL that no other service claims and that `is_web_url` accepts (not an
+  obvious download) opens in-app; it is checked last in dispatch.
+- `parse_html_page`: main content (`<main>`, lone `<article>`, `<body>`)
+  through `html_min` page mode (`sections`, `anchors`, `drop_chrome`);
+  also used for local `.html` files (`parse_document` dispatch). HTML is
+  read-only: Save asks for a `.md` name.
+- `web_fetch` dispatches on Content-Type; bodies go through
+  `detect_charset` / `to_utf8` (util.hpp) first.
+- `external:<url>` hrefs force the system browser (`open_external_url`).
 
 ## Ebooks
 

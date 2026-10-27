@@ -8,6 +8,37 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-27) — web pages as reader views
+
+- `html_page.cpp` (`XANATOO_WEB`): any other http(s) link opens in-app.
+  Main content only (`<main>` / role=main, a lone `<article>`, else
+  `<body>`); og:title / `<title>` as the top Section unless the content
+  has an `<h1>`; headings → nested Section + Header (outline, folding);
+  element ids → labels so `#fragment` / footnote links jump; first line
+  "host · Open in browser" (`external:` prefix → system browser).
+  Content-Type dispatch: HTML, feeds, text/plain (blank-line chunks as
+  code blocks), text/markdown, text/gemini; other types error out with an
+  "Open in browser" link. Obvious downloads (.pdf, .zip, images, media)
+  still go straight to the system browser (`is_web_url`).
+- `html_min` page mode (`sections` / `anchors` / `drop_chrome`): drops
+  nav / aside / form / footer / dialog, hidden + aria-hidden + sr-only,
+  ARIA nav roles, dropdown / toolbar / navbar / breadcrumb / cookie
+  classes, alt="" and 1×1 images; layout tables (nested or single-row,
+  role=presentation) unwrap; `<br><br>` splits paragraphs. Script bodies
+  are skipped raw; unquoted `href=x/` is no longer self-closing.
+- Local `.html` / `.htm` files open through the same mapper; Save on an
+  HTML file or URL asks for a `.md` name instead of overwriting.
+- Charsets: `detect_charset` + `to_utf8` (Latin-1 / Windows-1252 →
+  UTF-8, valid UTF-8 kept whatever the label), used for pages and feeds;
+  `&#150;`-style references decode as Windows-1252.
+- Checked: Wikipedia (sections, infobox table, cite_note jumps, link
+  navigation), jvns.ca, paulgraham.com (layout tables), gnu.org, lwn.net,
+  danluu.com, blog.rust-lang.org, an RFC .txt.
+- Open: remote images; JavaScript-only pages show "No readable content";
+  pages open in edit mode (a stray click on a list marker toggles a task
+  box and dirties the page); tab label is the URL, not the page title;
+  other code pages (Shift_JIS, KOI8-R) are not converted.
+
 ## Status (2026-10-27) — RSS / Atom feeds, shared HTML mapper
 
 - `html_min` (new): forgiving HTML fragment → document blocks (headings,
@@ -21,8 +52,7 @@ Next bundle number: **263** (this delivery is **262**)
   (all checked to parse: no leftover markup / entities).
 - `html_decode_entities` knows Latin-1, Greek and common punctuation names.
 - Open: remote images (would need fetching into the image cache — the
-  main gap for comics / photo feeds); non-UTF-8 feeds (ISO-8859-1) are
-  read as UTF-8; http-only feeds fail (https_request is TLS only); feed
+  main gap for comics / photo feeds); http-only feeds fail (https_request is TLS only); feed
   headings count in the outline / heading total; no read/unread state or
   subscriptions list yet (feeds.md is the subscription list for now).
 

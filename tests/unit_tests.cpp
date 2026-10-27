@@ -7,6 +7,7 @@
 #include "xanatoo/feed.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/html_min.hpp"
+#include "xanatoo/html_page.hpp"
 #include "xanatoo/hackernews.hpp"
 #include "xanatoo/json_min.hpp"
 #include "xanatoo/lemmy.hpp"
@@ -1340,8 +1341,104 @@ void test_parse_feeds() {
   EXPECT(!parse_feed("<html><body>x</body></html>", "https://x").has_value());
 }
 
+std::string doc_span_href(const xanatoo::Document& d, xanatoo::NodeId n) {
+  const auto& sp = d.get(n).spans;
+  return sp.empty() ? std::string{} : sp.front().href;
+}
+
+void test_html_page() {
+  using namespace xanatoo;
+  EXPECT(is_web_url("https://example.org"));
+  EXPECT(is_web_url("http://example.org/a/b.html?x=1"));
+  EXPECT(!(is_web_url("https://example.org/paper.PDF")));
+  EXPECT(!(is_web_url("https://example.org/i.png?w=10")));
+  EXPECT(!(is_web_url("gemini://example.org/")));
+  EXPECT(path_uses_html("/tmp/A.HTM"));
+  EXPECT(!(path_uses_html("a.md")));
+
+  const char* page =
+      "<!doctype html><html><head><title>T &amp; t</title>"
+      "<meta property=\"og:title\" content=\"OG title\"></head><body>"
+      "<nav><a href=/>Home</a></nav>"
+      "<main><h2 id=\"intro\">Intro</h2><p>See <a href=\"#more\">more</a> "
+      "and <a href=\"https://ex.org/p#intro\">top</a>"
+      "<span class=\"sr-only\">hidden</span><img src=d.png alt=\"\">"
+      "<div hidden><p>gone</div>"
+      "<h3>Sub</h3><p id=\"more\">Deep</p><h2>Two</h2><p>Last</main>"
+      "<footer>foot</footer></body></html>";
+  EXPECT_EQ(html_page_title(page), "OG title");
+  Document doc = parse_html_page(page, "https://ex.org/p");
+  auto top = kids_of(doc, doc.root);
+  // "host · Open in browser" line, then the title section.
+  EXPECT_EQ(top.size(), 2u);
+  EXPECT_EQ(doc.get(top[0]).spans.back().href, "external:https://ex.org/p");
+  NodeId title = top[1];
+  EXPECT(doc.get(title).kind == NodeKind::Section);
+  auto tk = kids_of(doc, title);
+  EXPECT_EQ(tk.size(), 3u);  // Header, Intro, Two
+  EXPECT_EQ(plain_text(doc, tk[0]), "OG title");
+  auto intro = kids_of(doc, tk[1]);
+  EXPECT_EQ(intro.size(), 3u);  // Header, Paragraph, Section "Sub"
+  EXPECT_EQ(doc.get(intro[0]).label, "intro");
+  EXPECT_EQ(plain_text(doc, intro[1]), "See more and top");
+  EXPECT_EQ(doc.get(intro[1]).spans[1].href, "#more");
+  EXPECT_EQ(doc.get(intro[1]).spans[3].href, "#intro");
+  EXPECT(doc.get(intro[2]).kind == NodeKind::Section);
+  EXPECT_EQ(doc.get(intro[2]).level, 3);
+  EXPECT(jump_to_href(doc, "#more").has_value());
+  EXPECT_EQ(plain_text(doc, jump_to_href(doc, "#more")->node), "Deep");
+  for (const Node& n : doc.nodes) {
+    std::string t = plain_text(doc, n.id);
+    EXPECT(t.find("Home") == std::string::npos);
+    EXPECT(t.find("hidden") == std::string::npos);
+    EXPECT(t.find("gone") == std::string::npos);
+    EXPECT(t.find("foot") == std::string::npos);
+    EXPECT(t.find("[image") == std::string::npos);
+  }
+
+  // Own <h1>: no synthetic title section; no <main>: <body> is used.
+  Document d2 = parse_html_page("<title>X</title><h1>Real</h1><p>b", "a.html");
+  auto k2 = kids_of(d2, d2.root);
+  EXPECT_EQ(k2.size(), 1u);
+  EXPECT_EQ(plain_text(d2, kids_of(d2, k2[0])[0]), "Real");
+  EXPECT(parse_document("<p>x", "local.html").nodes.size() > 1);
+
+  // Unquoted href ending in "/" is not self-closing; "a<b" in a script
+  // does not hide <main>; layout tables and <br><br> become paragraphs.
+  Document d3 = parse_html_page(
+      "<head><script>for(o=0;o<p.length;o++){x=\"'\"}</script></head>"
+      "<body><p>nav<main><h1>M</h1><a href=https://e.org/x/>link</a>"
+      "<table><tr><td><table><tr><td>one<br><br>two "
+      "<img src=s.gif width=1 height=1></table></table></main>",
+      "https://e.org/");
+  auto k3 = kids_of(d3, kids_of(d3, d3.root)[1]);  // the <h1> section
+  EXPECT_EQ(k3.size(), 4u);  // Header, link, one, two
+  EXPECT_EQ(doc_span_href(d3, k3[1]), "https://e.org/x/");
+  EXPECT_EQ(plain_text(d3, k3[2]), "one");
+  EXPECT_EQ(plain_text(d3, k3[3]), "two");
+
+  Document txt = plain_text_document("a\r\n  b\n\n\n c\n");
+  auto tk2 = kids_of(txt, txt.root);
+  EXPECT_EQ(tk2.size(), 2u);
+  EXPECT_EQ(plain_text(txt, tk2[0]), "a\n  b");
+  EXPECT_EQ(plain_text(txt, tk2[1]), " c");
+
+  // Charsets.
+  EXPECT_EQ(detect_charset("text/html; charset=ISO-8859-1", ""), "iso-8859-1");
+  EXPECT_EQ(detect_charset("text/html", "<meta charset=\"Windows-1252\">"),
+            "windows-1252");
+  EXPECT_EQ(detect_charset("", "<?xml version=\"1.0\" encoding='iso-8859-1'?>"),
+            "iso-8859-1");
+  EXPECT_EQ(to_utf8("caf\xe9 \x93q\x94", "iso-8859-1"),
+            "caf\xc3\xa9 \xe2\x80\x9cq\xe2\x80\x9d");
+  EXPECT_EQ(to_utf8("caf\xc3\xa9", "iso-8859-1"), "caf\xc3\xa9");
+  EXPECT_EQ(to_utf8("caf\xe9", ""), "caf\xc3\xa9");
+  EXPECT_EQ(html_decode_entities("a&#150;b"), "a\xe2\x80\x93" "b");
+}
+
 int main() {
   test_html_min();
+  test_html_page();
   test_feed_urls();
   test_parse_feeds();
   test_hn_urls_and_html();

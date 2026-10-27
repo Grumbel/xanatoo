@@ -17,6 +17,11 @@ namespace xanatoo {
 struct HtmlOptions {
   std::string base_url;    // relative href / src resolve against this
   bool gt_quotes = false;  // paragraphs starting with ">" → BlockQuote (HN)
+  // Whole web pages (html_page.cpp):
+  bool sections = false;     // h1–h6 open nested Section + Header (outline)
+  bool anchors = false;      // id= → node label; same-page links stay "#id"
+  bool drop_chrome = false;  // drop nav / aside / form / footer, hidden and
+                             // screen-reader-only elements, alt="" images
 };
 
 // Append the blocks of `html` as children of `parent`:
@@ -33,6 +38,16 @@ std::string html_to_plain(std::string_view html);
 // Value of attribute `name` inside a tag's attribute text
 // (`href="x" class=y`), entities decoded; empty when absent.
 std::string html_attr(std::string_view attrs, std::string_view name);
+bool html_has_attr(std::string_view attrs, std::string_view name);
+
+// Index of the '>' closing the tag that starts at `lt` (quote-aware);
+// npos when unterminated.
+size_t html_tag_end(std::string_view html, size_t lt);
+
+// Index just past the element whose open tag ends at `after_open`
+// (nesting of the same tag counted); html.size() when unclosed.
+size_t html_element_end(std::string_view html, size_t after_open,
+                        std::string_view tag);
 
 // Resolve `href` against `base` (absolute, //host, /path, ?q, #f, relative).
 std::string resolve_url(std::string_view base, std::string_view href);

@@ -83,6 +83,17 @@ void utf8_pop_back(std::string& s);
 // &mdash; &hellip; …). Unknown names stay as written.
 std::string html_decode_entities(std::string_view s);
 
+// Charset of a fetched body: the Content-Type "charset=" parameter, else
+// <meta charset> / http-equiv / <?xml encoding?> near the top. Lower-case,
+// empty when undeclared.
+std::string detect_charset(std::string_view content_type,
+                           std::string_view body);
+
+// `body` as UTF-8. Valid UTF-8 is kept whatever the label says; otherwise
+// Latin-1 / Windows-1252 / undeclared bytes are converted. Other code
+// pages are returned unchanged.
+std::string to_utf8(std::string body, std::string_view charset);
+
 // XDG config directory for xanatoo (~/.config/xanatoo). Created if missing.
 // Returns empty string if the home directory cannot be resolved.
 std::string config_dir();
