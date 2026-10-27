@@ -19,6 +19,13 @@ Targets Android 5.0+ (`minSdkVersion` 21), ABIs `armeabi-v7a arm64-v8a
 x86_64`, NDK 29. The launcher icon is `mk/android/app/ic_launcher.svg`,
 rasterized into `res/mipmap-*/`.
 
+SQLite (side store: persisted folds) is the amalgamation generated from
+nixpkgs' `sqlite.src` (`sqliteAmalgamation` in `nix/android.nix`) and built
+as a static module (`mk/android/sqlite/Android.mk`).
+
+The APK is `android:debuggable` (debug-signed development build), so
+`adb shell run-as io.github.grumbel.xanatoo ls files` inspects its data.
+
 ## Data files
 
 `build-apk.sh` packs `examples/`, `FORMAT.md`, `styles/*.xss`, the toolbar
@@ -62,7 +69,6 @@ lifecycle fixes).
 |---------|---------|---------|
 | Gemini / Nostr / Reddit / Lemmy | OpenSSL | off (`XANATOO_*=0`) |
 | Font lookup | FontConfig | `XANATOO_FONTCONFIG=0`: generic families → `data/fonts`, `/system/fonts` |
-| Fold persistence | SQLite | `XANATOO_SQLITE=0`: per session |
 
 The same switches work for desktop CMake builds (`-DXANATOO_FONTCONFIG=OFF
 -DXANATOO_SQLITE=OFF -DXANATOO_GEMINI=OFF …`), which is the quick way to

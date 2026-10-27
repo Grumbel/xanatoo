@@ -3,8 +3,8 @@
 #
 # libmain.so: xanatoo, linked against the prebuilt SDL2 and the static
 # FreeType module (see build-apk.sh, which puts src/, include/ and external/
-# next to this file). First port: no OpenSSL clients, no FontConfig (font
-# files are looked up in /system/fonts), no SQLite side store.
+# next to this file). No OpenSSL clients yet, no FontConfig (font files
+# come from the bundled DejaVu and /system/fonts); SQLite is a static module.
 LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
@@ -26,10 +26,10 @@ LOCAL_C_INCLUDES := \
 LOCAL_CPPFLAGS += -std=c++20 -Wno-psabi -Wall -Wextra -Wno-unused-parameter \
 	-O2 \
 	-DXANATOO_GEMINI=0 -DXANATOO_NOSTR=0 -DXANATOO_REDDIT=0 \
-	-DXANATOO_LEMMY=0 -DXANATOO_FONTCONFIG=0 -DXANATOO_SQLITE=0
+	-DXANATOO_LEMMY=0 -DXANATOO_FONTCONFIG=0 -DXANATOO_SQLITE=1
 LOCAL_CPP_FEATURES := exceptions rtti
 LOCAL_SHARED_LIBRARIES := SDL2
-LOCAL_STATIC_LIBRARIES := freetype
+LOCAL_STATIC_LIBRARIES := freetype sqlite3
 LOCAL_LDLIBS := -llog -landroid
 
 include $(BUILD_SHARED_LIBRARY)

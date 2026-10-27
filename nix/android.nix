@@ -7,8 +7,9 @@
 # source) into libmain.so against it; both packaged into a signed APK.
 #
 # First port, bare bones: no OpenSSL clients (Gemini / Nostr / Reddit /
-# Lemmy), no FontConfig (fonts come from /system/fonts), no SQLite side
-# store. Data files ship as APK assets (see mk/android/scripts/build-apk.sh).
+# Lemmy) and no FontConfig (fonts come from the bundled DejaVu and
+# /system/fonts). SQLite is built from its amalgamation. Data files ship as
+# APK assets (see mk/android/scripts/build-apk.sh).
 #
 #   nix build .#xanatoo-android        the APK
 #   nix run .#install-android-xanatoo  install it with adb
@@ -67,6 +68,19 @@ let
     dontStrip = true;
   };
 
+  # sqlite3.c + sqlite3.h from nixpkgs' full source tree (needs tclsh).
+  sqliteAmalgamation = pkgs.stdenv.mkDerivation {
+    pname = "sqlite-amalgamation";
+    inherit (pkgs.sqlite) version src;
+    nativeBuildInputs = [ pkgs.unzip pkgs.tcl ];
+    configureFlags = [ "--disable-tcl" ];
+    buildPhase = "make sqlite3.c";
+    installPhase = ''
+      mkdir -p $out
+      cp sqlite3.c sqlite3.h $out/
+    '';
+  };
+
   sdlPrebuiltMk = pkgs.writeText "SDL2-prebuilt-Android.mk" ''
     LOCAL_PATH := $(call my-dir)
     include $(CLEAR_VARS)
@@ -107,6 +121,8 @@ let
       FREETYPE_SRC = "${pkgs.freetype.src}";
       DEJAVU_DIR = "${pkgs.dejavu_fonts}/share/fonts/truetype";
       FREETYPE_MK = "${../mk/android/freetype/Android.mk}";
+      SQLITE_SRC = sqliteAmalgamation;
+      SQLITE_MK = "${../mk/android/sqlite/Android.mk}";
       APPLICATION_MK = applicationMk;
       TOP_ANDROID_MK = topAndroidMk;
       SDL_PREBUILT_MK = sdlPrebuiltMk;
@@ -138,5 +154,5 @@ let
   };
 
 in {
-  inherit sdlAndroidLibs apk installApp;
+  inherit sdlAndroidLibs sqliteAmalgamation apk installApp;
 }

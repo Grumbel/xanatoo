@@ -13,7 +13,7 @@
 #      repository: src/, include/, external/, examples/, styles/, icons/svg,
 #      scripts/rasterize_icons.py, FORMAT.md), DEJAVU_DIR (TTFs bundled as
 #      fonts/: same faces as desktop, and glyphs Roboto lacks — ▸ ▾ ☐ ☑),
-#      FREETYPE_SRC (tarball),
+#      FREETYPE_SRC (tarball), SQLITE_SRC (dir with sqlite3.c/.h), SQLITE_MK,
 #      FREETYPE_MK, APPLICATION_MK, TOP_ANDROID_MK, SDL_PREBUILT_MK,
 #      SDL_ANDROID_LIBS, KEYSTORE, APP_VERSION, VERSION_CODE
 set -euo pipefail
@@ -48,6 +48,11 @@ cp -r "$APP_SRC_DIR"/external src/jni/src/external
 # FreeType, built from source as a static module.
 tar xf "$FREETYPE_SRC" -C src/jni/freetype --strip-components=1
 cp "$FREETYPE_MK" src/jni/freetype/Android.mk
+
+# SQLite amalgamation as a static module (side store).
+mkdir -p src/jni/sqlite
+cp "$SQLITE_SRC"/sqlite3.c "$SQLITE_SRC"/sqlite3.h src/jni/sqlite/
+cp "$SQLITE_MK" src/jni/sqlite/Android.mk
 
 # SDL2, prebuilt; xanatoo includes <SDL.h> from include/SDL2.
 cp "$SDL_PREBUILT_MK" src/jni/SDL/Android.mk

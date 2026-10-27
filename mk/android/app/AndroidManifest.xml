@@ -17,7 +17,11 @@
         android:label="xanatoo"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="true"
+        android:debuggable="true"
         android:hasCode="true">
+        <!-- debuggable: debug-signed development build; lets `adb shell
+             run-as io.github.grumbel.xanatoo` inspect files/ (view.conf,
+             side store, unpacked data). -->
         <!-- One window only: a second launch brings the running app back. -->
         <activity
             android:name="org.libsdl.app.SDLActivity"
