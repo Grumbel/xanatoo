@@ -97,6 +97,9 @@ struct DocumentMeta {
   std::string title;
   std::string lang;   // BCP 47, e.g. "en"
   std::string author;
+  // Markdown YAML front matter, verbatim (between the --- lines) so a save
+  // keeps keys xanatoo does not read; title / author / lang come from it.
+  std::string front_matter;
 };
 
 // Simple arena-style store: contiguous nodes, IDs are indices+1

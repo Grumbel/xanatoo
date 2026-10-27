@@ -39,8 +39,11 @@ void apply_view_settings(App& app) {
 }
 
 void refresh_outline(App& app) {
+  // Preamble row label when the document has no title: the tab label.
+  std::string label = buffer_tab_label(app, focused_pane(app).buf);
+  if (xanatoo::starts_with(label, "*")) label.erase(0, 1);
   xanatoo::collect_outline(doc_of(app, focused_pane(app)), app.outline,
-                           &app.folded_sections);
+                           &app.folded_sections, label);
   if (app.outline_sel >= static_cast<int>(app.outline.size()))
     app.outline_sel = std::max(0, static_cast<int>(app.outline.size()) - 1);
   if (app.outline_sel < 0) app.outline_sel = 0;
@@ -588,6 +591,22 @@ void jump_outline_sel(App& app) {
   Pane& p = focused_pane(app);
   const auto& er = app.outline[static_cast<size_t>(app.outline_sel)];
   xanatoo::Document& d = doc_of(app, p);
+  if (er.preamble) {
+    // Title row: back to the very top (cover image, byline, …).
+    if (app.section_focus_mode && app.section_focus_id != xanatoo::INVALID_NODE) {
+      app.section_focus_id = xanatoo::INVALID_NODE;
+      drop_height_hints_for_buf(app, p.buf);
+      app.needs_layout = true;
+    }
+    if (app.needs_layout) layout_panes(app);
+    p.sel = {};
+    xanatoo::move_to_document_start(d, p.sel.focus);
+    p.sel.anchor = p.sel.focus;
+    p.scroll_y = 0.f;
+    ensure_virtual_layout(app, p);  // the band may not reach the top
+    reset_blink(app);
+    return;
+  }
   // Prefer the title Header; if the row only has a Section id (no header
   // child), land on the first text node under that section so
   // ensure_valid_caret does not relocate to the top of the document.

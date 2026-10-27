@@ -1608,7 +1608,48 @@ void test_collection() {
   EXPECT_EQ(serialize_sexpr(sdoc), sx);
 }
 
+void test_front_matter_and_preamble() {
+  using namespace xanatoo;
+  const std::string src =
+      "---\ntitle: \"The Picture of Dorian Gray\"\nauthor: Oscar Wilde\n"
+      "description: |\n  title: not this\nlanguage: en-GB\n---\n\n"
+      "![](cover.jpg)\n\n# Preface\n\nText.\n";
+  Document doc = parse_markup(src);
+  EXPECT_EQ(doc.meta.title, "The Picture of Dorian Gray");
+  EXPECT_EQ(doc.meta.author, "Oscar Wilde");
+  EXPECT_EQ(doc.meta.lang, "en-GB");
+  const std::string out = serialize_markup(doc);
+  EXPECT(starts_with(out, "---\ntitle: \"The Picture of Dorian Gray\"\n"));
+  EXPECT(out.find("description: |\n  title: not this\n") != std::string::npos);
+  EXPECT_EQ(serialize_markup(parse_markup(out)), out);
+
+  // Cover image before the first heading → title row, then the heading.
+  std::vector<OutlineEntry> ol;
+  collect_outline(doc, ol, nullptr, "content.md");
+  EXPECT_EQ(ol.size(), size_t(2));
+  if (ol.size() == 2) {
+    EXPECT(ol[0].preamble);
+    EXPECT_EQ(ol[0].text, "The Picture of Dorian Gray");
+    EXPECT(!ol[1].preamble);
+    EXPECT_EQ(ol[1].text, "Preface");
+  }
+
+  // A leading horizontal rule is not front matter.
+  Document hr = parse_markup("---\n\nSome text.\n\n---\n");
+  EXPECT(hr.meta.title.empty());
+  EXPECT(hr.meta.front_matter.empty());
+
+  // No title: the fallback label; no preamble row when a heading leads.
+  Document plain = parse_markup("Intro.\n\n# A\n");
+  collect_outline(plain, ol, nullptr, "notes.md");
+  EXPECT(!ol.empty() && ol[0].preamble && ol[0].text == "notes.md");
+  Document headed = parse_markup("# A\n\nText.\n");
+  collect_outline(headed, ol, nullptr, "notes.md");
+  EXPECT(ol.size() == 1 && !ol[0].preamble);
+}
+
 int main() {
+  test_front_matter_and_preamble();
   test_collection();
   test_wikipedia();
   test_pandoc_formats();

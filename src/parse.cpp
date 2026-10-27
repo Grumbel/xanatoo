@@ -41,6 +41,61 @@ std::vector<Line> split_lines(std::string_view src) {
   return lines;
 }
 
+std::string_view trimmed(std::string_view v) {
+  trim_ascii(v);
+  return v;
+}
+
+// Unquoted value of a top-level "key: value" YAML line ('' / "" stripped).
+std::string yaml_scalar(std::string_view v) {
+  trim_ascii(v);
+  if (v.size() >= 2 && (v.front() == '"' || v.front() == '\'') &&
+      v.back() == v.front()) {
+    const char q = v.front();
+    v = v.substr(1, v.size() - 2);
+    std::string out;
+    for (size_t k = 0; k < v.size(); ++k) {
+      if (q == '"' && v[k] == '\\' && k + 1 < v.size()) ++k;
+      else if (q == '\'' && v[k] == '\'' && k + 1 < v.size() && v[k + 1] == '\'')
+        ++k;
+      out += v[k];
+    }
+    return out;
+  }
+  return std::string(v);
+}
+
+// Leading "---" … "---" / "..." block (pandoc, Jekyll, Hugo): reads the
+// plain top-level title / author / lang keys and keeps the block verbatim.
+// Returns the index of the first line after it (0 if there is none).
+size_t read_front_matter(const std::vector<Line>& lines, DocumentMeta& meta) {
+  // A leading horizontal rule is not front matter: line 2 must be "key:".
+  if (lines.size() < 3 || trimmed(lines[0].text) != "---" ||
+      lines[1].text.find(':') == std::string_view::npos ||
+      lines[1].text[0] == ' ')
+    return 0;
+  size_t end = 1;
+  while (end < lines.size() && trimmed(lines[end].text) != "---" &&
+         trimmed(lines[end].text) != "...")
+    ++end;
+  if (end >= lines.size() || end == 1) return 0;  // no close / "---" rule
+  for (size_t k = 1; k < end; ++k) {
+    std::string_view l = lines[k].text;
+    if (!meta.front_matter.empty()) meta.front_matter += '\n';
+    meta.front_matter += l;
+    if (l.empty() || l[0] == ' ' || l[0] == '\t' || l[0] == '-') continue;
+    const size_t colon = l.find(':');
+    if (colon == std::string_view::npos) continue;
+    const std::string key = ascii_lower(trimmed(l.substr(0, colon)));
+    std::string val = yaml_scalar(l.substr(colon + 1));
+    if (val.empty() || val == "|" || val == ">") continue;
+    if (key == "title") meta.title = std::move(val);
+    else if (key == "author") meta.author = std::move(val);
+    else if (key == "lang" || key == "language") meta.lang = std::move(val);
+  }
+  return end + 1;
+}
+
 // Detect a list-item marker at the start of a trimmed line.
 // Returns bytes to skip past the marker, or 0 if not a list item.
 // Sets *ordered_index to 1-based index for "N. " markers, or 0 for "- "/"* ".
@@ -339,7 +394,7 @@ Document parse_markup(std::string_view source) {
   NodeId root = doc.create(NodeKind::Document);
 
   auto lines = split_lines(source);
-  size_t i = 0;
+  size_t i = read_front_matter(lines, doc.meta);
 
   // Simple stack for nested containers (stretch, columns, column)
   std::vector<NodeId> stack;
@@ -1828,6 +1883,8 @@ case NodeKind::Table: {
 
 std::string serialize_markup(const Document& doc) {
   std::string out;
+  if (!doc.meta.front_matter.empty())
+    out += "---\n" + doc.meta.front_matter + "\n---\n\n";
   if (doc.root != INVALID_NODE) {
     serialize_node(doc, doc.root, out, 0);
   }

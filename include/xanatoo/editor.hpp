@@ -336,6 +336,9 @@ bool table_move_cell(Document& doc, Caret& caret, bool forward);
 // Heading outline for navigation (document order).
 // Built from Section/Article trees when present; optional view-local fold set
 // hides nested rows (document body fold is the same set used by layout).
+// Content before the first heading (cover image, byline, …) gets a leading
+// `preamble` row labelled with the page title (doc.meta.title, else
+// `fallback_title`).
 struct OutlineEntry {
   NodeId node = INVALID_NODE;     // Header/Heading to jump to
   NodeId section = INVALID_NODE;  // enclosing Section/Article (for fold)
@@ -343,9 +346,11 @@ struct OutlineEntry {
   std::string text;
   bool has_children = false;  // nested outline rows when expanded
   bool folded = false;        // view-local: body (and outline children) hidden
+  bool preamble = false;      // top row: title + content before 1st heading
 };
 void collect_outline(const Document& doc, std::vector<OutlineEntry>& out,
-                     const std::unordered_set<NodeId>* folded_sections = nullptr);
+                     const std::unordered_set<NodeId>* folded_sections = nullptr,
+                     std::string_view fallback_title = {});
 
 // ---------------------------------------------------------------------------
 // Undo / redo via document snapshots (simple, correct at current scale).

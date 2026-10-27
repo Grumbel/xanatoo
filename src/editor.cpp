@@ -2836,9 +2836,30 @@ bool table_move_cell(Document& doc, Caret& caret, bool forward) {
 }
 
 void collect_outline(const Document& doc, std::vector<OutlineEntry>& out,
-                     const std::unordered_set<NodeId>* folded_sections) {
+                     const std::unordered_set<NodeId>* folded_sections,
+                     std::string_view fallback_title) {
   out.clear();
   if (doc.root == INVALID_NODE) return;
+
+  // Preamble: top-level blocks before the first Section / heading.
+  {
+    const Node& root = doc.get(doc.root);
+    const NodeId first =
+        root.children.empty() ? INVALID_NODE : root.children.front();
+    const NodeKind k =
+        first == INVALID_NODE ? NodeKind::Section : doc.get(first).kind;
+    if (k != NodeKind::Section && k != NodeKind::Article &&
+        k != NodeKind::Header && k != NodeKind::Heading) {
+      OutlineEntry e;
+      e.node = first;
+      e.level = 1;
+      e.preamble = true;
+      e.text = !doc.meta.title.empty() ? doc.meta.title
+               : !fallback_title.empty() ? std::string(fallback_title)
+                                         : std::string("(top)");
+      out.push_back(std::move(e));
+    }
+  }
 
   auto is_folded = [&](NodeId id) {
     return folded_sections &&

@@ -193,7 +193,8 @@ Document parse_html_page(std::string_view html, std::string_view page_url) {
                         return t.name == "h1";
                       }).has_value();
   NodeId parent = root;
-  if (std::string title = html_page_title(html); !title.empty() && !has_h1) {
+  doc.meta.title = html_page_title(html);
+  if (std::string title = doc.meta.title; !title.empty() && !has_h1) {
     parent = doc.create(NodeKind::Section, root);
     doc.get(parent).level = 1;
     NodeId h = doc.create(NodeKind::Header, parent);

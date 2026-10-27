@@ -392,10 +392,14 @@ ImportResult import_via_pandoc(const std::string& epub_path) {
     return out;
   }
 
-  // Reuse derived Markdown when it is at least as new as the EPUB.
+  // Reuse derived Markdown when it is at least as new as the EPUB and was
+  // made by the current conversion (bump kFormat when the pandoc call
+  // changes; the stamp file holds it).
+  static constexpr const char* kFormat = "2 front-matter";
+  const fs::path stamp = dir / ".format";
   bool reuse = false;
   try {
-    if (fs::exists(md)) {
+    if (fs::exists(md) && read_text_file(stamp) == kFormat) {
       auto epub_t = fs::last_write_time(epub_path);
       auto md_t = fs::last_write_time(md);
       if (md_t >= epub_t) reuse = true;
@@ -410,14 +414,16 @@ ImportResult import_via_pandoc(const std::string& epub_path) {
     } catch (...) {
     }
 
-    // pandoc book.epub -f epub -t gfm-raw_html -o content.md --extract-media=media
+    // pandoc book.epub -f epub -t gfm-raw_html+yaml_metadata_block -s
+    //   -o content.md --extract-media=media
+    // (-s writes the title / author / … as YAML front matter.)
     // Run with cwd = cache dir so relative media paths in the MD resolve.
     std::ostringstream cmd;
     cmd << "cd " << shell_quote(dir.string()) << " && "
         << "pandoc " << shell_quote(fs::absolute(epub_path).string())
         // -raw_html: unwrap div/span/section markup instead of passing it
         // through (EPUB XHTML leaves attribute lines in the text).
-        << " -f " << reader << " -t gfm-raw_html"
+        << " -f " << reader << " -t gfm-raw_html+yaml_metadata_block -s"
         << " -o " << shell_quote(md.filename().string())
         << " --extract-media=" << shell_quote(media.filename().string())
         << " 2>/tmp/xanatoo-pandoc-epub.err";
@@ -440,6 +446,7 @@ ImportResult import_via_pandoc(const std::string& epub_path) {
       if (!detail.empty()) out.error += ": " + detail;
       return out;
     }
+    write_text_file(stamp, kFormat);
   } else {
     std::cout << "Reusing import cache: " << md.string() << "\n";
   }

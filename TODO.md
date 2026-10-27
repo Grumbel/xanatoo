@@ -8,6 +8,21 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-27) — outline title row, Markdown front matter
+
+- Outline: content before the first heading (cover image, byline, web
+  page source line) gets a leading row labelled with the page title
+  (`doc.meta.title`, else the tab label); it jumps to the very top.
+  `OutlineEntry::preamble`, `collect_outline(…, fallback_title)`.
+- Markdown YAML front matter (`---` … `---`): title / author / lang into
+  `DocumentMeta`, block kept verbatim (`front_matter`) for round-trip; a
+  leading `---` rule is not mistaken for it (line 2 must be `key:`).
+- Pandoc imports run with `-s` + `yaml_metadata_block`, so EPUBs keep
+  their title; `.format` stamp in the import dir forces a re-import of
+  older caches. Web pages set `meta.title` from `<title>`.
+- Menus: Open in Window under File; Examples only under Help (grouped,
+  incl. Collections).
+
 ## Status (2026-10-27) — Services menu, split / outline buttons
 
 - Services menu (between Bookmarks and Help): front pages of the in-app

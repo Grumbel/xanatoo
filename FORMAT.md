@@ -38,6 +38,17 @@ stable identity matter.
 | `:lang`   | Primary language (BCP 47)        |
 | `:author` | Authorship string                |
 
+Markdown carries the same fields as leading YAML front matter (pandoc /
+Jekyll convention); `title`, `author` and `lang` / `language` are read,
+the whole block is kept verbatim on save:
+
+```markdown
+---
+title: Living hypertext
+author: …
+---
+```
+
 ## Blocks
 
 | Form | Role |
