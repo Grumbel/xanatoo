@@ -111,6 +111,16 @@ toolbar and shortcuts should route through `execute_command`.
 - Build target: `xanatoo_tests` (`ctest` or run the binary).
 - Does not exercise live network fetches.
 
+## Android
+
+- `nix build .#xanatoo-android` (ndk-build pipeline from Kurvenrausch;
+  `nix/android.nix`, `mk/android/`). See `docs/ANDROID.md`.
+- Built with `XANATOO_FONTCONFIG=0`, `XANATOO_SQLITE=0` and all OpenSSL
+  clients off; keep code compiling with those (desktop CMake accepts the
+  same `-D…=OFF` switches). New `src/*.cpp` files are picked up by
+  `mk/android/app/jni/Android.mk` automatically; OpenSSL-only files must be
+  excluded in `build-apk.sh` like `https.cpp`.
+
 ## Develop shell (`nix develop`)
 
 - PATH scripts: `xanatoo-configure`, `xanatoo-build`, `xanatoo-run`, `xanatoo-run-gdb`, `xanatoo-test`.

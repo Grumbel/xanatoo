@@ -3,6 +3,10 @@
 
 #include "xanatoo/cli.hpp"
 
+#ifdef __ANDROID__
+#include <SDL.h>
+#endif
+
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
@@ -149,7 +153,10 @@ void open_external_url(const std::string& url) {
     return;
   }
 
-#if defined(__linux__)
+#if defined(__ANDROID__)
+  if (SDL_OpenURL(url.c_str()) != 0)
+    std::cerr << "SDL_OpenURL failed: " << SDL_GetError() << "\n";
+#elif defined(__linux__)
   pid_t pid = fork();
   if (pid == 0) {
     // Double-fork so the browser is reparented and does not leave a zombie.

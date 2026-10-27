@@ -2,11 +2,18 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/font.hpp"
+#ifndef XANATOO_FONTCONFIG
+#define XANATOO_FONTCONFIG 1
+#endif
+#if XANATOO_FONTCONFIG
 #include <fontconfig/fontconfig.h>
+#endif
 #include <iostream>
+#include <cctype>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <vector>
 #include <strings.h>
 
 namespace xanatoo {
@@ -146,6 +153,7 @@ int Font::measure(const std::string& text) {
   return width;
 }
 
+#if XANATOO_FONTCONFIG
 std::string fontconfig_find(const std::string& family, int weight, int slant) {
   if (!FcInit()) return {};
 
@@ -194,6 +202,81 @@ std::string fontconfig_family_from_file(const std::string& path) {
   FcPatternDestroy(match);
   return name;
 }
+
+#else  // !XANATOO_FONTCONFIG
+
+// Without FontConfig (Android): family names map onto three generic groups,
+// each a list of font files in the usual font directories.
+namespace {
+
+enum class FontGroup { Sans, Serif, Mono };
+
+FontGroup font_group(const std::string& family) {
+  std::string f;
+  for (char c : family) f.push_back(static_cast<char>(std::tolower(
+                            static_cast<unsigned char>(c))));
+  if (f.find("mono") != std::string::npos ||
+      f.find("courier") != std::string::npos ||
+      f.find("typewriter") != std::string::npos)
+    return FontGroup::Mono;
+  if (f.find("serif") != std::string::npos &&
+      f.find("sans") == std::string::npos)
+    return FontGroup::Serif;
+  return FontGroup::Sans;
+}
+
+std::vector<std::filesystem::path> font_dirs() {
+  std::vector<std::filesystem::path> dirs;
+  if (const char* data = std::getenv("XANATOO_DATA_DIR"); data && data[0])
+    dirs.push_back(std::filesystem::path(data) / "fonts");
+  dirs.emplace_back("/system/fonts");                    // Android
+  dirs.emplace_back("/usr/share/fonts/truetype/dejavu");  // Debian
+  dirs.emplace_back("/usr/share/fonts/TTF");              // Arch
+  return dirs;
+}
+
+// Candidate file stems per group and style (index: weight*2 + slant).
+const std::vector<std::vector<const char*>>& group_files(FontGroup g) {
+  static const std::vector<std::vector<const char*>> sans = {
+      {"Roboto-Regular.ttf", "DroidSans.ttf", "DejaVuSans.ttf"},
+      {"Roboto-Italic.ttf", "DejaVuSans-Oblique.ttf"},
+      {"Roboto-Bold.ttf", "DroidSans-Bold.ttf", "DejaVuSans-Bold.ttf"},
+      {"Roboto-BoldItalic.ttf", "DejaVuSans-BoldOblique.ttf"},
+  };
+  static const std::vector<std::vector<const char*>> serif = {
+      {"NotoSerif-Regular.ttf", "DroidSerif-Regular.ttf", "DejaVuSerif.ttf"},
+      {"NotoSerif-Italic.ttf", "DroidSerif-Italic.ttf", "DejaVuSerif-Italic.ttf"},
+      {"NotoSerif-Bold.ttf", "DroidSerif-Bold.ttf", "DejaVuSerif-Bold.ttf"},
+      {"NotoSerif-BoldItalic.ttf", "DroidSerif-BoldItalic.ttf",
+       "DejaVuSerif-BoldItalic.ttf"},
+  };
+  static const std::vector<std::vector<const char*>> mono = {
+      {"DroidSansMono.ttf", "CutiveMono.ttf", "DejaVuSansMono.ttf"},
+      {"DejaVuSansMono-Oblique.ttf"},
+      {"DejaVuSansMono-Bold.ttf"},
+      {"DejaVuSansMono-BoldOblique.ttf"},
+  };
+  return g == FontGroup::Serif ? serif : g == FontGroup::Mono ? mono : sans;
+}
+
+}  // namespace
+
+std::string fontconfig_find(const std::string& family, int weight, int slant) {
+  const auto& files = group_files(font_group(family));
+  const size_t style = static_cast<size_t>((weight ? 2 : 0) + (slant ? 1 : 0));
+  for (const auto& dir : font_dirs()) {
+    for (const char* f : files[style]) {
+      std::error_code ec;
+      if (std::filesystem::exists(dir / f, ec)) return (dir / f).string();
+    }
+  }
+  // No bold / italic file: the caller falls back to the regular face.
+  return {};
+}
+
+std::string fontconfig_family_from_file(const std::string&) { return {}; }
+
+#endif  // XANATOO_FONTCONFIG
 
 static bool try_load(Font& font, const std::string& path, int px,
                      SDL_Renderer* r, const char* label) {
@@ -252,6 +335,13 @@ static bool is_generic_family(const std::string& name) {
 }
 
 std::string fontconfig_pick_family(const std::vector<std::string>& names) {
+#if !XANATOO_FONTCONFIG
+  // Only the generic names resolve without FontConfig, so style sheets fall
+  // through their family lists to "serif" / "monospace" / "sans-serif".
+  for (const std::string& name : names)
+    if (is_generic_family(name)) return name;
+  return {};
+#else
   if (!FcInit()) return {};
   for (const std::string& name : names) {
     if (name.empty()) continue;
@@ -276,6 +366,7 @@ std::string fontconfig_pick_family(const std::vector<std::string>& names) {
     if (same) return name;
   }
   return {};
+#endif
 }
 
 bool FontSet::load(SDL_Renderer* renderer, const std::string& preferred_path,

@@ -23,10 +23,19 @@ elseif(FREETYPE_LIBRARY AND NOT TARGET Freetype::Freetype)
     IMPORTED_LOCATION "${FREETYPE_LIBRARY}"
     INTERFACE_INCLUDE_DIRECTORIES "${FREETYPE_INCLUDE_DIRS}")
 endif()
+# FontConfig resolves font families; without it (Android) family names map
+# onto files in known font directories (see font.cpp).
+option(XANATOO_FONTCONFIG "Resolve fonts with FontConfig" ON)
+# SQLite side store (persisted section folds); without it folds are per-session.
+option(XANATOO_SQLITE "Persist view state in SQLite" ON)
 # Cross builds (R36S) may pass FONTCONFIG_* explicitly; otherwise pkg-config.
-if(NOT FONTCONFIG_LIBRARIES)
+if(XANATOO_FONTCONFIG AND NOT FONTCONFIG_LIBRARIES)
   find_package(PkgConfig REQUIRED)
   pkg_check_modules(FONTCONFIG REQUIRED fontconfig)
+endif()
+if(NOT XANATOO_FONTCONFIG)
+  set(FONTCONFIG_LIBRARIES "")
+  set(FONTCONFIG_INCLUDE_DIRS "")
 endif()
 
 # Gemini protocol (TLS client). Parser for .gmi is always built.
@@ -91,6 +100,9 @@ target_include_directories(xanatoo PRIVATE
   ${FONTCONFIG_INCLUDE_DIRS}
 )
 
+if(NOT XANATOO_SQLITE)
+  add_library(xanatoo_sqlite3 INTERFACE)
+else()
 find_package(SQLite3 REQUIRED)
 # Imported target name differs by CMake version: SQLite::SQLite3 (some
 # CMake versions) vs SQLite3::SQLite3. Normalise to xanatoo_sqlite3.
@@ -104,6 +116,10 @@ else()
     IMPORTED_LOCATION "${SQLite3_LIBRARIES}"
     INTERFACE_INCLUDE_DIRECTORIES "${SQLite3_INCLUDE_DIRS}")
 endif()
+endif()
+target_compile_definitions(xanatoo PRIVATE
+  XANATOO_SQLITE=$<BOOL:${XANATOO_SQLITE}>
+  XANATOO_FONTCONFIG=$<BOOL:${XANATOO_FONTCONFIG}>)
 
 target_link_libraries(xanatoo PRIVATE
   ${SDL2_LIBRARIES}
@@ -249,6 +265,7 @@ target_compile_definitions(xanatoo_tests PRIVATE
   XANATOO_NOSTR=0
   XANATOO_REDDIT=0
   XANATOO_LEMMY=0
+  XANATOO_FONTCONFIG=$<BOOL:${XANATOO_FONTCONFIG}>
   "XANATOO_STYLE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/styles\""
 )
 enable_testing()

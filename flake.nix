@@ -3,12 +3,47 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+    # SDL2 sources for the Android build (nix/android.nix).
+    sdl2-src = {
+      url = "https://github.com/libsdl-org/SDL/releases/download/release-2.30.3/SDL2-2.30.3.tar.gz";
+      flake = false;
+    };
   };
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, sdl2-src }:
     let
       systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
+
+      # Android (Linux hosts): the SDK and NDK are unfree. Android 5.0
+      # (API 21) is the minimum; the Java side compiles against API 33.
+      androidFor = system:
+        let
+          androidPkgs = import nixpkgs {
+            inherit system;
+            config.allowUnfree = true;
+            config.android_sdk.accept_license = true;
+          };
+        in import ./nix/android.nix {
+          pkgs = androidPkgs;
+          sdlSrc = sdl2-src;
+          sdlVersion = "2.30.3";
+          buildToolsVersion = "30.0.3";
+          packagePlatform = "21";
+          compilePlatform = "33";
+          targetAbis = [ "armeabi-v7a" "arm64-v8a" "x86_64" ];
+          androidSdk = (androidPkgs.androidenv.composeAndroidPackages {
+            platformVersions = [ "21" "33" ];
+            buildToolsVersions = [ "30.0.3" ];
+            includeNDK = true;
+            ndkVersion = "29.0.14206865";
+            includeEmulator = false;
+            includeSources = false;
+          }).androidsdk;
+          version = "0.1.0";
+          versionCode = self.revCount or 1;
+        };
     in
     {
       packages = forAllSystems (system:
@@ -79,7 +114,10 @@
               version = "0.1.0";
               date = "1970-01-01";
               r36s = import ./nix/r36s.nix { inherit pkgs version date; };
+              android = androidFor system;
             in {
+              xanatoo-android = android.apk;
+              sdl2-android = android.sdlAndroidLibs;
               arkos-sysroot = r36s.sysroot;
               xanatoo-r36s = r36s.r36s;
               xanatoo-r36s-portmaster = r36s.portmaster;
@@ -87,6 +125,12 @@
             }
           else { }
         ));
+
+      apps = nixpkgs.lib.genAttrs
+        (builtins.filter (nixpkgs.lib.hasSuffix "-linux") systems)
+        (system: {
+          install-android-xanatoo = (androidFor system).installApp;
+        });
 
       # Develop shell: deps + env + PATH scripts for out-of-tree CMake.
       # Helpers are writeShellScriptBin so `nix develop -c xanatoo-run` works.

@@ -146,7 +146,7 @@ bool navigate_to_url(App& app, std::string target, bool record_history) {
   };
 
   // Shared post-fetch path for Nostr / Reddit / Lemmy documents.
-  auto finish_remote_open = [&](std::optional<xanatoo::Document> doc,
+  [[maybe_unused]] auto finish_remote_open = [&](std::optional<xanatoo::Document> doc,
                                 const std::string& err, const char* service,
                                 std::string label, size_t label_max,
                                 const std::string& history_url) -> bool {

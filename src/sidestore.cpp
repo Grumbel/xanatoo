@@ -4,7 +4,12 @@
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/util.hpp"
 
+#ifndef XANATOO_SQLITE
+#define XANATOO_SQLITE 1
+#endif
+#if XANATOO_SQLITE
 #include <sqlite3.h>
+#endif
 
 #include <cstdio>
 #include <filesystem>
@@ -12,6 +17,7 @@
 namespace xanatoo {
 namespace {
 
+#if XANATOO_SQLITE
 sqlite3* open_db() {
   std::string path = sidestore_path();
   if (path.empty()) return nullptr;
@@ -35,6 +41,7 @@ sqlite3* open_db() {
   }
   return db;
 }
+#endif
 
 std::string child_index_path(const Document& doc, NodeId section) {
   std::vector<int> indices;
@@ -86,6 +93,7 @@ std::string section_stable_key(const Document& doc, NodeId section) {
   return child_index_path(doc, section);
 }
 
+#if XANATOO_SQLITE
 void load_section_folds(std::string_view doc_key,
                         std::unordered_set<std::string>& folded_keys) {
   folded_keys.clear();
@@ -143,6 +151,14 @@ void save_section_fold(std::string_view doc_key, std::string_view section_key,
   }
   sqlite3_close(db);
 }
+
+#else
+// Built without SQLite (e.g. Android first port): folds are not persisted.
+void load_section_folds(std::string_view, std::unordered_set<std::string>& folded_keys) {
+  folded_keys.clear();
+}
+void save_section_fold(std::string_view, std::string_view, bool) {}
+#endif
 
 void folds_keys_to_ids(const Document& doc,
                        const std::unordered_set<std::string>& keys,

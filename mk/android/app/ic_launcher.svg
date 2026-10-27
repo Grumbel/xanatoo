@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com> -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Launcher icon source; mipmap-*/ic_launcher.png are rasterized from it. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect x="12" y="12" width="168" height="168" rx="28" fill="#F8F6F0" stroke="#7E7B74" stroke-width="4"/>
+  <rect x="12" y="12" width="168" height="34" rx="28" fill="#F2BE1A"/>
+  <rect x="12" y="30" width="168" height="16" fill="#F2BE1A"/>
+  <line x1="12" y1="46" x2="180" y2="46" stroke="#9A7408" stroke-width="3"/>
+  <!-- linked passages: two text blocks joined by a link -->
+  <rect x="34" y="66" width="56" height="9" rx="3" fill="#2E3436"/>
+  <rect x="34" y="84" width="44" height="9" rx="3" fill="#2E3436"/>
+  <rect x="34" y="102" width="52" height="9" rx="3" fill="#2E3436"/>
+  <rect x="102" y="120" width="56" height="9" rx="3" fill="#2E3436"/>
+  <rect x="102" y="138" width="40" height="9" rx="3" fill="#2E3436"/>
+  <rect x="102" y="156" width="50" height="9" rx="3" fill="#2E3436"/>
+  <path d="M84 88 C 120 88, 96 124, 128 124" fill="none" stroke="#2A62A8" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="84" cy="88" r="7" fill="#2A62A8"/>
+  <circle cx="128" cy="124" r="7" fill="#2A62A8"/>
+</svg>

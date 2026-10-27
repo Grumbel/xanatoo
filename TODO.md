@@ -8,6 +8,18 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-27) — Android port (bare bones)
+
+- `nix build .#xanatoo-android` builds a signed debug APK (API 21+,
+  armeabi-v7a / arm64-v8a / x86_64) with the Kurvenrausch ndk-build
+  pipeline; FreeType is built from nixpkgs' source as a static module.
+- Off on Android: OpenSSL clients, FontConfig (`XANATOO_FONTCONFIG=0`,
+  generic families → /system/fonts), SQLite (`XANATOO_SQLITE=0`), all data
+  files. `HOME`/`TMPDIR` → app internal storage; links via `SDL_OpenURL`.
+- Not yet run on a device or emulator. Next: package examples / styles /
+  icons as assets, density-scaled chrome, soft keyboard handling, then
+  SQLite and OpenSSL back in. See docs/ANDROID.md.
+
 ## Status (2026-10-26) — style sheets
 
 - `styles/*.xss`: S-expression document style sheets (docs/STYLESHEETS.md),
