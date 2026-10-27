@@ -130,6 +130,14 @@ std::string config_dir() {
   return base.string();
 }
 
+std::string cache_dir() {
+  if (const char* xdg = std::getenv("XDG_CACHE_HOME"); xdg && xdg[0])
+    return (fs::path(xdg) / "xanatoo").string();
+  if (const char* home = std::getenv("HOME"); home && home[0])
+    return (fs::path(home) / ".cache" / "xanatoo").string();
+  return {};
+}
+
 std::string bookmarks_path() {
   std::string dir = config_dir();
   if (dir.empty()) return {};

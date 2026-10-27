@@ -467,6 +467,14 @@ std::string resolve_open_path(App& app, std::string path);
 xanatoo::Document load_doc(App& app, std::string path);
 std::string parent_dir(const std::string& path);
 bool is_in_app_remote_url(std::string_view s);
+// Foreign content — fetched pages, imported HTML / EPUB, anything under
+// cache_dir() — is read-only: browsed, never edited or saved in place.
+bool is_foreign_path(std::string_view path);
+// The focused pane is in browse mode: the global toggle, or foreign content.
+bool browsing(App& app);
+bool focused_read_only(App& app);
+inline constexpr const char* kReadOnlyNotice =
+    "Read-only page (foreign content) — Ctrl+S saves an editable Markdown copy";
 xanatoo::Document load_doc_or_placeholder(App& app, const std::string& path);
 std::string buffer_tab_label(App& app, BufferId bi);
 void update_title(App& app);

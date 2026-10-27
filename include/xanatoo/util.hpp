@@ -98,6 +98,10 @@ std::string to_utf8(std::string body, std::string_view charset);
 // Returns empty string if the home directory cannot be resolved.
 std::string config_dir();
 
+// XDG cache directory for xanatoo (~/.cache/xanatoo); not created. Empty
+// if the home directory cannot be resolved.
+std::string cache_dir();
+
 // Full path to the bookmarks file under config_dir().
 std::string bookmarks_path();
 

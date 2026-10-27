@@ -224,6 +224,31 @@ Intended responsibilities (brainstorm, not schema):
 **Principle:** editing *view* and *annotation* should not require rewriting the
 author’s original `.md`/`.org` once ingest is in place.
 
+### Saving without "Save" (Canon Cat direction, 2026-10-27)
+
+User direction, still brainstorm — nothing specified yet:
+
+- Saving is **automatic** and goes into the internal database, not the
+  filesystem: every edit lands there, **versioned**, with **persistent
+  undo** across sessions (the Canon Cat never asked to save; the text
+  simply was).
+- **Export** to `.md` / `.org` / `.sexp` files becomes an explicit action,
+  not the normal way work is kept.
+- **Foreign content** (web pages, feeds, Reddit / Lemmy / HN / Nostr
+  threads, imported EPUB / HTML) is read-only and opened in browse mode.
+  To work with it, the user either **clones** it into the database (an own,
+  editable version that remembers its origin) or switches on an
+  **overlay** (annotations / edits kept beside the untouched original —
+  ties in with the Xanadu-style links in §6).
+- Implemented so far (stop-gap): foreign = remote URL, `.html` / `.epub`
+  path, or anything under `cache_dir()`; such buffers are always browsed
+  (`browsing(app)`), F2 refuses, and Ctrl+S offers "Save as" a `.md`
+  copy — the file-based stand-in for "clone into the database".
+- Open questions: granularity of versions (keystroke runs? idle commits?),
+  how a clone tracks upstream changes (re-fetch → diff against the
+  version it was cloned from), and how files on disk relate to database
+  documents (import once, or watch and ingest).
+
 ---
 
 ## 9. Related open work (engineering)

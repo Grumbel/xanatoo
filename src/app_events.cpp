@@ -262,7 +262,7 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
         float hx = pi.x + pi.width - hs;
         float hy = pi.y + pi.height - hs - p.scroll_y;
         if (lx >= hx && lx <= hx + hs && my >= hy && my <= hy + hs) {
-          if (app.browse_mode) break;
+          if (browsing(app)) break;
           edit(app);
           app.dragging_image = true;
           app.resize_image = pi.node;
@@ -281,7 +281,7 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
       for (const auto& gap : p.layout.column_gaps) {
         if (adj_y < gap.y || adj_y > gap.y + gap.height) continue;
         if (std::abs(lx - gap.x) > 8.f) continue;
-        if (app.browse_mode) break;
+        if (browsing(app)) break;
         edit(app);
         app.dragging_col_gap = true;
         app.col_gap_left = gap.left;
@@ -312,7 +312,7 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
             bn.kind == xanatoo::NodeKind::List)
           continue;
         if (bn.parent == xanatoo::INVALID_NODE) continue;
-        if (app.browse_mode) break;
+        if (browsing(app)) break;
         app.dragging_block = true;
         app.drag_block_id = box.node;
         app.drop_target_id = xanatoo::INVALID_NODE;
@@ -395,7 +395,7 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
     }
 
     // Click list-item marker column → toggle GFM task checkbox
-    if (!app.browse_mode) {
+    if (!browsing(app)) {
       bool toggled = false;
       float adj_y = my + p.scroll_y;
       for (const auto& box : p.layout.boxes) {
@@ -509,14 +509,14 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
       p.preferred_x = lx;
       reset_blink(app);
       // Caret placed in the text: on-screen keyboard (Android).
-      if (!app.browse_mode) xanatoo::platform_request_keyboard();
+      if (!browsing(app)) xanatoo::platform_request_keyboard();
     }
 }
 
 // Middle press: paste at the pointer (unless over a float).
 static void mouse_middle_down(App& app, SDL_Event& ev, bool imgui_mouse) {
     // Middle-click paste at caret (common on Linux).
-    if (app.browse_mode) return;
+    if (browsing(app)) return;
     if (imgui_mouse) return;
     const int mxw = ev.button.x, myw = ev.button.y;
     const bool over_soft = float_at(app, mxw, myw) != nullptr;
@@ -976,7 +976,7 @@ static void on_textinput(App& app, SDL_Event& ev, bool imgui_mouse,
     reset_blink(app);
     return;
   }
-  if (app.browse_mode) return;  // read-only: no typing into the document
+  if (browsing(app)) return;  // read-only: no typing into the document
   if (imgui_keys) return;
   edit(app);
   Pane& p = focused_pane(app);
@@ -1139,10 +1139,12 @@ static void on_controllerbuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
         navigate_to_url(app,
                         app.nav_history[static_cast<size_t>(app.nav_hist_pos)],
                         /*record_history=*/false);
+      } else if (focused_read_only(app)) {
+        flash_status(app, kReadOnlyNotice);
       } else {
         app.browse_mode = !app.browse_mode;
         flash_status(app,
-                     app.browse_mode ? "Browse mode (read-only)" : "Edit mode");
+                     browsing(app) ? "Browse mode (read-only)" : "Edit mode");
       }
       break;
     case SDL_CONTROLLER_BUTTON_START:
@@ -1154,7 +1156,7 @@ static void on_controllerbuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
       break;
     case SDL_CONTROLLER_BUTTON_GUIDE:
       app.virtual_keyboard = !app.virtual_keyboard;
-      if (app.virtual_keyboard && app.browse_mode) {
+      if (app.virtual_keyboard && browsing(app)) {
         app.browse_mode = false;
         flash_status(app, "Virtual keyboard — edit mode");
       } else {
@@ -1610,7 +1612,8 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   }
 
   // Browse mode: navigation and view toggles only (no document edits).
-  if (app.browse_mode) {
+  // An open prompt (URL bar, Save as) keeps its own keys.
+  if (browsing(app) && !status_prompt) {
     const SDL_Keycode k = ev.key.keysym.sym;
     const bool browse_ok =
         k == SDLK_ESCAPE || k == SDLK_F1 || k == SDLK_F2 || k == SDLK_LEFT ||
@@ -1618,8 +1621,10 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         k == SDLK_PAGEDOWN || k == SDLK_HOME || k == SDLK_END ||
         k == SDLK_TAB || k == SDLK_RETURN || k == SDLK_KP_ENTER ||
         k == SDLK_SPACE || k == SDLK_LEFTBRACKET || k == SDLK_RIGHTBRACKET ||
+        // Ctrl+C / A / S: copy, select, save an editable Markdown copy.
         (ctrl && (k == SDLK_q || k == SDLK_o || k == SDLK_f || k == SDLK_g ||
-                  k == SDLK_BACKSLASH || k == SDLK_l || k == SDLK_l ||
+                  k == SDLK_c || k == SDLK_a || k == SDLK_s ||
+                  k == SDLK_BACKSLASH || k == SDLK_l ||
                   k == SDLK_EQUALS || k == SDLK_MINUS || k == SDLK_PLUS ||
                   k == SDLK_KP_PLUS || k == SDLK_KP_MINUS)) ||
         (ctrl && shift &&
@@ -1743,8 +1748,12 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       break;
 
     case SDLK_F2:
+      if (focused_read_only(app)) {
+        flash_status(app, kReadOnlyNotice);
+        break;
+      }
       app.browse_mode = !app.browse_mode;
-      if (app.browse_mode) {
+      if (browsing(app)) {
         close_prompt(app);
         flash_status(app,
                      "Browse mode — read-only · gamepad navigate · F2 edits");
@@ -2326,7 +2335,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         // Browse / capsule: copy page URL; edit: unwrap stretch
         std::string page = path_of(app, p);
         if (page.empty()) page = app.gemini_current_url;
-        if (app.browse_mode || xanatoo::is_gemini_url(page)) {
+        if (browsing(app) || xanatoo::is_gemini_url(page)) {
           if (page.empty()) {
             flash_status(app, "No page URL");
           } else {

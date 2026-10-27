@@ -208,6 +208,10 @@ mechanism; historical bundle numbers in TODO.md are archival).
 - `web_fetch` dispatches on Content-Type; bodies go through
   `detect_charset` / `to_utf8` (util.hpp) first.
 - `external:<url>` hrefs force the system browser (`open_external_url`).
+- Foreign content is read-only: `is_foreign_path` (remote URL, `.html` /
+  `.epub`, anything under `cache_dir()`) makes `browsing(app)` true.
+  Gate document edits on `browsing(app)`, never on `app.browse_mode`
+  alone (that is only the user's global toggle).
 
 ## Ebooks
 

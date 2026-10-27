@@ -168,6 +168,7 @@ Document parse_html_page(std::string_view html, std::string_view page_url) {
 
   HtmlOptions opt;
   opt.base_url = std::string(page_url);
+  opt.page_url = std::string(page_url);
   if (auto b = scan_tags(html, [](const TagRef& t) {
         return t.name == "base" || t.name == "body";
       });

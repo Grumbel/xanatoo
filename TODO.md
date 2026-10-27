@@ -34,9 +34,20 @@ Next bundle number: **263** (this delivery is **262**)
 - Checked: Wikipedia (sections, infobox table, cite_note jumps, link
   navigation), jvns.ca, paulgraham.com (layout tables), gnu.org, lwn.net,
   danluu.com, blog.rust-lang.org, an RFC .txt.
+- Foreign content is read-only (`is_foreign_path` / `browsing(app)`):
+  remote URLs, `.html` / `.epub` paths and everything under `cache_dir()`
+  are always browsed; F2 refuses with a notice; Ctrl+S / Ctrl+C / Ctrl+A
+  work in browse mode; Ctrl+S saves an editable `.md` copy. Prompts keep
+  their keys in browse mode (Enter used to activate the caret link).
+  Long-term: automatic versioned saving into the database, clone /
+  overlay for foreign content (docs/BRAINSTORM.md §8).
+- `wikipedia:` idea: raw wikitext + `pandoc -f mediawiki` drops every
+  template (all {{cite}} references come out empty, infoboxes and
+  {{Blockquote}} vanish); the REST endpoint
+  `/api/rest_v1/page/html/<Title>` returns template-expanded Parsoid HTML
+  that the html_page mapper already handles (references intact).
 - Open: remote images; JavaScript-only pages show "No readable content";
-  pages open in edit mode (a stray click on a list marker toggles a task
-  box and dirties the page); tab label is the URL, not the page title;
+  tab label is the URL, not the page title;
   other code pages (Shift_JIS, KOI8-R) are not converted.
 
 ## Status (2026-10-27) — RSS / Atom feeds, shared HTML mapper

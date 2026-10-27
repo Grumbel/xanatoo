@@ -20,6 +20,7 @@ struct HtmlOptions {
   // Whole web pages (html_page.cpp):
   bool sections = false;     // h1–h6 open nested Section + Header (outline)
   bool anchors = false;      // id= → node label; same-page links stay "#id"
+  std::string page_url;      // "same page" for anchors (default: base_url)
   bool drop_chrome = false;  // drop nav / aside / form / footer, hidden and
                              // screen-reader-only elements, alt="" images
 };

@@ -89,6 +89,23 @@ bool is_in_app_remote_url(std::string_view s) {
          xanatoo::is_feed_url(s) || web_in_app(s);
 }
 
+bool is_foreign_path(std::string_view path) {
+  if (path.empty()) return false;
+  if (is_in_app_remote_url(path) || xanatoo::starts_with(path, "http://") ||
+      xanatoo::starts_with(path, "https://"))
+    return true;
+  if (xanatoo::path_uses_html(path) || xanatoo::is_epub_path(path)) return true;
+  const std::string cache = xanatoo::cache_dir();
+  return !cache.empty() && xanatoo::starts_with(path, cache + "/");
+}
+
+bool focused_read_only(App& app) {
+  const DocBuffer* b = find_buf(app, focused_pane(app).buf);
+  return b && is_foreign_path(b->path);
+}
+
+bool browsing(App& app) { return app.browse_mode || focused_read_only(app); }
+
 xanatoo::Document load_doc_or_placeholder(App& app, const std::string& path) {
   if (is_in_app_remote_url(path)) {
     // Real fetch happens after navigate_to_url is defined.

@@ -395,7 +395,8 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
     if (!href.empty()) href = resolve_url(opt_.base_url, href);
     if (opt_.anchors && !href.empty() && href[0] != '#') {
       // Same-page link → in-document "#id".
-      std::string_view page = opt_.base_url;
+      std::string_view page =
+          opt_.page_url.empty() ? opt_.base_url : opt_.page_url;
       page = page.substr(0, page.find('#'));
       if (!page.empty() && href.size() > page.size() &&
           starts_with(href, page) && href[page.size()] == '#')

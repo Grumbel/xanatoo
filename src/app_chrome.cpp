@@ -206,7 +206,7 @@ StatusLine compute_status(App& app) {
         "Diff marks on — orange bars mark passages that differ · "
         "Ctrl+Shift+D toggles";
     tone = StatusTone::Warn;
-  } else if (app.browse_mode) {
+  } else if (browsing(app)) {
     std::string page = path_of(app, focused_pane(app));
     if (page.empty()) page = app.gemini_current_url;
     if (!page.empty() && xanatoo::is_gemini_url(page)) {
@@ -334,10 +334,13 @@ StatusLine compute_status(App& app) {
     else
       label += "    click to open";
     tone = StatusTone::Info;
-  } else if (app.browse_mode) {
+  } else if (browsing(app)) {
     label = app.gamepad
                 ? "Browse · R-stick pointer · A click · LB+A caret · "
                   "D-pad nav · L-stick scroll · Start help · F2 edit"
+                : focused_read_only(app)
+                ? "Read-only page — arrows move · Enter open · Ctrl+S copy as "
+                  "Markdown · F1 help"
                 : "Browse mode — arrows move · Enter open · F2 edit · F1 help";
     tone = StatusTone::Browse;
   } else {

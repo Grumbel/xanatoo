@@ -93,7 +93,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.styles.clear();
   for (const auto& e : app.styles) ui_state.styles.emplace_back(e.name, e.title);
   ui_state.style = app.style.name;
-  ui_state.browse = app.browse_mode;
+  ui_state.browse = browsing(app);
   ui_state.virtual_keyboard = app.virtual_keyboard;
   ui_state.help = app.help_mode;
   ui_state.selection = !focused_pane(app).sel.empty();
@@ -222,7 +222,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
   auto& d = doc_of(app, p);
 
   // Browse mode: ignore mutating commands from menus/toolbar.
-  if (app.browse_mode && cmd != C::None) {
+  if (browsing(app) && cmd != C::None) {
     const C c = cmd;
     const bool allowed =
         c == C::Quit || c == C::OpenDocument || c == C::OpenUrlBar ||
@@ -462,7 +462,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         else
           open_prompt(app, PromptKind::SaveAs,
                       fs::path(spath).replace_extension(".md").string());
-        flash_status(app, "Imported page — save as Markdown");
+        flash_status(app, "Read-only page — save an editable Markdown copy");
       } else {
         std::string text = xanatoo::serialize_document(d, spath);
         std::ofstream out(spath);
@@ -1037,8 +1037,12 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
                                            : "Structure highlight off");
       break;
     case C::ToggleBrowse:
+      if (focused_read_only(app)) {
+        flash_status(app, kReadOnlyNotice);
+        break;
+      }
       app.browse_mode = !app.browse_mode;
-      if (app.browse_mode) {
+      if (browsing(app)) {
         // Clear any status prompts so they do not trap keys
         close_prompt(app);
         flash_status(
@@ -1062,7 +1066,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
                                              : "Virtual keyboard off");
       break;
     case C::VirtualKey: {
-      if (app.browse_mode) {
+      if (browsing(app)) {
         flash_status(app, "Browse mode — F2 to edit");
         break;
       }
@@ -1804,7 +1808,7 @@ static void draw_pane_overlays(App& app, int i) {
         xanatoo::caret_screen_pos(pane.layout, pane.sel.focus, draw_scroll, lh);
     if (cpos.valid) pane.preferred_x = cpos.x;
     // Browse mode: steady caret (reading focus). Edit mode: blink.
-    if (app.browse_mode ||
+    if (browsing(app) ||
         ((SDL_GetTicks() - app.caret_blink_start) % 1000) < 600) {
       app.renderer.draw_caret(cpos, ox);
     }

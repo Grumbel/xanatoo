@@ -1417,6 +1417,15 @@ void test_html_page() {
   EXPECT_EQ(plain_text(d3, k3[2]), "one");
   EXPECT_EQ(plain_text(d3, k3[3]), "two");
 
+  // <base href> moves relative links, not the page "#id" links refer to.
+  Document d4 = parse_html_page(
+      "<base href=\"//w.org/wiki/\"><main><p><a href=\"./X\">x</a>"
+      "<a href=\"https://w.org/wiki/P#n1\">1</a></main>",
+      "https://w.org/wiki/P");
+  NodeId p4 = kids_of(d4, d4.root).back();
+  EXPECT_EQ(d4.get(p4).spans[0].href, "https://w.org/wiki/X");
+  EXPECT_EQ(d4.get(p4).spans[1].href, "#n1");
+
   Document txt = plain_text_document("a\r\n  b\n\n\n c\n");
   auto tk2 = kids_of(txt, txt.root);
   EXPECT_EQ(tk2.size(), 2u);
