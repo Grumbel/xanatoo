@@ -20,6 +20,8 @@ struct ViewSettings {
   float max_content_width = 0.f;
   // Justify wrapped body lines (not last line / headings / code).
   bool justify = false;
+  // Show the notes of on-screen footnote marks at the bottom of each pane.
+  bool footnote_overlay = true;
   // Document style sheet (styles/<name>.xss); "default" = built in.
   std::string style = "default";
 

@@ -33,6 +33,10 @@ public:
   void set_size(int pixel_size);
 
   const Glyph& glyph(uint32_t codepoint);
+  // True when the face maps `codepoint` (no .notdef fallback).
+  bool has_glyph(uint32_t codepoint) const {
+    return face_ && FT_Get_Char_Index(face_, codepoint) != 0;
+  }
   int line_height() const { return line_height_; }
   int ascender() const { return ascender_; }
   int descender() const { return descender_; }

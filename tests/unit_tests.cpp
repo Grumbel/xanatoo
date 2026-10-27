@@ -946,6 +946,124 @@ void test_sanitize_epub_markdown() {
   EXPECT_EQ(sanitize_epub_markdown("a&nbsp;b"), "a b");
 }
 
+// All nodes of `kind`, in document order.
+std::vector<xanatoo::NodeId> nodes_of(const xanatoo::Document& doc,
+                                      xanatoo::NodeKind kind) {
+  std::vector<xanatoo::NodeId> out;
+  for (const auto& n : doc.nodes)
+    if (n.id != xanatoo::INVALID_NODE && n.kind == kind) out.push_back(n.id);
+  return out;
+}
+
+void test_footnotes() {
+  using namespace xanatoo;
+  // Pandoc GFM output: refs, a one-line note, a two-paragraph note.
+  const char* md =
+      "Hello[^1] world[^b].\n"
+      "\n"
+      "[^1]: Note *one*.\n"
+      "\n"
+      "[^b]: Note B line\n"
+      "continued.\n"
+      "\n"
+      "    Second para of B.\n"
+      "\n"
+      "After the notes.\n";
+  Document doc = parse_document(md, "fn.md");
+  const auto fns = nodes_of(doc, NodeKind::Footnote);
+  EXPECT_EQ(fns.size(), 2u);
+  EXPECT(nodes_of(doc, NodeKind::BiblioEntry).empty());
+  if (fns.size() == 2) {
+    EXPECT_EQ(doc.get(fns[0]).label, "1");
+    EXPECT_EQ(doc.get(fns[0]).children.size(), 1u);
+    EXPECT_EQ(doc.get(fns[1]).label, "b");
+    EXPECT_EQ(doc.get(fns[1]).children.size(), 2u);
+    if (doc.get(fns[1]).children.size() == 2) {
+      EXPECT_EQ(plain_text(doc, doc.get(fns[1]).children[0]),
+                "Note B line continued.");
+      EXPECT_EQ(plain_text(doc, doc.get(fns[1]).children[1]),
+                "Second para of B.");
+    }
+  }
+  // First paragraph: Text, Ref(1), Text, Ref(b), Text
+  const Node& p0 = doc.get(doc.get(doc.root).children[0]);
+  EXPECT_EQ(p0.spans.size(), 5u);
+  if (p0.spans.size() == 5) {
+    EXPECT(p0.spans[1].kind == InlineKind::FootnoteRef);
+    EXPECT_EQ(p0.spans[1].href, "1");
+    EXPECT_EQ(p0.spans[3].href, "b");
+  }
+  // "After the notes." is an ordinary paragraph again
+  EXPECT(doc.get(doc.get(doc.root).children.back()).kind ==
+         NodeKind::Paragraph);
+
+  // #fn:key resolves to the note's first paragraph
+  const NodeId t = find_anchor_node(doc, footnote_href("B"));
+  EXPECT(t != INVALID_NODE && doc.get(t).parent == find_footnote(doc, "b"));
+
+  // Markdown round trip keeps refs and both paragraphs
+  const std::string out = serialize_document(doc, "fn.md");
+  EXPECT(out.find("Hello[^1] world[^b]") != std::string::npos);
+  EXPECT(out.find("\n    Second para of B.") != std::string::npos);
+  Document again = parse_document(out, "fn.md");
+  EXPECT_EQ(nodes_of(again, NodeKind::Footnote).size(), 2u);
+  EXPECT_EQ(serialize_document(again, "fn.md"), out);
+
+  // S-expression round trip
+  const std::string sx = serialize_document(doc, "fn.sexp");
+  EXPECT(sx.find("(fnref \"b\")") != std::string::npos);
+  Document sdoc = parse_document(sx, "fn.sexp");
+  EXPECT_EQ(nodes_of(sdoc, NodeKind::Footnote).size(), 2u);
+  EXPECT_EQ(serialize_document(sdoc, "fn.md"), out);
+
+  // [^key]: inside :::biblio stays a bibliography entry
+  Document bib = parse_document(
+      "See [Nelson](cite:nelson65).\n\n:::biblio\n[^nelson65]: Nelson, T.\n:::\n",
+      "b.md");
+  EXPECT_EQ(nodes_of(bib, NodeKind::BiblioEntry).size(), 1u);
+  EXPECT(nodes_of(bib, NodeKind::Footnote).empty());
+
+  // Org: [fn:key] refs and definitions
+  Document org = parse_document(
+      "* Head\nText[fn:1] more[fn:x].\n\n[fn:1] Org note.\n\n[fn:x] Other\nnote.\n",
+      "n.org");
+  const auto ofn = nodes_of(org, NodeKind::Footnote);
+  EXPECT_EQ(ofn.size(), 2u);
+  if (ofn.size() == 2) {
+    EXPECT_EQ(org.get(ofn[1]).label, "x");
+    EXPECT_EQ(plain_text(org, org.get(ofn[1]).children[0]), "Other note.");
+  }
+  const std::string oout = serialize_document(org, "n.org");
+  EXPECT(oout.find("Text[fn:1] more[fn:x].") != std::string::npos);
+  EXPECT(oout.find("[fn:x] Other note.") != std::string::npos);
+
+  // Overlay helpers: marks in the band, minus notes already shown there
+  LayoutResult lr;
+  const NodeId para = doc.get(doc.root).children[0];
+  auto mark = [&](size_t span, float y) {
+    PositionedGlyph g;
+    g.node = para;
+    g.span_index = span;
+    g.kind = InlineKind::FootnoteRef;
+    g.y = y;
+    lr.glyphs.push_back(g);
+  };
+  mark(3, 100.f);  // b
+  mark(1, 120.f);  // 1
+  mark(3, 900.f);  // b again, off screen
+  auto keys = visible_footnote_keys(doc, lr, 0.f, 500.f);
+  EXPECT((keys == std::vector<std::string>{"b", "1"}));
+  lr.boxes.push_back({fns[0], 0.f, 400.f, 100.f, 30.f});  // note 1 on screen
+  keys = visible_footnote_keys(doc, lr, 0.f, 500.f);
+  EXPECT((keys == std::vector<std::string>{"b"}));
+
+  std::vector<NodeId> src;
+  Document notes = extract_footnotes(doc, {"b", "nope", "1"}, &src);
+  EXPECT((src == std::vector<NodeId>{fns[1], fns[0]}));
+  EXPECT_EQ(notes.get(notes.root).children.size(), 2u);
+  EXPECT_EQ(nodes_of(notes, NodeKind::Paragraph).size(), 3u);
+}
+
 int main() {
   test_string_helpers();
   test_json_min();
@@ -980,6 +1098,7 @@ int main() {
   test_layout_wrap_respects_max_width();
   test_style_sheet_parse();
   test_style_sheets_shipped();
+  test_footnotes();
 
   std::printf("%d passed, %d failed\n", g_passed, g_failed);
   return g_failed == 0 ? 0 : 1;

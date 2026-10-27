@@ -50,6 +50,7 @@ enum class BlockRole : uint8_t {
   Figure,
   Caption,
   BiblioEntry,
+  Footnote,
   Thread,
   Message,
   Table,
@@ -58,7 +59,7 @@ enum class BlockRole : uint8_t {
   Count
 };
 constexpr size_t kBlockRoleCount = static_cast<size_t>(BlockRole::Count);
-constexpr size_t kInlineKindCount = static_cast<size_t>(InlineKind::Cite) + 1;
+constexpr size_t kInlineKindCount = static_cast<size_t>(InlineKind::FootnoteRef) + 1;
 
 struct BlockStyle {
   Length space_before;

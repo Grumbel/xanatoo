@@ -83,6 +83,22 @@ struct PaneRaster {
   bool search_tint = false;
 };
 
+// Notes of the footnote marks visible in a pane, laid out for the strip at
+// the pane's bottom (app_footnotes.cpp). Rebuilt when the marks or the
+// pane's layout change; height 0 = not shown this frame.
+struct FootnoteOverlay {
+  uint64_t layout_gen = 0;  // pane layout the notes were laid out for
+  int width = 0;
+  std::vector<std::string> keys;
+  std::vector<xanatoo::NodeId> notes;  // source Footnote per laid-out note
+  std::vector<float> note_y;           // top of each note in `layout`
+  xanatoo::LayoutResult layout;
+  float content_h = 0.f;
+  float y = 0.f;  // strip top, viewport y (0 = top of the pane content)
+  float h = 0.f;
+  float w = 0.f;
+};
+
 struct Pane {
   BufferId buf = kNoBuffer;
   xanatoo::Selection sel{};
@@ -98,6 +114,7 @@ struct Pane {
   float materialised_top = 0.f;
   float materialised_bottom = 0.f;
   PaneRaster raster;
+  FootnoteOverlay footnotes;
 };
 
 enum class SoftDock { None = 0, Left, Right, Top, Bottom, Max };
@@ -648,6 +665,15 @@ const CachedPage* find_cached_page(App& app, const std::string& url);
 void forget_cached_page(App& app, const std::string& url);  // Reload
 // Progress bar + "Loading host…" label on panes with a running fetch.
 void draw_load_indicator(App& app, int pi);
+
+// ---- footnotes (app_footnotes.cpp) ----
+// Notes of the footnote marks on screen, as a strip at the bottom of pane
+// `pi` (View → Footnote overlay). Call after the pane's content is drawn.
+void draw_footnote_overlay(App& app, int pi, const SDL_Rect& clip);
+// Pane-local point (lx, viewport y) inside pane `pi`'s footnote strip?
+bool in_footnote_overlay(const App& app, int pi, float lx, float my);
+// Press on the strip: jump to the note under it. True = press consumed.
+bool click_footnote_overlay(App& app, int pi, float lx, float my);
 
 // ---- split browsing (app_split.cpp) ----
 // Split view with independent panes (not diff mode): left links open on the

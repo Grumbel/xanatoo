@@ -80,6 +80,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.outline = app.outline_mode;
   ui_state.section_focus = app.section_focus_mode;
   ui_state.justify = app.view_settings.justify;
+  ui_state.footnote_overlay = app.view_settings.footnote_overlay;
   ui_state.backlinks = app.backlinks_mode;
   ui_state.diff = app.diff_mode;
   ui_state.can_diff = !shared_doc(app) &&
@@ -1254,6 +1255,13 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::ReloadStyles:
       reload_styles(app);
       break;
+    case C::ToggleFootnoteOverlay:
+      app.view_settings.footnote_overlay = !app.view_settings.footnote_overlay;
+      xanatoo::save_view_settings(app.view_settings);
+      flash_status(app, app.view_settings.footnote_overlay
+                            ? "Footnote overlay on"
+                            : "Footnote overlay off");
+      break;
     case C::ToggleJustify:
       app.view_settings.justify = !app.view_settings.justify;
       apply_view_settings(app);
@@ -1362,7 +1370,8 @@ static void draw_pane_overlays(App& app, int i) {
         if (pg.node != app.hover.link_node ||
             pg.span_index != app.hover.link_span ||
             (pg.kind != xanatoo::InlineKind::Link &&
-             pg.kind != xanatoo::InlineKind::Cite)) {
+             pg.kind != xanatoo::InlineKind::Cite &&
+             pg.kind != xanatoo::InlineKind::FootnoteRef)) {
           flush();
           continue;
         }
@@ -2282,6 +2291,7 @@ void draw_pane(App& app, int i) {
   }
 
   draw_pane_overlays(app, i);
+  draw_footnote_overlay(app, i, clip);
 
   // Scrollbar lives in the strip excluded from the content clip.
   SDL_RenderSetClipRect(app.sdl, nullptr);

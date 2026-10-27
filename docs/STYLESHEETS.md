@@ -71,22 +71,22 @@ recolours every parent rule that uses `accent` (see `night-amber.xss`).
 
 **Block roles:** `paragraph`, `header`, `section`, `list`, `list-item`,
 `block-quote`, `note`, `code-block`, `term`, `definition`, `figure`,
-`caption`, `bibliography-entry`, `thread`, `message`, `table`, `rule`,
-`transclusion`.
+`caption`, `bibliography-entry`, `footnote`, `thread`, `message`, `table`,
+`rule`, `transclusion`.
 
 Their properties:
 
 | property | meaning |
 |----------|---------|
 | `space-before`, `space-after` | vertical gap around the block |
-| `indent` | text inset: after the side bar (quote, note, transclusion), list marker slot, code padding, definition / bibliography hang, nested section inset |
+| `indent` | text inset: after the side bar (quote, note, transclusion), list marker slot, code padding, definition / bibliography / footnote hang, nested section inset |
 | `font` | `body`, `bold`, `italic`, `bold-italic`, `heading`, `code` |
 | `color` | text colour (else the page colour) |
 | `background` | code-block fill, table header fill |
-| `border` | side bar, rule, table grid, code-block frame |
+| `border` | side bar, rule, table grid, code-block frame, footnote overlay rule |
 
 **Inline roles:** `text`, `emphasis`, `strong`, `strike`, `link`, `code`,
-`cite`, with the properties `color` (beats the block colour), `background`
+`cite`, `footnote-ref`, with the properties `color` (beats the block colour), `background`
 (only `code` uses it) and `underline` (`#t` / `#f`).
 
 Unknown roles, properties or bad values become warnings on stderr, and the

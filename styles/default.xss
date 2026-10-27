@@ -36,6 +36,7 @@
   (role figure      (space-after 10))
   (role caption     (font italic) (space-after 6))
   (role bibliography-entry (indent 16) (space-after 8))
+  (role footnote    (indent 24) (space-after 8) (border "#aaa8a0"))
   (role thread      (font heading) (space-after 10))
   (role message     (space-after 10) (border "#28828c"))
   (role table       (space-after 10) (border "#a0a5af")
@@ -46,5 +47,6 @@
   ;; Inline roles.
   (role link   (color "#1e5ab4") (underline #t))
   (role cite   (color "#5a328c") (underline #t))
+  (role footnote-ref (color "#1e5ab4"))
   (role code   (color "#82371e") (background (rgba 245 235 220 200)))
   (role strike (color "#5a5a5f")))

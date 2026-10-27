@@ -249,6 +249,12 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
     Pane& p = focused_pane(app);
     float lx = local_x(app, mx, app.focus);
 
+    // Footnote strip over the pane's bottom edge: jump to the note.
+    if (click_footnote_overlay(app, app.focus, lx, my)) {
+      reset_blink(app);
+      return;
+    }
+
     // Image resize handle (bottom-right 12px square)?
     {
       const float hs = 12.f;
@@ -843,7 +849,8 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
 
       // Links / cites (skip stretch-marker glyphs — those are stretch)
       if (!app.hover.col_gap && app.hover.stretch == xanatoo::INVALID_NODE &&
-          app.hover.image == xanatoo::INVALID_NODE) {
+          app.hover.image == xanatoo::INVALID_NODE &&
+          !in_footnote_overlay(app, hover_pane, lx, my)) {
         if (auto hit =
                 xanatoo::hit_test_link_ex(hd, hp.layout, lx, my, hp.scroll_y)) {
           // Stretch summaries are laid out as Link-styled glyphs on a

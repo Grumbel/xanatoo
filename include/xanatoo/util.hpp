@@ -53,8 +53,17 @@ void collect_text_nodes(const Document& doc, NodeId id,
                         std::vector<NodeId>& out);
 
 // Resolve #anchor to a text node: exact plain-text match, then heading
-// substring. Returns INVALID_NODE if not found.
+// substring. "#fn:key" names a footnote (its first text node). Returns
+// INVALID_NODE if not found.
 NodeId find_anchor_node(const Document& doc, std::string_view href);
+
+// The Footnote node whose label is `key` (ASCII case-insensitive).
+NodeId find_footnote(const Document& doc, std::string_view key);
+
+// "#fn:key" — in-document href of a footnote reference.
+inline std::string footnote_href(std::string_view key) {
+  return "#fn:" + std::string(key);
+}
 
 // Concatenate a node's inline spans.
 std::string plain_text(const Document& doc, NodeId id);

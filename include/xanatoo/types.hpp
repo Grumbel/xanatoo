@@ -42,6 +42,7 @@ enum class NodeKind : uint8_t {
   TableCell,       // level 0 = data cell, 1 = header cell
   Thread,          // discussion container (mailing list / forum thread)
   Message,         // one post or comment; may reply to another Message
+  Footnote,        // note body (Paragraph children); label = key of its refs
 };
 
 enum class InlineKind : uint8_t {
@@ -52,6 +53,7 @@ enum class InlineKind : uint8_t {
   Link,
   Code,
   Cite,  // citation pointer; href holds bibliography key
+  FootnoteRef,  // footnote mark; href holds the Footnote key, text the mark
 };
 
 struct InlineSpan {
@@ -83,6 +85,7 @@ struct Node {
   // Message: label = message-id; src = from/author; summary = date (ISO);
   //          alt = in-reply-to id, or "about:#anchor" for passage comments
   // Header: text title (no rank); src may hold org TODO keyword; tags for org.
+  // Footnote: label = key; body blocks are children (usually Paragraphs).
   // Article/Section: containers grouping blocks.
 };
 

@@ -72,6 +72,25 @@ Inline: plain strings, `(em …)`, `(strong …)`, `(code …)`,
 - `(cite :key "…")` points at a `(ref :key "…")` in `(biblio …)`.
   Clicking a citation jumps to that entry (`#key` resolution).
 
+### Footnotes
+
+```lisp
+(p "Nelson coined hypertext in 1965." (fnref "1"))
+(footnote :key "1"
+  (p "Theodor H. Nelson, " (em "Complex information processing") ".")
+  (p "Further paragraphs are allowed."))
+```
+
+- `(fnref "key")` marks the reference; `(footnote :key "key" …)` holds the
+  note's blocks. Keys are matched case-insensitively; `#fn:key` links to the
+  note.
+- Markdown: `text[^key]` and `[^key]: note` (more paragraphs indented by four
+  spaces), as written by pandoc's GFM writer, so EPUB footnotes survive the
+  import. Inside `:::biblio` the same `[^key]:` line stays a bibliography
+  entry. Org: `[fn:key]` and `[fn:key] note`. Gemtext flattens to `[key]`.
+- While reading, the notes of the marks on screen show in a strip at the
+  bottom of the pane (View → Footnote overlay); click a note to jump to it.
+
 ## Identity and linking
 
 ```lisp

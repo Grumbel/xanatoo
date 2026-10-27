@@ -58,6 +58,18 @@ void parse_org_inlines(Node& node, std::string_view text) {
 
   size_t i = 0;
   while (i < text.size()) {
+    // [fn:key] footnote reference
+    if (starts_with(text.substr(i), "[fn:")) {
+      size_t end = text.find(']', i + 4);
+      if (end != std::string_view::npos && end > i + 4) {
+        std::string_view key = text.substr(i + 4, end - (i + 4));
+        if (key.find_first_of(": \t[") == std::string_view::npos) {
+          push(InlineKind::FootnoteRef, key, std::string(key));
+          i = end + 1;
+          continue;
+        }
+      }
+    }
     // [[target][desc]] or [[target]]
     if (text[i] == '[' && i + 1 < text.size() && text[i + 1] == '[') {
       size_t end = text.find("]]", i + 2);
@@ -115,6 +127,7 @@ void parse_org_inlines(Node& node, std::string_view text) {
     while (i < text.size()) {
       char c = text[i];
       if (c == '[' && i + 1 < text.size() && text[i + 1] == '[') break;
+      if (c == '[' && starts_with(text.substr(i), "[fn:")) break;
       if (c == '*' || c == '/' || c == '=' || c == '~' || c == '+') {
         // Possible markup open — let outer loop decide
         bool open_ok = (i == 0 || is_ws(text[i - 1]) || text[i - 1] == '(');
@@ -345,11 +358,15 @@ Document parse_org(std::string_view source) {
     return section_parent();
   };
 
-  // Flush a paragraph buffer
+  // Flush a paragraph buffer (into the open footnote definition, if any)
   std::string para_buf;
+  NodeId para_footnote = INVALID_NODE;
   auto flush_para = [&]() {
+    const NodeId fn = para_footnote;
+    para_footnote = INVALID_NODE;
     if (para_buf.empty()) return;
-    NodeId n = doc.create(NodeKind::Paragraph, current_parent());
+    NodeId n = doc.create(NodeKind::Paragraph,
+                          fn != INVALID_NODE ? fn : current_parent());
     // If parent is ListItem, body is under the item
     parse_org_inlines(doc.get(n), trim_view(para_buf));
     para_buf.clear();
@@ -607,6 +624,25 @@ Document parse_org(std::string_view source) {
       continue;
     }
 
+    // Footnote definition "[fn:key] text" at column 0; the text runs to the
+    // next blank line.
+    if (L.indent == 0 && starts_with(t, "[fn:")) {
+      size_t end = t.find(']');
+      std::string_view key =
+          end == std::string::npos ? std::string_view{}
+                                   : std::string_view(t).substr(4, end - 4);
+      if (!key.empty() && key.find_first_of(": \t[") == std::string_view::npos) {
+        flush_para();
+        close_lists();
+        NodeId fn = doc.create(NodeKind::Footnote, section_parent());
+        doc.get(fn).label = std::string(key);
+        para_buf = std::string(trim_view(std::string_view(t).substr(end + 1)));
+        para_footnote = fn;
+        ++i;
+        continue;
+      }
+    }
+
     // Ordinary paragraph text
     if (!list_frames.empty()) {
       // continuation under last list item
@@ -649,6 +685,11 @@ void ser_inlines_org(const Node& node, std::string& out) {
         out.push_back('+');
         out += sp.text;
         out.push_back('+');
+        break;
+      case InlineKind::FootnoteRef:
+        out += "[fn:";
+        out += sp.href;
+        out += "]";
         break;
       case InlineKind::Link:
       case InlineKind::Cite: {
@@ -754,6 +795,21 @@ void ser_node_org(const Document& doc, NodeId id, std::string& out,
       ser_inlines_org(node, out);
       out += "\n\n";
       break;
+
+    case NodeKind::Footnote: {
+      // Org definitions end at a blank line: paragraphs share one block.
+      out += "[fn:";
+      out += node.label;
+      out += "]";
+      for (NodeId c : node.children) {
+        const Node& p = doc.get(c);
+        if (p.id != c) continue;
+        out += " ";
+        ser_inlines_org(p, out);
+      }
+      out += "\n\n";
+      break;
+    }
 
     case NodeKind::BlockQuote:
       out += "#+BEGIN_QUOTE\n";

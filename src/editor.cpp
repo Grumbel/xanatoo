@@ -8,6 +8,7 @@
 #include <cmath>
 #include <algorithm>
 #include <limits>
+#include <unordered_set>
 
 namespace xanatoo {
 
@@ -2143,6 +2144,63 @@ std::optional<Caret> jump_to_href(const Document& doc, const std::string& href) 
   return Caret{id, 0, 0};
 }
 
+std::vector<std::string> visible_footnote_keys(const Document& doc,
+                                               const LayoutResult& layout,
+                                               float top, float bottom) {
+  std::vector<std::string> keys;
+  std::unordered_set<std::string> shown;  // Footnote blocks in the band
+  for (const LayoutBox& b : layout.boxes) {
+    if (b.y > bottom || b.y + b.height < top) continue;
+    const Node& n = doc.get(b.node);
+    if (n.id == b.node && n.kind == NodeKind::Footnote)
+      shown.insert(ascii_lower(n.label));
+  }
+  NodeId last_node = INVALID_NODE;
+  size_t last_span = 0;
+  for (const PositionedGlyph& g : layout.glyphs) {
+    if (g.kind != InlineKind::FootnoteRef || g.node == INVALID_NODE) continue;
+    if (g.y < top || g.y > bottom) continue;
+    if (g.node == last_node && g.span_index == last_span) continue;
+    last_node = g.node;
+    last_span = g.span_index;
+    const Node& n = doc.get(g.node);
+    if (n.id != g.node || g.span_index >= n.spans.size()) continue;
+    const std::string& key = n.spans[g.span_index].href;
+    if (key.empty() || shown.count(ascii_lower(key))) continue;
+    if (std::find(keys.begin(), keys.end(), key) == keys.end())
+      keys.push_back(key);
+  }
+  return keys;
+}
+
+static NodeId copy_subtree(const Document& src, NodeId id, Document& dst,
+                           NodeId parent) {
+  const Node& n = src.get(id);
+  if (n.id != id) return INVALID_NODE;
+  const NodeId c = dst.create(n.kind, parent);
+  Node copy = n;
+  copy.id = c;
+  copy.parent = parent;
+  copy.children.clear();
+  dst.get(c) = std::move(copy);
+  for (NodeId child : n.children) copy_subtree(src, child, dst, c);
+  return c;
+}
+
+Document extract_footnotes(const Document& doc,
+                           const std::vector<std::string>& keys,
+                           std::vector<NodeId>* sources) {
+  Document out;
+  out.create(NodeKind::Document);
+  for (const std::string& key : keys) {
+    const NodeId fn = find_footnote(doc, key);
+    if (fn == INVALID_NODE) continue;
+    copy_subtree(doc, fn, out, out.root);
+    if (sources) sources->push_back(fn);
+  }
+  return out;
+}
+
 std::optional<std::string> link_preview_text(const Document& doc,
                                             const std::string& href) {
   if (href.empty() || href[0] != '#') return std::nullopt;
@@ -2184,7 +2242,9 @@ std::optional<LinkHit> hit_test_link_ex(const Document& doc,
     const auto& g = layout.glyphs[i];
     // Skip far-away lines (glyphs are laid out top-to-bottom overall).
     if (g.y < adj_y - 120.f || g.y > adj_y + 80.f) continue;
-    if (g.kind != InlineKind::Link && g.kind != InlineKind::Cite) continue;
+    if (g.kind != InlineKind::Link && g.kind != InlineKind::Cite &&
+        g.kind != InlineKind::FootnoteRef)
+      continue;
     float x0 = g.x;
     float x1 = x0 + 10.f;
     size_t j = i;
@@ -2206,7 +2266,9 @@ std::optional<LinkHit> hit_test_link_ex(const Document& doc,
         hit.rel = sp.rel;
         hit.node = g.node;
         hit.span_index = g.span_index;
-        if (sp.kind == InlineKind::Cite) {
+        if (sp.kind == InlineKind::FootnoteRef) {
+          hit.href = footnote_href(sp.href);
+        } else if (sp.kind == InlineKind::Cite) {
           if (!sp.href.empty() && sp.href[0] == '#')
             hit.href = sp.href;
           else

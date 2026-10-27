@@ -725,6 +725,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       }
       if (ImGui::MenuItem("Justify lines", nullptr, state.justify))
         cmd = UiCommand::ToggleJustify;
+      if (ImGui::MenuItem("Footnote overlay", nullptr, state.footnote_overlay))
+        cmd = UiCommand::ToggleFootnoteOverlay;
       if (ImGui::BeginMenu("Style sheet")) {
         fill_style_items(state, cmd, result.arg);
         ImGui::EndMenu();

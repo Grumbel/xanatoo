@@ -276,6 +276,19 @@ size_t replace_all(Document& doc, const std::string& query,
 // Internal link: href "#Title" → caret at matching heading/paragraph.
 std::optional<Caret> jump_to_href(const Document& doc, const std::string& href);
 
+// Keys of the footnotes referenced by FootnoteRef glyphs with a baseline in
+// [top, bottom] (content y), in reading order, minus notes whose own
+// Footnote block already shows in that band.
+std::vector<std::string> visible_footnote_keys(const Document& doc,
+                                               const LayoutResult& layout,
+                                               float top, float bottom);
+
+// Copies of the Footnotes named by `keys` (unknown keys skipped) as the
+// top-level blocks of a new document; `sources` gets the original id of each.
+Document extract_footnotes(const Document& doc,
+                           const std::vector<std::string>& keys,
+                           std::vector<NodeId>* sources = nullptr);
+
 // Short preview of an internal #anchor target (first ~80 chars of the node).
 // Empty optional for external or unresolved hrefs.
 std::optional<std::string> link_preview_text(const Document& doc,

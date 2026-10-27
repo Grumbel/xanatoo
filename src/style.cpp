@@ -39,6 +39,7 @@ constexpr RoleName kBlockRoles[] = {
     {"figure", BlockRole::Figure},
     {"caption", BlockRole::Caption},
     {"bibliography-entry", BlockRole::BiblioEntry},
+    {"footnote", BlockRole::Footnote},
     {"thread", BlockRole::Thread},
     {"message", BlockRole::Message},
     {"table", BlockRole::Table},
@@ -54,7 +55,7 @@ constexpr InlineName kInlineRoles[] = {
     {"text", InlineKind::Text},     {"emphasis", InlineKind::Emphasis},
     {"strong", InlineKind::Strong}, {"strike", InlineKind::Strike},
     {"link", InlineKind::Link},     {"code", InlineKind::Code},
-    {"cite", InlineKind::Cite},
+    {"cite", InlineKind::Cite},     {"footnote-ref", InlineKind::FootnoteRef},
 };
 
 constexpr std::pair<const char*, FontRole> kFontRoles[] = {
@@ -428,6 +429,12 @@ DocStyle builtin_style() {
   blk(BlockRole::Caption).font = FontRole::BodyItalic;
   blk(BlockRole::BiblioEntry).indent = px(16);
   blk(BlockRole::BiblioEntry).space_after = px(8);
+  {
+    BlockStyle& b = blk(BlockRole::Footnote);
+    b.indent = px(24);
+    b.space_after = px(8);
+    b.border = {170, 168, 160, 255};
+  }
   blk(BlockRole::Thread).space_after = px(10);
   blk(BlockRole::Thread).font = FontRole::Heading;
   {
@@ -459,6 +466,7 @@ DocStyle builtin_style() {
   };
   inl(InlineKind::Link) = {true, {30, 90, 180, 255}, {0, 0, 0, 0}, true};
   inl(InlineKind::Cite) = {true, {90, 50, 140, 255}, {0, 0, 0, 0}, true};
+  inl(InlineKind::FootnoteRef) = {true, {30, 90, 180, 255}, {0, 0, 0, 0}, false};
   inl(InlineKind::Code) = {true, {130, 55, 30, 255}, {245, 235, 220, 200}, false};
   inl(InlineKind::Strike) = {true, {90, 90, 95, 255}, {0, 0, 0, 0}, false};
   return s;

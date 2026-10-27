@@ -46,10 +46,29 @@ std::string plain_text(const Document& doc, NodeId id) {
   return out;
 }
 
+NodeId find_footnote(const Document& doc, std::string_view key) {
+  const std::string klow = ascii_lower(std::string(key));
+  for (const Node& n : doc.nodes) {
+    if (n.id != INVALID_NODE && n.kind == NodeKind::Footnote &&
+        ascii_lower(n.label) == klow)
+      return n.id;
+  }
+  return INVALID_NODE;
+}
+
 NodeId find_anchor_node(const Document& doc, std::string_view href) {
   if (href.empty() || href[0] != '#') return INVALID_NODE;
   std::string tlow = ascii_lower(std::string(href.substr(1)));
   if (tlow.empty() || doc.root == INVALID_NODE) return INVALID_NODE;
+
+  // Footnotes live in their own key space: #fn:key → first text inside.
+  if (tlow.size() > 3 && tlow.compare(0, 3, "fn:") == 0) {
+    NodeId fn = find_footnote(doc, std::string_view(tlow).substr(3));
+    if (fn == INVALID_NODE) return INVALID_NODE;
+    std::vector<NodeId> body;
+    collect_text_nodes(doc, fn, body);
+    return body.empty() ? INVALID_NODE : body.front();
+  }
 
   // Prefer stable :label (semantic id) over heading text match.
   // Bibliography keys are labels; cite:key and #key both resolve here.

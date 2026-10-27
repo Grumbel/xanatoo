@@ -8,6 +8,26 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-27) — footnotes
+
+- New `Footnote` block (label = key, Paragraph children) and `FootnoteRef`
+  inline (href = key). Markdown `[^key]` / `[^key]: …` (multi-paragraph via
+  4-space indent, pandoc GFM style) — a bare `[^key]:` line used to become a
+  bibliography entry; it now only does inside `:::biblio` (which the writer
+  always emits). Org `[fn:key]`, sexp `(fnref …)` / `(footnote :key …)`.
+- Marks render as superscript digits (raised glyph when the face lacks
+  them); `#fn:key` resolves to the note, so click / hover preview work.
+- Footnote overlay (`app_footnotes.cpp`): notes of the marks on screen are
+  laid out in a strip at the pane bottom (≤ 40 % height, fade when cut),
+  skipped when the note itself is on screen or the caret is under the strip.
+  Click jumps to the note. View → Footnote overlay (`footnotes=` in
+  view.conf). Style roles `footnote` / `footnote-ref`.
+- EPUB footnotes come through pandoc's GFM output. HTML from arbitrary sites
+  is not covered (pandoc only recognises its own / EPUB note markup).
+- Open: other pandoc-readable formats (docx, odt, rst, LaTeX) could go
+  through the same import path; org inline definitions `[fn::…]`;
+  overlay is not scrollable when notes exceed 40 %.
+
 ## Status (2026-10-27) — split browsing, background page loads
 
 - Remote pages (Gemini / Nostr / Reddit / Lemmy) now fetch + parse on a

@@ -70,6 +70,18 @@ size_t list_marker_len(std::string_view trimmed, int* ordered_index) {
 
 
 // Extract key="value" or key='value' or key=bare from a fence line.
+// "[^key]: …" footnote / bibliography definition: index of the "]:" that
+// closes the key, else 0.
+size_t footnote_def_close(std::string_view trimmed) {
+  if (!starts_with(trimmed, "[^")) return 0;
+  size_t close = trimmed.find("]:");
+  if (close == std::string_view::npos || close <= 2) return 0;
+  if (trimmed.substr(2, close - 2).find_first_of(" \t[]") !=
+      std::string_view::npos)
+    return 0;
+  return close;
+}
+
 std::string fence_attr(std::string_view line, std::string_view key) {
   std::string pat(key);
   pat += '=';
@@ -182,6 +194,23 @@ void parse_inlines(Node& node, std::string_view text) {
             i = end + 1;
             continue;
           }
+        }
+      }
+    }
+    // [^key] footnote reference (definitions are block-level "[^key]: …")
+    if (text[i] == '[' && i + 1 < text.size() && text[i + 1] == '^') {
+      size_t end = text.find(']', i + 2);
+      if (end != std::string_view::npos && end > i + 2) {
+        std::string_view key = text.substr(i + 2, end - (i + 2));
+        if (key.find_first_of(" \t\n[") == std::string_view::npos) {
+          flush_plain();
+          InlineSpan s;
+          s.kind = InlineKind::FootnoteRef;
+          s.href = std::string(key);
+          s.text = s.href;
+          node.spans.push_back(std::move(s));
+          i = end + 1;
+          continue;
         }
       }
     }
@@ -1062,22 +1091,56 @@ Document parse_markup(std::string_view source) {
       }
     }
 
-    // Bibliography entry: [^key]: text
-    if (starts_with(trimmed, "[^")) {
-      size_t close = trimmed.find("]:");
-      if (close != std::string_view::npos && close > 2) {
-        NodeId parent = current_parent();
-        if (doc.get(parent).kind != NodeKind::Biblio)
-          parent = doc.create(NodeKind::Biblio, parent);
-        NodeId entry = doc.create(NodeKind::BiblioEntry, parent);
-        doc.get(entry).label = std::string(trimmed.substr(2, close - 2));
-        std::string_view body = trimmed.substr(close + 2);
-        while (!body.empty() && (body.front() == ' ' || body.front() == '\t'))
-          body.remove_prefix(1);
+    // "[^key]: text" — a bibliography entry inside :::biblio, else a footnote
+    if (size_t close = footnote_def_close(trimmed)) {
+      std::string key(trimmed.substr(2, close - 2));
+      std::string_view body = trimmed.substr(close + 2);
+      trim_ascii(body);
+      if (doc.get(current_parent()).kind == NodeKind::Biblio) {
+        NodeId entry = doc.create(NodeKind::BiblioEntry, current_parent());
+        doc.get(entry).label = std::move(key);
         if (!body.empty()) parse_inlines(doc.get(entry), body);
         ++i;
         continue;
       }
+      // Footnote body: lazy continuation lines, then further paragraphs
+      // indented by four spaces (or a tab) after blank lines.
+      NodeId fn = doc.create(NodeKind::Footnote, current_parent());
+      doc.get(fn).label = std::move(key);
+      std::string para(body);
+      auto flush_fn_para = [&]() {
+        if (para.empty()) return;
+        NodeId p = doc.create(NodeKind::Paragraph, fn);
+        parse_inlines(doc.get(p), para);
+        para.clear();
+      };
+      auto indented = [](std::string_view s) {
+        return starts_with(s, "    ") || starts_with(s, "\t");
+      };
+      ++i;
+      while (i < lines.size()) {
+        if (lines[i].blank) {
+          size_t j = i;
+          while (j < lines.size() && lines[j].blank) ++j;
+          if (j >= lines.size() || !indented(lines[j].text)) break;
+          flush_fn_para();
+          i = j;
+        }
+        std::string_view lt = lines[i].text;
+        std::string_view ltrim = lt;
+        trim_ascii(ltrim);
+        if (!indented(lt) &&
+            (footnote_def_close(ltrim) || starts_with(ltrim, ":::") ||
+             starts_with(ltrim, "# ") || starts_with(ltrim, "## ") ||
+             starts_with(ltrim, "![") || starts_with(ltrim, "> ") ||
+             starts_with(ltrim, "|") || list_marker_len(ltrim, nullptr) > 0))
+          break;
+        if (!para.empty()) para.push_back(' ');
+        para.append(ltrim);
+        ++i;
+      }
+      flush_fn_para();
+      continue;
     }
 
     // Caption under a figure: non-image text line becomes Caption
@@ -1100,7 +1163,7 @@ Document parse_markup(std::string_view source) {
       if (starts_with(ltrim, ":::") || starts_with(ltrim, "# ") ||
           starts_with(ltrim, "## ") || starts_with(ltrim, "![") ||
           starts_with(ltrim, "> ") || starts_with(ltrim, "|") ||
-          starts_with(ltrim, "[^") ||
+          footnote_def_close(ltrim) > 0 ||
           list_marker_len(ltrim, nullptr) > 0) {
         break;
       }
@@ -1180,6 +1243,11 @@ void serialize_inlines(const Node& node, std::string& out) {
         out += "](cite:";
         out += sp.href;
         out += ")";
+        break;
+      case InlineKind::FootnoteRef:
+        out += "[^";
+        out += sp.href;
+        out += "]";
         break;
       default:
         escape_md_plain(sp.text, out);
@@ -1428,6 +1496,35 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
       out += node.label.empty() ? node.src : node.label;
       out += "]: ";
       serialize_inlines(node, out);
+      out += "\n";
+      break;
+    }
+
+    case NodeKind::Footnote: {
+      // First paragraph on the "[^key]:" line, the rest indented four spaces.
+      out += pad;
+      out += "[^";
+      out += node.label;
+      out += "]:";
+      bool first = true;
+      for (NodeId c : node.children) {
+        const Node& p = doc.get(c);
+        if (p.id != c) continue;
+        std::string text;
+        serialize_inlines(p, text);
+        if (first) {
+          if (!text.empty()) out += " " + text;
+          out += "\n";
+          first = false;
+          continue;
+        }
+        out += "\n";
+        out += pad;
+        out += "    ";
+        out += text;
+        out += "\n";
+      }
+      if (first) out += "\n";
       out += "\n";
       break;
     }
@@ -1753,8 +1850,29 @@ void append_inline_from_sexpr(Node& node, const SExpr& e) {
   if (!is_atom(head, "em") && !is_atom(head, "strong") &&
       !is_atom(head, "strike") && !is_atom(head, "s") &&
       !is_atom(head, "code") && !is_atom(head, "a") &&
-      !is_atom(head, "cite") && !is_atom(head, "text"))
+      !is_atom(head, "cite") && !is_atom(head, "fnref") &&
+      !is_atom(head, "text"))
     return;
+
+  if (is_atom(head, "fnref")) {
+    // (fnref "key") or (fnref :key "key" "mark")
+    InlineSpan sp;
+    sp.kind = InlineKind::FootnoteRef;
+    for (size_t i = 1; i < e.kids.size(); ++i) {
+      if (e.kids[i].kind == SExpr::Kind::Atom && e.kids[i].text == ":key" &&
+          i + 1 < e.kids.size()) {
+        sp.href = sexpr_text(e.kids[++i]);
+      } else if (sp.href.empty()) {
+        sp.href = sexpr_text(e.kids[i]);
+      } else {
+        sp.text += sexpr_text(e.kids[i]);
+      }
+    }
+    if (sp.href.empty()) return;
+    if (sp.text.empty()) sp.text = sp.href;
+    node.spans.push_back(std::move(sp));
+    return;
+  }
 
   if (is_atom(head, "a")) {
     InlineSpan sp;
@@ -2141,6 +2259,19 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
     return;
   }
 
+  if (tag == "footnote" || tag == "fn") {
+    NodeId n = doc.create(NodeKind::Footnote, parent);
+    size_t i = 1;
+    while (i + 1 < e.kids.size() && e.kids[i].kind == SExpr::Kind::Atom &&
+           !e.kids[i].text.empty() && e.kids[i].text[0] == ':') {
+      if (e.kids[i].text == ":key" || e.kids[i].text == ":label")
+        doc.get(n).label = sexpr_text(e.kids[i + 1]);
+      i += 2;
+    }
+    parse_sexpr_children(doc, n, e.kids, i);
+    return;
+  }
+
   if (tag == "ref" || tag == "biblio-entry") {
     NodeId n = doc.create(NodeKind::BiblioEntry, parent);
     std::string label, key;
@@ -2450,6 +2581,15 @@ void serialize_sexpr_inlines(const Node& node, std::string& out) {
         escape_sexpr_string(sp.text, out);
         out += ")";
         break;
+      case InlineKind::FootnoteRef:
+        out += "(fnref ";
+        escape_sexpr_string(sp.href, out);
+        if (sp.text != sp.href) {
+          out.push_back(' ');
+          escape_sexpr_string(sp.text, out);
+        }
+        out += ")";
+        break;
       default:
         escape_sexpr_string(sp.text, out);
         break;
@@ -2643,6 +2783,17 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
       serialize_sexpr_children(doc, node, out, indent + 2);
       out.push_back('\n');
       out += pad;
+      out += ")";
+      break;
+    }
+
+    case NodeKind::Footnote: {
+      out += pad;
+      out += "(footnote";
+      emit_node_id(node, out);
+      out += " :key ";
+      escape_sexpr_string(node.label, out);
+      serialize_sexpr_children(doc, node, out, indent + 2);
       out += ")";
       break;
     }
@@ -3052,7 +3203,12 @@ static void gemtext_escape_line(std::string& out, std::string_view text) {
 
 static std::string gemtext_plain(const Node& n) {
   std::string s;
-  for (const auto& sp : n.spans) s += sp.text;
+  for (const auto& sp : n.spans) {
+    if (sp.kind == InlineKind::FootnoteRef)
+      s += "[" + sp.href + "]";
+    else
+      s += sp.text;
+  }
   return s;
 }
 
@@ -3123,6 +3279,18 @@ static void serialize_gemtext_node(const Document& doc, NodeId id, std::string& 
     case NodeKind::HorizontalRule:
       out += "\n";
       break;
+    case NodeKind::Footnote: {
+      // Gemtext has no notes: "[key] text", one line per paragraph.
+      std::string line = "[" + n.label + "]";
+      for (NodeId c : n.children) {
+        const Node& p = doc.get(c);
+        if (p.id != c) continue;
+        line += " " + gemtext_plain(p);
+      }
+      gemtext_escape_line(out, line);
+      out.push_back('\n');
+      break;
+    }
     default:
       for (NodeId c : n.children) serialize_gemtext_node(doc, c, out);
       if (!n.spans.empty()) {

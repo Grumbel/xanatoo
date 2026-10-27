@@ -132,6 +132,7 @@ enum class UiCommand {
   ViewMeasureWide,          // ~960px
   ToggleSectionFocus,       // outline: body shows one section only
   ToggleJustify,            // view: justify wrapped lines
+  ToggleFootnoteOverlay,    // view: notes of on-screen footnote marks
   SelectStyle,              // arg = style sheet name (styles/<name>.xss)
   ReloadStyles,             // rescan styles/ and re-read the active sheet
 };
@@ -145,6 +146,7 @@ struct UiState {
   bool outline = false;
   bool section_focus = false;
   bool justify = false;
+  bool footnote_overlay = true;
   bool backlinks = false;
   bool diff = false;
   bool can_diff = false;  // two independent documents loaded

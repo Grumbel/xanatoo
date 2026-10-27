@@ -115,6 +115,17 @@ static FontRole style_role(FontRole base, InlineKind kind) {
 
 static void decode_utf8(const std::string& text, std::vector<uint32_t>& out);
 
+// Unicode superscript for an ASCII digit, else 0.
+static uint32_t superscript_digit(uint32_t cp) {
+  switch (cp) {
+    case '1': return 0x00B9;
+    case '2': return 0x00B2;
+    case '3': return 0x00B3;
+    default:
+      return (cp >= '0' && cp <= '9') ? 0x2070 + (cp - '0') : 0;
+  }
+}
+
 // Message in-reply-to label → node id (rebuilt each layout).
 thread_local std::unordered_map<std::string, NodeId> g_msg_label_map;
 
@@ -717,6 +728,61 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       break;
     }
 
+    case NodeKind::Footnote: {
+      // Body blocks hang right of the key; the key sits on the first line.
+      const float start_y = y;
+      y += before(BlockRole::Footnote);
+      const float hang = indent(BlockRole::Footnote);
+      const size_t first = out.glyphs.size();
+      const float body_y = y;
+      // Paragraphs take the footnote role (font, colour, tighter spacing).
+      for (size_t ci = 0; ci < node.children.size(); ++ci) {
+        const NodeId cid = node.children[ci];
+        const Node& child = doc.get(cid);
+        if (child.id != cid) continue;
+        if (child.kind != NodeKind::Paragraph) {
+          layout_node(doc, cid, x + hang, y, max_width - hang, out);
+          continue;
+        }
+        if (ci > 0) y += after(BlockRole::Footnote);
+        const float py = y;
+        layout_role_text(doc, child, BlockRole::Footnote, x + hang, y,
+                         max_width - hang, out);
+        out.boxes.push_back({cid, x + hang, py, max_width - hang, y - py});
+      }
+      Font& mf = fonts_.pick(FontRole::Body);
+      float baseline = body_y + static_cast<float>(mf.ascender());
+      for (size_t gi = first; gi < out.glyphs.size(); ++gi) {
+        if (out.glyphs[gi].node == INVALID_NODE) continue;
+        baseline = out.glyphs[gi].y;
+        break;
+      }
+      std::string marker = node.label;
+      if (!marker.empty() &&
+          marker.find_first_not_of("0123456789") == std::string::npos)
+        marker += ".";
+      std::vector<uint32_t> m_cps;
+      decode_utf8(marker, m_cps);
+      float mx = x;
+      for (uint32_t cp : m_cps) {
+        const Glyph& g = mf.glyph(cp);
+        PositionedGlyph pg;
+        pg.codepoint = cp;
+        pg.x = mx + static_cast<float>(g.bearing_x);
+        pg.y = baseline;
+        pg.node = INVALID_NODE;  // decoration, not a caret target
+        pg.kind = InlineKind::FootnoteRef;
+        pg.font = FontRole::Body;
+        pg.color = st.text_color(BlockRole::Footnote, InlineKind::FootnoteRef);
+        out.glyphs.push_back(pg);
+        mx += static_cast<float>(g.advance >> 6);
+      }
+      if (node.children.empty()) y += mf.line_height();
+      y += after(BlockRole::Footnote);
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
+
     case NodeKind::Biblio: {
       float start_y = y;
       layout_children_sequential(doc, node.children, x, y, max_width, out);
@@ -1239,14 +1305,28 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     size_t char_idx;
     InlineKind kind;
     FontRole role;
+    float rise = 0.f;  // baseline lift (footnote marks without superscripts)
   };
   std::vector<CharInfo> chars;
   for (size_t si = 0; si < node.spans.size(); ++si) {
     std::vector<uint32_t> cps;
     decode_utf8(node.spans[si].text, cps);
-    FontRole r = style_role(base_role, node.spans[si].kind);
-    for (size_t ci = 0; ci < cps.size(); ++ci)
-      chars.push_back({cps[ci], si, ci, node.spans[si].kind, r});
+    const InlineKind kind = node.spans[si].kind;
+    FontRole r = style_role(base_role, kind);
+    for (size_t ci = 0; ci < cps.size(); ++ci) {
+      CharInfo c{cps[ci], si, ci, kind, r};
+      if (kind == InlineKind::FootnoteRef) {
+        // Footnote mark: superscript digit when the face has one (same
+        // char index, so caret / selection are unaffected), else raised.
+        Font& f = fonts_.pick(r);
+        const uint32_t sup = superscript_digit(c.cp);
+        if (sup && f.has_glyph(sup))
+          c.cp = sup;
+        else
+          c.rise = static_cast<float>(f.ascender()) * 0.4f;
+      }
+      chars.push_back(c);
+    }
   }
 
   Font& metrics = fonts_.pick(base_role == FontRole::Heading ? FontRole::Heading
@@ -1327,7 +1407,7 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
       PositionedGlyph pg;
       pg.codepoint = c.cp;
       pg.x = lx + static_cast<float>(g.bearing_x);
-      pg.y = baseline;
+      pg.y = baseline - c.rise;
       pg.node = node.id;
       pg.span_index = c.span_idx;
       pg.char_index = c.char_idx;

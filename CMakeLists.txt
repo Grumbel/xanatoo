@@ -62,6 +62,7 @@ add_executable(xanatoo
   src/app_keymap.cpp
   src/app_fetch.cpp
   src/app_split.cpp
+  src/app_footnotes.cpp
   src/theme.cpp
   src/font.cpp
   src/document.cpp
