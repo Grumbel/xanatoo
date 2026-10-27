@@ -76,7 +76,7 @@ for f in DejaVuSans DejaVuSans-Bold DejaVuSans-Oblique DejaVuSans-BoldOblique \
          DejaVuSansMono-BoldOblique; do
   cp "$DEJAVU_DIR/$f.ttf" "$A/fonts/"
 done
-cp "$APP_SRC_DIR"/examples/* "$A/examples/"
+cp -r "$APP_SRC_DIR"/examples/. "$A/examples/"
 cp "$APP_SRC_DIR"/styles/*.xss "$A/styles/"
 cp "$APP_SRC_DIR"/FORMAT.md "$A/"
 python3 "$APP_SRC_DIR"/scripts/rasterize_icons.py "$APP_SRC_DIR"/icons/svg "$A/icons" 20

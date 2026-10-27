@@ -102,7 +102,7 @@ std::string thumb_cache_path(const std::string& resolved, int edge) {
   const auto mtime = fs::last_write_time(resolved, ec).time_since_epoch().count();
   if (ec) return {};
   const size_t h = std::hash<std::string>{}(
-      resolved + "\n" + std::to_string(size) + "\n" + std::to_string(mtime));
+      resolved + "\n" + std::to_string(size) + "\n" + std::to_string(static_cast<long long>(mtime)));
   char name[64];
   std::snprintf(name, sizeof(name), "%016zx-%d.bmp", h, edge);
   return (fs::path(cache_dir()) / "thumbs" / name).string();
