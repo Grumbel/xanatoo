@@ -13,6 +13,7 @@
 
 #include "xanatoo/app.hpp"
 #include "xanatoo/ebooks.hpp"
+#include "xanatoo/feed.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/hackernews.hpp"
 #include "xanatoo/lemmy.hpp"
@@ -70,7 +71,13 @@ void fetch_gemini(const std::string& url, FetchShared& out) {
 // Worker thread body: everything here must stay off App.
 void fetch_page(std::string url, std::shared_ptr<FetchShared> out) {
   out->final_url = url;
-  if (xanatoo::is_gemini_url(url)) {
+  // Feeds first: /.rss, /feeds/… and /rss on Reddit / Lemmy / HN are feeds.
+  if (xanatoo::is_feed_url(url)) {
+#if defined(XANATOO_FEEDS) && XANATOO_FEEDS
+    out->service = "Feed";
+    out->doc = xanatoo::feed_fetch(url, &out->error);
+#endif
+  } else if (xanatoo::is_gemini_url(url)) {
 #if defined(XANATOO_GEMINI) && XANATOO_GEMINI
     fetch_gemini(url, *out);
 #endif
@@ -179,6 +186,13 @@ bool remote_fetch_supported(std::string_view url, std::string* why) {
     if (why) *why = msg;
     return false;
   };
+  if (xanatoo::is_feed_url(url)) {
+#if defined(XANATOO_FEEDS) && XANATOO_FEEDS
+    return true;
+#else
+    return no("RSS / Atom feeds need build with -DXANATOO_FEEDS=ON");
+#endif
+  }
   if (xanatoo::is_gemini_url(url)) {
 #if defined(XANATOO_GEMINI) && XANATOO_GEMINI
     return true;

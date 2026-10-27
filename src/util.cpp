@@ -176,6 +176,72 @@ void utf8_pop_back(std::string& s) {
   if (!s.empty()) s.pop_back();
 }
 
+namespace {
+
+// Latin-1 names, U+00A0 … U+00FF in order.
+constexpr std::string_view kLatin1Entities[96] = {
+    "nbsp",   "iexcl",  "cent",   "pound",  "curren", "yen",    "brvbar",
+    "sect",   "uml",    "copy",   "ordf",   "laquo",  "not",    "shy",
+    "reg",    "macr",   "deg",    "plusmn", "sup2",   "sup3",   "acute",
+    "micro",  "para",   "middot", "cedil",  "sup1",   "ordm",   "raquo",
+    "frac14", "frac12", "frac34", "iquest", "Agrave", "Aacute", "Acirc",
+    "Atilde", "Auml",   "Aring",  "AElig",  "Ccedil", "Egrave", "Eacute",
+    "Ecirc",  "Euml",   "Igrave", "Iacute", "Icirc",  "Iuml",   "ETH",
+    "Ntilde", "Ograve", "Oacute", "Ocirc",  "Otilde", "Ouml",   "times",
+    "Oslash", "Ugrave", "Uacute", "Ucirc",  "Uuml",   "Yacute", "THORN",
+    "szlig",  "agrave", "aacute", "acirc",  "atilde", "auml",   "aring",
+    "aelig",  "ccedil", "egrave", "eacute", "ecirc",  "euml",   "igrave",
+    "iacute", "icirc",  "iuml",   "eth",    "ntilde", "ograve", "oacute",
+    "ocirc",  "otilde", "ouml",   "divide", "oslash", "ugrave", "uacute",
+    "ucirc",  "uuml",   "yacute", "thorn",  "yuml"};
+
+// Lower-case Greek, U+03B1 … U+03C9 in order.
+constexpr std::string_view kGreekEntities[25] = {
+    "alpha", "beta",    "gamma", "delta",   "epsilon", "zeta",  "eta",
+    "theta", "iota",    "kappa", "lambda",  "mu",      "nu",    "xi",
+    "omicron", "pi",    "rho",   "sigmaf",  "sigma",   "tau",   "upsilon",
+    "phi",   "chi",     "psi",   "omega"};
+
+struct NamedEntity {
+  std::string_view name;
+  uint32_t cp;
+};
+
+// Punctuation and symbols common in feeds and blog HTML.
+constexpr NamedEntity kOtherEntities[] = {
+    {"amp", '&'},       {"lt", '<'},        {"gt", '>'},
+    {"quot", '"'},      {"apos", '\''},     {"ndash", 0x2013},
+    {"mdash", 0x2014},  {"lsquo", 0x2018},  {"rsquo", 0x2019},
+    {"sbquo", 0x201A},  {"ldquo", 0x201C},  {"rdquo", 0x201D},
+    {"bdquo", 0x201E},  {"dagger", 0x2020}, {"Dagger", 0x2021},
+    {"bull", 0x2022},   {"hellip", 0x2026}, {"permil", 0x2030},
+    {"prime", 0x2032},  {"Prime", 0x2033},  {"lsaquo", 0x2039},
+    {"rsaquo", 0x203A}, {"euro", 0x20AC},   {"trade", 0x2122},
+    {"larr", 0x2190},   {"uarr", 0x2191},   {"rarr", 0x2192},
+    {"darr", 0x2193},   {"harr", 0x2194},   {"lArr", 0x21D0},
+    {"rArr", 0x21D2},   {"hArr", 0x21D4},   {"minus", 0x2212},
+    {"infin", 0x221E},  {"asymp", 0x2248},  {"ne", 0x2260},
+    {"le", 0x2264},     {"ge", 0x2265},     {"ensp", 0x2002},
+    {"emsp", 0x2003},   {"thinsp", 0x2009}, {"zwnj", 0x200C},
+    {"zwj", 0x200D},    {"lrm", 0x200E},    {"rlm", 0x200F},
+    {"OElig", 0x152},   {"oelig", 0x153},   {"Scaron", 0x160},
+    {"scaron", 0x161},  {"Yuml", 0x178},    {"fnof", 0x192},
+    {"circ", 0x2C6},    {"tilde", 0x2DC},   {"hearts", 0x2665},
+    {"check", 0x2713},  {"NoBreak", 0x2060}, {"ZeroWidthSpace", 0x200B},
+};
+
+uint32_t named_entity(std::string_view name) {
+  for (const auto& e : kOtherEntities)
+    if (e.name == name) return e.cp;
+  for (size_t k = 0; k < 96; ++k)
+    if (kLatin1Entities[k] == name) return static_cast<uint32_t>(0xA0 + k);
+  for (size_t k = 0; k < 25; ++k)
+    if (kGreekEntities[k] == name) return static_cast<uint32_t>(0x3B1 + k);
+  return 0;
+}
+
+}  // namespace
+
 std::string html_decode_entities(std::string_view s) {
   std::string o;
   o.reserve(s.size());
@@ -183,19 +249,13 @@ std::string html_decode_entities(std::string_view s) {
     size_t semi;
     if (s[i] != '&' ||
         (semi = s.find(';', i + 1)) == std::string_view::npos ||
-        semi - i > 10) {
+        semi - i > 16) {
       o.push_back(s[i]);
       continue;
     }
     std::string_view name = s.substr(i + 1, semi - i - 1);
     uint32_t cp = 0;
-    if (name == "amp") cp = '&';
-    else if (name == "lt") cp = '<';
-    else if (name == "gt") cp = '>';
-    else if (name == "quot") cp = '"';
-    else if (name == "apos") cp = '\'';
-    else if (name == "nbsp") cp = 0xA0;
-    else if (name.size() > 1 && name[0] == '#') {
+    if (name.size() > 1 && name[0] == '#') {
       std::string num(name.substr(1));
       bool hex = !num.empty() && (num[0] == 'x' || num[0] == 'X');
       cp = static_cast<uint32_t>(
@@ -203,6 +263,7 @@ std::string html_decode_entities(std::string_view s) {
       if (cp == 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp < 0xE000))
         cp = 0xFFFD;
     }
+    if (cp == 0) cp = named_entity(name);
     if (cp == 0) {
       o.push_back(s[i]);
       continue;

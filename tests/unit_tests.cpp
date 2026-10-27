@@ -4,7 +4,9 @@
 // Lightweight unit tests (no Catch/GTest). Run: ./xanatoo_tests
 
 #include "xanatoo/ebooks.hpp"
+#include "xanatoo/feed.hpp"
 #include "xanatoo/gemini.hpp"
+#include "xanatoo/html_min.hpp"
 #include "xanatoo/hackernews.hpp"
 #include "xanatoo/json_min.hpp"
 #include "xanatoo/lemmy.hpp"
@@ -1153,7 +1155,195 @@ void test_ebook_urls() {
   EXPECT(text.find("Next page") != std::string::npos);
 }
 
+// Children of `id` with their kinds, for structure checks.
+std::vector<xanatoo::NodeId> kids_of(const xanatoo::Document& doc,
+                                     xanatoo::NodeId id) {
+  return doc.get(id).children;
+}
+
+const xanatoo::Node* first_of_kind(const xanatoo::Document& doc,
+                                   xanatoo::NodeKind kind) {
+  for (const auto& n : doc.nodes)
+    if (n.id != xanatoo::INVALID_NODE && n.kind == kind) return &n;
+  return nullptr;
+}
+
+void test_html_min() {
+  using namespace xanatoo;
+  EXPECT_EQ(resolve_url("https://x.org/blog/post.html", "img/a.png"),
+            "https://x.org/blog/img/a.png");
+  EXPECT_EQ(resolve_url("https://x.org/blog/post.html", "../a"), "https://x.org/a");
+  EXPECT_EQ(resolve_url("https://x.org/blog/", "/top"), "https://x.org/top");
+  EXPECT_EQ(resolve_url("https://x.org/b?q=1#f", "#g"), "https://x.org/b?q=1#g");
+  EXPECT_EQ(resolve_url("https://x.org/b", "//cdn.org/i"), "https://cdn.org/i");
+  EXPECT_EQ(resolve_url("https://x.org/b", "mailto:a@b"), "mailto:a@b");
+  EXPECT_EQ(resolve_url("https://x.org", "a"), "https://x.org/a");
+  EXPECT_EQ(html_attr(" href='a&amp;b' CLASS=x", "class"), "x");
+  EXPECT_EQ(html_attr(" href='a&amp;b' CLASS=x", "href"), "a&b");
+  EXPECT_EQ(html_to_plain("  A <b>bold</b>&nbsp;move &rsquo;s x < y "),
+            "A bold\xc2\xa0move \xe2\x80\x99s x < y");
+
+  Document doc;
+  NodeId root = doc.create(NodeKind::Document);
+  HtmlOptions opt;
+  opt.base_url = "https://blog.example/posts/1";
+  html_append_blocks(
+      doc, root,
+      "<div class=x><h2>Head</h2><p>One <a href=\"/a\">link</a><br>two"
+      "<script>bad()</script><p>Para <img src=\"i.png\" alt=\"cat\">"
+      "<ul><li>a<li>b<ol><li>b1</ol></ul>"
+      "<blockquote><p>q1</p><p>q2</p></blockquote>"
+      "<pre>\n  x &lt; 1\n</pre>"
+      "<table><tr><th>H<td>v</table><hr></div>",
+      opt);
+  auto k = kids_of(doc, root);
+  EXPECT_EQ(k.size(), 8u);
+  if (k.size() == 8) {
+    EXPECT(doc.get(k[0]).kind == NodeKind::Heading);
+    EXPECT_EQ(doc.get(k[0]).level, 2);
+    EXPECT_EQ(plain_text(doc, k[0]), "Head");
+    EXPECT_EQ(plain_text(doc, k[1]), "One link\ntwo");
+    EXPECT_EQ(doc.get(k[1]).spans.at(1).href, "https://blog.example/a");
+    EXPECT_EQ(doc.get(k[2]).spans.back().href, "https://blog.example/posts/i.png");
+    EXPECT_EQ(doc.get(k[2]).spans.back().text, "[image: cat]");
+    EXPECT(doc.get(k[3]).kind == NodeKind::List);
+    auto items = kids_of(doc, k[3]);
+    EXPECT_EQ(items.size(), 2u);
+    if (items.size() == 2) {
+      EXPECT_EQ(plain_text(doc, items[0]), "a");
+      auto nested = kids_of(doc, items[1]);
+      EXPECT_EQ(nested.size(), 1u);
+      if (!nested.empty()) {
+        EXPECT_EQ(doc.get(nested[0]).level, 1);  // ordered
+        EXPECT_EQ(doc.get(kids_of(doc, nested[0]).at(0)).level, 1);
+      }
+    }
+    EXPECT(doc.get(k[4]).kind == NodeKind::BlockQuote);
+    EXPECT_EQ(plain_text(doc, k[4]), "q1\nq2");
+    EXPECT(doc.get(k[5]).kind == NodeKind::CodeBlock);
+    EXPECT_EQ(plain_text(doc, k[5]), "  x < 1");
+    EXPECT(doc.get(k[6]).kind == NodeKind::Table);
+    auto cells = kids_of(doc, kids_of(doc, k[6]).at(0));
+    EXPECT_EQ(cells.size(), 2u);
+    if (cells.size() == 2) {
+      EXPECT_EQ(doc.get(cells[0]).level, 1);
+      EXPECT_EQ(plain_text(doc, cells[1]), "v");
+    }
+    EXPECT(doc.get(k[7]).kind == NodeKind::HorizontalRule);
+  }
+}
+
+void test_feed_urls() {
+  using namespace xanatoo;
+  EXPECT(is_feed_url("https://xkcd.com/atom.xml"));
+  EXPECT(is_feed_url("https://lwn.net/headlines/rss"));
+  EXPECT(is_feed_url("https://hackaday.com/blog/feed/"));
+  EXPECT(is_feed_url("https://mastodon.social/@Gargron.rss"));
+  EXPECT(is_feed_url("https://www.reddit.com/r/linux/.rss"));
+  EXPECT(is_feed_url("https://blog.example/?feed=rss2"));
+  EXPECT(is_feed_url("https://www.youtube.com/feeds/videos.xml?channel_id=x"));
+  EXPECT(is_feed_url("feed:https://jvns.ca/"));
+  EXPECT(!is_feed_url("https://example.org/sitemap.xml"));
+  EXPECT(!is_feed_url("https://example.org/feedback"));
+  EXPECT(!is_feed_url("https://news.ycombinator.com/item?id=1"));
+  EXPECT_EQ(feed_http_url("feed://example.org/rss"), "https://example.org/rss");
+  EXPECT_EQ(feed_http_url("feed:http://example.org/"), "https://example.org/");
+  EXPECT(looks_like_feed("\xEF\xBB\xBF<?xml version=\"1.0\"?>\n<!-- c --><rss version=\"2.0\">"));
+  EXPECT(looks_like_feed("<feed xmlns=\"http://www.w3.org/2005/Atom\">"));
+  EXPECT(!looks_like_feed("<!DOCTYPE html><html><head>"));
+  EXPECT_EQ(feed_autodiscover(
+                "<html><head><link rel=\"stylesheet\" href=\"s.css\">"
+                "<LINK REL=\"alternate\" TYPE=\"application/atom+xml\" "
+                "href=\"/atom.xml\"></head>",
+                "https://jvns.ca/blog/"),
+            "https://jvns.ca/atom.xml");
+}
+
+void test_parse_feeds() {
+  using namespace xanatoo;
+  auto rss = parse_feed(
+      "<?xml version=\"1.0\"?><rss version=\"2.0\" "
+      "xmlns:content=\"http://purl.org/rss/1.0/modules/content/\" "
+      "xmlns:dc=\"http://purl.org/dc/elements/1.1/\"><channel>"
+      "<title>Blog &amp; Co</title><link>https://b.example/</link>"
+      "<description>Notes</description>"
+      "<item><title>First &amp;amp; best</title><link>https://b.example/1</link>"
+      "<dc:creator>Ann</dc:creator><pubDate>Mon, 27 Oct 2026 10:05:00 +0000</pubDate>"
+      "<description>short</description>"
+      "<content:encoded><![CDATA[<p>Full <em>text</em></p><p>Two</p>]]></content:encoded>"
+      "<enclosure url=\"https://b.example/a.mp3\" type=\"audio/mpeg\" length=\"2500000\"/>"
+      "</item><item><description>&lt;p&gt;No title&lt;/p&gt;</description>"
+      "<guid>https://b.example/2</guid></item></channel></rss>",
+      "https://b.example/feed");
+  EXPECT(rss.has_value());
+  if (rss) {
+    const Node* thread = first_of_kind(*rss, NodeKind::Thread);
+    EXPECT(thread && thread->summary == "Blog & Co");
+    if (thread) {
+      EXPECT_EQ(thread->children.size(), 2u);
+      const Node& m = rss->get(thread->children.at(0));
+      EXPECT_EQ(m.src, "Ann");
+      EXPECT_EQ(m.summary, "2026-10-27 10:05 UTC");
+      auto parts = m.children;
+      EXPECT_EQ(parts.size(), 4u);  // title, 2 paragraphs, enclosure
+      if (parts.size() == 4) {
+        EXPECT_EQ(plain_text(*rss, parts[0]), "First & best");
+        EXPECT_EQ(rss->get(parts[0]).spans.at(0).href, "https://b.example/1");
+        EXPECT_EQ(plain_text(*rss, parts[1]), "Full text");
+        EXPECT_EQ(plain_text(*rss, parts[3]), "Enclosure: audio/mpeg (2.5 MB)");
+      }
+      const Node& m2 = rss->get(thread->children.at(1));
+      EXPECT_EQ(m2.src, "Blog & Co");
+      EXPECT_EQ(plain_text(*rss, m2.children.at(0)), "No title");
+      EXPECT_EQ(rss->get(m2.children.back()).spans.at(0).href, "https://b.example/2");
+    }
+  }
+
+  auto atom = parse_feed(
+      "<feed xmlns=\"http://www.w3.org/2005/Atom\"><title type=\"html\">"
+      "A &lt;b&gt;bold&lt;/b&gt; feed</title><author><name>Zed</name></author>"
+      "<link href=\"https://a.example/\"/><link rel=\"self\" href=\"/atom.xml\"/>"
+      "<entry><title>E1</title><link rel=\"alternate\" href=\"/e1\"/>"
+      "<updated>2026-10-01T08:30:00Z</updated>"
+      "<content type=\"xhtml\"><div xmlns=\"http://www.w3.org/1999/xhtml\">"
+      "<p>Hi <a href=\"x\">there</a></p></div></content></entry>"
+      "<entry><title>E2</title><summary>plain\n\nsecond</summary></entry></feed>",
+      "https://a.example/atom.xml");
+  EXPECT(atom.has_value());
+  if (atom) {
+    EXPECT_EQ(atom->meta.title, "A bold feed");
+    const Node* thread = first_of_kind(*atom, NodeKind::Thread);
+    if (thread && thread->children.size() == 2) {
+      const Node& e1 = atom->get(thread->children[0]);
+      EXPECT_EQ(e1.src, "Zed");
+      EXPECT_EQ(e1.summary, "2026-10-01 08:30 UTC");
+      EXPECT_EQ(atom->get(e1.children.at(0)).spans.at(0).href, "https://a.example/e1");
+      EXPECT_EQ(atom->get(e1.children.at(1)).spans.at(1).href, "https://a.example/x");
+      const Node& e2 = atom->get(thread->children[1]);
+      EXPECT_EQ(e2.children.size(), 3u);  // title + 2 text paragraphs
+    } else {
+      EXPECT(false);
+    }
+  }
+
+  auto rdf = parse_feed(
+      "<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\" "
+      "xmlns=\"http://purl.org/rss/1.0/\"><channel><title>R</title></channel>"
+      "<item rdf:about=\"https://r.example/1\"><title>One</title>"
+      "<link>https://r.example/1</link></item></rdf:RDF>",
+      "https://r.example/rss");
+  EXPECT(rdf.has_value());
+  if (rdf) {
+    const Node* thread = first_of_kind(*rdf, NodeKind::Thread);
+    EXPECT(thread && thread->children.size() == 1);
+  }
+  EXPECT(!parse_feed("<html><body>x</body></html>", "https://x").has_value());
+}
+
 int main() {
+  test_html_min();
+  test_feed_urls();
+  test_parse_feeds();
   test_hn_urls_and_html();
   test_json_utf8_and_top_level();
   test_ebook_urls();

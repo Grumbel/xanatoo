@@ -7,6 +7,7 @@
 // Maps stories/comments into Thread + Message document nodes.
 
 #include "xanatoo/hackernews.hpp"
+#include "xanatoo/html_min.hpp"
 #include "xanatoo/util.hpp"
 
 #include "xanatoo/https.hpp"
@@ -82,84 +83,20 @@ std::optional<HnUrl> parse_hn_url(std::string_view s) {
   return out;
 }
 
-// --- comment HTML ----------------------------------------------------------
+}  // namespace
 
-// Attribute value from the inside of a tag ("a href=\"x\" rel=…").
-std::string tag_attr(std::string_view tag, std::string_view name) {
-  std::string pat = std::string(name) + "=\"";
-  size_t p = tag.find(pat);
-  if (p == std::string_view::npos) return {};
-  p += pat.size();
-  size_t e = tag.find('"', p);
-  if (e == std::string_view::npos) return {};
-  return html_decode_entities(tag.substr(p, e - p));
+bool is_hn_url(std::string_view s) { return parse_hn_url(s).has_value(); }
+
+void hn_append_html(Document& doc, NodeId parent, std::string_view html) {
+  HtmlOptions opt;
+  opt.base_url = "https://news.ycombinator.com/";
+  opt.gt_quotes = true;  // HN has no quote markup; "> text" is the convention
+  html_append_blocks(doc, parent, html, opt);
 }
 
-void push_span(std::vector<InlineSpan>& spans, InlineKind kind,
-               std::string text, const std::string& href = {}) {
-  if (text.empty()) return;
-  if (!spans.empty() && spans.back().kind == kind && spans.back().href == href) {
-    spans.back().text += text;
-    return;
-  }
-  InlineSpan s;
-  s.kind = kind;
-  s.text = std::move(text);
-  s.href = href;
-  spans.push_back(std::move(s));
-}
+#if defined(XANATOO_HN) && XANATOO_HN
 
-// One paragraph of inline HTML → spans (links, italics; other tags dropped).
-std::vector<InlineSpan> inline_html(std::string_view html) {
-  std::vector<InlineSpan> spans;
-  bool italic = false;
-  std::string href;  // inside <a>
-  std::string text;
-  auto flush = [&] {
-    std::string t = html_decode_entities(text);
-    text.clear();
-    if (!href.empty())
-      push_span(spans, InlineKind::Link, std::move(t), href);
-    else
-      push_span(spans, italic ? InlineKind::Emphasis : InlineKind::Text,
-                std::move(t));
-  };
-  for (size_t i = 0; i < html.size(); ++i) {
-    if (html[i] != '<') {
-      text.push_back(html[i] == '\n' ? ' ' : html[i]);
-      continue;
-    }
-    size_t e = html.find('>', i);
-    if (e == std::string_view::npos) {
-      text.append(html.substr(i));
-      break;
-    }
-    std::string_view tag = html.substr(i + 1, e - i - 1);
-    std::string name = ascii_lower(tag.substr(0, tag.find(' ')));
-    flush();
-    if (name == "a") href = tag_attr(tag, "href");
-    else if (name == "/a") href.clear();
-    else if (name == "i" || name == "em") italic = true;
-    else if (name == "/i" || name == "/em") italic = false;
-    i = e;
-  }
-  flush();
-  return spans;
-}
-
-void append_paragraph(Document& doc, NodeId parent, std::string_view html) {
-  trim_ascii(html);
-  if (html.empty()) return;
-  // HN has no quote markup; "> text" (or "&gt; text") is the convention.
-  NodeKind kind = NodeKind::Paragraph;
-  if (starts_with(html, "&gt;") || starts_with(html, ">")) {
-    kind = NodeKind::BlockQuote;
-    html.remove_prefix(html[0] == '>' ? 1 : 4);
-    trim_ascii(html);
-  }
-  NodeId n = doc.create(kind, parent);
-  doc.get(n).spans = inline_html(html);
-}
+namespace {
 
 std::string format_time_iso(std::string_view iso) {
   // "2024-01-15T12:34:56.000Z" → "2024-01-15 12:34 UTC"
@@ -171,56 +108,6 @@ std::string format_time_iso(std::string_view iso) {
 std::string item_url(int64_t id) {
   return "https://news.ycombinator.com/item?id=" + std::to_string(id);
 }
-
-}  // namespace
-
-bool is_hn_url(std::string_view s) { return parse_hn_url(s).has_value(); }
-
-void hn_append_html(Document& doc, NodeId parent, std::string_view html) {
-  size_t i = 0;
-  size_t block = 0;  // start of the current paragraph
-  while (i < html.size()) {
-    if (html[i] != '<') {
-      ++i;
-      continue;
-    }
-    if (starts_with_ci(html.substr(i), "<p>")) {
-      append_paragraph(doc, parent, html.substr(block, i - block));
-      i += 3;
-      block = i;
-    } else if (starts_with_ci(html.substr(i), "<pre>")) {
-      append_paragraph(doc, parent, html.substr(block, i - block));
-      size_t end = html.find("</pre>", i);
-      if (end == std::string_view::npos) end = html.size();
-      std::string code;
-      for (size_t k = i + 5; k < end; ++k) {  // drop <code> wrappers
-        if (html[k] == '<') {
-          size_t g = html.find('>', k);
-          if (g == std::string_view::npos || g > end) break;
-          k = g;
-          continue;
-        }
-        code.push_back(html[k]);
-      }
-      code = html_decode_entities(code);
-      while (!code.empty() && (code.back() == '\n' || code.back() == ' '))
-        code.pop_back();
-      if (!code.empty()) {
-        NodeId n = doc.create(NodeKind::CodeBlock, parent);
-        doc.append_text(n, code);
-      }
-      i = std::min(html.size(), end + 6);
-      block = i;
-    } else {
-      ++i;
-    }
-  }
-  append_paragraph(doc, parent, html.substr(block));
-}
-
-#if defined(XANATOO_HN) && XANATOO_HN
-
-namespace {
 
 const char* kUserAgent =
     "xanatoo/0.1.0 (read-only Hacker News client; +https://github.com/Grumbel/xanatoo)";

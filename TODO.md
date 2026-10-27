@@ -8,6 +8,24 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-27) — RSS / Atom feeds, shared HTML mapper
+
+- `html_min` (new): forgiving HTML fragment → document blocks (headings,
+  nested lists, quotes, pre, tables, hr; links / em / strong / code / del;
+  br as line break). Hacker News comments now use it.
+- `feed.cpp` (`XANATOO_FEEDS`): RSS 2.0 / 1.0 / Atom → Thread + Message
+  per entry (author, date normalised to "YYYY-MM-DD HH:MM UTC", linked
+  title, content:encoded > description / content > summary, YouTube
+  media:description, enclosures, "Permalink" for untitled entries).
+  `feed:` prefix + HTML autodiscovery. `examples/feeds.md` lists ~30 feeds
+  (all checked to parse: no leftover markup / entities).
+- `html_decode_entities` knows Latin-1, Greek and common punctuation names.
+- Open: remote images (would need fetching into the image cache — the
+  main gap for comics / photo feeds); non-UTF-8 feeds (ISO-8859-1) are
+  read as UTF-8; http-only feeds fail (https_request is TLS only); feed
+  headings count in the outline / heading total; no read/unread state or
+  subscriptions list yet (feeds.md is the subscription list for now).
+
 ## Status (2026-10-27) — Hacker News, ebooks
 
 - Hacker News client (`hackernews.cpp`, `XANATOO_HN`): Top / New / Best /

@@ -52,6 +52,7 @@ Open any of these from this page (links load in the same pane and join session h
 - [programming.dev /c/rust](https://programming.dev/c/rust) — federated Lemmy community
 - [Hacker News](https://news.ycombinator.com/) — front page and comment trees
 - [Books and long reads](books.md) — Standard Ebooks / Project Gutenberg EPUBs
+- [Feeds](feeds.md) — RSS / Atom: blogs, news, Mastodon, Reddit, arXiv
 - [Org-mode sample](sample.org) — headings, TODO, tags, source blocks
 - [Semantic format (S-expression)](semantic.sexp) — experimental sexpr form
 - [Sample (S-expression)](sample.sexp) — compact sexpr demo
@@ -117,6 +118,12 @@ Comment HTML maps to paragraphs, `> quotes`, links and code blocks.
 [Standard Ebooks](https://standardebooks.org/ebooks) (catalogue, subjects,
 search) and Project Gutenberg. A click downloads the book and imports it via
 **pandoc**.
+
+## Feeds
+
+[Feeds](feeds.md) lists RSS and Atom feeds; entries render as message cards
+with their HTML mapped to paragraphs, lists, quotes, code and tables.
+**Ctrl+L** takes any feed URL, or `feed:https://site/` to autodiscover.
 
 ## Nostr
 

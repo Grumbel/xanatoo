@@ -14,6 +14,7 @@
 #include "xanatoo/app.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/ebooks.hpp"
+#include "xanatoo/feed.hpp"
 #include "xanatoo/hackernews.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/nostr.hpp"
@@ -291,6 +292,8 @@ StatusLine compute_status(App& app) {
       label = "Cite: ";
     else if (app.hover.href[0] == '#')
       label = "Anchor: ";
+    else if (xanatoo::is_feed_url(app.hover.href))
+      label = "Feed: ";
     else if (xanatoo::is_gemini_url(app.hover.href))
       label = "Gemini: ";
     else if (xanatoo::is_reddit_url(app.hover.href))

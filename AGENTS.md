@@ -174,6 +174,27 @@ mechanism; historical bundle numbers in TODO.md are archival).
 - `hn_append_html` maps comment HTML → Paragraph / BlockQuote (`> …`) /
   CodeBlock with Link / Emphasis spans.
 
+## Feeds (RSS / Atom)
+
+- `src/feed.cpp`, gated by `XANATOO_FEEDS` (default ON). Small tolerant XML
+  reader (names lower-cased, prefixes kept: `content:encoded`), RSS 2.0,
+  RSS 1.0 (RDF) and Atom (text / html / xhtml content) → Thread + Message.
+- `is_feed_url`: `feed:` prefix (HTML pages autodiscover via
+  `<link rel=alternate>`), *.rss / .atom / .rdf / .xml, /feed, /rss,
+  /feeds/…, ?feed=rss2. Checked before the other services in dispatch.
+- Entry HTML goes through `html_min` (below).
+
+## HTML fragments (`html_min.hpp`)
+
+- `html_append_blocks`: tag soup → Paragraph / Heading / List / ListItem /
+  BlockQuote / CodeBlock / Table / HorizontalRule with Link / Emphasis /
+  Strong / Code / Strike spans; script / style / iframe dropped, unknown
+  wrappers unwrapped. BlockQuote, ListItem and TableCell are leaves, so
+  nested blocks inside them flatten to line breaks / "• " lines.
+- Images become `[image: alt]` links (no remote image fetch yet).
+- Used by feeds and Hacker News (`gt_quotes` for HN's "> " convention);
+  also `html_to_plain`, `html_attr`, `resolve_url`.
+
 ## Ebooks
 
 - `src/ebooks.cpp`, gated by `XANATOO_EBOOKS` (default ON).

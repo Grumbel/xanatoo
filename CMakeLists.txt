@@ -46,6 +46,7 @@ option(XANATOO_REDDIT "Enable Reddit .json fetch (TLS HTTPS)" ON)
 option(XANATOO_LEMMY "Enable Lemmy API v3 fetch (TLS HTTPS)" ON)
 option(XANATOO_HN "Enable Hacker News fetch (Firebase + Algolia APIs, TLS HTTPS)" ON)
 option(XANATOO_EBOOKS "Enable Standard Ebooks / remote EPUB downloads (TLS HTTPS)" ON)
+option(XANATOO_FEEDS "Enable RSS / Atom feed fetch (TLS HTTPS)" ON)
 
 add_executable(xanatoo
   src/main.cpp
@@ -89,6 +90,8 @@ add_executable(xanatoo
   src/lemmy.cpp
   src/hackernews.cpp
   src/ebooks.cpp
+  src/feed.cpp
+  src/html_min.cpp
   # Vendored Dear ImGui (MIT) — menu bar / toolbar shell
   external/imgui/imgui.cpp
   external/imgui/imgui_draw.cpp
@@ -140,7 +143,7 @@ target_link_libraries(xanatoo PRIVATE
 
 set(XANATOO_NEED_OPENSSL OFF)
 if(XANATOO_GEMINI OR XANATOO_NOSTR OR XANATOO_REDDIT OR XANATOO_LEMMY OR
-   XANATOO_HN OR XANATOO_EBOOKS)
+   XANATOO_HN OR XANATOO_EBOOKS OR XANATOO_FEEDS)
   set(XANATOO_NEED_OPENSSL ON)
 endif()
 
@@ -213,6 +216,14 @@ else()
   message(STATUS "Ebook downloads: OFF")
 endif()
 
+if(XANATOO_FEEDS)
+  target_compile_definitions(xanatoo PRIVATE XANATOO_FEEDS=1)
+  message(STATUS "RSS / Atom feeds: ON (HTTPS, ${XANATOO_TLS})")
+else()
+  target_compile_definitions(xanatoo PRIVATE XANATOO_FEEDS=0)
+  message(STATUS "RSS / Atom feeds: OFF")
+endif()
+
 if(UNIX AND NOT APPLE)
   target_link_libraries(xanatoo PRIVATE m)
 endif()
@@ -282,6 +293,8 @@ add_executable(xanatoo_tests
   src/lemmy.cpp
   src/hackernews.cpp
   src/ebooks.cpp
+  src/feed.cpp
+  src/html_min.cpp
   src/nostr.cpp
   src/gemini.cpp
   src/epub_import.cpp
@@ -311,6 +324,7 @@ target_compile_definitions(xanatoo_tests PRIVATE
   XANATOO_LEMMY=0
   XANATOO_HN=0
   XANATOO_EBOOKS=0
+  XANATOO_FEEDS=0
   XANATOO_FONTCONFIG=$<BOOL:${XANATOO_FONTCONFIG}>
   "XANATOO_STYLE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/styles\""
 )
