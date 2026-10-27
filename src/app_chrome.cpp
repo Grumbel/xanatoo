@@ -16,6 +16,7 @@
 #include "xanatoo/ebooks.hpp"
 #include "xanatoo/feed.hpp"
 #include "xanatoo/hackernews.hpp"
+#include "xanatoo/wikipedia.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/reddit.hpp"
@@ -310,6 +311,8 @@ StatusLine compute_status(App& app) {
       label = "Standard Ebooks: ";
     else if (xanatoo::is_nostr_ref(app.hover.href))
       label = "Nostr: ";
+    else if (xanatoo::is_wikipedia_ref(app.hover.href))
+      label = "Wikipedia: ";
     else if (app.hover.href.rfind("http://", 0) == 0 ||
              app.hover.href.rfind("https://", 0) == 0)
       label = "Web: ";

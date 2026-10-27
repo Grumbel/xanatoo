@@ -280,6 +280,11 @@ def draw_icon(name: str, size: int = 20) -> bytes:
         px(buf, size, size, S(5), S(5), 0xCC, 0, 0, 255)
         px(buf, size, size, S(7), S(5), 0xCC, 0x99, 0, 255)
         px(buf, size, size, S(9), S(5), 0, 0x99, 0, 255)
+    elif name == "native":
+        rect(buf, size, size, S(4), S(3), S(12), S(14), INK, SOFT)
+        for yy in (7, 10, 13):
+            line(buf, size, size, S(6), S(yy), S(13), S(yy), INK, 1)
+        circle(buf, size, size, S(15), S(15), S(3), INK, ACCENT)
     elif name == "format":
         line(buf, size, size, S(6), S(15), S(10), S(4), INK, 2)
         line(buf, size, size, S(10), S(4), S(14), S(15), INK, 2)

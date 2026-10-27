@@ -164,7 +164,7 @@ bool show_preview(App& app, const std::string& href) {
       break;
     }
     case LinkKind::Doc: {
-      if (xanatoo::is_epub_path(t.url)) return false;  // pandoc import: slow
+      if (xanatoo::is_pandoc_path(t.url)) return false;  // pandoc import: slow
       show = find_buffer(app, t.url);
       if (show == kNoBuffer) {
         std::error_code ec;

@@ -13,18 +13,28 @@ namespace xanatoo {
 
 bool is_epub_path(std::string_view path);
 
-struct EpubImportResult {
+// Other formats pandoc reads (docx, odt, rtf, rst, LaTeX, typst, textile,
+// MediaWiki, DokuWiki, DocBook, FB2, ipynb, OPML, man, CSV / TSV, …) take
+// the same route: pandoc_input_format gives the reader for a path's
+// extension, empty for formats xanatoo reads itself (md, org, gmi, html).
+std::string pandoc_input_format(std::string_view path);
+bool is_pandoc_path(std::string_view path);
+
+struct ImportResult {
   bool ok = false;
   std::string markdown_path;  // derived content.md
   std::string media_dir;      // --extract-media target
   std::string error;
 };
+using EpubImportResult = ImportResult;
 
 // Convert epub_path to Markdown under the cache dir (or reuse if up to date).
 // Requires `pandoc` on PATH. On failure, ok=false and error is set.
 // Always runs sanitize_epub_markdown on the derived Markdown (including
 // cache hits) so older imports pick up cleaner HTML stripping.
 EpubImportResult import_epub_via_pandoc(const std::string& epub_path);
+// Any is_pandoc_path file → cached Markdown (same rules as EPUB).
+ImportResult import_via_pandoc(const std::string& path);
 
 // Strip Calibre / EPUB residual HTML that pandoc leaves in GFM output:
 // empty or whitespace-only <span class="calibreN">…</span>, empty page

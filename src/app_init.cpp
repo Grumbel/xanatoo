@@ -107,7 +107,7 @@ bool app_init(App& app) {
       b0_doc = load_doc_or_placeholder(app, b0_path.empty() ? p0 : b0_path);
       // If EPUB resolve failed, still attempt load_doc on original for error
       // page.
-      if (xanatoo::is_epub_path(p0) && r0.empty()) b0_doc = load_doc(app, p0);
+      if (xanatoo::is_pandoc_path(p0) && r0.empty()) b0_doc = load_doc(app, p0);
     }
     add_buffer(app, std::move(b0_doc), std::move(b0_path));
     if (!p1.empty()) {
@@ -117,7 +117,7 @@ bool app_init(App& app) {
         std::string r1 = resolve_open_path(app, p1);
         b1_path = r1.empty() ? p1 : r1;
         b1_doc = load_doc_or_placeholder(app, b1_path);
-        if (xanatoo::is_epub_path(p1) && r1.empty()) b1_doc = load_doc(app, p1);
+        if (xanatoo::is_pandoc_path(p1) && r1.empty()) b1_doc = load_doc(app, p1);
       }
       add_buffer(app, std::move(b1_doc), std::move(b1_path));
     }

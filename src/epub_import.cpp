@@ -21,6 +21,39 @@ bool is_epub_path(std::string_view path) {
   return path_ends_with_ci(path, ".epub");
 }
 
+namespace {
+
+// Extension → pandoc reader. Markdown, Org, gemtext and HTML are read
+// natively and stay out of this table.
+struct PandocFormat {
+  std::string_view ext;
+  std::string_view reader;
+};
+constexpr PandocFormat kPandocFormats[] = {
+    {".epub", "epub"},         {".docx", "docx"},       {".odt", "odt"},
+    {".rtf", "rtf"},           {".rst", "rst"},         {".tex", "latex"},
+    {".latex", "latex"},       {".typ", "typst"},       {".textile", "textile"},
+    {".wiki", "mediawiki"},    {".mediawiki", "mediawiki"},
+    {".dokuwiki", "dokuwiki"}, {".dbk", "docbook"},     {".docbook", "docbook"},
+    {".fb2", "fb2"},           {".ipynb", "ipynb"},     {".opml", "opml"},
+    {".man", "man"},           {".pod", "pod"},         {".t2t", "t2t"},
+    {".muse", "muse"},         {".creole", "creole"},   {".dj", "djot"},
+    {".djot", "djot"},         {".csv", "csv"},         {".tsv", "tsv"},
+    {".bib", "bibtex"},        {".ris", "ris"},         {".jira", "jira"},
+};
+
+}  // namespace
+
+std::string pandoc_input_format(std::string_view path) {
+  for (const PandocFormat& f : kPandocFormats)
+    if (path_ends_with_ci(path, f.ext)) return std::string(f.reader);
+  return {};
+}
+
+bool is_pandoc_path(std::string_view path) {
+  return !pandoc_input_format(path).empty();
+}
+
 static std::string shell_quote(const std::string& s) {
   // POSIX single-quote escaping: ' → '\''
   std::string out = "'";
@@ -35,14 +68,16 @@ static std::string shell_quote(const std::string& s) {
 }
 
 static fs::path import_cache_dir(const std::string& epub_path) {
-  // ~/.cache/xanatoo/epub-import/<stem>-<hash-of-abspath>/
+  // ~/.cache/xanatoo/epub-import/<stem>-<hash-of-abspath>/ (EPUB; other
+  // formats under pandoc-import/)
+  const char* sub = is_epub_path(epub_path) ? "epub-import" : "pandoc-import";
   fs::path base;
   if (const char* xdg = std::getenv("XDG_CACHE_HOME"); xdg && xdg[0]) {
-    base = fs::path(xdg) / "xanatoo" / "epub-import";
+    base = fs::path(xdg) / "xanatoo" / sub;
   } else if (const char* home = std::getenv("HOME"); home && home[0]) {
-    base = fs::path(home) / ".cache" / "xanatoo" / "epub-import";
+    base = fs::path(home) / ".cache" / "xanatoo" / sub;
   } else {
-    base = fs::temp_directory_path() / "xanatoo-epub-import";
+    base = fs::temp_directory_path() / (std::string("xanatoo-") + sub);
   }
 
   std::string abs = epub_path;
@@ -321,18 +356,28 @@ static std::string read_text_file(const fs::path& path) {
 }
 
 EpubImportResult import_epub_via_pandoc(const std::string& epub_path) {
-  EpubImportResult out;
-  if (epub_path.empty() || !is_epub_path(epub_path)) {
+  if (!is_epub_path(epub_path)) {
+    EpubImportResult out;
     out.error = "Not an EPUB path";
     return out;
   }
+  return import_via_pandoc(epub_path);
+}
+
+ImportResult import_via_pandoc(const std::string& epub_path) {
+  ImportResult out;
+  const std::string reader = pandoc_input_format(epub_path);
+  if (epub_path.empty() || reader.empty()) {
+    out.error = "No pandoc reader for " + epub_path;
+    return out;
+  }
   if (!fs::exists(epub_path)) {
-    out.error = "EPUB not found: " + epub_path;
+    out.error = "File not found: " + epub_path;
     return out;
   }
   if (!pandoc_available()) {
-    out.error =
-        "pandoc not found on PATH (install pandoc to import EPUB → Markdown)";
+    out.error = "pandoc not found on PATH (install pandoc to import " +
+                reader + " → Markdown)";
     return out;
   }
 
@@ -372,12 +417,13 @@ EpubImportResult import_epub_via_pandoc(const std::string& epub_path) {
         << "pandoc " << shell_quote(fs::absolute(epub_path).string())
         // -raw_html: unwrap div/span/section markup instead of passing it
         // through (EPUB XHTML leaves attribute lines in the text).
-        << " -f epub -t gfm-raw_html"
+        << " -f " << reader << " -t gfm-raw_html"
         << " -o " << shell_quote(md.filename().string())
         << " --extract-media=" << shell_quote(media.filename().string())
         << " 2>/tmp/xanatoo-pandoc-epub.err";
 
-    std::cout << "Importing EPUB via pandoc → " << md.string() << "\n";
+    std::cout << "Importing " << reader << " via pandoc → " << md.string()
+              << "\n";
     int rc = std::system(cmd.str().c_str());
     if (rc != 0 || !fs::exists(md)) {
       std::string detail;
@@ -395,7 +441,7 @@ EpubImportResult import_epub_via_pandoc(const std::string& epub_path) {
       return out;
     }
   } else {
-    std::cout << "Reusing EPUB import cache: " << md.string() << "\n";
+    std::cout << "Reusing import cache: " << md.string() << "\n";
   }
 
   // Always sanitize (including cache hits) so older imports lose calibre HTML.

@@ -139,7 +139,7 @@ green. Use this for reading and navigating.
 ## Navigation (history & bookmarks)
 
 - **Alt+Left** / **Alt+Right** — Back / Forward in session history
-- **Browse toolbar** — Back, Forward, Reload, location field, Bookmark, History, Browse mode
+- **Browse toolbar** — Back, Forward, Reload, Native view (web page → `wikipedia:` form), location field, Bookmark, History, Browse mode
 - **Edit toolbar** — file, clipboard, bold/italic/link; menus for more format, structure, lists, insert, and view tools
 - **Ctrl+Shift+H** / **View → History** — session history panel (click to open)
 - **Ctrl+Shift+B** — Bookmark or un-bookmark the current page

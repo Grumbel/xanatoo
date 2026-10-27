@@ -249,15 +249,15 @@ bool navigate_pane(App& app, int pi, std::string target, bool record_history) {
   }
   if (!allow_discard_dirty(app, p.buf)) return false;
   {
-    const bool was_epub = xanatoo::is_epub_path(path);
+    const bool was_import = xanatoo::is_pandoc_path(path);
     std::string open_path = resolve_open_path(app, path);
     if (open_path.empty()) {
-      flash_status(app, "EPUB import failed (need pandoc on PATH)");
+      flash_status(app, "Import failed (need pandoc on PATH)");
       return false;
     }
     show_doc_in_pane(app, pi, load_doc(app, open_path), open_path);
     if (record_history) push_nav_history(app, open_path);
-    flash_status(app, was_epub ? ("Imported EPUB → " + open_path)
+    flash_status(app, was_import ? ("Imported " + path + " → " + open_path)
                                : ("Opened " + open_path));
   }
   return true;

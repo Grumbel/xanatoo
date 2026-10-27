@@ -8,6 +8,7 @@
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/html_min.hpp"
 #include "xanatoo/html_page.hpp"
+#include "xanatoo/wikipedia.hpp"
 #include "xanatoo/hackernews.hpp"
 #include "xanatoo/json_min.hpp"
 #include "xanatoo/lemmy.hpp"
@@ -1445,7 +1446,78 @@ void test_html_page() {
   EXPECT_EQ(html_decode_entities("a&#150;b"), "a\xe2\x80\x93" "b");
 }
 
+void test_wikipedia() {
+  using namespace xanatoo;
+  auto r = parse_wikipedia_ref("wikipedia:Hypertext");
+  EXPECT(r.has_value());
+  EXPECT_EQ(r->lang, "en");
+  EXPECT_EQ(r->title, "Hypertext");
+  r = parse_wikipedia_ref("wikipedia:de:Ted Nelson#Leben");
+  EXPECT(r.has_value());
+  EXPECT_EQ(r->lang, "de");
+  EXPECT_EQ(r->title, "Ted_Nelson");
+  EXPECT_EQ(r->fragment, "Leben");
+  EXPECT_EQ(wikipedia_ref_string(*r), "wikipedia:de:Ted_Nelson#Leben");
+  // Upper-case first part is part of the title, not a language.
+  r = parse_wikipedia_ref("wikipedia:Star Wars: Episode IV");
+  EXPECT(r.has_value());
+  EXPECT_EQ(r->lang, "en");
+  EXPECT_EQ(r->title, "Star_Wars:_Episode_IV");
+  EXPECT(!is_wikipedia_ref("wikipedia:"));
+  EXPECT(!is_wikipedia_ref("https://en.wikipedia.org/wiki/X"));
+
+  WikipediaRef c{"en", "C++/CLI", ""};
+  EXPECT_EQ(wikipedia_rest_url(c),
+            "https://en.wikipedia.org/api/rest_v1/page/html/C%2B%2B%2FCLI");
+  const WikipediaRef de{"de", "Hypertext", ""};
+  EXPECT_EQ(wikipedia_page_url(de), "https://de.wikipedia.org/wiki/Hypertext");
+
+  EXPECT_EQ(native_url_for("https://en.wikipedia.org/wiki/Xanadu_(Projekt)#A"),
+            "wikipedia:Xanadu_(Projekt)#A");
+  EXPECT_EQ(native_url_for("https://de.m.wikipedia.org/wiki/K%C3%B6ln"),
+            "wikipedia:de:K\xc3\xb6ln");
+  EXPECT_EQ(native_url_for("https://en.wikipedia.org/wiki/File:X.png"), "");
+  EXPECT_EQ(native_url_for("https://en.wikipedia.org/wiki/Talk:Hypertext"), "");
+  EXPECT_EQ(native_url_for("https://de.wikipedia.org/wiki/Kategorie:Web"), "");
+  EXPECT_EQ(native_url_for("https://en.wikipedia.org/w/index.php?title=X"), "");
+  EXPECT_EQ(native_url_for("https://example.org/wiki/X"), "");
+
+  Document doc = parse_html_page(
+      "<base href=\"//en.wikipedia.org/wiki/\"><title>Hypertext</title>"
+      "<p><a href=\"./Ted_Nelson\">TN</a> <a href=\"./Hypertext#History\">h</a>"
+      " <a href=\"./Category:Web\">c</a>"
+      " <a href=\"https://de.wikipedia.org/wiki/Hypertext\">de</a></p>",
+      "https://en.wikipedia.org/wiki/Hypertext");
+  const WikipediaRef self{"en", "Hypertext", ""};
+  wikipedia_rewrite_links(doc, self);
+  std::vector<std::string> hrefs;
+  for (const Node& n : doc.nodes)
+    for (const InlineSpan& s : n.spans)
+      if (s.kind == InlineKind::Link) hrefs.push_back(s.href);
+  EXPECT_EQ(hrefs.size(), size_t(5));
+  if (hrefs.size() == 5) {
+    EXPECT_EQ(hrefs[0], "external:https://en.wikipedia.org/wiki/Hypertext");
+    EXPECT_EQ(hrefs[1], "wikipedia:Ted_Nelson");
+    EXPECT_EQ(hrefs[2], "#History");
+    EXPECT_EQ(hrefs[3], "https://en.wikipedia.org/wiki/Category:Web");
+    EXPECT_EQ(hrefs[4], "wikipedia:de:Hypertext");
+  }
+}
+
+void test_pandoc_formats() {
+  using namespace xanatoo;
+  EXPECT_EQ(pandoc_input_format("a/b.EPUB"), "epub");
+  EXPECT_EQ(pandoc_input_format("x.docx"), "docx");
+  EXPECT_EQ(pandoc_input_format("x.tex"), "latex");
+  EXPECT_EQ(pandoc_input_format("x.wiki"), "mediawiki");
+  EXPECT_EQ(pandoc_input_format("x.md"), "");
+  EXPECT(is_pandoc_path("notes.rst"));
+  EXPECT(!is_pandoc_path("notes.org"));
+}
+
 int main() {
+  test_wikipedia();
+  test_pandoc_formats();
   test_html_min();
   test_html_page();
   test_feed_urls();

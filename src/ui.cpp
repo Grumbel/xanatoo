@@ -219,7 +219,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
       "strike", "cite", "h1", "h2", "h3", "para", "task", "table",
       "figure", "note", "replace", "outline", "paste", "copy", "new", "open",
       "zoomin", "zoomout", "structure", "diff",
-      "back", "forward", "reload", "stop", "bookmark", "history", "browse",
+      "back", "forward", "reload", "stop", "bookmark", "history", "browse", "native",
       "linespacing", "measure", "style",
       "format", "insert", "view", "lists",
   };
@@ -303,7 +303,7 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
     // Text fallback when PNG missing (e.g. icons not rasterized yet).
     static const std::unordered_map<std::string, const char*> kShort = {
         {"back", "◀"}, {"forward", "▶"}, {"reload", "↻"}, {"stop", "✕"}, {"bookmark", "★"},
-        {"history", "Hist"}, {"browse", "Browse"},
+        {"history", "Hist"}, {"browse", "Browse"}, {"native", "Native"},
         {"linespacing", "≡↕"}, {"measure", "▣|"},
         {"format", "Aa▾"},
         {"insert", "+▾"}, {"view", "View▾"}, {"lists", "List▾"},
@@ -690,6 +690,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Back", UiCommand::NavBack, cmd, state.can_nav_back, "Alt+Left");
       menu_item_cmd("Forward", UiCommand::NavForward, cmd, state.can_nav_forward,
                     "Alt+Right");
+      menu_item_cmd("Native View", UiCommand::OpenNative, cmd,
+                    !state.native_url.empty());
       ImGui::Separator();
       if (ImGui::MenuItem("Split Pane", "Ctrl+\\", state.split))
         cmd = UiCommand::ToggleSplit;
@@ -854,6 +856,12 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     else
       tool_button("tb_reload", "reload", "Reload (Ctrl+R)", UiCommand::Reload,
                   cmd, state.has_path);
+    tool_button("tb_native", "native",
+                state.native_url.empty()
+                    ? "Native view (only for pages xanatoo has a native form of, "
+                      "e.g. Wikipedia articles)"
+                    : ("Native view: " + state.native_url).c_str(),
+                UiCommand::OpenNative, cmd, !state.native_url.empty());
 
     ImGui::TextDisabled("|");
     ImGui::SameLine(0.f, 4.f);

@@ -208,10 +208,28 @@ mechanism; historical bundle numbers in TODO.md are archival).
 - `web_fetch` dispatches on Content-Type; bodies go through
   `detect_charset` / `to_utf8` (util.hpp) first.
 - `external:<url>` hrefs force the system browser (`open_external_url`).
-- Foreign content is read-only: `is_foreign_path` (remote URL, `.html` /
-  `.epub`, anything under `cache_dir()`) makes `browsing(app)` true.
+- Foreign content is read-only: `is_foreign_path` (remote URL, `.html`,
+  any `is_pandoc_path` file, anything under `cache_dir()`) makes `browsing(app)` true.
   Gate document edits on `browsing(app)`, never on `app.browse_mode`
   alone (that is only the user's global toggle).
+
+## Wikipedia (`wikipedia.hpp`)
+
+- `src/wikipedia.cpp`, gated by `XANATOO_WIKIPEDIA` (default ON).
+  `wikipedia:Title` / `wikipedia:de:Title#frag` fetch the REST Parsoid
+  HTML (`/api/rest_v1/page/html/…`, descriptive User-Agent required) and
+  map it with `parse_html_page`; `wikipedia_rewrite_links` turns article
+  links into `wikipedia:` refs (non-article namespaces stay web links).
+- `https://*.wikipedia.org/wiki/…` stays an ordinary web page; the
+  explicit "Native view" button / `UiCommand::OpenNative` switches via
+  `native_url_for` — add new native mappings there, never reroute silently.
+
+## Pandoc import (`epub_import.hpp`)
+
+- `kPandocFormats` maps extensions to pandoc readers (epub, docx, odt, rst,
+  tex, typ, wiki, ipynb, csv, …); `is_pandoc_path` / `import_via_pandoc`
+  convert to cached GFM Markdown with `--extract-media`. The original file
+  is never touched and the import is read-only (foreign).
 
 ## Ebooks
 

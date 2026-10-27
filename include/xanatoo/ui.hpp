@@ -108,6 +108,7 @@ enum class UiCommand {
   ToggleDiff,
   ToggleStructure,
   ToggleBrowse,  // read-only navigation mode
+  OpenNative,    // web page → its native xanatoo form (wikipedia:…)
   ToggleHelp,
   ToggleVirtualKeyboard,  // F3 / View — on-screen keyboard
   VirtualKey,             // arg = UTF-8 key ("a", "\n", "\b", " ")
@@ -173,6 +174,8 @@ struct UiState {
   bool in_stretch = false;
   bool can_nav_back = false;
   bool can_nav_forward = false;
+  // Native form of the focused web page ("" = none), e.g. wikipedia:Title.
+  std::string native_url;
   bool loading = false;  // a page fetch is running (Reload becomes Stop)
   bool history_open = false;
   bool bookmarks_open = false;

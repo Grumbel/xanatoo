@@ -19,6 +19,7 @@
 #include "xanatoo/feed.hpp"
 #include "xanatoo/hackernews.hpp"
 #include "xanatoo/html_page.hpp"
+#include "xanatoo/wikipedia.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/nostr.hpp"
@@ -32,10 +33,10 @@ namespace fs = std::filesystem;
 namespace xanatoo::app {
 
 std::string resolve_open_path(App& app, std::string path) {
-  if (path.empty() || !xanatoo::is_epub_path(path)) return path;
-  auto imp = xanatoo::import_epub_via_pandoc(path);
+  if (path.empty() || !xanatoo::is_pandoc_path(path)) return path;
+  auto imp = xanatoo::import_via_pandoc(path);
   if (!imp.ok) {
-    std::cerr << "EPUB import failed: " << imp.error << "\n";
+    std::cerr << "Import failed: " << imp.error << "\n";
     return {};
   }
   return imp.markdown_path;
@@ -45,11 +46,14 @@ xanatoo::Document load_doc(App& app, std::string path) {
   if (path.empty()) {
     return xanatoo::parse_document(xanatoo::fallback_document(), {});
   }
-  if (xanatoo::is_epub_path(path)) {
+  if (xanatoo::is_pandoc_path(path)) {
     std::string md = resolve_open_path(app, path);
     if (md.empty()) {
       return xanatoo::parse_document(
-          "# EPUB import failed\n\nInstall **pandoc** and try again.\n", {});
+          "# Import failed\n\n`" + path +
+              "` is read through **pandoc**: install it, or see the "
+              "console for pandoc's error.\n",
+          {});
     }
     path = std::move(md);
   }
@@ -86,7 +90,8 @@ bool is_in_app_remote_url(std::string_view s) {
   return xanatoo::is_gemini_url(s) || xanatoo::is_reddit_url(s) ||
          xanatoo::is_lemmy_url(s) || xanatoo::is_nostr_ref(s) ||
          xanatoo::is_hn_url(s) || xanatoo::is_ebook_url(s) ||
-         xanatoo::is_feed_url(s) || web_in_app(s);
+         xanatoo::is_feed_url(s) || xanatoo::is_wikipedia_ref(s) ||
+         web_in_app(s);
 }
 
 bool is_foreign_path(std::string_view path) {
@@ -94,7 +99,7 @@ bool is_foreign_path(std::string_view path) {
   if (is_in_app_remote_url(path) || xanatoo::starts_with(path, "http://") ||
       xanatoo::starts_with(path, "https://"))
     return true;
-  if (xanatoo::path_uses_html(path) || xanatoo::is_epub_path(path)) return true;
+  if (xanatoo::path_uses_html(path) || xanatoo::is_pandoc_path(path)) return true;
   const std::string cache = xanatoo::cache_dir();
   return !cache.empty() && xanatoo::starts_with(path, cache + "/");
 }

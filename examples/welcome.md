@@ -135,6 +135,16 @@ no CSS, no scripts. Headings fill the outline, and the first line offers
 [How to Do Great Work](https://www.paulgraham.com/greatwork.html).
 Local `.html` files open the same way.
 
+`wikipedia:Hypertext` (or `wikipedia:de:Hypertext` for other languages)
+opens an article natively from the Wikipedia API: references intact, and
+article links stay native. On a Wikipedia web page the **Native view**
+button next to Reload switches to that form — try
+[wikipedia:Project Xanadu](wikipedia:Project_Xanadu).
+
+Documents in other formats — Word (.docx), OpenDocument (.odt), RTF,
+reStructuredText, LaTeX, Typst, MediaWiki, Jupyter notebooks, CSV, … —
+open read-only through **pandoc**.
+
 ## Nostr
 
 Open [Recent Nostr notes](nostr:recent) or [Nostr discussions](nostr-sample.md).

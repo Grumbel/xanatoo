@@ -24,6 +24,7 @@
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/theme.hpp"
 #include "xanatoo/util.hpp"
+#include "xanatoo/wikipedia.hpp"
 
 namespace fs = std::filesystem;
 
@@ -127,6 +128,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
                            ? std::string("untitled")
                            : path_of(app, focused_pane(app));
   ui_state.can_nav_back = app.nav_hist_pos > 0;
+  ui_state.native_url = xanatoo::native_url_for(path_of(app, focused_pane(app)));
   ui_state.can_nav_forward =
       app.nav_hist_pos + 1 < static_cast<int>(app.nav_history.size());
   ui_state.history_open = app.history_panel_open;
@@ -237,6 +239,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::Find || c == C::ToggleSplit || c == C::ToggleOutline ||
         c == C::ToggleBacklinks || c == C::OpenTranscludeOther ||
         c == C::ToggleDiff || c == C::ToggleStructure || c == C::ToggleBrowse ||
+        c == C::OpenNative ||
         c == C::ToggleHelp || c == C::ToggleVirtualKeyboard ||
         c == C::OpenFormatDoc || c == C::OpenSemanticDoc ||
         c == C::OpenInWindow || c == C::OpenExample || c == C::LoadDiffDemo ||
@@ -303,6 +306,15 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       close_prompt(app);
       app.ui.focus_url_bar();
       break;
+    case C::OpenNative: {
+      // Explicit only: web pages never switch to the native form on their own.
+      const std::string native = xanatoo::native_url_for(path_of(app, p));
+      if (native.empty())
+        flash_status(app, "No native view for this page");
+      else
+        navigate_to_url(app, native);
+      break;
+    }
     case C::NavigateUrl:
       xanatoo::platform_release_keyboard();  // URL typed; page is read-only
       if (!arg.empty()) navigate_to_url(app, arg);

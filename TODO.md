@@ -8,7 +8,7 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
-## Status (2026-10-27) — web pages as reader views
+## Status (2026-10-27) — web pages as reader views, wikipedia:, pandoc formats
 
 - `html_page.cpp` (`XANATOO_WEB`): any other http(s) link opens in-app.
   Main content only (`<main>` / role=main, a lone `<article>`, else
@@ -41,11 +41,25 @@ Next bundle number: **263** (this delivery is **262**)
   their keys in browse mode (Enter used to activate the caret link).
   Long-term: automatic versioned saving into the database, clone /
   overlay for foreign content (docs/BRAINSTORM.md §8).
-- `wikipedia:` idea: raw wikitext + `pandoc -f mediawiki` drops every
-  template (all {{cite}} references come out empty, infoboxes and
-  {{Blockquote}} vanish); the REST endpoint
-  `/api/rest_v1/page/html/<Title>` returns template-expanded Parsoid HTML
-  that the html_page mapper already handles (references intact).
+- `wikipedia:Title` / `wikipedia:de:Title` (`wikipedia.cpp`,
+  `XANATOO_WIKIPEDIA`): REST `/api/rest_v1/page/html/<Title>` (Parsoid,
+  templates expanded, references intact) through `parse_html_page`;
+  article links rewritten to `wikipedia:` refs, other namespaces (File:,
+  Category:, Talk, …) stay web links; redirects canonicalised from
+  `dc:isVersionOf`. Raw wikitext + `pandoc -f mediawiki` was rejected: it
+  drops every template ({{cite}}, infoboxes).
+- Native view (toolbar button next to Reload, View → Native View,
+  `UiCommand::OpenNative`): explicit jump from a web page to its native
+  form (`native_url_for`; only Wikipedia articles so far). Plain
+  https://*.wikipedia.org links are never rerouted automatically.
+- Pandoc import generalised (`import_via_pandoc`, `pandoc_input_format`):
+  epub, docx, odt, rtf, rst, LaTeX, typst, textile, MediaWiki, DokuWiki,
+  DocBook, FB2, ipynb, OPML, man, POD, t2t, Muse, Creole, Djot, CSV/TSV,
+  BibTeX, RIS, Jira → cached Markdown (`pandoc-import/`; EPUB keeps
+  `epub-import/`), read-only like EPUB.
+- Open: native view drops the `#fragment` of the web page (web pages
+  store the URL without it); more native mappings (HN / Reddit / Lemmy web
+  URLs are already routed, others could follow).
 - Open: remote images; JavaScript-only pages show "No readable content";
   tab label is the URL, not the page title;
   other code pages (Shift_JIS, KOI8-R) are not converted.
@@ -124,8 +138,7 @@ Next bundle number: **263** (this delivery is **262**)
   view.conf). Style roles `footnote` / `footnote-ref`.
 - EPUB footnotes come through pandoc's GFM output. HTML from arbitrary sites
   is not covered (pandoc only recognises its own / EPUB note markup).
-- Open: other pandoc-readable formats (docx, odt, rst, LaTeX) could go
-  through the same import path; org inline definitions `[fn::…]`;
+- Open: org inline definitions `[fn::…]`;
   overlay is not scrollable when notes exceed 40 %.
 
 ## Status (2026-10-27) — split browsing, background page loads

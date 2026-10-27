@@ -48,6 +48,7 @@ option(XANATOO_HN "Enable Hacker News fetch (Firebase + Algolia APIs, TLS HTTPS)
 option(XANATOO_EBOOKS "Enable Standard Ebooks / remote EPUB downloads (TLS HTTPS)" ON)
 option(XANATOO_FEEDS "Enable RSS / Atom feed fetch (TLS HTTPS)" ON)
 option(XANATOO_WEB "Open other http(s) pages in-app as reader views (TLS HTTPS)" ON)
+option(XANATOO_WIKIPEDIA "wikipedia: articles via the Wikimedia REST API (TLS HTTPS)" ON)
 
 add_executable(xanatoo
   src/main.cpp
@@ -94,6 +95,7 @@ add_executable(xanatoo
   src/feed.cpp
   src/html_min.cpp
   src/html_page.cpp
+  src/wikipedia.cpp
   # Vendored Dear ImGui (MIT) — menu bar / toolbar shell
   external/imgui/imgui.cpp
   external/imgui/imgui_draw.cpp
@@ -145,7 +147,8 @@ target_link_libraries(xanatoo PRIVATE
 
 set(XANATOO_NEED_OPENSSL OFF)
 if(XANATOO_GEMINI OR XANATOO_NOSTR OR XANATOO_REDDIT OR XANATOO_LEMMY OR
-   XANATOO_HN OR XANATOO_EBOOKS OR XANATOO_FEEDS OR XANATOO_WEB)
+   XANATOO_HN OR XANATOO_EBOOKS OR XANATOO_FEEDS OR XANATOO_WEB OR
+   XANATOO_WIKIPEDIA)
   set(XANATOO_NEED_OPENSSL ON)
 endif()
 
@@ -234,6 +237,14 @@ else()
   message(STATUS "Web pages: OFF")
 endif()
 
+if(XANATOO_WIKIPEDIA)
+  target_compile_definitions(xanatoo PRIVATE XANATOO_WIKIPEDIA=1)
+  message(STATUS "Wikipedia articles: ON (HTTPS, ${XANATOO_TLS})")
+else()
+  target_compile_definitions(xanatoo PRIVATE XANATOO_WIKIPEDIA=0)
+  message(STATUS "Wikipedia articles: OFF")
+endif()
+
 if(UNIX AND NOT APPLE)
   target_link_libraries(xanatoo PRIVATE m)
 endif()
@@ -306,6 +317,7 @@ add_executable(xanatoo_tests
   src/feed.cpp
   src/html_min.cpp
   src/html_page.cpp
+  src/wikipedia.cpp
   src/nostr.cpp
   src/gemini.cpp
   src/epub_import.cpp
@@ -337,6 +349,7 @@ target_compile_definitions(xanatoo_tests PRIVATE
   XANATOO_EBOOKS=0
   XANATOO_FEEDS=0
   XANATOO_WEB=0
+  XANATOO_WIKIPEDIA=0
   XANATOO_FONTCONFIG=$<BOOL:${XANATOO_FONTCONFIG}>
   "XANATOO_STYLE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/styles\""
 )

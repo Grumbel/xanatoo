@@ -13,6 +13,7 @@
 #include <optional>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/html_page.hpp"
 #include "xanatoo/platform.hpp"
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/gemini.hpp"
@@ -61,7 +62,8 @@ static void on_dropfile(App& app, SDL_Event& ev, bool imgui_mouse,
       (xanatoo::ends_with(low, ".md") || xanatoo::ends_with(low, ".markdown") ||
        xanatoo::ends_with(low, ".sexp") || xanatoo::ends_with(low, ".txt") ||
        xanatoo::ends_with(low, ".org") || xanatoo::ends_with(low, ".gmi") ||
-       xanatoo::ends_with(low, ".gemini") || xanatoo::ends_with(low, ".epub"));
+       xanatoo::ends_with(low, ".gemini") || xanatoo::path_uses_html(low) ||
+       xanatoo::is_pandoc_path(low));
 
   if (is_doc) {
     if (!std::filesystem::exists(fpath)) {
