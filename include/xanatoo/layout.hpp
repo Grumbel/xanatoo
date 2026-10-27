@@ -46,6 +46,11 @@ struct PositionedImage {
   std::string base;  // directory for relative path resolution
 };
 
+struct MessageCard {
+  LayoutBox box;
+  bool alt = false;  // odd reply depth
+};
+
 // Draggable gap between two Column children under a Columns node.
 struct ColumnGap {
   NodeId columns = INVALID_NODE;
@@ -66,6 +71,8 @@ struct LayoutResult {
   std::vector<LayoutBox> note_bars;
   // Vertical bars for messages / comments (thread depth uses x indent).
   std::vector<LayoutBox> message_bars;
+  // Message card fills; replies at odd depth use the `message-alt` fill.
+  std::vector<MessageCard> message_cards;
   // Soft background rectangles for fenced code blocks.
   std::vector<LayoutBox> code_blocks;
   // Table grid lines. height <= 2 → horizontal; width <= 2 → vertical.
@@ -160,6 +167,8 @@ private:
   const std::unordered_map<NodeId, float>* height_hints_ = nullptr;
   const std::unordered_set<NodeId>* folded_sections_ = nullptr;
   NodeId focus_section_ = INVALID_NODE;
+  // Author of the Thread's first Message while laying out that Thread.
+  std::string thread_op_;
   bool skipped_any_ = false;
 
   // If the block has a height hint and lies fully outside the materialised

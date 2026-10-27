@@ -8,6 +8,21 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-27) — comment thread look
+
+- Message headers are coloured by new style roles: `message-author` (blue,
+  bold), `message-op` (orange, replies by the thread's first poster),
+  `message-meta` (grey date / score / reply-to). "reply to #t1_abc" now
+  names the parent's author when the parent is in the document.
+- Each message is a card (`LayoutResult::message_cards`): `message`
+  background at even reply depth, `message-alt` at odd depth (old.reddit
+  zebra nesting), drawn under images / text. Box height still includes the
+  trailing gap (virtualization hint).
+- Sheets: default / night / sepia-book / high-contrast / typewriter set the
+  new roles; docs/STYLESHEETS.md lists them.
+- Open: relative times ("3 h ago") would need layout to depend on the clock;
+  score is still part of the meta string rather than its own span.
+
 ## Status (2026-10-27) — footnotes
 
 - New `Footnote` block (label = key, Paragraph children) and `FootnoteRef`

@@ -53,6 +53,10 @@ enum class BlockRole : uint8_t {
   Footnote,
   Thread,
   Message,
+  MessageAlt,     // card fill of replies at odd depth (zebra nesting)
+  MessageAuthor,  // author name in a message header
+  MessageOp,      // author name when it is the thread starter's
+  MessageMeta,    // date / score / reply-to in a message header
   Table,
   Rule,
   Transclusion,
@@ -68,7 +72,7 @@ struct BlockStyle {
   FontRole font = FontRole::Body;
   bool has_color = false;
   Rgba color;             // text colour (else page ink)
-  Rgba background{0, 0, 0, 0};  // code block fill, table header fill
+  Rgba background{0, 0, 0, 0};  // code block, table header, message card fill
   Rgba border{0, 0, 0, 0};      // side bars, rules, grid lines, frames
 };
 

@@ -41,6 +41,25 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
     return true;
   };
 
+  // Message cards (drawn under images, text, code blocks and table fills)
+  {
+    SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
+    for (const auto& mc : layout.message_cards) {
+      const Rgba& fill =
+          st[mc.alt ? BlockRole::MessageAlt : BlockRole::Message].background;
+      if (!fill.visible()) continue;
+      set_color(sdl_, fill);
+      SDL_Rect r{
+          static_cast<int>(mc.box.x + origin_x),
+          px(mc.box.y - scroll_y),
+          static_cast<int>(mc.box.width),
+          static_cast<int>(mc.box.height)};
+      if (!visible(r.x, r.y, r.w, r.h)) continue;
+      SDL_RenderFillRect(sdl_, &r);
+    }
+    SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
+  }
+
   if (images_) {
     for (const auto& pi : layout.images) {
       const Image& img = images_->get(pi.src, pi.base);

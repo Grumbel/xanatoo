@@ -71,8 +71,15 @@ recolours every parent rule that uses `accent` (see `night-amber.xss`).
 
 **Block roles:** `paragraph`, `header`, `section`, `list`, `list-item`,
 `block-quote`, `note`, `code-block`, `term`, `definition`, `figure`,
-`caption`, `bibliography-entry`, `footnote`, `thread`, `message`, `table`,
+`caption`, `bibliography-entry`, `footnote`, `thread`, `message`,
+`message-alt`, `message-author`, `message-op`, `message-meta`, `table`,
 `rule`, `transclusion`.
+
+Message headers (forum / Reddit / Lemmy / Nostr comments) colour the author
+with `message-author` (`message-op` when a reply comes from the thread
+starter) and the date / score / reply-to with `message-meta`. Each message
+is a card filled with the `message` background; replies at odd depth use
+`message-alt` instead, so nesting alternates like old.reddit.
 
 Their properties:
 
@@ -82,7 +89,7 @@ Their properties:
 | `indent` | text inset: after the side bar (quote, note, transclusion), list marker slot, code padding, definition / bibliography / footnote hang, nested section inset |
 | `font` | `body`, `bold`, `italic`, `bold-italic`, `heading`, `code` |
 | `color` | text colour (else the page colour) |
-| `background` | code-block fill, table header fill |
+| `background` | code-block fill, table header fill, message card fill |
 | `border` | side bar, rule, table grid, code-block frame, footnote overlay rule |
 
 **Inline roles:** `text`, `emphasis`, `strong`, `strike`, `link`, `code`,

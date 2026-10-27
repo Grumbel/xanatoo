@@ -578,7 +578,18 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         if (g.node == header.id) g.node = id;
       }
       y += 8.f;
+      // Replies by the thread starter get the `message-op` author colour.
+      const std::string outer_op = std::move(thread_op_);
+      thread_op_.clear();
+      for (NodeId child : node.children) {
+        const Node& ch = doc.get(child);
+        if (ch.kind == NodeKind::Message) {
+          thread_op_ = ch.src;
+          break;
+        }
+      }
       layout_children_sequential(doc, node.children, x, y, max_width, out);
+      thread_op_ = outer_op;
       y += after(BlockRole::Thread);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
@@ -589,6 +600,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       float start_y = y;
       // Indent by reply depth (follow in-reply-to chain via labels).
       int depth = 0;
+      NodeId reply_to = INVALID_NODE;
       if (!node.alt.empty() && node.alt.rfind("about:", 0) != 0) {
         std::string cur = node.alt;
         for (int guard = 0; guard < 24; ++guard) {
@@ -598,22 +610,26 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           auto it = g_msg_label_map.find(key);
           if (it != g_msg_label_map.end()) parent_msg = it->second;
           if (parent_msg == INVALID_NODE) break;
+          if (depth == 0) reply_to = parent_msg;
           ++depth;
           cur = doc.get(parent_msg).alt;
           if (cur.rfind("about:", 0) == 0) break;
         }
       }
+      const bool alt_card = (depth % 2) == 1;
       if (depth > 8) depth = 8;
       const float indent = 16.f * static_cast<float>(depth);
       const float bar_w = 3.f;
+      const float pad = 6.f * dp;  // card inset above the header / at the right
       float body_x = x + indent + bar_w + 10.f;
-      float body_w = max_width - indent - bar_w - 10.f;
+      float body_w = max_width - indent - bar_w - 10.f - pad;
       if (body_w < 48.f) {
         body_x = x + 8.f;
         body_w = max_width - 8.f;
       }
 
-      // Header: author · date · reply/about
+      // Header: author · date · reply/about, coloured by the message-author /
+      // message-op / message-meta roles so posts separate at a glance.
       Node header = node;
       header.kind = NodeKind::Paragraph;
       header.spans.clear();
@@ -636,22 +652,44 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         if (node.alt.rfind("about:", 0) == 0) {
           r.text = "  ·  re ";
           r.text += node.alt.substr(6);
+        } else if (reply_to != INVALID_NODE &&
+                   !doc.get(reply_to).src.empty()) {
+          // Name only: "Alice Example <alice@…>" → "Alice Example".
+          std::string who = doc.get(reply_to).src;
+          const size_t lt = who.find(" <");
+          if (lt != std::string::npos && lt > 0) who.resize(lt);
+          r.text = "  ·  reply to ";
+          r.text += who;
         } else {
           r.text = "  ·  reply to #";
           r.text += node.alt;
         }
         header.spans.push_back(std::move(r));
       }
+      y += pad;
+      const size_t header_glyphs = out.glyphs.size();
       layout_role_text(doc, header, BlockRole::Message, body_x, y, body_w, out);
-      for (auto& g : out.glyphs) {
-        if (g.node == header.id) g.node = id;
+      const bool is_op = depth > 0 && !thread_op_.empty() &&
+                         node.src == thread_op_;
+      const BlockStyle& author_st =
+          st[is_op ? BlockRole::MessageOp : BlockRole::MessageAuthor];
+      const BlockStyle& meta_st = st[BlockRole::MessageMeta];
+      for (size_t gi = header_glyphs; gi < out.glyphs.size(); ++gi) {
+        PositionedGlyph& g = out.glyphs[gi];
+        g.node = id;
+        const BlockStyle& bs = g.span_index == 0 ? author_st : meta_st;
+        if (bs.has_color) g.color = bs.color;
       }
       y += 4.f;
       for (NodeId child : node.children)
         layout_node(doc, child, body_x, y, body_w, out);
-      y += after(BlockRole::Message);
+      out.message_cards.push_back(
+          {{id, x + indent, start_y, max_width - indent, y - start_y},
+           alt_card});
       out.message_bars.push_back(
           {id, x + indent, start_y, bar_w, y - start_y});
+      y += after(BlockRole::Message);
+      // The box keeps the trailing gap: its height is the virtualization hint.
       out.boxes.push_back({id, x + indent, start_y, max_width - indent,
                            y - start_y});
       break;

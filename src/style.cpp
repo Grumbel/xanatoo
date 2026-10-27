@@ -42,6 +42,10 @@ constexpr RoleName kBlockRoles[] = {
     {"footnote", BlockRole::Footnote},
     {"thread", BlockRole::Thread},
     {"message", BlockRole::Message},
+    {"message-alt", BlockRole::MessageAlt},
+    {"message-author", BlockRole::MessageAuthor},
+    {"message-op", BlockRole::MessageOp},
+    {"message-meta", BlockRole::MessageMeta},
     {"table", BlockRole::Table},
     {"rule", BlockRole::Rule},
     {"transclusion", BlockRole::Transclusion},
@@ -439,8 +443,25 @@ DocStyle builtin_style() {
   blk(BlockRole::Thread).font = FontRole::Heading;
   {
     BlockStyle& b = blk(BlockRole::Message);
-    b.space_after = px(10);
+    b.space_after = px(8);
     b.border = {40, 130, 140, 255};
+    b.background = {255, 255, 255, 150};
+  }
+  blk(BlockRole::MessageAlt).background = {120, 110, 90, 22};
+  {
+    BlockStyle& b = blk(BlockRole::MessageAuthor);
+    b.has_color = true;
+    b.color = {30, 90, 180, 255};
+  }
+  {
+    BlockStyle& b = blk(BlockRole::MessageOp);
+    b.has_color = true;
+    b.color = {190, 80, 20, 255};
+  }
+  {
+    BlockStyle& b = blk(BlockRole::MessageMeta);
+    b.has_color = true;
+    b.color = {120, 118, 112, 255};
   }
   {
     BlockStyle& b = blk(BlockRole::Table);

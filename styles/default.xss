@@ -38,7 +38,12 @@
   (role bibliography-entry (indent 16) (space-after 8))
   (role footnote    (indent 24) (space-after 8) (border "#aaa8a0"))
   (role thread      (font heading) (space-after 10))
-  (role message     (space-after 10) (border "#28828c"))
+  (role message     (space-after 8) (border "#28828c")
+                    (background (rgba 255 255 255 150)))   ; comment card
+  (role message-alt (background (rgba 120 110 90 22)))     ; odd reply depth
+  (role message-author (color "#1e5ab4"))
+  (role message-op  (color "#be5014"))                      ; thread starter
+  (role message-meta (color "#787670"))                     ; date · score · reply
   (role table       (space-after 10) (border "#a0a5af")
                     (background (rgba 230 235 245 220)))
   (role rule        (space-before 10) (space-after 10) (border "#aaa8a0"))
