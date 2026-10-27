@@ -175,6 +175,16 @@ Next bundle number: **263** (this delivery is **262**)
 - Open: relative times ("3 h ago") would need layout to depend on the clock;
   score is still part of the meta string rather than its own span.
 
+## Status (2026-10-27) — site style sheets
+
+- `styles/hackernews.xss`, `reddit.xss` (old.reddit), `wikipedia.xss`.
+- Sheet extensions: `(fonts (body-scale x))`; `header` / `thread`
+  `background` = band behind the title, `border` = rule under it
+  (`LayoutResult::role_fills` / `role_rules`, `add_role_band`).
+- Open: pick the sheet per site automatically (selection is global; split
+  panes would need per-pane fonts); HN's grey title-row text and
+  non-bold authors are not expressible yet.
+
 ## Status (2026-10-27) — Home button, directory listings
 
 - Home (toolbar house, View → Home, Alt+Home, `UiCommand::GoHome`) opens

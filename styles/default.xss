@@ -19,6 +19,7 @@
   ;;          (heading "DejaVu Sans" "sans-serif")
   ;;          (heading-weight bold)        ; or regular
   ;;          (heading-scale 1.5)          ; heading px = body px × scale
+  ;;          (body-scale 0.9)             ; body px = zoom px × scale
   ;;          (code "DejaVu Sans Mono" "monospace"))
 
   ;; Blocks: space-before / space-after / indent are px or em.

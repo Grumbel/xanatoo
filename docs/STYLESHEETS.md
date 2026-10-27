@@ -49,6 +49,7 @@ Lowest priority first; a later directory replaces a sheet of the same name:
          (heading "DejaVu Sans" "sans-serif")      ; default: the body family
          (heading-weight regular)                  ; bold | regular
          (heading-scale 1.5)                       ; heading px = body px × 1.5
+         (body-scale 0.9)                          ; body px = zoom px × 0.9
          (code "Fira Mono" "monospace"))
 
   (role paragraph (space-after gap))
@@ -89,8 +90,8 @@ Their properties:
 | `indent` | text inset: after the side bar (quote, note, transclusion), list marker slot, code padding, definition / bibliography / footnote hang, nested section inset |
 | `font` | `body`, `bold`, `italic`, `bold-italic`, `heading`, `code` |
 | `color` | text colour (else the page colour) |
-| `background` | code-block fill, table header fill, message card fill |
-| `border` | side bar, rule, table grid, code-block frame, footnote overlay rule |
+| `background` | code-block fill, table header fill, message card fill, band behind a `header` / `thread` title |
+| `border` | side bar, rule, table grid, code-block frame, footnote overlay rule, rule under a `header` / `thread` title |
 
 **Inline roles:** `text`, `emphasis`, `strong`, `strike`, `link`, `code`,
 `cite`, `footnote-ref`, with the properties `color` (beats the block colour), `background`
@@ -98,6 +99,14 @@ Their properties:
 
 Unknown roles, properties or bad values become warnings on stderr, and the
 status line reports how many there were. The rest of the sheet still applies.
+
+## Site looks
+
+`hackernews.xss`, `reddit.xss` (old.reddit) and `wikipedia.xss` imitate those
+sites in broad strokes: Verdana at `body-scale` 0.85 under an orange `thread`
+band, blue authors with zebra nesting under a pale blue band, serif titles
+over grey `header` rules. They are ordinary sheets — the selection is still
+global, not per site.
 
 ## Implementation
 

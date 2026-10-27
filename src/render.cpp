@@ -44,6 +44,13 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
   // Message cards (drawn under images, text, code blocks and table fills)
   {
     SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
+    for (const RoleBox& rb : layout.role_fills) {
+      set_color(sdl_, st[rb.role].background);
+      SDL_Rect r{static_cast<int>(rb.box.x + origin_x), px(rb.box.y - scroll_y),
+                 static_cast<int>(rb.box.width),
+                 static_cast<int>(rb.box.height)};
+      if (visible(r.x, r.y, r.w, r.h)) SDL_RenderFillRect(sdl_, &r);
+    }
     for (const auto& mc : layout.message_cards) {
       const Rgba& fill =
           st[mc.alt ? BlockRole::MessageAlt : BlockRole::Message].background;
@@ -171,6 +178,15 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
         static_cast<int>(tl.x + origin_x),
         px(tl.y - scroll_y),
         w, h};
+    SDL_RenderFillRect(sdl_, &line);
+  }
+
+  // Rules under headers
+  for (const RoleBox& rb : layout.role_rules) {
+    set_color(sdl_, st[rb.role].border);
+    SDL_Rect line{static_cast<int>(rb.box.x + origin_x), px(rb.box.y - scroll_y),
+                  static_cast<int>(rb.box.width),
+                  std::max(1, static_cast<int>(rb.box.height))};
     SDL_RenderFillRect(sdl_, &line);
   }
 

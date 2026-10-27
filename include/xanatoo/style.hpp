@@ -72,8 +72,10 @@ struct BlockStyle {
   FontRole font = FontRole::Body;
   bool has_color = false;
   Rgba color;             // text colour (else page ink)
-  Rgba background{0, 0, 0, 0};  // code block, table header, message card fill
-  Rgba border{0, 0, 0, 0};      // side bars, rules, grid lines, frames
+  // Code block, table header, message card fill; header / thread title band.
+  Rgba background{0, 0, 0, 0};
+  // Side bars, rules, grid lines, frames; the rule under a header.
+  Rgba border{0, 0, 0, 0};
 };
 
 struct InlineStyle {
@@ -92,6 +94,7 @@ struct DocStyle {
   Rgba selection{160, 190, 230, 120};
   FontFamilies fonts;
   float heading_scale = 0.f;  // heading px = body px × scale; 0 = app default
+  float body_scale = 1.f;     // body px = zoom px × scale (small-print sites)
   BlockStyle block[kBlockRoleCount];
   InlineStyle inl[kInlineKindCount];
   // Unknown roles / properties / values met while loading (with sheet name).

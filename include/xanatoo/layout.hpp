@@ -63,6 +63,13 @@ struct ColumnGap {
   float height = 0.f;
 };
 
+// Band of a block filled / underlined with its role's colours (header and
+// thread title backgrounds, the rule under a header).
+struct RoleBox {
+  LayoutBox box;
+  BlockRole role = BlockRole::Paragraph;
+};
+
 struct LayoutResult {
   std::vector<PositionedGlyph> glyphs;
   std::vector<LayoutBox> boxes;
@@ -83,6 +90,10 @@ struct LayoutResult {
   std::vector<LayoutBox> table_header_fills;
   // Horizontal rules (x, y = center line, width, height = stroke thickness).
   std::vector<LayoutBox> hr_lines;
+  // Filled with the role's `background` (drawn under the text).
+  std::vector<RoleBox> role_fills;
+  // Filled with the role's `border` (1 px rules under headers).
+  std::vector<RoleBox> role_rules;
   std::vector<ColumnGap> column_gaps;
   float content_height = 0.f;
   // True when a viewport was active and some sequential blocks were skipped
@@ -229,6 +240,10 @@ private:
   // Paragraph in the role's font.
   void layout_role_text(const Document& doc, const Node& node, BlockRole role,
                         float x, float& y, float max_width, LayoutResult& out);
+  // Background band / underline of a title laid out from `top` to `bottom`,
+  // when the role sets those colours.
+  void add_role_band(BlockRole role, NodeId id, float x, float top,
+                     float width, float bottom, LayoutResult& out);
 };
 
 }  // namespace xanatoo

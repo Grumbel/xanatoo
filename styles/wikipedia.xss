@@ -1,0 +1,49 @@
+;; SPDX-License-Identifier: GPL-3.0-or-later
+;;
+;; Wikipedia — the Vector look: white page, sans body, serif section titles
+;; in regular weight with a grey rule beneath, #36c links without underline,
+;; light grey boxes for code, tables and quotes.
+
+(stylesheet
+  (name "Wikipedia")
+  (description "Vector skin: serif titles over grey rules, blue links, white page")
+
+  (define ink    "#202122")
+  (define blue   "#3366cc")
+  (define grey-rule "#a2a9b1")
+  (define box    "#f8f9fa")
+  (define frame  "#eaecf0")
+
+  (page (background "#ffffff") (color ink)
+        (selection (rgba 51 102 204 60)))
+
+  (fonts (body "Arial" "Liberation Sans" "Helvetica" "DejaVu Sans" "sans-serif")
+         (heading "Linux Libertine" "Libertinus Serif" "Georgia" "Times"
+                  "DejaVu Serif" "serif")
+         (heading-weight regular)
+         (heading-scale 1.6)
+         (code "Menlo" "Consolas" "Liberation Mono" "DejaVu Sans Mono" "monospace"))
+
+  (role paragraph   (space-after 0.6em))
+  (role header      (color "#000000") (border grey-rule)
+                    (space-before 1em) (space-after 0.6em))
+  (role section     (indent 0))
+  (role block-quote (indent 1.2em) (border frame))
+  (role note        (indent 1.6em) (font italic) (color "#54595d") (border none))
+  (role code-block  (background box) (border frame))
+  (role caption     (font body) (color ink))
+  (role figure      (space-after 0.8em))
+  (role table       (border grey-rule) (background frame))
+  (role rule        (border grey-rule))
+  (role footnote    (border grey-rule))
+  (role bibliography-entry (indent 1.6em))
+  (role thread      (border grey-rule))
+  (role message     (border frame) (background box))
+  (role message-alt (background "#ffffff"))
+  (role message-author (color blue))
+  (role message-meta (color "#54595d"))
+
+  (role link   (color blue) (underline #f))
+  (role cite   (color blue) (underline #f))
+  (role footnote-ref (color blue))
+  (role code   (color "#000000") (background box)))

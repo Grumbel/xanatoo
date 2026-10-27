@@ -1,0 +1,46 @@
+;; SPDX-License-Identifier: GPL-3.0-or-later
+;;
+;; Reddit — the old.reddit look: white page, small Verdana / Arial, the pale
+;; blue header bar over a thread, blue author names, grey meta and zebra
+;; nesting (white / light grey) with thin grey thread lines.
+
+(stylesheet
+  (name "Reddit")
+  (description "old.reddit: white page, blue authors, zebra comment nesting")
+
+  (define blue   "#336699")
+  (define link-blue "#0079d3")
+  (define grey   "#888888")
+  (define line   "#e5e5e5")
+
+  (page (background "#ffffff") (color "#222222")
+        (selection (rgba 0 121 211 60)))
+
+  (fonts (body "Verdana" "Arial" "Liberation Sans" "DejaVu Sans" "sans-serif")
+         (heading "Verdana" "Arial" "Liberation Sans" "DejaVu Sans" "sans-serif")
+         (heading-scale 1.3)
+         (body-scale 0.9)
+         (code "DejaVu Sans Mono" "monospace"))
+
+  (role paragraph   (space-after 0.7em))
+  (role header      (color "#222222") (space-before 0.8em) (space-after 0.4em))
+  (role section     (indent 0))
+  (role thread      (background "#cee3f8") (color "#0000ff")
+                    (space-before 0.4em) (space-after 0.6em))
+  (role message     (space-after 0.5em) (border line)
+                    (background "#ffffff"))
+  (role message-alt (background "#f7f7f8"))
+  (role message-author (color blue))
+  (role message-op  (color "#0055df"))
+  (role message-meta (color grey))
+  (role block-quote (indent 0.8em) (color "#4f4f4f") (border "#c5c1ad"))
+  (role note        (border "#ff4500"))
+  (role code-block  (background "#fcfcfb") (border "#e6e6de"))
+  (role table       (border "#d8d8d8") (background "#f6f7f8"))
+  (role rule        (border line))
+  (role footnote    (border line))
+
+  (role link   (color link-blue) (underline #f))
+  (role cite   (color blue))
+  (role footnote-ref (color link-blue))
+  (role code   (color "#222222") (background "#fcfcfb")))

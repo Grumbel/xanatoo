@@ -438,11 +438,13 @@ void zoom_by(App& app, int steps) {
 }
 
 void apply_font_sizes(App& app) {
+  const int body = std::max(
+      8, static_cast<int>(std::lround(app.body_px * app.style.body_scale)));
   const int heading =
       app.style.heading_scale > 0.f
-          ? static_cast<int>(std::lround(app.body_px * app.style.heading_scale))
-          : app.heading_px;
-  app.fonts.set_sizes(app.body_px, heading);
+          ? static_cast<int>(std::lround(body * app.style.heading_scale))
+          : static_cast<int>(std::lround(app.heading_px * app.style.body_scale));
+  app.fonts.set_sizes(body, heading);
 }
 
 std::string body_font_path(const App& app) {

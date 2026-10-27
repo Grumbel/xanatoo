@@ -1,0 +1,42 @@
+;; SPDX-License-Identifier: GPL-3.0-or-later
+;;
+;; Hacker News — beige page, small Verdana, an orange bar over each thread,
+;; grey meta lines and plain comments (no cards, no side bars).
+
+(stylesheet
+  (name "Hacker News")
+  (description "Beige page, small Verdana, orange title bar, grey meta")
+
+  (define orange "#ff6600")
+  (define grey   "#828282")
+  (define beige  "#f6f6ef")
+
+  (page (background beige) (color "#000000")
+        (selection (rgba 255 102 0 70)))
+
+  (fonts (body "Verdana" "DejaVu Sans" "Bitstream Vera Sans" "sans-serif")
+         (heading "Verdana" "DejaVu Sans" "sans-serif")
+         (heading-scale 1.25)
+         (body-scale 0.85)
+         (code "DejaVu Sans Mono" "monospace"))
+
+  (role paragraph   (space-after 0.4em))
+  (role header      (space-before 0.8em) (space-after 0.4em))
+  (role section     (indent 0))
+  (role thread      (background orange) (color "#000000")
+                    (space-before 0.4em) (space-after 0.6em))
+  (role message     (space-after 0.5em) (border none) (background none))
+  (role message-alt (background none))
+  (role message-author (color grey))
+  (role message-op  (color "#cd6e00"))
+  (role message-meta (color grey))
+  (role block-quote (indent 1em) (color "#5a5a5a") (border "#d8d8cc"))
+  (role code-block  (background none) (border none) (indent 2em))
+  (role table       (border "#d8d8cc") (background (rgba 255 102 0 30)))
+  (role rule        (border "#d8d8cc"))
+  (role footnote    (border "#d8d8cc"))
+
+  (role link   (color "#000000") (underline #f))
+  (role cite   (color "#000000"))
+  (role footnote-ref (color grey))
+  (role code   (color "#000000") (background none)))

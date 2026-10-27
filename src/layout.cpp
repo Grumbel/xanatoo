@@ -522,6 +522,10 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
                                       col_out.table_header_fills.end());
         out.hr_lines.insert(out.hr_lines.end(),
                             col_out.hr_lines.begin(), col_out.hr_lines.end());
+        out.role_fills.insert(out.role_fills.end(), col_out.role_fills.begin(),
+                              col_out.role_fills.end());
+        out.role_rules.insert(out.role_rules.end(), col_out.role_rules.begin(),
+                              col_out.role_rules.end());
         out.column_gaps.insert(out.column_gaps.end(),
                                col_out.column_gaps.begin(),
                                col_out.column_gaps.end());
@@ -608,6 +612,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
     case NodeKind::Header: {
       float start_y = y;
       y += before(BlockRole::Header);
+      const float text_y = y;
       // Org TODO / :tags: live in src + tags. Show them as decoration glyphs
       // that do not own a real span index (node = INVALID) so caret/edit stay
       // on the title text only.
@@ -646,6 +651,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       } else {
         layout_role_text(doc, node, BlockRole::Header, x, y, max_width, out);
       }
+      add_role_band(BlockRole::Header, id, x, text_y, max_width, y, out);
       y += after(BlockRole::Header);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
@@ -772,7 +778,9 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       }
       header.spans.push_back(std::move(hs));
       y += before(BlockRole::Thread);
+      const float text_y = y;
       layout_role_text(doc, header, BlockRole::Thread, x, y, max_width, out);
+      add_role_band(BlockRole::Thread, id, x, text_y, max_width, y, out);
       for (auto& g : out.glyphs) {
         if (g.node == header.id) g.node = id;
       }
@@ -1206,6 +1214,12 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
                                         cell_out.table_header_fills.end());
           out.hr_lines.insert(out.hr_lines.end(), cell_out.hr_lines.begin(),
                               cell_out.hr_lines.end());
+          out.role_fills.insert(out.role_fills.end(),
+                                cell_out.role_fills.begin(),
+                                cell_out.role_fills.end());
+          out.role_rules.insert(out.role_rules.end(),
+                                cell_out.role_rules.begin(),
+                                cell_out.role_rules.end());
           if (cy > max_bottom) max_bottom = cy;
           cx += col_w;
         }
@@ -1533,6 +1547,24 @@ void LayoutEngine::layout_role_text(const Document& doc, const Node& node,
                                     BlockRole role, float x, float& y,
                                     float max_width, LayoutResult& out) {
   layout_paragraph(doc, node, x, y, max_width, out, (*style_)[role].font, role);
+}
+
+void LayoutEngine::add_role_band(BlockRole role, NodeId id, float x,
+                                 float top, float width, float bottom,
+                                 LayoutResult& out) {
+  const BlockStyle& bs = (*style_)[role];
+  const float em = static_cast<float>(fonts_.regular.pixel_size());
+  const float dp = options_.px_scale;
+  // The band reaches a little past the text so it does not touch the glyphs.
+  const float pad_x = 0.35f * em;
+  const float pad_y = 0.2f * em;
+  if (bs.background.visible())
+    out.role_fills.push_back({{id, x - pad_x, top - pad_y, width + 2.f * pad_x,
+                               bottom - top + 2.f * pad_y},
+                              role});
+  if (bs.border.visible())
+    out.role_rules.push_back(
+        {{id, x, bottom + pad_y, width, std::max(1.f, dp)}, role});
 }
 
 void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,

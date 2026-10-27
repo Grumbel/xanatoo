@@ -719,7 +719,8 @@ void test_style_sheet_parse() {
       (define gap 1.5em)
       (page (background "#fff") (color (rgb 1 2 3)))
       (fonts (body "Some Serif" "serif") (heading-weight regular)
-             (heading-scale 1.5))
+             (heading-scale 1.5)
+             (body-scale 0.85))
       (role paragraph (space-after gap) (space-before 4px))
       (role header (color accent) (font code))
       (role link (color accent) (underline #f))
@@ -735,6 +736,7 @@ void test_style_sheet_parse() {
   EXPECT_EQ(st.fonts.body[0], "Some Serif");
   EXPECT(!st.fonts.heading_bold);
   EXPECT(st.heading_scale > 1.49f && st.heading_scale < 1.51f);
+  EXPECT(st.body_scale > 0.84f && st.body_scale < 0.86f);
   const BlockStyle& para = st[BlockRole::Paragraph];
   EXPECT(para.space_after.em);
   EXPECT(para.space_after.px(10.f) > 14.9f && para.space_after.px(10.f) < 15.1f);
@@ -769,6 +771,10 @@ void test_style_sheets_shipped() {
       std::fprintf(stderr, "style %s: %s\n", e.name.c_str(),
                    st.warnings.front().c_str());
     EXPECT(st.warnings.empty());
+  }
+  for (const char* site : {"hackernews", "reddit", "wikipedia"}) {
+    DocStyle st;
+    EXPECT(load_style(site, st));
   }
   // default.xss mirrors the built-in look.
   DocStyle def;

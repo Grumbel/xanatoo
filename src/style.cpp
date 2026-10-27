@@ -258,6 +258,9 @@ class SheetReader {
         if (w == "bold") ff.heading_bold = true;
         else if (w == "regular" || w == "normal") ff.heading_bold = false;
         else warn("heading-weight is bold or regular");
+      } else if (prop == "body-scale") {
+        style_.body_scale =
+            std::clamp(sexpr_float(value(p.kids[1]), 1.f), 0.5f, 2.f);
       } else if (prop == "heading-scale") {
         style_.heading_scale =
             std::clamp(sexpr_float(value(p.kids[1]), 0.f), 0.f, 4.f);
