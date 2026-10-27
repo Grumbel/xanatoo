@@ -73,6 +73,11 @@ Export via *File → Export as S-expression…* or *Export as Markdown…*.
 - **Ctrl+Shift+D** — toggle diff marks (needs two independent files)
 
 - **Ctrl+\\** — Toggle dual pane
+- **Dual pane browsing** — hover a link in the left pane to preview it on the
+  right, click to keep it; a link clicked on the right moves that page to the
+  left and opens the target on the right (Ctrl+click keeps the old behaviour)
+- **Esc** / toolbar **✕** — stop loading a page (remote pages load in the
+  background; the pane shows a progress bar and timer)
 - **Ctrl+Shift+D** — Diff marks (two independent files)
 - **Ctrl+Shift+L** — Structure highlight (colour bars + kind tags on the right)
 - **Drag left margin** — Reorder or reparent a block
@@ -92,7 +97,7 @@ xanatoo treats structure as data: headings, lists, columns, includes, and
 images are nodes in a tree, not only visual decorations.
 
 - **Transclusion** — `:::include #Target` or a path embeds another passage live
-- **Dual pane** — same document or two files; links can sync both views
+- **Dual pane** — a two-page trail: left links open on the right, right links shift left
 - **S-expression format** — experimental `.sexp` serialization of the tree
 
 Press **F1** or **Esc** to close this window.

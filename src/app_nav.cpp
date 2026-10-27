@@ -109,177 +109,100 @@ std::string resolve_doc_href(App& app, const std::string& href,
   return href;
 }
 
+std::string link_base_url(App& app, int pi) {
+  const std::string& page = path_of(app, app.panes[pi]);
+  if (xanatoo::is_gemini_url(page)) return page;
+  if (!page.empty()) return {};  // local file / other service
+  return app.gemini_current_url;
+}
+
+// Buffer pane `pi` loads a new page into: its own, unless the other visible
+// pane shows the same buffer or it has unsaved edits (then a new tab).
+static BufferId page_buffer(App& app, int pi) {
+  Pane& p = app.panes[pi];
+  const bool shared = app.split && app.panes[1 - pi].buf == p.buf;
+  const DocBuffer* b = find_buf(app, p.buf);
+  if (b && !shared && !(b->dirty && !b->placeholder)) return p.buf;
+  return add_buffer(app, xanatoo::parse_document("", {}), {});
+}
+
+void show_doc_in_pane(App& app, int pi, xanatoo::Document doc,
+                      const std::string& label) {
+  Pane& p = app.panes[pi];
+  p.buf = page_buffer(app, pi);
+  DocBuffer& b = buf(app, p.buf);
+  b.doc = std::move(doc);
+  b.path = label;
+  b.dirty = false;
+  b.placeholder = false;
+  xanatoo::Document& nd = b.doc;
+  p.sel = {};
+  xanatoo::ensure_valid_caret(nd, p.sel.focus);
+  p.sel.anchor = p.sel.focus;
+  p.scroll_y = 0.f;
+  // Drop stale layout boxes that still reference the previous tree —
+  // otherwise the next frame can call doc.get() with dead node ids.
+  p.layout = {};
+  drop_height_hints_for_buf(app, p.buf);
+  b.history.reset(nd, p.sel);
+  Pane& o = app.panes[1 - pi];
+  if (o.buf == p.buf) {
+    o.sel = p.sel;
+    o.scroll_y = 0.f;
+    o.layout = {};
+  }
+  for (auto& sw : app.soft_wins)
+    if (sw.buf == p.buf) {
+      sw.needs_layout = true;
+      sw.scroll = 0.f;
+      sw.layout = {};
+      xanatoo::ensure_valid_caret(nd, sw.sel.focus);
+      sw.sel.anchor = sw.sel.focus;
+    }
+  if (std::find(app.tab_order.begin(), app.tab_order.end(), p.buf) ==
+      app.tab_order.end())
+    app.tab_order.push_back(p.buf);
+  app.needs_layout = true;
+  update_title(app);
+}
+
 bool navigate_to_url(App& app, std::string target, bool record_history) {
+  return navigate_pane(app, app.focus, std::move(target), record_history);
+}
+
+bool navigate_pane(App& app, int pi, std::string target, bool record_history) {
   while (!target.empty() && (target.back() == ' ' || target.back() == '\t'))
     target.pop_back();
   if (target.empty()) return false;
-  Pane& p = focused_pane(app);
+  Pane& p = app.panes[pi];
 
-  auto load_into_pane = [&](xanatoo::Document doc, const std::string& label) {
-    buf(app, p.buf).doc = std::move(doc);
-    path_of(app, p) = label;
-    buf(app, p.buf).dirty = false;
-    xanatoo::Document& nd = buf(app, p.buf).doc;
-    xanatoo::ensure_valid_caret(nd, p.sel.focus);
-    p.sel.anchor = p.sel.focus;
-    p.scroll_y = 0.f;
-    // Drop stale layout boxes that still reference the previous tree —
-    // otherwise the next frame can call doc.get() with dead node ids.
-    p.layout = {};
-    drop_height_hints_for_buf(app, p.buf);
-    buf(app, p.buf).history.reset(nd, p.sel);
-    if (app.panes[0].buf == app.panes[1].buf) {
-      app.panes[1 - app.focus].sel = p.sel;
-      app.panes[1 - app.focus].scroll_y = 0.f;
-      app.panes[1 - app.focus].layout = {};
-    }
-    for (auto& sw : app.soft_wins)
-      if (sw.buf == p.buf) {
-        sw.needs_layout = true;
-        sw.scroll = 0.f;
-        sw.layout = {};
-        xanatoo::ensure_valid_caret(nd, sw.sel.focus);
-        sw.sel.anchor = sw.sel.focus;
+  // Remote pages load on a worker thread; poll_fetches shows them.
+  if (is_in_app_remote_url(target)) {
+    std::string why;
+    if (remote_fetch_supported(target, &why)) {
+      if (!allow_discard_dirty(app, p.buf)) return false;
+      if (const CachedPage* c = find_cached_page(app, target)) {
+        // Fresh from a hover preview: no second fetch.
+        const std::string final_url = c->final_url;
+        show_doc_in_pane(app, pi, c->doc, final_url);
+        if (xanatoo::is_gemini_url(final_url)) {
+          app.gemini_current_url = final_url;
+          app.browse_mode = true;
+        }
+        if (record_history) push_nav_history(app, final_url);
+        flash_status(app, "Opened " + final_url);
+        return true;
       }
-    app.needs_layout = true;
-    update_title(app);
-  };
-
-  // Shared post-fetch path for Nostr / Reddit / Lemmy documents.
-  [[maybe_unused]] auto finish_remote_open = [&](std::optional<xanatoo::Document> doc,
-                                const std::string& err, const char* service,
-                                std::string label, size_t label_max,
-                                const std::string& history_url) -> bool {
-    if (!doc) {
-      flash_status(app, std::string(service) + " failed: " + err);
-      std::cerr << service << ": " << err << "\n";
-      return false;
+      start_fetch(app, FetchPurpose::Navigate, pi, target, record_history);
+      return true;
     }
-    if (!allow_discard_dirty(app, p.buf)) return false;
-    if (label.size() > label_max) label = label.substr(0, label_max) + "…";
-    load_into_pane(std::move(*doc), label);
-    if (std::find(app.tab_order.begin(), app.tab_order.end(), p.buf) ==
-        app.tab_order.end())
-      app.tab_order.push_back(p.buf);
-    if (record_history) push_nav_history(app, history_url);
-    flash_status(app, std::string("Opened ") + service);
-    return true;
-  };
-
-  if (xanatoo::is_gemini_url(target)) {
-#if defined(XANATOO_GEMINI) && XANATOO_GEMINI
-    flash_status(app, "Fetching " + target + "…");
-    std::string err;
-    auto resp = xanatoo::gemini_fetch(target, &err);
-    if (!resp) {
-      flash_status(app, "Gemini failed: " + err);
-      std::cerr << "Gemini: " << err << "\n";
-      return false;
-    }
-    if (resp->status == 10 || resp->status == 11) {
-      // Input request — open URL bar with query for the user to complete.
-      std::string q = resp->final_url;
-      if (!q.empty() && q.back() != '?') q.push_back('?');
-      open_prompt(app, PromptKind::UrlBar, std::move(q));
-      flash_status(app, std::string(resp->status == 11 ? "Sensitive input: "
-                                                       : "Input: ") +
-                            resp->meta);
-      return false;
-    }
-    if (resp->status < 20 || resp->status >= 30) {
-      flash_status(app, "Gemini status " + std::to_string(resp->status) + " " +
-                            resp->meta);
-      return false;
-    }
-    if (!allow_discard_dirty(app, p.buf)) return false;
-    std::string meta = resp->meta;
-    for (char& c : meta)
-      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    // Drop parameters: "text/gemini; charset=utf-8"
-    std::string mime = meta;
-    size_t semi = mime.find(';');
-    if (semi != std::string::npos) mime.resize(semi);
-    while (!mime.empty() && mime.back() == ' ') mime.pop_back();
-
-    xanatoo::Document gdoc;
-    if (mime.find("text/markdown") != std::string::npos ||
-        mime.find("text/x-markdown") != std::string::npos) {
-      gdoc = xanatoo::parse_document(resp->body, "remote.md");
-    } else if (mime.empty() || mime.find("text/gemini") != std::string::npos ||
-               mime.find("text/plain") != std::string::npos) {
-      gdoc = xanatoo::parse_gemtext(resp->body);
-    } else {
-      // Binary or unknown — show a short notice instead of mojibake.
-      std::string notice =
-          "# Unsupported media\n\n"
-          "Gemini returned MIME type `" +
-          resp->meta + "` (" + std::to_string(resp->body.size()) +
-          " bytes). Only text/gemini, text/plain, and "
-          "text/markdown are rendered in-pane.\n";
-      gdoc = xanatoo::parse_gemtext(notice);
-    }
-    app.gemini_current_url = resp->final_url;
-    load_into_pane(std::move(gdoc), resp->final_url);
-    app.browse_mode = true;
-    if (record_history) push_nav_history(app, resp->final_url);
-    flash_status(
-        app, "Gemini " + std::to_string(resp->status) + " " + resp->final_url);
-    return true;
-#else
+    flash_status(app, why);
+    if (!xanatoo::is_gemini_url(target)) return false;
     // No TLS client in this build — still offer the local gemtext sample.
-    flash_status(app, "gemini:// needs TLS (build with -DXANATOO_GEMINI=ON)");
-    {
-      std::string sample = find_repo_file(app, "gemini-sample.gmi");
-      if (sample.empty())
-        sample = find_repo_file(app, "examples/gemini-sample.gmi");
-      if (!sample.empty() && fs::exists(sample)) {
-        // Fall through to local open of the sample after the message.
-        target = sample;
-      } else {
-        return false;
-      }
-    }
-#endif
-  }
-
-  // Nostr note / nevent (read-only thread view)
-  if (xanatoo::is_nostr_ref(target)) {
-#if defined(XANATOO_NOSTR) && XANATOO_NOSTR
-    flash_status(app, "Fetching Nostr " + target.substr(0, 24) + "…");
-    std::string err;
-    auto doc = xanatoo::nostr_fetch_thread(target, &err);
-    return finish_remote_open(std::move(doc), err, "Nostr", target, 64, target);
-#else
-    flash_status(app, "Nostr needs build with -DXANATOO_NOSTR=ON");
-    return false;
-#endif
-  }
-
-  // Reddit listing / post via public .json API
-  if (xanatoo::is_reddit_url(target)) {
-#if defined(XANATOO_REDDIT) && XANATOO_REDDIT
-    flash_status(app, "Fetching Reddit…");
-    std::string err;
-    auto doc = xanatoo::reddit_fetch(target, &err);
-    return finish_remote_open(std::move(doc), err, "Reddit", target, 72,
-                              target);
-#else
-    flash_status(app, "Reddit needs build with -DXANATOO_REDDIT=ON");
-    return false;
-#endif
-  }
-
-  // Lemmy community / post via API v3
-  if (xanatoo::is_lemmy_url(target)) {
-#if defined(XANATOO_LEMMY) && XANATOO_LEMMY
-    flash_status(app, "Fetching Lemmy…");
-    std::string err;
-    auto doc = xanatoo::lemmy_fetch(target, &err);
-    return finish_remote_open(std::move(doc), err, "Lemmy", target, 72, target);
-#else
-    flash_status(app, "Lemmy needs build with -DXANATOO_LEMMY=ON");
-    return false;
-#endif
+    std::string sample = find_repo_file(app, "gemini-sample.gmi");
+    if (sample.empty()) sample = find_repo_file(app, "examples/gemini-sample.gmi");
+    if (sample.empty() || !fs::exists(sample)) return false;
+    target = sample;
   }
 
   // Local path (or offline fallback for gemini:// when TLS is disabled)
@@ -332,10 +255,7 @@ bool navigate_to_url(App& app, std::string target, bool record_history) {
       flash_status(app, "EPUB import failed (need pandoc on PATH)");
       return false;
     }
-    load_into_pane(load_doc(app, open_path), open_path);
-    if (std::find(app.tab_order.begin(), app.tab_order.end(), p.buf) ==
-        app.tab_order.end())
-      app.tab_order.push_back(p.buf);
+    show_doc_in_pane(app, pi, load_doc(app, open_path), open_path);
     if (record_history) push_nav_history(app, open_path);
     flash_status(app, was_epub ? ("Imported EPUB → " + open_path)
                                : ("Opened " + open_path));
@@ -422,6 +342,7 @@ void activate_at_caret(App& app) {
   if (!cpos.valid) return;
   if (auto href =
           xanatoo::hit_test_link(d, p.layout, cpos.x, cpos.y, p.scroll_y)) {
+    if (follow_link_split(app, app.focus, *href)) return;
     if (auto dest = xanatoo::jump_to_href(d, *href)) {
       expand_ancestors_for_node(app, dest->node);
       p.sel.focus = *dest;
@@ -431,9 +352,9 @@ void activate_at_caret(App& app) {
       reset_blink(app);
     } else if (!href->empty() && (*href)[0] != '#') {
       std::string abs = *href;
-      if (!xanatoo::is_gemini_url(abs) && !app.gemini_current_url.empty()) {
-        std::string resolved =
-            xanatoo::resolve_gemini_url(app.gemini_current_url, abs);
+      const std::string base = link_base_url(app, app.focus);
+      if (!xanatoo::is_gemini_url(abs) && !base.empty()) {
+        std::string resolved = xanatoo::resolve_gemini_url(base, abs);
         if (!resolved.empty()) abs = resolved;
       }
       if (is_in_app_remote_url(abs)) {

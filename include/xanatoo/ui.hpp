@@ -20,6 +20,7 @@ enum class UiCommand {
   NavigateUrl,  // toolbar/menu URL field committed (arg = URL or path)
   NavBack,     // Alt+Left session history
   NavForward,  // Alt+Right
+  StopLoading, // cancel running page fetches (toolbar Stop, Esc)
   ToggleHistory,   // View → History panel
   AddBookmark,     // bookmark current page URL/path
   RemoveBookmark,  // remove current (or arg) from bookmarks
@@ -170,6 +171,7 @@ struct UiState {
   bool in_stretch = false;
   bool can_nav_back = false;
   bool can_nav_forward = false;
+  bool loading = false;  // a page fetch is running (Reload becomes Stop)
   bool history_open = false;
   bool bookmarks_open = false;
   bool current_bookmarked = false;

@@ -219,7 +219,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
       "strike", "cite", "h1", "h2", "h3", "para", "task", "table",
       "figure", "note", "replace", "outline", "paste", "copy", "new", "open",
       "zoomin", "zoomout", "structure", "diff",
-      "back", "forward", "reload", "bookmark", "history", "browse",
+      "back", "forward", "reload", "stop", "bookmark", "history", "browse",
       "linespacing", "measure", "style",
       "format", "insert", "view", "lists",
   };
@@ -302,7 +302,7 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
   } else {
     // Text fallback when PNG missing (e.g. icons not rasterized yet).
     static const std::unordered_map<std::string, const char*> kShort = {
-        {"back", "◀"}, {"forward", "▶"}, {"reload", "↻"}, {"bookmark", "★"},
+        {"back", "◀"}, {"forward", "▶"}, {"reload", "↻"}, {"stop", "✕"}, {"bookmark", "★"},
         {"history", "Hist"}, {"browse", "Browse"},
         {"linespacing", "≡↕"}, {"measure", "▣|"},
         {"format", "Aa▾"},
@@ -846,8 +846,12 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                 state.can_nav_back);
     tool_button("tb_fwd", "forward", "Forward (Alt+Right)", UiCommand::NavForward,
                 cmd, state.can_nav_forward);
-    tool_button("tb_reload", "reload", "Reload (Ctrl+R)", UiCommand::Reload, cmd,
-                state.has_path);
+    if (state.loading)
+      tool_button("tb_stop", "stop", "Stop loading (Esc)",
+                  UiCommand::StopLoading, cmd, true);
+    else
+      tool_button("tb_reload", "reload", "Reload (Ctrl+R)", UiCommand::Reload,
+                  cmd, state.has_path);
 
     ImGui::TextDisabled("|");
     ImGui::SameLine(0.f, 4.f);

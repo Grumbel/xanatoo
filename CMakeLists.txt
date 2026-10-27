@@ -60,6 +60,8 @@ add_executable(xanatoo
   src/app_frame.cpp
   src/app_chrome.cpp
   src/app_keymap.cpp
+  src/app_fetch.cpp
+  src/app_split.cpp
   src/theme.cpp
   src/font.cpp
   src/document.cpp
@@ -122,8 +124,10 @@ target_compile_definitions(xanatoo PRIVATE
   XANATOO_SQLITE=$<BOOL:${XANATOO_SQLITE}>
   XANATOO_FONTCONFIG=$<BOOL:${XANATOO_FONTCONFIG}>)
 
+find_package(Threads REQUIRED)
 target_link_libraries(xanatoo PRIVATE
   ${SDL2_LIBRARIES}
+  Threads::Threads
   xanatoo_sqlite3
   Freetype::Freetype
   ${FONTCONFIG_LIBRARIES}

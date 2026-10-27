@@ -8,17 +8,20 @@
 
 #include <unistd.h>
 
+#include <mutex>
+
 namespace xanatoo {
 
 namespace {
 
+// Pages are fetched on worker threads, so guard the one-time init.
 void init_once() {
-  static bool done = false;
-  if (done) return;
-  SSL_library_init();
-  SSL_load_error_strings();
-  OpenSSL_add_all_algorithms();
-  done = true;
+  static std::once_flag once;
+  std::call_once(once, [] {
+    SSL_library_init();
+    SSL_load_error_strings();
+    OpenSSL_add_all_algorithms();
+  });
 }
 
 }  // namespace

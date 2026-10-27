@@ -173,6 +173,19 @@ std::string buffer_tab_label(App& app, BufferId bi) {
   const std::string& path = b->path;
   if (path.empty()) {
     s += "untitled";
+  } else if (is_in_app_remote_url(path)) {
+    // URL: host + last path segment ("geminiprotocol.net/.../x.gmi"); ASCII
+    // dots because the ImGui tab font has no "…".
+    std::string u = path;
+    if (size_t sch = u.find("://"); sch != std::string::npos)
+      u.erase(0, sch + 3);
+    while (u.size() > 1 && u.back() == '/') u.pop_back();
+    const size_t slash = u.find('/');
+    const size_t last = u.rfind('/');
+    if (slash != std::string::npos && last != slash)
+      u = u.substr(0, slash) + "/..." + u.substr(last);
+    if (u.size() > 40) u = u.substr(0, 37) + "...";
+    s += u;
   } else {
     try {
       s += fs::path(path).filename().string();

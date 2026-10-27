@@ -73,6 +73,10 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
       buf(app, focused_pane(app).buf).dirty;
   ui_state.has_path = !path_of(app, focused_pane(app)).empty();
   ui_state.split = app.split;
+  ui_state.loading = std::any_of(
+      app.fetches.begin(), app.fetches.end(), [](const FetchJob& j) {
+        return j.purpose == FetchPurpose::Navigate;
+      });
   ui_state.outline = app.outline_mode;
   ui_state.section_focus = app.section_focus_mode;
   ui_state.justify = app.view_settings.justify;
@@ -301,6 +305,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       xanatoo::platform_release_keyboard();  // URL typed; page is read-only
       if (!arg.empty()) navigate_to_url(app, arg);
       break;
+    case C::StopLoading:
+      if (cancel_fetches(app)) flash_status(app, "Stopped loading");
+      break;
     case C::NavBack:
       if (app.nav_hist_pos > 0) {
         --app.nav_hist_pos;
@@ -486,6 +493,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         break;
       }
       if (is_in_app_remote_url(rpath)) {
+        forget_cached_page(app, rpath);  // really fetch again
         navigate_to_url(app, rpath, /*record_history=*/false);
         break;
       }
@@ -2279,6 +2287,8 @@ void draw_pane(App& app, int i) {
   SDL_RenderSetClipRect(app.sdl, nullptr);
 
   draw_pane_scrollbar(app, i);
+  draw_preview_badge(app, i);
+  draw_load_indicator(app, i);
   pane.scroll_y = exact_scroll;
 }
 
@@ -2700,6 +2710,8 @@ void run_frame(App& app) {
   SDL_Event ev;
   while (SDL_PollEvent(&ev)) handle_event(app, ev);
   update_touch(app);
+  poll_fetches(app);
+  update_split_preview(app);
   sync_window_size(app);
   relayout_if_needed(app);
   run_chrome(app);

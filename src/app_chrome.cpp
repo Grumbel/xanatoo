@@ -9,6 +9,8 @@
 #include <cmath>
 #include <string>
 
+#include <cstdio>
+
 #include "xanatoo/app.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/lemmy.hpp"
@@ -109,6 +111,13 @@ void draw_client_scrollbar(App& app, int cx, int cy, int cw, int ch,
                                   static_cast<float>(ch));
 }
 
+// First running page navigation (status line + toolbar Stop button).
+static const FetchJob* loading_job(const App& app) {
+  for (const FetchJob& j : app.fetches)
+    if (j.purpose == FetchPurpose::Navigate) return &j;
+  return nullptr;
+}
+
 StatusLine compute_status(App& app) {
   StatusLine st;
   std::string& label = st.text;
@@ -167,10 +176,22 @@ StatusLine compute_status(App& app) {
       case PromptKind::None:
         break;
     }
+  } else if (const FetchJob* job = loading_job(app)) {
+    char secs[32];
+    std::snprintf(secs, sizeof(secs), "%.1f s",
+                  static_cast<double>(SDL_GetTicks() - job->started) / 1000.0);
+    label = "Loading " + job->url + " …  " + secs;
+    if (app.split) label += job->pane == 0 ? "  (left pane)" : "  (right pane)";
+    label += "  ·  Esc stops";
+    tone = StatusTone::Info;
   } else if (!app.status_notice.empty() &&
              SDL_GetTicks() < app.status_notice_until) {
     label = app.status_notice;
     tone = StatusTone::Notice;
+  } else if (app.split_preview.active) {
+    label = "Preview: " + path_of(app, app.panes[1]);
+    label += "  ·  click the link to keep it · move away to drop it";
+    tone = StatusTone::Info;
   } else if (app.dragging_block) {
     label = "Moving block — drop before/after any block (columns & lists OK)";
     tone = StatusTone::Info;

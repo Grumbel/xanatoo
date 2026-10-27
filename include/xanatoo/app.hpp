@@ -4,7 +4,9 @@
 
 #include <SDL.h>
 
+#include <atomic>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -61,6 +63,8 @@ struct DocBuffer {
   std::string path;
   bool dirty = false;
   xanatoo::History history;
+  // Shows a "Loading …" stand-in until a background fetch replaces it.
+  bool placeholder = false;
 };
 
 // Cached raster of a pane's document layer (background, selection, text) so
@@ -196,6 +200,61 @@ struct Touch {
   // Pinch: finger distance and body size when the second finger landed.
   float pinch_dist = 0.f;
   int pinch_body_px = 0;
+};
+
+// ---- background page fetches (app_fetch.cpp) ----
+// Remote pages (Gemini / Nostr / Reddit / Lemmy) are fetched and parsed on a
+// worker thread; the frame loop applies finished jobs (poll_fetches).
+enum class FetchPurpose : uint8_t {
+  Navigate,  // show in `pane` when done
+  Preview,   // split-pane hover preview: goes to the page cache
+};
+
+// Written by the worker, read by the main thread once `done` is set.
+struct FetchShared {
+  std::atomic<bool> done{false};
+  std::optional<xanatoo::Document> doc;
+  std::string error;
+  std::string final_url;  // page URL after redirects (buffer path)
+  const char* service = "";
+  // Gemini 10/11: the server asks for input (meta = prompt text).
+  int input_status = 0;
+  std::string input_meta;
+};
+
+struct FetchJob {
+  uint64_t id = 0;
+  FetchPurpose purpose = FetchPurpose::Navigate;
+  int pane = 0;
+  std::string url;
+  bool record_history = true;
+  Uint32 started = 0;
+  std::shared_ptr<FetchShared> shared;
+};
+
+// Recently fetched pages, so a hover preview turns into a page instantly.
+struct CachedPage {
+  std::string url;
+  std::string final_url;
+  xanatoo::Document doc;
+  Uint32 ticks = 0;
+};
+
+// Split browsing (app_split.cpp): hovering a link in the left pane previews
+// its target in the right pane; the right pane's own page is kept in
+// `saved_*` and comes back when the pointer leaves the link.
+struct SplitPreview {
+  bool active = false;      // right pane currently shows a preview
+  std::string shown;        // href previewed (or just committed)
+  std::string hover;        // href under the pointer (left pane), "" = none
+  Uint32 hover_since = 0;
+  Uint32 off_since = 0;     // pointer left the link (grace period start)
+  std::string pending;      // remote URL whose preview fetch is running
+  BufferId scratch = kNoBuffer;  // preview doc not open elsewhere
+  BufferId shown_buf = kNoBuffer;  // what the right pane shows for it
+  BufferId saved_buf = kNoBuffer;
+  xanatoo::Selection saved_sel{};
+  float saved_scroll = 0.f;
 };
 
 // What the status bar says this frame (derived from world state each frame).
@@ -380,6 +439,10 @@ struct App {
   FloatWindow ol = make_float_panel(WindowRole::Outline, 40, 100, 320, 420);
   Hover hover;
   Touch touch;
+  std::vector<FetchJob> fetches;
+  uint64_t next_fetch_id = 1;
+  std::vector<CachedPage> page_cache;
+  SplitPreview split_preview;
 };
 
 // ---- buffers ----
@@ -554,9 +617,52 @@ void remove_bookmark(App& app, const std::string& url);
 bool is_inapp_doc_href(App& app, const std::string& href);
 std::string resolve_doc_href(App& app, const std::string& href,
                              const std::string& base_path = {});
+// Open `target` (path, gemini://, Nostr, Reddit, Lemmy) in the focused pane /
+// in pane `pi`. Remote pages load in the background; true = opened or started.
 bool navigate_to_url(App& app, std::string target, bool record_history = true);
+bool navigate_pane(App& app, int pi, std::string target,
+                   bool record_history = true);
+// Put a freshly loaded page into pane `pi`: reuses the pane's buffer unless
+// the other visible pane shows it too or it has unsaved edits.
+void show_doc_in_pane(App& app, int pi, xanatoo::Document doc,
+                      const std::string& label);
+// Links in pane `pi` resolve against that pane's page (gemini relative URLs).
+std::string link_base_url(App& app, int pi);
 void open_transclude_in_other_pane(App& app);
 void activate_at_caret(App& app);
+
+// ---- background fetches (app_fetch.cpp) ----
+// True when this build can fetch `url` (otherwise *why explains).
+bool remote_fetch_supported(std::string_view url, std::string* why);
+// Start fetching `url`; a Navigate job replaces the pane's running one.
+uint64_t start_fetch(App& app, FetchPurpose purpose, int pane,
+                     const std::string& url, bool record_history = true);
+// Apply finished jobs (once per frame).
+void poll_fetches(App& app);
+// Drop pane `pi`'s running navigation (-1: all navigations). True if any.
+bool cancel_fetches(App& app, int pi = -1);
+void cancel_preview_fetch(App& app);
+// Running navigation for pane `pi`, else its preview fetch (pane 1), or null.
+const FetchJob* pane_fetch(const App& app, int pi);
+const CachedPage* find_cached_page(App& app, const std::string& url);
+void forget_cached_page(App& app, const std::string& url);  // Reload
+// Progress bar + "Loading host…" label on panes with a running fetch.
+void draw_load_indicator(App& app, int pi);
+
+// ---- split browsing (app_split.cpp) ----
+// Split view with independent panes (not diff mode): left links open on the
+// right, right links shift the right page left.
+bool split_browsing(const App& app);
+// Follow `href` clicked in pane `pi` the split-browsing way. False = not
+// handled (caller falls back to single-pane behaviour).
+bool follow_link_split(App& app, int pi, const std::string& href);
+// Per frame: dwell-timed hover previews for links in the left pane.
+void update_split_preview(App& app);
+// The previewed page stays (a click / scroll in the right pane).
+void commit_split_preview(App& app);
+void revert_split_preview(App& app);
+// "Preview" frame + label over the right pane while a preview shows.
+void draw_preview_badge(App& app, int pi);
 
 // ---- softwin ----
 std::tuple<int, int, int, int> soft_client_rect(App& app,

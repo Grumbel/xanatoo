@@ -8,6 +8,32 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-27) — split browsing, background page loads
+
+- Remote pages (Gemini / Nostr / Reddit / Lemmy) now fetch + parse on a
+  detached worker thread (`app_fetch.cpp`: `FetchJob` / `FetchShared`,
+  `poll_fetches` per frame). The UI stays live: indeterminate progress bar +
+  "Loading host… 1.2 s" pill on the target pane, status line with timer,
+  toolbar Reload turns into Stop; Esc / Stop cancels. Failures show in the
+  status line (and as an error page when the pane only had a stand-in).
+- Split view (not diff mode) is a two-page trail (`app_split.cpp`): left
+  links open on the right; right links move the right page left and open the
+  target on the right (the dropped left buffer is recycled, so tabs do not
+  pile up). Hovering a left link previews it on the right after a short
+  dwell (250 ms local / 450 ms remote), framed + labelled "Preview"; click
+  keeps it, moving back into the left pane drops it, the pointer may rest
+  over the right pane to read / scroll it. Ctrl+click keeps the old
+  "anchor in other pane" behaviour.
+- Small page cache (16 entries, 5 min) so a previewed remote page opens
+  instantly on click.
+- `link_base_url`: relative gemini links resolve against the pane's own
+  page instead of the global `gemini_current_url`.
+- Remote tabs are labelled host/.../last-segment instead of blank.
+- Open: history is still one global list (Back in the left pane after a
+  split navigation walks the shared list); per-pane history would fit the
+  trail model better. Local loads (incl. EPUB import via pandoc) still run
+  on the UI thread.
+
 ## Status (2026-10-27) — Android: data, keyboard, SQLite, TLS, density
 
 - Tested on a Fire 7 (Fire OS 5 / Android 5.1.1) over adb.

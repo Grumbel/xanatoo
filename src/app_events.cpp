@@ -244,6 +244,8 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
     }
 
     app.focus = pane_at(app, mx);
+    // Any press in the right pane keeps the hover preview it shows.
+    if (app.focus == 1) commit_split_preview(app);
     Pane& p = focused_pane(app);
     float lx = local_x(app, mx, app.focus);
 
@@ -328,8 +330,13 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
     // externally
     if (auto href = xanatoo::hit_test_link(doc_of(app, p), p.layout, lx, my,
                                            p.scroll_y)) {
+      const bool ctrl_click = (SDL_GetModState() & KMOD_CTRL) != 0;
+      // Split view: left links open on the right, right links shift left.
+      if (!ctrl_click && follow_link_split(app, app.focus, *href)) {
+        reset_blink(app);
+        return;
+      }
       if (auto dest = xanatoo::jump_to_href(doc_of(app, p), *href)) {
-        const bool ctrl_click = (SDL_GetModState() & KMOD_CTRL) != 0;
         expand_ancestors_for_node(app, dest->node);
         // Ctrl+click: open target in the other pane (enable split)
         if (ctrl_click) {
@@ -361,9 +368,9 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
         return;
       } else if (!href->empty() && (*href)[0] != '#') {
         std::string abs = *href;
-        if (!xanatoo::is_gemini_url(abs) && !app.gemini_current_url.empty()) {
-          std::string resolved =
-              xanatoo::resolve_gemini_url(app.gemini_current_url, abs);
+        const std::string base = link_base_url(app, app.focus);
+        if (!xanatoo::is_gemini_url(abs) && !base.empty()) {
+          std::string resolved = xanatoo::resolve_gemini_url(base, abs);
           if (!resolved.empty()) abs = resolved;
         }
         if (is_in_app_remote_url(abs)) {
@@ -1707,6 +1714,8 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         const bool was_search = prompt_is_search(app);
         close_prompt(app, /*forget_search=*/true);
         if (was_search) reset_blink(app);
+      } else if (cancel_fetches(app)) {
+        flash_status(app, "Stopped loading");
       } else if (app.help_mode) {
         app.help_mode = false;
       } else if (!app.soft_wins.empty()) {
