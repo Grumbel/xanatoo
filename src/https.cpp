@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/https.hpp"
+#include "xanatoo/tls.hpp"
 #include "xanatoo/util.hpp"
 
 #include <cctype>
@@ -9,9 +10,6 @@
 #include <cstring>
 #include <sstream>
 #include <string>
-
-#include <openssl/err.h>
-#include <openssl/ssl.h>
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -54,15 +52,6 @@ int tcp_connect(const std::string& host, int port, std::string* err) {
 
 }  // namespace
 
-void ssl_library_init_once() {
-  static bool done = false;
-  if (done) return;
-  SSL_library_init();
-  SSL_load_error_strings();
-  OpenSSL_add_all_algorithms();
-  done = true;
-}
-
 int tcp_connect_host(const std::string& host, int port, std::string* err) {
   return tcp_connect(host, port, err);
 }
@@ -91,33 +80,10 @@ std::optional<HttpResult> https_request(std::string_view method,
     host = host.substr(0, colon);
   }
 
-  ssl_library_init_once();
   int fd = tcp_connect(host, port, err);
   if (fd < 0) return std::nullopt;
-
-  SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());
-  if (!ctx) {
-    ::close(fd);
-    if (err) *err = "SSL_CTX_new failed";
-    return std::nullopt;
-  }
-  SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, nullptr);
-  SSL* ssl = SSL_new(ctx);
-  if (!ssl) {
-    SSL_CTX_free(ctx);
-    ::close(fd);
-    if (err) *err = "SSL_new failed";
-    return std::nullopt;
-  }
-  SSL_set_fd(ssl, fd);
-  SSL_set_tlsext_host_name(ssl, host.c_str());
-  if (SSL_connect(ssl) != 1) {
-    if (err) *err = "TLS handshake failed";
-    SSL_free(ssl);
-    SSL_CTX_free(ctx);
-    ::close(fd);
-    return std::nullopt;
-  }
+  TlsStream tls;
+  if (!tls.connect(fd, host, err)) return std::nullopt;
 
   std::ostringstream req;
   req << method << " " << path << " HTTP/1.1\r\n"
@@ -132,27 +98,20 @@ std::optional<HttpResult> https_request(std::string_view method,
   req << "\r\n";
   if (!body_in.empty()) req << body_in;
   std::string req_s = req.str();
-  if (SSL_write(ssl, req_s.data(), static_cast<int>(req_s.size())) <= 0) {
+  if (!tls.write_all(req_s.data(), req_s.size())) {
     if (err) *err = "TLS write failed";
-    SSL_shutdown(ssl);
-    SSL_free(ssl);
-    SSL_CTX_free(ctx);
-    ::close(fd);
     return std::nullopt;
   }
 
   std::string data;
   char buf[4096];
   for (;;) {
-    int n = SSL_read(ssl, buf, sizeof(buf));
+    int n = tls.read(buf, sizeof(buf));
     if (n <= 0) break;
     data.append(buf, static_cast<size_t>(n));
     if (data.size() > 12 * 1024 * 1024) break;
   }
-  SSL_shutdown(ssl);
-  SSL_free(ssl);
-  SSL_CTX_free(ctx);
-  ::close(fd);
+  tls.close();
 
   size_t hdr_end = data.find("\r\n\r\n");
   if (hdr_end == std::string::npos) {

@@ -14,6 +14,7 @@
 #      scripts/rasterize_icons.py, FORMAT.md), DEJAVU_DIR (TTFs bundled as
 #      fonts/: same faces as desktop, and glyphs Roboto lacks — ▸ ▾ ☐ ☑),
 #      FREETYPE_SRC (tarball), SQLITE_SRC (dir with sqlite3.c/.h), SQLITE_MK,
+#      MBEDTLS_SRC (source tree), MBEDTLS_MK,
 #      FREETYPE_MK, APPLICATION_MK, TOP_ANDROID_MK, SDL_PREBUILT_MK,
 #      SDL_ANDROID_LIBS, KEYSTORE, APP_VERSION, VERSION_CODE
 set -euo pipefail
@@ -34,11 +35,12 @@ sed -e "s/@VERSION_NAME@/$APP_VERSION/" -e "s/@VERSION_CODE@/$VERSION_CODE/" \
   -e "s/@MIN_SDK@/$PACKAGE_PLATFORM/" \
   "$APP_DIR/AndroidManifest.xml" > src/AndroidManifest.xml
 
-# xanatoo: sources (minus the OpenSSL helpers), headers, vendored ImGui/stb.
+# xanatoo: sources (TLS through Mbed TLS, not OpenSSL), headers, vendored
+# ImGui/stb.
 mkdir -p src/jni/src/src
 for f in "$APP_SRC_DIR"/src/*.cpp; do
   case "$(basename "$f")" in
-    https.cpp) ;;
+    tls_openssl.cpp) ;;
     *) cp "$f" src/jni/src/src/ ;;
   esac
 done
@@ -48,6 +50,11 @@ cp -r "$APP_SRC_DIR"/external src/jni/src/external
 # FreeType, built from source as a static module.
 tar xf "$FREETYPE_SRC" -C src/jni/freetype --strip-components=1
 cp "$FREETYPE_MK" src/jni/freetype/Android.mk
+
+# Mbed TLS as a static module (TLS for HTTPS / Gemini / Nostr).
+mkdir -p src/jni/mbedtls
+cp -r "$MBEDTLS_SRC"/include "$MBEDTLS_SRC"/library src/jni/mbedtls/
+cp "$MBEDTLS_MK" src/jni/mbedtls/Android.mk
 
 # SQLite amalgamation as a static module (side store).
 mkdir -p src/jni/sqlite

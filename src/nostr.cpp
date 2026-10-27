@@ -8,6 +8,7 @@
 #include "xanatoo/util.hpp"
 
 #include "xanatoo/https.hpp"
+#include "xanatoo/tls.hpp"
 #include "xanatoo/json_min.hpp"
 
 #include <algorithm>
@@ -32,9 +33,6 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include <openssl/bio.h>
-#include <openssl/err.h>
-#include <openssl/ssl.h>
 #endif
 
 namespace xanatoo {
@@ -274,49 +272,22 @@ bool parse_event_json(std::string_view json, NostrEvent& ev) {
 }
 
 struct WsConn {
-  SSL_CTX* ctx = nullptr;
-  SSL* ssl = nullptr;
-  int fd = -1;
+  TlsStream tls;      // owns the socket once connected
   std::string carry;  // bytes after HTTP upgrade + partial WS frames
 
-  ~WsConn() { close(); }
-  void close() {
-    if (ssl) {
-      SSL_shutdown(ssl);
-      SSL_free(ssl);
-      ssl = nullptr;
-    }
-    if (ctx) {
-      SSL_CTX_free(ctx);
-      ctx = nullptr;
-    }
-    if (fd >= 0) {
-      ::close(fd);
-      fd = -1;
-    }
-  }
+  void close() { tls.close(); }
 
-  bool write_all(const void* data, size_t n) {
-    const char* p = static_cast<const char*>(data);
-    while (n) {
-      int r = SSL_write(ssl, p, static_cast<int>(n));
-      if (r <= 0) return false;
-      p += r;
-      n -= static_cast<size_t>(r);
-    }
-    return true;
-  }
+  bool write_all(const void* data, size_t n) { return tls.write_all(data, n); }
 
   bool read_some(std::string& buf, size_t max_add) {
     char tmp[4096];
     size_t got = 0;
     while (got < max_add) {
-      int r = SSL_read(ssl, tmp,
-                       static_cast<int>(std::min(sizeof(tmp), max_add - got)));
+      int r = tls.read(tmp, std::min(sizeof(tmp), max_add - got));
       if (r <= 0) return got > 0;
       buf.append(tmp, static_cast<size_t>(r));
       got += static_cast<size_t>(r);
-      if (SSL_pending(ssl) == 0) break;
+      if (!tls.pending()) break;
     }
     return true;
   }
@@ -434,30 +405,7 @@ bool ws_connect(WsConn& c, const std::string& url, std::string* err) {
     if (err) *err = "connect failed " + host;
     return false;
   }
-  c.fd = fd;
-
-  ssl_library_init_once();
-  c.ctx = SSL_CTX_new(TLS_client_method());
-  if (!c.ctx) {
-    if (err) *err = "SSL_CTX_new failed";
-    return false;
-  }
-  SSL_CTX_set_min_proto_version(c.ctx, TLS1_2_VERSION);
-  SSL_CTX_set_verify(c.ctx, SSL_VERIFY_NONE, nullptr);
-  c.ssl = SSL_new(c.ctx);
-  if (!c.ssl) {
-    if (err) *err = "SSL_new failed";
-    return false;
-  }
-  SSL_set_fd(c.ssl, c.fd);
-  SSL_set_tlsext_host_name(c.ssl, host.c_str());
-  // Some stacks need multiple SSL_connect calls when the socket times out mid-handshake
-  int ssl_rc = SSL_connect(c.ssl);
-  if (ssl_rc != 1) {
-    int e = SSL_get_error(c.ssl, ssl_rc);
-    if (err) *err = "TLS handshake failed (" + std::to_string(e) + ") " + host;
-    return false;
-  }
+  if (!c.tls.connect(fd, host, err)) return false;
 
   std::string key = "dGhlIHNhbXBsZSBub25jZQ==";
   std::ostringstream req;

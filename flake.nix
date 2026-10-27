@@ -72,6 +72,7 @@
               fontconfig
               expat # fontconfig.pc Requires: expat
               openssl
+              mbedtls # optional TLS backend: -DXANATOO_TLS=mbedtls
               sqlite
               # Prefer top-level libx11; xorg.* package set is deprecated.
               libx11

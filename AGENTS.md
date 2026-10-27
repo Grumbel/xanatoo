@@ -68,7 +68,8 @@ toolbar and shortcuts should route through `execute_command`.
 
 ## Shared network helpers
 
-- `include/xanatoo/https.hpp` + `src/https.cpp` — OpenSSL HTTPS GET/POST plus `ssl_library_init_once` / `tcp_connect_host` for Gemini TLS (linked when any OpenSSL feature is ON).
+- `include/xanatoo/tls.hpp` — `TlsStream` (connect over a socket fd with SNI, write_all / read / pending; owns the fd). Backends `src/tls_openssl.cpp` (desktop default) and `src/tls_mbedtls.cpp` (Android; `-DXANATOO_TLS=mbedtls`). Never call OpenSSL / mbedTLS directly elsewhere.
+- `include/xanatoo/https.hpp` + `src/https.cpp` — HTTPS GET/POST over `TlsStream` plus `tcp_connect_host` for Gemini / Nostr (built when any network feature is ON).
 - `include/xanatoo/json_min.hpp` — tiny JSON field/object helpers for read-only API clients (header-only).
 
 ## Style sheets
@@ -115,11 +116,13 @@ toolbar and shortcuts should route through `execute_command`.
 
 - `nix build .#xanatoo-android` (ndk-build pipeline from Kurvenrausch;
   `nix/android.nix`, `mk/android/`). See `docs/ANDROID.md`.
-- Built with `XANATOO_FONTCONFIG=0`, `XANATOO_SQLITE=0` and all OpenSSL
-  clients off; keep code compiling with those (desktop CMake accepts the
-  same `-D…=OFF` switches). New `src/*.cpp` files are picked up by
-  `mk/android/app/jni/Android.mk` automatically; OpenSSL-only files must be
-  excluded in `build-apk.sh` like `https.cpp`.
+- Built with `XANATOO_FONTCONFIG=0`, SQLite (amalgamation) and the network
+  clients on Mbed TLS; keep code compiling with `-DXANATOO_FONTCONFIG=OFF`
+  and `-DXANATOO_TLS=mbedtls` (desktop CMake accepts both). New `src/*.cpp`
+  files are picked up by `mk/android/app/jni/Android.mk` automatically;
+  OpenSSL-only files must be excluded in `build-apk.sh` like
+  `tls_openssl.cpp`.
+- Test on the device: `adb logcat -s xanatoo` shows std::cout / std::cerr.
 
 ## Develop shell (`nix develop`)
 
@@ -159,7 +162,7 @@ mechanism; historical bundle numbers in TODO.md are archival).
 
 ## Nostr
 
-- Uses shared `ssl_library_init_once` from `https.cpp` for WSS TLS.
+- WSS over `TlsStream` (`tls.hpp`).
 - Read-only note/thread fetch gated by `XANATOO_NOSTR` (default ON; needs OpenSSL).
 - Opens `note1` / `nevent1` / `nostr:…` / 64-hex via Ctrl+L → Thread+Message layout.
 - No posting or key management in v1.

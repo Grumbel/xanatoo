@@ -17,6 +17,8 @@ void platform_init();
 // The document took a tap / an ImGui text field gained focus: bring up the
 // on-screen keyboard (Android); desktop keeps text input on permanently.
 void platform_request_keyboard();
+// Text entry finished (URL committed): hide the on-screen keyboard (Android).
+void platform_release_keyboard();
 
 // Desktop starts text input once at launch; Android waits for a tap so the
 // on-screen keyboard does not cover the page on start.

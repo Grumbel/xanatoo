@@ -63,13 +63,35 @@ surface was resizing for the keyboard under fast input; not reproducible in
 a dozen further runs. If it returns, try SDL 2.32.x (Android surface
 lifecycle fixes).
 
+## Network (Mbed TLS)
+
+Gemini, Nostr (WSS), Reddit and Lemmy are on, over `TlsStream`
+(`include/xanatoo/tls.hpp`) with the Mbed TLS backend
+(`src/tls_mbedtls.cpp`, nixpkgs' `mbedtls.src` as a static module,
+`mk/android/mbedtls/Android.mk`); the APK requests `INTERNET`. Desktop keeps
+OpenSSL by default and can use the same backend with `-DXANATOO_TLS=mbedtls`.
+
+Entropy: mbedTLS's platform source calls `getrandom()` blocking, which on
+Fire OS 5's kernel stalled ~60 s (servers closed the connection before the
+ClientHello). The Android module builds with `MBEDTLS_NO_PLATFORM_ENTROPY` +
+`MBEDTLS_ENTROPY_HARDWARE_ALT`; `mbedtls_hardware_poll()` reads
+`/dev/urandom`.
+
+As on desktop, peer certificates are not verified yet (Gemini needs
+TOFU for self-signed certificates; HTTPS / WSS should verify against the
+system CAs, `/system/etc/security/cacerts`).
+
 ## Still off
 
 | Feature | Desktop | Android |
 |---------|---------|---------|
-| Gemini / Nostr / Reddit / Lemmy | OpenSSL | off (`XANATOO_*=0`) |
 | Font lookup | FontConfig | `XANATOO_FONTCONFIG=0`: generic families → `data/fonts`, `/system/fonts` |
 
-The same switches work for desktop CMake builds (`-DXANATOO_FONTCONFIG=OFF
--DXANATOO_SQLITE=OFF -DXANATOO_GEMINI=OFF …`), which is the quick way to
-check that the Android source set still compiles.
+The same switch works for desktop CMake builds (`-DXANATOO_FONTCONFIG=OFF
+-DXANATOO_TLS=mbedtls`), which is the quick way to check that the Android
+source set still compiles.
+
+## Next
+
+- Chrome scaled by display density (`--ui-scale`, default dpi/160).
+- Certificate verification (system CAs; TOFU for Gemini).

@@ -6,10 +6,10 @@
 # release tarball; xanatoo (plus a static FreeType built from nixpkgs'
 # source) into libmain.so against it; both packaged into a signed APK.
 #
-# First port, bare bones: no OpenSSL clients (Gemini / Nostr / Reddit /
-# Lemmy) and no FontConfig (fonts come from the bundled DejaVu and
-# /system/fonts). SQLite is built from its amalgamation. Data files ship as
-# APK assets (see mk/android/scripts/build-apk.sh).
+# Network clients (Gemini / Nostr / Reddit / Lemmy) use Mbed TLS; SQLite is
+# built from its amalgamation; no FontConfig (fonts come from the bundled
+# DejaVu and /system/fonts). Data files ship as APK assets (see
+# mk/android/scripts/build-apk.sh).
 #
 #   nix build .#xanatoo-android        the APK
 #   nix run .#install-android-xanatoo  install it with adb
@@ -123,6 +123,8 @@ let
       FREETYPE_MK = "${../mk/android/freetype/Android.mk}";
       SQLITE_SRC = sqliteAmalgamation;
       SQLITE_MK = "${../mk/android/sqlite/Android.mk}";
+      MBEDTLS_SRC = "${pkgs.mbedtls.src}";
+      MBEDTLS_MK = "${../mk/android/mbedtls/Android.mk}";
       APPLICATION_MK = applicationMk;
       TOP_ANDROID_MK = topAndroidMk;
       SDL_PREBUILT_MK = sdlPrebuiltMk;

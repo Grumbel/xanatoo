@@ -22,7 +22,7 @@
 #include <vector>
 
 #if defined(XANATOO_LEMMY) && XANATOO_LEMMY
-// HTTPS via xanatoo/https.hpp (OpenSSL)
+// HTTPS via xanatoo/https.hpp (TlsStream)
 #endif
 
 namespace xanatoo {

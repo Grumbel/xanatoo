@@ -13,6 +13,7 @@
 #include <optional>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/platform.hpp"
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/lemmy.hpp"
@@ -297,6 +298,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       app.ui.focus_url_bar();
       break;
     case C::NavigateUrl:
+      xanatoo::platform_release_keyboard();  // URL typed; page is read-only
       if (!arg.empty()) navigate_to_url(app, arg);
       break;
     case C::NavBack:

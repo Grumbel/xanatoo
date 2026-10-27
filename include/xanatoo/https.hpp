@@ -8,7 +8,7 @@
 
 namespace xanatoo {
 
-// Minimal HTTPS client (OpenSSL). Used by Reddit, Lemmy, and similar
+// Minimal HTTPS client (TlsStream: OpenSSL or Mbed TLS). Used by Reddit, Lemmy, and similar
 // read-only network document sources.
 
 struct HttpResult {
@@ -32,8 +32,7 @@ std::optional<HttpResult> https_get(std::string_view url,
                                     std::string_view user_agent,
                                     std::string* err = nullptr);
 
-// Shared OpenSSL / TCP helpers (Gemini protocol, etc.).
-void ssl_library_init_once();
+// Shared TCP helper (Gemini, Nostr WSS); wrap the fd in a TlsStream.
 // Returns a connected socket fd, or -1. Caller owns the fd.
 int tcp_connect_host(const std::string& host, int port,
                      std::string* err = nullptr);

@@ -41,10 +41,9 @@ class LogcatBuf : public std::streambuf {
     }
     return c;
   }
-  int sync() override {
-    if (!line_.empty()) flush_line();
-    return 0;
-  }
+  // std::cerr is unit-buffered (flush after every <<): keep collecting until
+  // the newline so one message stays one logcat entry.
+  int sync() override { return 0; }
 
  private:
   void flush_line() {
@@ -138,6 +137,7 @@ void platform_init() {
 }
 
 void platform_request_keyboard() { SDL_StartTextInput(); }
+void platform_release_keyboard() { SDL_StopTextInput(); }
 
 bool platform_text_input_at_start() { return false; }
 
@@ -146,6 +146,7 @@ bool platform_text_input_at_start() { return false; }
 void platform_pre_init() {}
 void platform_init() {}
 void platform_request_keyboard() {}
+void platform_release_keyboard() {}
 bool platform_text_input_at_start() { return true; }
 
 #endif

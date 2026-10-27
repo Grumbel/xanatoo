@@ -23,7 +23,7 @@
 #include <vector>
 
 #if defined(XANATOO_REDDIT) && XANATOO_REDDIT
-// HTTPS via xanatoo/https.hpp (OpenSSL)
+// HTTPS via xanatoo/https.hpp (TlsStream)
 #endif
 
 namespace xanatoo {
