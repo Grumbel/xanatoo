@@ -35,7 +35,7 @@ struct ViewSettings {
   // Menu steps: margin percent per side, measure in characters (0 = full).
   static constexpr float kMarginSteps[] = {2.f, 5.f, 10.f, 15.f, 20.f, 25.f,
                                            30.f};
-  static constexpr int kMeasureSteps[] = {0, 60, 72, 90, 120};
+  static constexpr int kMeasureSteps[] = {0, 60, 72, 90, 120, 160, 200, 300};
   // Floor so text never touches the pane edge / scrollbar (px, pre-DPI).
   static constexpr float kMinMarginPx = 8.f;
 

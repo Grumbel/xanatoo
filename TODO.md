@@ -13,7 +13,8 @@ Next bundle number: **263** (this delivery is **262**)
 - View → Margins: 2 / 5 / 10 / 15 / 20 / 25 / 30 % of the pane width per
   side (`ViewSettings::margin_pct`, floor `kMinMarginPx`), replacing the
   12…80 px steps that were barely visible on wide windows.
-- View → Text width (was Measure): Full / 60 / 72 / 90 / 120 characters
+- View → Text width (was Measure): Full / 60 / 72 / 90 / 120 / 160 / 200 /
+  300 characters
   (`measure_chars`), measured with the body font's average lowercase
   advance, so it follows zoom and the style sheet (the old 720 / 960 px cap
   shrank to ~45 chars at 150 % zoom). Column = min(pane × (1 − 2p), N ch).
