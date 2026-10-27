@@ -391,14 +391,19 @@ LayoutResult LayoutEngine::layout(
     if (n.kind == NodeKind::Message && !n.label.empty())
       g_msg_label_map.emplace(n.label, n.id);
   }
-  float mx = options_.margin_x;
+  float mx = std::max(options_.margin_x, options_.margin_pct * max_width);
   float y = options_.margin_y;
   float content_w = std::max(40.f, max_width - 2.f * mx);
-  if (options_.max_content_width > 0.f &&
-      content_w > options_.max_content_width) {
-    const float extra = content_w - options_.max_content_width;
-    mx += extra * 0.5f;
-    content_w = options_.max_content_width;
+  if (options_.measure_chars > 0) {
+    // Average lowercase advance of the body font: follows zoom and sheet.
+    const float ch =
+        fonts_.pick(FontRole::Body).measure("abcdefghijklmnopqrstuvwxyz") /
+        26.f;
+    const float cap = std::max(40.f, options_.measure_chars * ch);
+    if (content_w > cap) {
+      mx += (content_w - cap) * 0.5f;
+      content_w = cap;
+    }
   }
   layout_node(doc, doc.root, mx, y, content_w, result);
   result.content_height = y + options_.margin_y + 24.f;

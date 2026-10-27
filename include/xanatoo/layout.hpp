@@ -150,20 +150,22 @@ void clear_external_doc_cache();
 
 // Per-layout rendering options (from ViewSettings). Geometry only.
 struct LayoutOptions {
-  float margin_x = 32.f;
+  float margin_x = 32.f;     // minimum left/right inset in px
+  float margin_pct = 0.f;    // inset as a fraction of the width (each side)
   float margin_y = 24.f;
   float line_spacing = 1.30f;
-  float max_content_width = 0.f;  // 0 = fill pane
+  int measure_chars = 0;     // column cap in body-font characters; 0 = fill
   bool justify = false;
-  // Display scale for px lengths (style sheet px, margins, measure).
+  // Display scale for px lengths (style sheet px, margins).
   float px_scale = 1.f;
 
   static LayoutOptions from_view(const ViewSettings& v, float px_scale = 1.f) {
     LayoutOptions o;
-    o.margin_x = v.margin_x * px_scale;
+    o.margin_x = ViewSettings::kMinMarginPx * px_scale;
+    o.margin_pct = v.margin_pct / 100.f;
     o.margin_y = v.margin_y * px_scale;
     o.line_spacing = v.line_spacing;
-    o.max_content_width = v.max_content_width * px_scale;
+    o.measure_chars = v.measure_chars;
     o.justify = v.justify;
     o.px_scale = px_scale;
     return o;

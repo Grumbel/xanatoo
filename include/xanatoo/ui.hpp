@@ -127,13 +127,8 @@ enum class UiCommand {
   ViewLineSpacingNormal,
   ViewLineSpacingRelaxed,
   ViewLineSpacingLoose,
-  ViewMarginsNarrow,
-  ViewMarginsNormal,
-  ViewMarginsWide,
-  ViewMarginsExtra,
-  ViewMeasureFull,          // max_content_width = 0
-  ViewMeasureComfortable,   // ~720px
-  ViewMeasureWide,          // ~960px
+  ViewMargins,              // arg = margin percent per side
+  ViewMeasure,              // arg = column width in characters, "0" = full
   ToggleSectionFocus,       // outline: body shows one section only
   ToggleJustify,            // view: justify wrapped lines
   ToggleFootnoteOverlay,    // view: notes of on-screen footnote marks
@@ -167,8 +162,8 @@ struct UiState {
   bool structure = false;
   // Display prefs (for menu checks)
   float view_line_spacing = 1.30f;
-  float view_margin_x = 32.f;
-  float view_max_content_width = 0.f;
+  float view_margin_pct = 5.f;
+  int view_measure_chars = 0;
   // Style sheets: (name, title) pairs and the active name.
   std::vector<std::pair<std::string, std::string>> styles;
   std::string style;

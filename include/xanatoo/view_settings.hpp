@@ -11,13 +11,15 @@ namespace xanatoo {
 struct ViewSettings {
   // Multiplier on font metrics line_height between wrapped lines (was 1.3).
   float line_spacing = 1.30f;
-  // Left/right inset of the text column inside a pane (was 32).
-  float margin_x = 32.f;
+  // Left/right inset of the text column, in percent of the pane width
+  // (each side; never less than kMinMarginPx).
+  float margin_pct = 5.f;
   // Top inset before the first block (was 24).
   float margin_y = 24.f;
-  // Cap on content column width in px; 0 = use the full pane (minus margins).
-  // When set, the column is centered in the pane.
-  float max_content_width = 0.f;
+  // Cap on the text column in characters of the body font (follows zoom and
+  // the style sheet); 0 = use the full pane (minus margins). When set, the
+  // column is centered in the pane.
+  int measure_chars = 0;
   // Justify wrapped body lines (not last line / headings / code).
   bool justify = false;
   // Show the notes of on-screen footnote marks at the bottom of each pane.
@@ -30,14 +32,12 @@ struct ViewSettings {
   static constexpr float kLineRelaxed = 1.55f;
   static constexpr float kLineLoose = 1.80f;
 
-  static constexpr float kMarginNarrow = 12.f;
-  static constexpr float kMarginNormal = 32.f;
-  static constexpr float kMarginWide = 56.f;
-  static constexpr float kMarginExtra = 80.f;
-
-  // Comfortable measure for body text (~66–75 chars at typical sizes).
-  static constexpr float kMeasureComfortable = 720.f;
-  static constexpr float kMeasureWide = 960.f;
+  // Menu steps: margin percent per side, measure in characters (0 = full).
+  static constexpr float kMarginSteps[] = {2.f, 5.f, 10.f, 15.f, 20.f, 25.f,
+                                           30.f};
+  static constexpr int kMeasureSteps[] = {0, 60, 72, 90, 120};
+  // Floor so text never touches the pane edge / scrollbar (px, pre-DPI).
+  static constexpr float kMinMarginPx = 8.f;
 
   void clamp();
 };

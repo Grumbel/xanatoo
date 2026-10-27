@@ -5,14 +5,14 @@ presentation lives in S-expression style sheets (`styles/*.xss`), kept apart
 from the markup. A sheet styles **semantic roles** (paragraph, header, note,
 link, …), never markup structure, and there are no selectors or specificity.
 
-Pick one from the toolbar's style button (next to *Measure*) or
+Pick one from the toolbar's style button (next to *Text width*) or
 **View → Style sheet**. The choice is a reader preference stored as
 `style=<name>` in `~/.config/xanatoo/view.conf`. Editing a sheet takes effect
 via **Reload style sheets** in the same menu.
 
 ## Precedence
 
-1. Reader view prefs: line spacing, margins, measure, justify, zoom,
+1. Reader view prefs: line spacing, margins, text width, justify, zoom,
    `--font`.
 2. The selected style sheet, and the sheets it `inherit`s.
 3. The built-in default (`builtin_style()`; `styles/default.xss` spells it

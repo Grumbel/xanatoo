@@ -98,7 +98,7 @@ Android dpi / 160 in quarter steps (at least 1), on desktop 1. It scales the
 ImGui font / style / toolbar rows / icons, the canvas chrome metrics
 (`set_chrome_scale`: status bar, title bars, close box, panel padding,
 scrollbars, UI font), panel default sizes, the default document text size,
-and px lengths in layout (style sheet px, view margins, measure:
+and px lengths in layout (style sheet px, the view margin floor:
 `LayoutOptions::px_scale`; em lengths already follow the font). Test on
 desktop with `--ui-scale 2`. The Fire 7 is 160 dpi, so it runs at 1.
 

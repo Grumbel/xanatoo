@@ -47,30 +47,30 @@ void fill_line_spacing_items(const UiState& state, UiCommand& cmd) {
     cmd = UiCommand::ViewLineSpacingLoose;
 }
 
-void fill_margins_items(const UiState& state, UiCommand& cmd) {
-  using VS = xanatoo::ViewSettings;
-  const float mx = state.view_margin_x;
-  if (ImGui::MenuItem("Narrow", nullptr, near_eq(mx, VS::kMarginNarrow, 1.f)))
-    cmd = UiCommand::ViewMarginsNarrow;
-  if (ImGui::MenuItem("Normal", nullptr, near_eq(mx, VS::kMarginNormal, 1.f)))
-    cmd = UiCommand::ViewMarginsNormal;
-  if (ImGui::MenuItem("Wide", nullptr, near_eq(mx, VS::kMarginWide, 1.f)))
-    cmd = UiCommand::ViewMarginsWide;
-  if (ImGui::MenuItem("Extra wide", nullptr, near_eq(mx, VS::kMarginExtra, 1.f)))
-    cmd = UiCommand::ViewMarginsExtra;
+void fill_margins_items(const UiState& state, UiCommand& cmd,
+                        std::string& arg) {
+  for (float pct : xanatoo::ViewSettings::kMarginSteps) {
+    char label[16];
+    std::snprintf(label, sizeof label, "%g%%", pct);
+    if (ImGui::MenuItem(label, nullptr,
+                        near_eq(state.view_margin_pct, pct, 0.5f))) {
+      cmd = UiCommand::ViewMargins;
+      arg = std::to_string(static_cast<int>(pct));
+    }
+  }
 }
 
-void fill_measure_items(const UiState& state, UiCommand& cmd) {
-  using VS = xanatoo::ViewSettings;
-  const float mw = state.view_max_content_width;
-  if (ImGui::MenuItem("Full width", nullptr, mw < 1.f))
-    cmd = UiCommand::ViewMeasureFull;
-  if (ImGui::MenuItem("Comfortable (~720px)", nullptr,
-                      near_eq(mw, VS::kMeasureComfortable, 1.f)))
-    cmd = UiCommand::ViewMeasureComfortable;
-  if (ImGui::MenuItem("Wide (~960px)", nullptr,
-                      near_eq(mw, VS::kMeasureWide, 1.f)))
-    cmd = UiCommand::ViewMeasureWide;
+void fill_measure_items(const UiState& state, UiCommand& cmd,
+                        std::string& arg) {
+  for (int chars : xanatoo::ViewSettings::kMeasureSteps) {
+    std::string label =
+        chars == 0 ? "Full width" : std::to_string(chars) + " characters";
+    if (ImGui::MenuItem(label.c_str(), nullptr,
+                        state.view_measure_chars == chars)) {
+      cmd = UiCommand::ViewMeasure;
+      arg = std::to_string(chars);
+    }
+  }
 }
 
 // Document style sheets (styles/*.xss) — radio list + reload.
@@ -776,11 +776,11 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ImGui::EndMenu();
       }
       if (ImGui::BeginMenu("Margins")) {
-        fill_margins_items(state, cmd);
+        fill_margins_items(state, cmd, result.arg);
         ImGui::EndMenu();
       }
-      if (ImGui::BeginMenu("Measure (column width)")) {
-        fill_measure_items(state, cmd);
+      if (ImGui::BeginMenu("Text width")) {
+        fill_measure_items(state, cmd, result.arg);
         ImGui::EndMenu();
       }
       if (ImGui::MenuItem("Justify lines", nullptr, state.justify))
@@ -977,11 +977,11 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       tool_menu_end();
     }
     if (tool_menu_begin("tb_measure", "measure",
-                        "Measure / column width (view)")) {
-      fill_measure_items(state, cmd);
+                        "Text width / margins (view)")) {
+      fill_measure_items(state, cmd, result.arg);
       ImGui::Separator();
       ImGui::TextDisabled("Margins");
-      fill_margins_items(state, cmd);
+      fill_margins_items(state, cmd, result.arg);
       tool_menu_end();
     }
     if (tool_menu_begin("tb_style", "style", "Style sheet (view)")) {

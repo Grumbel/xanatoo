@@ -90,8 +90,8 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
                       app.panes[0].buf != app.panes[1].buf;
   ui_state.structure = app.structure_mode;
   ui_state.view_line_spacing = app.view_settings.line_spacing;
-  ui_state.view_margin_x = app.view_settings.margin_x;
-  ui_state.view_max_content_width = app.view_settings.max_content_width;
+  ui_state.view_margin_pct = app.view_settings.margin_pct;
+  ui_state.view_measure_chars = app.view_settings.measure_chars;
   ui_state.styles.clear();
   for (const auto& e : app.styles) ui_state.styles.emplace_back(e.name, e.title);
   ui_state.style = app.style.name;
@@ -302,10 +302,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::OpenInWindow || c == C::OpenExample || c == C::LoadDiffDemo ||
         c == C::ZoomIn || c == C::ZoomOut || c == C::ViewLineSpacingTight ||
         c == C::ViewLineSpacingNormal || c == C::ViewLineSpacingRelaxed ||
-        c == C::ViewLineSpacingLoose || c == C::ViewMarginsNarrow ||
-        c == C::ViewMarginsNormal || c == C::ViewMarginsWide ||
-        c == C::ViewMarginsExtra || c == C::ViewMeasureFull ||
-        c == C::ViewMeasureComfortable || c == C::ViewMeasureWide ||
+        c == C::ViewLineSpacingLoose || c == C::ViewMargins ||
+        c == C::ViewMeasure ||
         c == C::ToggleSectionFocus || c == C::ToggleJustify ||
         c == C::SelectStyle || c == C::ReloadStyles;
     if (!allowed) {
@@ -1316,41 +1314,25 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       apply_view_settings(app);
       flash_status(app, "Line spacing: loose");
       break;
-    case C::ViewMarginsNarrow:
-      app.view_settings.margin_x = xanatoo::ViewSettings::kMarginNarrow;
+    case C::ViewMargins:
+      try {
+        app.view_settings.margin_pct = std::stof(arg);
+      } catch (...) {
+        break;
+      }
       apply_view_settings(app);
-      flash_status(app, "Margins: narrow");
+      flash_status(app, "Margins: " + arg + "%");
       break;
-    case C::ViewMarginsNormal:
-      app.view_settings.margin_x = xanatoo::ViewSettings::kMarginNormal;
+    case C::ViewMeasure:
+      try {
+        app.view_settings.measure_chars = std::stoi(arg);
+      } catch (...) {
+        break;
+      }
       apply_view_settings(app);
-      flash_status(app, "Margins: normal");
-      break;
-    case C::ViewMarginsWide:
-      app.view_settings.margin_x = xanatoo::ViewSettings::kMarginWide;
-      apply_view_settings(app);
-      flash_status(app, "Margins: wide");
-      break;
-    case C::ViewMarginsExtra:
-      app.view_settings.margin_x = xanatoo::ViewSettings::kMarginExtra;
-      apply_view_settings(app);
-      flash_status(app, "Margins: extra wide");
-      break;
-    case C::ViewMeasureFull:
-      app.view_settings.max_content_width = 0.f;
-      apply_view_settings(app);
-      flash_status(app, "Measure: full width");
-      break;
-    case C::ViewMeasureComfortable:
-      app.view_settings.max_content_width =
-          xanatoo::ViewSettings::kMeasureComfortable;
-      apply_view_settings(app);
-      flash_status(app, "Measure: comfortable (~720px)");
-      break;
-    case C::ViewMeasureWide:
-      app.view_settings.max_content_width = xanatoo::ViewSettings::kMeasureWide;
-      apply_view_settings(app);
-      flash_status(app, "Measure: wide (~960px)");
+      flash_status(app, app.view_settings.measure_chars > 0
+                            ? "Text width: " + arg + " characters"
+                            : std::string("Text width: full"));
       break;
     case C::ToggleSectionFocus:
       toggle_section_focus_mode(app);
@@ -1372,9 +1354,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       app.view_settings.justify = !app.view_settings.justify;
       apply_view_settings(app);
       if (app.view_settings.justify) {
-        if (app.view_settings.max_content_width < 1.f)
+        if (app.view_settings.measure_chars == 0)
           flash_status(
-              app, "Justify on — View→Measure Comfortable for book-like width");
+              app, "Justify on — View→Text width 72 for book-like width");
         else
           flash_status(app, "Justify on");
       } else {

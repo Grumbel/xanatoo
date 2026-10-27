@@ -8,6 +8,19 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-27) — margins in percent, text width in characters
+
+- View → Margins: 2 / 5 / 10 / 15 / 20 / 25 / 30 % of the pane width per
+  side (`ViewSettings::margin_pct`, floor `kMinMarginPx`), replacing the
+  12…80 px steps that were barely visible on wide windows.
+- View → Text width (was Measure): Full / 60 / 72 / 90 / 120 characters
+  (`measure_chars`), measured with the body font's average lowercase
+  advance, so it follows zoom and the style sheet (the old 720 / 960 px cap
+  shrank to ~45 chars at 150 % zoom). Column = min(pane × (1 − 2p), N ch).
+- `UiCommand::ViewMargins` / `ViewMeasure` take the value as arg; old
+  `margin_x` / `max_content_width` lines in view.conf migrate to the
+  nearest step.
+
 ## Status (2026-10-27) — outline title row, Markdown front matter
 
 - Outline: content before the first heading (cover image, byline, web

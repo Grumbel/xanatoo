@@ -25,7 +25,11 @@
 #include "xanatoo/font.hpp"
 #include "xanatoo/style.hpp"
 
+#include <cmath>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <unistd.h>
 #include <cstdlib>
 #include <string>
 #include <algorithm>
@@ -799,6 +803,90 @@ void test_style_sheets_shipped() {
   }
   DocStyle missing;
   EXPECT(!load_style("no-such-sheet", missing));
+}
+
+// Text column = min(pane * (1 - 2 * margin%), measure_chars * avg char),
+// centred; never closer to the edge than margin_x px.
+void test_layout_margins_and_measure() {
+  using namespace xanatoo;
+  FontSet fonts;
+  std::string path = fontconfig_find("DejaVu Sans", 0, 0);
+  if (path.empty() || !fonts.load(nullptr, path, 18, 24)) {
+    std::fprintf(stderr, "SKIP test_layout_margins_and_measure (no font)\n");
+    return;
+  }
+  Document doc = parse_document(
+      "A paragraph long enough to wrap several times in every column we try "
+      "here, so that its glyphs span the whole width of the text column and "
+      "show where the margins are on both sides of the pane.\n",
+      "margins.md");
+  auto extent = [](const LayoutResult& lr) {
+    float l = 1e9f, r = 0.f;
+    for (const auto& g : lr.glyphs) {
+      if (g.codepoint == ' ' || g.codepoint == 0) continue;
+      l = std::min(l, g.x);
+      r = std::max(r, g.x);
+    }
+    return std::pair{l, r};
+  };
+  LayoutEngine engine(fonts, nullptr);
+  LayoutOptions opts;
+  opts.margin_x = 8.f;
+  opts.margin_pct = 0.20f;
+  engine.set_options(opts);
+  auto [l1, r1] = extent(engine.layout(doc, 1000.f));
+  EXPECT(l1 >= 199.f && l1 < 215.f);
+  EXPECT(r1 <= 801.f && r1 > 700.f);
+
+  // Narrow pane: the px floor wins over a tiny percentage.
+  opts.margin_pct = 0.01f;
+  engine.set_options(opts);
+  auto [l2, r2] = extent(engine.layout(doc, 400.f));
+  EXPECT(l2 >= 7.f);
+  (void)r2;
+
+  // Character cap: 40 chars of the body font, centred in a wide pane.
+  opts.margin_pct = 0.05f;
+  opts.measure_chars = 40;
+  engine.set_options(opts);
+  const float cap =
+      fonts.pick(FontRole::Body).measure("abcdefghijklmnopqrstuvwxyz") / 26.f *
+      40.f;
+  auto [l3, r3] = extent(engine.layout(doc, 2000.f));
+  EXPECT(r3 - l3 <= cap + 1.f);
+  EXPECT(std::abs(l3 - (2000.f - cap) / 2.f) < 15.f);
+}
+
+// Old view.conf files stored pixel margins / column width.
+void test_view_settings_migration() {
+  using namespace xanatoo;
+  namespace fs = std::filesystem;
+  const char* old_xdg = std::getenv("XDG_CONFIG_HOME");
+  std::string saved = old_xdg ? old_xdg : "";
+  fs::path dir = fs::temp_directory_path() /
+                 ("xanatoo-vs-test-" + std::to_string(::getpid()));
+  fs::create_directories(dir / "xanatoo");
+  ::setenv("XDG_CONFIG_HOME", dir.c_str(), 1);
+  {
+    std::ofstream(dir / "xanatoo" / "view.conf")
+        << "margin_x=56\nmax_content_width=720\n";
+  }
+  ViewSettings v;
+  EXPECT(load_view_settings(v));
+  EXPECT(v.margin_pct == 10.f);
+  EXPECT(v.measure_chars == 72);
+  v.margin_pct = 25.f;
+  v.measure_chars = 0;
+  EXPECT(save_view_settings(v));
+  ViewSettings w;
+  EXPECT(load_view_settings(w));
+  EXPECT(w.margin_pct == 25.f);
+  EXPECT(w.measure_chars == 0);
+  if (old_xdg)
+    ::setenv("XDG_CONFIG_HOME", saved.c_str(), 1);
+  else
+    ::unsetenv("XDG_CONFIG_HOME");
+  fs::remove_all(dir);
 }
 
 void test_layout_wrap_respects_max_width() {
@@ -1718,6 +1806,8 @@ int main() {
   test_utf8_pop_back();
   test_sanitize_epub_markdown();
   test_layout_wrap_respects_max_width();
+  test_layout_margins_and_measure();
+  test_view_settings_migration();
   test_style_sheet_parse();
   test_style_sheets_shipped();
   test_footnotes();
