@@ -44,6 +44,8 @@ option(XANATOO_GEMINI "Enable gemini:// network client (TLS)" ON)
 option(XANATOO_NOSTR "Enable Nostr note/thread fetch (TLS WebSocket)" ON)
 option(XANATOO_REDDIT "Enable Reddit .json fetch (TLS HTTPS)" ON)
 option(XANATOO_LEMMY "Enable Lemmy API v3 fetch (TLS HTTPS)" ON)
+option(XANATOO_HN "Enable Hacker News fetch (Firebase + Algolia APIs, TLS HTTPS)" ON)
+option(XANATOO_EBOOKS "Enable Standard Ebooks / remote EPUB downloads (TLS HTTPS)" ON)
 
 add_executable(xanatoo
   src/main.cpp
@@ -85,6 +87,8 @@ add_executable(xanatoo
   src/nostr.cpp
   src/reddit.cpp
   src/lemmy.cpp
+  src/hackernews.cpp
+  src/ebooks.cpp
   # Vendored Dear ImGui (MIT) — menu bar / toolbar shell
   external/imgui/imgui.cpp
   external/imgui/imgui_draw.cpp
@@ -135,7 +139,8 @@ target_link_libraries(xanatoo PRIVATE
 )
 
 set(XANATOO_NEED_OPENSSL OFF)
-if(XANATOO_GEMINI OR XANATOO_NOSTR OR XANATOO_REDDIT OR XANATOO_LEMMY)
+if(XANATOO_GEMINI OR XANATOO_NOSTR OR XANATOO_REDDIT OR XANATOO_LEMMY OR
+   XANATOO_HN OR XANATOO_EBOOKS)
   set(XANATOO_NEED_OPENSSL ON)
 endif()
 
@@ -190,6 +195,22 @@ if(XANATOO_LEMMY)
 else()
   target_compile_definitions(xanatoo PRIVATE XANATOO_LEMMY=0)
   message(STATUS "Lemmy API client: OFF")
+endif()
+
+if(XANATOO_HN)
+  target_compile_definitions(xanatoo PRIVATE XANATOO_HN=1)
+  message(STATUS "Hacker News client: ON (HTTPS, ${XANATOO_TLS})")
+else()
+  target_compile_definitions(xanatoo PRIVATE XANATOO_HN=0)
+  message(STATUS "Hacker News client: OFF")
+endif()
+
+if(XANATOO_EBOOKS)
+  target_compile_definitions(xanatoo PRIVATE XANATOO_EBOOKS=1)
+  message(STATUS "Ebook downloads: ON (HTTPS, ${XANATOO_TLS})")
+else()
+  target_compile_definitions(xanatoo PRIVATE XANATOO_EBOOKS=0)
+  message(STATUS "Ebook downloads: OFF")
 endif()
 
 if(UNIX AND NOT APPLE)
@@ -259,6 +280,8 @@ add_executable(xanatoo_tests
   src/editor.cpp
   src/reddit.cpp
   src/lemmy.cpp
+  src/hackernews.cpp
+  src/ebooks.cpp
   src/nostr.cpp
   src/gemini.cpp
   src/epub_import.cpp
@@ -286,6 +309,8 @@ target_compile_definitions(xanatoo_tests PRIVATE
   XANATOO_NOSTR=0
   XANATOO_REDDIT=0
   XANATOO_LEMMY=0
+  XANATOO_HN=0
+  XANATOO_EBOOKS=0
   XANATOO_FONTCONFIG=$<BOOL:${XANATOO_FONTCONFIG}>
   "XANATOO_STYLE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/styles\""
 )

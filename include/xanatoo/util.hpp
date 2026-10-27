@@ -78,6 +78,10 @@ bool path_ends_with_ci(std::string_view path, std::string_view suffix);
 // Remove the last UTF-8 code point (no-op on an empty string).
 void utf8_pop_back(std::string& s);
 
+// Decode HTML character references: &amp; &lt; &gt; &quot; &apos; &nbsp;
+// and numeric &#NN; / &#xHH; (to UTF-8). Unknown names stay as written.
+std::string html_decode_entities(std::string_view s);
+
 // XDG config directory for xanatoo (~/.config/xanatoo). Created if missing.
 // Returns empty string if the home directory cannot be resolved.
 std::string config_dir();

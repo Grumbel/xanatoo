@@ -13,6 +13,8 @@
 
 #include "xanatoo/app.hpp"
 #include "xanatoo/gemini.hpp"
+#include "xanatoo/ebooks.hpp"
+#include "xanatoo/hackernews.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/reddit.hpp"
@@ -295,6 +297,12 @@ StatusLine compute_status(App& app) {
       label = "Reddit: ";
     else if (xanatoo::is_lemmy_url(app.hover.href))
       label = "Lemmy: ";
+    else if (xanatoo::is_hn_url(app.hover.href))
+      label = "Hacker News: ";
+    else if (!xanatoo::ebook_download_url(app.hover.href).empty())
+      label = "Ebook (download): ";
+    else if (xanatoo::is_standard_ebooks_url(app.hover.href))
+      label = "Standard Ebooks: ";
     else if (xanatoo::is_nostr_ref(app.hover.href))
       label = "Nostr: ";
     else if (app.hover.href.rfind("http://", 0) == 0 ||

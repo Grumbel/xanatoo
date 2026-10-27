@@ -3,7 +3,9 @@
 //
 // Lightweight unit tests (no Catch/GTest). Run: ./xanatoo_tests
 
+#include "xanatoo/ebooks.hpp"
 #include "xanatoo/gemini.hpp"
+#include "xanatoo/hackernews.hpp"
 #include "xanatoo/json_min.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/nostr.hpp"
@@ -1064,7 +1066,97 @@ void test_footnotes() {
   EXPECT_EQ(nodes_of(notes, NodeKind::Paragraph).size(), 3u);
 }
 
+void test_hn_urls_and_html() {
+  using namespace xanatoo;
+  EXPECT(is_hn_url("https://news.ycombinator.com/"));
+  EXPECT(is_hn_url("https://news.ycombinator.com"));
+  EXPECT(is_hn_url("https://news.ycombinator.com/news?p=2"));
+  EXPECT(is_hn_url("https://news.ycombinator.com/newest"));
+  EXPECT(is_hn_url("http://news.ycombinator.com/item?id=8863"));
+  EXPECT(!is_hn_url("https://news.ycombinator.com/item"));
+  EXPECT(!is_hn_url("https://news.ycombinator.com/user?id=pg"));
+  EXPECT(!is_hn_url("https://example.com/item?id=1"));
+
+  Document doc;
+  NodeId root = doc.create(NodeKind::Document);
+  hn_append_html(doc, root,
+                 "First &#x27;one&#x27;<p>&gt; quoted <i>it</i>"
+                 "<p>See <a href=\"https:&#x2F;&#x2F;x.org&#x2F;\" "
+                 "rel=\"nofollow\">x.org</a> now"
+                 "<pre><code>  a &lt; b\n</code></pre>tail");
+  const auto& kids = doc.get(root).children;
+  EXPECT_EQ(kids.size(), 5u);
+  if (kids.size() == 5) {
+    EXPECT(doc.get(kids[0]).kind == NodeKind::Paragraph);
+    EXPECT_EQ(doc.get(kids[0]).spans.at(0).text, "First 'one'");
+    EXPECT(doc.get(kids[1]).kind == NodeKind::BlockQuote);
+    EXPECT_EQ(doc.get(kids[1]).spans.at(0).text, "quoted ");
+    EXPECT(doc.get(kids[1]).spans.at(1).kind == InlineKind::Emphasis);
+    const auto& link = doc.get(kids[2]).spans.at(1);
+    EXPECT(link.kind == InlineKind::Link);
+    EXPECT_EQ(link.href, "https://x.org/");
+    EXPECT(doc.get(kids[3]).kind == NodeKind::CodeBlock);
+    EXPECT_EQ(plain_text(doc, kids[3]), "  a < b");
+    EXPECT_EQ(plain_text(doc, kids[4]), "tail");
+  }
+}
+
+void test_json_utf8_and_top_level() {
+  using namespace xanatoo;
+  EXPECT_EQ(json_unescape("caf\\u00e9 \\u20ac \\ud83d\\ude00"),
+            "caf\xc3\xa9 \xe2\x82\xac \xf0\x9f\x98\x80");
+  std::string top = json_top_level(
+      "{\"_h\":{\"title\":{\"value\":\"x\"}},\"kids\":[{\"title\":\"no\"}],"
+      "\"title\":\"yes\",\"n\":3}");
+  EXPECT_EQ(json_str_field(top, "title"), "yes");
+  EXPECT_EQ(json_int_field(top, "n"), 3);
+  EXPECT_EQ(html_decode_entities("a &amp; b &#34;c&#x27; &bogus; &"),
+            "a & b \"c' &bogus; &");
+}
+
+void test_ebook_urls() {
+  using namespace xanatoo;
+  EXPECT(is_standard_ebooks_url("https://standardebooks.org/ebooks"));
+  EXPECT(is_standard_ebooks_url("https://standardebooks.org/ebooks?query=x"));
+  EXPECT(is_standard_ebooks_url("https://standardebooks.org/subjects/poetry"));
+  EXPECT(!is_standard_ebooks_url("https://standardebooks.org/about"));
+  EXPECT(ebook_download_url("https://standardebooks.org/ebooks/charles-dickens")
+             .empty());
+  EXPECT_EQ(ebook_download_url("https://standardebooks.org/ebooks/jane-austen/emma"),
+            "https://standardebooks.org/ebooks/jane-austen/emma/downloads/"
+            "jane-austen_emma.epub?source=feed");
+  EXPECT_EQ(ebook_download_url(
+                "https://standardebooks.org/ebooks/leo-tolstoy/anna-karenina/"
+                "constance-garnett/text/single-page"),
+            "https://standardebooks.org/ebooks/leo-tolstoy/anna-karenina/"
+            "constance-garnett/downloads/"
+            "leo-tolstoy_anna-karenina_constance-garnett.epub?source=feed");
+  EXPECT_EQ(ebook_download_url("https://www.gutenberg.org/ebooks/1342"),
+            "https://www.gutenberg.org/ebooks/1342.epub3.images");
+  EXPECT(is_remote_epub_url("https://www.gutenberg.org/ebooks/84.epub.noimages"));
+  EXPECT(is_remote_epub_url("https://example.org/books/a.EPUB?x=1"));
+  EXPECT(!is_remote_epub_url("https://www.gutenberg.org/ebooks/search/?query=x"));
+  EXPECT(!is_remote_epub_url("https://example.org/a.pdf"));
+
+  Document doc = parse_standard_ebooks_listing(
+      "<h1>Ebooks by A &amp; B</h1><ol>"
+      "<li typeof=\"schema:Book\" about=\"/ebooks/a-b/title-one\">"
+      "<p><a href=\"/ebooks/a-b/title-one\"><span property=\"schema:name\">"
+      "Title [One]</span></a></p><p class=\"author\" resource=\"/ebooks/a-b\">"
+      "<a href=\"x\"><span property=\"schema:name\">A B</span></a></p></li>"
+      "</ol><a href=\"/ebooks/a-b?page=2\" rel=\"next\">Next</a>",
+      "https://standardebooks.org/ebooks/a-b");
+  std::string text;
+  for (const Node& n : doc.nodes) text += plain_text(doc, n.id) + "\n";
+  EXPECT(text.find("Ebooks by A & B") != std::string::npos);
+  EXPECT(text.find("Title [One]") != std::string::npos);
+  EXPECT(text.find("Next page") != std::string::npos);
+}
+
 int main() {
+  test_hn_urls_and_html();
+  test_json_utf8_and_top_level();
+  test_ebook_urls();
   test_string_helpers();
   test_json_min();
   test_reddit_urls();

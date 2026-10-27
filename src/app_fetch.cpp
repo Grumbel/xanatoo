@@ -12,7 +12,9 @@
 #include <thread>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/ebooks.hpp"
 #include "xanatoo/gemini.hpp"
+#include "xanatoo/hackernews.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/parse.hpp"
@@ -86,6 +88,19 @@ void fetch_page(std::string url, std::shared_ptr<FetchShared> out) {
 #if defined(XANATOO_LEMMY) && XANATOO_LEMMY
     out->service = "Lemmy";
     out->doc = xanatoo::lemmy_fetch(url, &out->error);
+#endif
+  } else if (xanatoo::is_hn_url(url)) {
+#if defined(XANATOO_HN) && XANATOO_HN
+    out->service = "Hacker News";
+    out->doc = xanatoo::hn_fetch(url, &out->error);
+#endif
+  } else if (xanatoo::is_ebook_url(url)) {
+#if defined(XANATOO_EBOOKS) && XANATOO_EBOOKS
+    out->service = "Ebooks";
+    // Books open as their imported Markdown, so images resolve locally.
+    std::string local;
+    out->doc = xanatoo::ebook_fetch(url, &out->error, &local);
+    if (!local.empty()) out->final_url = local;
 #endif
   }
   if (!out->doc && out->error.empty()) out->error = "no client for " + url;
@@ -190,6 +205,20 @@ bool remote_fetch_supported(std::string_view url, std::string* why) {
     return true;
 #else
     return no("Lemmy needs build with -DXANATOO_LEMMY=ON");
+#endif
+  }
+  if (xanatoo::is_hn_url(url)) {
+#if defined(XANATOO_HN) && XANATOO_HN
+    return true;
+#else
+    return no("Hacker News needs build with -DXANATOO_HN=ON");
+#endif
+  }
+  if (xanatoo::is_ebook_url(url)) {
+#if defined(XANATOO_EBOOKS) && XANATOO_EBOOKS
+    return true;
+#else
+    return no("Ebook downloads need build with -DXANATOO_EBOOKS=ON");
 #endif
   }
   return no("not a remote URL");

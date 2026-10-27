@@ -72,8 +72,8 @@ toolbar and shortcuts should route through `execute_command`.
 ## Shared network helpers
 
 - `include/xanatoo/tls.hpp` — `TlsStream` (connect over a socket fd with SNI, write_all / read / pending; owns the fd). Backends `src/tls_openssl.cpp` (desktop default) and `src/tls_mbedtls.cpp` (Android; `-DXANATOO_TLS=mbedtls`). Never call OpenSSL / mbedTLS directly elsewhere.
-- `include/xanatoo/https.hpp` + `src/https.cpp` — HTTPS GET/POST over `TlsStream` plus `tcp_connect_host` for Gemini / Nostr (built when any network feature is ON).
-- `include/xanatoo/json_min.hpp` — tiny JSON field/object helpers for read-only API clients (header-only).
+- `include/xanatoo/https.hpp` + `src/https.cpp` — HTTPS GET/POST over `TlsStream` (chunked bodies decoded; `https_get_follow` follows redirects) plus `tcp_connect_host` for Gemini / Nostr (built when any network feature is ON).
+- `include/xanatoo/json_min.hpp` — tiny JSON field/object helpers for read-only API clients (header-only). The `*_field` lookups are flat (first match anywhere): use `json_top_level(obj)` when nested objects repeat a key.
 
 ## Style sheets
 
@@ -100,6 +100,7 @@ toolbar and shortcuts should route through `execute_command`.
 - `starts_with` / `ends_with` / `starts_with_ci`
 - `ascii_lower` (string or string_view)
 - `trim_ascii` for string_view edges
+- `html_decode_entities` (named basics + numeric → UTF-8)
 
 ## Coding rules
 
@@ -162,6 +163,27 @@ Read `TODO.md` first. Record plans and outcomes there.
 Longer design notes: `docs/BRAINSTORM.md`.
 Work is committed directly to git (bundles were only a Grok Web handover
 mechanism; historical bundle numbers in TODO.md are archival).
+
+## Hacker News
+
+- Read-only (`src/hackernews.cpp`), gated by `XANATOO_HN` (default ON).
+- Lists (`/`, `/news`, `/newest`, `/best`, `/ask`, `/show`, `?p=N`): ranked
+  ids from the Firebase API + one Algolia search for titles / scores.
+- Items (`/item?id=N`): whole tree in one Algolia `/items/N` request; top
+  level re-ordered by the Firebase item's `kids` (HN rank).
+- `hn_append_html` maps comment HTML → Paragraph / BlockQuote (`> …`) /
+  CodeBlock with Link / Emphasis spans.
+
+## Ebooks
+
+- `src/ebooks.cpp`, gated by `XANATOO_EBOOKS` (default ON).
+- Standard Ebooks catalogue pages (`/ebooks`, `?query=`, author pages,
+  `/subjects/x`) are scraped into a Markdown book list.
+- Book URLs (Standard Ebooks book pages, Gutenberg `/ebooks/N`, any `.epub`
+  link) download into `~/.cache/xanatoo/downloads/` and open through the
+  pandoc EPUB import; the pane path is the derived `content.md` so images
+  resolve. Never previewed on hover.
+- `examples/books.md` is the curated entry page.
 
 ## Nostr
 

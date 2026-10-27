@@ -14,7 +14,9 @@
 #include <optional>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/ebooks.hpp"
 #include "xanatoo/epub_import.hpp"
+#include "xanatoo/hackernews.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/nostr.hpp"
@@ -69,7 +71,8 @@ std::string parent_dir(const std::string& path) {
 
 bool is_in_app_remote_url(std::string_view s) {
   return xanatoo::is_gemini_url(s) || xanatoo::is_reddit_url(s) ||
-         xanatoo::is_lemmy_url(s) || xanatoo::is_nostr_ref(s);
+         xanatoo::is_lemmy_url(s) || xanatoo::is_nostr_ref(s) ||
+         xanatoo::is_hn_url(s) || xanatoo::is_ebook_url(s);
 }
 
 xanatoo::Document load_doc_or_placeholder(App& app, const std::string& path) {

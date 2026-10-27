@@ -365,12 +365,14 @@ EpubImportResult import_epub_via_pandoc(const std::string& epub_path) {
     } catch (...) {
     }
 
-    // pandoc book.epub -f epub -t gfm -o content.md --extract-media=media
+    // pandoc book.epub -f epub -t gfm-raw_html -o content.md --extract-media=media
     // Run with cwd = cache dir so relative media paths in the MD resolve.
     std::ostringstream cmd;
     cmd << "cd " << shell_quote(dir.string()) << " && "
         << "pandoc " << shell_quote(fs::absolute(epub_path).string())
-        << " -f epub -t gfm"
+        // -raw_html: unwrap div/span/section markup instead of passing it
+        // through (EPUB XHTML leaves attribute lines in the text).
+        << " -f epub -t gfm-raw_html"
         << " -o " << shell_quote(md.filename().string())
         << " --extract-media=" << shell_quote(media.filename().string())
         << " 2>/tmp/xanatoo-pandoc-epub.err";

@@ -32,6 +32,13 @@ std::optional<HttpResult> https_get(std::string_view url,
                                     std::string_view user_agent,
                                     std::string* err = nullptr);
 
+// GET following up to five redirects (relative Location resolved, http
+// upgraded to https). `final_url` receives the last URL requested.
+std::optional<HttpResult> https_get_follow(std::string_view url,
+                                           std::string_view user_agent,
+                                           std::string* err = nullptr,
+                                           std::string* final_url = nullptr);
+
 // Shared TCP helper (Gemini, Nostr WSS); wrap the fd in a TlsStream.
 // Returns a connected socket fd, or -1. Caller owns the fd.
 int tcp_connect_host(const std::string& host, int port,

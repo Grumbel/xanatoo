@@ -14,6 +14,29 @@
 
 namespace xanatoo {
 
+inline void json_append_utf8(std::string& o, uint32_t cp) {
+  if (cp < 0x80) {
+    o.push_back(static_cast<char>(cp));
+  } else if (cp < 0x800) {
+    o.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+    o.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+  } else if (cp < 0x10000) {
+    o.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+    o.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+    o.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+  } else {
+    o.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+    o.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+    o.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+    o.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+  }
+}
+
+inline uint32_t json_hex4(std::string_view s) {
+  return static_cast<uint32_t>(
+      std::strtoul(std::string(s.substr(0, 4)).c_str(), nullptr, 16));
+}
+
 inline std::string json_unescape(std::string_view s) {
   std::string o;
   o.reserve(s.size());
@@ -25,8 +48,19 @@ inline std::string json_unescape(std::string_view s) {
       else if (c == 't') o.push_back('\t');
       else if (c == '"' || c == '\\' || c == '/') o.push_back(c);
       else if (c == 'u' && i + 4 < s.size()) {
+        uint32_t cp = json_hex4(s.substr(i + 1));
         i += 4;
-        o.push_back('?');
+        // UTF-16 surrogate pair: \uD83D\uDE00
+        if (cp >= 0xD800 && cp < 0xDC00 && i + 6 < s.size() &&
+            s[i + 1] == '\\' && s[i + 2] == 'u') {
+          uint32_t lo = json_hex4(s.substr(i + 3));
+          if (lo >= 0xDC00 && lo < 0xE000) {
+            cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
+            i += 6;
+          }
+        }
+        if (cp >= 0xD800 && cp < 0xE000) cp = 0xFFFD;
+        json_append_utf8(o, cp);
       } else
         o.push_back(c);
     } else {
@@ -102,6 +136,36 @@ inline bool json_bool_field(std::string_view json, std::string_view key) {
   while (p < json.size() && std::isspace(static_cast<unsigned char>(json[p])))
     ++p;
   return p + 4 <= json.size() && json.substr(p, 4) == "true";
+}
+
+// Copy of object `obj` with every nested object / array value replaced by
+// null, so the flat *_field lookups only see its own top-level fields.
+inline std::string json_top_level(std::string_view obj) {
+  std::string out;
+  out.reserve(obj.size());
+  int depth = 0;
+  for (size_t i = 0; i < obj.size(); ++i) {
+    char c = obj[i];
+    if (c == '"') {
+      size_t start = i++;
+      while (i < obj.size() && obj[i] != '"') i += (obj[i] == '\\') ? 2 : 1;
+      if (depth <= 1) out.append(obj.substr(start, i - start + 1));
+      continue;
+    }
+    if (c == '{' || c == '[') {
+      if (depth == 1) out += "null";
+      ++depth;
+      if (depth == 1) out.push_back(c);
+      continue;
+    }
+    if (c == '}' || c == ']') {
+      --depth;
+      if (depth == 0) out.push_back(c);
+      continue;
+    }
+    if (depth <= 1) out.push_back(c);
+  }
+  return out;
 }
 
 // Object value after "key": { ... } (brace-matched, string-aware).

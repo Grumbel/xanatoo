@@ -9,6 +9,7 @@
 #include <filesystem>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/ebooks.hpp"
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/parse.hpp"
@@ -149,6 +150,8 @@ bool show_preview(App& app, const std::string& href) {
       has_dest = true;
       break;
     case LinkKind::Remote: {
+      // Book download + pandoc import: far too heavy for a hover.
+      if (!xanatoo::ebook_download_url(t.url).empty()) return false;
       const CachedPage* c = find_cached_page(app, t.url);
       if (!c) {
         if (pv.pending != t.url) {

@@ -56,6 +56,27 @@ int tcp_connect_host(const std::string& host, int port, std::string* err) {
   return tcp_connect(host, port, err);
 }
 
+namespace {
+
+// Decode a "Transfer-Encoding: chunked" body (hex size line, data, CRLF).
+std::string dechunk(const std::string& in) {
+  std::string out;
+  size_t p = 0;
+  while (p < in.size()) {
+    size_t eol = in.find("\r\n", p);
+    if (eol == std::string::npos) break;
+    size_t n = std::strtoul(in.c_str() + p, nullptr, 16);
+    if (n == 0) break;
+    p = eol + 2;
+    if (p + n > in.size()) n = in.size() - p;
+    out.append(in, p, n);
+    p += n + 2;
+  }
+  return out;
+}
+
+}  // namespace
+
 std::optional<HttpResult> https_request(std::string_view method,
                                         std::string_view url,
                                         std::string_view user_agent,
@@ -148,6 +169,9 @@ std::optional<HttpResult> https_request(std::string_view method,
   };
   out.location = header_val("location");
   out.content_type = header_val("content-type");
+  if (ascii_lower(header_val("transfer-encoding")).find("chunked") !=
+      std::string::npos)
+    out.body = dechunk(out.body);
   return out;
 }
 
@@ -155,6 +179,32 @@ std::optional<HttpResult> https_get(std::string_view url,
                                     std::string_view user_agent,
                                     std::string* err) {
   return https_request("GET", url, user_agent, {}, {}, err);
+}
+
+std::optional<HttpResult> https_get_follow(std::string_view url,
+                                           std::string_view user_agent,
+                                           std::string* err,
+                                           std::string* final_url) {
+  std::string current(url);
+  std::optional<HttpResult> resp;
+  for (int hop = 0; hop < 5; ++hop) {
+    resp = https_get(current, user_agent, err);
+    if (!resp || resp->status < 300 || resp->status >= 400 ||
+        resp->location.empty())
+      break;
+    std::string loc = resp->location;
+    if (!starts_with_ci(loc, "https://") && !starts_with_ci(loc, "http://")) {
+      // Relative redirect: resolve against scheme://host of `current`.
+      size_t host_end = current.find('/', current.find("://") + 3);
+      std::string origin = current.substr(0, host_end);
+      if (loc.empty() || loc[0] != '/') loc.insert(loc.begin(), '/');
+      loc = origin + loc;
+    }
+    if (starts_with_ci(loc, "http://")) loc = "https://" + loc.substr(7);
+    current = std::move(loc);
+  }
+  if (final_url) *final_url = current;
+  return resp;
 }
 
 }  // namespace xanatoo

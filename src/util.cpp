@@ -3,6 +3,7 @@
 
 #include "xanatoo/util.hpp"
 
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -173,6 +174,57 @@ void utf8_pop_back(std::string& s) {
   while (!s.empty() && (static_cast<unsigned char>(s.back()) & 0xc0) == 0x80)
     s.pop_back();
   if (!s.empty()) s.pop_back();
+}
+
+std::string html_decode_entities(std::string_view s) {
+  std::string o;
+  o.reserve(s.size());
+  for (size_t i = 0; i < s.size(); ++i) {
+    size_t semi;
+    if (s[i] != '&' ||
+        (semi = s.find(';', i + 1)) == std::string_view::npos ||
+        semi - i > 10) {
+      o.push_back(s[i]);
+      continue;
+    }
+    std::string_view name = s.substr(i + 1, semi - i - 1);
+    uint32_t cp = 0;
+    if (name == "amp") cp = '&';
+    else if (name == "lt") cp = '<';
+    else if (name == "gt") cp = '>';
+    else if (name == "quot") cp = '"';
+    else if (name == "apos") cp = '\'';
+    else if (name == "nbsp") cp = 0xA0;
+    else if (name.size() > 1 && name[0] == '#') {
+      std::string num(name.substr(1));
+      bool hex = !num.empty() && (num[0] == 'x' || num[0] == 'X');
+      cp = static_cast<uint32_t>(
+          std::strtoul(num.c_str() + (hex ? 1 : 0), nullptr, hex ? 16 : 10));
+      if (cp == 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp < 0xE000))
+        cp = 0xFFFD;
+    }
+    if (cp == 0) {
+      o.push_back(s[i]);
+      continue;
+    }
+    if (cp < 0x80) {
+      o.push_back(static_cast<char>(cp));
+    } else if (cp < 0x800) {
+      o.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+      o.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp < 0x10000) {
+      o.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+      o.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+      o.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else {
+      o.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+      o.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+      o.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+      o.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+    i = semi;
+  }
+  return o;
 }
 
 }  // namespace xanatoo

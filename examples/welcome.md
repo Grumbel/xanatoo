@@ -50,6 +50,8 @@ Open any of these from this page (links load in the same pane and join session h
 - [r/linux on Reddit](https://www.reddit.com/r/linux) — another public listing
 - [Ask Lemmy](https://lemmy.world/c/asklemmy) — Lemmy community via API v3
 - [programming.dev /c/rust](https://programming.dev/c/rust) — federated Lemmy community
+- [Hacker News](https://news.ycombinator.com/) — front page and comment trees
+- [Books and long reads](books.md) — Standard Ebooks / Project Gutenberg EPUBs
 - [Org-mode sample](sample.org) — headings, TODO, tags, source blocks
 - [Semantic format (S-expression)](semantic.sexp) — experimental sexpr form
 - [Sample (S-expression)](sample.sexp) — compact sexpr demo
@@ -101,6 +103,20 @@ Community listings and posts open in-pane via **Lemmy API v3** (Thread/Message l
 - [lemmy.world/c/asklemmy](https://lemmy.world/c/asklemmy)
 - [programming.dev/c/rust](https://programming.dev/c/rust)
 - Or paste `https://<instance>/c/<name>` or `/post/<id>`
+
+## Hacker News
+
+[Front page](https://news.ycombinator.com/), [New](https://news.ycombinator.com/newest),
+[Ask](https://news.ycombinator.com/ask) and [Show](https://news.ycombinator.com/show)
+lists plus whole comment trees (`/item?id=…`) open in the Thread/Message layout.
+Comment HTML maps to paragraphs, `> quotes`, links and code blocks.
+
+## Books
+
+[Books and long reads](books.md) lists public-domain EPUBs from
+[Standard Ebooks](https://standardebooks.org/ebooks) (catalogue, subjects,
+search) and Project Gutenberg. A click downloads the book and imports it via
+**pandoc**.
 
 ## Nostr
 

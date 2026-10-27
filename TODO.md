@@ -8,6 +8,32 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-27) — Hacker News, ebooks
+
+- Hacker News client (`hackernews.cpp`, `XANATOO_HN`): Top / New / Best /
+  Ask / Show lists (Firebase ranked ids + one Algolia search, 30 per page,
+  "More →") and item pages (whole tree from Algolia `/items/N`, top level
+  in HN rank order via Firebase `kids`). Comment HTML → Paragraph,
+  BlockQuote for `> …` lines, CodeBlock for `<pre>`, links / italics.
+- Ebooks (`ebooks.cpp`, `XANATOO_EBOOKS`): Standard Ebooks catalogue,
+  search, author and subject pages scraped into a list; book pages,
+  Gutenberg `/ebooks/N` and any `.epub` URL download to
+  `~/.cache/xanatoo/downloads/` and import through pandoc on the fetch
+  thread. `examples/books.md` is a curated list (linked from welcome).
+- EPUB import now runs pandoc with `-t gfm-raw_html`: div / section /
+  attribute residue is unwrapped instead of showing as text. Existing
+  import caches are reused until the EPUB is newer.
+- Shared fixes: `https_request` decodes chunked bodies (was passing the
+  chunk headers through), `https_get_follow`; `json_unescape` decodes
+  `\uXXXX` (+ surrogate pairs) to UTF-8 instead of `?`; `json_top_level`;
+  `html_decode_entities` in util.
+- Open: book panes show the cache `content.md` path in the URL bar, not
+  the remote URL; no download progress (large EPUBs just show the loading
+  pill); HN user pages / deep comment pagination ("more" links) are not
+  handled; Archive.org not done (its public-domain items mostly lack EPUBs
+  or are lending-only — Gutenberg covers the same texts); SE OPDS / full
+  Atom feeds need a Patrons Circle login, so the catalogue is scraped HTML.
+
 ## Status (2026-10-27) — comment thread look
 
 - Message headers are coloured by new style roles: `message-author` (blue,
