@@ -19,6 +19,7 @@
 #include "xanatoo/html_page.hpp"
 #include "xanatoo/wikipedia.hpp"
 #include "xanatoo/lemmy.hpp"
+#include "xanatoo/native.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/parse.hpp"
 #include "xanatoo/reddit.hpp"
@@ -89,20 +90,23 @@ void fetch_page(std::string url, std::shared_ptr<FetchShared> out) {
     out->service = "Nostr";
     out->doc = xanatoo::nostr_fetch_thread(url, &out->error);
 #endif
-  } else if (xanatoo::is_reddit_url(url)) {
+  } else if (xanatoo::is_reddit_ref(url)) {
 #if defined(XANATOO_REDDIT) && XANATOO_REDDIT
     out->service = "Reddit";
-    out->doc = xanatoo::reddit_fetch(url, &out->error);
+    out->doc = xanatoo::reddit_fetch(xanatoo::web_url_for(url), &out->error);
+    if (out->doc) xanatoo::native_rewrite_links(*out->doc, url);
 #endif
-  } else if (xanatoo::is_lemmy_url(url)) {
+  } else if (xanatoo::is_lemmy_ref(url)) {
 #if defined(XANATOO_LEMMY) && XANATOO_LEMMY
     out->service = "Lemmy";
-    out->doc = xanatoo::lemmy_fetch(url, &out->error);
+    out->doc = xanatoo::lemmy_fetch(xanatoo::web_url_for(url), &out->error);
+    if (out->doc) xanatoo::native_rewrite_links(*out->doc, url);
 #endif
-  } else if (xanatoo::is_hn_url(url)) {
+  } else if (xanatoo::is_hn_ref(url)) {
 #if defined(XANATOO_HN) && XANATOO_HN
     out->service = "Hacker News";
-    out->doc = xanatoo::hn_fetch(url, &out->error);
+    out->doc = xanatoo::hn_fetch(xanatoo::web_url_for(url), &out->error);
+    if (out->doc) xanatoo::native_rewrite_links(*out->doc, url);
 #endif
   } else if (xanatoo::is_ebook_url(url)) {
 #if defined(XANATOO_EBOOKS) && XANATOO_EBOOKS
@@ -236,21 +240,21 @@ bool remote_fetch_supported(std::string_view url, std::string* why) {
     return no("Nostr needs build with -DXANATOO_NOSTR=ON");
 #endif
   }
-  if (xanatoo::is_reddit_url(url)) {
+  if (xanatoo::is_reddit_ref(url)) {
 #if defined(XANATOO_REDDIT) && XANATOO_REDDIT
     return true;
 #else
     return no("Reddit needs build with -DXANATOO_REDDIT=ON");
 #endif
   }
-  if (xanatoo::is_lemmy_url(url)) {
+  if (xanatoo::is_lemmy_ref(url)) {
 #if defined(XANATOO_LEMMY) && XANATOO_LEMMY
     return true;
 #else
     return no("Lemmy needs build with -DXANATOO_LEMMY=ON");
 #endif
   }
-  if (xanatoo::is_hn_url(url)) {
+  if (xanatoo::is_hn_ref(url)) {
 #if defined(XANATOO_HN) && XANATOO_HN
     return true;
 #else

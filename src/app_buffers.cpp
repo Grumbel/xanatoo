@@ -22,6 +22,7 @@
 #include "xanatoo/wikipedia.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/lemmy.hpp"
+#include "xanatoo/native.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/parse.hpp"
 #include "xanatoo/reddit.hpp"
@@ -87,9 +88,9 @@ static bool web_in_app(std::string_view s) {
 }
 
 bool is_in_app_remote_url(std::string_view s) {
-  return xanatoo::is_gemini_url(s) || xanatoo::is_reddit_url(s) ||
-         xanatoo::is_lemmy_url(s) || xanatoo::is_nostr_ref(s) ||
-         xanatoo::is_hn_url(s) || xanatoo::is_ebook_url(s) ||
+  return xanatoo::is_gemini_url(s) || xanatoo::is_reddit_ref(s) ||
+         xanatoo::is_lemmy_ref(s) || xanatoo::is_nostr_ref(s) ||
+         xanatoo::is_hn_ref(s) || xanatoo::is_ebook_url(s) ||
          xanatoo::is_feed_url(s) || xanatoo::is_wikipedia_ref(s) ||
          web_in_app(s);
 }

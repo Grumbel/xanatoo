@@ -18,6 +18,7 @@
 #include "xanatoo/hackernews.hpp"
 #include "xanatoo/wikipedia.hpp"
 #include "xanatoo/lemmy.hpp"
+#include "xanatoo/native.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/theme.hpp"
@@ -302,11 +303,11 @@ StatusLine compute_status(App& app) {
       label = "Feed: ";
     else if (xanatoo::is_gemini_url(app.hover.href))
       label = "Gemini: ";
-    else if (xanatoo::is_reddit_url(app.hover.href))
+    else if (xanatoo::is_reddit_ref(app.hover.href))
       label = "Reddit: ";
-    else if (xanatoo::is_lemmy_url(app.hover.href))
+    else if (xanatoo::is_lemmy_ref(app.hover.href))
       label = "Lemmy: ";
-    else if (xanatoo::is_hn_url(app.hover.href))
+    else if (xanatoo::is_hn_ref(app.hover.href))
       label = "Hacker News: ";
     else if (!xanatoo::ebook_download_url(app.hover.href).empty())
       label = "Ebook (download): ";

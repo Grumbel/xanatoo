@@ -237,8 +237,19 @@ mechanism; historical bundle numbers in TODO.md are archival).
   map it with `parse_html_page`; `wikipedia_rewrite_links` turns article
   links into `wikipedia:` refs (non-article namespaces stay web links).
 - `https://*.wikipedia.org/wiki/…` stays an ordinary web page; the
-  explicit "Native view" button / `UiCommand::OpenNative` switches via
-  `native_url_for` — add new native mappings there, never reroute silently.
+  explicit "Native view" toggle / `UiCommand::ToggleNative` switches via
+  `alternate_view_url` (`native.hpp`) — add new native mappings there,
+  never reroute silently.
+
+## Service refs (`native.hpp`)
+
+- `hn:` / `reddit:` / `lemmy:` refs select the native Thread + Message
+  clients; the part after the prefix mirrors the web path (`hn:item?id=1`,
+  `reddit:r/linux/`, `lemmy:lemmy.world/c/technology`). `web_url_for`
+  maps a ref back to https for the API clients, which still take web URLs.
+- Plain https URLs of those sites open as web pages. Links inside native
+  views stay native: `native_rewrite_links` (HN, Reddit) or refs emitted by
+  `lemmy.cpp` (its path test is too loose for arbitrary links).
 
 ## Pandoc import (`epub_import.hpp`)
 
@@ -275,7 +286,7 @@ mechanism; historical bundle numbers in TODO.md are archival).
 
 - Read-only client via public `https://www.reddit.com/…/.json` (OpenSSL HTTPS).
 - Gated by `XANATOO_REDDIT` (default ON; needs OpenSSL).
-- Ctrl+L accepts listing or post URLs with or without `.json`.
+- `reddit:r/<sub>/…` refs (the reddit.com path); https links open as web pages.
 - Maps posts/comments to Thread + Message nodes.
 - Optional OAuth: `XANATOO_REDDIT_CLIENT_ID` + `XANATOO_REDDIT_CLIENT_SECRET` (script app) when anonymous `.json` returns 403.
 - Optional UA override: `XANATOO_REDDIT_USER_AGENT`.
@@ -284,6 +295,6 @@ mechanism; historical bundle numbers in TODO.md are archival).
 
 - Read-only client via Lemmy **API v3** JSON (`/api/v3/post/list`, `/api/v3/post`).
 - Gated by `XANATOO_LEMMY` (default ON; needs OpenSSL).
-- Ctrl+L accepts `https://<instance>/c/<community>` and `/post/<id>`.
+- `lemmy:<instance>/c/<community>` and `lemmy:<instance>/post/<id>` refs.
 - Maps posts/comments to Thread + Message nodes.
 - Optional UA override: `XANATOO_LEMMY_USER_AGENT`.

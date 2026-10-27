@@ -88,8 +88,16 @@ Next bundle number: **263** (this delivery is **262**)
   BibTeX, RIS, Jira → cached Markdown (`pandoc-import/`; EPUB keeps
   `epub-import/`), read-only like EPUB.
 - Open: native view drops the `#fragment` of the web page (web pages
-  store the URL without it); more native mappings (HN / Reddit / Lemmy web
-  URLs are already routed, others could follow).
+  store the URL without it).
+- Service refs `hn:`, `reddit:`, `lemmy:` (`native.hpp`): HN, Reddit and
+  Lemmy no longer hijack their https URLs — those open as web pages, the
+  refs open the native Thread + Message views. Native view became a toggle
+  (`UiCommand::ToggleNative`, `alternate_view_url`; pressed while native,
+  View → Native View / Web Page View). Links in native views stay native.
+  Services menu, welcome / books pages use the refs.
+- Open: scheme-less `reddit.com/r/x` typed into Ctrl+L no longer opens
+  (was the Reddit client); HN comment links to other sites' threads stay
+  web links.
 - Open: remote images; JavaScript-only pages show "No readable content";
   tab label is the URL, not the page title;
   other code pages (Shift_JIS, KOI8-R) are not converted.

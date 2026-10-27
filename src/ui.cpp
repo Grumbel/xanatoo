@@ -716,8 +716,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Back", UiCommand::NavBack, cmd, state.can_nav_back, "Alt+Left");
       menu_item_cmd("Forward", UiCommand::NavForward, cmd, state.can_nav_forward,
                     "Alt+Right");
-      menu_item_cmd("Native View", UiCommand::OpenNative, cmd,
-                    !state.native_url.empty());
+      menu_item_cmd(state.native_view ? "Web Page View" : "Native View",
+                    UiCommand::ToggleNative, cmd, !state.alternate_url.empty());
       if (ImGui::BeginMenu("Collection", state.collection)) {
         menu_collection_items(state, cmd, result.arg);
         ImGui::EndMenu();
@@ -903,12 +903,23 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     else
       tool_button("tb_reload", "reload", "Reload (Ctrl+R)", UiCommand::Reload,
                   cmd, state.has_path);
-    tool_button("tb_native", "native",
-                state.native_url.empty()
-                    ? "Native view (only for pages xanatoo has a native form of, "
-                      "e.g. Wikipedia articles)"
-                    : ("Native view: " + state.native_url).c_str(),
-                UiCommand::OpenNative, cmd, !state.native_url.empty());
+    {
+      // Pressed while showing the native form; a click flips to the other.
+      const std::string tip =
+          state.alternate_url.empty()
+              ? "Native view (only for pages xanatoo has a native form of: "
+                "Wikipedia, Hacker News, Reddit, Lemmy)"
+          : state.native_view ? "Back to the web page: " + state.alternate_url
+                              : "Native view: " + state.alternate_url;
+      if (state.native_view) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                              ImVec4(0.4f, 0.5f, 0.75f, 1.f));
+      }
+      tool_button("tb_native", "native", tip.c_str(), UiCommand::ToggleNative,
+                  cmd, !state.alternate_url.empty());
+      if (state.native_view) ImGui::PopStyleColor(2);
+    }
 
     ImGui::TextDisabled("|");
     ImGui::SameLine(0.f, 4.f);

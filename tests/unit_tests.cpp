@@ -8,6 +8,7 @@
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/html_min.hpp"
 #include "xanatoo/html_page.hpp"
+#include "xanatoo/native.hpp"
 #include "xanatoo/wikipedia.hpp"
 #include "xanatoo/hackernews.hpp"
 #include "xanatoo/json_min.hpp"
@@ -1481,6 +1482,51 @@ void test_wikipedia() {
   EXPECT_EQ(native_url_for("https://de.wikipedia.org/wiki/Kategorie:Web"), "");
   EXPECT_EQ(native_url_for("https://en.wikipedia.org/w/index.php?title=X"), "");
   EXPECT_EQ(native_url_for("https://example.org/wiki/X"), "");
+
+  // hn: / reddit: / lemmy: refs ↔ web URLs.
+  EXPECT_EQ(native_url_for("https://news.ycombinator.com/"), "hn:");
+  EXPECT_EQ(native_url_for("https://news.ycombinator.com/news?p=2"), "hn:?p=2");
+  EXPECT_EQ(native_url_for("https://news.ycombinator.com/item?id=42"),
+            "hn:item?id=42");
+  EXPECT_EQ(native_url_for("https://news.ycombinator.com/user?id=pg"), "");
+  EXPECT_EQ(web_url_for("hn:newest"), "https://news.ycombinator.com/newest");
+  EXPECT(is_hn_ref("hn:"));
+  EXPECT(!is_hn_ref("https://news.ycombinator.com/"));
+  EXPECT_EQ(native_url_for("https://old.reddit.com/r/linux/.json?after=x"),
+            "reddit:r/linux/?after=x");
+  EXPECT_EQ(native_url_for("https://www.reddit.com/r/linux/comments/abc/t/"),
+            "reddit:r/linux/comments/abc/t/");
+  EXPECT_EQ(native_url_for("https://redd.it/abc"), "");
+  EXPECT_EQ(web_url_for("reddit:r/popular/"), "https://www.reddit.com/r/popular/");
+  EXPECT_EQ(native_url_for("https://lemmy.world/c/technology"),
+            "lemmy:lemmy.world/c/technology");
+  EXPECT_EQ(native_url_for("https://lemmy.world/api/v3/post/list"), "");
+  EXPECT_EQ(web_url_for("lemmy:programming.dev/post/7"),
+            "https://programming.dev/post/7");
+  EXPECT(!is_lemmy_ref("lemmy:"));
+  EXPECT_EQ(web_url_for("wikipedia:de:Hypertext#A"),
+            "https://de.wikipedia.org/wiki/Hypertext#A");
+  EXPECT_EQ(alternate_view_url("hn:item?id=1"),
+            "https://news.ycombinator.com/item?id=1");
+  EXPECT_EQ(alternate_view_url("https://news.ycombinator.com/item?id=1"),
+            "hn:item?id=1");
+  EXPECT_EQ(alternate_view_url("https://example.org/"), "");
+  EXPECT_EQ(alternate_view_url("notes.md"), "");
+  {
+    Document hn;
+    NodeId root = hn.create(NodeKind::Document);
+    NodeId para = hn.create(NodeKind::Paragraph, root);
+    InlineSpan item;
+    item.kind = InlineKind::Link;
+    item.href = "https://news.ycombinator.com/item?id=5";
+    InlineSpan ext = item;
+    ext.href = "https://example.org/c/post/1";
+    hn.get(para).spans.push_back(item);
+    hn.get(para).spans.push_back(ext);
+    native_rewrite_links(hn, "hn:");
+    EXPECT_EQ(hn.get(para).spans[0].href, "hn:item?id=5");
+    EXPECT_EQ(hn.get(para).spans[1].href, "https://example.org/c/post/1");
+  }
 
   Document doc = parse_html_page(
       "<base href=\"//en.wikipedia.org/wiki/\"><title>Hypertext</title>"

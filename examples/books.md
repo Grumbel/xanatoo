@@ -90,9 +90,9 @@ page opens as its EPUB (with images).
 
 ## Discussion threads
 
-- [Hacker News front page](https://news.ycombinator.com/) ·
-  [New](https://news.ycombinator.com/newest) ·
-  [Best](https://news.ycombinator.com/best) ·
-  [Ask HN](https://news.ycombinator.com/ask) ·
-  [Show HN](https://news.ycombinator.com/show)
-- [HN item #1](https://news.ycombinator.com/item?id=1) — the first story, with replies
+- [Hacker News front page](hn:) ·
+  [New](hn:newest) ·
+  [Best](hn:best) ·
+  [Ask HN](hn:ask) ·
+  [Show HN](hn:show)
+- [HN item #1](hn:item?id=1) — the first story, with replies

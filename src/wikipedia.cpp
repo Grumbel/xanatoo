@@ -190,11 +190,6 @@ void wikipedia_rewrite_links(Document& doc, const WikipediaRef& self) {
   }
 }
 
-std::string native_url_for(std::string_view url) {
-  if (auto r = wikipedia_ref_from_url(url)) return wikipedia_ref_string(*r);
-  return {};
-}
-
 #if defined(XANATOO_WIKIPEDIA) && XANATOO_WIKIPEDIA
 
 std::optional<Document> wikipedia_fetch(std::string_view ref_in,

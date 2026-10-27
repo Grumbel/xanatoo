@@ -50,11 +50,11 @@ Open any of these from this page (links load in the same pane and join session h
 - [Gemini gemtext sample](gemini-sample.gmi) — native gemtext layout
 - [Nostr discussions](nostr-sample.md) — relay-backed Thread/Message view
 - [Recent Nostr notes](nostr:recent) — live firehose sample from public relays
-- [r/GameDeals on Reddit](https://www.reddit.com/r/GameDeals/.json) — subreddit listing via `.json`
-- [r/linux on Reddit](https://www.reddit.com/r/linux) — another public listing
-- [Ask Lemmy](https://lemmy.world/c/asklemmy) — Lemmy community via API v3
-- [programming.dev /c/rust](https://programming.dev/c/rust) — federated Lemmy community
-- [Hacker News](https://news.ycombinator.com/) — front page and comment trees
+- [r/GameDeals on Reddit](reddit:r/GameDeals/) — subreddit listing via `.json`
+- [r/linux on Reddit](reddit:r/linux/) — another public listing
+- [Ask Lemmy](lemmy:lemmy.world/c/asklemmy) — Lemmy community via API v3
+- [programming.dev /c/rust](lemmy:programming.dev/c/rust) — federated Lemmy community
+- [Hacker News](hn:) — front page and comment trees
 - [Books and long reads](books.md) — Standard Ebooks / Project Gutenberg EPUBs
 - [Feeds](feeds.md) — RSS / Atom: blogs, news, Mastodon, Reddit, arXiv
 - [Collections](collection.md) — image grids / lists with a fullscreen viewer
@@ -88,12 +88,14 @@ Drag column gutters to reweight widths. Drag an image’s blue corner to resize 
 
 ## Reddit
 
-Subreddit listings and posts open in-pane via Reddit's JSON API
-(same Thread/Message layout as Nostr). **Ctrl+L** accepts URLs with or without `.json`.
+`reddit:` refs open subreddit listings and posts in-pane via Reddit's JSON
+API (same Thread/Message layout as Nostr). The part after `reddit:` is the
+path on reddit.com.
 
-- [r/GameDeals](https://www.reddit.com/r/GameDeals/.json)
-- [r/linux](https://www.reddit.com/r/linux)
-- Or paste any `https://www.reddit.com/r/…` or post URL
+- [reddit:r/GameDeals/](reddit:r/GameDeals/)
+- [reddit:r/linux/](reddit:r/linux/)
+- Plain `https://www.reddit.com/…` links open as web pages; the **Native
+  view** button next to Reload switches between the two
 
 If requests return **HTTP 403**, Reddit is blocking the client/IP. Set a script app's credentials:
 
@@ -104,18 +106,21 @@ If requests return **HTTP 403**, Reddit is blocking the client/IP. Set a script 
 
 ## Lemmy
 
-Community listings and posts open in-pane via **Lemmy API v3** (Thread/Message layout). **Ctrl+L** accepts any instance URL:
+`lemmy:` refs open community listings and posts in-pane via **Lemmy API
+v3** (Thread/Message layout), on any instance: `lemmy:<instance>/c/<name>`
+or `lemmy:<instance>/post/<id>`.
 
-- [lemmy.world/c/asklemmy](https://lemmy.world/c/asklemmy)
-- [programming.dev/c/rust](https://programming.dev/c/rust)
-- Or paste `https://<instance>/c/<name>` or `/post/<id>`
+- [lemmy:lemmy.world/c/asklemmy](lemmy:lemmy.world/c/asklemmy)
+- [lemmy:programming.dev/c/rust](lemmy:programming.dev/c/rust)
+- On a Lemmy web page, **Native view** switches to the `lemmy:` form
 
 ## Hacker News
 
-[Front page](https://news.ycombinator.com/), [New](https://news.ycombinator.com/newest),
-[Ask](https://news.ycombinator.com/ask) and [Show](https://news.ycombinator.com/show)
-lists plus whole comment trees (`/item?id=…`) open in the Thread/Message layout.
-Comment HTML maps to paragraphs, `> quotes`, links and code blocks.
+[Front page](hn:), [New](hn:newest), [Ask](hn:ask) and [Show](hn:show)
+lists plus whole comment trees (`hn:item?id=…`) open in the Thread/Message
+layout. Comment HTML maps to paragraphs, `> quotes`, links and code blocks.
+`https://news.ycombinator.com/…` links open the HN website itself; **Native
+view** switches between the two.
 
 ## Books
 
@@ -143,7 +148,7 @@ Local `.html` files open the same way.
 `wikipedia:Hypertext` (or `wikipedia:de:Hypertext` for other languages)
 opens an article natively from the Wikipedia API: references intact, and
 article links stay native. On a Wikipedia web page the **Native view**
-button next to Reload switches to that form — try
+button next to Reload switches to that form, and back — try
 [wikipedia:Project Xanadu](wikipedia:Project_Xanadu).
 
 Documents in other formats — Word (.docx), OpenDocument (.odt), RTF,

@@ -5,6 +5,7 @@
 // Maps posts/comments into Thread + Message document nodes.
 
 #include "xanatoo/lemmy.hpp"
+#include "xanatoo/native.hpp"
 #include "xanatoo/util.hpp"
 
 #include "xanatoo/https.hpp"
@@ -194,6 +195,11 @@ void append_message(Document& doc, NodeId thread, const LemmyPost& post,
   }
 
   const std::string permalink = post_permalink(post, origin);
+  // Post and community links stay in the native view (lemmy: refs).
+  auto native = [](const std::string& url) {
+    std::string ref = lemmy_ref_from_url(url);
+    return ref.empty() ? url : ref;
+  };
 
   if (!post.is_comment && !post.title.empty()) {
     NodeId title = doc.create(NodeKind::Paragraph, msg);
@@ -202,7 +208,7 @@ void append_message(Document& doc, NodeId thread, const LemmyPost& post,
     if (!permalink.empty()) {
       hs.kind = InlineKind::Link;
       hs.text = post.title;
-      hs.href = permalink;
+      hs.href = native(permalink);
     } else {
       hs.kind = InlineKind::Strong;
       hs.text = post.title;
@@ -233,9 +239,9 @@ void append_message(Document& doc, NodeId thread, const LemmyPost& post,
       c.kind = InlineKind::Link;
       c.text = "c/" + post.community;
       if (!post.community_url.empty())
-        c.href = post.community_url;
+        c.href = native(post.community_url);
       else if (!origin.empty())
-        c.href = origin + "/c/" + post.community;
+        c.href = native(origin + "/c/" + post.community);
       else
         c.kind = InlineKind::Emphasis;
       doc.get(foot).spans.push_back(std::move(c));
@@ -253,7 +259,7 @@ void append_message(Document& doc, NodeId thread, const LemmyPost& post,
       cl.text = post.comments > 0
                     ? (std::to_string(post.comments) + " comments")
                     : "comments";
-      cl.href = permalink;
+      cl.href = native(permalink);
       doc.get(foot).spans.push_back(std::move(cl));
     }
   }

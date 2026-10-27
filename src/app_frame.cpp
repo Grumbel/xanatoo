@@ -24,6 +24,7 @@
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/theme.hpp"
 #include "xanatoo/util.hpp"
+#include "xanatoo/native.hpp"
 #include "xanatoo/wikipedia.hpp"
 
 namespace fs = std::filesystem;
@@ -128,7 +129,12 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
                            ? std::string("untitled")
                            : path_of(app, focused_pane(app));
   ui_state.can_nav_back = app.nav_hist_pos > 0;
-  ui_state.native_url = xanatoo::native_url_for(path_of(app, focused_pane(app)));
+  {
+    const std::string& path = path_of(app, focused_pane(app));
+    ui_state.alternate_url = xanatoo::alternate_view_url(path);
+    ui_state.native_view = !ui_state.alternate_url.empty() &&
+                           xanatoo::native_url_for(path).empty();
+  }
   if (ui_state.services.empty()) {
     // Front pages of the in-app clients; greyed out when not built in.
     struct Entry {
@@ -140,9 +146,9 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
     static const Entry kServices[] = {
         {"Wikipedia", "wikipedia:Main_Page", false, false},
         {"Wikipedia (Deutsch)", "wikipedia:de:Wikipedia:Hauptseite", false, false},
-        {"Hacker News", "https://news.ycombinator.com/", false, true},
-        {"Reddit (r/popular)", "https://www.reddit.com/r/popular/", false, false},
-        {"Lemmy (lemmy.world/c/technology)", "https://lemmy.world/c/technology",
+        {"Hacker News", "hn:", false, true},
+        {"Reddit (r/popular)", "reddit:r/popular/", false, false},
+        {"Lemmy (lemmy.world/c/technology)", "lemmy:lemmy.world/c/technology",
          false, false},
         {"Nostr (recent notes)", "nostr:recent", false, false},
         {"Gemini (geminiprotocol.net)", "gemini://geminiprotocol.net/", false,
@@ -288,7 +294,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::Find || c == C::ToggleSplit || c == C::ToggleOutline ||
         c == C::ToggleBacklinks || c == C::OpenTranscludeOther ||
         c == C::ToggleDiff || c == C::ToggleStructure || c == C::ToggleBrowse ||
-        c == C::OpenNative || c == C::CollectionView ||
+        c == C::ToggleNative || c == C::CollectionView ||
         c == C::ToggleHelp || c == C::ToggleVirtualKeyboard ||
         c == C::OpenFormatDoc || c == C::OpenSemanticDoc ||
         c == C::OpenInWindow || c == C::OpenExample || c == C::LoadDiffDemo ||
@@ -358,13 +364,14 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::CollectionView:
       collection_command(app, arg);
       break;
-    case C::OpenNative: {
-      // Explicit only: web pages never switch to the native form on their own.
-      const std::string native = xanatoo::native_url_for(path_of(app, p));
-      if (native.empty())
+    case C::ToggleNative: {
+      // Explicit only: web pages never switch to the native form on their
+      // own, and native refs are never rerouted from https:// URLs.
+      const std::string other = xanatoo::alternate_view_url(path_of(app, p));
+      if (other.empty())
         flash_status(app, "No native view for this page");
       else
-        navigate_to_url(app, native);
+        navigate_to_url(app, other);
       break;
     }
     case C::NavigateUrl:

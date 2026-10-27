@@ -97,6 +97,7 @@ add_executable(xanatoo
   src/html_min.cpp
   src/html_page.cpp
   src/wikipedia.cpp
+  src/native.cpp
   # Vendored Dear ImGui (MIT) — menu bar / toolbar shell
   external/imgui/imgui.cpp
   external/imgui/imgui_draw.cpp
@@ -319,6 +320,7 @@ add_executable(xanatoo_tests
   src/html_min.cpp
   src/html_page.cpp
   src/wikipedia.cpp
+  src/native.cpp
   src/nostr.cpp
   src/gemini.cpp
   src/epub_import.cpp

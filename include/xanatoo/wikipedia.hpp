@@ -45,10 +45,6 @@ std::optional<WikipediaRef> wikipedia_ref_from_url(std::string_view url);
 // other articles "wikipedia:…".
 void wikipedia_rewrite_links(Document& doc, const WikipediaRef& self);
 
-// Native form of a web page URL ("" when there is none). Currently
-// Wikipedia articles only.
-std::string native_url_for(std::string_view url);
-
 #if defined(XANATOO_WIKIPEDIA) && XANATOO_WIKIPEDIA
 // Fetch an article; `final_ref` receives the canonical ref after
 // redirects (with the requested fragment).
