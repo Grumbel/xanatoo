@@ -183,6 +183,10 @@ Next bundle number: **263** (this delivery is **262**)
   renders a read-only Markdown index (dirs first, absolute links, dot files
   hidden); `navigate_pane` normalises to a trailing '/'.
 - Open: non-document files in a listing (images, …) still open as text.
+- Up (toolbar ↑, View → Up, Alt+Up on read-only pages, `UiCommand::GoUp`):
+  `up_url` (native.hpp, pure + unit-tested) — local dirs, URL path levels
+  (http / gemini), reddit post → subreddit → front page, hn: → hn:,
+  lemmy: → instance web page; wikipedia: / nostr: / feed: have no parent.
 - `examples/footnotes.md` demos marks, notes and the overlay.
 
 ## Status (2026-10-27) — footnotes

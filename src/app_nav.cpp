@@ -20,6 +20,7 @@
 #include "xanatoo/parse.hpp"
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/sidestore.hpp"
+#include "xanatoo/native.hpp"
 #include "xanatoo/util.hpp"
 
 namespace fs = std::filesystem;
@@ -171,6 +172,19 @@ std::string home_page(App& app) {
   std::string p = find_repo_file(app, "welcome.md");
   if (p.empty()) p = xanatoo::find_default_document();
   return p;
+}
+
+std::string page_up_url(App& app) {
+  std::string page = path_of(app, focused_pane(app));
+  if (page.empty()) return {};
+  // Local paths go up through absolute directories.
+  if (!is_in_app_remote_url(page) && page.find("://") == std::string::npos &&
+      page.find(':') == std::string::npos) {
+    std::error_code ec;
+    fs::path abs = fs::absolute(page, ec);
+    if (!ec) page = abs.lexically_normal().string();
+  }
+  return xanatoo::up_url(page);
 }
 
 bool navigate_to_url(App& app, std::string target, bool record_history) {

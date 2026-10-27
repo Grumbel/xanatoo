@@ -117,6 +117,64 @@ std::string alternate_view_url(std::string_view url) {
   return web_url_for(url);
 }
 
+namespace {
+
+// Parent of a '/'-separated path (query / fragment dropped): "a/b/c" and
+// "a/b/c/" → "a/b/"; "a" → "". `path` holds no leading root.
+std::string parent_path_of(std::string_view path) {
+  path = path.substr(0, path.find_first_of("?#"));
+  if (ends_with(path, "/")) path.remove_suffix(1);
+  const size_t slash = path.rfind('/');
+  if (slash == std::string_view::npos) return {};
+  return std::string(path.substr(0, slash + 1));
+}
+
+}  // namespace
+
+std::string up_url(std::string_view url) {
+  trim_ascii(url);
+  if (url.empty()) return {};
+  if (starts_with(url, "/")) {
+    std::string up = parent_path_of(url.substr(1));
+    if (up.empty() && url.find_first_not_of('/') == std::string_view::npos)
+      return {};
+    return "/" + up;
+  }
+  if (size_t sep = url.find("://"); sep != std::string_view::npos) {
+    const size_t path_at = url.find_first_of("/?#", sep + 3);
+    if (path_at == std::string_view::npos) return {};
+    const std::string_view origin = url.substr(0, path_at);
+    std::string_view rest = url.substr(path_at);
+    if (starts_with(rest, "/")) rest.remove_prefix(1);
+    // "https://h/" itself, or "https://h/?q" / "#f" → "https://h/".
+    if (rest.empty()) return {};
+    return std::string(origin) + "/" + parent_path_of(rest);
+  }
+  if (is_hn_ref(url)) {
+    if (after_prefix(url, kHnPrefix).empty()) return {};
+    return std::string(kHnPrefix);
+  }
+  if (is_reddit_ref(url)) {
+    std::string_view rest = after_prefix(url, kRedditPrefix);
+    rest = rest.substr(0, rest.find_first_of("?#"));
+    // A post's parent is its subreddit, not the bare ".../comments/".
+    if (size_t c = rest.find("/comments/"); c != std::string_view::npos)
+      return std::string(kRedditPrefix) + std::string(rest.substr(0, c + 1));
+    if (rest.empty()) return {};
+    std::string up = parent_path_of(rest);
+    if (up == "r/" || up == "user/") up.clear();
+    return std::string(kRedditPrefix) + up;
+  }
+  if (is_lemmy_ref(url)) {
+    // Communities and posts sit under the instance, which has no native
+    // view: up leaves for its web page.
+    std::string_view rest = after_prefix(url, kLemmyPrefix);
+    return "https://" + std::string(rest.substr(0, rest.find_first_of("/?#"))) +
+           "/";
+  }
+  return {};
+}
+
 void native_rewrite_links(Document& doc, std::string_view ref) {
   std::string (*to_ref)(std::string_view) = nullptr;
   // Lemmy's path test is too loose for arbitrary links ("/c/" anywhere);

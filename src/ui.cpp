@@ -219,7 +219,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
       "strike", "cite", "h1", "h2", "h3", "para", "task", "table",
       "figure", "note", "replace", "outline", "paste", "copy", "new", "open",
       "zoomin", "zoomout", "structure", "diff",
-      "back", "forward", "home", "reload", "stop", "bookmark", "history", "browse", "native",
+      "back", "forward", "up", "home", "reload", "stop", "bookmark", "history", "browse", "native",
       "linespacing", "measure", "style",
       "format", "insert", "view", "lists",
   };
@@ -742,6 +742,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Back", UiCommand::NavBack, cmd, state.can_nav_back, "Alt+Left");
       menu_item_cmd("Forward", UiCommand::NavForward, cmd, state.can_nav_forward,
                     "Alt+Right");
+      menu_item_cmd("Up", UiCommand::GoUp, cmd, !state.up_url.empty(), "Alt+Up");
       menu_item_cmd("Home", UiCommand::GoHome, cmd, true, "Alt+Home");
       menu_item_cmd(state.native_view ? "Web Page View" : "Native View",
                     UiCommand::ToggleNative, cmd, !state.alternate_url.empty());
@@ -878,6 +879,13 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                 state.can_nav_back);
     tool_button("tb_fwd", "forward", "Forward (Alt+Right)", UiCommand::NavForward,
                 cmd, state.can_nav_forward);
+    {
+      const std::string tip = state.up_url.empty()
+                                  ? std::string("Up (at the top)")
+                                  : "Up (Alt+Up when read-only): " + state.up_url;
+      tool_button("tb_up", "up", tip.c_str(), UiCommand::GoUp, cmd,
+                  !state.up_url.empty());
+    }
     tool_button("tb_home", "home", "Home (Alt+Home)", UiCommand::GoHome, cmd);
     if (state.loading)
       tool_button("tb_stop", "stop", "Stop loading (Esc)",

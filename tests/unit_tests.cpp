@@ -1512,6 +1512,27 @@ void test_wikipedia() {
             "hn:item?id=1");
   EXPECT_EQ(alternate_view_url("https://example.org/"), "");
   EXPECT_EQ(alternate_view_url("notes.md"), "");
+
+  EXPECT_EQ(up_url("/a/b/c.md"), "/a/b/");
+  EXPECT_EQ(up_url("/a/b/"), "/a/");
+  EXPECT_EQ(up_url("/a"), "/");
+  EXPECT_EQ(up_url("/"), "");
+  EXPECT_EQ(up_url("https://h.org/a/b?q=1#f"), "https://h.org/a/");
+  EXPECT_EQ(up_url("https://h.org/a/"), "https://h.org/");
+  EXPECT_EQ(up_url("https://h.org/a"), "https://h.org/");
+  EXPECT_EQ(up_url("https://h.org/?q"), "https://h.org/");
+  EXPECT_EQ(up_url("https://h.org/"), "");
+  EXPECT_EQ(up_url("https://h.org"), "");
+  EXPECT_EQ(up_url("gemini://g.net/docs/faq.gmi"), "gemini://g.net/docs/");
+  EXPECT_EQ(up_url("hn:item?id=1"), "hn:");
+  EXPECT_EQ(up_url("hn:"), "");
+  EXPECT_EQ(up_url("reddit:r/linux/comments/abc/t/"), "reddit:r/linux/");
+  EXPECT_EQ(up_url("reddit:r/linux/"), "reddit:");
+  EXPECT_EQ(up_url("reddit:r/linux/top/"), "reddit:r/linux/");
+  EXPECT_EQ(up_url("reddit:"), "");
+  EXPECT_EQ(up_url("lemmy:lemmy.world/post/7"), "https://lemmy.world/");
+  EXPECT_EQ(up_url("wikipedia:Hypertext"), "");
+  EXPECT_EQ(up_url("notes.md"), "");
   {
     Document hn;
     NodeId root = hn.create(NodeKind::Document);

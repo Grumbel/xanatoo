@@ -37,6 +37,14 @@ std::string native_url_for(std::string_view url);
 // "" when the page has only one form.
 std::string alternate_view_url(std::string_view url);
 
+// One level up the page hierarchy, "" at the top or when there is none:
+//   /a/b/c.md → /a/b/ → /a/ → /      (absolute local paths, dirs end in '/')
+//   https://h/a/b?q#f → https://h/a/ → https://h/   (also gemini:// etc.)
+//   reddit:r/x/comments/id/t/ → reddit:r/x/ → reddit:
+//   hn:item?id=1 → hn:          lemmy:h/c/x, lemmy:h/post/1 → https://h/
+// Other refs (wikipedia:, nostr:, feed:, …) have no parent.
+std::string up_url(std::string_view url);
+
 // In a fetched native view, turn links to other pages of the same service
 // (by the ref's prefix: "hn:" / "reddit:") into refs so they stay native.
 // Lemmy views get refs from lemmy.cpp directly.

@@ -140,8 +140,9 @@ green. Use this for reading and navigating.
 ## Navigation (history & bookmarks)
 
 - **Alt+Left** / **Alt+Right** — Back / Forward in session history
+- **Alt+Up** (read-only pages) — Up one level: parent directory, URL path, subreddit
 - **Alt+Home** — Home page (`welcome.md`; toolbar house button)
-- **Browse toolbar** — Back, Forward, Home, Reload, Native view (web page ↔ `wikipedia:` / `hn:` / `reddit:` / `lemmy:` form; pressed while native), location field, Bookmark, History, Browse mode
+- **Browse toolbar** — Back, Forward, Up, Home, Reload, Native view (web page ↔ `wikipedia:` / `hn:` / `reddit:` / `lemmy:` form; pressed while native), location field, Bookmark, History, Browse mode
 - **Edit toolbar** — file, clipboard, bold/italic/link; menus for more format, structure, lists, insert; Find, Split pane and Heading outline toggles, and view tools
 - **Services menu** — front pages of the built-in clients: Wikipedia, Hacker News, Reddit, Lemmy, Nostr, Gemini, Standard Ebooks, books and feeds
 - **Ctrl+Shift+H** / **View → History** — session history panel (click to open)

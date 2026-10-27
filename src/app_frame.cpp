@@ -134,6 +134,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
     ui_state.alternate_url = xanatoo::alternate_view_url(path);
     ui_state.native_view = !ui_state.alternate_url.empty() &&
                            xanatoo::native_url_for(path).empty();
+    ui_state.up_url = page_up_url(app);
   }
   if (ui_state.services.empty()) {
     // Front pages of the in-app clients; greyed out when not built in.
@@ -284,7 +285,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     const bool allowed =
         c == C::Quit || c == C::OpenDocument || c == C::OpenUrlBar ||
         c == C::NavigateUrl || c == C::NavBack || c == C::NavForward ||
-        c == C::GoHome ||
+        c == C::GoHome || c == C::GoUp ||
         c == C::ToggleHistory || c == C::ToggleBookmarks ||
         c == C::AddBookmark || c == C::RemoveBookmark || c == C::NewTab ||
         c == C::CloseTab || c == C::NextTab || c == C::PrevTab ||
@@ -408,6 +409,14 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         flash_status(app, "Home page not found (welcome.md)");
       else
         navigate_to_url(app, home);
+      break;
+    }
+    case C::GoUp: {
+      const std::string up = page_up_url(app);
+      if (up.empty())
+        flash_status(app, "Already at the top");
+      else
+        navigate_to_url(app, up);
       break;
     }
     case C::NewTab: {

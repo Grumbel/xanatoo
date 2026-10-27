@@ -667,6 +667,9 @@ std::string resolve_doc_href(App& app, const std::string& href,
                              const std::string& base_path = {});
 // Page the Home button opens (welcome.md); empty when not found.
 std::string home_page(App& app);
+// Parent of the focused page (directory, URL path level, subreddit, …) for
+// the Up button; "" at the top.
+std::string page_up_url(App& app);
 // Open `target` (path, gemini://, Nostr, Reddit, Lemmy) in the focused pane /
 // in pane `pi`. Remote pages load in the background; true = opened or started.
 bool navigate_to_url(App& app, std::string target, bool record_history = true);

@@ -21,6 +21,7 @@ enum class UiCommand {
   NavBack,     // Alt+Left session history
   NavForward,  // Alt+Right
   GoHome,      // Alt+Home: home page (welcome.md for now)
+  GoUp,        // one level up the page hierarchy (UiState::up_url)
   StopLoading, // cancel running page fetches (toolbar Stop, Esc)
   ToggleHistory,   // View → History panel
   AddBookmark,     // bookmark current page URL/path
@@ -189,6 +190,7 @@ struct UiState {
   // Other view of the focused page ("" = none): the native ref of a web
   // page (wikipedia:Title, hn:item?id=1) or the web URL of a native view.
   std::string alternate_url;
+  std::string up_url;  // parent page of the focused one ("" at the top)
   bool native_view = false;  // focused page is a native ref (alternate = web)
   // Caret / right-click inside a Collection: its current view for the
   // Collection menus (layout 0 grid, 1 list, 2 full; sort 0 doc, 1 name,

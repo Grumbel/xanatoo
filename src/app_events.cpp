@@ -1412,6 +1412,9 @@ static bool handle_nav_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
           reset_blink(app);
           flash_status(app, "Section moved up");
         }
+      } else if ((ev.key.keysym.mod & KMOD_ALT) != 0 && browsing(app)) {
+        // Read-only pages have no blocks to move: Alt+Up goes up instead.
+        execute_command(app, xanatoo::UiCommand::GoUp, {});
       } else if ((ev.key.keysym.mod & KMOD_ALT) != 0) {
         edit(app);
         if (xanatoo::move_block_up(d, p.sel.focus.node)) {

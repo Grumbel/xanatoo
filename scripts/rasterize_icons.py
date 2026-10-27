@@ -253,6 +253,10 @@ def draw_icon(name: str, size: int = 20) -> bytes:
         line(buf, size, size, S(12), S(4), S(6), S(10), INK, 2)
         line(buf, size, size, S(6), S(10), S(12), S(16), INK, 2)
         line(buf, size, size, S(6), S(10), S(16), S(10), INK, 2)
+    elif name == "up":
+        line(buf, size, size, S(4), S(10), S(10), S(4), INK, 2)
+        line(buf, size, size, S(10), S(4), S(16), S(10), INK, 2)
+        line(buf, size, size, S(10), S(4), S(10), S(16), INK, 2)
     elif name == "home":
         line(buf, size, size, S(3), S(10), S(10), S(3), INK, 2)
         line(buf, size, size, S(10), S(3), S(17), S(10), INK, 2)
