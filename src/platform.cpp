@@ -5,6 +5,8 @@
 
 #include <SDL.h>
 
+#include <cmath>
+
 #ifdef __ANDROID__
 #include <android/log.h>
 #include <unistd.h>
@@ -141,6 +143,14 @@ void platform_release_keyboard() { SDL_StopTextInput(); }
 
 bool platform_text_input_at_start() { return false; }
 
+float platform_default_ui_scale() {
+  float ddpi = 0.f;
+  if (SDL_GetDisplayDPI(0, &ddpi, nullptr, nullptr) != 0 || ddpi <= 0.f)
+    return 1.f;
+  const float s = std::round(ddpi / 160.f * 4.f) / 4.f;
+  return s < 1.f ? 1.f : s;
+}
+
 #else
 
 void platform_pre_init() {}
@@ -148,6 +158,7 @@ void platform_init() {}
 void platform_request_keyboard() {}
 void platform_release_keyboard() {}
 bool platform_text_input_at_start() { return true; }
+float platform_default_ui_scale() { return 1.f; }
 
 #endif
 

@@ -75,7 +75,7 @@ void print_usage(const char* argv0) {
       << "Ctrl+\\ toggles split; drag the gutter to resize panes.\n"
       << "\n"
       << "  -F, --fullscreen      Borderless fullscreen\n"
-      << "  --ui-scale <n>        ImGui chrome scale (default: auto from width)\n"
+      << "  --ui-scale <n>        chrome + default text scale (default: 1; Android: dpi/160)\n"
       << "\n"
       << "Font resolution: --font / XANATOO_FONT, then FontConfig\n"
       << "(regular/bold/italic/mono faces for styled text).\n";

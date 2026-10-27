@@ -108,14 +108,17 @@ struct LayoutOptions {
   float line_spacing = 1.30f;
   float max_content_width = 0.f;  // 0 = fill pane
   bool justify = false;
+  // Display scale for px lengths (style sheet px, margins, measure).
+  float px_scale = 1.f;
 
-  static LayoutOptions from_view(const ViewSettings& v) {
+  static LayoutOptions from_view(const ViewSettings& v, float px_scale = 1.f) {
     LayoutOptions o;
-    o.margin_x = v.margin_x;
-    o.margin_y = v.margin_y;
+    o.margin_x = v.margin_x * px_scale;
+    o.margin_y = v.margin_y * px_scale;
     o.line_spacing = v.line_spacing;
-    o.max_content_width = v.max_content_width;
+    o.max_content_width = v.max_content_width * px_scale;
     o.justify = v.justify;
+    o.px_scale = px_scale;
     return o;
   }
 };

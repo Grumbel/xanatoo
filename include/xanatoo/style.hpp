@@ -26,11 +26,14 @@ struct Rgba {
   bool operator==(const Rgba&) const = default;
 };
 
-// px, or em relative to the body font size (follows zoom).
+// px (logical: × ui scale, like CSS px on high-density screens), or em
+// relative to the body font size (follows zoom).
 struct Length {
   float value = 0.f;
   bool em = false;
-  float px(float em_px) const { return em ? value * em_px : value; }
+  float px(float em_px, float px_scale = 1.f) const {
+    return em ? value * em_px : value * px_scale;
+  }
 };
 
 enum class BlockRole : uint8_t {

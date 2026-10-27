@@ -203,8 +203,9 @@ public:
   Ui(const Ui&) = delete;
   Ui& operator=(const Ui&) = delete;
 
-  // ui_scale: 0 = auto from window width (larger on ≤720px displays).
-  bool init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale = 0.f);
+  // ui_scale: chrome factor (font, padding, icons, toolbar rows); 1 = 14 px
+  // menu font. The app passes --ui-scale or the display density.
+  bool init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale = 1.f);
   void shutdown();
 
   void process_event(const SDL_Event& ev);
@@ -250,6 +251,7 @@ private:
   void tool_menu_end();
 
   bool ready_ = false;
+  float scale_ = 1.f;
   SDL_Renderer* renderer_ = nullptr;
   std::unordered_map<std::string, Icon> icons_;
 

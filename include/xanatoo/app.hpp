@@ -29,21 +29,27 @@
 // "systems" that read/transform it. No behaviour lives on the data types.
 namespace xanatoo::app {
 
-constexpr int kSbW = 14;
-constexpr int kSbArrow = 14;
-constexpr int kSbLayoutGutter = kSbW + 4;
+// Chrome metrics in px at ui scale 1. Variables, not constants: app_init
+// multiplies them once by the display's ui scale (set_chrome_scale; --ui-scale
+// or dpi/160 on Android) before anything is laid out.
+inline int kSbW = 14;
+inline int kSbArrow = 14;
+inline int kSbLayoutGutter = kSbW + 4;
 constexpr float kBlockGripW = 18.f;
 constexpr int soft_snap_px = 16;
 constexpr int soft_dock_zone = 36;
-constexpr int status_bar_h = 28;
+inline int status_bar_h = 28;
 constexpr int kMaxNavHistory = 100;
-constexpr int help_title_h = 28;
-constexpr int float_close_w = 28;  // close box hit zone at the title's right
+inline int help_title_h = 28;
+inline int float_close_w = 28;  // close box hit zone at the title's right
 // Canvas chrome text (status line, window titles, outline / backlinks);
 // matches the ImGui menu font and ignores document style + zoom.
-constexpr int kUiFontPx = 14;
-constexpr int help_pad = 12;
-constexpr int help_edge = 6;
+inline int kUiFontPx = 14;
+inline int help_pad = 12;
+inline int help_edge = 6;
+
+// Scale the chrome metrics above (call once, before the first layout).
+void set_chrome_scale(float scale);
 
 // Stable identity of a document buffer; never reused, 0 = none.
 using BufferId = uint32_t;
@@ -248,6 +254,7 @@ struct App {
   int body_px = 17;
   int heading_px = 26;
   xanatoo::FontSet fonts;
+  float ui_scale = 1.f;        // chrome / default zoom factor (set_chrome_scale)
   xanatoo::Font ui_font;       // chrome text (see kUiFontPx)
   xanatoo::Font ui_font_bold;  // outline top level, emphasis in chrome
   std::vector<DocBuffer> buffers;  // dense storage; address by BufferId
@@ -461,12 +468,15 @@ float local_x(App& app, float mx, int pi);
 float content_y(App& app, float window_y);
 std::tuple<int, int, int, int> outline_client_rect(App& app);
 float outline_row_step(App& app);
+// Backlinks rows: same height as outline rows (paint + click).
+inline float backlinks_row_step(App& app) { return outline_row_step(app); }
 // Horizontal layout of one outline row, relative to the client x: shortcut
-// number right edge, disclosure triangle box (kOutlineTwistW wide), text.
-constexpr int kOutlineTwistW = 14;
+// number right edge, disclosure triangle box (twist_w wide), text. Scales
+// with the ui scale.
 struct OutlineRowGeom {
   int num_right = 0;
   int twist_x = 0;
+  int twist_w = 14;
   int text_x = 0;
 };
 OutlineRowGeom outline_row_geom(App& app, int level);

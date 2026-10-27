@@ -8,6 +8,22 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-27) — Android: data, keyboard, SQLite, TLS, density
+
+- Tested on a Fire 7 (Fire OS 5 / Android 5.1.1) over adb.
+- APK assets (examples, FORMAT.md, styles, icons, DejaVu fonts) unpacked to
+  internal storage (`src/platform.cpp`); logcat for std::cout/cerr; Back =
+  Esc; on-screen keyboard on caret tap / URL field, window resizes above it
+  and the caret is revealed.
+- SQLite amalgamation module; `TlsStream` (tls.hpp) with OpenSSL (desktop)
+  and Mbed TLS (Android, `-DXANATOO_TLS=mbedtls`) backends — Gemini, Nostr,
+  Reddit, Lemmy work on the device. mbedTLS entropy from /dev/urandom
+  (getrandom blocked ~60 s on Fire OS 5).
+- `--ui-scale` / Android density scales chrome, default text and px
+  lengths.
+- Open: certificate verification (all backends, pre-existing), rare
+  SIGSEGV in SDL 2.30.3 RenderPresent during keyboard resize (seen once).
+
 ## Status (2026-10-27) — Android port (bare bones)
 
 - `nix build .#xanatoo-android` builds a signed debug APK (API 21+,

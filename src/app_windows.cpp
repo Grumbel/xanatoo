@@ -15,7 +15,6 @@ namespace xanatoo::app {
 
 namespace {
 
-constexpr int kBacklinkStep = 22;
 
 bool resizable(const FloatWindow& w) { return w.role != WindowRole::Backlinks; }
 
@@ -89,7 +88,7 @@ void begin_scroll_drag(App& app, FloatWindow& w, int my) {
 // ---- role-specific client actions ----
 
 void click_backlinks(App& app, FloatWindow& w, int my) {
-  const float step = static_cast<float>(kBacklinkStep);
+  const float step = backlinks_row_step(app);
   auto [cx, cy, cw, ch] = backlinks_client_rect(w);
   const int row =
       static_cast<int>((static_cast<float>(my - cy) + w.scroll) / step);
@@ -117,7 +116,7 @@ void click_outline(App& app, FloatWindow& w, int mx, int my) {
   const int local_x = mx - cx;
   const OutlineRowGeom g = outline_row_geom(app, er.level);
   const bool on_twist = er.has_children && local_x >= g.twist_x - 4 &&
-                        local_x < g.twist_x + kOutlineTwistW + 2;
+                        local_x < g.twist_x + g.twist_w + 2;
   if (on_twist && er.section != xanatoo::INVALID_NODE) {
     toggle_section_fold(app, er.section);
   } else {
@@ -314,7 +313,7 @@ float float_max_scroll(App& app, const FloatWindow& w) {
                    8.f - view_h);
     case WindowRole::Backlinks:
       return std::max(0.f, static_cast<float>(app.backlinks.size()) *
-                                   static_cast<float>(kBacklinkStep) +
+                                   backlinks_row_step(app) +
                                8.f - view_h);
   }
   return 0.f;

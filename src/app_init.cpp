@@ -3,6 +3,7 @@
 //
 // App lifecycle: build the initial world state / tear down platform handles.
 
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
@@ -13,6 +14,7 @@
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/parse.hpp"
+#include "xanatoo/platform.hpp"
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/util.hpp"
@@ -22,6 +24,23 @@ namespace fs = std::filesystem;
 namespace xanatoo::app {
 
 bool app_init(App& app) {
+  // Chrome metrics, UI font and the default document size follow the
+  // display scale (--ui-scale, else density on Android).
+  app.ui_scale = app.opt.ui_scale > 0.f ? app.opt.ui_scale
+                                        : xanatoo::platform_default_ui_scale();
+  set_chrome_scale(app.ui_scale);
+  std::cout << "UI scale: " << app.ui_scale << "\n";
+  app.body_px = static_cast<int>(std::lround(app.body_px * app.ui_scale));
+  app.heading_px = static_cast<int>(std::lround(app.heading_px * app.ui_scale));
+  // Panel geometry defaults (px at scale 1).
+  for (FloatWindow* w : {&app.help, &app.bl, &app.ol}) {
+    w->x = static_cast<int>(std::lround(w->x * app.ui_scale));
+    w->y = static_cast<int>(std::lround(w->y * app.ui_scale));
+    w->w = static_cast<int>(std::lround(w->w * app.ui_scale));
+    w->h = static_cast<int>(std::lround(w->h * app.ui_scale));
+  }
+  app.outline_dock_w =
+      static_cast<int>(std::lround(app.outline_dock_w * app.ui_scale));
   // Preferred paths are optional — FontConfig resolves a full family set.
   auto existing_font = [](std::string path) {
     if (!path.empty() && !fs::exists(path)) {
@@ -106,8 +125,8 @@ bool app_init(App& app) {
   for (const auto& b : app.buffers) app.tab_order.push_back(b.id);
   update_title(app);
   app.layout_engine.set_options(
-      xanatoo::LayoutOptions::from_view(app.view_settings));
-  if (!app.ui.init(app.window, app.sdl, app.opt.ui_scale)) {
+      xanatoo::LayoutOptions::from_view(app.view_settings, app.ui_scale));
+  if (!app.ui.init(app.window, app.sdl, app.ui_scale)) {
     std::cerr << "Warning: ImGui UI failed to init; continuing without menus\n";
   }
   app.panes[0].buf = app.buffers.front().id;
@@ -127,7 +146,8 @@ bool app_init(App& app) {
       app.win_h = nh;
     }
   }
-  if (app.win_w > 0 && app.win_w <= 720 && app.body_px < 20) {
+  if (app.ui_scale == 1.f && app.win_w > 0 && app.win_w <= 720 &&
+      app.body_px < 20) {
     app.body_px = 20;
     app.heading_px = 28;
   }

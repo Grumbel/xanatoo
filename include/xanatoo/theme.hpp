@@ -72,6 +72,7 @@ struct WindowChrome {
   bool active = true;     // yellow tab vs. grey
   bool close_box = true;  // right-aligned close widget (hit zone: last 28px)
   bool resizable = true;  // SE grip
+  float scale = 1.f;      // ui scale: close box size
 };
 
 // Frame, title strip (gradient), close box and resize grip. The window

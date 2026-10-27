@@ -2427,16 +2427,17 @@ void draw_outline_panel(App& app) {
       }
       // Disclosure triangle (drawn, so it never depends on font coverage).
       if (e.has_children) {
-        const int tcx = cx + g.twist_x + kOutlineTwistW / 2;
+        const int tcx = cx + g.twist_x + g.twist_w / 2;
         const int tcy = ry + rh / 2;
         SDL_SetRenderDrawColor(app.sdl, dim.r, dim.g, dim.b, 255);
-        for (int k = 0; k <= 4; ++k) {
+        const int t = std::max(4, g.twist_w * 2 / 7);  // half extent
+        for (int k = 0; k <= t; ++k) {
           if (e.folded)  // ▸ pointing right
-            SDL_RenderDrawLine(app.sdl, tcx - 2 + k, tcy - 4 + k, tcx - 2 + k,
-                               tcy + 4 - k);
+            SDL_RenderDrawLine(app.sdl, tcx - t / 2 + k, tcy - t + k,
+                               tcx - t / 2 + k, tcy + t - k);
           else  // ▾ pointing down
-            SDL_RenderDrawLine(app.sdl, tcx - 4 + k, tcy - 2 + k, tcx + 4 - k,
-                               tcy - 2 + k);
+            SDL_RenderDrawLine(app.sdl, tcx - t + k, tcy - t / 2 + k,
+                               tcx + t - k, tcy - t / 2 + k);
         }
       }
       const int text_w = text_right - g.text_x - 4;
@@ -2467,7 +2468,7 @@ void draw_backlinks_panel(App& app) {
   if (app.backlinks_mode) {
     if (app.bl.w < 200) app.bl.w = 200;
     if (app.bl.h < 120) app.bl.h = 120;
-    const float step = 22.f;
+    const float step = backlinks_row_step(app);
     const int title_h = help_title_h;
     const int pad = 8;
     int cx = app.bl.x + pad, cy = app.bl.y + title_h + 4;

@@ -91,7 +91,21 @@ The same switch works for desktop CMake builds (`-DXANATOO_FONTCONFIG=OFF
 -DXANATOO_TLS=mbedtls`), which is the quick way to check that the Android
 source set still compiles.
 
+## Display density
+
+`app.ui_scale` = `--ui-scale`, else `platform_default_ui_scale()`: on
+Android dpi / 160 in quarter steps (at least 1), on desktop 1. It scales the
+ImGui font / style / toolbar rows / icons, the canvas chrome metrics
+(`set_chrome_scale`: status bar, title bars, close box, panel padding,
+scrollbars, UI font), panel default sizes, the default document text size,
+and px lengths in layout (style sheet px, view margins, measure:
+`LayoutOptions::px_scale`; em lengths already follow the font). Test on
+desktop with `--ui-scale 2`. The Fire 7 is 160 dpi, so it runs at 1.
+
+Toolbar icons are 20 px PNGs scaled up; rasterize them larger if they look
+soft on high-density screens.
+
 ## Next
 
-- Chrome scaled by display density (`--ui-scale`, default dpi/160).
 - Certificate verification (system CAs; TOFU for Gemini).
+- Per-glyph font fallback (Android system fonts for scripts DejaVu lacks).

@@ -117,11 +117,14 @@ void draw_window_chrome(SDL_Renderer* r, const WindowChrome& w) {
   SDL_RenderDrawRect(r, &o);
   // Close box (right), 16x14 inside the 28px hit zone
   if (w.close_box) {
-    SDL_Rect cb{o.x + o.w - 24, o.y + (w.title_h - 15) / 2, 18, 15};
+    auto px = [&](int v) { return static_cast<int>(v * w.scale + 0.5f); };
+    const int bw = px(18), bh = px(15);
+    SDL_Rect cb{o.x + o.w - px(24), o.y + (w.title_h - bh) / 2, bw, bh};
     draw_button_face(r, cb, false, false);
     set(r, p.text);
     const int cx = cb.x + cb.w / 2, cy = cb.y + cb.h / 2;
-    for (int d = -3; d <= 3; ++d) {
+    const int arm = px(3);
+    for (int d = -arm; d <= arm; ++d) {
       SDL_RenderDrawPoint(r, cx + d, cy + d);
       SDL_RenderDrawPoint(r, cx + d + 1, cy + d);
       SDL_RenderDrawPoint(r, cx + d, cy - d);

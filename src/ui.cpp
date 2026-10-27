@@ -287,7 +287,7 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
   ImGui::BeginDisabled(!enabled);
   if (ic) {
     ImGui::PushID(id);
-    ImVec2 size(static_cast<float>(ic->w), static_cast<float>(ic->h));
+    ImVec2 size(ic->w * scale_, ic->h * scale_);
     // Pad hit target a little for classic toolbar feel
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.f, 3.f));
     if (ImGui::ImageButton(
@@ -347,7 +347,7 @@ bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip)
   ImGui::PushID(id);
   bool pressed = false;
   if (ic) {
-    ImVec2 size(static_cast<float>(ic->w), static_cast<float>(ic->h));
+    ImVec2 size(ic->w * scale_, ic->h * scale_);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.f, 3.f));
     if (ImGui::ImageButton(
             "##btn", reinterpret_cast<ImTextureID>(ic->texture), size,
@@ -396,9 +396,9 @@ void Ui::tool_menu_end() {
   ImGui::PopID();
 }
 
-static void load_ui_fonts(ImGuiIO& io) {
+static void load_ui_fonts(ImGuiIO& io, float scale) {
   // ~10–11 pt at 96 dpi — close to GNOME 2 menu/toolbar size
-  const float size_px = 14.0f;
+  const float size_px = std::round(14.0f * scale);
   std::string path = ui_font_path();
   ImFontConfig cfg;
   cfg.OversampleH = 2;
@@ -427,9 +427,9 @@ bool Ui::init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale) {
   // Gamepad navigates ImGui menus when a controller is present.
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
   io.IniFilename = nullptr;
-  (void)ui_scale;  // font size is fixed; scale arg kept for API only
+  scale_ = ui_scale > 0.f ? ui_scale : 1.f;
 
-  load_ui_fonts(io);
+  load_ui_fonts(io, scale_);
   apply_classic_theme();
   // Slightly roomier chrome once a proportional face is loaded
   {
@@ -437,6 +437,7 @@ bool Ui::init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale) {
     s.FramePadding = ImVec2(7.f, 4.f);
     s.ItemSpacing = ImVec2(7.f, 5.f);
     s.ScrollbarSize = 14.f;
+    s.ScaleAllSizes(scale_);
   }
   load_icons(renderer);
 
@@ -835,7 +836,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGuiWindowFlags_NoScrollWithMouse;
 
   // -- Browse / navigation row (browser chrome) --
-  const float browse_h = 34.f;
+  const float browse_h = 34.f * scale_;
   ImGui::SetNextWindowPos(ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
   ImGui::SetNextWindowSize(ImVec2(vp->Size.x, browse_h));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.f, 4.f));
@@ -955,7 +956,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   result.top_reserved += browse_h;
 
   // -- Edit row (compact: primary icons + dropdown groups) --
-  const float edit_h = 36.f;
+  const float edit_h = 36.f * scale_;
   ImGui::SetNextWindowPos(ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
   ImGui::SetNextWindowSize(ImVec2(vp->Size.x, edit_h));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.f, 4.f));
@@ -1090,7 +1091,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
 
   // ---- Document tab strip (browser-style) ----
   if (!state.tab_labels.empty()) {
-    const float tab_h = 28.f;
+    const float tab_h = 28.f * scale_;
     ImGui::SetNextWindowPos(
         ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
     ImGui::SetNextWindowSize(ImVec2(vp->Size.x, tab_h));
@@ -1280,7 +1281,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   // ---- On-screen keyboard (handheld / no physical keyboard) ----
   if (state.virtual_keyboard) {
     ImGuiViewport* vk_vp = ImGui::GetMainViewport();
-    const float vk_h = vk_vp->Size.y < 500.f ? 200.f : 220.f;
+    const float vk_h = (vk_vp->Size.y < 500.f ? 200.f : 220.f) * scale_;
     ImGui::SetNextWindowPos(
         ImVec2(vk_vp->Pos.x, vk_vp->Pos.y + vk_vp->Size.y - vk_h));
     ImGui::SetNextWindowSize(ImVec2(vk_vp->Size.x, vk_h));
@@ -1290,7 +1291,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing;
     if (ImGui::Begin("##vkeyboard", nullptr, vk_flags)) {
       auto keybtn = [&](const char* label, const char* payload, float w) {
-        if (ImGui::Button(label, ImVec2(w, 34.f))) {
+        if (ImGui::Button(label, ImVec2(w, 34.f * scale_))) {
           if (cmd == UiCommand::None) {
             cmd = UiCommand::VirtualKey;
             result.arg = payload;
@@ -1317,7 +1318,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         keybtn(lab, pay, kw);
       }
       ImGui::NewLine();
-      if (ImGui::Button(shift ? "SHIFT" : "Shift", ImVec2(kw * 1.6f, 34.f)))
+      if (ImGui::Button(shift ? "SHIFT" : "Shift", ImVec2(kw * 1.6f, 34.f * scale_)))
         shift = !shift;
       ImGui::SameLine(0.f, 2.f);
       for (const char* c = row3; *c; ++c) {
@@ -1325,7 +1326,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         char pay[2] = {*c, 0};
         keybtn(lab, pay, kw);
       }
-      if (ImGui::Button("Bksp", ImVec2(kw * 1.8f, 34.f))) {
+      if (ImGui::Button("Bksp", ImVec2(kw * 1.8f, 34.f * scale_))) {
         if (cmd == UiCommand::None) {
           cmd = UiCommand::VirtualKey;
           result.arg = "\b";
@@ -1339,7 +1340,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         keybtn(lab, pay, kw * 0.95f);
       }
       ImGui::NewLine();
-      if (ImGui::Button(",", ImVec2(kw, 34.f))) {
+      if (ImGui::Button(",", ImVec2(kw, 34.f * scale_))) {
         if (cmd == UiCommand::None) {
           cmd = UiCommand::VirtualKey;
           result.arg = ",";
@@ -1347,28 +1348,28 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       }
       ImGui::SameLine(0.f, 2.f);
       const float space_w = std::max(100.f, vk_vp->Size.x - kw * 6.f);
-      if (ImGui::Button("Space", ImVec2(space_w, 34.f))) {
+      if (ImGui::Button("Space", ImVec2(space_w, 34.f * scale_))) {
         if (cmd == UiCommand::None) {
           cmd = UiCommand::VirtualKey;
           result.arg = " ";
         }
       }
       ImGui::SameLine(0.f, 2.f);
-      if (ImGui::Button(".", ImVec2(kw, 34.f))) {
+      if (ImGui::Button(".", ImVec2(kw, 34.f * scale_))) {
         if (cmd == UiCommand::None) {
           cmd = UiCommand::VirtualKey;
           result.arg = ".";
         }
       }
       ImGui::SameLine(0.f, 2.f);
-      if (ImGui::Button("Enter", ImVec2(kw * 2.f, 34.f))) {
+      if (ImGui::Button("Enter", ImVec2(kw * 2.f, 34.f * scale_))) {
         if (cmd == UiCommand::None) {
           cmd = UiCommand::VirtualKey;
           result.arg = "\n";
         }
       }
       ImGui::SameLine(0.f, 2.f);
-      if (ImGui::Button("Hide", ImVec2(kw * 1.6f, 34.f)))
+      if (ImGui::Button("Hide", ImVec2(kw * 1.6f, 34.f * scale_)))
         cmd = UiCommand::ToggleVirtualKeyboard;
     }
     ImGui::End();

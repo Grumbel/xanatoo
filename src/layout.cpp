@@ -209,9 +209,10 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
   // Role spacing from the style sheet; em follows the body size (zoom).
   const DocStyle& st = *style_;
   const float em = static_cast<float>(fonts_.regular.pixel_size());
-  auto before = [&](BlockRole r) { return st[r].space_before.px(em); };
-  auto after = [&](BlockRole r) { return st[r].space_after.px(em); };
-  auto indent = [&](BlockRole r) { return st[r].indent.px(em); };
+  const float dp = options_.px_scale;
+  auto before = [&](BlockRole r) { return st[r].space_before.px(em, dp); };
+  auto after = [&](BlockRole r) { return st[r].space_after.px(em, dp); };
+  auto indent = [&](BlockRole r) { return st[r].indent.px(em, dp); };
 
   switch (node.kind) {
     case NodeKind::Document:

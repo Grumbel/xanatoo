@@ -29,7 +29,7 @@ namespace xanatoo::app {
 void apply_view_settings(App& app) {
   app.view_settings.clamp();
   app.layout_engine.set_options(
-      xanatoo::LayoutOptions::from_view(app.view_settings));
+      xanatoo::LayoutOptions::from_view(app.view_settings, app.ui_scale));
   app.panes[0].height_cache.clear();
   app.panes[1].height_cache.clear();
   app.needs_layout = true;
@@ -672,10 +672,12 @@ float outline_row_step(App& app) {
 }
 
 OutlineRowGeom outline_row_geom(App& app, int level) {
+  auto px = [&](int v) { return static_cast<int>(std::lround(v * app.ui_scale)); };
   OutlineRowGeom g;
-  g.num_right = 6 + app.ui_font.measure("9");
-  g.twist_x = g.num_right + 6 + std::max(0, level - 1) * 14;
-  g.text_x = g.twist_x + kOutlineTwistW + 2;
+  g.num_right = px(6) + app.ui_font.measure("9");
+  g.twist_w = px(14);
+  g.twist_x = g.num_right + px(6) + std::max(0, level - 1) * px(14);
+  g.text_x = g.twist_x + g.twist_w + px(2);
   return g;
 }
 

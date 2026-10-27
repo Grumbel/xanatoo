@@ -6,6 +6,7 @@
 // world (compute_status); drawing only consumes the resulting record.
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 
 #include "xanatoo/app.hpp"
@@ -17,6 +18,19 @@
 #include "xanatoo/util.hpp"
 
 namespace xanatoo::app {
+
+void set_chrome_scale(float scale) {
+  auto px = [&](int v) { return static_cast<int>(std::lround(v * scale)); };
+  kSbW = px(14);
+  kSbArrow = px(14);
+  kSbLayoutGutter = kSbW + px(4);
+  status_bar_h = px(28);
+  help_title_h = px(28);
+  float_close_w = px(28);
+  kUiFontPx = px(14);
+  help_pad = px(12);
+  help_edge = px(6);
+}
 
 void fill_doc_paper(App& app, const SDL_Rect& rect) {
   const xanatoo::Rgba& c = app.style.paper;
@@ -66,6 +80,7 @@ void draw_floating_frame(App& app, const SDL_Rect& outer,
   w.title_h = help_title_h;
   w.active = active;
   w.resizable = resizable;
+  w.scale = app.ui_scale;
   th::draw_window_chrome(app.sdl, w);
   const th::Palette& p = th::palette();
   // Document well: paper surface in a sunken frame under the title strip.

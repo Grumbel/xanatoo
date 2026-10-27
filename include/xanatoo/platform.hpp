@@ -24,4 +24,8 @@ void platform_release_keyboard();
 // on-screen keyboard does not cover the page on start.
 bool platform_text_input_at_start();
 
+// Chrome / default zoom factor when --ui-scale is not given: Android uses
+// the display density (dpi / 160, quarter steps, at least 1); desktop 1.
+float platform_default_ui_scale();
+
 }  // namespace xanatoo
