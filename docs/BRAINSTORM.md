@@ -84,12 +84,83 @@ when a passage is cited or annotated.
 
 ---
 
-## 4. Image galleries (semantic)
+## 4. Collections (image galleries and beyond)
 
-Prefer **document meaning** over chrome-only “gallery mode”.
+One name everywhere: **Collection** (node kind, `.sexp` form, Markdown
+fenced div). A "gallery" is just a collection of images shown as a grid.
+Prefer **document meaning** over a chrome-only "gallery mode": the
+collection is content and embeds in any document like a `Table`; how it
+looks is a view.
 
-| Approach | Notes |
-|----------|--------|
+### Prior art
+
+- **IIIF Presentation API** — Collection / Manifest / Canvas; `thumbnail`
+  is a property of the resource, the Image API renders any size on demand;
+  `behavior` (individuals / paged / continuous) is a layout *hint*.
+- **freedesktop thumbnail spec** — thumbnails are a regenerable cache
+  (`~/.cache/thumbnails`, keyed by URI + mtime), never part of the data.
+- **Notion / Obsidian Bases database views** — one collection, many views
+  (table, list, board, card gallery); layout and sort live in the view.
+- **Smart albums (Lightroom, digiKam)** — static set vs saved query.
+- **OPDS, Media RSS** — collections of *documents* with covers.
+- **HTML / WordPress gallery block** — no gallery element; a gallery is a
+  figure of figures.
+- **Pandoc / Djot fenced divs** — `::: collection` marks the block and
+  degrades to a plain image list elsewhere.
+
+### Model
+
+1. **Content: `Collection` node.** Ordered items; each item references a
+   resource (image, document, passage, URL) with optional caption and
+   label. `Figure` nodes can be the items. Author order is content.
+2. **Card face is derived, never stored.** Image → scaled image; document
+   → title + first image + first lines; passage → miniature transclusion;
+   web page → og:image + title. "Thumbnail of a document" is the same
+   feature as an image thumbnail — transclusion at small scale.
+3. **Layout is view state.** Grid / strip / list / table, thumbnail size,
+   user sort, fullscreen (lightbox with next / prev) live outside the
+   document like fold state. The markup may carry a default hint
+   (`:view grid`), IIIF-`behavior` style.
+4. **Sources.** Explicit items, or derived from a directory, glob, feed,
+   later a Commons category. Opening a directory = a document holding one
+   derived collection, which gives directory browsing for free.
+5. **Thumbnails are a cache** under `cache_dir()/thumbs`, keyed by URL +
+   mtime / ETag (maybe share `~/.cache/thumbnails` for local files).
+   Remote images: download full, scale ourselves. Sources that offer
+   sizes (Wikimedia, IIIF, `srcset`) may let the fetcher ask for a smaller
+   rendition — a transport optimisation, never markup.
+
+```
+::: collection                   (collection :view grid
+![Harbour at dawn](img/a.jpg)      (figure (image "img/a.jpg") (caption "Harbour at dawn"))
+![](img/b.jpg)                     (item "notes.md#Intro")
+:::                                (source "photos/*.jpg"))
+```
+
+### Phases
+
+1. `Collection` node, `::: collection` parse, grid of local images,
+   thumbnail cache, lightbox.
+2. View controls (layout / size / sort), stored view-local.
+3. Derived sources → directory browsing.
+4. Document and passage cards.
+5. Remote: galleries in web pages, Commons, feeds with media.
+
+### Open: inclusion, transclusion, thumbnail, hyperlink
+
+These overlap: all four point at another resource and differ in how much
+of it is shown and who decides. In a collection the author *includes* the
+images, and the collection is what turns an image into a thumbnail when
+rendering — the presentation comes from the container, not the item.
+Fine for now, but the general question is still open: how much is the
+author's explicit choice (link vs embed vs excerpt) and how much does the
+system pick from context (a link in a collection becomes a card, an image
+in running text stays full size, a hovered link previews)? Possibly one
+"reference" with a presentation level (link → card → excerpt → full
+transclusion) chosen by the container or the view; revisit once
+collections and Transclude both exist in practice.
+
+----------|--------|
 | **Section (or dedicated Gallery) of Figures** | Ordered children: image + caption + per-item label. Outline lists the set. |
 | **Layout as view** | Grid / strip / lightbox is presentation of the same container. |
 | **Columns of figures** | Works today for 2–3; weak semantics if overused as “the” gallery. |
