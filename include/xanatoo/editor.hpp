@@ -62,10 +62,17 @@ CaretScreenPos caret_screen_pos(const LayoutResult& layout,
 struct SelRect {
   float x, y, w, h;
 };
+// Pixels above / below the baseline of one face; indexed by FontRole so
+// each selected run covers the glyphs of its own font (headings are taller).
+struct GlyphExtent {
+  float ascent = 0.f;
+  float descent = 0.f;
+};
+using GlyphExtents = std::vector<GlyphExtent>;
 std::vector<SelRect> selection_rects(const LayoutResult& layout,
                                      const Selection& sel,
                                      float scroll_y,
-                                     float line_height);
+                                     const GlyphExtents& extents);
 
 // If caret sits on a same-document Transclude, move it to the source
 // passage so subsequent edits write through. Returns true when redirected.

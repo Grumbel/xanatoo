@@ -566,8 +566,8 @@ static void mouse_right_down(App& app, SDL_Event& ev, bool imgui_mouse) {
       // caret when there is no selection, or the click is outside.
       bool keep_selection = false;
       if (!p.sel.empty()) {
-        const float lh = static_cast<float>(app.fonts.regular.line_height());
-        auto rects = xanatoo::selection_rects(p.layout, p.sel, p.scroll_y, lh);
+        auto rects = xanatoo::selection_rects(p.layout, p.sel, p.scroll_y,
+                                              app.renderer.glyph_extents());
         for (const auto& r : rects) {
           if (lx >= r.x && lx < r.x + r.w && my >= r.y && my < r.y + r.h) {
             keep_selection = true;

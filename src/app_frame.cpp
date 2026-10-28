@@ -2254,7 +2254,6 @@ static void draw_pane_scrollbar(App& app, int i) {
 // target, clipped to `area`. Content y maps to target y - `scroll`.
 static void draw_pane_layer(App& app, int i, const SDL_Rect& area, float ox,
                             float scroll) {
-  const float lh = static_cast<float>(app.fonts.regular.line_height());
   Pane& pane = app.panes[i];
   SDL_RenderSetClipRect(app.sdl, &area);
   SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
@@ -2262,7 +2261,8 @@ static void draw_pane_layer(App& app, int i, const SDL_Rect& area, float ox,
   SDL_SetRenderDrawColor(app.sdl, paper.r, paper.g, paper.b, 255);
   SDL_RenderFillRect(app.sdl, &area);
   if (!pane.sel.empty()) {
-    auto rects = xanatoo::selection_rects(pane.layout, pane.sel, scroll, lh);
+    auto rects = xanatoo::selection_rects(pane.layout, pane.sel, scroll,
+                                          app.renderer.glyph_extents());
     // Leap-search match uses amber so it is distinct from a user selection.
     if (prompt_is_search(app) && i == app.focus)
       app.renderer.draw_selection(rects, ox, 230, 190, 70, 150);

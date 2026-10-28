@@ -284,6 +284,18 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
   }
 }
 
+GlyphExtents Renderer::glyph_extents() const {
+  GlyphExtents ext;
+  for (FontRole role : {FontRole::Body, FontRole::BodyBold, FontRole::BodyItalic,
+                        FontRole::BodyBoldItalic, FontRole::Heading,
+                        FontRole::Code}) {
+    const Font& f = fonts_.pick(role);
+    ext.push_back({static_cast<float>(f.ascender()),
+                   static_cast<float>(-f.descender())});
+  }
+  return ext;
+}
+
 void Renderer::draw_selection(const std::vector<SelRect>& rects, float origin_x) {
   const Rgba& c = (style_ ? *style_ : fallback_style()).selection;
   draw_selection(rects, origin_x, c.r, c.g, c.b, c.a);

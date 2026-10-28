@@ -199,9 +199,13 @@ CaretScreenPos caret_screen_pos(const LayoutResult& layout,
 std::vector<SelRect> selection_rects(const LayoutResult& layout,
                                      const Selection& sel,
                                      float scroll_y,
-                                     float line_height) {
+                                     const GlyphExtents& extents) {
   std::vector<SelRect> rects;
-  if (sel.empty() || layout.glyphs.empty()) return rects;
+  if (sel.empty() || layout.glyphs.empty() || extents.empty()) return rects;
+  auto extent_of = [&](const PositionedGlyph& g) {
+    size_t i = static_cast<size_t>(g.font);
+    return i < extents.size() ? extents[i] : extents[0];
+  };
 
   // Build ordered range by scanning glyphs and checking against caret keys
   // We use a simple approach: collect glyphs whose (node,span,char) falls
@@ -221,6 +225,7 @@ std::vector<SelRect> selection_rects(const LayoutResult& layout,
   // Group selected glyphs by baseline into runs
   struct Run {
     float x0, x1, y;
+    float ascent, descent;
   };
   std::vector<Run> runs;
   Run cur{};
@@ -245,14 +250,17 @@ std::vector<SelRect> selection_rects(const LayoutResult& layout,
         std::abs(layout.glyphs[i + 1].y - g.y) < 0.5f) {
       gw = layout.glyphs[i + 1].x - g.x;
     }
+    const GlyphExtent e = extent_of(g);
     if (!in_run) {
-      cur = {g.x, g.x + gw, g.y};
+      cur = {g.x, g.x + gw, g.y, e.ascent, e.descent};
       in_run = true;
     } else if (std::abs(g.y - cur.y) < 0.5f) {
       cur.x1 = g.x + gw;
+      cur.ascent = std::max(cur.ascent, e.ascent);
+      cur.descent = std::max(cur.descent, e.descent);
     } else {
       runs.push_back(cur);
-      cur = {g.x, g.x + gw, g.y};
+      cur = {g.x, g.x + gw, g.y, e.ascent, e.descent};
     }
   }
   if (in_run) runs.push_back(cur);
@@ -260,9 +268,9 @@ std::vector<SelRect> selection_rects(const LayoutResult& layout,
   for (const auto& r : runs) {
     SelRect sr;
     sr.x = r.x0;
-    sr.y = r.y - line_height * 0.85f - scroll_y;
+    sr.y = r.y - r.ascent - scroll_y;
     sr.w = std::max(2.f, r.x1 - r.x0);
-    sr.h = line_height * 0.95f;
+    sr.h = r.ascent + r.descent;
     rects.push_back(sr);
   }
   return rects;

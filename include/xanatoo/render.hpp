@@ -29,6 +29,8 @@ public:
   void draw_selection(const std::vector<SelRect>& rects, float origin_x,
                       uint8_t r, uint8_t g, uint8_t b, uint8_t a);
   void draw_caret(const CaretScreenPos& pos, float origin_x = 0.f);
+  // Ascent / descent per FontRole for selection_rects.
+  GlyphExtents glyph_extents() const;
   // Simple left-to-right UTF-8 run (status bars, overlays).
   void draw_text(Font& font, float x, float y_baseline, const std::string& text,
                  uint8_t r, uint8_t g, uint8_t b);
