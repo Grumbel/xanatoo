@@ -249,28 +249,46 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
     SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
   }
 
-  for (const auto& pg : layout.glyphs) {
+  const auto& glyphs = layout.glyphs;
+  for (size_t i = 0; i < glyphs.size(); ++i) {
+    const PositionedGlyph& pg = glyphs[i];
     Font& font = fonts_.pick(pg.font);
     const Glyph& g = font.glyph(pg.codepoint);
-    if (!g.texture) continue;
 
-    SDL_Rect dst;
-    dst.x = static_cast<int>(pg.x + origin_x);
-    dst.y = px(pg.y - g.bearing_y - scroll_y);
-    dst.w = g.width;
-    dst.h = g.height;
-    if (!visible(dst.x, dst.y, dst.w, dst.h)) continue;
+    if (g.texture) {
+      SDL_Rect dst;
+      dst.x = static_cast<int>(pg.x + origin_x);
+      dst.y = px(pg.y - g.bearing_y - scroll_y);
+      dst.w = g.width;
+      dst.h = g.height;
+      if (visible(dst.x, dst.y, dst.w, dst.h)) {
+        SDL_SetTextureColorMod(g.texture, pg.color.r, pg.color.g, pg.color.b);
+        SDL_SetTextureAlphaMod(g.texture, pg.color.a);
+        SDL_RenderCopy(sdl_, g.texture, nullptr, &dst);
+      }
+    }
 
-    SDL_SetTextureColorMod(g.texture, pg.color.r, pg.color.g, pg.color.b);
-    SDL_SetTextureAlphaMod(g.texture, pg.color.a);
-    SDL_RenderCopy(sdl_, g.texture, nullptr, &dst);
     const bool underline = st[pg.kind].underline;
     const bool strike = pg.kind == InlineKind::Strike;
     if (underline || strike) {
-      SDL_SetRenderDrawColor(sdl_, pg.color.r, pg.color.g, pg.color.b, 255);
+      // Decorations bridge to the next glyph when it continues the same
+      // decoration on the same line, so spaces (no bitmap, justified gaps)
+      // stay covered; a trailing space at a line or run end is left bare.
+      const PositionedGlyph* next =
+          i + 1 < glyphs.size() ? &glyphs[i + 1] : nullptr;
+      const bool joins = next && next->node == pg.node &&
+                         std::abs(next->y - pg.y) < 0.5f && next->x > pg.x &&
+                         next->kind == pg.kind;
+      if (pg.codepoint == ' ' && !joins) continue;
       const int ux = static_cast<int>(pg.x + origin_x);
-      const int uw = static_cast<int>((g.advance >> 6) > 0 ? (g.advance >> 6)
-                                                           : (g.width + 1));
+      const int uw =
+          joins ? static_cast<int>(next->x + origin_x) - ux
+                : static_cast<int>((g.advance >> 6) > 0 ? (g.advance >> 6)
+                                                        : (g.width + 1));
+      if (!visible(ux, px(pg.y - g.bearing_y - scroll_y), uw,
+                   g.height + 4))
+        continue;
+      SDL_SetRenderDrawColor(sdl_, pg.color.r, pg.color.g, pg.color.b, 255);
       if (underline) {
         const int uy = px(pg.y + 2.f - scroll_y);
         SDL_RenderDrawLine(sdl_, ux, uy, ux + uw, uy);
