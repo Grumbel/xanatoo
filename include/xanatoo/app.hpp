@@ -65,6 +65,13 @@ struct DocBuffer {
   xanatoo::History history;
   // Shows a "Loading …" stand-in until a background fetch replaces it.
   bool placeholder = false;
+  // Local revisions (revstore.hpp, app_drafts.cpp): doc key, content id of
+  // the buffer's serialized text when clean, of the last draft written, and
+  // when unsaved edits are next written (SDL ticks, 0 = nothing pending).
+  std::string doc_key;
+  std::string base_id;
+  std::string draft_id;
+  Uint32 draft_due = 0;
 };
 
 // Cached raster of a pane's document layer (background, selection, text) so
@@ -424,7 +431,7 @@ struct App {
   bool bookmarks_panel_open = false;
   std::string status_notice;
   Uint32 status_notice_until = 0;
-  bool discard_armed = false;
+  bool discard_armed = false;  // only without a revision store (no SQLite)
   bool help_mode = false;
   xanatoo::Document help_doc;
   xanatoo::LayoutResult help_layout;
@@ -482,6 +489,31 @@ struct App {
   SplitPreview split_preview;
 };
 
+// ---- drafts (app_drafts.cpp) ----
+// Unsaved edits are written to the local revision store as drafts, so
+// buffers can be closed or replaced without asking; reopening the file
+// restores them. Only when the store is unavailable is a discard confirmed.
+inline constexpr Uint32 kDraftDelayMs = 2000;  // max. edit age before a write
+// After loading `b.path` into the buffer: set its doc key / base and put a
+// stored draft in place of the file text. True when a draft was restored.
+bool attach_draft(App& app, BufferId id);
+// Write the buffer's unsaved edits now. True when nothing would be lost by
+// dropping the buffer (clean, read-only, or draft written).
+bool stash_draft(App& app, BufferId id);
+// stash_draft, else the old "repeat to discard" confirmation.
+bool stash_or_confirm(App& app, BufferId id);
+bool stash_all_or_confirm(App& app);  // every buffer (quit, demos)
+void autosave_drafts(App& app);       // per frame: write drafts that are due
+// `text` was written to `b.path`: record the save, clear the draft (also
+// the one under a previous key after Save As).
+void note_saved(App& app, BufferId id, const std::string& text);
+// Drop the draft and reload the file (File → Revert to Saved).
+void revert_buffer(App& app, BufferId id);
+// "drafts:" page listing every stored draft; "draft:<key>" opens one.
+inline constexpr const char* kDraftsPage = "drafts:";
+void open_drafts_page(App& app);
+bool open_draft(App& app, int pi, const std::string& ref);
+
 // ---- buffers ----
 std::string resolve_open_path(App& app, std::string path);
 xanatoo::Document load_doc(App& app, std::string path);
@@ -508,8 +540,8 @@ bool shared_doc(App& app);
 Pane& focused_pane(App& app);
 void checkpoint(App& app);
 void mark_dirty(App& app);
-bool any_dirty(App& app);
-bool allow_discard_dirty(App& app, BufferId di);
+// Edits outside mark_dirty (e.g. floating windows): dirty + draft pending.
+void note_edit(App& app, DocBuffer& b);
 void edit(App& app);
 std::string find_help_path(App& app);
 std::string find_repo_file(App& app, const char* name);

@@ -3,6 +3,7 @@
 //
 // App lifecycle: build the initial world state / tear down platform handles.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
@@ -16,6 +17,7 @@
 #include "xanatoo/parse.hpp"
 #include "xanatoo/platform.hpp"
 #include "xanatoo/reddit.hpp"
+#include "xanatoo/revstore.hpp"
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/util.hpp"
 
@@ -171,10 +173,25 @@ bool app_init(App& app) {
   }
   app.focus = 0;
   app.split = app.buffers.size() > 1;  // auto-split when two files given
+  {
+    // Drafts nobody is looking at yet (untitled ones have no file to open).
+    size_t hidden = 0;
+    for (const xanatoo::DraftHead& d : xanatoo::list_drafts())
+      if (std::none_of(app.buffers.begin(), app.buffers.end(),
+                       [&](const DocBuffer& b) { return b.doc_key == d.key; }))
+        ++hidden;
+    if (hidden)
+      flash_status(app, std::to_string(hidden) +
+                            (hidden == 1 ? " unsaved draft" : " unsaved drafts") +
+                            " — File → Drafts");
+  }
   return true;
 }
 
 void app_shutdown(App& app) {
+  // Every way out (window close, Quit, signals reaching the loop) keeps
+  // unsaved edits as drafts.
+  for (const DocBuffer& b : app.buffers) stash_draft(app, b.id);
   SDL_StopTextInput();
   release_pane_rasters(app);
   app.ui.shutdown();

@@ -10,12 +10,12 @@ Jump to: [Files](#Files) · [Edit](#Edit) · [Navigate](#Navigate) · [View](#Vi
 
 ## Files
 
-- **Ctrl+N** — New document (warns if unsaved; repeat to discard)
+- **Ctrl+N** — New document (unsaved edits are kept as a draft)
 - **Ctrl+O** — Open file… (type a path in the status bar)
 - **Ctrl+S** — Save
 - **Ctrl+Shift+S** — Save As…
 - **Ctrl+R** / **Ctrl+Shift+R** — Reload / force reload
-- **Ctrl+Q** — Quit (warns if unsaved; repeat to exit)
+- **Ctrl+Q** — Quit (unsaved edits are kept as drafts; File → Drafts)
 - **Ctrl+T** — New tab
 - **Ctrl+W** — Close floating window, help, outline, or document tab
 - **Ctrl+Tab** / **Ctrl+Shift+Tab** — Next / previous tab

@@ -15,6 +15,7 @@
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/reddit.hpp"
+#include "xanatoo/revstore.hpp"
 #include "xanatoo/util.hpp"
 #include "xanatoo/parse.hpp"
 #include "xanatoo/editor.hpp"
@@ -73,6 +74,67 @@ void test_string_helpers() {
   std::string_view empty = "   ";
   trim_ascii(empty);
   EXPECT(empty.empty());
+}
+
+void test_sha256() {
+  using namespace xanatoo;
+  EXPECT_EQ(sha256_hex(""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+  EXPECT_EQ(sha256_hex("abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+  // Two-block message (56 bytes: padding spills into a second block).
+  EXPECT_EQ(sha256_hex("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"),
+            "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
+  EXPECT_EQ(sha256_hex(std::string(1000000, 'a')),
+            "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0");
+  EXPECT_EQ(content_id("abc").substr(0, 7), "sha256:");
+}
+
+void test_revstore() {
+#if XANATOO_SQLITE
+  using namespace xanatoo;
+  namespace fs = std::filesystem;
+  const fs::path db =
+      fs::temp_directory_path() / ("xanatoo-revstore-" + std::to_string(getpid()) + ".sqlite");
+  fs::remove(db);
+  revstore_use_path(db.string());
+
+  const std::string key = new_doc_key();
+  EXPECT_EQ(key.size(), 4u + 64u);
+  EXPECT(key != new_doc_key());
+  EXPECT(!find_draft(key));
+
+  const std::string id = put_draft(key, "# Two\n", "# One\n", "notes.md");
+  EXPECT_EQ(id, content_id("# Two\n"));
+  auto d = find_draft(key);
+  EXPECT(d.has_value());
+  if (d) {
+    EXPECT_EQ(d->content, id);
+    EXPECT_EQ(d->base, content_id("# One\n"));
+    EXPECT_EQ(d->title, "notes.md");
+    EXPECT_EQ(load_object(d->content).value_or(""), "# Two\n");
+  }
+  EXPECT_EQ(load_object(content_id("# One\n")).value_or(""), "# One\n");
+  // A later draft replaces the head, keeps the base.
+  put_draft(key, "# Three\n", "", "notes.md");
+  d = find_draft(key);
+  EXPECT(d && d->content == content_id("# Three\n"));
+  EXPECT(d && d->base == content_id("# One\n"));
+  EXPECT_EQ(list_drafts().size(), 1u);
+
+  EXPECT(record_save(key, "# Three\n"));
+  EXPECT(!find_draft(key));
+  EXPECT(list_drafts().empty());
+  // Old versions stay addressable.
+  EXPECT_EQ(load_object(content_id("# Two\n")).value_or(""), "# Two\n");
+
+  put_draft(key, "# Four\n", "", "notes.md");
+  EXPECT(drop_draft(key));
+  EXPECT(!find_draft(key));
+
+  revstore_use_path({});
+  fs::remove(db);
+#endif
 }
 
 void test_json_min() {
@@ -1764,6 +1826,8 @@ void test_front_matter_and_preamble() {
 }
 
 int main() {
+  test_sha256();
+  test_revstore();
   test_front_matter_and_preamble();
   test_collection();
   test_wikipedia();

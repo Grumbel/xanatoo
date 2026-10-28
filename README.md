@@ -69,7 +69,7 @@ A **Dear ImGui** menu bar and toolbar sit above the document (File / Edit / Form
 | **Ctrl+S** | Save (untitled → `untitled.md`) |
 | **Ctrl+Shift+S** | Save As (path in status bar) |
 | **Ctrl+R** | Reload from disk (refuses if dirty) |
-| **Ctrl+Shift+R** | Force reload (discard unsaved changes) |
+| **Ctrl+Shift+R** | Force reload (File → Revert to Saved drops a draft) |
 | **Ctrl+Q** | Quit (warns once if dirty) |
 | **F1** | Keyboard reference overlay |
 

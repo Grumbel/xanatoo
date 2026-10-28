@@ -69,6 +69,7 @@ add_executable(xanatoo
   src/app_split.cpp
   src/app_footnotes.cpp
   src/app_collection.cpp
+  src/app_drafts.cpp
   src/theme.cpp
   src/font.cpp
   src/document.cpp
@@ -82,6 +83,7 @@ add_executable(xanatoo
   src/util.cpp
   src/minibuffer.cpp
   src/sidestore.cpp
+  src/revstore.cpp
   src/epub_import.cpp
   src/view_settings.cpp
   src/style.cpp
@@ -307,6 +309,7 @@ install(DIRECTORY examples/
 add_executable(xanatoo_tests
   tests/unit_tests.cpp
   src/util.cpp
+  src/revstore.cpp
   src/minibuffer.cpp
   src/document.cpp
   src/parse.cpp
@@ -338,6 +341,7 @@ target_include_directories(xanatoo_tests PRIVATE
   ${FONTCONFIG_INCLUDE_DIRS}
 )
 target_link_libraries(xanatoo_tests PRIVATE
+  xanatoo_sqlite3
   ${SDL2_LIBRARIES}
   Freetype::Freetype
   ${FONTCONFIG_LIBRARIES}
@@ -354,6 +358,7 @@ target_compile_definitions(xanatoo_tests PRIVATE
   XANATOO_WEB=0
   XANATOO_WIKIPEDIA=0
   XANATOO_FONTCONFIG=$<BOOL:${XANATOO_FONTCONFIG}>
+  XANATOO_SQLITE=$<BOOL:${XANATOO_SQLITE}>
   "XANATOO_STYLE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/styles\""
 )
 enable_testing()

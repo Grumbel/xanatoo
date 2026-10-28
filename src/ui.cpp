@@ -686,6 +686,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Reload", UiCommand::Reload, cmd, state.has_path, "Ctrl+R");
       menu_item_cmd("Force Reload", UiCommand::ForceReload, cmd, state.has_path,
                     "Ctrl+Shift+R");
+      menu_item_cmd("Revert to Saved", UiCommand::RevertToSaved, cmd,
+                    state.has_path && state.dirty);
+      menu_item_cmd("Drafts", UiCommand::OpenDrafts, cmd);
       ImGui::Separator();
       menu_item_cmd("Quit", UiCommand::Quit, cmd, true, "Ctrl+Q");
       ImGui::EndMenu();

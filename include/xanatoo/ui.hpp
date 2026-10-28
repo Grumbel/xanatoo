@@ -42,6 +42,8 @@ enum class UiCommand {
   ExportMarkdown,
   Reload,
   ForceReload,
+  RevertToSaved,  // drop the buffer's draft and reload the file
+  OpenDrafts,     // "drafts:" page: every stored unsaved draft
   Quit,
   // Edit
   Undo,

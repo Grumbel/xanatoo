@@ -283,14 +283,12 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
         close_prompt(app);
         return true;
       }
-      if (!allow_discard_dirty(app, p.buf)) {
-        flash_status(app, "Unsaved changes — Enter again to discard and open");
-        return true;
-      }
+      if (!stash_or_confirm(app, p.buf)) return true;
       DocBuffer& b = buf(app, p.buf);
       b.doc = load_doc(app, path);
       b.path = path;
       b.dirty = false;
+      attach_draft(app, p.buf);
       xanatoo::ensure_valid_caret(b.doc, p.sel.focus);
       p.sel.anchor = p.sel.focus;
       p.scroll_y = 0.f;
@@ -329,6 +327,7 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
           out << text;
           path_of(app, p) = target;
           buf(app, p.buf).dirty = false;
+          note_saved(app, p.buf, text);
           app.discard_armed = false;
           update_title(app);
           flash_status(app, "Saved as " + target);

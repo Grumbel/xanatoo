@@ -291,7 +291,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::CloseTab || c == C::NextTab || c == C::PrevTab ||
         c == C::SelectTab || c == C::PopOut || c == C::PopIn || c == C::Save ||
         c == C::SaveAs || c == C::ExportSexpr || c == C::ExportMarkdown ||
-        c == C::Reload || c == C::ForceReload || c == C::Copy ||
+        c == C::Reload || c == C::ForceReload || c == C::OpenDrafts ||
+        c == C::Copy ||
         c == C::CopyPageUrl || c == C::SelectAll || c == C::SelectBlock ||
         c == C::Find || c == C::ToggleSplit || c == C::ToggleOutline ||
         c == C::ToggleBacklinks || c == C::OpenTranscludeOther ||
@@ -313,23 +314,16 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
   }
 
   switch (cmd) {
-    case C::Quit: {
-      if (any_dirty(app) && !app.discard_armed) {
-        app.discard_armed = true;
-        flash_status(app,
-                     "Unsaved changes — Ctrl+S to save, or Quit again to exit");
-        break;
-      }
-      app.discard_armed = false;
-      app.running = false;
+    case C::Quit:
+      if (stash_all_or_confirm(app)) app.running = false;
       break;
-    }
     case C::NewDocument: {
-      if (!allow_discard_dirty(app, p.buf)) break;
+      if (!stash_or_confirm(app, p.buf)) break;
       buf(app, p.buf).doc =
           xanatoo::parse_document(xanatoo::fallback_document(), {});
       path_of(app, p).clear();
       buf(app, p.buf).dirty = false;
+      attach_draft(app, p.buf);  // forget the old file's doc key
       xanatoo::ensure_valid_caret(buf(app, p.buf).doc,
                                   p.sel.focus);
       p.sel.anchor = p.sel.focus;
@@ -455,7 +449,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       }
       if (tab_i < 0 || app.tab_order.empty()) break;
       const BufferId bi = app.tab_order[static_cast<size_t>(tab_i)];
-      if (!allow_discard_dirty(app, bi)) break;
+      if (!stash_or_confirm(app, bi)) break;
       close_tab(app, bi);
       flash_status(app, "Tab closed");
       break;
@@ -513,6 +507,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       else
         flash_status(app, "No floating window to dock");
       break;
+    case C::OpenDrafts:
+      navigate_to_url(app, kDraftsPage);
+      break;
     case C::ToggleHistory:
       app.history_panel_open = !app.history_panel_open;
       break;
@@ -556,6 +553,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         if (out) {
           out << text;
           buf(app, p.buf).dirty = false;
+          note_saved(app, p.buf, text);
           app.discard_armed = false;
           update_title(app);
           flash_status(app, "Saved " + spath);
@@ -586,11 +584,21 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     }
     case C::Reload:
-    case C::ForceReload: {
+    case C::ForceReload:
+    case C::RevertToSaved: {
       std::string& rpath = path_of(app, p);
       if (rpath.empty()) break;
-      if (buf(app, p.buf).dirty && cmd == C::Reload) {
-        flash_status(app, "Unsaved changes — use Force Reload");
+      if (rpath == kDraftsPage) {
+        open_drafts_page(app);
+        break;
+      }
+      if (cmd == C::RevertToSaved) {
+        revert_buffer(app, p.buf);
+      } else if (buf(app, p.buf).dirty && !is_foreign_path(rpath)) {
+        // Reloading would just restore the draft again.
+        stash_draft(app, p.buf);
+        flash_status(app, "Unsaved changes are kept as a draft — "
+                          "File → Revert to Saved drops them");
         break;
       }
       if (is_in_app_remote_url(rpath)) {
@@ -601,6 +609,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       xanatoo::clear_external_doc_cache();
       buf(app, p.buf).doc = load_doc(app, rpath);
       buf(app, p.buf).dirty = false;
+      attach_draft(app, p.buf);
       buf(app, p.buf).history.reset(
           buf(app, p.buf).doc, p.sel);
       for (int pi = 0; pi < 2; ++pi) {
@@ -623,7 +632,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         }
       update_title(app);
       app.needs_layout = true;
-      flash_status(app, "Reloaded " + rpath);
+      flash_status(app, (cmd == C::RevertToSaved ? "Reverted to " : "Reloaded ") +
+                            rpath);
       break;
     }
     case C::Undo:
@@ -1243,14 +1253,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     }
     case C::LoadDiffDemo: {
-      if (any_dirty(app) && !app.discard_armed) {
-        app.discard_armed = true;
-        flash_status(
-            app,
-            "Unsaved changes — save first, or repeat Diff demo to discard");
-        break;
-      }
-      app.discard_armed = false;
+      if (!stash_all_or_confirm(app)) break;
       std::string p0 = find_repo_file(app, "diff-v1.md");
       std::string p1 = find_repo_file(app, "diff-v2.md");
       if (p0.empty()) p0 = find_repo_file(app, "examples/diff-v1.md");
@@ -2813,6 +2816,7 @@ void run_frame(App& app) {
   while (SDL_PollEvent(&ev)) handle_event(app, ev);
   update_touch(app);
   poll_fetches(app);
+  autosave_drafts(app);
   update_split_preview(app);
   sync_window_size(app);
   relayout_if_needed(app);

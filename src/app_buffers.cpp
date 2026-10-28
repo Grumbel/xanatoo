@@ -154,6 +154,7 @@ bool is_foreign_path(std::string_view path) {
       xanatoo::starts_with(path, "https://"))
     return true;
   if (xanatoo::path_uses_html(path) || xanatoo::is_pandoc_path(path)) return true;
+  if (path == kDraftsPage) return true;
   // Directory listings (navigate_pane gives them a trailing '/').
   std::error_code ec;
   if (xanatoo::ends_with(path, "/") ||
@@ -191,7 +192,9 @@ BufferId add_buffer(App& app, xanatoo::Document doc, std::string path) {
   b.doc = std::move(doc);
   b.path = std::move(path);
   app.buffers.push_back(std::move(b));
-  return app.buffers.back().id;
+  const BufferId id = app.buffers.back().id;
+  attach_draft(app, id);
+  return id;
 }
 
 DocBuffer& buf(App& app, BufferId id) {
@@ -241,6 +244,7 @@ static void leave_tab(App& app, BufferId id) {
 
 void remove_buffer(App& app, BufferId id) {
   if (!find_buf(app, id)) return;
+  stash_draft(app, id);
   app.soft_wins.erase(
       std::remove_if(app.soft_wins.begin(), app.soft_wins.end(),
                      [&](const FloatWindow& sw) { return sw.buf == id; }),
@@ -325,10 +329,7 @@ void mark_dirty(App& app) {
   const BufferId di = focused_pane(app).buf;
   app.discard_armed = false;  // new edits require a fresh discard warning
   if (find_buf(app, di)) {
-    if (!buf(app, di).dirty) {
-      buf(app, di).dirty = true;
-      update_title(app);
-    }
+    note_edit(app, buf(app, di));
     // Soft windows sharing this buffer must re-layout.
     for (auto& sw : app.soft_wins)
       if (sw.buf == di) sw.needs_layout = true;
@@ -342,24 +343,12 @@ void mark_dirty(App& app) {
   }
 }
 
-bool any_dirty(App& app) {
-  for (const auto& b : app.buffers)
-    if (b.dirty) return true;
-  return false;
-}
-
-bool allow_discard_dirty(App& app, BufferId di) {
-  const DocBuffer* b = find_buf(app, di);
-  if (!b || !b->dirty) return true;
-  if (app.discard_armed) {
-    app.discard_armed = false;
-    return true;
+void note_edit(App& app, DocBuffer& b) {
+  if (!b.draft_due) b.draft_due = SDL_GetTicks() + kDraftDelayMs;
+  if (!b.dirty) {
+    b.dirty = true;
+    update_title(app);
   }
-  app.discard_armed = true;
-  flash_status(app, "Unsaved changes — Ctrl+S to save, or repeat to discard");
-  std::cerr
-      << "Unsaved changes — save first, or repeat the command to discard.\n";
-  return false;
 }
 
 void edit(App& app) {

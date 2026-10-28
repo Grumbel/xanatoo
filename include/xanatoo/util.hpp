@@ -83,6 +83,9 @@ void utf8_pop_back(std::string& s);
 // &mdash; &hellip; …). Unknown names stay as written.
 std::string html_decode_entities(std::string_view s);
 
+// SHA-256 of `data` as 64 lower-case hex digits (content ids, revstore.hpp).
+std::string sha256_hex(std::string_view data);
+
 // Charset of a fetched body: the Content-Type "charset=" parameter, else
 // <meta charset> / http-equiv / <?xml encoding?> near the top. Lower-case,
 // empty when undeclared.

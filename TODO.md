@@ -8,6 +8,22 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-28) — drafts instead of "discard?" prompts
+
+- Unsaved edits go to a local revision store
+  (`~/.config/xanatoo/revisions.sqlite`, `revstore.hpp`): content-addressed
+  objects (SHA-256), immutable revision records with parents, per-document
+  heads. Autosave 2 s after an edit and whenever a buffer is left (navigate,
+  close, New, Open, Quit, window close); no more "save first, or repeat to
+  discard" (kept only for builds without SQLite).
+- Reopening a file restores its draft (`*` tab + notice; warns when the
+  file changed on disk since). Ctrl+S records a save revision; File →
+  Revert to Saved drops the draft; File → Drafts (`drafts:`) lists all,
+  untitled ones as `draft:doc:<hex>` (random 256-bit doc keys).
+- Roadmap (revision browser, doc ids in files, overlays for remote pages,
+  persistent text units, transclusion by revision, signatures, exchange):
+  `docs/REVISIONS.md`.
+
 ## Status (2026-10-27) — margins in percent, text width in characters
 
 - View → Margins: 2 / 5 / 10 / 15 / 20 / 25 / 30 % of the pane width per

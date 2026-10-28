@@ -163,8 +163,7 @@ void click_document(App& app, FloatWindow& w, int mx, int my) {
       if (DocBuffer* b = find_buf(app, w.buf)) {
         b->history.push(sdoc, w.sel);  // snapshot for undo
         sdoc.get(*sid).expanded = !sdoc.get(*sid).expanded;
-        b->dirty = true;
-        update_title(app);
+        note_edit(app, *b);
       } else {
         sdoc.get(*sid).expanded = !sdoc.get(*sid).expanded;
       }

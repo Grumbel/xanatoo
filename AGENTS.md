@@ -35,6 +35,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_buffers.cpp` / `app_view.cpp` / `app_nav.cpp` / `app_softwin.cpp` / `app_prompts.cpp` / `app_pointer.cpp` | document buffers, scroll/fold/outline, URL history + bookmarks, floating windows, minibuffer, cursor/gamepad |
 | `app_fetch.cpp` | background page fetches (`FetchJob` on a worker thread → `poll_fetches`), page cache, loading indicator |
 | `app_collection.cpp` | collection view state (layout / size / sort), card clicks, fullscreen `Lightbox` viewer |
+| `app_drafts.cpp` | unsaved edits → drafts in the revision store (`revstore.hpp`): autosave, restore on load (`attach_draft`), save / revert, `drafts:` page |
 | `app_footnotes.cpp` | footnote overlay: notes of on-screen `FootnoteRef` marks laid out in a strip at the pane bottom (`FootnoteOverlay` per pane), click jumps to the note |
 | `app_split.cpp` | split browsing: left links open right, right links shift left, hover previews (`SplitPreview`) |
 | `theme.cpp` | classic palette (`Palette`) + stateless bevel/gradient/window primitives shared with the ImGui theme |
@@ -51,6 +52,13 @@ Status-bar prompts are one `Prompt` record (`App::prompt`: `PromptKind`,
 through `commit_prompt` (`app_prompts.cpp`). At most one prompt is active;
 path/URL kinds edit through `App::minibuf` (`prompt_uses_minibuf`), and
 `last_search`/`last_replace` keep a displaced find for F3 / Replace All.
+
+Unsaved edits are never discarded behind a confirmation: before a buffer
+is replaced or dropped call `stash_draft` / `stash_or_confirm` (the latter
+only asks when no store is available). After putting a local file into a
+buffer call `attach_draft` (`add_buffer` / `show_doc_in_pane` do); after
+writing it, `note_saved`. Mark edits with `mark_dirty` / `note_edit`, not
+`dirty = true`. Design and roadmap: `docs/REVISIONS.md`.
 
 Keyboard focus: `App::key_focus` (`KeyFocus::Document/Outline/Backlinks`).
 Panels handle plain keys only while `panel_has_keys(app, …)`; opening or

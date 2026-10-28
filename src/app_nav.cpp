@@ -117,13 +117,14 @@ std::string link_base_url(App& app, int pi) {
   return app.gemini_current_url;
 }
 
-// Buffer pane `pi` loads a new page into: its own, unless the other visible
-// pane shows the same buffer or it has unsaved edits (then a new tab).
+// Buffer pane `pi` loads a new page into: its own (unsaved edits go to a
+// draft first), unless the other visible pane shows the same buffer or the
+// draft could not be written (then a new tab).
 static BufferId page_buffer(App& app, int pi) {
   Pane& p = app.panes[pi];
   const bool shared = app.split && app.panes[1 - pi].buf == p.buf;
   const DocBuffer* b = find_buf(app, p.buf);
-  if (b && !shared && !(b->dirty && !b->placeholder)) return p.buf;
+  if (b && !shared && stash_draft(app, p.buf)) return p.buf;
   return add_buffer(app, xanatoo::parse_document("", {}), {});
 }
 
@@ -136,6 +137,7 @@ void show_doc_in_pane(App& app, int pi, xanatoo::Document doc,
   b.path = label;
   b.dirty = false;
   b.placeholder = false;
+  attach_draft(app, p.buf);
   xanatoo::Document& nd = b.doc;
   p.sel = {};
   xanatoo::ensure_valid_caret(nd, p.sel.focus);
@@ -197,11 +199,25 @@ bool navigate_pane(App& app, int pi, std::string target, bool record_history) {
   if (target.empty()) return false;
   Pane& p = app.panes[pi];
 
+  if (target == kDraftsPage) {
+    const int saved = app.focus;
+    app.focus = pi;  // open_drafts_page shows in the focused pane
+    open_drafts_page(app);
+    app.focus = saved;
+    if (record_history) push_nav_history(app, target);
+    return true;
+  }
+  if (xanatoo::starts_with(target, "draft:")) {
+    if (!open_draft(app, pi, target)) return false;
+    if (record_history) push_nav_history(app, target);
+    return true;
+  }
+
   // Remote pages load on a worker thread; poll_fetches shows them.
   if (is_in_app_remote_url(target)) {
     std::string why;
     if (remote_fetch_supported(target, &why)) {
-      if (!allow_discard_dirty(app, p.buf)) return false;
+      if (!stash_or_confirm(app, p.buf)) return false;
       if (const CachedPage* c = find_cached_page(app, target)) {
         // Fresh from a hover preview: no second fetch.
         const std::string final_url = c->final_url;
@@ -275,7 +291,7 @@ bool navigate_pane(App& app, int pi, std::string target, bool record_history) {
       }
     }
   }
-  if (!allow_discard_dirty(app, p.buf)) return false;
+  if (!stash_or_confirm(app, p.buf)) return false;
   {
     const bool was_import = xanatoo::is_pandoc_path(path);
     std::string open_path = resolve_open_path(app, path);

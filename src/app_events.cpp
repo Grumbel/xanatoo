@@ -1818,16 +1818,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         app.needs_layout = true;
         reset_blink(app);
       } else if (ctrl) {
-        if (any_dirty(app) && !app.discard_armed) {
-          app.discard_armed = true;
-          flash_status(
-              app, "Unsaved changes — Ctrl+S to save, or Ctrl+Q again to quit");
-          std::cerr
-              << "Unsaved changes — save first, or Ctrl+Q again to quit.\n";
-          break;
-        }
-        app.discard_armed = false;
-        app.running = false;
+        if (stash_all_or_confirm(app)) app.running = false;
       }
       break;
 
@@ -1849,7 +1840,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
           if (tab_i >= 0) {
             // Reuse CloseTab logic via command path is heavy; inline.
             const BufferId bi = app.tab_order[static_cast<size_t>(tab_i)];
-            if (allow_discard_dirty(app, bi)) {
+            if (stash_or_confirm(app, bi)) {
               close_tab(app, bi);
               flash_status(app, "Tab closed");
             }

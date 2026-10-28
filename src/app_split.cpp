@@ -129,6 +129,7 @@ BufferId scratch_buffer(App& app, xanatoo::Document doc,
   b.path = label;
   b.dirty = false;
   b.placeholder = false;
+  attach_draft(app, pv.scratch);
   return pv.scratch;
 }
 
