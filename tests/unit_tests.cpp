@@ -1825,6 +1825,19 @@ void test_front_matter_and_preamble() {
   EXPECT(ol.size() == 1 && !ol[0].preamble);
 }
 
+// Lines that look like a block start but no block parser claims (a lone
+// "|", a malformed "![") must still be consumed: this used to loop forever.
+void test_parse_unclaimed_block_lines() {
+  using namespace xanatoo;
+  for (const char* src : {"|\n", "|x\n", "![\n", "![x\n", "text\n|\nmore\n"}) {
+    Document doc = parse_markup(src);
+    bool has_para = false;
+    for (NodeId c : doc.get(doc.root).children)
+      if (doc.get(c).kind == NodeKind::Paragraph) has_para = true;
+    EXPECT(has_para);
+  }
+}
+
 int main() {
   test_sha256();
   test_revstore();
@@ -1846,6 +1859,7 @@ int main() {
   test_gemini_urls();
   test_nostr_refs();
   test_parse_markup();
+  test_parse_unclaimed_block_lines();
   test_parse_gemtext();
   test_json_edge_cases();
   test_url_edge_cases();

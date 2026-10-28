@@ -1237,17 +1237,22 @@ Document parse_markup(std::string_view source) {
 
     // Paragraph: gather consecutive non-blank, non-fence lines.
     // Two trailing spaces → hard line break ('\n' in span text).
+    // The first line is always taken: no block above claimed it (e.g. a
+    // lone "|" or a malformed "![…"), and breaking on it would never
+    // advance `i`.
     std::string para;
+    const size_t para_start = i;
     while (i < lines.size() && !lines[i].blank) {
       std::string_view lt = lines[i].text;
       size_t llead = 0;
       while (llead < lt.size() && (lt[llead] == ' ' || lt[llead] == '\t')) ++llead;
       std::string_view ltrim = lt.substr(llead);
-      if (starts_with(ltrim, ":::") || starts_with(ltrim, "# ") ||
+      if (i > para_start &&
+          (starts_with(ltrim, ":::") || starts_with(ltrim, "# ") ||
           starts_with(ltrim, "## ") || starts_with(ltrim, "![") ||
           starts_with(ltrim, "> ") || starts_with(ltrim, "|") ||
           footnote_def_close(ltrim) > 0 ||
-          list_marker_len(ltrim, nullptr) > 0) {
+          list_marker_len(ltrim, nullptr) > 0)) {
         break;
       }
       bool hard_break = false;
