@@ -107,12 +107,12 @@ std::optional<Caret> hit_test(const LayoutResult& layout,
     // so 10MB documents are not O(all glyphs) on every motion event.
     if (gy < sy - 120.f || gy > sy + 80.f) continue;
     float gx = g.x;
-    float gw = 8.f;
+    float gw = g.advance > 0.f ? g.advance : 8.f;
     if (i + 1 < layout.glyphs.size() &&
         layout.glyphs[i + 1].node == g.node &&
         std::abs(layout.glyphs[i + 1].y - g.y) < 0.5f) {
       gw = layout.glyphs[i + 1].x - g.x;
-      if (gw < 1.f) gw = 8.f;
+      if (gw < 1.f) gw = g.advance > 0.f ? g.advance : 8.f;
     }
     float mid = gx + gw * 0.5f;
     size_t ch = g.char_index + (sx >= mid ? 1 : 0);
@@ -170,7 +170,7 @@ CaretScreenPos caret_screen_pos(const LayoutResult& layout,
       return pos;
     }
     if (g.char_index < caret.char_index) {
-      float gw = 8.f;
+      float gw = g.advance > 0.f ? g.advance : 8.f;
       if (i + 1 < layout.glyphs.size() &&
           layout.glyphs[i + 1].node == g.node &&
           layout.glyphs[i + 1].span_index == g.span_index &&
@@ -244,7 +244,7 @@ std::vector<SelRect> selection_rects(const LayoutResult& layout,
       }
       continue;
     }
-    float gw = 8.f;
+    float gw = g.advance > 0.f ? g.advance : 8.f;
     if (i + 1 < layout.glyphs.size() &&
         layout.glyphs[i + 1].node == g.node &&
         std::abs(layout.glyphs[i + 1].y - g.y) < 0.5f) {

@@ -20,6 +20,7 @@ struct PositionedGlyph {
   uint32_t codepoint = 0;
   float x = 0.f;
   float y = 0.f;   // baseline
+  float advance = 0.f;  // g.x → next pen position (caret after the glyph)
   NodeId node = INVALID_NODE;
   size_t span_index = 0;
   size_t char_index = 0;

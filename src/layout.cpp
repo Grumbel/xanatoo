@@ -1028,6 +1028,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         pg.kind = InlineKind::FootnoteRef;
         pg.font = FontRole::Body;
         pg.color = st.text_color(BlockRole::Footnote, InlineKind::FootnoteRef);
+        pg.advance = mx + static_cast<float>(g.advance >> 6) - pg.x;
         out.glyphs.push_back(pg);
         mx += static_cast<float>(g.advance >> 6);
       }
@@ -1305,6 +1306,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         pg.kind = InlineKind::Text;
         pg.font = FontRole::Body;
         pg.color = st.text_color(BlockRole::ListItem, InlineKind::Text);
+        pg.advance = mx + static_cast<float>(g.advance >> 6) - pg.x;
         out.glyphs.push_back(pg);
         mx += static_cast<float>(g.advance >> 6);
       }
@@ -1692,6 +1694,7 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
       pg.kind = c.kind;
       pg.font = c.role;
       pg.color = style_->text_color(block, c.kind);
+      pg.advance = lx + adv - pg.x;
       out.glyphs.push_back(pg);
       lx += adv;
     }
