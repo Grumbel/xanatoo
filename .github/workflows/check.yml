@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
+#
+# gamepkgstd FLAKE-14: CI runs `nix flake check` and nothing else; every
+# build and test is defined in flake.nix.
+
+name: check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # self.revCount for the version string (VER-5)
+      - uses: cachix/install-nix-action@v31
+      - run: nix flake check --print-build-logs
