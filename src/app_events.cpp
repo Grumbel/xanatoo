@@ -1570,8 +1570,6 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   Pane& p = focused_pane(app);
   xanatoo::Document& d = doc_of(app, p);
   app.eat_text_input = false;
-  // Android Back (trapped, see platform_pre_init) acts like Escape.
-  if (ev.key.keysym.sym == SDLK_AC_BACK) ev.key.keysym.sym = SDLK_ESCAPE;
 
   // Alt+letter opens the matching top-level menu (Windows/GNOME style).
   // Handled before status-prompt isolation so chrome stays reachable.
@@ -2491,6 +2489,13 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
 }
 
 void handle_event(App& app, SDL_Event& ev) {
+  // Android Back (trapped, see platform_pre_init) acts like Escape everywhere:
+  // lightbox, ImGui popups, prompts, panels.
+  if ((ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP) &&
+      ev.key.keysym.sym == SDLK_AC_BACK) {
+    ev.key.keysym.sym = SDLK_ESCAPE;
+    ev.key.keysym.scancode = SDL_SCANCODE_ESCAPE;
+  }
   if (lightbox_event(app, ev)) return;  // fullscreen viewer owns the input
   app.ui.process_event(ev);
   // Mouse events SDL synthesises from touches only drive ImGui chrome; the
