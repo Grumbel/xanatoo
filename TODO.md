@@ -32,10 +32,8 @@ Next bundle number: **263** (this delivery is **262**)
   links (13 MB unstripped). ~20 MB of `.a` files.
   nixpkgs' own glib / libarchive / sqlite / libjxl / libwebp derivations
   fail (attr, elfutils, bash, tools) — minimal derivations needed.
-- Blocker: thumtoo's cache codec is hard-wired JXL (`kDefaultCodec`,
-  `encode_jxl_level`, `vips_jxlload_buffer`); cache format only has to be
-  fast → JPEG by default, WebP for alpha, codec per blob (exists). Change
-  in thumtoo, then libjxl optional.
+- thumtoo `3cb19f1`: ladder levels are JPEG (WebP with alpha) instead of
+  JXL, so libvips without libjxl suffices; the Android probe rebuilds.
 - Open: run on a device; armeabi-v7a / x86_64; move the probe into
   `nix/` and feed prebuilt `.a` into ndk-build; R36S (eoan sysroot,
   `std::span` shim for GCC 9).
