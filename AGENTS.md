@@ -298,6 +298,8 @@ mechanism; historical bundle numbers in TODO.md are archival).
   tex, typ, wiki, ipynb, csv, …); `is_pandoc_path` / `import_via_pandoc`
   convert to cached GFM Markdown with `--extract-media`. The original file
   is never touched and the import is read-only (foreign).
+- Pandoc misbehaviour and our workarounds (Lua filter, post-passes) are
+  collected in `docs/PANDOC.md`; add new findings there.
 
 ## Ebooks
 

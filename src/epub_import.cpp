@@ -109,6 +109,15 @@ static bool pandoc_available() {
   return rc == 0;
 }
 
+// Lua filter for every pandoc import: drop raw HTML blocks / inlines.
+// The EPUB reader keeps elements it does not map (<hgroup>, <footer>,
+// <article>, empty <svg> cover wrappers, …) as RawBlock "html", and the
+// gfm writer prints those even with -raw_html. Their content is already
+// separate blocks, so only the tag lines go. See docs/PANDOC.md.
+static constexpr const char* kStripRawHtmlLua =
+    "function RawBlock(b) if b.format == 'html' then return {} end end\n"
+    "function RawInline(b) if b.format == 'html' then return {} end end\n";
+
 static bool is_ascii_space(unsigned char c) {
   return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' ||
          c == '\v';
@@ -395,7 +404,7 @@ ImportResult import_via_pandoc(const std::string& epub_path) {
   // Reuse derived Markdown when it is at least as new as the EPUB and was
   // made by the current conversion (bump kFormat when the pandoc call
   // changes; the stamp file holds it).
-  static constexpr const char* kFormat = "2 front-matter";
+  static constexpr const char* kFormat = "3 strip-raw-html";
   const fs::path stamp = dir / ".format";
   bool reuse = false;
   try {
@@ -414,8 +423,14 @@ ImportResult import_via_pandoc(const std::string& epub_path) {
     } catch (...) {
     }
 
+    const fs::path filter = dir / "strip-raw-html.lua";
+    if (!write_text_file(filter, kStripRawHtmlLua)) {
+      out.error = "Cannot write pandoc filter: " + filter.string();
+      return out;
+    }
+
     // pandoc book.epub -f epub -t gfm-raw_html+yaml_metadata_block -s
-    //   -o content.md --extract-media=media
+    //   -L strip-raw-html.lua -o content.md --extract-media=media
     // (-s writes the title / author / … as YAML front matter.)
     // Run with cwd = cache dir so relative media paths in the MD resolve.
     std::ostringstream cmd;
@@ -424,6 +439,7 @@ ImportResult import_via_pandoc(const std::string& epub_path) {
         // -raw_html: unwrap div/span/section markup instead of passing it
         // through (EPUB XHTML leaves attribute lines in the text).
         << " -f " << reader << " -t gfm-raw_html+yaml_metadata_block -s"
+        << " -L " << shell_quote(filter.filename().string())
         << " -o " << shell_quote(md.filename().string())
         << " --extract-media=" << shell_quote(media.filename().string())
         << " 2>/tmp/xanatoo-pandoc-epub.err";

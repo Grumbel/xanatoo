@@ -8,6 +8,17 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-29) — pandoc raw HTML residue
+
+- EPUB imports showed `<hgroup>` / `<footer>` / `<svg>` tag lines
+  (Standard Ebooks, Gutenberg). Pandoc's EPUB reader keeps them as raw
+  HTML and the gfm writer prints them despite `-raw_html`. Every pandoc
+  import now runs `-L strip-raw-html.lua` (`kStripRawHtmlLua`), `kFormat`
+  bumped to re-import caches. Pandoc quirks are collected in
+  `docs/PANDOC.md`. Open: escaped HTML in the front-matter description;
+  check whether `sanitize_epub_markdown` is still needed; report the two
+  pandoc issues upstream.
+
 ## Status (2026-10-29) — document windows are full views
 
 - `Pane` is the one document view: `App::panes[kMaxViews]`, slots 0 / 1
