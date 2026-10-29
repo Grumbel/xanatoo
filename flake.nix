@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
+
 {
   description = "xanatoo — interactive document composition engine";
 
@@ -167,6 +170,13 @@
           '';
           help = pkgs.runCommand "xanatoo-check-help" { } ''
             ${pkg}/bin/xanatoo --help > /dev/null
+            touch $out
+          '';
+          reuse = pkgs.runCommand "xanatoo-check-reuse" {
+            nativeBuildInputs = [ pkgs.reuse ];
+          } ''
+            cd ${self}
+            HOME=$TMPDIR reuse lint
             touch $out
           '';
           man = pkgs.runCommand "xanatoo-check-man" {

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 """Rasterize icons/svg/*.svg → PNG. Prefers ImageMagick; falls back to drawn icons."""
 from __future__ import annotations
 

@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
+#
+# Licensing of files that cannot carry an SPDX header (gamepkgstd
+# STACK-9; checked by `reuse lint`, checks.reuse in flake.nix). Source
+# files carry their own headers.
+
+version = 1
+
+# Documentation, documents, style sheets, data and generated icons.
+[[annotations]]
+path = [
+  ".gitignore",
+  "*.md",
+  "VERSION",
+  "flake.lock",
+  "docs/**",
+  "examples/**",
+  "styles/**",
+  "icons/svg/**",
+  "data/icons/**",
+  "mk/android/app/res/**",
+  "mk/android/keystore/debug.keystore",
+  "mk/r36s/port.json",
+]
+SPDX-FileCopyrightText = "2026 Ingo Ruhnke <grumbel@gmail.com>"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Vendored Dear ImGui (external/imgui/LICENSE.txt).
+[[annotations]]
+path = "external/imgui/**"
+SPDX-FileCopyrightText = "2014-2025 Omar Cornut"
+SPDX-License-Identifier = "MIT"
+
+# Vendored stb_image (license at the end of the file).
+[[annotations]]
+path = "external/stb_image.h"
+SPDX-FileCopyrightText = "2017 Sean Barrett"
+SPDX-License-Identifier = "MIT OR Unlicense"
+
+[[annotations]]
+path = "external/README.md"
+SPDX-FileCopyrightText = "2026 Ingo Ruhnke <grumbel@gmail.com>"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# thumtoo files its own REUSE.toml does not annotate yet (fix upstream in
+# thumtoo, then drop this).
+[[annotations]]
+path = [
+  "external/thumtoo/docs/bench/baselines/**",
+  "external/thumtoo/tools/__pycache__/**",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Ingo Ruhnke <grumbel@gmail.com>"
+SPDX-License-Identifier = "GPL-3.0-or-later"

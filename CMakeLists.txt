@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
+
 cmake_minimum_required(VERSION 3.16)
 # Version (gamepkgstd VER-1, VER-6): VERSION is the only place it is
 # written; Nix passes the full dev string (0.1.0-dev.<revCount>+g<rev>).
