@@ -18,6 +18,7 @@
 #include "xanatoo/util.hpp"
 #if defined(XANATOO_HTTPS) && XANATOO_HTTPS
 #include "xanatoo/https.hpp"
+#include "xanatoo/version.hpp"
 #endif
 
 namespace fs = std::filesystem;
@@ -36,7 +37,7 @@ bool download_image(const std::string& url) {
   std::string fetch = url;
   if (starts_with_ci(fetch, "http://")) fetch = "https://" + fetch.substr(7);
   std::string err;
-  auto r = xanatoo::https_get_follow(fetch, "xanatoo/0.1 (image fetch)", &err);
+  auto r = xanatoo::https_get_follow(fetch, xanatoo::user_agent("image fetch"), &err);
   if (!r || r->status != 200 || r->body.empty()) {
     std::cerr << "image: " << url << ": "
               << (r ? "HTTP " + std::to_string(r->status) : err) << "\n";

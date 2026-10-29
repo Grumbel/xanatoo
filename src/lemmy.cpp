@@ -10,6 +10,7 @@
 
 #include "xanatoo/https.hpp"
 #include "xanatoo/json_min.hpp"
+#include "xanatoo/version.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -71,10 +72,10 @@ bool is_lemmy_url(std::string_view s) {
 
 namespace {
 
-std::string user_agent() {
+std::string lemmy_user_agent() {
   const char* env = std::getenv("XANATOO_LEMMY_USER_AGENT");
   if (env && env[0]) return env;
-  return "xanatoo/0.1.0 (read-only Lemmy client; by grumbel; +https://github.com/Grumbel/xanatoo)";
+  return user_agent("read-only Lemmy client; by grumbel");
 }
 
 std::string format_time_iso(std::string_view iso) {
@@ -389,7 +390,7 @@ std::optional<Document> lemmy_fetch(std::string_view url_in, std::string* err) {
   for (int hop = 0; hop < 4; ++hop) {
     std::cerr << "Lemmy: GET " << current << "\n";
     std::string req_err;
-    resp = https_get(current, user_agent(), &req_err);
+    resp = https_get(current, lemmy_user_agent(), &req_err);
     if (!resp) {
       if (err) *err = req_err.empty() ? "request failed" : req_err;
       return std::nullopt;
@@ -468,7 +469,7 @@ std::optional<Document> lemmy_fetch(std::string_view url_in, std::string* err) {
         "&limit=80&max_depth=8&sort=Hot";
     std::cerr << "Lemmy: GET " << curl << "\n";
     std::string cerr;
-    auto cresp = https_get(curl, user_agent(), &cerr);
+    auto cresp = https_get(curl, lemmy_user_agent(), &cerr);
     if (cresp && cresp->status == 200 && !cresp->body.empty()) {
       size_t cs = 0;
       while (cs < cresp->body.size() &&

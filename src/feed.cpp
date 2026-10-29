@@ -11,6 +11,7 @@
 
 #include "xanatoo/html_min.hpp"
 #include "xanatoo/https.hpp"
+#include "xanatoo/version.hpp"
 
 #include <cctype>
 #include <cstdlib>
@@ -597,8 +598,7 @@ std::optional<Document> parse_feed(std::string_view xml, std::string_view feed_u
 #if defined(XANATOO_FEEDS) && XANATOO_FEEDS
 
 std::optional<Document> feed_fetch(std::string_view url_in, std::string* err) {
-  static const char* kUserAgent =
-      "xanatoo/0.1.0 (feed reader; +https://github.com/Grumbel/xanatoo)";
+  static const std::string kUserAgent = user_agent("feed reader");
   std::string url = feed_http_url(url_in);
   for (int attempt = 0; attempt < 2; ++attempt) {
     std::cerr << "Feed: GET " << url << "\n";

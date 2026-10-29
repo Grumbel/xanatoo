@@ -3,6 +3,7 @@
 
 #include "xanatoo/cli.hpp"
 #include "xanatoo/paths.hpp"
+#include "xanatoo/version.hpp"
 
 #ifdef __ANDROID__
 #include <SDL.h>
@@ -16,10 +17,6 @@
 #if defined(__linux__) || defined(__APPLE__)
 #include <sys/wait.h>
 #include <unistd.h>
-#endif
-
-#ifndef XANATOO_VERSION
-#define XANATOO_VERSION "unknown"
 #endif
 
 namespace xanatoo {
@@ -133,7 +130,7 @@ CliResult parse_cli(int argc, char** argv, CliOptions& opt) {
       return CliResult::Exit;
     }
     if (a == "-v" || a == "--version") {
-      std::cout << "xanatoo " << XANATOO_VERSION << "\n";
+      std::cout << "xanatoo " << version_string() << "\n";
       return CliResult::Exit;
     }
     if (a == "-f" || a == "--fullscreen") {

@@ -101,6 +101,7 @@ add_executable(xanatoo
   src/platform.cpp
   src/cli.cpp
   src/paths.cpp
+  src/version.cpp
   src/gemini.cpp
   src/nostr.cpp
   src/reddit.cpp
@@ -365,6 +366,7 @@ add_executable(xanatoo_tests
   src/about.cpp
   src/util.cpp
   src/paths.cpp
+  src/version.cpp
   src/revstore.cpp
   src/minibuffer.cpp
   src/document.cpp
@@ -419,6 +421,7 @@ target_compile_definitions(xanatoo_tests PRIVATE
   XANATOO_FONTCONFIG=$<BOOL:${XANATOO_FONTCONFIG}>
   XANATOO_SQLITE=$<BOOL:${XANATOO_SQLITE}>
   "XANATOO_STYLE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/styles\""
+  "XANATOO_VERSION=\"${PROJECT_VERSION_FULL}\""
 )
 enable_testing()
 add_test(NAME unit_tests COMMAND xanatoo_tests)

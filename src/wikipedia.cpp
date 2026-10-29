@@ -9,6 +9,7 @@
 
 #if defined(XANATOO_WIKIPEDIA) && XANATOO_WIKIPEDIA
 #include "xanatoo/https.hpp"
+#include "xanatoo/version.hpp"
 #endif
 
 #include <array>
@@ -196,8 +197,7 @@ std::optional<Document> wikipedia_fetch(std::string_view ref_in,
                                         std::string* err,
                                         std::string* final_ref) {
   // Wikimedia asks for a descriptive User-Agent with a contact URL.
-  static const char* kUserAgent =
-      "xanatoo/0.1 (https://github.com/Grumbel/xanatoo; document reader)";
+  static const std::string kUserAgent = user_agent("document reader");
   auto ref = parse_wikipedia_ref(ref_in);
   if (!ref) {
     if (err) *err = "not a wikipedia: reference";

@@ -9,6 +9,7 @@
 #include "xanatoo/https.hpp"
 #include "xanatoo/json_min.hpp"
 #include "xanatoo/util.hpp"
+#include "xanatoo/version.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -145,7 +146,8 @@ std::string reddit_user_agent() {
   const char* env = std::getenv("XANATOO_REDDIT_USER_AGENT");
   if (env && env[0]) return env;
   // Reddit's preferred form: platform:app_id:version (by /u/name)
-  return "linux:xanatoo:0.1.0 (by /u/grumbel; read-only; +https://github.com/Grumbel/xanatoo)";
+  return std::string("linux:xanatoo:") + version_string() +
+         " (by /u/grumbel; read-only; +https://github.com/Grumbel/xanatoo)";
 }
 
 // App-only OAuth token (client credentials). Empty if env not set or fails.

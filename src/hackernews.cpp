@@ -12,6 +12,7 @@
 
 #include "xanatoo/https.hpp"
 #include "xanatoo/json_min.hpp"
+#include "xanatoo/version.hpp"
 
 #include <algorithm>
 #include <cstdlib>
@@ -109,8 +110,7 @@ std::string item_url(int64_t id) {
   return "https://news.ycombinator.com/item?id=" + std::to_string(id);
 }
 
-const char* kUserAgent =
-    "xanatoo/0.1.0 (read-only Hacker News client; +https://github.com/Grumbel/xanatoo)";
+const std::string kUserAgent = user_agent("read-only Hacker News client");
 
 struct HnItem {
   int64_t id = 0;

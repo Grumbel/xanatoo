@@ -10,6 +10,7 @@
 
 #if defined(XANATOO_WEB) && XANATOO_WEB
 #include "xanatoo/https.hpp"
+#include "xanatoo/version.hpp"
 #endif
 
 #include <array>
@@ -248,8 +249,9 @@ Document plain_text_document(std::string_view text) {
 
 std::optional<Document> web_fetch(std::string_view url_in, std::string* err,
                                   std::string* final_url) {
-  static const char* kUserAgent =
-      "Mozilla/5.0 (compatible; xanatoo/0.1; +https://github.com/Grumbel/xanatoo)";
+  static const std::string kUserAgent =
+      std::string("Mozilla/5.0 (compatible; xanatoo/") + version_string() +
+      "; +https://github.com/Grumbel/xanatoo)";
   std::string url(url_in.substr(0, url_in.find('#')));
   std::cerr << "Web: GET " << url << "\n";
   std::string fin;

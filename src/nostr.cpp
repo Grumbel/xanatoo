@@ -10,6 +10,7 @@
 #include "xanatoo/https.hpp"
 #include "xanatoo/tls.hpp"
 #include "xanatoo/json_min.hpp"
+#include "xanatoo/version.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -730,7 +731,7 @@ bool ws_connect(WsConn& c, const std::string& url, std::string* err) {
       << "Connection: Upgrade\r\n"
       << "Sec-WebSocket-Key: " << key << "\r\n"
       << "Sec-WebSocket-Version: 13\r\n"
-      << "User-Agent: xanatoo/0.1\r\n"
+      << "User-Agent: xanatoo/" << version_string() << "\r\n"
       << "\r\n";
   std::string reqs = req.str();
   if (!c.write_all(reqs.data(), reqs.size())) {

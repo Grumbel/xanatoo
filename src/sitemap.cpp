@@ -12,6 +12,7 @@
 
 #if defined(XANATOO_WEB) && XANATOO_WEB
 #include "xanatoo/https.hpp"
+#include "xanatoo/version.hpp"
 #endif
 
 #include <algorithm>
@@ -426,8 +427,7 @@ Document site_tree_document(const SiteTree& t) {
 
 namespace {
 
-constexpr const char* kUserAgent =
-    "xanatoo/0.1 (sitemap reader; https://github.com/Grumbel/xanatoo)";
+const std::string kUserAgent = user_agent("sitemap reader");
 constexpr size_t kMaxFiles = 25;
 constexpr size_t kMaxUrls = 50000;
 constexpr size_t kMaxXmlBytes = 52428800;

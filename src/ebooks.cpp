@@ -13,6 +13,7 @@
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/https.hpp"
 #include "xanatoo/parse.hpp"
+#include "xanatoo/version.hpp"
 
 #include <cctype>
 #include <cstdlib>
@@ -236,8 +237,7 @@ Document parse_standard_ebooks_listing(std::string_view html,
 
 namespace {
 
-const char* kUserAgent =
-    "xanatoo/0.1.0 (ebook reader; +https://github.com/Grumbel/xanatoo)";
+const std::string kUserAgent = user_agent("ebook reader");
 
 fs::path download_dir() {
   const std::string cache = cache_dir();

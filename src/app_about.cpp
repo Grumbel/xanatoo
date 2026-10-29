@@ -15,6 +15,7 @@
 #include "xanatoo/paths.hpp"
 #include "xanatoo/tls.hpp"
 #include "xanatoo/util.hpp"
+#include "xanatoo/version.hpp"
 
 #include <SDL.h>
 #include <ft2build.h>
@@ -27,10 +28,6 @@
 #endif
 #if XANATOO_THUMTOO
 #include <thumtoo/version.hpp>
-#endif
-
-#ifndef XANATOO_VERSION
-#define XANATOO_VERSION "unknown"
 #endif
 
 namespace xanatoo::app {
@@ -206,7 +203,7 @@ AboutSection libraries(App& app) {
 
 void open_about_page(App& app) {
   xanatoo::AboutInfo info;
-  info.version = XANATOO_VERSION;
+  info.version = xanatoo::version_string();
   info.sections = {services(), formats(), images(), libraries(app)};
   show_doc_in_pane(app, app.focus,
                    xanatoo::parse_document(xanatoo::about_markdown(info), {}),
