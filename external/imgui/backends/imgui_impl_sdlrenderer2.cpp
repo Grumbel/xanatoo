@@ -36,6 +36,7 @@
 #include "imgui.h"
 #ifndef IMGUI_DISABLE
 #include "imgui_impl_sdlrenderer2.h"
+#include "imgui_internal.h" // ImHashData
 #include <stdint.h>     // intptr_t
 
 // Clang warnings with -Weverything
@@ -68,7 +69,7 @@ static ImGui_ImplSDLRenderer2_GeometryRawFn ImGui_ImplSDLRenderer2_LookupGeometr
     SDL_version v;
     SDL_GetVersion(&v);
     ImGui_ImplSDLRenderer2_GeometryRawFn fn = nullptr;
-#if defined(__linux__)
+#if defined(__linux__) && !defined(IMGUI_SDL_RENDERER_FORCE_FALLBACK)
     // Opening the loaded library by its soname returns the same handle.
     if (SDL_VERSIONNUM(v.major, v.minor, v.patch) >= SDL_VERSIONNUM(2, 0, 18))
         if (void* lib = SDL_LoadObject("libSDL2-2.0.so.0"))
@@ -85,6 +86,14 @@ struct ImGui_ImplSDLRenderer2_Data
 {
     SDL_Renderer*   Renderer;       // Main viewport's renderer
     SDL_Texture*    FontTexture;
+#if IMGUI_SDL_RENDERER_LEGACY
+    // Fallback renderer: UI drawn into Cache, redrawn when CacheHash changes.
+    SDL_Texture*    Cache;
+    int             CacheW, CacheH;
+    bool            CacheValid, CacheFailed;
+    ImGuiID         CacheHash;
+    SDL_Rect        CacheRect;
+#endif
     ImGui_ImplSDLRenderer2_Data()   { memset((void*)this, 0, sizeof(*this)); }
 };
 
@@ -150,8 +159,17 @@ void ImGui_ImplSDLRenderer2_NewFrame()
 
 
 #if IMGUI_SDL_RENDERER_LEGACY
-// Minimal textured-triangle path for SDL < 2.0.17 (no RenderGeometry).
-// Adequate for ImGui menus on low-res handhelds (R36S 640x480).
+// Minimal textured-triangle path for SDL < 2.0.17 (no RenderGeometry): each
+// triangle becomes the rectangle of its bounding box, one SDL call. Right for
+// the axis-aligned quads ImGui emits without anti-aliasing and rounding
+// (ImGui_ImplSDLRenderer2_UsesTriangleFallback); a quad's two triangles cover
+// the same rectangle and are drawn once.
+struct ImGui_ImplSDLRenderer2_TriRect
+{
+    float x0, y0, x1, y1, u0, v0, u1, v1;
+    int col;
+};
+
 static void ImGui_ImplSDLRenderer2_RenderGeometryLegacy(
     SDL_Renderer* renderer, SDL_Texture* texture,
     const float* xy, int xy_stride,
@@ -166,87 +184,173 @@ static void ImGui_ImplSDLRenderer2_RenderGeometryLegacy(
             return (unsigned int)(*(const ImU16*)(base + i * 2));
         return *(const unsigned int*)(base + i * 4);
     };
-    auto vert = [&](unsigned int i, float& x, float& y, float& u, float& v, int& col) {
-        const char* pxy = (const char*)xy + i * xy_stride;
-        const char* puv = (const char*)uv + i * uv_stride;
-        const char* pcol = (const char*)color + i * color_stride;
-        x = ((const float*)pxy)[0];
-        y = ((const float*)pxy)[1];
-        u = ((const float*)puv)[0];
-        v = ((const float*)puv)[1];
-        col = *(const int*)pcol;
+    auto tri_rect = [&](int i, ImGui_ImplSDLRenderer2_TriRect& t) {
+        for (int k = 0; k < 3; k++)
+        {
+            const unsigned int vi = idx_at(i + k);
+            const float* pxy = (const float*)((const char*)xy + vi * xy_stride);
+            const float* puv = (const float*)((const char*)uv + vi * uv_stride);
+            if (k == 0)
+            {
+                t.x0 = t.x1 = pxy[0]; t.y0 = t.y1 = pxy[1];
+                t.u0 = t.u1 = puv[0]; t.v0 = t.v1 = puv[1];
+                t.col = *(const int*)((const char*)color + vi * color_stride);
+                continue;
+            }
+            t.x0 = ImMin(t.x0, pxy[0]); t.x1 = ImMax(t.x1, pxy[0]);
+            t.y0 = ImMin(t.y0, pxy[1]); t.y1 = ImMax(t.y1, pxy[1]);
+            t.u0 = ImMin(t.u0, puv[0]); t.u1 = ImMax(t.u1, puv[0]);
+            t.v0 = ImMin(t.v0, puv[1]); t.v1 = ImMax(t.v1, puv[1]);
+        }
     };
 
     int tw = 1, th = 1;
     if (texture)
         SDL_QueryTexture(texture, nullptr, nullptr, &tw, &th);
 
-    for (int i = 0; i + 2 < num_indices; i += 3)
+    SDL_BlendMode old_blend;
+    SDL_GetRenderDrawBlendMode(renderer, &old_blend);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    bool mod_set = false;
+    int mod_col = 0;
+
+    for (int i = 0; i + 2 < num_indices; )
     {
-        float x0, y0, u0, v0, x1, y1, u1, v1, x2, y2, u2, v2;
-        int c0, c1, c2;
-        vert(idx_at(i + 0), x0, y0, u0, v0, c0);
-        vert(idx_at(i + 1), x1, y1, u1, v1, c1);
-        vert(idx_at(i + 2), x2, y2, u2, v2, c2);
+        ImGui_ImplSDLRenderer2_TriRect t;
+        tri_rect(i, t);
+        i += 3;
+        if (i + 2 < num_indices)
+        {
+            ImGui_ImplSDLRenderer2_TriRect next;
+            tri_rect(i, next);
+            if (memcmp(&t, &next, sizeof(t)) == 0)
+                i += 3;
+        }
 
-        // Axis-aligned bounds → single textured rect (ImGui UI is mostly quads).
-        float minx = x0 < x1 ? (x0 < x2 ? x0 : x2) : (x1 < x2 ? x1 : x2);
-        float maxx = x0 > x1 ? (x0 > x2 ? x0 : x2) : (x1 > x2 ? x1 : x2);
-        float miny = y0 < y1 ? (y0 < y2 ? y0 : y2) : (y1 < y2 ? y1 : y2);
-        float maxy = y0 > y1 ? (y0 > y2 ? y0 : y2) : (y1 > y2 ? y1 : y2);
-        float minu = u0 < u1 ? (u0 < u2 ? u0 : u2) : (u1 < u2 ? u1 : u2);
-        float maxu = u0 > u1 ? (u0 > u2 ? u0 : u2) : (u1 > u2 ? u1 : u2);
-        float minv = v0 < v1 ? (v0 < v2 ? v0 : v2) : (v1 < v2 ? v1 : v2);
-        float maxv = v0 > v1 ? (v0 > v2 ? v0 : v2) : (v1 > v2 ? v1 : v2);
+        const Uint8 a = (Uint8)((t.col >> 24) & 0xff);
+        const Uint8 r = (Uint8)((t.col >> 0) & 0xff);
+        const Uint8 g = (Uint8)((t.col >> 8) & 0xff);
+        const Uint8 b = (Uint8)((t.col >> 16) & 0xff);
 
-        const int a = (c0 >> 24) & 0xff;
-        const int r = (c0 >> 0) & 0xff;
-        const int g = (c0 >> 8) & 0xff;
-        const int b = (c0 >> 16) & 0xff;
-        SDL_SetRenderDrawColor(renderer, r, g, b, a);
+        SDL_Rect dst;
+        dst.x = (int)t.x0;
+        dst.y = (int)t.y0;
+        dst.w = (int)(t.x1 - t.x0);
+        dst.h = (int)(t.y1 - t.y0);
+        if (dst.w < 1) dst.w = 1;
+        if (dst.h < 1) dst.h = 1;
 
-        if (texture && (maxu - minu) > 1e-6f && (maxv - minv) > 1e-6f)
+        if (texture && (t.u1 - t.u0) > 1e-6f && (t.v1 - t.v0) > 1e-6f)
         {
             SDL_Rect src;
-            src.x = (int)(minu * tw);
-            src.y = (int)(minv * th);
-            src.w = (int)((maxu - minu) * tw);
-            src.h = (int)((maxv - minv) * th);
+            src.x = (int)(t.u0 * tw);
+            src.y = (int)(t.v0 * th);
+            src.w = (int)((t.u1 - t.u0) * tw);
+            src.h = (int)((t.v1 - t.v0) * th);
             if (src.w < 1) src.w = 1;
             if (src.h < 1) src.h = 1;
-            SDL_Rect dst;
-            dst.x = (int)minx;
-            dst.y = (int)miny;
-            dst.w = (int)(maxx - minx);
-            dst.h = (int)(maxy - miny);
-            if (dst.w < 1) dst.w = 1;
-            if (dst.h < 1) dst.h = 1;
-            SDL_SetTextureColorMod(texture, (Uint8)r, (Uint8)g, (Uint8)b);
-            SDL_SetTextureAlphaMod(texture, (Uint8)a);
+            if (!mod_set || t.col != mod_col)
+            {
+                SDL_SetTextureColorMod(texture, r, g, b);
+                SDL_SetTextureAlphaMod(texture, a);
+                mod_set = true;
+                mod_col = t.col;
+            }
             SDL_RenderCopy(renderer, texture, &src, &dst);
-            // Restore so the next batch (and other code) does not inherit tint.
-            SDL_SetTextureColorMod(texture, 255, 255, 255);
-            SDL_SetTextureAlphaMod(texture, 255);
         }
         else
         {
-            SDL_Rect dst;
-            dst.x = (int)minx;
-            dst.y = (int)miny;
-            dst.w = (int)(maxx - minx);
-            dst.h = (int)(maxy - miny);
-            if (dst.w < 1) dst.w = 1;
-            if (dst.h < 1) dst.h = 1;
+            SDL_SetRenderDrawColor(renderer, r, g, b, a);
             SDL_RenderFillRect(renderer, &dst);
         }
     }
-    if (texture)
+    // Restore so other code does not inherit the tint.
+    if (mod_set)
     {
         SDL_SetTextureColorMod(texture, 255, 255, 255);
         SDL_SetTextureAlphaMod(texture, 255);
     }
+    SDL_SetRenderDrawBlendMode(renderer, old_blend);
+}
+
+// Hash of everything that decides what the draw data puts on screen; also
+// returns the bounding box of the clipped commands in framebuffer pixels.
+static ImGuiID ImGui_ImplSDLRenderer2_HashDrawData(ImDrawData* draw_data, ImVec2 clip_off, ImVec2 clip_scale,
+                                                   int fb_width, int fb_height, SDL_Rect* bounds)
+{
+    ImGuiID h = ImHashData(&draw_data->DisplaySize, sizeof(draw_data->DisplaySize));
+    ImVec2 bmin((float)fb_width, (float)fb_height), bmax(0.0f, 0.0f);
+    for (int n = 0; n < draw_data->CmdListsCount; n++)
+    {
+        const ImDrawList* draw_list = draw_data->CmdLists[n];
+        h = ImHashData(draw_list->VtxBuffer.Data, (size_t)draw_list->VtxBuffer.Size * sizeof(ImDrawVert), h);
+        h = ImHashData(draw_list->IdxBuffer.Data, (size_t)draw_list->IdxBuffer.Size * sizeof(ImDrawIdx), h);
+        for (const ImDrawCmd& cmd : draw_list->CmdBuffer)
+        {
+            const ImTextureID tex = cmd.GetTexID();
+            h = ImHashData(&cmd.ClipRect, sizeof(cmd.ClipRect), h);
+            h = ImHashData(&tex, sizeof(tex), h);
+            h = ImHashData(&cmd.VtxOffset, sizeof(cmd.VtxOffset), h);
+            h = ImHashData(&cmd.IdxOffset, sizeof(cmd.IdxOffset), h);
+            h = ImHashData(&cmd.ElemCount, sizeof(cmd.ElemCount), h);
+            h = ImHashData(&cmd.UserCallback, sizeof(cmd.UserCallback), h);
+            if (cmd.ElemCount == 0)
+                continue;
+            bmin.x = ImMin(bmin.x, (cmd.ClipRect.x - clip_off.x) * clip_scale.x);
+            bmin.y = ImMin(bmin.y, (cmd.ClipRect.y - clip_off.y) * clip_scale.y);
+            bmax.x = ImMax(bmax.x, (cmd.ClipRect.z - clip_off.x) * clip_scale.x);
+            bmax.y = ImMax(bmax.y, (cmd.ClipRect.w - clip_off.y) * clip_scale.y);
+        }
+    }
+    bmin = ImMax(bmin, ImVec2(0.0f, 0.0f));
+    bmax = ImMin(bmax, ImVec2((float)fb_width, (float)fb_height));
+    bounds->x = (int)bmin.x;
+    bounds->y = (int)bmin.y;
+    bounds->w = ImMax(0, (int)ImCeil(bmax.x) - bounds->x);
+    bounds->h = ImMax(0, (int)ImCeil(bmax.y) - bounds->y);
+    return h;
+}
+
+// Target texture the fallback draws the UI into (premultiplied alpha), or
+// nullptr when SDL cannot render to textures or applies its own scale.
+static SDL_Texture* ImGui_ImplSDLRenderer2_UiCache(ImGui_ImplSDLRenderer2_Data* bd, SDL_Renderer* renderer,
+                                                   int fb_width, int fb_height, float rsx, float rsy)
+{
+    if (bd->CacheFailed || rsx != 1.0f || rsy != 1.0f || SDL_GetRenderTarget(renderer) != nullptr)
+        return nullptr;
+    if (bd->Cache && bd->CacheW == fb_width && bd->CacheH == fb_height)
+        return bd->Cache;
+    if (bd->Cache)
+        SDL_DestroyTexture(bd->Cache);
+    bd->Cache = nullptr;
+    bd->CacheValid = false;
+    if (SDL_RenderTargetSupported(renderer))
+        bd->Cache = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, fb_width, fb_height);
+    if (!bd->Cache)
+    {
+        SDL_Log("imgui: no render target for the UI cache, drawing every frame");
+        bd->CacheFailed = true;
+        return nullptr;
+    }
+    const SDL_BlendMode premultiplied = SDL_ComposeCustomBlendMode(
+        SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA, SDL_BLENDOPERATION_ADD,
+        SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA, SDL_BLENDOPERATION_ADD);
+    if (SDL_SetTextureBlendMode(bd->Cache, premultiplied) != 0)
+        SDL_SetTextureBlendMode(bd->Cache, SDL_BLENDMODE_BLEND);
+    bd->CacheW = fb_width;
+    bd->CacheH = fb_height;
+    return bd->Cache;
 }
 #endif
+
+bool ImGui_ImplSDLRenderer2_UsesTriangleFallback()
+{
+#if IMGUI_SDL_RENDERER_LEGACY
+    return g_RenderGeometryRaw == nullptr;
+#else
+    return false;
+#endif
+}
 
 void ImGui_ImplSDLRenderer2_RenderDrawData(ImDrawData* draw_data, SDL_Renderer* renderer)
 {
@@ -291,8 +395,38 @@ void ImGui_ImplSDLRenderer2_RenderDrawData(ImDrawData* draw_data, SDL_Renderer* 
 	ImVec2 clip_off = draw_data->DisplayPos;         // (0,0) unless using multi-viewports
 	ImVec2 clip_scale = render_scale;
 
+    int list_count = draw_data->CmdListsCount;
+#if IMGUI_SDL_RENDERER_LEGACY
+    // One SDL call per triangle is slow (a draw call each on GLES) and the UI
+    // rarely changes while the page scrolls: draw it into a texture only when
+    // the draw data changed and blend that texture in on every frame.
+    ImGui_ImplSDLRenderer2_Data* bd = ImGui_ImplSDLRenderer2_GetBackendData();
+    SDL_Texture* cache = g_RenderGeometryRaw ? nullptr
+        : ImGui_ImplSDLRenderer2_UiCache(bd, renderer, fb_width, fb_height, rsx, rsy);
+    bool to_cache = false;
+    if (cache)
+    {
+        SDL_Rect bounds;
+        const ImGuiID hash = ImGui_ImplSDLRenderer2_HashDrawData(draw_data, clip_off, clip_scale, fb_width, fb_height, &bounds);
+        if (bd->CacheValid && hash == bd->CacheHash)
+        {
+            list_count = 0;
+        }
+        else
+        {
+            bd->CacheHash = hash;
+            bd->CacheValid = true;
+            bd->CacheRect = bounds;
+            to_cache = true;
+            SDL_SetRenderTarget(renderer, cache);
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+            SDL_RenderClear(renderer);
+        }
+    }
+#endif
+
     // Render command lists
-    for (int n = 0; n < draw_data->CmdListsCount; n++)
+    for (int n = 0; n < list_count; n++)
     {
         const ImDrawList* draw_list = draw_data->CmdLists[n];
         const ImDrawVert* vtx_buffer = draw_list->VtxBuffer.Data;
@@ -364,6 +498,17 @@ void ImGui_ImplSDLRenderer2_RenderDrawData(ImDrawData* draw_data, SDL_Renderer* 
     }
     platform_io.Renderer_RenderState = nullptr;
 
+#if IMGUI_SDL_RENDERER_LEGACY
+    if (cache)
+    {
+        if (to_cache)
+            SDL_SetRenderTarget(renderer, nullptr);
+        ImGui_ImplSDLRenderer2_SetupRenderState(renderer);
+        if (bd->CacheRect.w > 0 && bd->CacheRect.h > 0)
+            SDL_RenderCopy(renderer, cache, &bd->CacheRect, &bd->CacheRect);
+    }
+#endif
+
     // Restore modified SDL_Renderer state
     SDL_RenderSetViewport(renderer, &old.Viewport);
     SDL_RenderSetClipRect(renderer, old.ClipEnabled ? &old.ClipRect : nullptr);
@@ -432,6 +577,15 @@ bool ImGui_ImplSDLRenderer2_CreateDeviceObjects()
 void ImGui_ImplSDLRenderer2_DestroyDeviceObjects()
 {
     ImGui_ImplSDLRenderer2_DestroyFontsTexture();
+#if IMGUI_SDL_RENDERER_LEGACY
+    ImGui_ImplSDLRenderer2_Data* bd = ImGui_ImplSDLRenderer2_GetBackendData();
+    if (bd && bd->Cache)
+    {
+        SDL_DestroyTexture(bd->Cache);
+        bd->Cache = nullptr;
+        bd->CacheValid = false;
+    }
+#endif
 }
 
 //-----------------------------------------------------------------------------

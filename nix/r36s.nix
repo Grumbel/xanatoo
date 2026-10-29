@@ -15,7 +15,8 @@
 # Same approach as kurvenrausch's nix/r36s.nix; FreeType/Fontconfig debs
 # added for xanatoo's text stack. ImGui's SDL_Renderer backend is patched
 # for SDL 2.0.10 headers (no RenderGeometry): it looks up
-# SDL_RenderGeometryRaw in the device SDL at runtime, else draws per triangle.
+# SDL_RenderGeometryRaw in the device SDL at runtime, else draws per triangle
+# (ArkOS has 2.0.10) into a texture that is only redrawn when the UI changes.
 #
 #   nix build .#xanatoo-r36s
 #   nix build .#xanatoo-r36s-portmaster

@@ -17,10 +17,17 @@ Next bundle number: **263** (this delivery is **262**)
 - The backend now looks up `SDL_RenderGeometryRaw` in the SDL loaded at
   runtime (2.0.18+, ArkOS ships its own build) and only falls back to the
   per-triangle path without it; it logs `imgui: SDL x.y.z at runtime, …`.
-  Checked on desktop with the fallback forced on
-  (`-DIMGUI_SDL_RENDERER_LEGACY=1`); not yet on the device.
-- Open: if the device SDL turns out < 2.0.18, cheapen the fallback (no AA /
-  rounding, one call per quad, cache the chrome in a target texture).
+- The device (ArkOS on the R36S) has SDL 2.0.10, so the fallback runs.
+  Made cheap: no anti-aliasing / rounding while it is active
+  (`ImGui_ImplSDLRenderer2_UsesTriangleFallback`), a quad's two triangles
+  in one call, colour mods only on change, and the whole UI drawn into a
+  target texture only when the draw data hash changes, blended in with one
+  copy otherwise. Desktop measurement at 640x480 (fallback forced with
+  `-DIMGUI_SDL_RENDERER_LEGACY=1 -DIMGUI_SDL_RENDERER_FORCE_FALLBACK`):
+  ~2420 SDL draw calls per frame before, 320 per UI redraw now, 1 copy
+  while only the page scrolls. Not yet measured on the device.
+- Open: non-rectangular triangles (menu arrows, check marks) still draw as
+  their bounding boxes.
 - Later: SDL3 (desktop already runs on it via sdl2-compat; R36S would have
   to bundle libSDL3 for KMSDRM / Mali; Android 5 = API 21 is SDL3's floor).
 

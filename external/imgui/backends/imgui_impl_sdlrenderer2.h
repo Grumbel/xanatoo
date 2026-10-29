@@ -33,6 +33,9 @@ IMGUI_IMPL_API bool     ImGui_ImplSDLRenderer2_Init(SDL_Renderer* renderer);
 IMGUI_IMPL_API void     ImGui_ImplSDLRenderer2_Shutdown();
 IMGUI_IMPL_API void     ImGui_ImplSDLRenderer2_NewFrame();
 IMGUI_IMPL_API void     ImGui_ImplSDLRenderer2_RenderDrawData(ImDrawData* draw_data, SDL_Renderer* renderer);
+// xanatoo: true when SDL lacks RenderGeometry and triangles are drawn as
+// their bounding rectangles (keep the style free of rounding / anti-aliasing).
+IMGUI_IMPL_API bool     ImGui_ImplSDLRenderer2_UsesTriangleFallback();
 
 // Called by Init/NewFrame/Shutdown
 IMGUI_IMPL_API bool     ImGui_ImplSDLRenderer2_CreateFontsTexture();

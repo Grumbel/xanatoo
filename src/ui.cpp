@@ -427,6 +427,15 @@ bool Ui::init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale) {
 
   if (!ImGui_ImplSDL2_InitForSDLRenderer(window, renderer)) return false;
   if (!ImGui_ImplSDLRenderer2_Init(renderer)) return false;
+  if (ImGui_ImplSDLRenderer2_UsesTriangleFallback()) {
+    // Old SDL (R36S): triangles are drawn as their bounding rectangles, so
+    // keep every shape an axis-aligned quad (no fringes, square corners).
+    ImGuiStyle& s = ImGui::GetStyle();
+    s.AntiAliasedLines = s.AntiAliasedLinesUseTex = s.AntiAliasedFill = false;
+    s.WindowRounding = s.ChildRounding = s.FrameRounding = 0.f;
+    s.PopupRounding = s.ScrollbarRounding = s.GrabRounding = 0.f;
+    s.TabRounding = 0.f;
+  }
   ready_ = true;
   return true;
 }
