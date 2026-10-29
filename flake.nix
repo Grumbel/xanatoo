@@ -169,9 +169,16 @@
             ${pkg}/bin/xanatoo --help > /dev/null
             touch $out
           '';
+          man = pkgs.runCommand "xanatoo-check-man" {
+            nativeBuildInputs = [ pkgs.mandoc ];
+          } ''
+            mandoc -T lint -W warning ${pkg}/share/man/man1/xanatoo.1
+            touch $out
+          '';
           layout = pkgs.runCommand "xanatoo-check-layout" { } ''
             for f in \
               bin/xanatoo \
+              share/man/man1/xanatoo.1 \
               share/applications/xanatoo.desktop \
               share/metainfo/xanatoo.metainfo.xml \
               share/icons/hicolor/scalable/apps/xanatoo.svg \

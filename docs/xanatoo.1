@@ -1,0 +1,111 @@
+.\" SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+.\" SPDX-License-Identifier: GPL-3.0-or-later
+.Dd October 29, 2026
+.Dt XANATOO 1
+.Os
+.Sh NAME
+.Nm xanatoo
+.Nd interactive document composition engine
+.Sh SYNOPSIS
+.Nm
+.Op Ar options
+.Op Ar file Op Ar file2
+.Sh DESCRIPTION
+.Nm
+edits Markdown, Org and Gemtext documents live and browses web pages,
+feeds, Wikipedia, Gemini, Hacker News, Reddit, Lemmy and Nostr as
+read-only documents.
+.Pp
+One
+.Ar file
+(or URL) opens that document; two open side by side.
+With none,
+.Pa examples/welcome.md
+from the data directory opens.
+HTML opens as a read-only reader view; EPUB, DOCX, ODT, reStructuredText,
+LaTeX and other formats are imported to Markdown through
+.Xr pandoc 1
+without changing the original.
+.Pp
+Press F1 in the program for the keyboard reference.
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl h , Fl \-help
+Print a usage summary and exit.
+.It Fl v , Fl \-version
+Print the version and exit.
+.It Fl f , Fl \-fullscreen
+Start fullscreen.
+.It Fl w , Fl \-windowed
+Start in a window.
+.It Fl g , Fl \-geometry Ar W Ns x Ns Ar H
+Window size in pixels; the default is 1024x768.
+.It Fl o , Fl \-open Ar path
+Open
+.Ar path ,
+the same as giving it as an argument.
+.It Fl \-font Ar path
+TrueType or OpenType font for body text.
+.It Fl \-ui-scale Ar n
+Scale of the menus, toolbar and default text size.
+.It Fl \-data-dir Ar dir
+Installed data: example documents, help, style sheets, toolbar icons.
+.It Fl \-config-dir Ar dir
+Settings.
+.It Fl \-state-dir Ar dir
+Drafts of unsaved edits, revisions, folds, bookmarks and history.
+.It Fl \-user-data-dir Ar dir
+Your own style sheets, in
+.Pa styles/ .
+.It Fl \-cache-dir Ar dir
+Thumbnails, downloads and imported documents.
+.It Fl \-portable
+Keep all of the above in
+.Pa userdata/
+next to the executable.
+Also enabled by a file
+.Pa portable.txt
+next to the executable.
+.It Fl \-no-save
+Write no settings and no state during this run.
+Unsaved edits then have no drafts, so closing an edited document asks
+first.
+.It Fl \-show-paths
+Print every directory and where it came from, then exit.
+.It Fl \-
+End of options; the following arguments are paths.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width Ds
+.It Ev XDG_CONFIG_HOME , XDG_STATE_HOME , XDG_DATA_HOME , XDG_CACHE_HOME
+Base directories for settings, state, user data and cache.
+Used only when set to an absolute path.
+.It Ev XANATOO_FONT
+Body font when
+.Fl \-font
+is not given.
+.It Ev XANATOO_REDDIT_CLIENT_ID , XANATOO_REDDIT_CLIENT_SECRET
+Reddit OAuth credentials, used when anonymous access is refused.
+.It Ev XANATOO_REDDIT_USER_AGENT , XANATOO_LEMMY_USER_AGENT
+User-Agent override for the Reddit and Lemmy clients.
+.El
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa $XDG_CONFIG_HOME/xanatoo/view.conf
+Preferences.
+.It Pa $XDG_STATE_HOME/xanatoo/
+Revision store with drafts of unsaved edits, folds, bookmarks and
+history.
+.It Pa $XDG_DATA_HOME/xanatoo/styles/
+User style sheets.
+.It Pa $XDG_CACHE_HOME/xanatoo/
+Thumbnails, downloads and imports.
+.It Pa <prefix>/share/xanatoo/
+Installed data.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr pandoc 1
+.Sh AUTHORS
+.An Ingo Ruhnke Aq Mt grumbel@gmail.com

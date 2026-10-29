@@ -333,6 +333,8 @@ install(DIRECTORY icons/svg/
         FILES_MATCHING PATTERN "*.svg")
 # Desktop integration: launcher, AppStream metainfo, hicolor app icons
 # (generated from data/icons/xanatoo.svg by tools/make_icons.py).
+# Section 1, not the 6 of gamepkgstd DIR-1: xanatoo is not a game.
+install(FILES docs/xanatoo.1 DESTINATION share/man/man1)
 install(FILES data/xanatoo.desktop DESTINATION share/applications)
 install(FILES data/xanatoo.metainfo.xml DESTINATION share/metainfo)
 install(DIRECTORY data/icons/hicolor/
