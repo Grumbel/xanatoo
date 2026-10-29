@@ -19,9 +19,10 @@ Next bundle number: **263** (this delivery is **262**)
   no macros for them; sdl2-compat reads `SDL_APP_ID`) and the 64×64 window
   icon. Flake `checks.layout` / `checks.integration` (desktop-file-validate,
   appstreamcli). PortMaster gets `xanatoo/cover.png` and `screenshot.png`.
-- Open: Android `package` is `io.github.grumbel.xanatoo` (spec wants
-  `org.grumbel.xanatoo`; changing it loses installed data), no adaptive
-  icon (INT-14); PortMaster launcher `Xanatoo.sh` vs display name
+- Android `package` is now `org.grumbel.xanatoo` (was
+  `io.github.grumbel.xanatoo`: no hosting provider in IDs); it installs
+  as a new app beside the old one, which keeps its data.
+- Open: no adaptive icon (INT-14); PortMaster launcher `Xanatoo.sh` vs display name
   `xanatoo` (INT-15); no `--version` / `version` check; no Windows build.
 
 ## Status (2026-10-29) — middle-click opens links in a new tab

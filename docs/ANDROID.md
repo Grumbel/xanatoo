@@ -24,7 +24,7 @@ nixpkgs' `sqlite.src` (`sqliteAmalgamation` in `nix/android.nix`) and built
 as a static module (`mk/android/sqlite/Android.mk`).
 
 The APK is `android:debuggable` (debug-signed development build), so
-`adb shell run-as io.github.grumbel.xanatoo ls files` inspects its data.
+`adb shell run-as org.grumbel.xanatoo ls files` inspects its data.
 
 ## Data files
 

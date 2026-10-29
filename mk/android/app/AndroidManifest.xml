@@ -3,7 +3,7 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- build-apk.sh fills in the version name and code. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="io.github.grumbel.xanatoo"
+    package="org.grumbel.xanatoo"
     android:versionCode="@VERSION_CODE@"
     android:versionName="@VERSION_NAME@">
 
@@ -22,7 +22,7 @@
         android:debuggable="true"
         android:hasCode="true">
         <!-- debuggable: debug-signed development build; lets `adb shell
-             run-as io.github.grumbel.xanatoo` inspect files/ (view.conf,
+             run-as org.grumbel.xanatoo` inspect files/ (view.conf,
              side store, unpacked data). -->
         <!-- One window only: a second launch brings the running app back. -->
         <activity
