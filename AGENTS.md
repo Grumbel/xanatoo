@@ -35,7 +35,8 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_touch.cpp` | touchscreen gestures: tap → click, drag/fling scroll, long-press select, pinch zoom |
 | `app_buffers.cpp` / `app_view.cpp` / `app_nav.cpp` / `app_softwin.cpp` / `app_prompts.cpp` / `app_pointer.cpp` | document buffers, scroll/fold/outline, URL history + bookmarks, floating windows, minibuffer, cursor/gamepad |
 | `app_fetch.cpp` | background page fetches (`FetchJob` on a worker thread → `poll_fetches`), page cache, loading indicator |
-| `app_images.cpp` | remote (http/https) images: worker downloads of what `ImageCache` queued → `cache_dir()/images/`, thumbnail prebuilt, relayout on completion (`poll_images`); cache pruning at startup |
+| `app_images.cpp` | remote (http/https) images: worker downloads of what `ImageCache` queued → `cache_dir()/images/`, relayout on completion and on finished thumbnails (`poll_images`); cache pruning at startup |
+| `images_thumtoo.cpp` | `image_backend.hpp` over vendored thumtoo (`XANATOO_THUMTOO`): libvips decode, thumbnails composed from the shared tile cache |
 | `app_collection.cpp` | collection view state (layout / size / sort), card clicks, fullscreen `Lightbox` viewer |
 | `app_drafts.cpp` | unsaved edits → drafts in the revision store (`revstore.hpp`): autosave, restore on load (`attach_draft`), save / revert, `drafts:` page |
 | `app_footnotes.cpp` | footnote overlay: notes of on-screen `FootnoteRef` marks laid out in a strip at the pane bottom (`FootnoteOverlay` per pane), click jumps to the note |
@@ -346,8 +347,23 @@ mechanism; historical bundle numbers in TODO.md are archival).
   `poll_images` (app_images.cpp) downloads it and calls `remote_done`.
 - Layout draws remote images from their `kRemoteThumbEdge` thumbnail
   (`layout_remote_image`); a click opens the lightbox over all document
-  images. Decoding is stb_image only (PNG / JPEG / GIF / BMP — no WebP / AVIF).
+  images.
 - No posting or key management in v1.
+
+## Images through thumtoo (`image_backend.hpp`)
+
+- `external/thumtoo` is a git subtree of `~/projects/thumtoo/thumtoo.git`
+  (`git subtree pull --prefix external/thumtoo … --squash`); change thumtoo
+  upstream first, then pull.
+- `XANATOO_THUMTOO` (default ON on desktop): `ImageCache` decodes through
+  libvips (`image_backend_decode`, every format vips has) and thumbnails
+  asynchronously: `thumb()` returns a pending image and queues the request,
+  `ImageCache::poll()` (from `poll_images`) uploads finished ones. Thumbnails
+  are durable thumtoo tiles (JPEG, WebP with alpha) of the coarse scales
+  only, composed by `get_pixels_from_tiles`; the cache is
+  `$XDG_CACHE_HOME/thumtoo`, shared with galapix / biltoo.
+- Without it (unit tests, Android for now) stb_image decodes (PNG / JPEG /
+  GIF / BMP) and thumbnails are BMPs under `cache_dir()/thumbs/`.
 
 ## Gemini
 

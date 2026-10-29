@@ -16,6 +16,17 @@
       systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
 
+      # thumtoo's dependency list (libvips, libarchive, MuPDF pin, …) from the
+      # vendored flake.nix: external/ is no flake input, so its outputs
+      # function is evaluated directly (lib uses only nixpkgs), as galapix does.
+      thumtooLib = ((import ./external/thumtoo/flake.nix).outputs {
+        self = { };
+        inherit nixpkgs;
+        benchtoo = null;
+      }).lib;
+      thumtooBuildInputs = pkgs:
+        thumtooLib.mkBuildInputs (pkgs // { mupdf = thumtooLib.pinMupdf pkgs; });
+
       # Android (Linux hosts): the SDK and NDK are unfree. Android 5.0
       # (API 21) is the minimum; the Java side compiles against API 33.
       androidFor = system:
@@ -77,7 +88,7 @@
               # Prefer top-level libx11; xorg.* package set is deprecated.
               libx11
               libGL
-            ];
+            ] ++ thumtooBuildInputs pkgs;
 
             cmakeFlags = [
               "-DCMAKE_BUILD_TYPE=RelWithDebInfo"

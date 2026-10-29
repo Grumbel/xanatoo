@@ -3,8 +3,10 @@
 
 // Remote images: ImageCache queues the http(s) sources layout asks for;
 // a few detached workers download each one into cache_dir()/images/ and
-// prebuild its inline thumbnail, then the main thread marks it done and
-// relayouts (the image's size changes from placeholder to real).
+// prebuild its inline thumbnail (stb builds; thumtoo makes it on request),
+// then the main thread marks it done and relayouts (the image's size
+// changes from placeholder to real). Thumbnails finished by thumtoo also
+// arrive here (ImageCache::poll).
 
 #include <filesystem>
 #include <fstream>
@@ -58,7 +60,11 @@ bool download_image(const std::string& url) {
   }
   fs::rename(tmp, path, ec);
   if (ec) return false;
+#if defined(XANATOO_THUMTOO) && XANATOO_THUMTOO
+  return true;  // thumtoo builds the thumbnail when layout asks for it
+#else
   return xanatoo::build_thumb_file(path, xanatoo::kRemoteThumbEdge);
+#endif
 #else
   (void)url;
   return false;
@@ -99,7 +105,8 @@ void poll_images(App& app) {
     }
     done.swap(sh.done);
   }
-  if (done.empty()) return;
+  const bool thumbs = app.images.poll();
+  if (done.empty() && !thumbs) return;
   for (const auto& [url, ok] : done) app.images.remote_done(url, ok);
   // Placeholders became images (or vanished): heights changed.
   for (Pane& p : app.panes) p.height_cache.clear();

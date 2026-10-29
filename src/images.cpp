@@ -10,6 +10,7 @@
 #define STBI_ONLY_GIF
 #include "stb_image.h"
 
+#include "xanatoo/image_backend.hpp"
 #include "xanatoo/util.hpp"
 
 #include <algorithm>
@@ -24,7 +25,11 @@ namespace fs = std::filesystem;
 
 namespace xanatoo {
 
-ImageCache::ImageCache(SDL_Renderer* renderer) : renderer_(renderer) {}
+ImageCache::ImageCache(SDL_Renderer* renderer) : renderer_(renderer) {
+#if defined(XANATOO_THUMTOO) && XANATOO_THUMTOO
+  backend_ = image_backend_open();
+#endif
+}
 
 ImageCache::~ImageCache() {
   clear();
@@ -75,6 +80,14 @@ unsigned char* load_rgba(const std::string& path, int& w, int& h) {
 }  // namespace
 
 Image ImageCache::load(const std::string& resolved_path) {
+#if defined(XANATOO_THUMTOO) && XANATOO_THUMTOO
+  if (backend_) {
+    std::vector<unsigned char> px;
+    int pw = 0, ph = 0;
+    if (!image_backend_decode(resolved_path, kMaxPixels, px, pw, ph)) return {};
+    return to_texture(px.data(), pw, ph);
+  }
+#endif
   int w = 0, h = 0;
   unsigned char* data = load_rgba(resolved_path, w, h);
   if (!data) {
@@ -289,8 +302,30 @@ const Image& ImageCache::thumb(const std::string& path, const std::string& base,
   key += "#thumb" + std::to_string(edge);
   auto it = cache_.find(key);
   if (it != cache_.end()) return it->second;
+#if defined(XANATOO_THUMTOO) && XANATOO_THUMTOO
+  if (backend_) {
+    static const Image kBuilding{nullptr, 0, 0, false, true};
+    if (thumb_pending_.insert(key).second)
+      image_backend_request_thumb(*backend_, key, resolved, edge);
+    return kBuilding;
+  }
+#endif
   auto [ins, _] = cache_.emplace(key, load_thumb(resolved, edge));
   return ins->second;
+}
+
+bool ImageCache::poll() {
+#if defined(XANATOO_THUMTOO) && XANATOO_THUMTOO
+  if (!backend_) return false;
+  std::vector<DecodedImage> done = image_backend_take_done(*backend_);
+  for (DecodedImage& d : done) {
+    thumb_pending_.erase(d.key);
+    cache_[d.key] = d.rgba.empty() ? Image{} : to_texture(d.rgba.data(), d.w, d.h);
+  }
+  return !done.empty();
+#else
+  return false;
+#endif
 }
 
 const Image& ImageCache::get(const std::string& path, const std::string& base) {

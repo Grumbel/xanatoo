@@ -34,9 +34,22 @@ Next bundle number: **263** (this delivery is **262**)
   fail (attr, elfutils, bash, tools) — minimal derivations needed.
 - thumtoo `3cb19f1`: ladder levels are JPEG (WebP with alpha) instead of
   JXL, so libvips without libjxl suffices; the Android probe rebuilds.
-- Open: run on a device; armeabi-v7a / x86_64; move the probe into
-  `nix/` and feed prebuilt `.a` into ndk-build; R36S (eoan sysroot,
-  `std::span` shim for GCC 9).
+- thumtoo `f29ec55`: tiles of images with alpha are WebP (`CodecId::Webp`),
+  `get_pixels_from_tiles` keeps alpha. Vendored as subtree `external/thumtoo`.
+- Device run (Kindle Fire KFAUWI, armeabi-v7a only, API 22): static
+  `thumtoo-prepare` (armv7a probe; libjpeg-turbo needs `ENABLE_SHARED=0`
+  and `-DHWCAP_ARM_NEON=4096`) sizes, ladders and tiles files and CBZ
+  members into SQLite.
+- Desktop integration (`XANATOO_THUMTOO`, `images_thumtoo.cpp`): libvips
+  decode (WebP / TIFF / … inline), async thumbnails from coarse tiles in
+  the shared `$XDG_CACHE_HOME/thumtoo` cache; warm start shows them at once.
+  The APK still excludes `images_thumtoo.cpp` (stb path).
+- Open: move the probe into `nix/` as prebuilt C libs per ABI
+  (armeabi-v7a / arm64-v8a / x86_64) + an ndk-build module for thumtoo's
+  C++ sources (shares xanatoo's sqlite3), then `XANATOO_THUMTOO=1` on
+  Android; R36S (eoan sysroot, `std::span` shim for GCC 9); remote images
+  could go to thumtoo directly (it has a curl fetcher) instead of
+  `cache_dir()/images/`.
 
 ## Status (2026-10-29) — desktop integration (gamepkgstd INTEGRATION.md)
 

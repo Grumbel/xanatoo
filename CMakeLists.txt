@@ -153,6 +153,23 @@ target_link_libraries(xanatoo PRIVATE
   ${FONTCONFIG_LIBRARIES}
 )
 
+# Images through thumtoo (vendored git subtree, shared with galapix /
+# biltoo): libvips decoding and a tile cache for thumbnails. Without it
+# images decode with stb_image (PNG / JPEG / GIF / BMP).
+option(XANATOO_THUMTOO "Images through thumtoo (libvips, shared tile cache)" ON)
+if(XANATOO_THUMTOO)
+  set(THUMTOO_BUILD_TESTS OFF)
+  set(THUMTOO_BUILD_TOOLS OFF)
+  add_subdirectory(external/thumtoo ${CMAKE_BINARY_DIR}/thumtoo EXCLUDE_FROM_ALL)
+  target_sources(xanatoo PRIVATE src/images_thumtoo.cpp)
+  target_link_libraries(xanatoo PRIVATE thumtoo::thumtoo)
+  target_compile_definitions(xanatoo PRIVATE XANATOO_THUMTOO=1)
+  message(STATUS "Images: thumtoo (libvips)")
+else()
+  target_compile_definitions(xanatoo PRIVATE XANATOO_THUMTOO=0)
+  message(STATUS "Images: stb_image")
+endif()
+
 set(XANATOO_NEED_OPENSSL OFF)
 if(XANATOO_GEMINI OR XANATOO_NOSTR OR XANATOO_REDDIT OR XANATOO_LEMMY OR
    XANATOO_HN OR XANATOO_EBOOKS OR XANATOO_FEEDS OR XANATOO_WEB OR

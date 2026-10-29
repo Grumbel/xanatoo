@@ -3,6 +3,7 @@
 #pragma once
 
 #include <SDL.h>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -12,12 +13,14 @@
 
 namespace xanatoo {
 
+struct ImageBackend;  // image_backend.hpp
+
 struct Image {
   SDL_Texture* texture = nullptr;
   int width = 0;
   int height = 0;
   bool ok = false;
-  bool pending = false;  // remote source still downloading
+  bool pending = false;  // remote source downloading / thumbnail building
 };
 
 // Remote (http / https) image sources are downloaded by the app's image
@@ -57,9 +60,11 @@ public:
   const Image& get(const std::string& path, const std::string& base = {});
 
   // Downscaled copy whose longer edge is at most `max_px` (rounded up to
-  // 128 / 256 / 512). Thumbnails are a cache, never document data: built
-  // from the original on first use and kept under cache_dir()/thumbs/,
-  // keyed by path + size + mtime. width/height are the thumbnail's.
+  // 128 / 256 / 512). Thumbnails are a cache, never document data. With
+  // thumtoo they come from its tile cache and arrive asynchronously
+  // (pending until poll); else built from the original on first use and
+  // kept under cache_dir()/thumbs/, keyed by path + size + mtime.
+  // width/height are the thumbnail's.
   const Image& thumb(const std::string& path, const std::string& base,
                      int max_px);
 
@@ -72,10 +77,16 @@ public:
   // The fetcher finished `url`: its file is in place (ok) or never will be.
   void remote_done(const std::string& url, bool ok);
 
+  // Thumbnails finished in the background → textures. True when any
+  // arrived (their size changed from the placeholder: relayout).
+  bool poll();
+
   void clear();
 
 private:
   SDL_Renderer* renderer_ = nullptr;
+  std::shared_ptr<ImageBackend> backend_;   // null: stb_image only
+  std::unordered_set<std::string> thumb_pending_;  // keys of building thumbs
   std::string base_dir_;
   std::unordered_map<std::string, Image> cache_;
   std::unordered_set<std::string> pending_;  // remote URLs being fetched
