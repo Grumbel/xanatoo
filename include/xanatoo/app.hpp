@@ -356,6 +356,15 @@ struct SplitPreview {
   float saved_scroll = 0.f;
 };
 
+// The link in the left pane whose target the right pane shows (marked in
+// the left pane). Valid while both panes still show these pages; cleared by
+// update_split_preview otherwise.
+struct SplitTrail {
+  std::string href;        // "" = no mark
+  std::string left_page;   // path_of(left pane) the link lives in
+  std::string right_page;  // what the right pane shows; "" = still loading
+};
+
 // What the status bar says this frame (derived from world state each frame).
 enum class StatusTone { Hint, Info, Browse, Warn, Prompt, Notice };
 struct StatusLine {
@@ -553,6 +562,7 @@ struct App {
   uint64_t next_fetch_id = 1;
   std::vector<CachedPage> page_cache;
   SplitPreview split_preview;
+  SplitTrail split_trail;
 };
 
 // ---- drafts (app_drafts.cpp) ----
@@ -868,6 +878,8 @@ void commit_split_preview(App& app);
 void revert_split_preview(App& app);
 // "Preview" frame + label over the right pane while a preview shows.
 void draw_preview_badge(App& app, int pi);
+// Href of the left-pane link the right pane shows, "" = none (or preview).
+const std::string& split_trail_href(const App& app, int pi);
 
 // ---- softwin ----
 std::tuple<int, int, int, int> soft_client_rect(App& app,

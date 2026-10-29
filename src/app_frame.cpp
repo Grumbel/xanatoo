@@ -1402,6 +1402,41 @@ void poll_gamepad_axes(App& app) {
   }
 }
 
+// Calls `fn(x0, x1, top, baseline)` (layout coordinates) for each line-run
+// of consecutive glyphs accepted by `match`.
+template <typename Match, typename Fn>
+static void for_each_link_run(App& app, const Pane& pane, Match match,
+                              Fn fn) {
+  float run_x0 = 0.f, run_x1 = 0.f, run_top = 0.f, run_base = 0.f;
+  bool in_run = false;
+  auto flush = [&]() {
+    if (in_run) fn(run_x0, run_x1, run_top, run_base);
+    in_run = false;
+  };
+  for (const auto& pg : pane.layout.glyphs) {
+    if (!match(pg)) {
+      flush();
+      continue;
+    }
+    xanatoo::Font& font = app.fonts.pick(pg.font);
+    const xanatoo::Glyph& g = font.glyph(pg.codepoint);
+    float adv = static_cast<float>((g.advance >> 6) > 0 ? (g.advance >> 6)
+                                                        : (g.width + 1));
+    float top = pg.y - static_cast<float>(font.ascender());
+    if (in_run && std::abs(top - run_top) < 0.5f && pg.x <= run_x1 + 2.f) {
+      run_x1 = pg.x + adv;
+      continue;
+    }
+    flush();
+    run_x0 = pg.x;
+    run_x1 = pg.x + adv;
+    run_top = top;
+    run_base = pg.y;
+    in_run = true;
+  }
+  flush();
+}
+
 // Hover affordances, caret, focus bar, diff marks, structure overlay, drop
 // indicators — everything drawn over the text inside the pane clip.
 static void draw_pane_overlays(App& app, int i) {
@@ -1415,59 +1450,67 @@ static void draw_pane_overlays(App& app, int i) {
   // Hover affordances for interactive elements in this pane
   {
     SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
+    // Split trail: the left link whose target the right pane shows gets a
+    // steady wash and a ▸ at the edge towards the right pane.
+    if (const std::string& trail = split_trail_href(app, i); !trail.empty()) {
+      const auto& tdoc = doc_of(app, pane);
+      SDL_Rect last{};
+      for_each_link_run(
+          app, pane,
+          [&](const xanatoo::PositionedGlyph& pg) {
+            if (pg.kind != xanatoo::InlineKind::Link) return false;
+            const xanatoo::Node& n = tdoc.get(pg.node);
+            return pg.span_index < n.spans.size() &&
+                   n.spans[pg.span_index].href == trail;
+          },
+          [&](float x0, float x1, float top, float base) {
+            SDL_Rect r{static_cast<int>(x0 + ox) - 2,
+                       static_cast<int>(top - draw_scroll) - 2,
+                       static_cast<int>(x1 - x0) + 4,
+                       app.fonts.regular.line_height() + 4};
+            SDL_SetRenderDrawColor(app.sdl, 230, 160, 30, 70);
+            SDL_RenderFillRect(app.sdl, &r);
+            const int uy = static_cast<int>(base + 3.f - draw_scroll);
+            SDL_SetRenderDrawColor(app.sdl, 200, 120, 10, 255);
+            SDL_RenderDrawLine(app.sdl, r.x + 1, uy, r.x + r.w - 2, uy);
+            last = r;
+          });
+      if (last.w > 0) {
+        // ▸ at the pane's right edge, level with the link's last line.
+        const int h = std::max(4, last.h / 3);
+        const int x = pane.x + pane.w - kSbW - h - 3;
+        const int cy = last.y + last.h / 2;
+        SDL_SetRenderDrawColor(app.sdl, 200, 120, 10, 255);
+        for (int k = 0; k < h; ++k)
+          SDL_RenderDrawLine(app.sdl, x + k, cy - (h - k), x + k, cy + (h - k));
+      }
+    }
     // Link / cite run: soft wash + thicker underline
     if (app.hover.link_pane == i &&
         app.hover.link_node != xanatoo::INVALID_NODE &&
         !app.hover.href.empty()) {
-      float run_x0 = 0.f, run_x1 = 0.f, run_top = 0.f, run_base = 0.f;
-      bool in_run = false;
-      auto flush = [&]() {
-        if (!in_run) return;
-        int x = static_cast<int>(run_x0 + ox) - 2;
-        int y = static_cast<int>(run_top - draw_scroll) - 2;
-        int w = static_cast<int>(run_x1 - run_x0) + 4;
-        int h = app.fonts.regular.line_height() + 4;
-        SDL_SetRenderDrawColor(app.sdl, 40, 110, 220, 45);
-        SDL_Rect r{x, y, w, h};
-        SDL_RenderFillRect(app.sdl, &r);
-        int uy = static_cast<int>(run_base + 3.f - draw_scroll);
-        SDL_SetRenderDrawColor(app.sdl, 20, 80, 190, 255);
-        SDL_RenderDrawLine(app.sdl, x + 1, uy, x + w - 2, uy);
-        SDL_RenderDrawLine(app.sdl, x + 1, uy + 1, x + w - 2, uy + 1);
-        in_run = false;
-      };
-      for (const auto& pg : pane.layout.glyphs) {
-        if (pg.node != app.hover.link_node ||
-            pg.span_index != app.hover.link_span ||
-            (pg.kind != xanatoo::InlineKind::Link &&
-             pg.kind != xanatoo::InlineKind::Cite &&
-             pg.kind != xanatoo::InlineKind::FootnoteRef)) {
-          flush();
-          continue;
-        }
-        xanatoo::Font& font = app.fonts.pick(pg.font);
-        const xanatoo::Glyph& g = font.glyph(pg.codepoint);
-        float adv = static_cast<float>((g.advance >> 6) > 0 ? (g.advance >> 6)
-                                                            : (g.width + 1));
-        float top = pg.y - static_cast<float>(font.ascender());
-        if (!in_run) {
-          run_x0 = pg.x;
-          run_x1 = pg.x + adv;
-          run_top = top;
-          run_base = pg.y;
-          in_run = true;
-        } else if (std::abs(top - run_top) < 0.5f && pg.x <= run_x1 + 2.f) {
-          run_x1 = pg.x + adv;
-        } else {
-          flush();
-          run_x0 = pg.x;
-          run_x1 = pg.x + adv;
-          run_top = top;
-          run_base = pg.y;
-          in_run = true;
-        }
-      }
-      flush();
+      for_each_link_run(
+          app, pane,
+          [&](const xanatoo::PositionedGlyph& pg) {
+            return pg.node == app.hover.link_node &&
+                   pg.span_index == app.hover.link_span &&
+                   (pg.kind == xanatoo::InlineKind::Link ||
+                    pg.kind == xanatoo::InlineKind::Cite ||
+                    pg.kind == xanatoo::InlineKind::FootnoteRef);
+          },
+          [&](float x0, float x1, float top, float base) {
+            int x = static_cast<int>(x0 + ox) - 2;
+            int y = static_cast<int>(top - draw_scroll) - 2;
+            int w = static_cast<int>(x1 - x0) + 4;
+            int h = app.fonts.regular.line_height() + 4;
+            SDL_SetRenderDrawColor(app.sdl, 40, 110, 220, 45);
+            SDL_Rect r{x, y, w, h};
+            SDL_RenderFillRect(app.sdl, &r);
+            int uy = static_cast<int>(base + 3.f - draw_scroll);
+            SDL_SetRenderDrawColor(app.sdl, 20, 80, 190, 255);
+            SDL_RenderDrawLine(app.sdl, x + 1, uy, x + w - 2, uy);
+            SDL_RenderDrawLine(app.sdl, x + 1, uy + 1, x + w - 2, uy + 1);
+          });
     }
     // Stretch marker wash
     if (app.hover.stretch_pane == i &&

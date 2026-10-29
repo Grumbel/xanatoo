@@ -8,6 +8,16 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-29) — split trail mark
+
+- Split view marks the left-pane link whose target the right pane shows
+  (`App::split_trail`, `SplitTrail`): orange wash + underline and a ▸ at
+  the pane edge. Set by left clicks and by right clicks (the page moves
+  left with its clicked link); dropped once either pane shows another
+  page (`check_trail` in `update_split_preview`; remote targets are taken
+  once the fetch lands). Hidden while a hover preview shows.
+- Open: a failed remote fetch leaves the mark on the old right page.
+
 ## Status (2026-10-29) — scrollbar chapter marks per view
 
 - Marks blinked: they came from `App::outline` (built from the focused

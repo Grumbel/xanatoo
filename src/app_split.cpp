@@ -236,6 +236,35 @@ void open_in_right(App& app, const LinkTarget& t, bool placeholder) {
   }
 }
 
+// Mark `href` in the left pane as what the right pane now shows.
+void set_trail(App& app, const std::string& href) {
+  SplitTrail& t = app.split_trail;
+  t.href = href;
+  t.left_page = path_of(app, app.panes[0]);
+  t.right_page.clear();  // taken once the right page has loaded
+}
+
+// Drop the mark once either pane shows another page.
+void check_trail(App& app) {
+  SplitTrail& t = app.split_trail;
+  if (t.href.empty() || app.split_preview.active) return;
+  if (!split_browsing(app) || path_of(app, app.panes[0]) != t.left_page) {
+    t = {};
+    return;
+  }
+  Pane& r = app.panes[1];
+  if (t.right_page.empty()) {
+    const FetchJob* f = pane_fetch(app, 1);
+    const DocBuffer* rb = find_buf(app, r.buf);
+    if ((f && f->purpose == FetchPurpose::Navigate) ||
+        (rb && rb->placeholder))
+      return;
+    t.right_page = path_of(app, r);
+  } else if (path_of(app, r) != t.right_page) {
+    t = {};
+  }
+}
+
 }  // namespace
 
 bool split_browsing(const App& app) { return app.split && !app.diff_mode; }
@@ -253,6 +282,7 @@ bool follow_link_split(App& app, int pi, const std::string& href) {
       open_in_right(app, t, /*placeholder=*/false);
     }
     pv.shown = href;  // no fresh preview while the pointer stays on it
+    set_trail(app, href);
     focus_view(app, 0);
     if (t.kind != LinkKind::Remote) flash_status(app, "→ right pane: " + href);
     return true;
@@ -261,6 +291,7 @@ bool follow_link_split(App& app, int pi, const std::string& href) {
   // An anchor's caret refers to the right document, which moves left.
   shift_left(app);
   open_in_right(app, t, /*placeholder=*/true);
+  set_trail(app, href);  // the clicked page is the left one now
   pv.shown.clear();
   // The pointer's hover data belongs to the page that just moved away.
   app.hover.href.clear();
@@ -319,6 +350,7 @@ void update_split_preview(App& app) {
     if (pv.active || !pv.pending.empty()) revert_split_preview(app);
     pv.hover.clear();
     pv.shown.clear();
+    app.split_trail = {};
     return;
   }
   // Something else changed the right pane (tab switch, navigation): the
@@ -328,6 +360,7 @@ void update_split_preview(App& app) {
     pv.saved_buf = kNoBuffer;
     drop_scratch(app);
   }
+  check_trail(app);
 
   const Uint32 now = SDL_GetTicks();
   const int mx = static_cast<int>(app.mouse_x);
@@ -374,6 +407,13 @@ void update_split_preview(App& app) {
   }
   if (pv.off_since == 0) pv.off_since = now;
   if (now - pv.off_since >= kPreviewGraceMs) revert_split_preview(app);
+}
+
+const std::string& split_trail_href(const App& app, int pi) {
+  static const std::string none;
+  if (pi != 0 || !split_browsing(app) || app.split_preview.active)
+    return none;
+  return app.split_trail.href;
 }
 
 void draw_preview_badge(App& app, int pi) {
