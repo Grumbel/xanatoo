@@ -14,7 +14,8 @@
 #      scripts/rasterize_icons.py, FORMAT.md), DEJAVU_DIR (TTFs bundled as
 #      fonts/: same faces as desktop, and glyphs Roboto lacks — ▸ ▾ ☐ ☑),
 #      FREETYPE_SRC (tarball), SQLITE_SRC (dir with sqlite3.c/.h), SQLITE_MK,
-#      MBEDTLS_SRC (source tree), MBEDTLS_MK,
+#      MBEDTLS_SRC (source tree), MBEDTLS_MK, THUMTOO_MK, IMAGELIBS (dir
+#      with <abi>/lib/libimagedeps.a + <abi>/include per ABI),
 #      FREETYPE_MK, APPLICATION_MK, TOP_ANDROID_MK, SDL_PREBUILT_MK,
 #      SDL_ANDROID_LIBS, KEYSTORE, APP_VERSION, VERSION_CODE
 set -euo pipefail
@@ -35,13 +36,12 @@ sed -e "s/@VERSION_NAME@/$APP_VERSION/" -e "s/@VERSION_CODE@/$VERSION_CODE/" \
   -e "s/@MIN_SDK@/$PACKAGE_PLATFORM/" \
   "$APP_DIR/AndroidManifest.xml" > src/AndroidManifest.xml
 
-# xanatoo: sources (TLS through Mbed TLS, not OpenSSL; images through
-# stb_image until thumtoo's prebuilt libs reach ndk-build), headers, vendored
+# xanatoo: sources (TLS through Mbed TLS, not OpenSSL), headers, vendored
 # ImGui/stb.
 mkdir -p src/jni/src/src
 for f in "$APP_SRC_DIR"/src/*.cpp; do
   case "$(basename "$f")" in
-    tls_openssl.cpp|images_thumtoo.cpp) ;;
+    tls_openssl.cpp) ;;
     *) cp "$f" src/jni/src/src/ ;;
   esac
 done
@@ -61,6 +61,23 @@ cp "$MBEDTLS_MK" src/jni/mbedtls/Android.mk
 mkdir -p src/jni/sqlite
 cp "$SQLITE_SRC"/sqlite3.c "$SQLITE_SRC"/sqlite3.h src/jni/sqlite/
 cp "$SQLITE_MK" src/jni/sqlite/Android.mk
+
+# thumtoo (images: libvips decode, tile cache) from external/thumtoo as a
+# static module over the prebuilt C libraries; version.hpp is what thumtoo's
+# CMake would generate (no optional backends).
+T=src/jni/thumtoo
+mkdir -p "$T/gen/thumtoo" "$T/deps"
+cp -r "$APP_SRC_DIR"/external/thumtoo/{src,include,external} "$T/"
+cp "$THUMTOO_MK" "$T/Android.mk"
+for abi in $TARGET_ABIS; do
+  cp -r "$IMAGELIBS/$abi" "$T/deps/$abi"
+done
+tv="$(tr -d ' \n' < "$APP_SRC_DIR"/external/thumtoo/VERSION)"
+IFS=. read -r tv_major tv_minor tv_patch <<< "${tv%%-*}"
+sed -e "s/@THUMTOO_VERSION_MAJOR@/$tv_major/" -e "s/@THUMTOO_VERSION_MINOR@/$tv_minor/" \
+  -e "s/@THUMTOO_VERSION_PATCH@/$tv_patch/" -e "s/@THUMTOO_VERSION_STRING@/$tv/" \
+  -e "s/@THUMTOO_HAVE_[A-Z]*@/0/" \
+  "$APP_SRC_DIR"/external/thumtoo/include/thumtoo/version.hpp.in > "$T/gen/thumtoo/version.hpp"
 
 # SDL2, prebuilt; xanatoo includes <SDL.h> from include/SDL2.
 cp "$SDL_PREBUILT_MK" src/jni/SDL/Android.mk

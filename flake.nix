@@ -38,6 +38,7 @@
           };
         in import ./nix/android.nix {
           pkgs = androidPkgs;
+          inherit nixpkgs;
           sdlSrc = sdl2-src;
           sdlVersion = "2.30.3";
           buildToolsVersion = "30.0.3";
@@ -132,6 +133,7 @@
             in {
               xanatoo-android = android.apk;
               sdl2-android = android.sdlAndroidLibs;
+              android-imagelibs = android.imageLibs;
               arkos-sysroot = r36s.sysroot;
               xanatoo-r36s = r36s.r36s;
               xanatoo-r36s-portmaster = r36s.portmaster;

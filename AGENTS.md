@@ -167,6 +167,12 @@ toolbar and shortcuts should route through `execute_command`.
   files are picked up by `mk/android/app/jni/Android.mk` automatically;
   OpenSSL-only files must be excluded in `build-apk.sh` like
   `tls_openssl.cpp`.
+- Images: thumtoo is an ndk-build module (`mk/android/thumtoo/Android.mk`,
+  sources from `external/thumtoo`, no MuPDF / DjVu / unarr / curl) over
+  prebuilt C libraries (libvips, glib, libarchive, codecs) that
+  `nix/android-imagelibs.nix` cross-builds per ABI with nixpkgs' Android
+  set (NDK 27, plain C, so they link into the NDK 29 build) and merges into
+  one `libimagedeps.a`; `nix build .#android-imagelibs`.
 - Test on the device: `adb logcat -s xanatoo` shows std::cout / std::cerr.
 
 ## Develop shell (`nix develop`)
@@ -362,8 +368,8 @@ mechanism; historical bundle numbers in TODO.md are archival).
   are durable thumtoo tiles (JPEG, WebP with alpha) of the coarse scales
   only, composed by `get_pixels_from_tiles`; the cache is
   `$XDG_CACHE_HOME/thumtoo`, shared with galapix / biltoo.
-- Without it (unit tests, Android for now) stb_image decodes (PNG / JPEG /
-  GIF / BMP) and thumbnails are BMPs under `cache_dir()/thumbs/`.
+- Without it (unit tests) stb_image decodes (PNG / JPEG / GIF / BMP) and
+  thumbnails are BMPs under `cache_dir()/thumbs/`.
 
 ## Gemini
 

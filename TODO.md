@@ -43,11 +43,15 @@ Next bundle number: **263** (this delivery is **262**)
 - Desktop integration (`XANATOO_THUMTOO`, `images_thumtoo.cpp`): libvips
   decode (WebP / TIFF / … inline), async thumbnails from coarse tiles in
   the shared `$XDG_CACHE_HOME/thumtoo` cache; warm start shows them at once.
-  The APK still excludes `images_thumtoo.cpp` (stb path).
-- Open: move the probe into `nix/` as prebuilt C libs per ABI
-  (armeabi-v7a / arm64-v8a / x86_64) + an ndk-build module for thumtoo's
-  C++ sources (shares xanatoo's sqlite3), then `XANATOO_THUMTOO=1` on
-  Android; R36S (eoan sysroot, `std::span` shim for GCC 9); remote images
+- Android: `nix/android-imagelibs.nix` (C libs per ABI → one
+  `libimagedeps.a`; x86_64 needs the cc-wrapper's `-mtls-dialect=gnu2`
+  removed) + `mk/android/thumtoo/Android.mk` (thumtoo's C++ under
+  ndk-build, xanatoo's sqlite3); APK 34 MB (libmain.so 13 MB armv7).
+  Kindle Fire: welcome / collection images through libvips, thumbnails
+  from tiles. Found and fixed upstream (thumtoo `fe678e4`): concurrent
+  probes got each other's row ids (`last_insert_rowid` on the shared
+  connection) → one image's tiles under another file.
+- Open: R36S (eoan sysroot, `std::span` shim for GCC 9); remote images
   could go to thumtoo directly (it has a curl fetcher) instead of
   `cache_dir()/images/`.
 

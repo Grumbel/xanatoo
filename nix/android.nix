@@ -7,7 +7,8 @@
 # source) into libmain.so against it; both packaged into a signed APK.
 #
 # Network clients (Gemini / Nostr / Reddit / Lemmy) use Mbed TLS; SQLite is
-# built from its amalgamation; no FontConfig (fonts come from the bundled
+# built from its amalgamation; images go through thumtoo over prebuilt
+# libvips / glib / libarchive (nix/android-imagelibs.nix); no FontConfig (fonts come from the bundled
 # DejaVu and /system/fonts). Data files ship as APK assets (see
 # mk/android/scripts/build-apk.sh).
 #
@@ -15,6 +16,7 @@
 #   nix run .#install-android-xanatoo  install it with adb
 
 { pkgs
+, nixpkgs           # for the cross-built image libraries
 , sdlSrc
 , sdlVersion
 , androidSdk
@@ -81,6 +83,12 @@ let
     '';
   };
 
+  # Prebuilt C libraries for thumtoo, one directory per ABI.
+  imageLibs = pkgs.linkFarm "xanatoo-android-imagelibs" (map (abi: {
+    name = abi;
+    path = import ./android-imagelibs.nix { inherit nixpkgs abi; system = pkgs.stdenv.buildPlatform.system; };
+  }) targetAbis);
+
   sdlPrebuiltMk = pkgs.writeText "SDL2-prebuilt-Android.mk" ''
     LOCAL_PATH := $(call my-dir)
     include $(CLEAR_VARS)
@@ -125,6 +133,8 @@ let
       SQLITE_MK = "${../mk/android/sqlite/Android.mk}";
       MBEDTLS_SRC = "${pkgs.mbedtls.src}";
       MBEDTLS_MK = "${../mk/android/mbedtls/Android.mk}";
+      THUMTOO_MK = "${../mk/android/thumtoo/Android.mk}";
+      IMAGELIBS = imageLibs;
       APPLICATION_MK = applicationMk;
       TOP_ANDROID_MK = topAndroidMk;
       SDL_PREBUILT_MK = sdlPrebuiltMk;
@@ -156,5 +166,5 @@ let
   };
 
 in {
-  inherit sdlAndroidLibs sqliteAmalgamation apk installApp;
+  inherit sdlAndroidLibs sqliteAmalgamation imageLibs apk installApp;
 }

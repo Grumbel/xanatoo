@@ -8,7 +8,7 @@ the card size or the sort order. Click a card to view the images
 fullscreen: ←/→ steps, **F** toggles window fullscreen, **Esc** closes.
 
 Thumbnails are never stored in the document: they are generated from the
-originals and cached under `~/.cache/xanatoo/thumbs/`.
+originals and cached in the shared thumtoo tile cache (`~/.cache/thumtoo/`).
 
 ## Plain images
 
