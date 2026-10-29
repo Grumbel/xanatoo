@@ -16,6 +16,9 @@ Next bundle number: **263** (this delivery is **262**)
   left with its clicked link); dropped once either pane shows another
   page (`check_trail` in `update_split_preview`; remote targets are taken
   once the fetch lands). Hidden while a hover preview shows.
+- Its target is marked on the right too (`SplitTrail::target`, the caret
+  node of an anchor / `file#frag` jump): same wash, ◂ at the pane edge.
+  Remote `#fragment` targets are not marked (no jump there yet).
 - Open: a failed remote fetch leaves the mark on the old right page.
 
 ## Status (2026-10-29) — scrollbar chapter marks per view

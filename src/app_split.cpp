@@ -237,11 +237,19 @@ void open_in_right(App& app, const LinkTarget& t, bool placeholder) {
 }
 
 // Mark `href` in the left pane as what the right pane now shows.
-void set_trail(App& app, const std::string& href) {
+// `lt` is the link just opened in the right pane; its anchor (if any) is
+// where the right pane's caret was put.
+void set_trail(App& app, const std::string& href, const LinkTarget& lt) {
   SplitTrail& t = app.split_trail;
   t.href = href;
   t.left_page = path_of(app, app.panes[0]);
   t.right_page.clear();  // taken once the right page has loaded
+  t.target = xanatoo::INVALID_NODE;
+  Pane& r = app.panes[1];
+  if (lt.kind == LinkKind::Anchor ||
+      (lt.kind == LinkKind::Doc && !lt.fragment.empty() &&
+       xanatoo::jump_to_href(doc_of(app, r), lt.fragment)))
+    t.target = r.sel.focus.node;
 }
 
 // Drop the mark once either pane shows another page.
@@ -282,7 +290,7 @@ bool follow_link_split(App& app, int pi, const std::string& href) {
       open_in_right(app, t, /*placeholder=*/false);
     }
     pv.shown = href;  // no fresh preview while the pointer stays on it
-    set_trail(app, href);
+    set_trail(app, href, t);
     focus_view(app, 0);
     if (t.kind != LinkKind::Remote) flash_status(app, "→ right pane: " + href);
     return true;
@@ -291,7 +299,7 @@ bool follow_link_split(App& app, int pi, const std::string& href) {
   // An anchor's caret refers to the right document, which moves left.
   shift_left(app);
   open_in_right(app, t, /*placeholder=*/true);
-  set_trail(app, href);  // the clicked page is the left one now
+  set_trail(app, href, t);  // the clicked page is the left one now
   pv.shown.clear();
   // The pointer's hover data belongs to the page that just moved away.
   app.hover.href.clear();
@@ -414,6 +422,16 @@ const std::string& split_trail_href(const App& app, int pi) {
   if (pi != 0 || !split_browsing(app) || app.split_preview.active)
     return none;
   return app.split_trail.href;
+}
+
+xanatoo::NodeId split_trail_target(App& app, int pi) {
+  const SplitTrail& t = app.split_trail;
+  if (pi != 1 || t.href.empty() || t.right_page.empty() ||
+      t.target == xanatoo::INVALID_NODE || !split_browsing(app) ||
+      app.split_preview.active)
+    return xanatoo::INVALID_NODE;
+  const xanatoo::Document& d = doc_of(app, app.panes[1]);
+  return d.get(t.target).id == t.target ? t.target : xanatoo::INVALID_NODE;
 }
 
 void draw_preview_badge(App& app, int pi) {

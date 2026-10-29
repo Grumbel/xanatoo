@@ -1485,6 +1485,33 @@ static void draw_pane_overlays(App& app, int i) {
           SDL_RenderDrawLine(app.sdl, x + k, cy - (h - k), x + k, cy + (h - k));
       }
     }
+    // ... and its target on the right: the same wash and a ◂ at the edge
+    // towards the left pane.
+    if (const xanatoo::NodeId target = split_trail_target(app, i);
+        target != xanatoo::INVALID_NODE) {
+      SDL_Rect first{};
+      for_each_link_run(
+          app, pane,
+          [&](const xanatoo::PositionedGlyph& pg) { return pg.node == target; },
+          [&](float x0, float x1, float top, float) {
+            SDL_Rect r{static_cast<int>(x0 + ox) - 2,
+                       static_cast<int>(top - draw_scroll) - 2,
+                       static_cast<int>(x1 - x0) + 4,
+                       app.fonts.regular.line_height() + 4};
+            SDL_SetRenderDrawColor(app.sdl, 230, 160, 30, 70);
+            SDL_RenderFillRect(app.sdl, &r);
+            if (first.w == 0) first = r;
+          });
+      if (first.w > 0) {
+        const int h = std::max(4, first.h / 3);
+        const int x = pane.x + 3;
+        const int cy = first.y + first.h / 2;
+        SDL_SetRenderDrawColor(app.sdl, 200, 120, 10, 255);
+        for (int k = 0; k < h; ++k)
+          SDL_RenderDrawLine(app.sdl, x + h - 1 - k, cy - (h - k),
+                             x + h - 1 - k, cy + (h - k));
+      }
+    }
     // Link / cite run: soft wash + thicker underline
     if (app.hover.link_pane == i &&
         app.hover.link_node != xanatoo::INVALID_NODE &&

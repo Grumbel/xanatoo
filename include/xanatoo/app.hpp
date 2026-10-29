@@ -363,6 +363,7 @@ struct SplitTrail {
   std::string href;        // "" = no mark
   std::string left_page;   // path_of(left pane) the link lives in
   std::string right_page;  // what the right pane shows; "" = still loading
+  xanatoo::NodeId target = xanatoo::INVALID_NODE;  // anchor in the right page
 };
 
 // What the status bar says this frame (derived from world state each frame).
@@ -880,6 +881,8 @@ void revert_split_preview(App& app);
 void draw_preview_badge(App& app, int pi);
 // Href of the left-pane link the right pane shows, "" = none (or preview).
 const std::string& split_trail_href(const App& app, int pi);
+// The node the trail link jumped to in the right pane, or INVALID_NODE.
+xanatoo::NodeId split_trail_target(App& app, int pi);
 
 // ---- softwin ----
 std::tuple<int, int, int, int> soft_client_rect(App& app,
