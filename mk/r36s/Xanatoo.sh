@@ -43,7 +43,21 @@ export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
 $GPTOKEYB "xanatoo" &
 pm_platform_helper "$GAMEDIR/xanatoo"
 
+# ArkOS installs several SDL2 builds side by side but points
+# libSDL2-2.0.so.0 at eoan's 2.0.10, which lacks SDL_RenderGeometry (the
+# UI then takes a slow fallback path). Preload the newest one; it satisfies
+# the binary's libSDL2-2.0.so.0 by its soname.
+sdl_preload=""
+sdl_default=$(readlink -f /usr/lib/aarch64-linux-gnu/libSDL2-2.0.so.0 2>/dev/null)
+sdl_newest=$(ls /usr/lib/aarch64-linux-gnu/libSDL2-2.0.so.0.* 2>/dev/null | sort -V | tail -n 1)
+if [ -n "$sdl_newest" ] && [ -n "$sdl_default" ] &&
+   [ "$(printf '%s\n%s\n' "$sdl_default" "$sdl_newest" | sort -V | tail -n 1)" != "$sdl_default" ]; then
+  echo "xanatoo: using $sdl_newest instead of $sdl_default"
+  sdl_preload="$sdl_newest"
+fi
+
 # The port folder is the data directory (examples, styles, icons, font);
 # with no file given, examples/welcome.md opens.
-./xanatoo --fullscreen --data-dir "$GAMEDIR" "$@"
+LD_PRELOAD="$sdl_preload${LD_PRELOAD:+:$LD_PRELOAD}" \
+  ./xanatoo --fullscreen --data-dir "$GAMEDIR" "$@"
 pm_finish

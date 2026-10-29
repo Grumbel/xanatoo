@@ -26,8 +26,19 @@ Next bundle number: **263** (this delivery is **262**)
   `-DIMGUI_SDL_RENDERER_LEGACY=1 -DIMGUI_SDL_RENDERER_FORCE_FALLBACK`):
   ~2420 SDL draw calls per frame before, 320 per UI redraw now, 1 copy
   while only the page scrolls. Not yet measured on the device.
+- On the device (help.md, left stick held via evdev injection): previous
+  fallback ~20 FPS idle and scrolling; cached chrome 61 FPS (vsync);
+  ArkOS' SDL 2.30.10 61 FPS too.
+- `Xanatoo.sh` preloads the newest `libSDL2-2.0.so.0.*` in the multiarch
+  dir when it is newer than the default link (ArkOS: 2.30.10 over eoan's
+  2.0.10), so the R36S gets real RenderGeometry (rounding, AA, arrows).
+  The cached fallback stays for firmwares without a newer SDL.
 - Open: non-rectangular triangles (menu arrows, check marks) still draw as
-  their bounding boxes.
+  their bounding boxes on the fallback.
+- Open: stick scrolling is per frame (18 px), so it slows with the frame
+  rate; scale by frame time.
+- Open: `pm_finish` / `pm_platform_helper` are missing in this device's
+  PortMaster, so gptokeyb outlives a quit started outside gptokeyb.
 - Later: SDL3 (desktop already runs on it via sdl2-compat; R36S would have
   to bundle libSDL3 for KMSDRM / Mali; Android 5 = API 21 is SDL3's floor).
 

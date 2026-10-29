@@ -9,7 +9,10 @@ the binary needs nothing newer than the device's glibc 2.30 / libstdc++.
 Image decoding uses stb_image (PNG / JPEG / GIF / BMP): there is no libvips
 in that sysroot, so no thumtoo.
 
-Uses the device's SDL2 (KMS/DRM). Example documents, toolbar icons, and a
+Uses the device's SDL2 (KMS/DRM). ArkOS installs several SDL2 builds but
+links the default to eoan's 2.0.10; `Xanatoo.sh` preloads the newest one
+(e.g. 2.30.10), so ImGui gets `SDL_RenderGeometry` instead of the slow
+per-triangle fallback. Example documents, toolbar icons, and a
 UI/body font ship inside the port folder. The gamepad pointer is a drawn
 sprite (not the system cursor — KMS/DRM has none).
 
