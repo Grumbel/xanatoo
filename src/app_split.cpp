@@ -341,7 +341,8 @@ void update_split_preview(App& app) {
                     app.dragging_image || app.dragging_col_gap ||
                     app.touch.mode != TouchMode::Idle;
   std::string want;
-  if (in_content && !busy && app.hover.link_pane == 0 &&
+  if (app.view_settings.hover_preview && in_content && !busy &&
+      app.hover.link_pane == 0 &&
       mx < app.panes[0].x + app.panes[0].w)
     want = app.hover.href;
 

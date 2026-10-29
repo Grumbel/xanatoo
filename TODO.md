@@ -38,6 +38,16 @@ Next bundle number: **263** (this delivery is **262**)
 - Ctrl+Shift+P toggles: pop out, or (caret in a window) back to a tab
   (Ctrl+Shift+I stays Insert Image).
 
+## Status (2026-10-29) — preferences, hover previews off
+
+- Split-view hover previews are now opt-in (`ViewSettings::hover_preview`,
+  `hover_preview=` in view.conf, default off): the right pane changing
+  without a click confused.
+- Edit → Preferences…: ImGui window with checkboxes (hover preview,
+  footnote overlay, justify); each issues the existing toggle command.
+- ImGui UI font now loads General Punctuation, Arrows and Geometric
+  Shapes, so "…", "→", "▸" in menus no longer draw as "?".
+
 ## Status (2026-10-29) — site maps
 
 - `sitemap.hpp` / `src/sitemap.cpp`: robots.txt `Sitemap:` lines (else

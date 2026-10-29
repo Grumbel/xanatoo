@@ -39,7 +39,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_drafts.cpp` | unsaved edits → drafts in the revision store (`revstore.hpp`): autosave, restore on load (`attach_draft`), save / revert, `drafts:` page |
 | `app_footnotes.cpp` | footnote overlay: notes of on-screen `FootnoteRef` marks laid out in a strip at the pane bottom (`FootnoteOverlay` per pane), click jumps to the note |
 | `app_sitemap.cpp` | Sitemap panel (`WindowRole::Sitemap`, `SitemapPanel`): site tree of the focused page's host, one `SiteCache` per host loaded on a worker thread; "Page" opens `sitemap:host` |
-| `app_split.cpp` | split browsing: left links open right, right links shift left, hover previews (`SplitPreview`) |
+| `app_split.cpp` | split browsing: left links open right, right links shift left, hover previews (`SplitPreview`, only with `ViewSettings::hover_preview`, off by default) |
 | `theme.cpp` | classic palette (`Palette`) + stateless bevel/gradient/window primitives shared with the ImGui theme |
 | `style.cpp` | document style sheets (`styles/*.xss`, S-expressions): `DocStyle` roles → layout spacing/fonts/glyph colours + renderer decoration colours; `apply_style` in `app_view.cpp` |
 
@@ -169,7 +169,7 @@ toolbar and shortcuts should route through `execute_command`.
 - Sequential containers (Document, Section, Article, Thread, List, Column,
   DefList, Biblio) skip off-screen children when a prior box height is known.
 - Main keeps per-pane `height_cache`
-- View display prefs (`ViewSettings` / `view.conf`): line spacing, margins, measure — layout only, not document format
+- Preferences (`ViewSettings` / `view.conf`): line spacing, margins, measure, plus behaviour switches (footnote overlay, justify, hover preview) shown in Edit → Preferences (ImGui window, `UiCommand::TogglePreferences`); never document format
 - Section Focus mode: `LayoutEngine::layout(..., focus_section)` filters body to one Section/Article (outline still full tree); scroll outside the materialised band
   triggers re-layout. Width changes clear the cache.
 - History still snapshots whole documents (depth capped for large trees).

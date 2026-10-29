@@ -137,6 +137,8 @@ enum class UiCommand {
   ToggleSectionFocus,       // outline: body shows one section only
   ToggleJustify,            // view: justify wrapped lines
   ToggleFootnoteOverlay,    // view: notes of on-screen footnote marks
+  ToggleHoverPreview,       // split view: preview hovered links on the right
+  TogglePreferences,        // Edit → Preferences window
   SelectStyle,              // arg = style sheet name (styles/<name>.xss)
   ReloadStyles,             // rescan styles/ and re-read the active sheet
 };
@@ -161,6 +163,8 @@ struct UiState {
   bool section_focus = false;
   bool justify = false;
   bool footnote_overlay = true;
+  bool hover_preview = false;
+  bool preferences_open = false;
   bool backlinks = false;
   bool sitemap = false;
   bool diff = false;

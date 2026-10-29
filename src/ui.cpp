@@ -405,8 +405,12 @@ static void load_ui_fonts(ImGuiIO& io, float scale) {
   cfg.OversampleV = 1;
   cfg.PixelSnapH = true;  // crisper menus on integer positions
   if (!path.empty()) {
-    ImFont* font = io.Fonts->AddFontFromFileTTF(path.c_str(), size_px, &cfg,
-                                                io.Fonts->GetGlyphRangesDefault());
+    // Latin-1 plus the punctuation, arrows and shapes menu labels use
+    // ("…", "—", "→", "▸"); the default range alone draws them as "?".
+    static const ImWchar kRanges[] = {0x0020, 0x00FF, 0x2010, 0x205E,
+                                      0x2190, 0x21FF, 0x25A0, 0x25FF, 0};
+    ImFont* font =
+        io.Fonts->AddFontFromFileTTF(path.c_str(), size_px, &cfg, kRanges);
     if (font) {
       std::cout << "UI font: " << path << " @ " << size_px << "px\n";
       return;
@@ -716,6 +720,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Replace…", UiCommand::Replace, cmd, true, "Ctrl+H");
       menu_item_cmd("Replace All", UiCommand::ReplaceAll, cmd, true,
                     "Ctrl+Shift+Enter");
+      ImGui::Separator();
+      menu_item_cmd("Preferences…", UiCommand::TogglePreferences, cmd);
       ImGui::EndMenu();
     }
     force_menu("Format");
@@ -1282,6 +1288,38 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     menu_item_cmd("Find…", UiCommand::Find, cmd, true, "Ctrl+F");
     menu_item_cmd("Replace…", UiCommand::Replace, cmd, true, "Ctrl+H");
     ImGui::EndPopup();
+  }
+
+  // ---- Preferences ----
+  if (state.preferences_open) {
+    bool open = true;
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_FirstUseEver,
+                            ImVec2(0.5f, 0.5f));
+    if (ImGui::Begin("Preferences", &open,
+                     ImGuiWindowFlags_AlwaysAutoResize)) {
+      // Checkboxes show the state; a click issues the toggle command.
+      auto toggle = [&](const char* label, bool on, UiCommand c,
+                        const char* tip) {
+        if (ImGui::Checkbox(label, &on)) cmd = c;
+        ImGui::TextDisabled("  %s", tip);
+      };
+      ImGui::SeparatorText("Browsing");
+      toggle("Preview links on hover", state.hover_preview,
+             UiCommand::ToggleHoverPreview,
+             "Split view: a link hovered on the left shows on the right");
+      ImGui::SeparatorText("Reading");
+      toggle("Footnote overlay", state.footnote_overlay,
+             UiCommand::ToggleFootnoteOverlay,
+             "Notes of on-screen footnote marks at the pane bottom");
+      toggle("Justify text", state.justify, UiCommand::ToggleJustify,
+             "Wrapped body lines fill the column");
+      ImGui::Spacing();
+      ImGui::TextDisabled("Saved to view.conf; layout options are in View.");
+      if (ImGui::Button("Close")) open = false;
+    }
+    ImGui::End();
+    if (!open) cmd = UiCommand::TogglePreferences;
   }
 
   // ---- Session History panel ----

@@ -6,8 +6,9 @@
 
 namespace xanatoo {
 
-// User rendering preferences — not part of the document format.
-// Affects layout geometry only (line spacing, margins, measure).
+// User preferences (view.conf) — not part of the document format. Mostly
+// layout geometry (line spacing, margins, measure), plus a few behaviour
+// switches set in Edit → Preferences.
 struct ViewSettings {
   // Multiplier on font metrics line_height between wrapped lines (was 1.3).
   float line_spacing = 1.30f;
@@ -24,6 +25,9 @@ struct ViewSettings {
   bool justify = false;
   // Show the notes of on-screen footnote marks at the bottom of each pane.
   bool footnote_overlay = true;
+  // Split view: hovering a link in the left pane previews it on the right.
+  // Off by default: the right pane changing without a click confuses.
+  bool hover_preview = false;
   // Document style sheet (styles/<name>.xss); "default" = built in.
   std::string style = "default";
 

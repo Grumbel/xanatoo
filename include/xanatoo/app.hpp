@@ -485,6 +485,7 @@ struct App {
   int nav_hist_pos = -1;
   std::vector<std::string> bookmarks;
   bool history_panel_open = false;
+  bool preferences_open = false;  // Edit → Preferences (ImGui window)
   bool bookmarks_panel_open = false;
   std::string status_notice;
   Uint32 status_notice_until = 0;

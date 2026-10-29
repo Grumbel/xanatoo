@@ -85,6 +85,8 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.section_focus = app.section_focus_mode;
   ui_state.justify = app.view_settings.justify;
   ui_state.footnote_overlay = app.view_settings.footnote_overlay;
+  ui_state.hover_preview = app.view_settings.hover_preview;
+  ui_state.preferences_open = app.preferences_open;
   ui_state.backlinks = app.backlinks_mode;
   ui_state.sitemap = app.sitemap.shown;
   ui_state.diff = app.diff_mode;
@@ -310,6 +312,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::ViewLineSpacingLoose || c == C::ViewMargins ||
         c == C::ViewMeasure ||
         c == C::ToggleSectionFocus || c == C::ToggleJustify ||
+        c == C::ToggleHoverPreview || c == C::TogglePreferences ||
         c == C::SelectStyle || c == C::ReloadStyles;
     if (!allowed) {
       flash_status(app, "Browse mode — F2 to edit");
@@ -1324,6 +1327,16 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       flash_status(app, app.view_settings.footnote_overlay
                             ? "Footnote overlay on"
                             : "Footnote overlay off");
+      break;
+    case C::ToggleHoverPreview:
+      app.view_settings.hover_preview = !app.view_settings.hover_preview;
+      xanatoo::save_view_settings(app.view_settings);
+      flash_status(app, app.view_settings.hover_preview
+                            ? "Link previews on hover on"
+                            : "Link previews on hover off");
+      break;
+    case C::TogglePreferences:
+      app.preferences_open = !app.preferences_open;
       break;
     case C::ToggleJustify:
       app.view_settings.justify = !app.view_settings.justify;

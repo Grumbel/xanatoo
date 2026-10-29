@@ -101,6 +101,8 @@ bool load_view_settings(ViewSettings& out) {
         out.justify = (val == "1" || val == "true" || val == "yes");
       else if (key == "footnotes")
         out.footnote_overlay = (val == "1" || val == "true" || val == "yes");
+      else if (key == "hover_preview")
+        out.hover_preview = (val == "1" || val == "true" || val == "yes");
       else if (key == "style" && !val.empty())
         out.style = val;
     } catch (...) {
@@ -121,13 +123,14 @@ bool save_view_settings(const ViewSettings& in) {
   }
   std::ofstream out(path, std::ios::trunc);
   if (!out) return false;
-  out << "# xanatoo view settings (rendering only; not document format)\n";
+  out << "# xanatoo preferences (not document format)\n";
   out << "line_spacing=" << v.line_spacing << "\n";
   out << "margin_pct=" << v.margin_pct << "\n";
   out << "margin_y=" << v.margin_y << "\n";
   out << "measure_chars=" << v.measure_chars << "\n";
   out << "justify=" << (v.justify ? "1" : "0") << "\n";
   out << "footnotes=" << (v.footnote_overlay ? "1" : "0") << "\n";
+  out << "hover_preview=" << (v.hover_preview ? "1" : "0") << "\n";
   out << "style=" << v.style << "\n";
   return static_cast<bool>(out);
 }

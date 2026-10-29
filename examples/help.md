@@ -86,9 +86,11 @@ Export via *File → Export as S-expression…* or *Export as Markdown…*.
 - **Ctrl+\\** — Toggle dual pane
 - **Tab** (outside lists and tables) — move the caret to the next view:
   the other pane, then document windows
-- **Dual pane browsing** — hover a link in the left pane to preview it on the
-  right, click to keep it; a link clicked on the right moves that page to the
-  left and opens the target on the right (Ctrl+click keeps the old behaviour)
+- **Dual pane browsing** — a link clicked in the left pane opens on the
+  right; a link clicked on the right moves that page to the left and opens
+  the target on the right (Ctrl+click keeps the old behaviour). Edit →
+  Preferences → *Preview links on hover* also shows a hovered left-pane link
+  on the right until you click it or move away
 - **Esc** / toolbar **✕** — stop loading a page (remote pages load in the
   background; the pane shows a progress bar and timer)
 - **Ctrl+Shift+D** — Diff marks (two independent files)
