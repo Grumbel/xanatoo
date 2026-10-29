@@ -34,6 +34,7 @@ void push_nav_history(App& app, int pi, const std::string& url) {
     if (static_cast<int>(app.visited.size()) > kMaxNavHistory)
       app.visited.erase(app.visited.begin());
   }
+  split_history_note(app, pi, url);  // no-op unless split browsing
   NavHistory& h = app.panes[pi].nav;
   if (h.pos >= 0 && h.pos < static_cast<int>(h.urls.size()) &&
       h.urls[static_cast<size_t>(h.pos)] == url)
@@ -47,12 +48,16 @@ void push_nav_history(App& app, int pi, const std::string& url) {
 }
 
 bool can_nav_step(App& app, int dir) {
+  if (split_browsing(app) && app.focus < kCentreViews)
+    return split_history_can_step(app, dir);
   const NavHistory& h = focused_pane(app).nav;
   const int to = h.pos + dir;
   return h.pos >= 0 && to >= 0 && to < static_cast<int>(h.urls.size());
 }
 
 bool nav_step(App& app, int dir) {
+  if (split_browsing(app) && app.focus < kCentreViews)
+    return split_history_step(app, dir);
   if (!can_nav_step(app, dir)) return false;
   NavHistory& h = focused_pane(app).nav;
   const int from = h.pos;

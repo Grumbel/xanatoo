@@ -55,7 +55,10 @@ Every view has its own rect (`Pane::x/y/w/h`, centre rows from
 after replacing a buffer's document call `refresh_views_of_buf`.
 Back / Forward are per view (`Pane::nav`): record a shown page with
 `push_nav_history(app, pi, url)`, step with `nav_step`; `App::visited`
-is only the session log for the History panel.
+is only the session log for the History panel. While split browsing, the
+centre panes share one trail instead (`App::split_history`, levels = left
+page + pages opened from it on the right): `push_nav_history` forwards to
+it and `nav_step` / `can_nav_step` walk it (`app_split.cpp`).
 
 Buffers are addressed by stable `BufferId` (`DocBuffer::id`, never reused,
 `kNoBuffer` = 0): use `buf(app, id)` / `find_buf` / `add_buffer` /

@@ -8,6 +8,20 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-29) — split history
+
+- Split browsing Back / Forward walk one shared trail (`SplitHistory`):
+  each level is a left page plus the pages opened from it on the right.
+  Back steps through those, then slides back a level (left page moves
+  right, `move_page` keeps its buffer); Forward retraces. A new click
+  drops the Forward part. Entries keep caret / scroll (restored once a
+  remote page lands) and the link that opened them (trail mark restored).
+  Status "n/m" counts trail stops. Applies whichever centre pane has
+  focus; windows keep `Pane::nav`.
+- Reset when split browsing ends; per-pane `Pane::nav` is still kept up to
+  date, so the single pane's Back works afterwards.
+- Open: tab switches are still not navigation (not recorded in the trail).
+
 ## Status (2026-10-29) — split trail mark
 
 - Split view marks the left-pane link whose target the right pane shows

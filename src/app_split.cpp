@@ -133,6 +133,127 @@ BufferId scratch_buffer(App& app, xanatoo::Document doc,
   return pv.scratch;
 }
 
+// Pane `from`'s page moves to pane `to`; `from` keeps `to`'s old buffer to
+// load the next page into, when nothing else needs it.
+void move_page(App& app, int from, int to) {
+  Pane& f = app.panes[from];
+  Pane& t = app.panes[to];
+  const BufferId old = t.buf;
+  set_pane_view(app, to, f.buf, f.sel, f.scroll_y);
+  const DocBuffer* ob = find_buf(app, old);
+  if (ob && old != t.buf && !ob->dirty && !shown_anywhere_else(app, old, from))
+    set_pane_view(app, from, old, {}, 0.f);
+}
+
+// ---- split history ----
+
+bool same_page(const std::string& a, const std::string& b) {
+  if (a == b) return true;
+  if (a.empty() || b.empty() || is_in_app_remote_url(a) ||
+      is_in_app_remote_url(b))
+    return false;
+  std::error_code ea, eb;
+  const fs::path ca = fs::weakly_canonical(a, ea);
+  const fs::path cb = fs::weakly_canonical(b, eb);
+  return !ea && !eb && ca == cb;
+}
+
+void seed_history(App& app) {
+  SplitHistory& h = app.split_history;
+  if (!h.levels.empty()) return;
+  SplitHistoryLevel l;
+  l.page.url = path_of(app, app.panes[0]);
+  if (const std::string r = path_of(app, app.panes[1]); !r.empty()) {
+    l.opened.push_back({});
+    l.opened.back().url = r;
+    l.cur = 0;
+  }
+  h.levels.push_back(std::move(l));
+  h.top = 0;
+}
+
+// Record `url` shown in centre pane `pi`: the right pane adds a page opened
+// from the current left page, the left pane starts a new level. Forward
+// history past it is dropped. `force` records even a repeat of the current
+// page (anchor jumps, a page moving left onto itself).
+void note_page(App& app, int pi, std::string url, bool force) {
+  if (url.empty()) return;
+  seed_history(app);
+  SplitHistory& h = app.split_history;
+  // Keep the pane's own spelling, so per-frame matching is a string compare.
+  if (const std::string shown = path_of(app, app.panes[pi]);
+      shown != url && same_page(shown, url))
+    url = shown;
+  SplitHistoryLevel& l = h.levels[static_cast<size_t>(h.top)];
+  if (!force) {
+    const SplitHistoryEntry* now =
+        pi == 0 ? &l.page
+                : (l.cur >= 0 ? &l.opened[static_cast<size_t>(l.cur)]
+                              : nullptr);
+    if (now && now->url == url) return;
+  }
+  l.opened.resize(static_cast<size_t>(l.cur + 1));
+  h.levels.resize(static_cast<size_t>(h.top + 1));
+  if (pi == 1) {
+    SplitHistoryEntry e;
+    e.url = std::move(url);
+    e.href = std::move(h.pending_href);
+    h.pending_href.clear();
+    l.opened.push_back(std::move(e));
+    l.cur = static_cast<int>(l.opened.size()) - 1;
+  } else {
+    SplitHistoryLevel nl;
+    nl.page.url = std::move(url);
+    h.levels.push_back(std::move(nl));
+    h.top = static_cast<int>(h.levels.size()) - 1;
+  }
+  ++h.gen;
+}
+
+SplitHistoryEntry* right_entry(App& app) {
+  SplitHistory& h = app.split_history;
+  if (h.top < 0) return nullptr;
+  SplitHistoryLevel& l = h.levels[static_cast<size_t>(h.top)];
+  return l.cur >= 0 ? &l.opened[static_cast<size_t>(l.cur)] : nullptr;
+}
+
+void apply_entry(App& app, int pi, const SplitHistoryEntry& e) {
+  Pane& p = app.panes[pi];
+  p.sel = e.sel;
+  xanatoo::ensure_valid_caret(doc_of(app, p), p.sel.focus);
+  xanatoo::ensure_valid_caret(doc_of(app, p), p.sel.anchor);
+  p.scroll_y = e.scroll;
+  app.needs_layout = true;
+}
+
+// Per frame: remember caret / scroll of the pages the panes show (so Back
+// returns there), or put them back once a page restored by Back has loaded.
+void sync_entry(App& app, int pi, SplitHistoryEntry& e, bool& restore) {
+  Pane& p = app.panes[pi];
+  if (path_of(app, p) != e.url) return;
+  if (restore) {
+    const FetchJob* f = pane_fetch(app, pi);
+    if (f && f->purpose == FetchPurpose::Navigate) return;
+    apply_entry(app, pi, e);
+    restore = false;
+    return;
+  }
+  e.sel = p.sel;
+  e.scroll = p.scroll_y;
+}
+
+// Show entry `e` in pane `pi` (already there: just its caret / scroll).
+void show_entry(App& app, int pi, SplitHistoryEntry& e, bool& restore) {
+  restore = false;
+  if (path_of(app, app.panes[pi]) != e.url &&
+      !navigate_pane(app, pi, e.url, /*record_history=*/false))
+    return;
+  if (path_of(app, app.panes[pi]) == e.url)
+    apply_entry(app, pi, e);
+  else
+    restore = true;  // remote page still loading
+}
+
 // Show `href` (hovered in the left pane) in the right pane. False when there
 // is nothing to show yet (external link, missing file, fetch running).
 bool show_preview(App& app, const std::string& href) {
@@ -198,15 +319,10 @@ bool show_preview(App& app, const std::string& href) {
 // The right page moves to the left; the right pane gets a buffer to load the
 // next page into (the old left page's, when nothing else needs it).
 void shift_left(App& app) {
-  Pane& l = app.panes[0];
-  Pane& r = app.panes[1];
-  const BufferId old_left = l.buf;
-  set_pane_view(app, 0, r.buf, r.sel, r.scroll_y);
-  push_nav_history(app, 0, path_of(app, l));  // the trail moved left
-  const DocBuffer* ob = find_buf(app, old_left);
-  if (ob && old_left != l.buf && !ob->dirty &&
-      !shown_anywhere_else(app, old_left, 1))
-    set_pane_view(app, 1, old_left, {}, 0.f);
+  move_page(app, 1, 0);
+  const std::string page = path_of(app, app.panes[0]);
+  note_page(app, 0, page, /*force=*/true);  // the trail moved left
+  push_nav_history(app, 0, page);
 }
 
 // Open link target `t` (resolved in the left pane) in the right pane.
@@ -256,6 +372,9 @@ void set_trail(App& app, const std::string& href, const LinkTarget& lt) {
 void check_trail(App& app) {
   SplitTrail& t = app.split_trail;
   if (t.href.empty() || app.split_preview.active) return;
+  if (const FetchJob* f = pane_fetch(app, 0);
+      split_browsing(app) && f && f->purpose == FetchPurpose::Navigate)
+    return;  // Back is reloading the left page
   if (!split_browsing(app) || path_of(app, app.panes[0]) != t.left_page) {
     t = {};
     return;
@@ -282,7 +401,23 @@ bool follow_link_split(App& app, int pi, const std::string& href) {
   SplitPreview& pv = app.split_preview;
   const LinkTarget t = resolve_link(app, pi, href);
   if (t.kind == LinkKind::None || t.kind == LinkKind::External) return false;
+  SplitHistory& h = app.split_history;
+  // The right page's history entry: remote pages are recorded when they
+  // land (taking `pending_href`), anchors here since nothing loads.
+  auto record = [&](uint64_t gen0) {
+    const bool anchor = t.kind == LinkKind::Anchor ||
+                        (t.kind == LinkKind::Doc && !t.fragment.empty());
+    if (anchor && h.gen == gen0)
+      note_page(app, 1, path_of(app, app.panes[1]), /*force=*/true);
+    if (h.gen != gen0)
+      if (SplitHistoryEntry* e = right_entry(app))
+        e->target = app.split_trail.target;
+    if (t.kind != LinkKind::Remote) h.pending_href.clear();
+  };
   if (pi == 0) {
+    seed_history(app);
+    h.pending_href = href;
+    const uint64_t gen0 = h.gen;
     if (pv.active && pv.shown == href) {
       commit_split_preview(app);
     } else {
@@ -291,6 +426,7 @@ bool follow_link_split(App& app, int pi, const std::string& href) {
     }
     pv.shown = href;  // no fresh preview while the pointer stays on it
     set_trail(app, href, t);
+    record(gen0);
     focus_view(app, 0);
     if (t.kind != LinkKind::Remote) flash_status(app, "→ right pane: " + href);
     return true;
@@ -298,8 +434,11 @@ bool follow_link_split(App& app, int pi, const std::string& href) {
   commit_split_preview(app);
   // An anchor's caret refers to the right document, which moves left.
   shift_left(app);
+  h.pending_href = href;
+  const uint64_t gen0 = h.gen;
   open_in_right(app, t, /*placeholder=*/true);
   set_trail(app, href, t);  // the clicked page is the left one now
+  record(gen0);
   pv.shown.clear();
   // The pointer's hover data belongs to the page that just moved away.
   app.hover.href.clear();
@@ -313,6 +452,8 @@ void commit_split_preview(App& app) {
   SplitPreview& pv = app.split_preview;
   if (!pv.active) return;
   pv.active = false;
+  if (app.split_history.pending_href.empty())
+    app.split_history.pending_href = pv.shown;
   Pane& r = app.panes[1];
   if (r.buf == pv.scratch && find_buf(app, pv.scratch)) {
     // Move the previewed page into a real page buffer (recycling the right
@@ -359,6 +500,7 @@ void update_split_preview(App& app) {
     pv.hover.clear();
     pv.shown.clear();
     app.split_trail = {};
+    app.split_history = {};
     return;
   }
   // Something else changed the right pane (tab switch, navigation): the
@@ -369,6 +511,14 @@ void update_split_preview(App& app) {
     drop_scratch(app);
   }
   check_trail(app);
+  seed_history(app);
+  {
+    SplitHistory& h = app.split_history;
+    SplitHistoryLevel& l = h.levels[static_cast<size_t>(h.top)];
+    sync_entry(app, 0, l.page, h.restore[0]);
+    if (SplitHistoryEntry* e = right_entry(app); e && !pv.active)
+      sync_entry(app, 1, *e, h.restore[1]);
+  }
 
   const Uint32 now = SDL_GetTicks();
   const int mx = static_cast<int>(app.mouse_x);
@@ -415,6 +565,75 @@ void update_split_preview(App& app) {
   }
   if (pv.off_since == 0) pv.off_since = now;
   if (now - pv.off_since >= kPreviewGraceMs) revert_split_preview(app);
+}
+
+void split_history_note(App& app, int pi, const std::string& url) {
+  if (!split_browsing(app) || pi < 0 || pi >= kCentreViews) return;
+  note_page(app, pi, url, /*force=*/false);
+}
+
+bool split_history_can_step(const App& app, int dir) {
+  const SplitHistory& h = app.split_history;
+  if (h.top < 0) return false;
+  const SplitHistoryLevel& l = h.levels[static_cast<size_t>(h.top)];
+  if (dir < 0) return l.cur > 0 || h.top > 0;
+  return l.cur + 1 < static_cast<int>(l.opened.size()) ||
+         h.top + 1 < static_cast<int>(h.levels.size());
+}
+
+bool split_history_step(App& app, int dir) {
+  if (!split_history_can_step(app, dir)) return false;
+  revert_split_preview(app);
+  SplitHistory& h = app.split_history;
+  SplitHistoryLevel* l = &h.levels[static_cast<size_t>(h.top)];
+  const bool within = dir < 0 ? l->cur > 0
+                              : l->cur + 1 < static_cast<int>(l->opened.size());
+  if (within) {
+    l->cur += dir;
+  } else {
+    // Slide the two-pane window over the trail: back puts the left page
+    // on the right again, forward moves the right page left.
+    h.top += dir;
+    l = &h.levels[static_cast<size_t>(h.top)];
+    if (dir > 0) l->cur = l->opened.empty() ? -1 : 0;
+    // Move the page that stays in view instead of loading it again.
+    const SplitHistoryEntry* e = right_entry(app);
+    if (dir < 0 && e && path_of(app, app.panes[0]) == e->url)
+      move_page(app, 0, 1);
+    else if (dir > 0 && path_of(app, app.panes[1]) == l->page.url)
+      move_page(app, 1, 0);
+    show_entry(app, 0, l->page, h.restore[0]);
+  }
+  if (SplitHistoryEntry* e = right_entry(app)) {
+    show_entry(app, 1, *e, h.restore[1]);
+    SplitTrail& t = app.split_trail;
+    t = {};
+    if (!e->href.empty()) {
+      t.href = e->href;
+      t.left_page = l->page.url;
+      t.target = e->target;
+    }
+  } else {
+    app.split_trail = {};
+  }
+  app.split_preview.shown.clear();
+  return true;
+}
+
+bool split_history_position(const App& app, int& pos, int& total) {
+  const SplitHistory& h = app.split_history;
+  if (h.top < 0) return false;
+  // Every Back / Forward stop: one per page opened on the right, or one
+  // for a left page that opened none.
+  pos = total = 0;
+  for (int i = 0; i < static_cast<int>(h.levels.size()); ++i) {
+    const SplitHistoryLevel& l = h.levels[static_cast<size_t>(i)];
+    const int stops = std::max(1, static_cast<int>(l.opened.size()));
+    if (i < h.top) pos += stops;
+    if (i == h.top) pos += std::max(0, l.cur) + 1;
+    total += stops;
+  }
+  return true;
 }
 
 const std::string& split_trail_href(const App& app, int pi) {

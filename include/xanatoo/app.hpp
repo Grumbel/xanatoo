@@ -366,6 +366,31 @@ struct SplitTrail {
   xanatoo::NodeId target = xanatoo::INVALID_NODE;  // anchor in the right page
 };
 
+// Split browsing history (app_split.cpp): the two panes are a window on one
+// trail. Each level is a page shown on the left with the pages opened from
+// it on the right; a right-pane click starts the next level. Back steps
+// through the top level's pages, then slides back a level (left page moves
+// right); Forward retraces.
+struct SplitHistoryEntry {
+  std::string url;
+  std::string href;  // left link that opened it ("" = none known)
+  xanatoo::NodeId target = xanatoo::INVALID_NODE;  // its anchor, if any
+  xanatoo::Selection sel{};  // last caret / scroll seen there
+  float scroll = 0.f;
+};
+struct SplitHistoryLevel {
+  SplitHistoryEntry page;                  // left pane
+  std::vector<SplitHistoryEntry> opened;   // right pane, oldest first
+  int cur = -1;                            // into `opened`, -1 = none
+};
+struct SplitHistory {
+  std::vector<SplitHistoryLevel> levels;  // levels past `top` = Forward
+  int top = -1;
+  uint64_t gen = 0;          // bumped by every recorded change
+  std::string pending_href;  // link being opened on the right
+  bool restore[2] = {false, false};  // put caret / scroll back once loaded
+};
+
 // What the status bar says this frame (derived from world state each frame).
 enum class StatusTone { Hint, Info, Browse, Warn, Prompt, Notice };
 struct StatusLine {
@@ -564,6 +589,7 @@ struct App {
   std::vector<CachedPage> page_cache;
   SplitPreview split_preview;
   SplitTrail split_trail;
+  SplitHistory split_history;
 };
 
 // ---- drafts (app_drafts.cpp) ----
@@ -883,6 +909,13 @@ void draw_preview_badge(App& app, int pi);
 const std::string& split_trail_href(const App& app, int pi);
 // The node the trail link jumped to in the right pane, or INVALID_NODE.
 xanatoo::NodeId split_trail_target(App& app, int pi);
+// push_nav_history forwards centre-pane pages here while split browsing.
+void split_history_note(App& app, int pi, const std::string& url);
+// Back / Forward over the split trail (nav_step / can_nav_step use these
+// while split browsing). `pos` / `total` for the status line "3/7".
+bool split_history_can_step(const App& app, int dir);
+bool split_history_step(App& app, int dir);
+bool split_history_position(const App& app, int& pos, int& total);
 
 // ---- softwin ----
 std::tuple<int, int, int, int> soft_client_rect(App& app,
