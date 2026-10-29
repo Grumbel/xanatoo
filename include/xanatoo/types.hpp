@@ -85,6 +85,8 @@ struct Node {
   // Thread: label = thread id; summary = subject
   // Message: label = message-id; src = from/author; summary = date (ISO);
   //          alt = in-reply-to id, or "about:#anchor" for passage comments
+  //          spans (optional) = Link spans for the header: [0] author,
+  //          [1] date (e.g. profile / permalink); body blocks are children.
   // Header: text title (no rank); src may hold org TODO keyword; tags for org.
   // Footnote: label = key; body blocks are children (usually Paragraphs).
   // Collection: summary = default view hint ("grid", "list", "full");

@@ -232,6 +232,24 @@ void test_nostr_refs() {
   if (hex)
     EXPECT_EQ(*hex,
               "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+
+  // NIP-19 example key (npub ↔ hex) and round trips through the encoder.
+  const std::string pk =
+      "7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e";
+  const std::string npub =
+      "npub10elfcs4fr0l0r8af98jlmgdh9c8tcxjvz9qkw038js35mp4dma8qzvjptg";
+  EXPECT_EQ(nostr_bech32("npub", pk), npub);
+  EXPECT(is_nostr_ref(npub));
+  EXPECT(is_nostr_ref("nostr:" + npub));
+  auto dec = nostr_decode_pubkey("nostr:" + npub);
+  EXPECT(dec.has_value());
+  if (dec) EXPECT_EQ(*dec, pk);
+  EXPECT(!nostr_decode_event_id(npub).has_value());
+  EXPECT(!nostr_decode_pubkey(nostr_bech32("note", pk)).has_value());
+  auto note = nostr_decode_event_id(nostr_bech32("note", pk));
+  EXPECT(note.has_value());
+  if (note) EXPECT_EQ(*note, pk);
+  EXPECT(nostr_bech32("npub", "xyz").empty());
 }
 
 

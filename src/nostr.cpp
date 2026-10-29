@@ -158,8 +158,9 @@ std::string bytes_to_hex(const uint8_t* p, size_t n) {
   return o;
 }
 
-// NIP-19 TLV: type (1) + length (1) + value
-bool parse_nevent_tlvs(const std::vector<uint8_t>& bytes, std::string& event_hex,
+// NIP-19 TLV (nevent / nprofile): type (1) + length (1) + value;
+// type 0 = 32-byte event id or pubkey, type 1 = relay hint.
+bool parse_nip19_tlvs(const std::vector<uint8_t>& bytes, std::string& event_hex,
                        std::vector<std::string>* relays) {
   size_t i = 0;
   event_hex.clear();
@@ -177,6 +178,19 @@ bool parse_nevent_tlvs(const std::vector<uint8_t>& bytes, std::string& event_hex
   return !event_hex.empty();
 }
 
+std::string bech32_encode(std::string_view hrp, const std::vector<uint8_t>& data5) {
+  auto values = bech32_hrp_expand(hrp);
+  values.insert(values.end(), data5.begin(), data5.end());
+  for (int i = 0; i < 6; ++i) values.push_back(0);
+  uint32_t mod = bech32_polymod(values) ^ 1;
+  std::string out(hrp);
+  out.push_back('1');
+  for (uint8_t d : data5) out.push_back(kBech32Charset[d]);
+  for (int i = 0; i < 6; ++i)
+    out.push_back(kBech32Charset[(mod >> (5 * (5 - i))) & 31]);
+  return out;
+}
+
 }  // namespace
 
 bool is_nostr_ref(std::string_view s) {
@@ -185,7 +199,8 @@ bool is_nostr_ref(std::string_view s) {
   if (is_hex64(t)) return true;
   std::string low = ascii_lower(t);
   if (low == "recent" || low == "firehose" || low == "latest") return true;
-  return low.rfind("note1", 0) == 0 || low.rfind("nevent1", 0) == 0;
+  return low.rfind("note1", 0) == 0 || low.rfind("nevent1", 0) == 0 ||
+         low.rfind("npub1", 0) == 0 || low.rfind("nprofile1", 0) == 0;
 }
 
 std::optional<std::string> nostr_decode_event_id(
@@ -205,10 +220,43 @@ std::optional<std::string> nostr_decode_event_id(
   }
   if (hrp == "nevent") {
     std::string hex;
-    if (!parse_nevent_tlvs(data8, hex, relays)) return std::nullopt;
+    if (!parse_nip19_tlvs(data8, hex, relays)) return std::nullopt;
     return hex;
   }
   return std::nullopt;
+}
+
+std::optional<std::string> nostr_decode_pubkey(
+    std::string_view ref, std::vector<std::string>* relays) {
+  std::string t = strip_nostr_prefix(ref);
+  std::string hrp;
+  std::vector<uint8_t> data5;
+  if (!bech32_decode(t, hrp, data5)) return std::nullopt;
+  std::vector<uint8_t> data8;
+  if (!convert_bits(data5, 5, 8, false, data8)) return std::nullopt;
+
+  if (hrp == "npub") {
+    if (data8.size() != 32) return std::nullopt;
+    return bytes_to_hex(data8.data(), 32);
+  }
+  if (hrp == "nprofile") {
+    std::string hex;
+    if (!parse_nip19_tlvs(data8, hex, relays)) return std::nullopt;
+    return hex;
+  }
+  return std::nullopt;
+}
+
+std::string nostr_bech32(std::string_view hrp, std::string_view hex) {
+  if (!is_hex64(hex)) return {};
+  std::vector<uint8_t> raw(32);
+  for (size_t i = 0; i < 32; ++i) {
+    char pair[3] = {hex[i * 2], hex[i * 2 + 1], 0};
+    raw[i] = static_cast<uint8_t>(std::strtoul(pair, nullptr, 16));
+  }
+  std::vector<uint8_t> data5;
+  if (!convert_bits(raw, 8, 5, true, data5)) return {};
+  return bech32_encode(hrp, data5);
 }
 
 #if defined(XANATOO_NOSTR) && XANATOO_NOSTR
@@ -517,35 +565,9 @@ bool ws_read_text(WsConn& c, std::string& out, std::string& carry) {
   return false;
 }
 
-std::string bech32_encode(std::string_view hrp, const std::vector<uint8_t>& data5) {
-  auto values = bech32_hrp_expand(hrp);
-  values.insert(values.end(), data5.begin(), data5.end());
-  for (int i = 0; i < 6; ++i) values.push_back(0);
-  uint32_t mod = bech32_polymod(values) ^ 1;
-  std::string out(hrp);
-  out.push_back('1');
-  for (uint8_t d : data5) out.push_back(kBech32Charset[d]);
-  for (int i = 0; i < 6; ++i)
-    out.push_back(kBech32Charset[(mod >> (5 * (5 - i))) & 31]);
-  return out;
-}
-
 std::string pubkey_to_npub(const std::string& pubkey_hex) {
-  if (!is_hex64(pubkey_hex)) return pubkey_hex;
-  std::vector<uint8_t> raw(32);
-  auto hexv = [](char c) -> int {
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-    return 0;
-  };
-  for (size_t i = 0; i < 32; ++i)
-    raw[i] = static_cast<uint8_t>((hexv(pubkey_hex[i * 2]) << 4) |
-                                  hexv(pubkey_hex[i * 2 + 1]));
-  std::vector<uint8_t> data5;
-  if (!convert_bits(raw, 8, 5, true, data5))
-    return pubkey_hex.substr(0, 8) + "…";
-  return bech32_encode("npub", data5);
+  std::string npub = nostr_bech32("npub", pubkey_hex);
+  return npub.empty() ? pubkey_hex : npub;
 }
 
 std::string short_npub(const std::string& pubkey_hex) {
@@ -578,6 +600,45 @@ std::string format_time(int64_t ts) {
   return buf;
 }
 
+// One kind-1 note → Message. Its spans link the header: author name →
+// nostr:npub1… (the author's notes), date → nostr:note1… (the note's thread).
+void add_note_message(Document& doc, NodeId thread, const NostrEvent& e,
+                      const std::map<std::string, std::string>& profiles,
+                      bool with_reply) {
+  NodeId msg = doc.create(NodeKind::Message, thread);
+  {
+    Node& n = doc.get(msg);
+    n.label = e.id;
+    auto pit = profiles.find(e.pubkey);
+    n.src = (pit != profiles.end()) ? pit->second : short_npub(e.pubkey);
+    n.summary = format_time(e.created_at);
+    // Only mark real in-reply-to chains; do not invent a parent for
+    // independent firehose notes (that made every line say "reply to #root").
+    if (with_reply && !e.reply_to.empty())
+      n.alt = e.reply_to;
+    std::string npub = nostr_bech32("npub", e.pubkey);
+    std::string note = nostr_bech32("note", e.id);
+    if (!npub.empty()) {
+      InlineSpan a;
+      a.kind = InlineKind::Link;
+      a.text = n.src;
+      a.href = "nostr:" + npub;
+      n.spans.push_back(std::move(a));
+      if (!note.empty() && !n.summary.empty()) {
+        InlineSpan d;
+        d.kind = InlineKind::Link;
+        d.text = n.summary;
+        d.href = "nostr:" + note;
+        n.spans.push_back(std::move(d));
+      }
+    }
+  }
+  // Body lives on a child Paragraph — Message layout/serialize only walk
+  // children; the Message's own spans are just the header links above.
+  NodeId body = doc.create(NodeKind::Paragraph, msg);
+  doc.append_text(body, e.content.empty() ? "(empty)" : e.content);
+}
+
 Document events_to_document(const std::string& root_id,
                             std::vector<NostrEvent>& events,
                             const std::map<std::string, std::string>& profiles) {
@@ -608,23 +669,8 @@ Document events_to_document(const std::string& root_id,
               return a.id < b.id;
             });
 
-  for (const auto& e : events) {
-    if (e.kind != 1) continue;
-    NodeId msg = doc.create(NodeKind::Message, thread);
-    Node& n = doc.get(msg);
-    n.label = e.id;
-    auto pit = profiles.find(e.pubkey);
-    n.src = (pit != profiles.end()) ? pit->second : short_npub(e.pubkey);
-    n.summary = format_time(e.created_at);
-    // Only mark real in-reply-to chains; do not invent a parent for
-    // independent firehose notes (that made every line say "reply to #root").
-    if (!e.reply_to.empty())
-      n.alt = e.reply_to;
-    // Body lives on a child Paragraph — Message layout/serialize only walk
-    // children, not spans on the Message node itself.
-    NodeId body = doc.create(NodeKind::Paragraph, msg);
-    doc.append_text(body, e.content.empty() ? "(empty)" : e.content);
-  }
+  for (const auto& e : events)
+    if (e.kind == 1) add_note_message(doc, thread, e, profiles, true);
 
   if (doc.get(thread).children.empty()) {
     NodeId msg = doc.create(NodeKind::Message, thread);
@@ -637,7 +683,66 @@ Document events_to_document(const std::string& root_id,
 
   NodeId foot = doc.create(NodeKind::Paragraph, root);
   doc.append_text(foot,
-                  "Nostr · read-only · Ctrl+L to open another note1/nevent1");
+                  "Nostr · read-only · Ctrl+L to open another note1/nevent1/npub1");
+  return doc;
+}
+
+// An author's recent notes, newest first, under their profile.
+Document author_feed_document(const std::string& pubkey,
+                              std::vector<NostrEvent>& events) {
+  const NostrEvent* profile = nullptr;
+  for (const auto& e : events)
+    if (e.kind == 0 && e.pubkey == pubkey &&
+        (!profile || e.created_at > profile->created_at))
+      profile = &e;
+  std::map<std::string, std::string> profiles;
+  std::string about, nip05;
+  if (profile) {
+    profiles[pubkey] = profile_display_name(profile->content, pubkey);
+    about = json_str_field(profile->content, "about");
+    nip05 = json_str_field(profile->content, "nip05");
+    // NIP-05: "_@domain" is the domain's root identifier.
+    if (starts_with(nip05, "_@")) nip05.erase(0, 2);
+  }
+  const std::string name =
+      profile ? profiles[pubkey] : short_npub(pubkey);
+
+  Document doc;
+  NodeId root = doc.create(NodeKind::Document);
+  doc.meta.title = name;
+  NodeId intro = doc.create(NodeKind::Paragraph, root);
+  std::string line = nostr_bech32("npub", pubkey);
+  if (!nip05.empty()) line = nip05 + "  ·  " + line;
+  doc.append_text(intro, line);
+  if (!about.empty()) {
+    NodeId p = doc.create(NodeKind::Paragraph, root);
+    doc.append_text(p, about);
+  }
+
+  NodeId thread = doc.create(NodeKind::Thread, root);
+  doc.get(thread).summary = "Notes by " + name;
+
+  std::sort(events.begin(), events.end(),
+            [](const NostrEvent& a, const NostrEvent& b) {
+              if (a.created_at != b.created_at)
+                return a.created_at > b.created_at;
+              return a.id < b.id;
+            });
+  // Parents of replies are not in the feed; the date link opens the thread.
+  for (const auto& e : events)
+    if (e.kind == 1 && e.pubkey == pubkey)
+      add_note_message(doc, thread, e, profiles, false);
+
+  if (doc.get(thread).children.empty()) {
+    NodeId msg = doc.create(NodeKind::Message, thread);
+    doc.get(msg).src = "xanatoo";
+    NodeId body = doc.create(NodeKind::Paragraph, msg);
+    doc.append_text(body, "No notes returned from relays for this author.");
+  }
+
+  NodeId foot = doc.create(NodeKind::Paragraph, root);
+  doc.append_text(foot,
+                  "Nostr · read-only · Ctrl+L to open another note1/nevent1/npub1");
   return doc;
 }
 
@@ -717,6 +822,27 @@ void query_recent(const std::string& relay,
   ws_send_text(c, std::string("[\"CLOSE\",\"") + sub + "\"]");
 }
 
+void query_author(const std::string& relay, const std::string& pubkey,
+                  std::map<std::string, NostrEvent>& by_id, std::string* last_err) {
+  WsConn c;
+  std::string err;
+  if (!ws_connect(c, relay, &err)) {
+    if (last_err) *last_err = err;
+    return;
+  }
+  std::string sub = "author";
+  // Profile (kind 0) + newest notes (kind 1) of one pubkey.
+  std::string req = std::string("[\"REQ\",\"") + sub + "\"," +
+                    "{\"kinds\":[0],\"authors\":[\"" + pubkey + "\"],\"limit\":1}," +
+                    "{\"kinds\":[1],\"authors\":[\"" + pubkey + "\"],\"limit\":40}]";
+  if (!ws_send_text(c, req)) {
+    if (last_err) *last_err = "WS send failed";
+    return;
+  }
+  collect_ws_events(c, by_id, 6);
+  ws_send_text(c, std::string("[\"CLOSE\",\"") + sub + "\"]");
+}
+
 void query_profiles(const std::string& relay,
                     const std::vector<std::string>& pubkeys,
                     std::map<std::string, std::string>& profiles,
@@ -759,10 +885,13 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
 
   std::vector<std::string> hint_relays;
   std::optional<std::string> id;
+  std::optional<std::string> author;
   if (!recent_mode) {
-    id = nostr_decode_event_id(ref, &hint_relays);
-    if (!id) {
-      if (err) *err = "not a valid note1/nevent1/hex event id (or nostr:recent)";
+    author = nostr_decode_pubkey(ref, &hint_relays);
+    if (!author) id = nostr_decode_event_id(ref, &hint_relays);
+    if (!author && !id) {
+      if (err)
+        *err = "not a valid note1/nevent1/npub1/hex event id (or nostr:recent)";
       return std::nullopt;
     }
   }
@@ -787,6 +916,8 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
     size_t before = by_id.size();
     if (recent_mode)
       query_recent(r, by_id, &one_err);
+    else if (author)
+      query_author(r, *author, by_id, &one_err);
     else
       query_relay(r, *id, by_id, &one_err);
     if (by_id.size() > before) {
@@ -797,6 +928,7 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
       std::cerr << "Nostr: " << one_err << "\n";
     }
     if (recent_mode && by_id.size() >= 15) break;
+    if (author && by_id.size() >= 20) break;
     if (!recent_mode && id && by_id.count(*id) && by_id.size() >= 3) break;
   }
 
@@ -804,6 +936,9 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
     if (err) {
       if (recent_mode) {
         *err = "no recent notes from " + std::to_string(tried) + " relay(s)";
+      } else if (author) {
+        *err = "no notes or profile for this author on " +
+               std::to_string(tried) + " relay(s)";
       } else {
         *err = "note not found on " + std::to_string(tried) +
                " relay(s) (id may be old or rare — try nostr:recent)";
@@ -816,6 +951,13 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
       }
     }
     return std::nullopt;
+  }
+
+  if (author) {
+    std::vector<NostrEvent> events;
+    events.reserve(by_id.size());
+    for (auto& kv : by_id) events.push_back(std::move(kv.second));
+    return author_feed_document(*author, events);
   }
 
   std::string root_id = recent_mode ? by_id.begin()->second.id : *id;

@@ -330,6 +330,9 @@ mechanism; historical bundle numbers in TODO.md are archival).
 - WSS over `TlsStream` (`tls.hpp`).
 - Read-only note/thread fetch gated by `XANATOO_NOSTR` (default ON; needs OpenSSL).
 - Opens `note1` / `nevent1` / `nostr:…` / 64-hex via Ctrl+L → Thread+Message layout.
+- `npub1` / `nprofile1` open the author's profile + recent notes. Message
+  headers link the author (`nostr:npub1…`) and date (`nostr:note1…`) via
+  Link spans on the Message node (`[0]` author, `[1]` date; see `types.hpp`).
 - No posting or key management in v1.
 
 ## Gemini

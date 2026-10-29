@@ -842,6 +842,13 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
       // Header: author · date · reply/about, coloured by the message-author /
       // message-op / message-meta roles so posts separate at a glance.
+      // Optional Link spans on the Message (0 = author, 1 = date) turn those
+      // header parts into links; header span i hit-tests as node.spans[i].
+      auto header_link = [&](size_t i) -> const InlineSpan* {
+        return i < node.spans.size() && node.spans[i].kind == InlineKind::Link
+                   ? &node.spans[i]
+                   : nullptr;
+      };
       Node header = node;
       header.kind = NodeKind::Paragraph;
       header.spans.clear();
@@ -849,6 +856,10 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         InlineSpan a;
         a.kind = InlineKind::Strong;
         a.text = node.src.empty() ? "(unknown)" : node.src;
+        if (const InlineSpan* l = header_link(0)) {
+          a.kind = InlineKind::Link;
+          a.href = l->href;
+        }
         header.spans.push_back(std::move(a));
       }
       if (!node.summary.empty()) {
@@ -856,6 +867,10 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         d.kind = InlineKind::Text;
         d.text = "  ·  ";
         d.text += node.summary;
+        if (const InlineSpan* l = header_link(1)) {
+          d.kind = InlineKind::Link;
+          d.href = l->href;
+        }
         header.spans.push_back(std::move(d));
       }
       if (!node.alt.empty()) {
