@@ -8,6 +8,30 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-29) — versioning (gamepkgstd VERSIONING.md)
+
+- `VERSION` (`0.1.0-dev`) is the only place the version is written
+  (VER-1); `flake.nix` derives `0.1.0-dev.<revCount>+g<shortRev>` (VER-5)
+  and passes it as `-DPROJECT_VERSION_FULL` to the native and R36S builds
+  and as `versionName` / `XANATOO_VERSION` to Android; CMake falls back to
+  the bare `VERSION` contents (VER-6). `xanatoo --version` prints it,
+  `--help` goes to stdout with exit 0 (OPT-2); `checks.version` /
+  `checks.help` verify both (FLAKE-11).
+- Open deviations from gamepkgstd (audit 2026-10-29, not fixed yet):
+  Android `versionCode` stays `self.lastModified` (VER-7 says `revCount
+  or 1`; lastModified also works for dirty trees); metainfo lists an
+  unreleased `0.1.0` (INT-8); no REUSE.toml / `reuse lint`, CMakeLists.txt
+  and flake.nix lack SPDX headers (STACK-9); `checks` lacks the package
+  set and app checks (FLAKE-9/10), no `doCheck` (FLAKE-7), no CI
+  (FLAKE-14); `-f` is `--font` and fullscreen is `-F`, no `--windowed`,
+  `--geometry`, `--data-dir` (env `XANATOO_DATA_DIR` instead),
+  `--config-dir`, `--cache-dir`, `--show-paths` (OPT-3, DEV-6); welcome.md
+  is searched relative to the cwd (DIR-3); revisions / sidestore /
+  bookmarks live in the config dir, not `XDG_STATE_HOME` (DIR-4/7); XDG
+  variables are not checked for absolute paths (DIR-6); bookmarks and
+  other user files are not written atomically (DIR-14); PortMaster
+  launcher sets config and state to the same `conf/` (DIR-10).
+
 ## Status (2026-10-29) — about: page
 
 - Help → About xanatoo opens `about:` (`app_about.cpp`, read-only,

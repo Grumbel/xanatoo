@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 #pragma once
 
+#include <iosfwd>
 #include <string>
 
 namespace xanatoo {
@@ -14,10 +15,15 @@ struct CliOptions {
   float ui_scale = 0.f;  // 0 = auto (display density on Android, else 1)
 };
 
-// Returns false if the process should exit (help printed or bad args).
-bool parse_cli(int argc, char** argv, CliOptions& opt);
+enum class CliResult {
+  Run,
+  Exit,   // --help / --version printed: exit 0
+  Error,  // bad arguments, reported on stderr: exit non-zero
+};
 
-void print_usage(const char* argv0);
+CliResult parse_cli(int argc, char** argv, CliOptions& opt);
+
+void print_usage(std::ostream& out, const char* argv0);
 
 // Prefer examples/welcome.md near cwd or the executable.
 std::string find_default_document();

@@ -60,7 +60,11 @@ void set_window_icon(SDL_Window* window) {
 int main(int argc, char** argv) {
   xanatoo::platform_pre_init();
   xanatoo::CliOptions opt;
-  if (!xanatoo::parse_cli(argc, argv, opt)) return 1;
+  switch (xanatoo::parse_cli(argc, argv, opt)) {
+    case xanatoo::CliResult::Run: break;
+    case xanatoo::CliResult::Exit: return 0;
+    case xanatoo::CliResult::Error: return 1;
+  }
 
   // App ID for window matching: Nix's wrapper renames the binary to
   // .xanatoo-wrapped, which SDL would otherwise use as WM_CLASS / app_id.

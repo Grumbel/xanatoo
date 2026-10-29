@@ -16,6 +16,10 @@
 #include <unistd.h>
 #endif
 
+#ifndef XANATOO_VERSION
+#define XANATOO_VERSION "unknown"
+#endif
+
 namespace xanatoo {
 namespace fs = std::filesystem;
 
@@ -58,14 +62,14 @@ std::string find_default_document() {
   return {};
 }
 
-void print_usage(const char* argv0) {
-  std::cerr
-      << "Usage: " << argv0 << " [options] [file] [file2]\n"
+void print_usage(std::ostream& out, const char* argv0) {
+  out << "Usage: " << argv0 << " [options] [file] [file2]\n"
       << "\n"
       << "Options:\n"
       << "  -f, --font <path>     TTF/OTF font file (body + headings)\n"
       << "  -o, --open <path>     Open a markup document\n"
       << "  -h, --help            Show this help\n"
+      << "  -v, --version         Show the version\n"
       << "\n"
       << "With no file, opens examples/welcome.md when found.\n"
       << "One positional path opens that document (or gemini:// URL).\n"
@@ -83,7 +87,7 @@ void print_usage(const char* argv0) {
       << "(regular/bold/italic/mono faces for styled text).\n";
 }
 
-bool parse_cli(int argc, char** argv, CliOptions& opt) {
+CliResult parse_cli(int argc, char** argv, CliOptions& opt) {
   for (int i = 1; i < argc; ++i) {
     std::string a = argv[i];
     if (a == "--fullscreen" || a == "-F") {
@@ -93,7 +97,7 @@ bool parse_cli(int argc, char** argv, CliOptions& opt) {
     if (a == "--ui-scale") {
       if (i + 1 >= argc) {
         std::cerr << "error: " << a << " requires a number\n";
-        return false;
+        return CliResult::Error;
       }
       opt.ui_scale = std::strtof(argv[++i], nullptr);
       continue;
@@ -103,14 +107,18 @@ bool parse_cli(int argc, char** argv, CliOptions& opt) {
       continue;
     }
     if (a == "-h" || a == "--help") {
-      print_usage(argv[0]);
-      return false;
+      print_usage(std::cout, argv[0]);
+      return CliResult::Exit;
+    }
+    if (a == "-v" || a == "--version") {
+      std::cout << "xanatoo " << XANATOO_VERSION << "\n";
+      return CliResult::Exit;
     }
     if (a == "-f" || a == "--font") {
       if (i + 1 >= argc) {
         std::cerr << "error: " << a << " requires a path argument\n";
-        print_usage(argv[0]);
-        return false;
+        print_usage(std::cerr, argv[0]);
+        return CliResult::Error;
       }
       opt.font_path = argv[++i];
       continue;
@@ -122,8 +130,8 @@ bool parse_cli(int argc, char** argv, CliOptions& opt) {
     if (a == "-o" || a == "--open" || a == "--file") {
       if (i + 1 >= argc) {
         std::cerr << "error: " << a << " requires a path argument\n";
-        print_usage(argv[0]);
-        return false;
+        print_usage(std::cerr, argv[0]);
+        return CliResult::Error;
       }
       opt.file_path = argv[++i];
       continue;
@@ -138,14 +146,14 @@ bool parse_cli(int argc, char** argv, CliOptions& opt) {
         continue;
       }
       std::cerr << "error: unexpected argument: " << a << "\n";
-      print_usage(argv[0]);
-      return false;
+      print_usage(std::cerr, argv[0]);
+      return CliResult::Error;
     }
     std::cerr << "error: unknown argument: " << a << "\n";
-    print_usage(argv[0]);
-    return false;
+    print_usage(std::cerr, argv[0]);
+    return CliResult::Error;
   }
-  return true;
+  return CliResult::Run;
 }
 
 void open_external_url(const std::string& url_in) {
