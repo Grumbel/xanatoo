@@ -7,6 +7,7 @@
 
 #include "xanatoo/sitemap.hpp"
 
+#include "xanatoo/inflate.hpp"
 #include "xanatoo/util.hpp"
 
 #if defined(XANATOO_WEB) && XANATOO_WEB
@@ -429,6 +430,7 @@ constexpr const char* kUserAgent =
     "xanatoo/0.1 (sitemap reader; https://github.com/Grumbel/xanatoo)";
 constexpr size_t kMaxFiles = 25;
 constexpr size_t kMaxUrls = 50000;
+constexpr size_t kMaxXmlBytes = 52428800;
 
 }  // namespace
 
@@ -476,10 +478,14 @@ std::optional<SiteTree> sitemap_fetch_tree(std::string_view host_in,
       last_err = r ? url + ": HTTP " + std::to_string(r->status) : e;
       continue;
     }
-    if (r->body.size() >= 2 && static_cast<unsigned char>(r->body[0]) == 0x1f &&
-        static_cast<unsigned char>(r->body[1]) == 0x8b) {
-      notes.push_back("Skipped gzip-compressed " + url + " (not supported).");
-      continue;
+    // *.xml.gz (sitemaps.org allows gzip; a sitemap is ≤ 50 MB unpacked).
+    if (is_gzip(r->body)) {
+      if (auto xml = gunzip(r->body, kMaxXmlBytes)) {
+        r->body = std::move(*xml);
+      } else {
+        notes.push_back("Could not unpack " + url + ".");
+        continue;
+      }
     }
     SitemapFile f = parse_sitemap_xml(r->body);
     if (f.urls.empty() && f.sitemaps.empty()) continue;

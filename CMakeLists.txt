@@ -98,6 +98,7 @@ add_executable(xanatoo
   src/ebooks.cpp
   src/feed.cpp
   src/sitemap.cpp
+  src/inflate.cpp
   src/html_min.cpp
   src/html_page.cpp
   src/wikipedia.cpp
@@ -323,6 +324,7 @@ add_executable(xanatoo_tests
   src/ebooks.cpp
   src/feed.cpp
   src/sitemap.cpp
+  src/inflate.cpp
   src/html_min.cpp
   src/html_page.cpp
   src/wikipedia.cpp
