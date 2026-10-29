@@ -2,19 +2,13 @@
 <!-- SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com> -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- App icon source; tools/make_icons.py rasterizes the hicolor and Android launcher icons from it. -->
-<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
-  <rect x="12" y="12" width="168" height="168" rx="28" fill="#F8F6F0" stroke="#7E7B74" stroke-width="4"/>
-  <rect x="12" y="12" width="168" height="34" rx="28" fill="#F2BE1A"/>
-  <rect x="12" y="30" width="168" height="16" fill="#F2BE1A"/>
-  <line x1="12" y1="46" x2="180" y2="46" stroke="#9A7408" stroke-width="3"/>
-  <!-- linked passages: two text blocks joined by a link -->
-  <rect x="34" y="66" width="56" height="9" rx="3" fill="#2E3436"/>
-  <rect x="34" y="84" width="44" height="9" rx="3" fill="#2E3436"/>
-  <rect x="34" y="102" width="52" height="9" rx="3" fill="#2E3436"/>
-  <rect x="102" y="120" width="56" height="9" rx="3" fill="#2E3436"/>
-  <rect x="102" y="138" width="40" height="9" rx="3" fill="#2E3436"/>
-  <rect x="102" y="156" width="50" height="9" rx="3" fill="#2E3436"/>
-  <path d="M84 88 C 120 88, 96 124, 128 124" fill="none" stroke="#2A62A8" stroke-width="7" stroke-linecap="round"/>
-  <circle cx="84" cy="88" r="7" fill="#2A62A8"/>
-  <circle cx="128" cy="124" r="7" fill="#2A62A8"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7CB3A"/><stop offset="1" stop-color="#E3AA10"/></linearGradient></defs>
+  <rect x="12" y="12" width="232" height="232" rx="48" fill="url(#bg)"/>
+  <!-- two link curves crossing: an X of connections -->
+  <path d="M66 66 C 132 66, 124 190, 190 190" fill="none" stroke="#2E3436" stroke-width="34" stroke-linecap="round"/>
+  <path d="M66 190 C 132 190, 124 66, 190 66" fill="none" stroke="#EDBB22" stroke-width="58" stroke-linecap="round"/>
+  <path d="M66 190 C 132 190, 124 66, 190 66" fill="none" stroke="#2A62A8" stroke-width="34" stroke-linecap="round"/>
+  <circle cx="66" cy="66" r="24" fill="#2E3436"/><circle cx="190" cy="190" r="24" fill="#2E3436"/>
+  <circle cx="66" cy="190" r="24" fill="#2A62A8"/><circle cx="190" cy="66" r="24" fill="#2A62A8"/>
 </svg>
