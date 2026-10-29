@@ -181,7 +181,7 @@ toolbar and shortcuts should route through `execute_command`.
   prebuilt C libraries (libvips, glib, libarchive, codecs) that
   `nix/android-imagelibs.nix` cross-builds per ABI with nixpkgs' Android
   set (NDK 27, plain C, so they link into the NDK 29 build) and merges into
-  one `libimagedeps.a`; `nix build .#android-imagelibs`.
+  one `libimagedeps.a`; `nix build .#imagedeps-android`.
 - Test on the device: `adb logcat -s xanatoo` shows std::cout / std::cerr.
 
 ## Develop shell (`nix develop`)

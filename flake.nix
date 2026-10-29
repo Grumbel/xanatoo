@@ -106,6 +106,8 @@
               "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
               "-DPROJECT_VERSION_FULL=${version}"
             ];
+            # CTest unit tests (FLAKE-7); skipped automatically when cross.
+            doCheck = true;
 
             meta = with pkgs.lib; {
               description = "Interactive document composition engine";
@@ -114,11 +116,10 @@
               mainProgram = "xanatoo";
             };
           };
-        in
-        {
-          # Default package wraps the binary with a font and pandoc; data is
-          # found next to the binary (<exe>/../share/xanatoo).
-          default = pkgs.symlinkJoin {
+
+          # The binary wrapped with a font and pandoc; data is found next
+          # to the binary (<exe>/../share/xanatoo).
+          wrapped = pkgs.symlinkJoin {
             name = "xanatoo-${version}";
             paths = [ xanatoo ];
             nativeBuildInputs = [ pkgs.makeWrapper ];
@@ -130,6 +131,11 @@
             '';
             meta = xanatoo.meta;
           };
+        in
+        {
+          # FLAKE-1: default and xanatoo are the same native build.
+          default = wrapped;
+          xanatoo = wrapped;
 
           # Unwrapped binary for packaging / debugging
           xanatoo-unwrapped = xanatoo;
@@ -143,7 +149,7 @@
             in {
               xanatoo-android = android.apk;
               sdl2-android = android.sdlAndroidLibs;
-              android-imagelibs = android.imageLibs;
+              imagedeps-android = android.imageLibs;
               arkos-sysroot = r36s.sysroot;
               xanatoo-r36s = r36s.r36s;
               xanatoo-r36s-portmaster = r36s.portmaster;
@@ -152,14 +158,22 @@
           else { }
         ));
 
-      # gamepkgstd FLAKE-11: --version / --help (OPT-2, VER-3), and desktop
-      # integration (INT-6..8): every launcher file is installed, and the
-      # .desktop / metainfo files validate.
+      # gamepkgstd FLAKE-9..11: `nix flake check` builds every package, checks
+      # that every app's program exists, and runs the extra checks:
+      # --version / --help (OPT-2, VER-3), man page, REUSE, and desktop
+      # integration (INT-6..8: every launcher file is installed, the
+      # .desktop / metainfo files validate).
       checks = forAllSystems (system:
         let
           pkgs = import nixpkgs { inherit system; };
           pkg = self.packages.${system}.xanatoo-unwrapped;
-        in {
+          appChecks = nixpkgs.lib.mapAttrs' (name: app:
+            nixpkgs.lib.nameValuePair "app-${name}"
+              (pkgs.runCommand "xanatoo-check-app-${name}" { } ''
+                test -x ${app.program}
+                touch $out
+              '')) self.apps.${system};
+        in self.packages.${system} // appChecks // {
           version = pkgs.runCommand "xanatoo-check-version" { } ''
             out_v=$(${pkg}/bin/xanatoo --version)
             if [ "$out_v" != "xanatoo ${version}" ]; then
@@ -182,13 +196,14 @@
           man = pkgs.runCommand "xanatoo-check-man" {
             nativeBuildInputs = [ pkgs.mandoc ];
           } ''
-            mandoc -T lint -W warning ${pkg}/share/man/man1/xanatoo.1
+            # stdenv fixup gzips man pages
+            mandoc -T lint -W warning ${pkg}/share/man/man1/xanatoo.1.gz
             touch $out
           '';
           layout = pkgs.runCommand "xanatoo-check-layout" { } ''
             for f in \
               bin/xanatoo \
-              share/man/man1/xanatoo.1 \
+              share/man/man1/xanatoo.1.gz \
               share/applications/xanatoo.desktop \
               share/metainfo/xanatoo.metainfo.xml \
               share/icons/hicolor/scalable/apps/xanatoo.svg \
@@ -213,9 +228,18 @@
           '';
         });
 
-      apps = nixpkgs.lib.genAttrs
-        (builtins.filter (nixpkgs.lib.hasSuffix "-linux") systems)
-        (system: {
+      # FLAKE-5: run the native build; adb-install the APK (Linux hosts).
+      apps = forAllSystems (system:
+        let
+          run = {
+            type = "app";
+            program = nixpkgs.lib.getExe self.packages.${system}.default;
+            meta.description = "Run xanatoo";
+          };
+        in {
+          default = run;
+          xanatoo = run;
+        } // nixpkgs.lib.optionalAttrs (nixpkgs.lib.hasSuffix "-linux" system) {
           install-android-xanatoo = (androidFor system).installApp;
         });
 
