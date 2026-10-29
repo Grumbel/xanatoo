@@ -713,7 +713,12 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
     }
     if (app.dragging_split && app.split) {
       float mx = app.mouse_x;
-      app.split_ratio = mx / static_cast<float>(app.win_w);
+      // Ratio within the pane area (docked columns excluded).
+      const int area_x = dock_column_w(app, Dock::Left);
+      const int area_w = std::max(
+          1, app.win_w - area_x - dock_column_w(app, Dock::Right));
+      app.split_ratio = (mx - static_cast<float>(area_x)) /
+                        static_cast<float>(area_w);
       app.split_ratio = std::max(0.15f, std::min(0.85f, app.split_ratio));
       app.needs_layout = true;
       return;
@@ -2124,13 +2129,19 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
 
     case SDLK_o:
       if (ctrl && alt) {
-        app.outline_docked = !app.outline_docked;
-        if (app.outline_mode) {
+        // Placement is kept while the outline is hidden.
+        if (app.ol.dock == Dock::None) {
+          app.ol.restore_x = app.ol.x;
+          app.ol.restore_y = app.ol.y;
+          app.ol.restore_w = app.ol.w;
+          app.ol.restore_h = app.ol.h;
+          app.ol.dock = Dock::Left;
           app.needs_layout = true;
-          layout_panes(app);
+        } else {
+          undock_window(app, app.ol);
         }
-        flash_status(app, app.outline_docked ? "Outline docked (left)"
-                                             : "Outline floating");
+        flash_status(app, app.ol.dock == Dock::Left ? "Outline docked (left)"
+                                                    : "Outline floating");
         break;
       }
       if (ctrl && shift) {

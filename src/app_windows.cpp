@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <utility>
 
 #include "xanatoo/app.hpp"
 #include "xanatoo/cli.hpp"
@@ -16,7 +18,26 @@ namespace xanatoo::app {
 namespace {
 
 
-bool resizable(const FloatWindow& w) { return w.role != WindowRole::Backlinks; }
+// Smallest free-floating size per role.
+std::pair<int, int> min_size(const FloatWindow& w) {
+  switch (w.role) {
+    case WindowRole::Outline:
+      return {200, 140};
+    case WindowRole::Backlinks:
+      return {200, 120};
+    case WindowRole::Help:
+    case WindowRole::Document:
+      break;
+  }
+  return {280, 160};
+}
+
+bool docked(const FloatWindow& w) {
+  return w.dock == Dock::Left || w.dock == Dock::Right;
+}
+
+// Pointer travel before a title press on a docked window tears it off.
+constexpr int kTearOffPx = 8;
 
 bool contains(const FloatWindow& w, int mx, int my) {
   return mx >= w.x && mx < w.x + w.w && my >= w.y && my < w.y + w.h;
@@ -57,9 +78,7 @@ void close_window(App& app, FloatWindow& w) {
   }
 }
 
-void begin_resize(App& app, FloatWindow& w, int bits, int mx, int my) {
-  // Docked outline: only the dock width can change.
-  if (w.role == WindowRole::Outline && app.outline_docked) bits = 1;
+void begin_resize(FloatWindow& w, int bits, int mx, int my) {
   w.resize = bits;
   w.resize_start_x = mx;
   w.resize_start_y = my;
@@ -72,6 +91,8 @@ void begin_drag(FloatWindow& w, int mx, int my) {
   w.dragging = true;
   w.drag_dx = mx - w.x;
   w.drag_dy = my - w.y;
+  w.press_x = mx;
+  w.press_y = my;
 }
 
 // Jump the scroll offset to the click position on the scrollbar strip.
@@ -203,39 +224,35 @@ void press_title(App& app, FloatWindow& w, int mx, int my) {
     close_window(app, w);
     return;
   }
-  switch (w.role) {
-    case WindowRole::Outline: {
-      // Focus toggle sits just left of ×.
-      const SDL_Rect fb = outline_focus_rect(app, SDL_Rect{w.x, w.y, w.w, w.h});
-      if (mx >= fb.x - 2 && mx < fb.x + fb.w + 2) {
-        toggle_section_focus_mode(app);
-        w.dragging = false;
-      } else {
-        begin_drag(w, mx, my);
-      }
-      break;
+  if (w.role == WindowRole::Outline) {
+    // Focus toggle sits just left of ×.
+    const SDL_Rect fb = outline_focus_rect(app, SDL_Rect{w.x, w.y, w.w, w.h});
+    if (mx >= fb.x - 2 && mx < fb.x + fb.w + 2) {
+      toggle_section_focus_mode(app);
+      return;
     }
-    case WindowRole::Document: {
-      const Uint32 now = SDL_GetTicks();
-      if (w.last_title_click != 0 && now - w.last_title_click < 400) {
-        maximize_soft(app, w);
-        w.last_title_click = 0;
-        w.dragging = false;
-      } else {
-        w.last_title_click = now;
-        // Dragging a tiled/maximized window restores float first.
-        if (w.maximized || w.dock != SoftDock::None)
-          restore_soft_float(app, w, mx, my);
-        begin_drag(w, mx, my);
-        app.dock_preview = SoftDock::None;
-      }
-      break;
-    }
-    case WindowRole::Help:
-    case WindowRole::Backlinks:
-      begin_drag(w, mx, my);
-      break;
   }
+  // Double-click maximizes / restores; a drag moves the window (a docked
+  // or maximized one tears off first, see float_motion).
+  const Uint32 now = SDL_GetTicks();
+  if (w.last_title_click != 0 && now - w.last_title_click < 400) {
+    toggle_maximize(app, w);
+    w.last_title_click = 0;
+    return;
+  }
+  w.last_title_click = now;
+  begin_drag(w, mx, my);
+  app.dock_preview = Dock::None;
+}
+
+// Docked / maximized window dragged by its title: float it again at its
+// free size, under the pointer.
+void tear_off(App& app, FloatWindow& w, int mx, int my) {
+  undock_window(app, w);
+  w.x = std::max(0, mx - w.w / 2);
+  w.y = std::max(static_cast<int>(app.ui_top), my - help_title_h / 2);
+  w.drag_dx = mx - w.x;
+  w.drag_dy = my - w.y;
 }
 
 void press_client(App& app, FloatWindow& w, int mx, int my) {
@@ -273,6 +290,14 @@ std::vector<FloatWindow*> float_stack(App& app) {
   if (app.backlinks_mode) st.push_back(&app.bl);
   if (app.help_mode) st.push_back(&app.help);
   for (auto& sw : app.soft_wins) st.push_back(&sw);
+  // Docked columns under floating windows, maximized ones on top.
+  auto layer = [](const FloatWindow* w) {
+    return w->dock == Dock::None ? 1 : w->dock == Dock::Max ? 2 : 0;
+  };
+  std::stable_sort(st.begin(), st.end(),
+                   [&](const FloatWindow* a, const FloatWindow* b) {
+                     return layer(a) < layer(b);
+                   });
   return st;
 }
 
@@ -326,14 +351,28 @@ bool float_press(App& app, int mx, int my) {
         my < w->y - help_edge || my > w->y + w->h + help_edge)
       continue;
     const bool inside = contains(*w, mx, my);
+    // Free windows resize at right / bottom; a docked one only at the
+    // edge facing the panes (the column width); maximized ones not at all.
     int bits = 0;
-    if (resizable(*w)) {
-      const bool on_r = mx >= w->x + w->w - help_edge &&
-                        my >= w->y + help_title_h &&
-                        my <= w->y + w->h + help_edge;
-      const bool on_b = my >= w->y + w->h - help_edge && mx >= w->x &&
-                        mx <= w->x + w->w + help_edge;
-      bits = (on_r ? 1 : 0) | (on_b ? 2 : 0);
+    const bool on_r = mx >= w->x + w->w - help_edge &&
+                      my >= w->y + help_title_h &&
+                      my <= w->y + w->h + help_edge;
+    const bool on_l = mx <= w->x + help_edge && my >= w->y + help_title_h &&
+                      my <= w->y + w->h;
+    const bool on_b = my >= w->y + w->h - help_edge && mx >= w->x &&
+                      mx <= w->x + w->w + help_edge;
+    switch (w->dock) {
+      case Dock::None:
+        bits = (on_r ? 1 : 0) | (on_b ? 2 : 0);
+        break;
+      case Dock::Left:
+        bits = on_r ? 1 : 0;
+        break;
+      case Dock::Right:
+        bits = on_l ? 4 : 0;
+        break;
+      case Dock::Max:
+        break;
     }
     if (!bits && !inside) continue;
     // Clicking a panel gives it the keyboard; any other window, the document.
@@ -347,7 +386,7 @@ bool float_press(App& app, int mx, int my) {
       w = &app.soft_wins.back();
     }
     if (bits) {
-      begin_resize(app, *w, bits, mx, my);
+      begin_resize(*w, bits, mx, my);
       return true;
     }
     if (my < w->y + help_title_h)
@@ -362,10 +401,14 @@ bool float_press(App& app, int mx, int my) {
 bool float_motion(App& app, int mx, int my) {
   for (FloatWindow* w : float_stack(app)) {
     if (w->dragging) {
+      if (w->dock != Dock::None) {
+        if (std::abs(mx - w->press_x) + std::abs(my - w->press_y) < kTearOffPx)
+          return true;
+        tear_off(app, *w, mx, my);
+      }
       w->x = std::max(0, mx - w->drag_dx);
       w->y = std::max(static_cast<int>(app.ui_top), my - w->drag_dy);
-      if (w->role == WindowRole::Document)
-        app.dock_preview = compute_dock_zone(app, mx, my);
+      app.dock_preview = compute_dock_zone(app, mx, my);
       return true;
     }
     if (w->scroll_dragging) {
@@ -379,28 +422,25 @@ bool float_motion(App& app, int mx, int my) {
     if (w->resize) {
       const int dx = mx - w->resize_start_x;
       const int dy = my - w->resize_start_y;
-      const bool outline = w->role == WindowRole::Outline;
+      if (docked(*w)) {
+        // Column width, shared by every window docked on that side.
+        int& cw = app.dock_w[w->dock == Dock::Right ? 1 : 0];
+        const int nw = w->resize_start_w + (w->resize & 4 ? -dx : dx);
+        cw = std::clamp(nw, 160, std::max(160, app.win_w * 2 / 5));
+        app.needs_layout = true;
+        place_windows(app);
+        return true;
+      }
+      auto [min_w, min_h] = min_size(*w);
       if (w->resize & 1) {
-        w->w = w->resize_start_w + dx;
-        if (outline && app.outline_docked) {
-          w->w = std::clamp(w->w, 160, std::max(160, app.win_w / 2));
-          if (w->w != app.outline_dock_w) {
-            app.outline_dock_w = w->w;
-            app.needs_layout = true;
-            layout_panes(app);
-          }
-        } else {
-          w->w = std::clamp(w->w, outline ? 200 : 280,
-                            std::max(1, app.win_w - 20));
-          if (w->role == WindowRole::Document) w->needs_layout = true;
-          if (w->role == WindowRole::Help) app.help_needs_layout = true;
-        }
+        w->w = std::clamp(w->resize_start_w + dx, min_w,
+                          std::max(min_w, app.win_w - 20));
+        if (w->role == WindowRole::Document) w->needs_layout = true;
+        if (w->role == WindowRole::Help) app.help_needs_layout = true;
       }
-      if ((w->resize & 2) && !(outline && app.outline_docked)) {
-        w->h = w->resize_start_h + dy;
-        w->h =
-            std::clamp(w->h, outline ? 140 : 160, std::max(1, app.win_h - 40));
-      }
+      if (w->resize & 2)
+        w->h = std::clamp(w->resize_start_h + dy, min_h,
+                          std::max(min_h, app.win_h - 40));
       return true;
     }
   }
@@ -409,35 +449,21 @@ bool float_motion(App& app, int mx, int my) {
 
 void float_release(App& app, int mx, int my) {
   for (FloatWindow* w : float_stack(app)) {
-    const bool geom = w->dragging || w->resize;
-    switch (w->role) {
-      case WindowRole::Document:
-        if (w->dragging) {
-          SoftDock zone = compute_dock_zone(app, mx, my);
-          if (zone != SoftDock::None)
-            apply_soft_dock(app, *w, zone);
-          else
-            snap_soft_geom(app, w->x, w->y, w->w, w->h);
-        } else if (w->resize) {
-          snap_soft_geom(app, w->x, w->y, w->w, w->h);
-          w->needs_layout = true;
-        }
-        break;
-      case WindowRole::Help:
-        if (geom) snap_soft_geom(app, w->x, w->y, w->w, w->h);
-        if (w->resize) app.help_needs_layout = true;
-        break;
-      case WindowRole::Outline:
-        if (geom) snap_soft_geom(app, w->x, w->y, w->w, w->h);
-        break;
-      case WindowRole::Backlinks:
-        break;
+    // A press on a docked title that never moved keeps it docked.
+    if (w->dragging && w->dock == Dock::None) {
+      const Dock zone = compute_dock_zone(app, mx, my);
+      if (zone != Dock::None)
+        dock_window(app, *w, zone, my);
+      else
+        snap_soft_geom(app, w->x, w->y, w->w, w->h);
+    } else if (w->resize && w->dock == Dock::None) {
+      snap_soft_geom(app, w->x, w->y, w->w, w->h);
     }
     w->dragging = false;
     w->resize = 0;
     w->scroll_dragging = false;
   }
-  app.dock_preview = SoftDock::None;
+  app.dock_preview = Dock::None;
 }
 
 bool float_wheel(App& app, int mx, int my, int wheel_y) {
@@ -468,13 +494,15 @@ bool close_top_float(App& app) {
 }
 
 static void draw_soft_window(App& app, FloatWindow& sw, bool active) {
-  if (sw.w < 280) sw.w = 280;
-  if (sw.h < 200) sw.h = 200;
+  if (sw.dock == Dock::None) {
+    sw.w = std::max(sw.w, 280);
+    sw.h = std::max(sw.h, 200);
+  }
   if (sw.needs_layout) layout_soft(app, sw);
   auto [cx, cy, cw, ch] = soft_client_rect(app, sw);
   sw.scroll = std::min(sw.scroll, float_max_scroll(app, sw));
   draw_floating_frame(app, SDL_Rect{sw.x, sw.y, sw.w, sw.h},
-                      soft_title(app, sw), active);
+                      soft_title(app, sw), active, sw.dock == Dock::None);
   SDL_Rect clip{cx, cy, cw, ch};
   SDL_RenderSetClipRect(app.sdl, &clip);
   fill_doc_paper(app, clip);
@@ -486,7 +514,7 @@ static void draw_soft_window(App& app, FloatWindow& sw, bool active) {
 }
 
 void draw_floats(App& app) {
-  clamp_all_floating(app);
+  place_windows(app);
   app.soft_wins.erase(std::remove_if(app.soft_wins.begin(), app.soft_wins.end(),
                                      [&](const FloatWindow& sw) {
                                        return !find_buf(app, sw.buf);

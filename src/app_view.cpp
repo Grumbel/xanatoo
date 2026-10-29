@@ -224,11 +224,10 @@ void expand_ancestors_for_node(App& app, xanatoo::NodeId target) {
 }
 
 void layout_panes(App& app) {
-  const int dock =
-      (app.outline_mode && app.outline_docked)
-          ? std::max(160, std::min(app.outline_dock_w, app.win_w / 2))
-          : 0;
-  const int ww = std::max(64, app.win_w - dock);
+  // Docked window columns take their width from the pane area.
+  const int dock = dock_column_w(app, Dock::Left);
+  const int ww =
+      std::max(64, app.win_w - dock - dock_column_w(app, Dock::Right));
   const int gutter = app.split ? 6 : 0;
   if (app.split) {
     int left_w = static_cast<int>(app.split_ratio * (ww - gutter));
@@ -676,13 +675,6 @@ float local_x(App& app, float mx, int pi) {
 float content_y(App& app, float window_y) { return window_y - app.ui_top; }
 
 std::tuple<int, int, int, int> outline_client_rect(App& app) {
-  if (app.outline_docked && app.outline_mode) {
-    const int top = static_cast<int>(app.ui_top);
-    const int h = app.win_h - status_bar_h - top;
-    return std::tuple{help_pad, top + help_title_h + 4,
-                      app.outline_dock_w - help_pad * 2,
-                      h - help_title_h - help_pad - 4};
-  }
   return std::tuple{app.ol.x + help_pad, app.ol.y + help_title_h + 4,
                     app.ol.w - help_pad * 2,
                     app.ol.h - help_title_h - help_pad - 4};

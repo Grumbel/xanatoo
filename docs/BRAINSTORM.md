@@ -350,6 +350,42 @@ mark the corresponding brainstorm section so this file stays a **forward** noteb
 not a second changelog.
 
 
+## 11. Views, arrangement, documents (windows / tabs / split)
+
+Today four mechanisms overlap: two fixed panes (split), tabs (which buffer
+the focused pane shows), floating windows (docs or panels), and dock
+columns. Docking is now one model (§ TODO 2026-10-29); the rest should
+follow by separating three layers:
+
+1. **Documents** — buffers with stable `BufferId`, revisions, drafts. No
+   geometry. "Document management" (open, tabs as a buffer list, drafts:,
+   history, bookmarks) lives here.
+2. **Views** — something that shows data: a document view (buffer + caret
+   + scroll + layout; today `Pane` and Document-role `FloatWindow`, which
+   are the same thing twice) or a *tool view* derived from another view
+   (outline, backlinks, footnotes, a future sitemap). A tool view has a
+   *target* (the focused view, or pinned to one) and no document of its
+   own — that is why the outline never becomes a tab. If a tool's result
+   is worth keeping/searching/linking it is rendered *as a document*
+   (`drafts:`, `sitemap:host`), and then it is an ordinary buffer.
+3. **Arrangement** — where views sit: centre slots (the panes), side
+   columns, floating, maximized. Any document view may go anywhere; a tab
+   strip belongs to a centre slot (its history of buffers), not to the
+   app.
+
+Multi-document interaction (diff, split preview, synced scrolling,
+transclusion source ↔ target) is a **relation between views**, not a
+property of pane 0 / pane 1. Direction: give views ids (`ViewId`, like
+`BufferId`) and keep relations as small records (`{kind: Diff, a, b}`),
+so a diff can be between a pane and a docked window, or three-way later.
+
+Steps, each useful alone:
+- Merge `Pane` and Document-role `FloatWindow` into one `DocView` record;
+  placement becomes `{CentreSlot n | Dock | Float | Max}`.
+- Tool views take an explicit target view instead of `focused_pane`.
+- Diff / split preview reference `ViewId`s.
+- Per-slot tab strips; "Move Window to Tab" = change placement.
+
 ## EPUB import (implemented path)
 
 EPUB is treated as **immutable**. Opening `.epub` runs:

@@ -675,7 +675,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Open in Window…", UiCommand::OpenInWindow, cmd);
       menu_item_cmd("Pop Out to Window", UiCommand::PopOut, cmd, true,
                     "Ctrl+Shift+P");
-      menu_item_cmd("Dock Window to Tab", UiCommand::PopIn, cmd, state.has_floating,
+      menu_item_cmd("Move Window to Tab", UiCommand::PopIn, cmd, state.has_floating,
                     "Ctrl+Shift+I");
       ImGui::Separator();
       menu_item_cmd("Save", UiCommand::Save, cmd, true, "Ctrl+S");

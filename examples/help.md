@@ -20,7 +20,7 @@ Jump to: [Files](#Files) · [Edit](#Edit) · [Navigate](#Navigate) · [View](#Vi
 - **Ctrl+W** — Close floating window, help, outline, or document tab
 - **Ctrl+Tab** / **Ctrl+Shift+Tab** — Next / previous tab
 - **Ctrl+Shift+P** — Pop focused document out to a floating window
-- **Ctrl+Shift+I** — Dock top floating window back as a tab
+- **Ctrl+Shift+I** — Move the top floating window back into a tab
 - **Alt+F / E / O / I / V / B / H** — File / Edit / Format / Insert / View / Bookmarks / Help menu
 - **Middle-click** — Paste at caret
 - **Drag .md / .sexp** — Open in a software window
@@ -70,6 +70,10 @@ Export via *File → Export as S-expression…* or *Export as Markdown…*.
 
 - **Help → Examples** — open sample documents in the current pane
 - **File → Open in Window…** — open a path in a floating window
+- **Windows** (help, outline, backlinks, documents) all place the same way:
+  drag a title to the left / right edge (or onto a column) to dock it as a
+  side column, drag it off again to float; double-click a title to
+  maximize / restore; **Ctrl+Alt+O** docks / floats the outline
 - **Examples → Diff demo (v1 | v2)** — dual-pane load of `diff-v1.md` and `diff-v2.md` with diff marks on
 - **Ctrl+Shift+D** — toggle diff marks (needs two independent files)
 

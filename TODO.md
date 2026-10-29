@@ -8,6 +8,22 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-29) — one docking model for all windows
+
+- `FloatWindow::dock` (`Dock::None / Left / Right / Max`) for every role
+  replaces `SoftDock` (doc windows only, overlay tiling) and
+  `outline_docked` / `outline_dock_w` (outline only, reserved column).
+- Left / Right docks are real side columns: `layout_panes` leaves out
+  `dock_column_w`; windows on one side stack (`dock_seq`, drop position
+  picks the slot), the inner edge resizes the shared column
+  (`App::dock_w`, panes keep ≥ 320 px). Drag a title to an edge or onto a
+  column to dock; drag a docked title > 8 px to tear it off at its free
+  geometry; double-click a title → Max ↔ previous placement.
+- Dropped: Top / Bottom half-screen tiles of doc windows (panes have no
+  vertical extent yet). "Dock Window to Tab" → "Move Window to Tab".
+- Design direction (views vs. arrangement vs. documents):
+  `docs/BRAINSTORM.md` §11.
+
 ## Status (2026-10-28) — drafts instead of "discard?" prompts
 
 - Unsaved edits go to a local revision store

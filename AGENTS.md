@@ -31,6 +31,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_frame.cpp` | frame stages: sync size, relayout, `run_chrome` (UiState + `execute_command`), draw panes, overlays |
 | `app_chrome.cpp` | status line (`compute_status` is pure data → `draw_status_bar`), floating window frame, client scrollbar |
 | `app_windows.cpp` | floating windows (`FloatWindow`, role = Help/Outline/Backlinks/Document): one z-stack, shared hit-test / drag / resize / scroll / draw |
+| `app_softwin.cpp` | window placement: `Dock` (None / Left / Right / Max) for every role — `dock_window` / `undock_window` / `toggle_maximize`, `place_windows` derives docked geometry, `dock_column_w` is what `layout_panes` leaves out |
 | `app_touch.cpp` | touchscreen gestures: tap → click, drag/fling scroll, long-press select, pinch zoom |
 | `app_buffers.cpp` / `app_view.cpp` / `app_nav.cpp` / `app_softwin.cpp` / `app_prompts.cpp` / `app_pointer.cpp` | document buffers, scroll/fold/outline, URL history + bookmarks, floating windows, minibuffer, cursor/gamepad |
 | `app_fetch.cpp` | background page fetches (`FetchJob` on a worker thread → `poll_fetches`), page cache, loading indicator |
@@ -64,6 +65,13 @@ Keyboard focus: `App::key_focus` (`KeyFocus::Document/Outline/Backlinks`).
 Panels handle plain keys only while `panel_has_keys(app, …)`; opening or
 clicking a panel focuses it, a pane click / jump / unused plain key returns
 focus to the document. Never let a panel consume keys just because it is open.
+
+Windows place one way regardless of role: Left / Right docks are side
+columns that take width from the panes (stacked by `dock_seq`, shared
+`App::dock_w`), Max overlays the client area. Never add a per-panel
+"docked" flag; set `FloatWindow::dock` through the helpers above.
+See `docs/BRAINSTORM.md` "Views, arrangement, documents" for where tabs /
+split / windows are heading.
 
 Rules: no behaviour on data types; new modal state goes in `App` (group
 related fields into small records like `FloatPanel` / `Hover`); menus,

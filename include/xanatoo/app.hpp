@@ -124,12 +124,16 @@ struct Pane {
   FootnoteOverlay footnotes;
 };
 
-enum class SoftDock { None = 0, Left, Right, Top, Bottom, Max };
+// Placement of a floating window. Left / Right dock it into a side column
+// that takes its width from the panes (windows docked on the same side
+// stack top to bottom by `dock_seq`); Max covers the whole client area.
+enum class Dock : uint8_t { None = 0, Left, Right, Max };
 
 enum class WindowRole : uint8_t { Help, Outline, Backlinks, Document };
 
 // One floating window: help / outline / backlinks panels and document
-// windows share geometry + interaction state; role picks the content.
+// windows share geometry, docking + interaction state; role picks the
+// content.
 struct FloatWindow {
   WindowRole role = WindowRole::Document;
   // Document role only:
@@ -138,15 +142,20 @@ struct FloatWindow {
   xanatoo::Selection sel{};
   xanatoo::LayoutResult layout;
   bool needs_layout = true;
-  bool maximized = false;
-  SoftDock dock = SoftDock::None;
+  // Placement (all roles). x/y/w/h of a docked or maximized window are
+  // derived each frame (`place_windows`); restore_* keep the free geometry.
+  Dock dock = Dock::None;
+  Dock restore_dock = Dock::None;  // placement to return to from Max
+  int dock_seq = 0;                // order within a dock column
   int restore_x = 120, restore_y = 70, restore_w = 540, restore_h = 440;
   Uint32 last_title_click = 0;
   // Geometry + interaction (all roles):
   int x = 120, y = 70, w = 540, h = 440;
   bool dragging = false;
   int drag_dx = 0, drag_dy = 0;
-  int resize = 0;  // bit 1=right, 2=bottom
+  int press_x = 0, press_y = 0;  // title press; a docked window tears off
+                                 // once the pointer moved away from it
+  int resize = 0;  // bit 1=right, 2=bottom, 4=left
   int resize_start_x = 0, resize_start_y = 0;
   int resize_start_w = 0, resize_start_h = 0;
   float scroll = 0.f;
@@ -161,6 +170,10 @@ inline FloatWindow make_float_panel(WindowRole role, int x, int y, int w,
   f.y = y;
   f.w = w;
   f.h = h;
+  f.restore_x = x;
+  f.restore_y = y;
+  f.restore_w = w;
+  f.restore_h = h;
   return f;
 }
 
@@ -415,7 +428,8 @@ struct App {
   int last_layout_w = 0;
   int last_layout_h = 0;
   std::vector<FloatWindow> soft_wins;  // Document-role floats, back→front
-  SoftDock dock_preview = SoftDock::None;
+  Dock dock_preview = Dock::None;  // drop target while dragging a title
+  int dock_w[2] = {280, 360};       // Left / Right column width
   Prompt prompt;
   // Last find / replace text, kept when another prompt displaces a search
   // so F3 / Replace All keep working.
@@ -438,8 +452,6 @@ struct App {
   bool help_needs_layout = true;
   bool help_loaded = false;
   bool outline_mode = false;
-  bool outline_docked = true;
-  int outline_dock_w = 280;
   std::vector<xanatoo::OutlineEntry> outline;
   int outline_sel = 0;
   bool backlinks_mode = false;
@@ -777,12 +789,21 @@ std::tuple<int, int, int, int> soft_client_rect(App& app,
                                                 const FloatWindow& sw);
 void snap_soft_geom(App& app, int& x, int& y, int w, int h);
 std::tuple<int, int, int> soft_client_bounds(App& app);
-SoftDock compute_dock_zone(App& app, int mx, int my);
-std::tuple<int, int, int, int> dock_rect(App& app, SoftDock d);
-void apply_soft_dock(App& app, FloatWindow& sw, SoftDock d);
-void restore_soft_float(App& app, FloatWindow& sw, int mx, int my);
-void maximize_soft(App& app, FloatWindow& sw);
-void clamp_all_floating(App& app);
+// Docking: one placement model for every FloatWindow role.
+// Drop target for a title dragged to (mx, my); None = keep floating.
+Dock compute_dock_zone(App& app, int mx, int my);
+// Area a Dock covers (column for Left / Right, client area for Max).
+std::tuple<int, int, int, int> dock_rect(App& app, Dock d);
+// Width taken from the panes by visible windows docked on `side`; 0 = none.
+int dock_column_w(App& app, Dock side);
+// Dock `w` at `d`; for a column, `my` picks its slot among the others.
+void dock_window(App& app, FloatWindow& w, Dock d, int my);
+// Back to free placement at the remembered geometry.
+void undock_window(App& app, FloatWindow& w);
+// Max ↔ previous placement (title double-click).
+void toggle_maximize(App& app, FloatWindow& w);
+// Derive docked / maximized geometry, keep floating windows on screen.
+void place_windows(App& app);
 xanatoo::Document& soft_doc(App& app, FloatWindow& sw);
 const std::string& soft_path(App& app, const FloatWindow& sw);
 std::string soft_title(App& app, const FloatWindow& sw);
@@ -790,7 +811,8 @@ void layout_soft(App& app, FloatWindow& sw);
 void raise_soft(App& app, size_t i);
 
 // ---- floating windows (app_windows.cpp) ----
-// z-order, back→front: outline, backlinks, help, document windows.
+// z-order, back→front: docked columns, floating (outline, backlinks, help,
+// document windows), maximized.
 std::vector<FloatWindow*> float_stack(App& app);
 FloatWindow* float_at(App& app, int x, int y);  // topmost window under (x,y)
 std::tuple<int, int, int, int> float_client_rect(App& app,

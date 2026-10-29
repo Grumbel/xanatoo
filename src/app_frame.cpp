@@ -37,17 +37,18 @@ void apply_window_size(App& app, int nw, int nh) {
   app.win_w = nw;
   app.win_h = nh;
   app.needs_layout = true;
-  // Keep tiled/maximized soft windows filling the new client area.
-  for (auto& sw : app.soft_wins) {
-    if (sw.dock != SoftDock::None || sw.maximized)
-      apply_soft_dock(app, sw, sw.maximized ? SoftDock::Max : sw.dock);
-  }
+  place_windows(app);
 }
 
 void sync_window_size(App& app) {
   int nw = 0, nh = 0;
   SDL_GetWindowSize(app.window, &nw, &nh);
   apply_window_size(app, nw, nh);
+  // A docked window opened, closed or moved: the pane area changed.
+  const Pane& last = app.split ? app.panes[1] : app.panes[0];
+  if (app.panes[0].x != dock_column_w(app, Dock::Left) ||
+      last.x + last.w != app.win_w - dock_column_w(app, Dock::Right))
+    app.needs_layout = true;
 }
 
 void relayout_if_needed(App& app) {
@@ -2455,15 +2456,9 @@ void draw_split_chrome(App& app) {
 
 void draw_outline_panel(App& app) {
   if (app.outline_mode) {
-    if (app.outline_docked) {
-      app.ol.x = 0;
-      app.ol.y = static_cast<int>(app.ui_top);
-      app.ol.w = std::max(160, std::min(app.outline_dock_w, app.win_w / 2));
-      app.ol.h = app.win_h - status_bar_h - app.ol.y;
-      app.outline_dock_w = app.ol.w;
-    } else {
-      if (app.ol.w < 200) app.ol.w = 200;
-      if (app.ol.h < 140) app.ol.h = 140;
+    if (app.ol.dock == Dock::None) {
+      app.ol.w = std::max(app.ol.w, 200);
+      app.ol.h = std::max(app.ol.h, 140);
     }
     const float step = outline_row_step(app);
     auto [cx, cy, cw, ch] = outline_client_rect(app);
@@ -2490,7 +2485,7 @@ void draw_outline_panel(App& app) {
     const SDL_Rect fb = outline_focus_rect(app, outer);
     // Title tab + selection are lit only while the outline has the keyboard.
     const bool keys = panel_has_keys(app, KeyFocus::Outline);
-    draw_floating_frame(app, outer, ol_title, keys, !app.outline_docked,
+    draw_floating_frame(app, outer, ol_title, keys, app.ol.dock == Dock::None,
                         outer.x + outer.w - float_close_w - fb.x);
     // Focus toggle (section isolation): latched push button left of close.
     {
@@ -2580,8 +2575,10 @@ void draw_outline_panel(App& app) {
 
 void draw_backlinks_panel(App& app) {
   if (app.backlinks_mode) {
-    if (app.bl.w < 200) app.bl.w = 200;
-    if (app.bl.h < 120) app.bl.h = 120;
+    if (app.bl.dock == Dock::None) {
+      app.bl.w = std::max(app.bl.w, 200);
+      app.bl.h = std::max(app.bl.h, 120);
+    }
     const float step = backlinks_row_step(app);
     const int title_h = help_title_h;
     const int pad = 8;
@@ -2596,7 +2593,8 @@ void draw_backlinks_panel(App& app) {
                         app.backlinks_label.empty()
                             ? "Backlinks (no label under caret)"
                             : ("Backlinks → #" + app.backlinks_label),
-                        panel_has_keys(app, KeyFocus::Backlinks));
+                        panel_has_keys(app, KeyFocus::Backlinks),
+                        app.bl.dock == Dock::None);
     SDL_Rect clip{cx, cy, cw, ch};
     SDL_RenderSetClipRect(app.sdl, &clip);
     xanatoo::Font& font = app.ui_font;
@@ -2644,8 +2642,10 @@ void draw_backlinks_panel(App& app) {
 void draw_help_window(App& app) {
   if (app.help_mode) {
     ensure_help_doc(app);
-    if (app.help.w < 280) app.help.w = 280;
-    if (app.help.h < 200) app.help.h = 200;
+    if (app.help.dock == Dock::None) {
+      app.help.w = std::max(app.help.w, 280);
+      app.help.h = std::max(app.help.h, 200);
+    }
     if (app.help_needs_layout) layout_help(app);
 
     // Clamp scroll
@@ -2658,7 +2658,7 @@ void draw_help_window(App& app) {
 
     draw_floating_frame(
         app, SDL_Rect{app.help.x, app.help.y, app.help.w, app.help.h},
-        "Help — xanatoo", true);
+        "Help — xanatoo", true, app.help.dock == Dock::None);
 
     auto [cx, cy, cw, ch] = help_client_rect(app);
     SDL_Rect clip{cx, cy, cw, ch};
@@ -2680,7 +2680,7 @@ void draw_help_window(App& app) {
 }
 
 void draw_dock_preview(App& app) {
-  if (app.dock_preview != SoftDock::None) {
+  if (app.dock_preview != Dock::None) {
     auto [dx, dy, dw, dh] = dock_rect(app, app.dock_preview);
     if (dw > 0 && dh > 0) {
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
@@ -2692,22 +2692,16 @@ void draw_dock_preview(App& app) {
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
       const char* label = "";
       switch (app.dock_preview) {
-        case SoftDock::Left:
-          label = "Tile left";
+        case Dock::Left:
+          label = "Dock left";
           break;
-        case SoftDock::Right:
-          label = "Tile right";
+        case Dock::Right:
+          label = "Dock right";
           break;
-        case SoftDock::Top:
-          label = "Tile top";
-          break;
-        case SoftDock::Bottom:
-          label = "Tile bottom";
-          break;
-        case SoftDock::Max:
+        case Dock::Max:
           label = "Maximize";
           break;
-        default:
+        case Dock::None:
           break;
       }
       if (label[0]) {

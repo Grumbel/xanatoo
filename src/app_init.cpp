@@ -41,8 +41,15 @@ bool app_init(App& app) {
     w->w = static_cast<int>(std::lround(w->w * app.ui_scale));
     w->h = static_cast<int>(std::lround(w->h * app.ui_scale));
   }
-  app.outline_dock_w =
-      static_cast<int>(std::lround(app.outline_dock_w * app.ui_scale));
+  for (int& w : app.dock_w)
+    w = static_cast<int>(std::lround(w * app.ui_scale));
+  for (FloatWindow* w : {&app.help, &app.bl, &app.ol}) {
+    w->restore_x = w->x;
+    w->restore_y = w->y;
+    w->restore_w = w->w;
+    w->restore_h = w->h;
+  }
+  app.ol.dock = Dock::Left;  // outline starts as a side column
   // Preferred paths are optional — FontConfig resolves a full family set.
   auto existing_font = [](std::string path) {
     if (!path.empty() && !fs::exists(path)) {
