@@ -36,18 +36,15 @@ Next bundle number: **263** (this delivery is **262**)
   launcher keeps config / state / data / cache apart under `conf/`.
 - Deliberate deviations (README "Packaging standard"): Android
   `versionCode` stays `self.lastModified` (VER-7); man page section 1.
-- Open: thumtoo's `docs/bench/baselines/**` and `tools/__pycache__/**`
-  lack REUSE info upstream (overridden in our `REUSE.toml`; fix in
-  thumtoo, drop the override); `nix flake check` builds the Android APK
+- Open: `nix flake check` builds the Android APK
   and R36S cross packages — heavy for GitHub runners (disk / time), may
   need a split CI job; the R36S build now passes again (it had broken:
   no SQLite in the sysroot, thumtoo needs libvips, code is C++20 but the
   build forced C++17): eoan SQLite debs + `libs/libsqlite3.so.0` in the
   port, `XANATOO_THUMTOO=OFF`, `-DCMAKE_CXX_STANDARD=20` against
-  libstdc++ 9 (language features only, see gamepkgstd `R36S.md`); starts
-  under qemu-aarch64 with the eoan libs, not yet run on the device. The
-  Android paths (JNI `getCacheDir`, assets in
-  `<internal>/assets`) are only compile-tested.
+  libstdc++ 9 (language features only, see gamepkgstd `R36S.md`); works
+  on the device, as does Android with the new paths; both may want UI
+  polish for small screens.
 
 ## Status (2026-10-29) — about: page
 

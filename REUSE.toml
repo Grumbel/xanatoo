@@ -42,14 +42,3 @@ SPDX-License-Identifier = "MIT OR Unlicense"
 path = "external/README.md"
 SPDX-FileCopyrightText = "2026 Ingo Ruhnke <grumbel@gmail.com>"
 SPDX-License-Identifier = "GPL-3.0-or-later"
-
-# thumtoo files its own REUSE.toml does not annotate yet (fix upstream in
-# thumtoo, then drop this).
-[[annotations]]
-path = [
-  "external/thumtoo/docs/bench/baselines/**",
-  "external/thumtoo/tools/__pycache__/**",
-]
-precedence = "override"
-SPDX-FileCopyrightText = "2026 Ingo Ruhnke <grumbel@gmail.com>"
-SPDX-License-Identifier = "GPL-3.0-or-later"
