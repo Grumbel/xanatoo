@@ -8,6 +8,20 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-29) — browse-mode chrome, content only
+
+- Browse mode hides the edit toolbar row, the Format / Insert menus and
+  the editing entries of the context menu; Find, Split, Outline and View
+  tools (now also holding line spacing / text width / style sheet) sit on
+  the browse row, so it stays one row no wider than before.
+- Content only (`App::chrome_hidden`, `UiCommand::ToggleChrome`, F11,
+  gamepad X — which used to toggle the outline): no menu bar, toolbars,
+  tabs; the status line (`status_bar_h` 0) returns while a prompt or
+  notice is up. Right-click menu / View menu leave it.
+- Open: touch-only Android has no F11 / X — needs a gesture (e.g. tap on
+  the top edge) to bring the chrome back; maybe remember the switch in
+  view.conf.
+
 ## Status (2026-10-29) — versioning (gamepkgstd VERSIONING.md)
 
 - `VERSION` (`0.1.0-dev`) is the only place the version is written

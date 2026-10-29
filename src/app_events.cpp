@@ -1118,12 +1118,8 @@ static void on_controllerbuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
       break;
     }
     case SDL_CONTROLLER_BUTTON_X:
-      app.outline_mode = !app.outline_mode;
-      if (app.outline_mode) {
-        app.key_focus = KeyFocus::Outline;
-        refresh_outline(app);
-        app.outline_sel = 0;
-      }
+      // Content only (the outline is in the toolbar / View menu).
+      toggle_chrome(app);
       break;
     case SDL_CONTROLLER_BUTTON_Y:
       // Forward in history when possible; else structure overlay.
@@ -1632,7 +1628,8 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
                     k == SDLK_w))));
     if (!prompt_key) return;
   } else if (imgui_keys && ev.key.keysym.sym != SDLK_ESCAPE &&
-             ev.key.keysym.sym != SDLK_F1 && ev.key.keysym.sym != SDLK_F2) {
+             ev.key.keysym.sym != SDLK_F1 && ev.key.keysym.sym != SDLK_F2 &&
+             ev.key.keysym.sym != SDLK_F11) {
     return;
   }
 
@@ -1645,7 +1642,8 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   if (browsing(app) && !status_prompt) {
     const SDL_Keycode k = ev.key.keysym.sym;
     const bool browse_ok =
-        k == SDLK_ESCAPE || k == SDLK_F1 || k == SDLK_F2 || k == SDLK_LEFT ||
+        k == SDLK_ESCAPE || k == SDLK_F1 || k == SDLK_F2 || k == SDLK_F11 ||
+        k == SDLK_LEFT ||
         k == SDLK_RIGHT || k == SDLK_UP || k == SDLK_DOWN || k == SDLK_PAGEUP ||
         k == SDLK_PAGEDOWN || k == SDLK_HOME || k == SDLK_END ||
         k == SDLK_TAB || k == SDLK_RETURN || k == SDLK_KP_ENTER ||
@@ -1777,6 +1775,10 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         ensure_help_doc(app);
         app.help_needs_layout = true;
       }
+      break;
+
+    case SDLK_F11:
+      toggle_chrome(app);
       break;
 
     case SDLK_F2:

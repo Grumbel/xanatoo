@@ -46,7 +46,8 @@ constexpr int soft_dock_zone = 36;
 // App::panes slots: two centre views (split), the rest for document windows.
 constexpr int kCentreViews = 2;
 constexpr int kMaxViews = 16;
-inline int status_bar_h = 28;
+inline int status_bar_h = 28;       // 0 while content only hides it
+inline int status_bar_full_h = 28;  // scaled height when shown
 constexpr int kMaxNavHistory = 100;
 inline int help_title_h = 28;
 inline int float_close_w = 28;  // close box hit zone at the title's right
@@ -573,6 +574,9 @@ struct App {
   std::vector<xanatoo::DiffWordMark> diff_words[2];
   bool structure_mode = false;
   bool browse_mode = false;
+  // Content only (F11, gamepad X): no menu bar, toolbars, tab strip; the
+  // status line only while a prompt or notice needs it.
+  bool chrome_hidden = false;
   bool virtual_keyboard = false;
   SDL_GameController* gamepad = nullptr;
   bool stick_cursor_on = false;
@@ -813,6 +817,8 @@ void minibuf_commit_path_hist(App& app);
 void minibuf_commit_url_hist(App& app);
 void minibuf_sync_out(App& app);
 void flash_status(App& app, const std::string& msg);
+// Content only on / off (app_chrome.cpp).
+void toggle_chrome(App& app);
 
 // ---- pointer ----
 void open_first_gamepad(App& app);

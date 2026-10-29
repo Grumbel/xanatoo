@@ -32,12 +32,19 @@ void set_chrome_scale(float scale) {
   kSbW = px(14);
   kSbArrow = px(14);
   kSbLayoutGutter = kSbW + px(4);
-  status_bar_h = px(28);
+  status_bar_full_h = status_bar_h = px(28);
   help_title_h = px(28);
   float_close_w = px(28);
   kUiFontPx = px(14);
   help_pad = px(12);
   help_edge = px(6);
+}
+
+void toggle_chrome(App& app) {
+  app.chrome_hidden = !app.chrome_hidden;
+  flash_status(app, app.chrome_hidden
+                        ? "Content only — F11 / gamepad X shows the menus"
+                        : "Menus and toolbars shown");
 }
 
 void fill_doc_paper(App& app, const SDL_Rect& rect) {
@@ -417,8 +424,9 @@ StatusLine compute_status(App& app) {
 void draw_status_bar(App& app) {
   namespace th = xanatoo::theme;
   const th::Palette& p = th::palette();
-  const StatusLine st = compute_status(app);
   const int bar_h = status_bar_h;
+  if (bar_h <= 0) return;  // content only
+  const StatusLine st = compute_status(app);
   const SDL_Rect bar{0, app.win_h - bar_h - static_cast<int>(app.ui_bottom),
                      app.win_w, bar_h};
   th::fill(app.sdl, bar, p.face);

@@ -100,6 +100,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   for (const auto& e : app.styles) ui_state.styles.emplace_back(e.name, e.title);
   ui_state.style = app.style.name;
   ui_state.browse = browsing(app);
+  ui_state.chrome_hidden = app.chrome_hidden;
   ui_state.virtual_keyboard = app.virtual_keyboard;
   ui_state.help = app.help_mode;
   ui_state.selection = !focused_pane(app).sel.empty();
@@ -312,7 +313,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::SitemapPrev || c == C::SitemapNext ||
         c == C::OpenTranscludeOther ||
         c == C::ToggleDiff || c == C::ToggleStructure || c == C::ToggleBrowse ||
-        c == C::ToggleNative || c == C::CollectionView ||
+        c == C::ToggleChrome || c == C::ToggleNative || c == C::CollectionView ||
         c == C::ToggleHelp || c == C::ToggleVirtualKeyboard ||
         c == C::OpenFormatDoc || c == C::OpenSemanticDoc ||
         c == C::OpenInWindow || c == C::OpenExample || c == C::LoadDiffDemo ||
@@ -1126,6 +1127,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         flash_status(app, "Edit mode");
       }
       break;
+    case C::ToggleChrome:
+      toggle_chrome(app);
+      break;
     case C::ToggleHelp:
       app.help_mode = !app.help_mode;
       if (app.help_mode) {
@@ -1359,6 +1363,11 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
 }
 
 void run_chrome(App& app) {
+  // Content only keeps the status line while a prompt or notice needs it.
+  status_bar_h = app.chrome_hidden && app.prompt.kind == PromptKind::None &&
+                         SDL_GetTicks() >= app.status_notice_until
+                     ? 0
+                     : status_bar_full_h;
   xanatoo::UiState ui_state;
   build_ui_state(app, ui_state);
   auto ui_frame = app.ui.begin_frame(ui_state);

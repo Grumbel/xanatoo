@@ -115,6 +115,7 @@ enum class UiCommand {
   ToggleDiff,
   ToggleStructure,
   ToggleBrowse,  // read-only navigation mode
+  ToggleChrome,  // content only: hide menu bar, toolbars, tabs, status line
   ToggleNative,  // web page ↔ its native xanatoo form (wikipedia:, hn:, …)
   CollectionView,  // arg: layout / size / sort / "view" for the collection
   ToggleHelp,
@@ -179,6 +180,7 @@ struct UiState {
   std::vector<std::pair<std::string, std::string>> styles;
   std::string style;
   bool browse = false;  // read-only navigation
+  bool chrome_hidden = false;  // content only: no menu bar / toolbars / tabs
   bool virtual_keyboard = false;
   // Gamepad right-stick software pointer (extra; real mouse stays separate)
   bool stick_cursor = false;
@@ -285,6 +287,7 @@ private:
   bool tool_button(const char* id, const char* icon_name, const char* tip,
                    UiCommand c, UiCommand& out, bool enabled = true);
   bool tool_menu_begin(const char* id, const char* icon_name, const char* tip);
+  void toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd);
   void tool_menu_end();
 
   bool ready_ = false;

@@ -128,13 +128,22 @@ See **Examples → Article / section / header**.
 
 **F2** toggles **Browse mode** (read-only). Typing, edits, paste, and
 structure changes are blocked (menus/toolbar included); the status bar turns
-green. Use this for reading and navigating.
+green. Use this for reading and navigating. The edit toolbar, the Format /
+Insert menus and the editing entries of the context menu are hidden; Find,
+Split pane, Heading outline and View tools (line spacing, text width, style
+sheet) move into the browse toolbar.
+
+**F11** (gamepad **X**) toggles **Content only**: menu bar, toolbars, tabs
+and the status line disappear and only the page is left. Prompts (Ctrl+F,
+Ctrl+L) and notices still bring up the status line; right-click → **Show
+Menus and Toolbars** also leaves it.
 
 ### Keyboard (browse)
 - Arrows / Page / Home / End — move and scroll
 - **Space** or **Enter** — expand/collapse stretch or follow link under caret
 - **Ctrl+[** / **Ctrl+]** — collapse / expand all stretches
 - **F2** — return to edit mode
+- **F11** — content only (hide menus, toolbars, tabs, status line)
 
 ### Gamepad
 | Control | Action |
@@ -142,7 +151,7 @@ green. Use this for reading and navigating.
 | D-pad | Move by line; Left/Right toggles stretch under caret |
 | **A** | Activate (stretch or link) |
 | **B** | Collapse stretch (or collapse all) |
-| **X** | Toggle outline |
+| **X** | Content only (hide menus and toolbars) |
 | **Y** | Toggle structure highlight |
 | **LB / RB** | Previous / next header |
 | **LT / RT** | Page up / page down |
@@ -158,8 +167,8 @@ green. Use this for reading and navigating.
   tab's trail along); the History panel lists every page of the session
 - **Alt+Up** (read-only pages) — Up one level: parent directory, URL path, subreddit
 - **Alt+Home** — Home page (`welcome.md`; toolbar house button)
-- **Browse toolbar** — Back, Forward, Up, Home, Reload, Native view (web page ↔ `wikipedia:` / `hn:` / `reddit:` / `lemmy:` form; pressed while native), location field, Bookmark, History, Browse mode
-- **Edit toolbar** — file, clipboard, bold/italic/link; menus for more format, structure, lists, insert; Find, Split pane and Heading outline toggles, and view tools
+- **Browse toolbar** — Back, Forward, Up, Home, Reload, Native view (web page ↔ `wikipedia:` / `hn:` / `reddit:` / `lemmy:` form; pressed while native), location field, Bookmark, display menus, History, Browse mode; in browse mode Find, Split pane, Heading outline and View tools instead of the display menus
+- **Edit toolbar** (not in browse mode) — file, clipboard, bold/italic/link; menus for more format, structure, lists, insert; Find, Split pane and Heading outline toggles, and view tools
 - **Services menu** — front pages of the built-in clients: Wikipedia, Hacker News, Reddit, Lemmy, Nostr, Gemini, Standard Ebooks, books and feeds
 - **Ctrl+Shift+H** / **View → History** — session history panel (click to open)
 - **Ctrl+Shift+B** — Bookmark or un-bookmark the current page
@@ -192,6 +201,6 @@ TODO keywords use `Header.src`; `:CUSTOM_ID:` becomes the stable label.
 - `--ui-scale N` or `XANATOO_UI_SCALE` — enlarge ImGui chrome (auto 1.35 when width ≤720)
 - **Right stick** software cursor · **A** click · **B** right-click
 - **LB+A** activate under caret · **LB+B** collapse stretch
-- **D-pad** move · **Left stick** scroll · **Back** history/browse · **Y** forward · **Start** help
+- **D-pad** move · **Left stick** scroll · **Back** history/browse · **Y** forward · **X** content only · **Start** help
 
 - **F3** — toggle on-screen virtual keyboard
