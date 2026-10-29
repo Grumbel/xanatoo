@@ -98,6 +98,14 @@ Rules: no behaviour on data types; new modal state goes in `App` (group
 related fields into small records like `FloatPanel` / `Hover`); menus,
 toolbar and shortcuts should route through `execute_command`.
 
+## Versioning
+
+- gamepkgstd `VERSIONING.md` (`~/projects/gamepkgstd`): the top-level
+  `VERSION` file is the only place the version is written; on master it
+  always ends in `-dev`. Nix builds report `<VERSION>.<revCount>+g<rev>`
+  through `-DPROJECT_VERSION_FULL` → `XANATOO_VERSION` (`--version`,
+  `about:`, Android `versionName`). Never hard-code a version elsewhere.
+
 ## Tech stack (current)
 
 - C++20

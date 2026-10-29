@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
-project(xanatoo VERSION 0.1.0 LANGUAGES CXX)
+# Version (gamepkgstd VER-1, VER-6): VERSION is the only place it is
+# written; Nix passes the full dev string (0.1.0-dev.<revCount>+g<rev>).
+if(NOT DEFINED PROJECT_VERSION_FULL)
+  file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" PROJECT_VERSION_FULL LIMIT_COUNT 1)
+endif()
+# project() only accepts numeric versions
+string(REGEX MATCH "^[0-9]+(\\.[0-9]+)*" _version_numeric "${PROJECT_VERSION_FULL}")
+project(xanatoo VERSION ${_version_numeric} LANGUAGES CXX)
 
 if(NOT DEFINED CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 20)
@@ -143,7 +150,7 @@ else()
 endif()
 endif()
 target_compile_definitions(xanatoo PRIVATE
-  "XANATOO_VERSION=\"${PROJECT_VERSION}\""
+  "XANATOO_VERSION=\"${PROJECT_VERSION_FULL}\""
   XANATOO_SQLITE=$<BOOL:${XANATOO_SQLITE}>
   XANATOO_FONTCONFIG=$<BOOL:${XANATOO_FONTCONFIG}>)
 

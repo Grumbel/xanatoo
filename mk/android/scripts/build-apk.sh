@@ -108,6 +108,7 @@ echo "==> $(printf '%s\n' "$files" | wc -l) data files in assets/xanatoo"
   NDK_PROJECT_PATH="$PWD/src" \
   APP_BUILD_SCRIPT="$PWD/src/jni/Android.mk" \
   NDK_APPLICATION_MK="$PWD/src/jni/Application.mk" \
+  XANATOO_VERSION="$APP_VERSION" \
   -j"${NIX_BUILD_CORES:-$(nproc)}"
 
 mkdir -p out

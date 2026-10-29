@@ -16,6 +16,14 @@
       systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
 
+      # gamepkgstd VER-5: VERSION is the only place the version is written.
+      versionBase = nixpkgs.lib.fileContents ./VERSION;
+      gitRev = self.shortRev or self.dirtyShortRev or "dirty";
+      version =
+        if nixpkgs.lib.hasInfix "-dev" versionBase
+        then "${versionBase}.${toString (self.revCount or 0)}+g${gitRev}"
+        else versionBase;
+
       # thumtoo's dependency list (libvips, libarchive, MuPDF pin, …) from the
       # vendored flake.nix: external/ is no flake input, so its outputs
       # function is evaluated directly (lib uses only nixpkgs), as galapix does.
@@ -53,7 +61,7 @@
             includeEmulator = false;
             includeSources = false;
           }).androidsdk;
-          version = "0.1.0";
+          inherit version;
           # Last commit time: also set for dirty trees (revCount is not), so
           # local test builds install over committed ones; < 2^31 until 2036.
           versionCode = self.lastModified or 1;
@@ -65,7 +73,7 @@
           pkgs = import nixpkgs { inherit system; };
           xanatoo = pkgs.stdenv.mkDerivation {
             pname = "xanatoo";
-            version = "0.1.0";
+            inherit version;
             src = ./.;
 
             nativeBuildInputs = with pkgs; [
@@ -93,6 +101,7 @@
 
             cmakeFlags = [
               "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+              "-DPROJECT_VERSION_FULL=${version}"
             ];
 
             meta = with pkgs.lib; {
@@ -106,7 +115,7 @@
         {
           # Default package wraps the binary with font + installed icon path.
           default = pkgs.symlinkJoin {
-            name = "xanatoo";
+            name = "xanatoo-${version}";
             paths = [ xanatoo ];
             nativeBuildInputs = [ pkgs.makeWrapper ];
             postBuild = ''
@@ -126,7 +135,6 @@
           # R36S / ArkOS PortMaster packages (Linux hosts only: cross to aarch64).
           if pkgs.stdenv.hostPlatform.isLinux then
             let
-              version = "0.1.0";
               date = "1970-01-01";
               r36s = import ./nix/r36s.nix { inherit pkgs version date; };
               android = androidFor system;
@@ -142,13 +150,26 @@
           else { }
         ));
 
-      # Desktop integration (gamepkgstd FLAKE-11 / INT-6..8): every launcher
-      # file is installed, and the .desktop / metainfo files validate.
+      # gamepkgstd FLAKE-11: --version / --help (OPT-2, VER-3), and desktop
+      # integration (INT-6..8): every launcher file is installed, and the
+      # .desktop / metainfo files validate.
       checks = forAllSystems (system:
         let
           pkgs = import nixpkgs { inherit system; };
           pkg = self.packages.${system}.xanatoo-unwrapped;
         in {
+          version = pkgs.runCommand "xanatoo-check-version" { } ''
+            out_v=$(${pkg}/bin/xanatoo --version)
+            if [ "$out_v" != "xanatoo ${version}" ]; then
+              echo "--version printed '$out_v', expected 'xanatoo ${version}'" >&2
+              exit 1
+            fi
+            touch $out
+          '';
+          help = pkgs.runCommand "xanatoo-check-help" { } ''
+            ${pkg}/bin/xanatoo --help > /dev/null
+            touch $out
+          '';
           layout = pkgs.runCommand "xanatoo-check-layout" { } ''
             for f in \
               bin/xanatoo \

@@ -159,6 +159,7 @@ let
       "-DCMAKE_RANLIB=${binutils}/bin/${tp}-ranlib"
       "-DCMAKE_STRIP=${binutils}/bin/${tp}-strip"
       "-DCMAKE_BUILD_TYPE=Release"
+      "-DPROJECT_VERSION_FULL=${version}"
       "-DCMAKE_SKIP_RPATH=ON"
       "-DCMAKE_CXX_STANDARD=17"
       "-DXANATOO_GEMINI=ON"
