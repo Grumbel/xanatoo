@@ -15,8 +15,8 @@
 //   cache      thumbnails, imports, downloads    $XDG_CACHE_HOME/xanatoo
 //
 // Installed data (examples, help, style sheets, icons, fonts) is separate:
-// --data-dir, else <exe>/../share/xanatoo, else the compiled-in install
-// path. Never the current working directory (DIR-3).
+// --data-dir, else <exe>/../share/xanatoo (or <exe>/share/xanatoo in the
+// build tree), else the compiled-in install path. Never the current working directory (DIR-3).
 
 #include <iosfwd>
 #include <string>
@@ -58,7 +58,8 @@ std::string cache_dir();
 bool ensure_dir(const std::string& dir);
 
 // Installed data: --data-dir (or the platform layer), then
-// <exe>/../share/xanatoo, then the compiled-in install path.
+// <exe>/../share/xanatoo (build tree: <exe>/share/xanatoo), then the
+// compiled-in install path.
 void set_data_dir(std::string path, std::string source);
 DirInfo data_dir_info();
 std::string data_dir();

@@ -128,9 +128,12 @@ DirInfo data_dir_info() {
   if (!g_data_dir.empty()) return {g_data_dir, g_data_source};
   std::error_code ec;
   if (const std::string exe = executable_dir(); !exe.empty()) {
-    const fs::path p =
-        fs::weakly_canonical(fs::path(exe) / ".." / "share" / "xanatoo", ec);
-    if (!ec && fs::is_directory(p, ec)) return {p.string(), "executable"};
+    // Installed (<prefix>/bin/xanatoo) or the build tree, which keeps the
+    // binary at its root next to share/xanatoo.
+    for (const char* rel : {"../share/xanatoo", "share/xanatoo"}) {
+      const fs::path p = fs::weakly_canonical(fs::path(exe) / rel, ec);
+      if (!ec && fs::is_directory(p, ec)) return {p.string(), "executable"};
+    }
   }
 #ifdef XANATOO_DATA_INSTALL_DIR
   if (fs::is_directory(XANATOO_DATA_INSTALL_DIR, ec))
