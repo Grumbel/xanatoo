@@ -54,6 +54,9 @@ let
     { file = "pool/main/u/util-linux/uuid-dev_2.34-0.1ubuntu2_arm64.deb"; sha256 = "d30984212486096a8f499354dfeae0a45d7754ccee6c4e1183de1997fc44bcd8"; }
     { file = "pool/main/b/brotli/libbrotli1_1.0.7-2_arm64.deb"; sha256 = "f180a18ae74016c5db89a1ed438e2fa45cd7d64c2abcec6a32e4316724b1b85a"; }
     { file = "pool/main/b/brotli/libbrotli-dev_1.0.7-2_arm64.deb"; sha256 = "861312067f81e664925243294070dcb31e4478c21f9a237a95d9cec7ebde7155"; }
+    # SQLite for the revision store (drafts) and the side store.
+    { file = "pool/main/s/sqlite3/libsqlite3-0_3.29.0-2_arm64.deb"; sha256 = "af04f3eb2390c433206b3a7d07b124fae097df302fcca9a47d76f76f806ee32c"; }
+    { file = "pool/main/s/sqlite3/libsqlite3-dev_3.29.0-2_arm64.deb"; sha256 = "6f2fe12282ad58b54b5033cb3190ba1ee8846344ef51f243da25c0eaf78748ab"; }
     # OpenSSL 1.1 for gemini:// (ArkOS/device typically already has libssl1.1).
     { file = "pool/main/o/openssl/libssl1.1_1.1.1c-1ubuntu4_arm64.deb"; sha256 = "ec2aca230fa845c96c90afc5a4bb9b41ea10e0135a70eb5898d3d2597a3d0c3d"; }
     { file = "pool/main/o/openssl/libssl-dev_1.1.1c-1ubuntu4_arm64.deb"; sha256 = "275f730b1867066b841f3d66289bfd87d10d98c1358d611d687b1311c974fbab"; }
@@ -161,8 +164,10 @@ let
       "-DCMAKE_BUILD_TYPE=Release"
       "-DPROJECT_VERSION_FULL=${version}"
       "-DCMAKE_SKIP_RPATH=ON"
-      "-DCMAKE_CXX_STANDARD=17"
+      "-DCMAKE_CXX_STANDARD=20"
       "-DXANATOO_GEMINI=ON"
+      # No libvips in the ArkOS sysroot: stb_image decodes, BMP thumbnails.
+      "-DXANATOO_THUMTOO=OFF"
       "-DSDL2_INCLUDE_DIRS=${sysroot}/usr/include/SDL2"
       "-DSDL2_LIBRARIES=${sdlStub}/lib/libSDL2.so"
       "-DFREETYPE_INCLUDE_DIRS=${sysroot}/usr/include/freetype2"
@@ -175,6 +180,8 @@ let
       "-DOPENSSL_INCLUDE_DIR=${sysroot}/usr/include"
       "-DOPENSSL_SSL_LIBRARY=${sysroot}/usr/lib/${multiarch}/libssl.so"
       "-DOPENSSL_CRYPTO_LIBRARY=${sysroot}/usr/lib/${multiarch}/libcrypto.so"
+      "-DSQLite3_INCLUDE_DIR=${sysroot}/usr/include"
+      "-DSQLite3_LIBRARY=${sysroot}/usr/lib/${multiarch}/libsqlite3.so"
     ];
     dontPatchELF = true;
     dontPatchShebangs = true;
@@ -199,6 +206,9 @@ let
       if [ -d ${r36s}/share/xanatoo/icons ]; then
         cp -r ${r36s}/share/xanatoo/icons/. $out/xanatoo/icons/
       fi
+      # Not every ArkOS image has SQLite; ship the sysroot's (eoan 3.29).
+      mkdir -p $out/xanatoo/libs
+      cp -L ${sysroot}/usr/lib/${multiarch}/libsqlite3.so.0 $out/xanatoo/libs/
       cp ${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSans.ttf \
          $out/xanatoo/fonts/DejaVuSans.ttf
       cp ${../LICENSE} $out/xanatoo/LICENSE.txt

@@ -3,7 +3,12 @@
 
 # xanatoo for the R36S (ArkOS) and other PortMaster handhelds
 
-Native aarch64 build linked against an ArkOS-era (Ubuntu 19.10) userland.
+Native aarch64 build linked against an ArkOS-era (Ubuntu 19.10) userland:
+GCC 16 compiling C++20 against GCC 9's libstdc++ headers and library, so
+the binary needs nothing newer than the device's glibc 2.30 / libstdc++.
+Image decoding uses stb_image (PNG / JPEG / GIF / BMP): there is no libvips
+in that sysroot, so no thumtoo.
+
 Uses the device's SDL2 (KMS/DRM). Example documents, toolbar icons, and a
 UI/body font ship inside the port folder. The gamepad pointer is a drawn
 sprite (not the system cursor — KMS/DRM has none).
@@ -22,6 +27,7 @@ zip into `ports/PortMaster/autoinstall/` and start PortMaster once.
 /roms/ports/xanatoo/styles/          # style sheets
 /roms/ports/xanatoo/icons/           # toolbar PNGs
 /roms/ports/xanatoo/fonts/           # DejaVuSans.ttf
+/roms/ports/xanatoo/libs/            # libsqlite3.so.0 (drafts, folds)
 /roms/ports/xanatoo/conf/            # created at runtime: config/, state/
                                      # (drafts, bookmarks), data/, cache/
 ```
