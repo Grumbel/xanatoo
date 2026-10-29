@@ -252,6 +252,60 @@ void test_nostr_refs() {
   EXPECT(nostr_bech32("npub", "xyz").empty());
 }
 
+void test_nostr_content() {
+  using namespace xanatoo;
+  const std::string pk =
+      "7e7e9c42a91bfef19fa929e5fda1b72e0ebc1a4c1141673e2794234d86addf4e";
+  const std::string npub = nostr_bech32("npub", pk);
+  const std::string json =
+      "{\"id\":\"x\",\"content\":\"say \\\"tags\\\" [x]\",\"tags\":[[\"p\",\"" +
+      pk + "\"],[\"imeta\",\"url https://cdn.example/a\",\"m image/png\","
+      "\"alt A \\\"cat\\\"\"],[\"t\",\"]\"]],\"kind\":1}";
+  auto tags = nostr_event_tags(json);
+  EXPECT_EQ(tags.size(), size_t(3));
+  if (tags.size() == 3) {
+    EXPECT_EQ(tags[0][1], pk);
+    EXPECT_EQ(tags[1][3], "alt A \"cat\"");
+    EXPECT_EQ(tags[2][1], "]");
+  }
+
+  std::map<std::string, std::string> names{{pk, "Alice"}};
+  Document doc;
+  NodeId root = doc.create(NodeKind::Document);
+  nostr_append_content(
+      doc, root,
+      "Hi nostr:" + npub + " see https://example.com/page). and #[0]\n"
+      "pic https://cdn.example/a\n\nclip https://v.example/x.mp4?t=1",
+      tags, names);
+  const auto& kids = doc.get(root).children;
+  EXPECT_EQ(kids.size(), size_t(3));  // Paragraph, Image, Paragraph
+  if (kids.size() != 3) return;
+  const Node& p1 = doc.get(kids[0]);
+  std::vector<std::string> links;
+  for (const auto& sp : p1.spans)
+    if (sp.kind == InlineKind::Link) links.push_back(sp.text + "|" + sp.href);
+  EXPECT_EQ(links.size(), size_t(4));
+  if (links.size() == 4) {
+    EXPECT_EQ(links[0], "@Alice|nostr:" + npub);
+    EXPECT_EQ(links[1], "example.com/page|https://example.com/page");
+    EXPECT_EQ(links[2], "@Alice|nostr:" + npub);
+    EXPECT_EQ(links[3], "[image]|https://cdn.example/a");
+  }
+  EXPECT_EQ(p1.spans.back().kind, InlineKind::Link);  // trailing "\n" trimmed
+  const Node& img = doc.get(kids[1]);
+  EXPECT(img.kind == NodeKind::Image);
+  EXPECT_EQ(img.src, "https://cdn.example/a");
+  EXPECT_EQ(img.alt, "A \"cat\"");
+  const Node& p2 = doc.get(kids[2]);
+  EXPECT_EQ(p2.spans.size(), size_t(2));
+  if (p2.spans.size() == 2) {
+    EXPECT_EQ(p2.spans[0].text, "clip ");
+    EXPECT_EQ(p2.spans[1].text, "[video]");
+  }
+  auto mentioned = nostr_mentioned_pubkeys("cc nostr:" + npub + ", nostr:bogus");
+  EXPECT_EQ(mentioned.size(), size_t(1));
+}
+
 
 void test_parse_markup() {
   using namespace xanatoo;
@@ -2047,6 +2101,7 @@ int main() {
   test_lemmy_urls();
   test_gemini_urls();
   test_nostr_refs();
+  test_nostr_content();
   test_parse_markup();
   test_parse_unclaimed_block_lines();
   test_parse_gemtext();

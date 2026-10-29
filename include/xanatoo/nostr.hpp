@@ -4,6 +4,7 @@
 
 #include "xanatoo/types.hpp"
 
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -31,6 +32,21 @@ std::optional<std::string> nostr_decode_pubkey(std::string_view ref,
 // Bech32-encode a 64-hex id with the given prefix ("npub", "note");
 // empty if hex is not 64 hex digits.
 std::string nostr_bech32(std::string_view hrp, std::string_view hex);
+
+// The "tags" array of an event's JSON: one string vector per tag.
+std::vector<std::vector<std::string>> nostr_event_tags(std::string_view event_json);
+
+// Note text → blocks under `parent`. Blank lines split paragraphs; http(s)
+// URLs, nostr:npub/nprofile/note/nevent refs and NIP-08 "#[n]" become Link
+// spans (mentions as "@name" from `names`, hex pubkey → display name).
+// Media URLs (NIP-92 imeta "m" type, else file extension) read "[image]" /
+// "[video]" / "[audio]"; images also get an Image node after their paragraph.
+void nostr_append_content(Document& doc, NodeId parent, std::string_view content,
+                          const std::vector<std::vector<std::string>>& tags,
+                          const std::map<std::string, std::string>& names);
+
+// Hex pubkeys of the nostr:npub1… / nostr:nprofile1… mentions in a note.
+std::vector<std::string> nostr_mentioned_pubkeys(std::string_view content);
 
 #if defined(XANATOO_NOSTR) && XANATOO_NOSTR
 // Fetch a root note and kind-1 replies from public relays (blocking, short

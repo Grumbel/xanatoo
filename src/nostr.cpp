@@ -259,6 +259,297 @@ std::string nostr_bech32(std::string_view hrp, std::string_view hex) {
   return bech32_encode(hrp, data5);
 }
 
+
+namespace {
+
+std::string short_npub(const std::string& pubkey_hex) {
+  std::string npub = nostr_bech32("npub", pubkey_hex);
+  if (npub.empty()) return pubkey_hex;
+  if (npub.size() > 16) return npub.substr(0, 12) + "…";
+  return npub;
+}
+
+// Index just past a JSON string starting at s[i] == '"', unescaped into *out.
+size_t read_json_string(std::string_view s, size_t i, std::string* out) {
+  size_t j = i + 1;
+  while (j < s.size() && s[j] != '"') j += (s[j] == '\\') ? 2 : 1;
+  if (out) *out = json_unescape(s.substr(i + 1, std::min(j, s.size()) - i - 1));
+  return j + 1;
+}
+
+enum class MediaKind { None, Image, Video, Audio };
+
+MediaKind media_kind(std::string_view url, std::string_view mime) {
+  if (starts_with(mime, "image/")) return MediaKind::Image;
+  if (starts_with(mime, "video/")) return MediaKind::Video;
+  if (starts_with(mime, "audio/")) return MediaKind::Audio;
+  std::string_view path = url.substr(0, url.find_first_of("?#"));
+  const size_t dot = path.rfind('.');
+  if (dot == std::string_view::npos || path.find('/', dot) != std::string_view::npos)
+    return MediaKind::None;
+  const std::string ext = ascii_lower(path.substr(dot + 1));
+  for (const char* e : {"jpg", "jpeg", "png", "gif", "webp", "avif", "bmp", "svg"})
+    if (ext == e) return MediaKind::Image;
+  for (const char* e : {"mp4", "webm", "mov", "m4v", "ogv", "m3u8"})
+    if (ext == e) return MediaKind::Video;
+  for (const char* e : {"mp3", "ogg", "oga", "m4a", "wav", "flac", "opus"})
+    if (ext == e) return MediaKind::Audio;
+  return MediaKind::None;
+}
+
+// "https://host/very/long/path" → "host/very/long/pa…" for link text.
+std::string short_url(std::string_view url) {
+  if (starts_with(url, "https://")) url.remove_prefix(8);
+  else if (starts_with(url, "http://")) url.remove_prefix(7);
+  if (url.size() <= 48) return std::string(url);
+  // Cut on a UTF-8 boundary.
+  size_t cut = 44;
+  while (cut > 0 && (static_cast<unsigned char>(url[cut]) & 0xc0) == 0x80) --cut;
+  return std::string(url.substr(0, cut)) + "…";
+}
+
+// End of a URL starting at `i`: up to whitespace / quote / angle bracket,
+// minus trailing punctuation and an unbalanced closing parenthesis.
+size_t url_end(std::string_view s, size_t i) {
+  size_t j = i;
+  int parens = 0;
+  while (j < s.size()) {
+    const unsigned char c = static_cast<unsigned char>(s[j]);
+    if (std::isspace(c) || c == '"' || c == '<' || c == '>') break;
+    if (c == '(') ++parens;
+    if (c == ')' && --parens < 0) break;
+    ++j;
+  }
+  while (j > i && std::strchr(".,;:!?'", s[j - 1])) --j;
+  return j;
+}
+
+bool is_bech32_char(char c) {
+  return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+}
+
+struct NoteLinker {
+  Document& doc;
+  NodeId parent;
+  const std::vector<std::vector<std::string>>& tags;
+  const std::map<std::string, std::string>& names;
+  std::map<std::string, std::string> media_mime, media_alt;  // by URL (imeta)
+
+  NodeId para = INVALID_NODE;
+  std::vector<std::pair<std::string, std::string>> images;  // url, alt
+
+  void text(std::string_view t) {
+    if (t.empty()) return;
+    if (para == INVALID_NODE) para = doc.create(NodeKind::Paragraph, parent);
+    Node& n = doc.get(para);
+    if (!n.spans.empty() && n.spans.back().kind == InlineKind::Text)
+      n.spans.back().text += t;
+    else
+      doc.append_text(para, std::string(t));
+  }
+
+  void link(std::string label, std::string href) {
+    if (para == INVALID_NODE) para = doc.create(NodeKind::Paragraph, parent);
+    InlineSpan l;
+    l.kind = InlineKind::Link;
+    l.text = std::move(label);
+    l.href = std::move(href);
+    doc.get(para).spans.push_back(std::move(l));
+  }
+
+  // Close the current paragraph; its images follow it.
+  void flush() {
+    if (para != INVALID_NODE) {
+      // Drop the whitespace a removed paragraph break leaves at the ends.
+      auto& spans = doc.get(para).spans;
+      if (!spans.empty() && spans.back().kind == InlineKind::Text) {
+        std::string& t = spans.back().text;
+        while (!t.empty() && std::isspace(static_cast<unsigned char>(t.back())))
+          t.pop_back();
+      }
+    }
+    for (auto& [url, alt] : images) {
+      NodeId im = doc.create(NodeKind::Image, parent);
+      doc.get(im).src = url;
+      doc.get(im).alt = alt;
+    }
+    images.clear();
+    para = INVALID_NODE;
+  }
+
+  void url(std::string_view u) {
+    const std::string us(u);
+    auto mi = media_mime.find(us);
+    auto ai = media_alt.find(us);
+    const std::string alt = ai != media_alt.end() ? ai->second : std::string();
+    switch (media_kind(u, mi != media_mime.end() ? mi->second : std::string())) {
+      case MediaKind::Image:
+        link("[image]", us);  // alt text goes under the image
+        images.emplace_back(us, alt);
+        break;
+      case MediaKind::Video:
+        link(alt.empty() ? "[video]" : "[video: " + alt + "]", us);
+        break;
+      case MediaKind::Audio:
+        link(alt.empty() ? "[audio]" : "[audio: " + alt + "]", us);
+        break;
+      case MediaKind::None:
+        link(short_url(u), us);
+        break;
+    }
+  }
+
+  // NIP-19 entity (no "nostr:" prefix) → mention / note link, or false.
+  bool entity(std::string_view ref) {
+    if (auto pk = nostr_decode_pubkey(ref)) return mention(*pk);
+    if (auto id = nostr_decode_event_id(ref)) return note(*id);
+    return false;
+  }
+
+  bool mention(const std::string& pk) {
+    auto it = names.find(pk);
+    link("@" + (it != names.end() ? it->second : short_npub(pk)),
+         "nostr:" + nostr_bech32("npub", pk));
+    return true;
+  }
+
+  bool note(const std::string& id) {
+    std::string note = nostr_bech32("note", id);
+    link(note.substr(0, 14) + "…", "nostr:" + note);
+    return true;
+  }
+
+  // NIP-08 "#[n]": index into the event's tags.
+  bool tag_ref(size_t n) {
+    if (n >= tags.size() || tags[n].size() < 2) return false;
+    const std::string& v = tags[n][1];
+    if (!is_hex64(v)) return false;
+    if (tags[n][0] == "p") return mention(ascii_lower(v));
+    if (tags[n][0] == "e") return note(ascii_lower(v));
+    return false;
+  }
+};
+
+}  // namespace
+
+std::vector<std::vector<std::string>> nostr_event_tags(std::string_view json) {
+  std::vector<std::vector<std::string>> out;
+  // "tags" as a key: content strings escape their quotes, so no false hit.
+  size_t p = json.find("\"tags\"");
+  if (p == std::string_view::npos) return out;
+  p = json.find_first_not_of(" \t\r\n", p + 6);
+  if (p == std::string_view::npos || json[p] != ':') return out;
+  p = json.find_first_not_of(" \t\r\n", p + 1);
+  if (p == std::string_view::npos || json[p] != '[') return out;
+  ++p;
+  std::vector<std::string>* tag = nullptr;
+  while (p < json.size()) {
+    const char c = json[p];
+    if (c == '"') {
+      std::string v;
+      p = read_json_string(json, p, &v);
+      if (tag) tag->push_back(std::move(v));
+    } else if (c == '[') {
+      tag = &out.emplace_back();
+      ++p;
+    } else if (c == ']') {
+      if (!tag) break;  // end of the tags array
+      tag = nullptr;
+      ++p;
+    } else {
+      ++p;
+    }
+  }
+  return out;
+}
+
+void nostr_append_content(Document& doc, NodeId parent, std::string_view content,
+                          const std::vector<std::vector<std::string>>& tags,
+                          const std::map<std::string, std::string>& names) {
+  NoteLinker nl{doc, parent, tags, names, {}, {}, INVALID_NODE, {}};
+  // NIP-92: ["imeta", "url https://…", "m image/jpeg", "alt …", …]
+  for (const auto& t : tags) {
+    if (t.empty() || t[0] != "imeta") continue;
+    std::string url, mime, alt;
+    for (size_t i = 1; i < t.size(); ++i) {
+      std::string_view kv = t[i];
+      const size_t sp = kv.find(' ');
+      if (sp == std::string_view::npos) continue;
+      std::string_view k = kv.substr(0, sp), v = kv.substr(sp + 1);
+      if (k == "url") url = v;
+      else if (k == "m") mime = v;
+      else if (k == "alt") alt = v;
+    }
+    if (url.empty()) continue;
+    if (!mime.empty()) nl.media_mime[url] = mime;
+    if (!alt.empty()) nl.media_alt[url] = alt;
+  }
+
+  size_t i = 0, run = 0;  // [run, i) is plain text not yet emitted
+  auto emit_run = [&] { nl.text(content.substr(run, i - run)); };
+  while (i < content.size()) {
+    const std::string_view rest = content.substr(i);
+    const bool word_start =
+        i == 0 || !std::isalnum(static_cast<unsigned char>(content[i - 1]));
+    if (rest[0] == '\n' && rest.size() > 1 && rest[1] == '\n') {
+      emit_run();
+      nl.flush();
+      while (i < content.size() &&
+             std::isspace(static_cast<unsigned char>(content[i])))
+        ++i;
+      run = i;
+      continue;
+    }
+    if (word_start && (starts_with_ci(rest, "https://") ||
+                       starts_with_ci(rest, "http://"))) {
+      const size_t end = url_end(content, i);
+      if (end > i + 8) {
+        emit_run();
+        nl.url(content.substr(i, end - i));
+        i = run = end;
+        continue;
+      }
+    }
+    if (word_start && starts_with_ci(rest, "nostr:")) {
+      size_t end = i + 6;
+      while (end < content.size() && is_bech32_char(content[end])) ++end;
+      emit_run();
+      if (nl.entity(content.substr(i + 6, end - i - 6))) {
+        i = run = end;
+        continue;
+      }
+    }
+    if (starts_with(rest, "#[")) {
+      size_t end = i + 2;
+      while (end < content.size() && std::isdigit(static_cast<unsigned char>(content[end])))
+        ++end;
+      if (end > i + 2 && end < content.size() && content[end] == ']') {
+        emit_run();
+        if (nl.tag_ref(std::stoul(std::string(content.substr(i + 2, end - i - 2))))) {
+          i = run = end + 1;
+          continue;
+        }
+      }
+    }
+    ++i;
+  }
+  emit_run();
+  nl.flush();
+}
+
+std::vector<std::string> nostr_mentioned_pubkeys(std::string_view content) {
+  std::vector<std::string> out;
+  size_t p = 0;
+  while ((p = content.find("nostr:", p)) != std::string_view::npos) {
+    size_t end = p + 6;
+    while (end < content.size() && is_bech32_char(content[end])) ++end;
+    if (auto pk = nostr_decode_pubkey(content.substr(p + 6, end - p - 6)))
+      out.push_back(*pk);
+    p = end;
+  }
+  return out;
+}
+
 #if defined(XANATOO_NOSTR) && XANATOO_NOSTR
 
 namespace {
@@ -270,43 +561,8 @@ struct NostrEvent {
   int kind = 0;
   std::string content;
   std::string reply_to;  // parent event id (hex), empty if root
-  std::vector<std::string> e_tags;
+  std::vector<std::vector<std::string>> tags;
 };
-
-
-// Pull "e" tag values from tags array (NIP-10 aware).
-void parse_e_tags(std::string_view json, NostrEvent& ev) {
-  size_t tags = json.find("\"tags\"");
-  if (tags == std::string_view::npos) return;
-  size_t arr = json.find('[', tags);
-  if (arr == std::string_view::npos) return;
-  size_t p = arr;
-  std::string marked_reply;
-  while ((p = json.find("\"e\"", p)) != std::string_view::npos) {
-    size_t q = json.find('"', p + 3);
-    if (q == std::string_view::npos) break;
-    size_t s0 = json.find('"', q + 1);
-    if (s0 == std::string_view::npos) break;
-    size_t s1 = json.find('"', s0 + 1);
-    if (s1 == std::string_view::npos) break;
-    std::string_view id = json.substr(s0 + 1, s1 - s0 - 1);
-    size_t tag_end = json.find(']', s1);
-    bool is_reply_marker = false;
-    if (tag_end != std::string_view::npos) {
-      std::string_view tag_body = json.substr(s1, tag_end - s1);
-      if (tag_body.find("\"reply\"") != std::string_view::npos)
-        is_reply_marker = true;
-    }
-    if (is_hex64(id)) {
-      std::string hex = ascii_lower(id);
-      ev.e_tags.push_back(hex);
-      if (is_reply_marker) marked_reply = hex;
-      ev.reply_to = hex;
-    }
-    p = s1 + 1;
-  }
-  if (!marked_reply.empty()) ev.reply_to = marked_reply;
-}
 
 bool parse_event_json(std::string_view json, NostrEvent& ev) {
   ev.id = ascii_lower(json_str_field(json, "id"));
@@ -315,7 +571,16 @@ bool parse_event_json(std::string_view json, NostrEvent& ev) {
   ev.created_at = json_int_field(json, "created_at");
   ev.kind = static_cast<int>(json_int_field(json, "kind"));
   if (!is_hex64(ev.id)) return false;
-  parse_e_tags(json, ev);
+  ev.tags = nostr_event_tags(json);
+  // NIP-10: the "e" tag marked "reply", else the last "e" tag.
+  std::string marked_reply;
+  for (const auto& t : ev.tags) {
+    if (t.size() < 2 || t[0] != "e" || !is_hex64(t[1])) continue;
+    ev.reply_to = ascii_lower(t[1]);
+    if (std::find(t.begin() + 2, t.end(), "reply") != t.end())
+      marked_reply = ev.reply_to;
+  }
+  if (!marked_reply.empty()) ev.reply_to = marked_reply;
   return true;
 }
 
@@ -565,17 +830,6 @@ bool ws_read_text(WsConn& c, std::string& out, std::string& carry) {
   return false;
 }
 
-std::string pubkey_to_npub(const std::string& pubkey_hex) {
-  std::string npub = nostr_bech32("npub", pubkey_hex);
-  return npub.empty() ? pubkey_hex : npub;
-}
-
-std::string short_npub(const std::string& pubkey_hex) {
-  std::string npub = pubkey_to_npub(pubkey_hex);
-  if (npub.size() > 16) return npub.substr(0, 12) + "…";
-  return npub;
-}
-
 std::string profile_display_name(std::string_view content,
                                  const std::string& pubkey_hex) {
   std::string name = json_str_field(content, "display_name");
@@ -633,10 +887,10 @@ void add_note_message(Document& doc, NodeId thread, const NostrEvent& e,
       }
     }
   }
-  // Body lives on a child Paragraph — Message layout/serialize only walk
-  // children; the Message's own spans are just the header links above.
-  NodeId body = doc.create(NodeKind::Paragraph, msg);
-  doc.append_text(body, e.content.empty() ? "(empty)" : e.content);
+  // Body blocks are children — Message layout/serialize only walk children;
+  // the Message's own spans are just the header links above.
+  nostr_append_content(doc, msg, e.content.empty() ? "(empty)" : e.content,
+                       e.tags, profiles);
 }
 
 Document events_to_document(const std::string& root_id,
@@ -689,13 +943,13 @@ Document events_to_document(const std::string& root_id,
 
 // An author's recent notes, newest first, under their profile.
 Document author_feed_document(const std::string& pubkey,
-                              std::vector<NostrEvent>& events) {
+                              std::vector<NostrEvent>& events,
+                              std::map<std::string, std::string> profiles) {
   const NostrEvent* profile = nullptr;
   for (const auto& e : events)
     if (e.kind == 0 && e.pubkey == pubkey &&
         (!profile || e.created_at > profile->created_at))
       profile = &e;
-  std::map<std::string, std::string> profiles;
   std::string about, nip05;
   if (profile) {
     profiles[pubkey] = profile_display_name(profile->content, pubkey);
@@ -953,14 +1207,8 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
     return std::nullopt;
   }
 
-  if (author) {
-    std::vector<NostrEvent> events;
-    events.reserve(by_id.size());
-    for (auto& kv : by_id) events.push_back(std::move(kv.second));
-    return author_feed_document(*author, events);
-  }
-
-  std::string root_id = recent_mode ? by_id.begin()->second.id : *id;
+  std::string root_id =
+      (recent_mode || author) ? by_id.begin()->second.id : *id;
   if (recent_mode) {
     // Prefer the newest event as the "thread" root for the firehose view.
     int64_t best_t = -1;
@@ -972,11 +1220,16 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
     }
   }
 
+  // Names for note authors and for users mentioned in the notes; an author
+  // feed already carries its author's profile.
   std::vector<std::string> pubkeys;
   std::set<std::string> seen_pk;
+  if (author) seen_pk.insert(*author);
   for (const auto& kv : by_id) {
     if (seen_pk.insert(kv.second.pubkey).second)
       pubkeys.push_back(kv.second.pubkey);
+    for (auto& pk : nostr_mentioned_pubkeys(kv.second.content))
+      if (seen_pk.insert(pk).second) pubkeys.push_back(std::move(pk));
   }
   std::map<std::string, std::string> profiles;
   std::string prof_err;
@@ -990,6 +1243,7 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
   events.reserve(by_id.size());
   for (auto& kv : by_id) events.push_back(std::move(kv.second));
 
+  if (author) return author_feed_document(*author, events, profiles);
   Document doc = events_to_document(root_id, events, profiles);
   if (recent_mode) {
     // Clarify this is a sample firehose, not a single conversation.
