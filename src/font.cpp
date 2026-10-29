@@ -13,18 +13,16 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <mutex>
 #include <vector>
 #include <strings.h>
 
 namespace xanatoo {
 
 Font::~Font() {
-  for (auto& [cp, g] : cache_) {
-    if (g.texture) {
-      SDL_DestroyTexture(g.texture);
-    }
-  }
-  cache_.clear();
+  drop_cache();
+  for (FallbackFace& f : fallbacks_) FT_Done_Face(f.face);
+  fallbacks_.clear();
   if (face_) {
     FT_Done_Face(face_);
     face_ = nullptr;
@@ -39,10 +37,9 @@ bool Font::load(const std::string& path, int pixel_size, SDL_Renderer* renderer)
   renderer_ = renderer;
   path_ = path;
   // Clear previous face if reloading
-  for (auto& [cp, g] : cache_) {
-    if (g.texture) SDL_DestroyTexture(g.texture);
-  }
-  cache_.clear();
+  drop_cache();
+  for (FallbackFace& f : fallbacks_) FT_Done_Face(f.face);
+  fallbacks_.clear();
   if (face_) {
     FT_Done_Face(face_);
     face_ = nullptr;
@@ -59,32 +56,62 @@ bool Font::load(const std::string& path, int pixel_size, SDL_Renderer* renderer)
   return true;
 }
 
-void Font::set_size(int pixel_size) {
-  // Drop cached textures — they are sized for the old pixel size
-  for (auto& [cp, g] : cache_) {
-    if (g.texture) SDL_DestroyTexture(g.texture);
-  }
-  cache_.clear();
-
-  pixel_size_ = pixel_size;
-  FT_Set_Pixel_Sizes(face_, 0, pixel_size);
-  line_height_ = static_cast<int>(face_->size->metrics.height >> 6);
-  ascender_ = static_cast<int>(face_->size->metrics.ascender >> 6);
-  descender_ = static_cast<int>(face_->size->metrics.descender >> 6);
-
-  // Invalidate cache on size change
+void Font::drop_cache() {
   for (auto& [cp, g] : cache_) {
     if (g.texture) SDL_DestroyTexture(g.texture);
   }
   cache_.clear();
 }
 
+void Font::set_size(int pixel_size) {
+  // Drop cached textures — they are sized for the old pixel size
+  drop_cache();
+
+  pixel_size_ = pixel_size;
+  FT_Set_Pixel_Sizes(face_, 0, pixel_size);
+  for (FallbackFace& f : fallbacks_) FT_Set_Pixel_Sizes(f.face, 0, pixel_size);
+  line_height_ = static_cast<int>(face_->size->metrics.height >> 6);
+  ascender_ = static_cast<int>(face_->size->metrics.ascender >> 6);
+  descender_ = static_cast<int>(face_->size->metrics.descender >> 6);
+}
+
+// A face that maps `codepoint`, opening fallback files on first need.
+// Line metrics stay the primary face's; only the glyph comes from here.
+FT_Face Font::fallback_face(uint32_t codepoint) {
+  for (const FallbackFace& f : fallbacks_)
+    if (FT_Get_Char_Index(f.face, codepoint) != 0) return f.face;
+  const std::string family = face_->family_name ? face_->family_name : "";
+  const int weight = (face_->style_flags & FT_STYLE_FLAG_BOLD) ? 1 : 0;
+  const int slant = (face_->style_flags & FT_STYLE_FLAG_ITALIC) ? 1 : 0;
+  for (const std::string& path :
+       fallback_font_paths(codepoint, family, weight, slant)) {
+    if (path == path_) continue;
+    bool open = false;
+    for (const FallbackFace& f : fallbacks_) open = open || f.path == path;
+    if (open) continue;  // already checked above
+    FT_Face face = nullptr;
+    if (FT_New_Face(library_, path.c_str(), 0, &face)) continue;
+    if (!FT_IS_SCALABLE(face)) {  // bitmap-only (colour emoji) faces
+      FT_Done_Face(face);
+      continue;
+    }
+    FT_Set_Pixel_Sizes(face, 0, pixel_size_);
+    fallbacks_.push_back({path, face});
+    if (FT_Get_Char_Index(face, codepoint) != 0) return face;
+  }
+  return nullptr;
+}
+
 Glyph Font::load_glyph(uint32_t codepoint) {
   Glyph g;
-  if (FT_Load_Char(face_, codepoint, FT_LOAD_RENDER)) {
+  FT_Face face = face_;
+  if (codepoint >= 0x20 && FT_Get_Char_Index(face_, codepoint) == 0) {
+    if (FT_Face fb = fallback_face(codepoint)) face = fb;
+  }
+  if (FT_Load_Char(face, codepoint, FT_LOAD_RENDER)) {
     return g;
   }
-  FT_GlyphSlot slot = face_->glyph;
+  FT_GlyphSlot slot = face->glyph;
   g.width = slot->bitmap.width;
   g.height = slot->bitmap.rows;
   g.bearing_x = slot->bitmap_left;
@@ -183,6 +210,59 @@ std::string fontconfig_find(const std::string& family, int weight, int slant) {
   return path;
 }
 
+std::vector<std::string> fallback_font_paths(uint32_t codepoint,
+                                             const std::string& family,
+                                             int weight, int slant) {
+  // One FcFontSort per (family, style, codepoint); the answer never changes.
+  static std::mutex memo_mutex;
+  static std::unordered_map<std::string, std::vector<std::string>> memo;
+  std::lock_guard<std::mutex> lock(memo_mutex);
+  std::string key = family + '\n' + std::to_string(weight) +
+                    std::to_string(slant) + '\n' + std::to_string(codepoint);
+  if (auto it = memo.find(key); it != memo.end()) return it->second;
+
+  std::vector<std::string> paths;
+  if (FcInit()) {
+    FcPattern* pat = FcPatternCreate();
+    FcCharSet* want = FcCharSetCreate();
+    if (pat && want) {
+      FcCharSetAddChar(want, codepoint);
+      if (!family.empty())
+        FcPatternAddString(pat, FC_FAMILY,
+                           reinterpret_cast<const FcChar8*>(family.c_str()));
+      FcPatternAddCharSet(pat, FC_CHARSET, want);
+      FcPatternAddInteger(pat, FC_WEIGHT,
+                          weight ? FC_WEIGHT_BOLD : FC_WEIGHT_REGULAR);
+      FcPatternAddInteger(pat, FC_SLANT,
+                          slant ? FC_SLANT_ITALIC : FC_SLANT_ROMAN);
+      FcConfigSubstitute(nullptr, pat, FcMatchPattern);
+      FcDefaultSubstitute(pat);
+      FcResult result = FcResultNoMatch;
+      if (FcFontSet* set = FcFontSort(nullptr, pat, FcFalse, nullptr, &result)) {
+        for (int i = 0; i < set->nfont && paths.size() < 3; ++i) {
+          FcPattern* f = set->fonts[i];
+          FcCharSet* cs = nullptr;
+          FcBool scalable = FcTrue, color = FcFalse;
+          FcPatternGetBool(f, FC_SCALABLE, 0, &scalable);
+          FcPatternGetBool(f, FC_COLOR, 0, &color);
+          if (!scalable || color) continue;
+          if (FcPatternGetCharSet(f, FC_CHARSET, 0, &cs) != FcResultMatch ||
+              !FcCharSetHasChar(cs, codepoint))
+            continue;
+          FcChar8* file = nullptr;
+          if (FcPatternGetString(f, FC_FILE, 0, &file) == FcResultMatch && file)
+            paths.emplace_back(reinterpret_cast<const char*>(file));
+        }
+        FcFontSetDestroy(set);
+      }
+    }
+    if (want) FcCharSetDestroy(want);
+    if (pat) FcPatternDestroy(pat);
+  }
+  memo.emplace(std::move(key), paths);
+  return paths;
+}
+
 std::string fontconfig_family_from_file(const std::string& path) {
   if (path.empty() || !FcInit()) return {};
   FcPattern* pat = FcPatternCreate();
@@ -272,6 +352,26 @@ std::string fontconfig_find(const std::string& family, int weight, int slant) {
   }
   // No bold / italic file: the caller falls back to the regular face.
   return {};
+}
+
+std::vector<std::string> fallback_font_paths(uint32_t, const std::string&,
+                                             int, int) {
+  // Broad-coverage faces; Font opens them lazily and checks the codepoint.
+  static const std::vector<std::string> paths = [] {
+    std::vector<std::string> found;
+    for (const auto& dir : font_dirs()) {
+      for (const char* f : {"DejaVuSans.ttf", "Roboto-Regular.ttf",
+                            "NotoSans-Regular.ttf", "NotoSansSymbols-Regular-Subsetted.ttf",
+                            "NotoSansSymbols-Regular.ttf", "NotoSansSymbols2-Regular.ttf",
+                            "NotoSansMath-Regular.ttf", "DroidSansFallback.ttf",
+                            "DroidSansFallbackFull.ttf"}) {
+        std::error_code ec;
+        if (std::filesystem::exists(dir / f, ec)) found.push_back((dir / f).string());
+      }
+    }
+    return found;
+  }();
+  return paths;
 }
 
 std::string fontconfig_family_from_file(const std::string&) { return {}; }

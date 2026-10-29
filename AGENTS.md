@@ -122,6 +122,10 @@ toolbar and shortcuts should route through `execute_command`.
   tooltips) uses `app.ui_font` / `app.ui_font_bold` (`ui_font_path()`, the
   ImGui face at `kUiFontPx`), never `app.fonts` — those follow the style
   sheet and zoom. Cut long labels with `fit_text`.
+- Sheets may name faces with poor coverage (Verdana has no arrows):
+  `Font::glyph` draws codepoints the face lacks from fallback faces
+  (`fallback_font_paths`: FontConfig coverage sort, fixed list on Android);
+  line metrics stay the primary face's.
 - Selected sheet = `ViewSettings::style` (view.conf); toolbar style button and
   View → Style sheet issue `UiCommand::SelectStyle` / `ReloadStyles`.
 
