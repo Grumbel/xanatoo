@@ -2279,9 +2279,11 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       break;
 
     case SDLK_p:
-      if (ctrl && shift) {
-        pop_out_focused(app);
-      }
+      if (ctrl && shift)  // toggle: a window's view goes back to a tab
+        execute_command(app, app.focus >= kCentreViews
+                                 ? xanatoo::UiCommand::PopIn
+                                 : xanatoo::UiCommand::PopOut,
+                        {});
       break;
 
     case SDLK_b:

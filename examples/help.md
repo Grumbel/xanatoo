@@ -20,9 +20,8 @@ Jump to: [Files](#Files) · [Edit](#Edit) · [Navigate](#Navigate) · [View](#Vi
 - **Ctrl+W** — Close floating window, help, outline, or document tab
 - **Ctrl+Tab** / **Ctrl+Shift+Tab** — Next / previous tab
 - **Ctrl+Shift+P** — Pop focused document out to a floating window (a full
-  view: edit, select, follow links inside it)
-- **File → Move Window to Tab** — put the top floating window's page back
-  into the centre
+  view: edit, select, follow links inside it); in a window, move its page
+  back into a tab
 - **Alt+F / E / O / I / V / B / H** — File / Edit / Format / Insert / View / Bookmarks / Help menu
 - **Middle-click** — Paste at caret
 - **Drag .md / .sexp** — Open in a software window

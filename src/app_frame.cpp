@@ -497,7 +497,10 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       pop_out_focused(app);
       break;
     case C::PopIn:
-      if (!app.soft_wins.empty())
+      // The focused window, else the top one.
+      if (FloatWindow* w = window_of_view(app, app.focus))
+        pop_in_soft(app, static_cast<size_t>(w - app.soft_wins.data()));
+      else if (!app.soft_wins.empty())
         pop_in_soft(app, app.soft_wins.size() - 1);
       else
         flash_status(app, "No floating window to dock");

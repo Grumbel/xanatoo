@@ -24,8 +24,8 @@ Next bundle number: **263** (this delivery is **262**)
 - Pages opened inside a window still join the tab strip (tabs = buffer
   list) and the one session history. Open: per-view history, per-slot
   tab strips, `ViewId` relations (BRAINSTORM §11).
-- Menu shows Ctrl+Shift+I for "Move Window to Tab", but that key is
-  Insert Image (pre-existing clash; pick a new key).
+- Ctrl+Shift+P toggles: pop out, or (caret in a window) back to a tab
+  (Ctrl+Shift+I stays Insert Image).
 
 ## Status (2026-10-29) — site maps
 
