@@ -54,10 +54,6 @@
 #ifndef IMGUI_SDL_RENDERER_LEGACY
 #define IMGUI_SDL_RENDERER_LEGACY 0
 #endif
-#if IMGUI_SDL_RENDERER_LEGACY && defined(__unix__)
-#include <dlfcn.h>
-#endif
-
 #if IMGUI_SDL_RENDERER_LEGACY
 // Built against SDL < 2.0.17 headers, but the SDL loaded at runtime may be
 // newer (ArkOS ships its own build): use its SDL_RenderGeometryRaw when it
@@ -72,9 +68,11 @@ static ImGui_ImplSDLRenderer2_GeometryRawFn ImGui_ImplSDLRenderer2_LookupGeometr
     SDL_version v;
     SDL_GetVersion(&v);
     ImGui_ImplSDLRenderer2_GeometryRawFn fn = nullptr;
-#if defined(__unix__)
+#if defined(__linux__)
+    // Opening the loaded library by its soname returns the same handle.
     if (SDL_VERSIONNUM(v.major, v.minor, v.patch) >= SDL_VERSIONNUM(2, 0, 18))
-        fn = (ImGui_ImplSDLRenderer2_GeometryRawFn)dlsym(RTLD_DEFAULT, "SDL_RenderGeometryRaw");
+        if (void* lib = SDL_LoadObject("libSDL2-2.0.so.0"))
+            fn = (ImGui_ImplSDLRenderer2_GeometryRawFn)SDL_LoadFunction(lib, "SDL_RenderGeometryRaw");
 #endif
     SDL_Log("imgui: SDL %d.%d.%d at runtime, %s", v.major, v.minor, v.patch,
             fn ? "using SDL_RenderGeometryRaw" : "per-triangle fallback renderer");
