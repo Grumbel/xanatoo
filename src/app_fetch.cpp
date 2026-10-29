@@ -206,6 +206,9 @@ void finish_navigate(App& app, const FetchJob& job) {
   }
   cache_page(app, job);
   show_doc_in_pane(app, job.pane, std::move(*r.doc), r.final_url);
+  // Redirected: the sitemap lists the requested URL.
+  if (job.url != r.final_url)
+    note_page_seen(app, job.url, buf(app, app.panes[job.pane].buf).doc);
   jump_to_url_fragment(app, job.pane, job.url);
   if (xanatoo::is_gemini_url(r.final_url)) {
     app.gemini_current_url = r.final_url;

@@ -313,6 +313,10 @@ struct SiteCache {
   std::optional<xanatoo::SiteTree> tree;
   std::string error;
   std::vector<uint8_t> open;  // per tree node: expanded in the panel
+  // Coverage, derived from SitemapPanel::seen when `seen_gen` is stale:
+  // per node, pages of the subtree shown so far.
+  std::vector<int> seen_count;
+  uint64_t seen_gen = 0;
 };
 
 struct SitemapPanel {
@@ -322,6 +326,10 @@ struct SitemapPanel {
   std::string page;       // page URL the selection was last moved to
   std::vector<int> rows;  // visible tree nodes, top to bottom
   int sel = 0;            // selected row
+  // Pages shown this session (site_url_key → title, may be ""), for every
+  // host, whether or not the panel is open; `seen_gen` counts changes.
+  std::unordered_map<std::string, std::string> seen;
+  uint64_t seen_gen = 1;
 };
 
 // Split browsing (app_split.cpp): hovering a link in the left pane previews
@@ -887,6 +895,12 @@ void click_sitemap(App& app, int mx, int my);
 bool sitemap_key(App& app, SDL_Keycode sym);
 // `sitemap:host` of the panel's site in the focused pane.
 void open_sitemap_page(App& app);
+// Records a shown web page (title for the panel, coverage counts).
+void note_page_seen(App& app, const std::string& url,
+                    const xanatoo::Document& doc);
+// Previous / next page of the focused page's site map (pre-order);
+// starts reading the site map when it is not there yet.
+void sitemap_step(App& app, int dir);
 
 // ---- floating windows (app_windows.cpp) ----
 // z-order, back→front: docked columns, floating (outline, backlinks, help,

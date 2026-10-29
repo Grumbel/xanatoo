@@ -298,6 +298,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::CopyPageUrl || c == C::SelectAll || c == C::SelectBlock ||
         c == C::Find || c == C::ToggleSplit || c == C::ToggleOutline ||
         c == C::ToggleBacklinks || c == C::ToggleSitemap ||
+        c == C::SitemapPrev || c == C::SitemapNext ||
         c == C::OpenTranscludeOther ||
         c == C::ToggleDiff || c == C::ToggleStructure || c == C::ToggleBrowse ||
         c == C::ToggleNative || c == C::CollectionView ||
@@ -1065,6 +1066,10 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     case C::ToggleSitemap:
       toggle_sitemap(app);
+      break;
+    case C::SitemapPrev:
+    case C::SitemapNext:
+      sitemap_step(app, cmd == C::SitemapNext ? 1 : -1);
       break;
     case C::ToggleBacklinks:
       app.backlinks_mode = !app.backlinks_mode;

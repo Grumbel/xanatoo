@@ -148,6 +148,7 @@ void show_doc_in_pane(App& app, int pi, xanatoo::Document doc,
   p.layout = {};
   drop_height_hints_for_buf(app, p.buf);
   b.history.reset(nd, p.sel);
+  note_page_seen(app, label, nd);
   refresh_views_of_buf(app, p.buf, pi, true);
   if (std::find(app.tab_order.begin(), app.tab_order.end(), p.buf) ==
       app.tab_order.end())

@@ -765,6 +765,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleBacklinks;
       if (ImGui::MenuItem("Site Map", "Ctrl+Alt+M", state.sitemap))
         cmd = UiCommand::ToggleSitemap;
+      menu_item_cmd("  Previous Page in Site", UiCommand::SitemapPrev, cmd, true,
+                    "Alt+PgUp");
+      menu_item_cmd("  Next Page in Site", UiCommand::SitemapNext, cmd, true,
+                    "Alt+PgDn");
       if (ImGui::MenuItem("Diff Marks", "Ctrl+Shift+D", state.diff, state.can_diff))
         cmd = UiCommand::ToggleDiff;
       if (ImGui::MenuItem("Structure Highlight", "Ctrl+Shift+L", state.structure))

@@ -47,9 +47,17 @@ Next bundle number: **263** (this delivery is **262**)
 - View → Site Map (Ctrl+Alt+M): `WindowRole::Sitemap` panel, docked right
   by default; follows the focused page (reveals and bolds it), ↑↓ ←→
   Enter, click twisty folds, "Page" opens the document form.
-- Open: gzip sitemaps (no zlib yet), page titles instead of path
-  segments (known from history / page cache), coverage (visited pages),
-  prev / next page within a branch.
+- `.xml.gz` sitemaps through the built-in `inflate.hpp` (gzip / zlib /
+  raw DEFLATE, no zlib dependency).
+- Pages shown this session are recorded (`note_page_seen`, from
+  `show_doc_in_pane` + the requested URL of a redirect): the panel labels
+  them by title (site suffix "Post | Site" cut when a heading matches),
+  marks them with a dot and counts "seen/total" per directory.
+- Alt+PgUp / Alt+PgDn (View menu): previous / next page of the site in
+  tree order, panel open or not (starts reading the map on first use).
+- Open: seen pages are per session (persist with history?); sitemap
+  files are fetched one after another (nytimes.com ~40 s) — parallel
+  fetches or a progress count; hover previews count as seen.
 
 ## Status (2026-10-29) — one docking model for all windows
 

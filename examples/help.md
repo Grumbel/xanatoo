@@ -67,7 +67,9 @@ Export via *File → Export as S-expression…* or *Export as Markdown…*.
 - **Ctrl+Shift+O** — Outline (headers by section depth)
 - **Ctrl+Alt+M** — Site map of the current web page's site (from its
   sitemap.xml): ↑/↓ move, ←/→ fold, Enter opens; **Page** shows it as a
-  `sitemap:host` document
+  `sitemap:host` document. Pages you have seen show their title and a
+  dot; directories count seen/total
+- **Alt+PgUp / Alt+PgDn** — Previous / next page of the site map
 - **Click a link** — Follow `#anchor` or open http(s)
 
 ## View & layout

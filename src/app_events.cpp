@@ -1260,13 +1260,20 @@ static bool handle_backlinks_key(App& app, const SDL_Event& ev, bool ctrl, bool 
   return false;
 }
 
-// Sitemap panel: Ctrl+Alt+M toggles; with keyboard focus Esc closes,
-// arrows / Home / End move, ←/→ fold, Enter opens. True = consumed.
+// Sitemap panel: Ctrl+Alt+M toggles, Alt+PgUp / PgDn step through the
+// site (panel open or not); with keyboard focus Esc closes, arrows /
+// Home / End move, ←/→ fold, Enter opens. True = consumed.
 static bool handle_sitemap_key(App& app, const SDL_Event& ev, bool ctrl,
                                bool alt) {
   const SDL_Keycode k = ev.key.keysym.sym;
   if (k == SDLK_m && ctrl && alt) {
     toggle_sitemap(app);
+    return true;
+  }
+  if (alt && !ctrl && (k == SDLK_PAGEUP || k == SDLK_PAGEDOWN)) {
+    execute_command(app, k == SDLK_PAGEDOWN ? UiCommand::SitemapNext
+                                            : UiCommand::SitemapPrev,
+                    {});
     return true;
   }
   if (!panel_has_keys(app, KeyFocus::Sitemap)) return false;

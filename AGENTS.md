@@ -264,11 +264,14 @@ mechanism; historical bundle numbers in TODO.md are archival).
   tree in pre-order, page-less one-child chains folded to "a/b") and
   `site_tree_document`; parsing / tree are always built and unit-tested,
   the fetch (`sitemap_fetch_tree`: robots.txt, else /sitemap.xml,
-  /sitemap_index.xml, /wp-sitemap.xml; ≤ 25 files, ≤ 50k URLs; gzip
-  skipped) needs `XANATOO_WEB`.
+  /sitemap_index.xml, /wp-sitemap.xml; ≤ 25 files, ≤ 50k URLs; `.gz`
+  through `inflate.hpp`) needs `XANATOO_WEB`.
 - `sitemap:host` is a read-only page (one Section per directory, so the
   outline is the site structure). The panel is a tool view of the focused
   pane, not a document; its keys run before the browse-mode key filter.
+- Shown pages land in `SitemapPanel::seen` (`note_page_seen`, called by
+  `show_doc_in_pane`): titles and per-node coverage (`SiteCache::
+  seen_count`, recomputed on `seen_gen`). `sitemap_step` = Alt+PgUp/PgDn.
 
 ## Wikipedia (`wikipedia.hpp`)
 

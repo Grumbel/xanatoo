@@ -109,6 +109,8 @@ enum class UiCommand {
   ToggleOutline,
   ToggleBacklinks,
   ToggleSitemap,  // site structure panel of the focused web page
+  SitemapPrev,    // previous / next page in the site map's order
+  SitemapNext,
   OpenTranscludeOther,  // open include target in the other pane
   ToggleDiff,
   ToggleStructure,

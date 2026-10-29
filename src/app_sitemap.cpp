@@ -14,6 +14,7 @@
 #include "xanatoo/native.hpp"
 #include "xanatoo/sitemap.hpp"
 #include "xanatoo/theme.hpp"
+#include "xanatoo/util.hpp"
 
 namespace xanatoo::app {
 
@@ -149,6 +150,29 @@ void open_node_page(App& app, int node) {
   navigate_to_url(app, url);
 }
 
+// Recounts the shown pages per subtree after new pages were seen.
+void update_coverage(App& app, SiteCache& c) {
+  if (!c.tree || c.seen_gen == app.sitemap.seen_gen) return;
+  c.seen_gen = app.sitemap.seen_gen;
+  const auto& nodes = c.tree->nodes;
+  c.seen_count.assign(nodes.size(), 0);
+  // Pre-order: walking backwards finishes every subtree before its parent.
+  for (size_t i = nodes.size(); i-- > 0;) {
+    const auto& n = nodes[i];
+    if (!n.url.empty() && app.sitemap.seen.count(xanatoo::site_url_key(n.url)))
+      ++c.seen_count[i];
+    if (n.parent >= 0) c.seen_count[static_cast<size_t>(n.parent)] += c.seen_count[i];
+  }
+}
+
+// Title of a page shown earlier, "" when unknown.
+const std::string& seen_title(const App& app, const std::string& url) {
+  static const std::string none;
+  if (url.empty()) return none;
+  auto it = app.sitemap.seen.find(xanatoo::site_url_key(url));
+  return it == app.sitemap.seen.end() ? none : it->second;
+}
+
 std::string status_line(App& app) {
   if (app.sitemap.host.empty()) return "No web page in this pane";
   const SiteCache* c = current_site(app);
@@ -177,8 +201,9 @@ void toggle_sitemap(App& app) {
 }
 
 void update_sitemap(App& app) {
-  if (!app.sitemap.shown) return;
+  // Loads started by sitemap_step finish with the panel closed, too.
   poll_loads(app);
+  if (!app.sitemap.shown) return;
   const std::string url = focused_web_url(app);
   const std::string host = xanatoo::url_host(url);
   if (host != app.sitemap.host) {
@@ -199,6 +224,7 @@ void update_sitemap(App& app) {
     start_load(*c);
   }
   rebuild_rows(app);
+  update_coverage(app, *c);
   if (c->tree && url != app.sitemap.page) {
     app.sitemap.page = url;
     reveal_page(app, *c, url);
@@ -299,6 +325,77 @@ void open_sitemap_page(App& app) {
   navigate_to_url(app, std::string(xanatoo::kSitemapPrefix) + app.sitemap.host);
 }
 
+void note_page_seen(App& app, const std::string& url,
+                    const xanatoo::Document& doc) {
+  if (xanatoo::url_host(url).empty()) return;
+  auto trimmed = [](std::string_view v) {
+    xanatoo::trim_ascii(v);
+    return std::string(v);
+  };
+  std::string title = trimmed(doc.meta.title);
+  for (const xanatoo::Node& n : doc.nodes) {
+    if (n.kind != xanatoo::NodeKind::Header &&
+        n.kind != xanatoo::NodeKind::Heading)
+      continue;
+    std::string h = trimmed(xanatoo::plain_text(doc, n.id));
+    if (title.empty()) {
+      title = std::move(h);
+      break;
+    }
+    // "Post | Site Name" with a "Post" heading: drop the site suffix.
+    if (h.size() >= 3 && h.size() < title.size() &&
+        xanatoo::starts_with(title, h) && title[h.size()] == ' ' &&
+        std::string_view("|-:·–—").find(title[h.size() + 1]) !=
+            std::string_view::npos) {
+      title = std::move(h);
+      break;
+    }
+  }
+  std::string& slot = app.sitemap.seen[xanatoo::site_url_key(url)];
+  if (slot == title && !slot.empty()) return;
+  if (!title.empty() || slot.empty()) slot = std::move(title);
+  ++app.sitemap.seen_gen;
+}
+
+void sitemap_step(App& app, int dir) {
+  const std::string url = focused_web_url(app);
+  const std::string host = xanatoo::url_host(url);
+  if (host.empty()) {
+    flash_status(app, "Site map: no web page in this pane");
+    return;
+  }
+  SiteCache* c = find_site(app, host);
+  if (!c) {
+    app.sitemap.sites.emplace_back();
+    c = &app.sitemap.sites.back();
+    c->host = host;
+    start_load(*c);
+  }
+  if (!c->tree) {
+    flash_status(app, c->pending ? "Reading the site map of " + host + "…"
+                                 : "No site map: " + c->error);
+    return;
+  }
+  const auto& nodes = c->tree->nodes;
+  const int n = static_cast<int>(nodes.size());
+  // Off-map pages (and the sitemap: page) step from the root.
+  int at = xanatoo::is_sitemap_ref(path_of(app, focused_pane(app)))
+               ? -1
+               : xanatoo::site_tree_find(*c->tree, url);
+  if (at < 0) at = dir > 0 ? -1 : n;
+  for (int i = at + dir; i >= 0 && i < n; i += dir) {
+    const auto& node = nodes[static_cast<size_t>(i)];
+    if (node.url.empty()) continue;
+    const std::string& title = seen_title(app, node.url);
+    flash_status(app, std::string(dir > 0 ? "Next: " : "Previous: ") +
+                          (title.empty() ? node.url : title));
+    navigate_to_url(app, node.url);
+    return;
+  }
+  flash_status(app, dir > 0 ? "Last page of the site map"
+                            : "First page of the site map");
+}
+
 void draw_sitemap_panel(App& app) {
   if (!app.sitemap.shown) return;
   FloatWindow& w = app.sm;
@@ -397,16 +494,28 @@ void draw_sitemap_panel(App& app) {
                              tcx + t - k, tcy - t / 2 + k);
       }
     }
-    // Page count of a directory, right-aligned.
+    const int seen = c.seen_count.empty() ? 0 : c.seen_count[static_cast<size_t>(id)];
+    if (n.kids.empty() && seen > 0) {
+      // Shown before: a dot where a directory has its twisty.
+      const int r = std::max(2, g.twist_w / 6);
+      th::fill(app.sdl,
+               SDL_Rect{cx + g.twist_x + g.twist_w / 2 - r, ry + rh / 2 - r,
+                        r * 2, r * 2},
+               dim);
+    }
+    // Page count of a directory, right-aligned; "seen/all" once visited.
     int count_w = 0;
     if (!n.kids.empty()) {
-      const std::string count = std::to_string(n.pages);
+      const std::string count =
+          seen > 0 ? std::to_string(seen) + "/" + std::to_string(n.pages)
+                   : std::to_string(n.pages);
       count_w = font.measure(count) + 8;
       app.renderer.draw_text(
           font, static_cast<float>(cx + text_right - count_w + 4), baseline,
           count, dim.r, dim.g, dim.b);
     }
-    const std::string label = id == 0 ? c.host : n.label;
+    const std::string& title = seen_title(app, n.url);
+    const std::string label = id == 0 ? c.host : title.empty() ? n.label : title;
     // A directory without its own page is not a link: dimmed.
     const th::Rgb tink = n.url.empty() ? dim : ink;
     app.renderer.draw_text(
