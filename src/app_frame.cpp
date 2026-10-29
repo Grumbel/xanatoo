@@ -1392,6 +1392,7 @@ void poll_gamepad_axes(App& app) {
       Pane& p = focused_pane(app);
       const float max_s = pane_max_scroll(app, p);
       p.scroll_y = std::max(0.f, std::min(max_s, p.scroll_y + ly * 18.f));
+      ensure_virtual_layout(app, p);  // the band may not reach the new view
     }
     // Triggers as page up/down
     static bool lt_held = false, rt_held = false;
@@ -2871,9 +2872,11 @@ void run_frame(App& app) {
   // UI commands (Open, Diff demo, New tab, …) often replace documents after
   // the first layout pass. Relayout before draw so glyphs/carets never
   // reference node ids from the previous document tree.
+  // Stick scrolling may leave the materialised band: scroll before the
+  // relayout so the exposed raster strip is drawn from a complete layout.
+  poll_gamepad_axes(app);
   relayout_if_needed(app);
   poll_images(app);
-  poll_gamepad_axes(app);
   draw_panes(app);
   draw_split_chrome(app);
   draw_status_bar(app);
