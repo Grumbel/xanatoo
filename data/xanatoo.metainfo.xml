@@ -44,7 +44,6 @@
   <provides>
     <binary>xanatoo</binary>
   </provides>
-  <releases>
-    <release version="0.1.0" type="development" date="2026-10-29"/>
-  </releases>
+  <!-- One entry per released VERSION (gamepkgstd INT-8); none yet. -->
+  <releases/>
 </component>
