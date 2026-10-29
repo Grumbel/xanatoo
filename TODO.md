@@ -8,6 +8,22 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-29) — startup report (gamepkgstd LOGGING.md)
+
+- `print_startup_report` (`app_report.cpp`) runs first in `app_init`:
+  `topic: details` lines on stderr with runtime vs built-against library
+  versions and the mapped `.so` (from `/proc/self/maps`), video, renderer,
+  GL vendor / renderer / version, controllers with the mapping SDL applies
+  and where its bindings come from, directories. Font / icon / style /
+  gamepad lines moved to stderr in the same format; stdout is line
+  buffered so a piped log keeps its order.
+- First R36S report: Mali-G31, OpenGL ES 3.2 (`libmali-bifrost-g31-rxp0-gbm`),
+  KMSDRM 640x480 @ 61 Hz; with the preloaded SDL 2.30.10 the pad's GUID
+  gains a CRC, but SDL still applies PortMaster's SDL_GAMECONTROLLERCONFIG
+  bindings (same layout as on 2.0.10).
+- Not checked: the Android build (new code: `SDL_GetAndroidSDKVersion`,
+  `ro.product.model`).
+
 ## Status (2026-10-29) — R36S: ImGui via runtime SDL_RenderGeometryRaw
 
 - Scrolling on the R36S was much smoother with the chrome hidden: built

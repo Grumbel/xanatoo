@@ -33,7 +33,7 @@ void open_first_gamepad(App& app) {
       app.gamepad = SDL_GameControllerOpen(i);
       if (app.gamepad) {
         const char* name = SDL_GameControllerName(app.gamepad);
-        std::cout << "Gamepad: " << (name ? name : "(unknown)") << "\n";
+        std::cerr << "gamepad: opened " << (name ? name : "(unknown)") << "\n";
         break;
       }
     }

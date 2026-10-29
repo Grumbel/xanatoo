@@ -12,6 +12,7 @@
 #include <mbedtls/error.h>
 #include <mbedtls/net_sockets.h>
 #include <mbedtls/ssl.h>
+#include <mbedtls/version.h>
 #include <psa/crypto.h>
 
 #include <cerrno>
@@ -79,6 +80,9 @@ TlsStream::TlsStream() : impl_(std::make_unique<Impl>()) {}
 TlsStream::~TlsStream() { close(); }
 
 const char* TlsStream::backend() { return "Mbed TLS"; }
+
+// Linked statically, so the runtime version is the built one.
+std::string TlsStream::version() { return MBEDTLS_VERSION_STRING_FULL; }
 
 bool TlsStream::connect(int fd, const std::string& host, std::string* err) {
   close();

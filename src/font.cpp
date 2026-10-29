@@ -383,7 +383,7 @@ static bool try_load(Font& font, const std::string& path, int px,
                      SDL_Renderer* r, const char* label) {
   if (path.empty()) return false;
   if (font.load(path, px, r)) {
-    std::cout << "Font (" << label << "): " << path << "\n";
+    std::cerr << "font " << label << ": " << path << " @ " << px << " px\n";
     return true;
   }
   return false;

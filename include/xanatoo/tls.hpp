@@ -39,6 +39,9 @@ class TlsStream {
 
   // Name of the compiled-in backend ("OpenSSL", "Mbed TLS").
   static const char* backend();
+  // Library version at runtime, plus the built-against one where they can
+  // differ ("OpenSSL 3.4.1 11 Feb 2025 (built against …)").
+  static std::string version();
 
  private:
   struct Impl;

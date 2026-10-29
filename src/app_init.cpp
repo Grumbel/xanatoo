@@ -31,7 +31,7 @@ bool app_init(App& app) {
   app.ui_scale = app.opt.ui_scale > 0.f ? app.opt.ui_scale
                                         : xanatoo::platform_default_ui_scale();
   set_chrome_scale(app.ui_scale);
-  std::cout << "UI scale: " << app.ui_scale << "\n";
+  print_startup_report(app);
   app.body_px = static_cast<int>(std::lround(app.body_px * app.ui_scale));
   app.heading_px = static_cast<int>(std::lround(app.heading_px * app.ui_scale));
   // Panel geometry defaults (px at scale 1).
@@ -74,6 +74,7 @@ bool app_init(App& app) {
     }
     for (const std::string& w : app.style.warnings)
       std::cerr << "style warning: " << w << "\n";
+    std::cerr << "style: " << app.view_settings.style << "\n";
   }
   app.layout_engine.set_style(&app.style);
   app.layout_engine.set_collection_views(&app.collection_views);
@@ -91,6 +92,8 @@ bool app_init(App& app) {
     app.ui_font.load(app.fonts.regular.path(), kUiFontPx, app.sdl);
   if (const std::string ui = xanatoo::ui_font_path(true); !ui.empty())
     app.ui_font_bold.load(ui, kUiFontPx, app.sdl);
+  std::cerr << "chrome font: " << app.ui_font.path() << " @ " << kUiFontPx
+            << " px\n";
   app.cursor_arrow = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
   app.cursor_hand = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
   app.cursor_sizewe = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE);

@@ -82,6 +82,7 @@ add_executable(xanatoo
   src/app_collection.cpp
   src/app_drafts.cpp
   src/app_about.cpp
+  src/app_report.cpp
   src/about.cpp
   src/app_images.cpp
   src/theme.cpp
@@ -156,6 +157,7 @@ endif()
 endif()
 target_compile_definitions(xanatoo PRIVATE
   "XANATOO_VERSION=\"${PROJECT_VERSION_FULL}\""
+  "XANATOO_BUILD_TYPE=\"${CMAKE_BUILD_TYPE}\""
   XANATOO_SQLITE=$<BOOL:${XANATOO_SQLITE}>
   XANATOO_FONTCONFIG=$<BOOL:${XANATOO_FONTCONFIG}>)
 

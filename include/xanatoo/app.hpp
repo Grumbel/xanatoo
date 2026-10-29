@@ -637,6 +637,9 @@ void open_drafts_page(App& app);
 // "about:" page: services, formats and libraries of this build (app_about.cpp).
 inline constexpr const char* kAboutPage = "about:";
 void open_about_page(App& app);
+// Startup report on stderr (app_report.cpp, gamepkgstd LOGGING.md): versions
+// at runtime, video / renderer / OpenGL, controllers, directories.
+void print_startup_report(App& app);
 bool open_draft(App& app, int pi, const std::string& ref);
 
 // ---- buffers ----

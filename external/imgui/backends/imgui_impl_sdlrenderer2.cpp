@@ -38,6 +38,7 @@
 #include "imgui_impl_sdlrenderer2.h"
 #include "imgui_internal.h" // ImHashData
 #include <stdint.h>     // intptr_t
+#include <stdio.h>      // fprintf (xanatoo: fallback log lines)
 
 // Clang warnings with -Weverything
 #if defined(__clang__)
@@ -75,7 +76,7 @@ static ImGui_ImplSDLRenderer2_GeometryRawFn ImGui_ImplSDLRenderer2_LookupGeometr
         if (void* lib = SDL_LoadObject("libSDL2-2.0.so.0"))
             fn = (ImGui_ImplSDLRenderer2_GeometryRawFn)SDL_LoadFunction(lib, "SDL_RenderGeometryRaw");
 #endif
-    SDL_Log("imgui: SDL %d.%d.%d at runtime, %s", v.major, v.minor, v.patch,
+    fprintf(stderr, "imgui: SDL %d.%d.%d at runtime, %s\n", v.major, v.minor, v.patch,
             fn ? "using SDL_RenderGeometryRaw" : "per-triangle fallback renderer");
     return fn;
 }
@@ -328,7 +329,7 @@ static SDL_Texture* ImGui_ImplSDLRenderer2_UiCache(ImGui_ImplSDLRenderer2_Data* 
         bd->Cache = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, fb_width, fb_height);
     if (!bd->Cache)
     {
-        SDL_Log("imgui: no render target for the UI cache, drawing every frame");
+        fprintf(stderr, "imgui: no render target for the UI cache, drawing every frame\n");
         bd->CacheFailed = true;
         return nullptr;
     }

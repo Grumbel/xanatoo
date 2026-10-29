@@ -250,8 +250,10 @@ void Ui::load_icons(SDL_Renderer* renderer) {
     ic.h = h;
     icons_[name] = ic;
   }
-  std::cout << "Loaded " << icons_.size() << "/" << (sizeof(names) / sizeof(names[0]))
-            << " toolbar icons (searched " << dirs.size() << " dir(s))\n";
+  std::cerr << "icons: " << icons_.size() << "/" << (sizeof(names) / sizeof(names[0]))
+            << " from";
+  for (const auto& dir : dirs) std::cerr << " " << dir.string();
+  std::cerr << "\n";
 }
 
 const Ui::Icon* Ui::icon(const char* name) const {
@@ -392,7 +394,7 @@ static void load_ui_fonts(ImGuiIO& io, float scale) {
     ImFont* font =
         io.Fonts->AddFontFromFileTTF(path.c_str(), size_px, &cfg, kRanges);
     if (font) {
-      std::cout << "UI font: " << path << " @ " << size_px << "px\n";
+      std::cerr << "menu font: " << path << " @ " << size_px << " px\n";
       return;
     }
     std::cerr << "UI font load failed: " << path << " — using ImGui default\n";

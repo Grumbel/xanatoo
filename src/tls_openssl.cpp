@@ -37,6 +37,11 @@ TlsStream::~TlsStream() { close(); }
 
 const char* TlsStream::backend() { return "OpenSSL"; }
 
+std::string TlsStream::version() {
+  return std::string(OpenSSL_version(OPENSSL_VERSION)) +
+         " (built against " OPENSSL_VERSION_TEXT ")";
+}
+
 bool TlsStream::connect(int fd, const std::string& host, std::string* err) {
   close();
   impl_->fd = fd;

@@ -13,6 +13,7 @@
 #include "xanatoo/platform.hpp"
 
 #include <SDL.h>
+#include <cstdio>
 #include <filesystem>
 #include <iostream>
 #include <utility>
@@ -53,6 +54,9 @@ void set_window_icon(SDL_Window* window) {
 }  // namespace
 
 int main(int argc, char** argv) {
+  // Logs are usually a pipe (PortMaster's tee, a terminal paste): keep
+  // stdout lines in order with stderr instead of flushing them at exit.
+  std::setvbuf(stdout, nullptr, _IOLBF, BUFSIZ);
   xanatoo::platform_pre_init();
   xanatoo::CliOptions opt;
   xanatoo::CliResult cli = xanatoo::parse_cli(argc, argv, opt);
