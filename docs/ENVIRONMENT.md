@@ -125,8 +125,12 @@ Anything the **packaged** binary gets via `makeWrapper` must also be set for the
 | Concern | xanatoo |
 |---------|---------|
 | Default font | `XANATOO_FONT` (DejaVu from nixpkgs) |
-| Toolbar icons | `XANATOO_ICON_DIR` → `$XANATOO_BUILD_DIR/icons` |
-| examples / welcome / help | `XANATOO_DATA_DIR` → `$XANATOO_SOURCE` (live tree) |
+| Data (icons, examples, help, styles) | `--data-dir $XANATOO_BUILD_DIR/share/xanatoo` |
+
+The build tree mirrors the installed `share/`: `share/xanatoo/icons` is
+rasterized, `styles/`, `examples/` and `FORMAT.md` are symlinks to the
+source tree (edits show at once), `share/icons` links `data/icons`. The
+package finds its data next to the binary (`<exe>/../share/xanatoo`).
 
 Do **not** copy Qt-only variables into this SDL2 project.
 
@@ -171,8 +175,9 @@ except Exception:
 | `XANATOO_BUILD_DIR` | `/tmp/xanatoo-build` | Out-of-tree build directory |
 | `CMAKE_BUILD_TYPE` | `Debug` in develop | Override before configure |
 | `XANATOO_FONT` | DejaVu Sans from nixpkgs | Same as package wrapper |
-| `XANATOO_ICON_DIR` | `$XANATOO_BUILD_DIR/icons` | Rasterized toolbar icons |
-| `XANATOO_DATA_DIR` | `$XANATOO_SOURCE` | examples / welcome / help lookup |
+
+`xanatoo --show-paths` prints the data, config, state, user data and cache
+directories and where each came from.
 
 Running a helper **outside** `nix develop` fails with a clear error
 (`XANATOO_SOURCE is not set`).

@@ -32,8 +32,36 @@ Font resolution: `--font` → `XANATOO_FONT` env → common system paths.
 `nix build` wraps the binary with DejaVu Sans.
 
 The demo document lives in **`examples/welcome.md`** (with PNGs alongside).
-With no path argument, xanatoo searches for that file relative to the
-working directory or the executable.
+With no path argument, xanatoo opens it from the data directory
+(`--data-dir`, else `<exe>/../share/xanatoo`, else the install prefix; the
+build tree has the same layout). `xanatoo --show-paths` prints every
+directory it uses; see `man xanatoo` for all options.
+
+## Files
+
+| What | Where |
+|------|-------|
+| Preferences (`view.conf`) | `$XDG_CONFIG_HOME/xanatoo/` |
+| Drafts / revisions, folds, bookmarks, history | `$XDG_STATE_HOME/xanatoo/` |
+| Your style sheets (`styles/*.xss`) | `$XDG_DATA_HOME/xanatoo/styles/` |
+| Thumbnails, downloads, imports | `$XDG_CACHE_HOME/xanatoo/` |
+
+`--config-dir` / `--state-dir` / `--user-data-dir` / `--cache-dir` move one
+of them, `--portable` (or a `portable.txt` next to the executable) keeps all
+of them in `userdata/` beside it, and `--no-save` writes nothing.
+
+## Packaging standard
+
+xanatoo follows [gamepkgstd](https://github.com/Grumbel/gamepkgstd) where
+its rules apply to a document editor (the game-only rules — screenshots,
+pause on focus loss, gameplay rebinding, volume — do not). Deliberate
+deviations:
+
+- **VER-7**: the Android `versionCode` is the commit time
+  (`self.lastModified`), not the revision count, so a build from a dirty
+  tree still installs over the last committed one.
+- **DIR / man page**: the man page is in section 1, not 6; xanatoo is not
+  a game.
 
 ## Markup
 
@@ -177,6 +205,7 @@ nix build .#xanatoo-r36s-portmaster      # folder for /roms/ports/
 nix build .#xanatoo-r36s-portmaster-zip  # zip for PortMaster autoinstall
 ```
 
-The port ships `examples/`, toolbar icons, and DejaVu Sans. The launcher sets
-`XANATOO_DATA_DIR`, `XANATOO_ICON_DIR`, and `XANATOO_FONT` so welcome/help and
-the Examples menu resolve on device. See `mk/r36s/README.md`.
+The port ships `examples/`, style sheets, toolbar icons, and DejaVu Sans. The
+launcher passes the port folder as `--data-dir`, sets `XANATOO_FONT` and keeps
+config, state and cache under `conf/` via the XDG variables. See
+`mk/r36s/README.md`.

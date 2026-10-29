@@ -17,20 +17,37 @@ Next bundle number: **263** (this delivery is **262**)
   the bare `VERSION` contents (VER-6). `xanatoo --version` prints it,
   `--help` goes to stdout with exit 0 (OPT-2); `checks.version` /
   `checks.help` verify both (FLAKE-11).
-- Open deviations from gamepkgstd (audit 2026-10-29, not fixed yet):
-  Android `versionCode` stays `self.lastModified` (VER-7 says `revCount
-  or 1`; lastModified also works for dirty trees); metainfo lists an
-  unreleased `0.1.0` (INT-8); no REUSE.toml / `reuse lint`, CMakeLists.txt
-  and flake.nix lack SPDX headers (STACK-9); `checks` lacks the package
-  set and app checks (FLAKE-9/10), no `doCheck` (FLAKE-7), no CI
-  (FLAKE-14); `-f` is `--font` and fullscreen is `-F`, no `--windowed`,
-  `--geometry`, `--data-dir` (env `XANATOO_DATA_DIR` instead),
-  `--config-dir`, `--cache-dir`, `--show-paths` (OPT-3, DEV-6); welcome.md
-  is searched relative to the cwd (DIR-3); revisions / sidestore /
-  bookmarks live in the config dir, not `XDG_STATE_HOME` (DIR-4/7); XDG
-  variables are not checked for absolute paths (DIR-6); bookmarks and
-  other user files are not written atomically (DIR-14); PortMaster
-  launcher sets config and state to the same `conf/` (DIR-10).
+- gamepkgstd audit (2026-10-29), fixed: one directory module
+  (`paths.hpp`: config / state / user data / cache, XDG only when
+  absolute, `--*-dir` options, `--portable` / `portable.txt`, `--no-save`,
+  `--show-paths`); state (revisions, sidestore, bookmarks, minibuffer
+  history) moved from the config dir to `XDG_STATE_HOME`, user style
+  sheets to `XDG_DATA_HOME` (existing files moved by hand, no migration
+  code); installed data via `--data-dir` / `<exe>/../share/xanatoo` /
+  install prefix, never the cwd (the build tree mirrors that layout;
+  `XANATOO_DATA_DIR` / `XANATOO_ICON_DIR` are gone); atomic writes
+  (`write_file_atomic`); options per OPTIONS.md (`-f` fullscreen,
+  `--windowed`, `--geometry`, `--`; `--font` has no short form); man page
+  `docs/xanatoo.1`; User-Agents carry the version (`user_agent()`); REUSE
+  (`REUSE.toml`, `LICENSES/`, `checks.reuse`); flake `checks` = packages +
+  apps + version / help / man / reuse / layout / integration, `doCheck`,
+  wrapped default package, `imagedeps-android` naming; metainfo has no
+  unreleased `<release>`; GitHub CI runs `nix flake check`; PortMaster
+  launcher keeps config / state / data / cache apart under `conf/`.
+- Deliberate deviations (README "Packaging standard"): Android
+  `versionCode` stays `self.lastModified` (VER-7); man page section 1.
+- Open: thumtoo's `docs/bench/baselines/**` and `tools/__pycache__/**`
+  lack REUSE info upstream (overridden in our `REUSE.toml`; fix in
+  thumtoo, drop the override); `nix flake check` builds the Android APK
+  and R36S cross packages — heavy for GitHub runners (disk / time), may
+  need a split CI job; the R36S build now passes again (it had broken:
+  no SQLite in the sysroot, thumtoo needs libvips, code is C++20 but the
+  build forced C++17): eoan SQLite debs + `libs/libsqlite3.so.0` in the
+  port, `XANATOO_THUMTOO=OFF`, `-DCMAKE_CXX_STANDARD=20` against
+  libstdc++ 9 (language features only, see gamepkgstd `R36S.md`); starts
+  under qemu-aarch64 with the eoan libs, not yet run on the device. The
+  Android paths (JNI `getCacheDir`, assets in
+  `<internal>/assets`) are only compile-tested.
 
 ## Status (2026-10-29) — about: page
 

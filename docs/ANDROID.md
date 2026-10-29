@@ -33,17 +33,20 @@ icons (rasterized from `icons/svg` with `rsvg-convert`) and DejaVu
 Sans/Serif/Mono into `assets/xanatoo/` with a `MANIFEST` (stamp line, then
 one path per line: SDL can read assets but not list them).
 `platform_init()` (`src/platform.cpp`) copies them to
-`<internal storage>/data` whenever the stamp changed, `chdir`s there and sets
-`XANATOO_DATA_DIR` / `XANATOO_ICON_DIR`, so the desktop lookups
-(`examples/help.md`, `styles/`, `icons/`) work unchanged. Edits to shipped
-examples are overwritten by the next upgrade; other files are kept.
+`<internal storage>/assets` whenever the stamp changed and makes that the
+data directory (`paths.hpp`), so the desktop lookups (`examples/help.md`,
+`styles/`, `icons/`) work unchanged. Edits to shipped examples are
+overwritten by the next upgrade; other files are kept.
 
-DejaVu comes first in the font search (`data/fonts`), so documents look as on
+DejaVu comes first in the font search (`<data dir>/fonts`), so documents look as on
 desktop and glyphs Roboto lacks (▸ ▾ ☐ ☑) render.
 
 ## Platform behaviour
 
-- `HOME` / `TMPDIR` → internal storage: view.conf, history, bookmarks.
+- User directories (gamepkgstd DIR-5): `<internal>/config` (view.conf),
+  `<internal>/state` (drafts, bookmarks, history), `<internal>/data` (user
+  style sheets, working directory for relative saves), cache in
+  `Context.getCacheDir()`. `HOME` / `TMPDIR` also point at internal storage.
 - `std::cout` / `std::cerr` → logcat, tag `xanatoo`
   (`adb logcat -s xanatoo`).
 - Back is trapped (`SDL_HINT_ANDROID_TRAP_BACK_BUTTON`) and acts like Esc,
@@ -85,7 +88,7 @@ system CAs, `/system/etc/security/cacerts`).
 
 | Feature | Desktop | Android |
 |---------|---------|---------|
-| Font lookup | FontConfig | `XANATOO_FONTCONFIG=0`: generic families → `data/fonts`, `/system/fonts` |
+| Font lookup | FontConfig | `XANATOO_FONTCONFIG=0`: generic families → `<data dir>/fonts`, `/system/fonts` |
 
 The same switch works for desktop CMake builds (`-DXANATOO_FONTCONFIG=OFF
 -DXANATOO_TLS=mbedtls`), which is the quick way to check that the Android

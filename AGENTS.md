@@ -106,6 +106,23 @@ toolbar and shortcuts should route through `execute_command`.
   through `-DPROJECT_VERSION_FULL` → `XANATOO_VERSION` (`--version`,
   `about:`, Android `versionName`). Never hard-code a version elsewhere.
 
+## Directories (`paths.hpp`)
+
+- Never build a user path by hand: `config_dir()` (view.conf),
+  `state_dir()` (revstore, sidestore, bookmarks, history),
+  `user_data_dir()` (user `styles/`), `cache_dir()`; each may be empty
+  (no usable dir, error already printed) — skip the write then. Call
+  `ensure_dir` before writing; write small files with `write_file_atomic`
+  (util.hpp) and write nothing config / state when `no_save()`.
+- Installed data: `data_dir()` / `data_file("examples/x.md")` (from
+  `--data-dir`, `<exe>/../share/xanatoo`, the install prefix; Android
+  sets it to the unpacked assets). Never the cwd, no env variables.
+  The build tree has `share/xanatoo/` with symlinks into the source.
+- New options go into `cli.cpp`, `print_usage` and `docs/xanatoo.1`
+  (`checks.man` / `checks.help`).
+- Version strings: `version_string()`; network User-Agents via
+  `user_agent("purpose")` (`version.hpp`).
+
 ## Tech stack (current)
 
 - C++20

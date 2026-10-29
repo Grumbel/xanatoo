@@ -21,7 +21,7 @@ revision. Neither says anything about trust or truth.
 ## Phase 1 (done): local drafts
 
 `include/xanatoo/revstore.hpp`, `src/revstore.cpp`,
-`~/.config/xanatoo/revisions.sqlite`:
+`~/.local/state/xanatoo/revisions.sqlite` (`state_dir()`):
 
 - `objects(id, data)` — content-addressed bytes, insert-only.
 - `revisions(id, doc_key, parent, content, kind, time)` — immutable

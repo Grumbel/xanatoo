@@ -26,11 +26,10 @@ names no body family.
 
 Lowest priority first; a later directory replaces a sheet of the same name:
 
-- `<source>/styles` (dev builds, compile-time path)
-- `<exe>/../share/xanatoo/styles`, `<exe>/styles`
-- `$XANATOO_DATA_DIR/styles`
-- `./styles`
-- `~/.config/xanatoo/styles` (your own sheets)
+- `<data dir>/styles` (installed: `<exe>/../share/xanatoo/styles`; see
+  `xanatoo --show-paths`)
+- `$XDG_DATA_HOME/xanatoo/styles`, default `~/.local/share/xanatoo/styles`
+  (your own sheets)
 
 ## Format
 

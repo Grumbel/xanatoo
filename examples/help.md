@@ -164,7 +164,7 @@ green. Use this for reading and navigating.
 - **Ctrl+Shift+H** / **View → History** — session history panel (click to open)
 - **Ctrl+Shift+B** — Bookmark or un-bookmark the current page
 - **Bookmarks** menu — add/remove, list, open; **Show Bookmarks…** for the manager
-- Bookmarks persist in `~/.config/xanatoo/bookmarks` (one URL or path per line)
+- Bookmarks persist in `~/.local/state/xanatoo/bookmarks` (one URL or path per line)
 - Local files and `gemini://` pages share the same session history
 
 ## Org-mode (`.org`)
