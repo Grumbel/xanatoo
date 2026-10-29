@@ -24,6 +24,7 @@
 #include <iostream>
 #include <map>
 #include <mutex>
+#include <set>
 
 namespace fs = std::filesystem;
 
@@ -196,6 +197,24 @@ void image_backend_request_thumb(ImageBackend& b, const std::string& key,
 std::vector<DecodedImage> image_backend_take_done(ImageBackend& b) {
   std::lock_guard<std::mutex> lock(b.mutex);
   return std::exchange(b.done, {});
+}
+
+std::string image_backend_vips_version() { return vips_version_string(); }
+
+std::vector<std::string> image_backend_suffixes() {
+  std::set<std::string> suffs;
+  if (VIPS_INIT("xanatoo") == 0) {  // no-op once thumtoo started it
+    vips_foreign_map(
+        "VipsForeignLoad",
+        [](void* cls, void* a, void*) -> void* {
+          auto& out = *static_cast<std::set<std::string>*>(a);
+          if (const char** s = static_cast<VipsForeignClass*>(cls)->suffs)
+            for (; *s; ++s) out.insert(ascii_lower(std::string_view(*s)));
+          return nullptr;
+        },
+        &suffs, nullptr);
+  }
+  return {suffs.begin(), suffs.end()};
 }
 
 }  // namespace xanatoo

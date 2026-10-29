@@ -71,6 +71,8 @@ add_executable(xanatoo
   src/app_sitemap.cpp
   src/app_collection.cpp
   src/app_drafts.cpp
+  src/app_about.cpp
+  src/about.cpp
   src/app_images.cpp
   src/theme.cpp
   src/font.cpp
@@ -141,6 +143,7 @@ else()
 endif()
 endif()
 target_compile_definitions(xanatoo PRIVATE
+  "XANATOO_VERSION=\"${PROJECT_VERSION}\""
   XANATOO_SQLITE=$<BOOL:${XANATOO_SQLITE}>
   XANATOO_FONTCONFIG=$<BOOL:${XANATOO_FONTCONFIG}>)
 
@@ -341,6 +344,7 @@ install(DIRECTORY examples/
 # ---------------------------------------------------------------------------
 add_executable(xanatoo_tests
   tests/unit_tests.cpp
+  src/about.cpp
   src/util.cpp
   src/revstore.cpp
   src/minibuffer.cpp

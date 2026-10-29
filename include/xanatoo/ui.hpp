@@ -122,6 +122,7 @@ enum class UiCommand {
   VirtualKey,             // arg = UTF-8 key ("a", "\n", "\b", " ")
   OpenInWindow,
   OpenFormatDoc,
+  OpenAbout,  // generated about: page (build features, services)
   OpenSemanticDoc,
   OpenExample,       // arg = filename under examples/ (or repo root)
   LoadDiffDemo,      // dual-pane diff-v1 | diff-v2 + diff marks on

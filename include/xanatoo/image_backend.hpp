@@ -39,4 +39,9 @@ struct DecodedImage {
 // Thumbnails finished since the last call (any thread → caller).
 std::vector<DecodedImage> image_backend_take_done(ImageBackend& b);
 
+// For the about: page: libvips version and the file suffixes its loaders
+// accept (".jpg", ".webp", …, sorted).
+std::string image_backend_vips_version();
+std::vector<std::string> image_backend_suffixes();
+
 }  // namespace xanatoo

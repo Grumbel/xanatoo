@@ -4,6 +4,7 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace xanatoo {
 
@@ -19,6 +20,10 @@ bool is_epub_path(std::string_view path);
 // extension, empty for formats xanatoo reads itself (md, org, gmi, html).
 std::string pandoc_input_format(std::string_view path);
 bool is_pandoc_path(std::string_view path);
+// Every extension routed through pandoc (".epub", ".docx", …).
+std::vector<std::string> pandoc_extensions();
+// `pandoc` found on PATH (runs a shell; not for every frame).
+bool pandoc_available();
 
 struct ImportResult {
   bool ok = false;

@@ -866,6 +866,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         menu_example_items(cmd, result.arg);
         ImGui::EndMenu();
       }
+      ImGui::Separator();
+      menu_item_cmd("About xanatoo", UiCommand::OpenAbout, cmd);
       ImGui::EndMenu();
     }
 

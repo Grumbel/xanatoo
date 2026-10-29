@@ -3,6 +3,7 @@
 //
 // Lightweight unit tests (no Catch/GTest). Run: ./xanatoo_tests
 
+#include "xanatoo/about.hpp"
 #include "xanatoo/ebooks.hpp"
 #include "xanatoo/feed.hpp"
 #include "xanatoo/gemini.hpp"
@@ -1812,6 +1813,39 @@ void test_pandoc_formats() {
   EXPECT(!is_pandoc_path("notes.org"));
 }
 
+void test_about_markdown() {
+  using namespace xanatoo;
+  AboutInfo info;
+  info.version = "1.2.3";
+  info.sections = {
+      {"Services", "Read-only.",
+       {{"Hacker News", true, "`hn:` lists", "hn:", "`-DXANATOO_HN=ON`"},
+        {"Reddit", false, "`reddit:` refs", "reddit:r/linux/",
+         "`-DXANATOO_REDDIT=ON`"}}},
+      {"Platform", {}, {{"SDL", true, "2.30.0", {}, {}}}}};
+  const std::string md = about_markdown(info);
+  EXPECT(md.find("1.2.3") != std::string::npos);
+  EXPECT(md.find("needs `-DXANATOO_REDDIT=ON`") != std::string::npos);
+  EXPECT(md.find("-DXANATOO_HN") == std::string::npos);  // on: no switch
+
+  const Document doc = parse_document(md, {});
+  int sections = 0;
+  std::vector<std::string> hrefs;
+  std::vector<NodeId> stack{doc.root};
+  while (!stack.empty()) {
+    const Node& n = doc.get(stack.back());
+    stack.pop_back();
+    if (n.kind == NodeKind::Section) ++sections;
+    for (const auto& sp : n.spans)
+      if (sp.kind == InlineKind::Link) hrefs.push_back(sp.href);
+    for (auto c : n.children) stack.push_back(c);
+  }
+  EXPECT_EQ(sections, 3);  // the page + one per group (the outline)
+  // Only items in the build link to an example; off ones would dead-end.
+  EXPECT_EQ(hrefs.size(), size_t(1));
+  if (!hrefs.empty()) EXPECT_EQ(hrefs[0], "hn:");
+}
+
 void test_collection() {
   using namespace xanatoo;
   const char* md =
@@ -2080,6 +2114,7 @@ void test_sitemap() {
 }
 
 int main() {
+  test_about_markdown();
   test_sitemap();
   test_inflate();
   test_sha256();

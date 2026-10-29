@@ -304,6 +304,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::SelectTab || c == C::PopOut || c == C::PopIn || c == C::Save ||
         c == C::SaveAs || c == C::ExportSexpr || c == C::ExportMarkdown ||
         c == C::Reload || c == C::ForceReload || c == C::OpenDrafts ||
+        c == C::OpenAbout ||
         c == C::Copy ||
         c == C::CopyPageUrl || c == C::SelectAll || c == C::SelectBlock ||
         c == C::Find || c == C::ToggleSplit || c == C::ToggleOutline ||
@@ -506,6 +507,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::OpenDrafts:
       navigate_to_url(app, kDraftsPage);
       break;
+    case C::OpenAbout:
+      navigate_to_url(app, kAboutPage);
+      break;
     case C::ToggleHistory:
       app.history_panel_open = !app.history_panel_open;
       break;
@@ -586,6 +590,10 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       if (rpath.empty()) break;
       if (rpath == kDraftsPage) {
         open_drafts_page(app);
+        break;
+      }
+      if (rpath == kAboutPage) {
+        open_about_page(app);
         break;
       }
       if (cmd == C::RevertToSaved) {

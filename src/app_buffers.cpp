@@ -155,7 +155,7 @@ bool is_foreign_path(std::string_view path) {
       xanatoo::starts_with(path, "https://"))
     return true;
   if (xanatoo::path_uses_html(path) || xanatoo::is_pandoc_path(path)) return true;
-  if (path == kDraftsPage) return true;
+  if (path == kDraftsPage || path == kAboutPage) return true;
   // Directory listings (navigate_pane gives them a trailing '/').
   std::error_code ec;
   if (xanatoo::ends_with(path, "/") ||

@@ -8,6 +8,19 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-29) — about: page
+
+- Help → About xanatoo opens `about:` (`app_about.cpp`, read-only,
+  regenerated on Reload): version, every service (also the always-built
+  ones, with an example link while enabled, the CMake switch while not),
+  document formats (pandoc found on PATH + its extensions), images
+  (thumtoo version, libvips version + loader suffixes, MuPDF / DjVuLibre,
+  remote images), platform (SDL / video driver / renderer, FreeType,
+  FontConfig, SQLite, ImGui, TLS backend, cache / settings dirs).
+- Open: services as a registry (one table instead of the per-service
+  code in `is_in_app_remote_url` / dispatch) would let this page and
+  later plugins list them from data.
+
 ## Status (2026-10-29) — Nostr links / media, remote images, thumtoo on Android
 
 - Nostr: author names link to `nostr:npub1…` (author feed: profile +

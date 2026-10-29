@@ -324,6 +324,14 @@ bool navigate_pane(App& app, int pi, std::string target, bool record_history) {
     if (record_history) push_nav_history(app, pi, target);
     return true;
   }
+  if (target == kAboutPage) {
+    const int saved = app.focus;
+    app.focus = pi;
+    open_about_page(app);
+    app.focus = saved;
+    if (record_history) push_nav_history(app, pi, target);
+    return true;
+  }
   if (xanatoo::starts_with(target, "draft:")) {
     if (!open_draft(app, pi, target)) return false;
     if (record_history) push_nav_history(app, pi, target);

@@ -630,6 +630,9 @@ void revert_buffer(App& app, BufferId id);
 // "drafts:" page listing every stored draft; "draft:<key>" opens one.
 inline constexpr const char* kDraftsPage = "drafts:";
 void open_drafts_page(App& app);
+// "about:" page: services, formats and libraries of this build (app_about.cpp).
+inline constexpr const char* kAboutPage = "about:";
+void open_about_page(App& app);
 bool open_draft(App& app, int pi, const std::string& ref);
 
 // ---- buffers ----

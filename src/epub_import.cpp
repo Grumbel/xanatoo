@@ -54,6 +54,12 @@ bool is_pandoc_path(std::string_view path) {
   return !pandoc_input_format(path).empty();
 }
 
+std::vector<std::string> pandoc_extensions() {
+  std::vector<std::string> out;
+  for (const PandocFormat& f : kPandocFormats) out.emplace_back(f.ext);
+  return out;
+}
+
 static std::string shell_quote(const std::string& s) {
   // POSIX single-quote escaping: ' → '\''
   std::string out = "'";
@@ -104,7 +110,7 @@ static fs::path import_cache_dir(const std::string& epub_path) {
   return base / key.str();
 }
 
-static bool pandoc_available() {
+bool pandoc_available() {
   int rc = std::system("command -v pandoc >/dev/null 2>&1");
   return rc == 0;
 }
