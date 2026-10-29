@@ -41,6 +41,9 @@ inline int kSbLayoutGutter = kSbW + 4;
 constexpr float kBlockGripW = 18.f;
 constexpr int soft_snap_px = 16;
 constexpr int soft_dock_zone = 36;
+// App::panes slots: two centre views (split), the rest for document windows.
+constexpr int kCentreViews = 2;
+constexpr int kMaxViews = 16;
 inline int status_bar_h = 28;
 constexpr int kMaxNavHistory = 100;
 inline int help_title_h = 28;
@@ -107,6 +110,11 @@ struct FootnoteOverlay {
   float w = 0.f;
 };
 
+// One document view: a buffer shown at some scroll position with its own
+// caret, layout and raster. App::panes[0] / [1] are the centre slots (split
+// view); document windows own one of the slots from kCentreViews up
+// (FloatWindow::view). x / y / w / h is the content rect in window pixels
+// (the scrollbar strip is the rightmost kSbW of it).
 struct Pane {
   BufferId buf = kNoBuffer;
   xanatoo::Selection sel{};
@@ -115,6 +123,8 @@ struct Pane {
   xanatoo::LayoutResult layout{};
   int x = 0;
   int w = 0;
+  int y = 0;
+  int h = 0;
   // Prior block heights for viewport virtualization (node → height).
   std::unordered_map<xanatoo::NodeId, float> height_cache;
   int last_layout_pane_w = 0;  // drop cache when this pane's width changes
@@ -137,12 +147,9 @@ enum class WindowRole : uint8_t { Help, Outline, Backlinks, Sitemap, Document };
 // content.
 struct FloatWindow {
   WindowRole role = WindowRole::Document;
-  // Document role only:
-  BufferId buf = kNoBuffer;
+  // Document role only: the view (App::panes slot) shown in the client area.
+  int view = -1;
   std::string title;  // display override; empty → derive from path
-  xanatoo::Selection sel{};
-  xanatoo::LayoutResult layout;
-  bool needs_layout = true;
   // Placement (all roles). x/y/w/h of a docked or maximized window are
   // derived each frame (`place_windows`); restore_* keep the free geometry.
   Dock dock = Dock::None;
@@ -159,7 +166,7 @@ struct FloatWindow {
   int resize = 0;  // bit 1=right, 2=bottom, 4=left
   int resize_start_x = 0, resize_start_y = 0;
   int resize_start_w = 0, resize_start_h = 0;
-  float scroll = 0.f;
+  float scroll = 0.f;  // panel roles; a document view scrolls its Pane
   bool scroll_dragging = false;
 };
 
@@ -411,8 +418,10 @@ struct App {
   xanatoo::Ui ui;
   float ui_top = 0.f;
   float ui_bottom = 0.f;
-  Pane panes[2];
-  int focus = 0;
+  // Document views: [0] / [1] centre slots, then document windows.
+  Pane panes[kMaxViews];
+  int focus = 0;         // view with the caret (any slot)
+  int centre_focus = 0;  // last focused centre slot (tabs, closing windows)
   KeyFocus key_focus = KeyFocus::Document;
   // A panel consumed a printable key (outline 1–9): drop the TEXTINPUT
   // SDL sends right after it so the digit is not typed into the document.
@@ -577,7 +586,24 @@ xanatoo::Document& doc_of(App& app, Pane& p);
 std::string& path_of(App& app, Pane& p);
 std::string base_of(App& app, Pane& p);
 bool shared_doc(App& app);
+// Some live view other than `except_pane` shows `b`.
+bool shown_anywhere_else(App& app, BufferId b, int except_pane);
 Pane& focused_pane(App& app);
+// Views (App::panes slots): live = shown (centre 0, 1 while split, and every
+// document window's view). The other centre slot of a split for links that
+// open "in the other pane"; a window view's partner is the centre focus.
+bool view_live(const App& app, int pi);
+std::vector<int> live_views(const App& app);
+int other_pane(const App& app);
+void focus_view(App& app, int pi);
+// Free slot for a new document window, -1 when all are taken; release_view
+// clears a slot (layout, raster) and moves the focus off it.
+int alloc_view(App& app);
+void release_view(App& app, int pi);
+// Views of `bi` other than `except` after its document was replaced or
+// rewound: stale layout dropped, caret clamped to the tree; `top` also
+// scrolls them home.
+void refresh_views_of_buf(App& app, BufferId bi, int except, bool top);
 void checkpoint(App& app);
 void mark_dirty(App& app);
 // Edits outside mark_dirty (e.g. floating windows): dirty + draft pending.
@@ -646,9 +672,16 @@ void nav_header(App& app, bool prev);
 bool toggle_stretch_at_caret(App& app);
 void collapse_or_expand_all(App& app, bool expand);
 void jump_outline_sel(App& app);
-int pane_at(App& app, float mx);
+// View under a window point: a document window's content rect, else the
+// centre slot by x.
+int pane_at(App& app, float mx, float my);
+// Centre views' y / h from the chrome (menu, toolbar, status line).
+void place_centre_rows(App& app);
+// Over a floating window's frame or a panel, i.e. not over document text.
+bool over_float_chrome(App& app, int x, int y);
 float local_x(App& app, float mx, int pi);
-float content_y(App& app, float window_y);
+// Window y → content y of view `pi` (0 = top of its viewport).
+float content_y(App& app, float window_y, int pi);
 std::tuple<int, int, int, int> outline_client_rect(App& app);
 float outline_row_step(App& app);
 // Backlinks rows: same height as outline rows (paint + click).
@@ -834,11 +867,13 @@ void undock_window(App& app, FloatWindow& w);
 void toggle_maximize(App& app, FloatWindow& w);
 // Derive docked / maximized geometry, keep floating windows on screen.
 void place_windows(App& app);
-xanatoo::Document& soft_doc(App& app, FloatWindow& sw);
 const std::string& soft_path(App& app, const FloatWindow& sw);
 std::string soft_title(App& app, const FloatWindow& sw);
-void layout_soft(App& app, FloatWindow& sw);
 void raise_soft(App& app, size_t i);
+// Close soft_wins[i] and free its view.
+void close_doc_window(App& app, size_t i);
+// Document window showing view `pi`, nullptr for a centre view.
+FloatWindow* window_of_view(App& app, int pi);
 
 // ---- sitemap panel (app_sitemap.cpp) ----
 void toggle_sitemap(App& app);
@@ -901,6 +936,7 @@ void draw_pane(App& app, int i);
 void draw_panes(App& app);
 // Drop cached pane rasters (render-target reset / shutdown).
 void release_pane_rasters(App& app);
+void release_raster(PaneRaster& r);
 void draw_split_chrome(App& app);
 void draw_status_bar(App& app);
 void draw_outline_panel(App& app);

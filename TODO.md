@@ -8,6 +8,25 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-29) — document windows are full views
+
+- `Pane` is the one document view: `App::panes[kMaxViews]`, slots 0 / 1
+  centre, the rest owned by document windows (`FloatWindow::view`; the
+  window's own buf / sel / layout / needs_layout are gone). Each view has
+  its own rect (`Pane::y` / `h` next to `x` / `w`), so virtualized layout,
+  raster cache, caret, editing, selection drag, links (navigate inside
+  the window), hover, footnote overlay, scrollbar and load indicator all
+  work in windows, docked or maximized.
+- `app.focus` can be a window view; `centre_focus` is what tabs, "Move
+  Window to Tab" and closing a window fall back to. Tab (outside lists /
+  tables) cycles live views. Split preview, diff and the shared-doc
+  caret mirror stay centre-only.
+- Pages opened inside a window still join the tab strip (tabs = buffer
+  list) and the one session history. Open: per-view history, per-slot
+  tab strips, `ViewId` relations (BRAINSTORM §11).
+- Menu shows Ctrl+Shift+I for "Move Window to Tab", but that key is
+  Insert Image (pre-existing clash; pick a new key).
+
 ## Status (2026-10-29) — site maps
 
 - `sitemap.hpp` / `src/sitemap.cpp`: robots.txt `Sitemap:` lines (else

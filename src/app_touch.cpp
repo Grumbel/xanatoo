@@ -72,7 +72,8 @@ void begin_gesture(App& app, float x, float y) {
     t.mode = TouchMode::Ignored;
     return;
   }
-  if (FloatWindow* w = float_at(app, xi, yi)) {
+  if (FloatWindow* w = float_at(app, xi, yi);
+      w && over_float_chrome(app, xi, yi)) {
     // Client area scrolls/taps; title, frame and scrollbar strip drag.
     auto [cx, cy, cw, ch] = float_client_rect(app, *w);
     constexpr int sb_w = 10;
@@ -85,7 +86,7 @@ void begin_gesture(App& app, float x, float y) {
     }
     return;
   }
-  t.pane = pane_at(app, x);
+  t.pane = pane_at(app, x, y);
   const Pane& p = app.panes[t.pane];
   const bool on_scrollbar = xi >= p.x + p.w - kSbW;
   const bool on_gutter = app.split && std::abs(x - app.panes[1].x) <= 3.f;
@@ -102,14 +103,14 @@ void begin_select(App& app) {
   Touch& t = app.touch;
   Pane& p = app.panes[t.pane];
   const float lx = local_x(app, t.start_x, t.pane);
-  const float my = content_y(app, t.start_y);
+  const float my = content_y(app, t.start_y, t.pane);
   auto hit = xanatoo::hit_test(p.layout, lx, my, p.scroll_y);
   if (!hit) {
     t.mode = TouchMode::Pan;  // nothing to select; keep scrolling
     return;
   }
   if (prompt_active(app) && !prompt_is_search(app)) close_prompt(app);
-  app.focus = t.pane;
+  focus_view(app, t.pane);
   p.sel.focus = *hit;
   p.sel.anchor = *hit;
   xanatoo::select_word_at(doc_of(app, p), p.sel);

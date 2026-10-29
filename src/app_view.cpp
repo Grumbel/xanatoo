@@ -30,8 +30,7 @@ void apply_view_settings(App& app) {
   app.view_settings.clamp();
   app.layout_engine.set_options(
       xanatoo::LayoutOptions::from_view(app.view_settings, app.ui_scale));
-  app.panes[0].height_cache.clear();
-  app.panes[1].height_cache.clear();
+  for (Pane& p : app.panes) p.height_cache.clear();
   app.needs_layout = true;
   if (!xanatoo::save_view_settings(app.view_settings))
     std::cerr << "Could not persist view settings to "
@@ -81,7 +80,7 @@ void invalidate_height_around(App& app, Pane& pane, xanatoo::NodeId id) {
 }
 
 void drop_height_hints_for_buf(App& app, BufferId bi) {
-  for (int pi = 0; pi < 2; ++pi) {
+  for (int pi : live_views(app)) {
     if (app.panes[pi].buf != bi) continue;
     app.panes[pi].height_cache.clear();
     app.panes[pi].materialised_top = 0.f;
@@ -107,7 +106,7 @@ void toggle_section_fold(App& app, xanatoo::NodeId section) {
     app.folded_sections.insert(section);
   else
     app.folded_sections.erase(section);
-  for (int pi = 0; pi < 2; ++pi) {
+  for (int pi : live_views(app)) {
     if (app.panes[pi].buf == focused_pane(app).buf)
       invalidate_height_around(app, app.panes[pi], section);
   }
@@ -212,7 +211,7 @@ void expand_ancestors_for_node(App& app, xanatoo::NodeId target) {
       std::string sk = xanatoo::section_stable_key(d, id);
       xanatoo::save_section_fold(doc_key, sk, false);
     }
-    for (int pi = 0; pi < 2; ++pi) {
+    for (int pi : live_views(app)) {
       if (app.panes[pi].buf == focused_pane(app).buf)
         invalidate_height_around(app, app.panes[pi], id);
     }
@@ -223,7 +222,21 @@ void expand_ancestors_for_node(App& app, xanatoo::NodeId target) {
   }
 }
 
+void place_centre_rows(App& app) {
+  const int top = static_cast<int>(app.ui_top);
+  const int view_h = std::max(
+      1, app.win_h - status_bar_h - top - static_cast<int>(app.ui_bottom));
+  for (int pi = 0; pi < kCentreViews; ++pi) {
+    Pane& p = app.panes[pi];
+    if (p.h != view_h) app.needs_layout = true;
+    p.y = top;
+    p.h = view_h;
+  }
+}
+
 void layout_panes(App& app) {
+  // Window views take their rects from the window placement.
+  place_windows(app);
   // Docked window columns take their width from the pane area.
   const int dock = dock_column_w(app, Dock::Left);
   const int ww =
@@ -248,8 +261,9 @@ void layout_panes(App& app) {
       app.panes[pi].buf = app.tab_order.front();
     }
   }
+  place_centre_rows(app);
   // Block heights depend on width; drop hints when this pane's width changed.
-  for (int pi = 0; pi < 2; ++pi) {
+  for (int pi : live_views(app)) {
     if (app.panes[pi].w != app.panes[pi].last_layout_pane_w) {
       app.panes[pi].height_cache.clear();
       app.panes[pi].last_layout_pane_w = app.panes[pi].w;
@@ -259,9 +273,7 @@ void layout_panes(App& app) {
     try {
       xanatoo::ensure_valid_caret(doc_of(app, pane), pane.sel.focus);
       xanatoo::ensure_valid_caret(doc_of(app, pane), pane.sel.anchor);
-      float view_h = static_cast<float>(app.win_h - status_bar_h) - app.ui_top -
-                     app.ui_bottom;
-      if (view_h < 80.f) view_h = 80.f;
+      const float view_h = std::max(80.f, static_cast<float>(pane.h));
       xanatoo::LayoutViewport vp;
       vp.top = pane.scroll_y;
       vp.bottom = pane.scroll_y + view_h;
@@ -293,8 +305,7 @@ void layout_panes(App& app) {
       pane.layout = {};
     }
   };
-  layout_one(app.panes[0]);
-  if (app.split) layout_one(app.panes[1]);
+  for (int pi : live_views(app)) layout_one(app.panes[pi]);
   app.needs_layout = false;
   app.last_layout_w = app.win_w;
   app.last_layout_h = app.win_h;
@@ -303,9 +314,7 @@ void layout_panes(App& app) {
 
 void ensure_virtual_layout(App& app, Pane& p) {
   if (p.height_cache.empty()) return;
-  float view_h =
-      static_cast<float>(app.win_h - status_bar_h) - app.ui_top - app.ui_bottom;
-  if (view_h < 80.f) view_h = 80.f;
+  const float view_h = std::max(80.f, static_cast<float>(p.h));
   const float margin = 64.f;
   const float vis_top = p.scroll_y;
   const float vis_bot = p.scroll_y + view_h;
@@ -359,9 +368,7 @@ void scroll_caret_into_view(App& app, Pane& p) {
   float doc_y = *yopt;
   float margin = 40.f;
   // Visible content height excludes menu/toolbar and status bar.
-  float view_h =
-      static_cast<float>(app.win_h - status_bar_h) - app.ui_top - app.ui_bottom;
-  if (view_h < 80.f) view_h = 80.f;
+  const float view_h = std::max(80.f, static_cast<float>(p.h));
   if (doc_y - p.scroll_y < margin) {
     p.scroll_y = std::max(0.f, doc_y - margin);
   } else if (doc_y - p.scroll_y > view_h - margin) {
@@ -407,9 +414,7 @@ void scroll_caret_to_top(App& app, Pane& p) {
   if (!yopt) return;
   // Small pad so the box edge is not flush under the chrome.
   const float margin = 8.f;
-  float view_h =
-      static_cast<float>(app.win_h - status_bar_h) - app.ui_top - app.ui_bottom;
-  if (view_h < 80.f) view_h = 80.f;
+  const float view_h = std::max(80.f, static_cast<float>(p.h));
   float max_s = std::max(0.f, p.layout.content_height - view_h + 40.f);
   p.scroll_y = std::max(0.f, std::min(max_s, *yopt - margin));
   app.needs_layout = true;
@@ -417,8 +422,7 @@ void scroll_caret_to_top(App& app, Pane& p) {
 }
 
 float pane_max_scroll(App& app, const Pane& p) {
-  const float view_h =
-      static_cast<float>(app.win_h - status_bar_h) - app.ui_top - app.ui_bottom;
+  const float view_h = static_cast<float>(p.h);
   return std::max(0.f, p.layout.content_height - view_h + 40.f);
 }
 
@@ -471,7 +475,6 @@ void apply_style(App& app, const std::string& name) {
   }
   apply_font_sizes(app);
   app.help_needs_layout = true;
-  for (FloatWindow& sw : app.soft_wins) sw.needs_layout = true;
   app.view_settings.style = app.style.name;
   apply_view_settings(app);  // drops height hints, relayouts, saves view.conf
   std::string msg = "Style: " + app.style.title;
@@ -488,8 +491,7 @@ void reload_styles(App& app) {
 
 void nav_page(App& app, bool up) {
   Pane& p = focused_pane(app);
-  const float view_h =
-      static_cast<float>(app.win_h - status_bar_h) - app.ui_top - app.ui_bottom;
+  const float view_h = static_cast<float>(p.h);
   const float step = view_h * 0.85f;
   float max_s = std::max(0.f, p.layout.content_height - view_h + 40.f);
   if (up)
@@ -663,7 +665,14 @@ void jump_outline_sel(App& app) {
   reset_blink(app);
 }
 
-int pane_at(App& app, float mx) {
+int pane_at(App& app, float mx, float my) {
+  if (FloatWindow* w = float_at(app, static_cast<int>(mx), static_cast<int>(my));
+      w && w->role == WindowRole::Document && view_live(app, w->view)) {
+    const Pane& p = app.panes[w->view];
+    if (mx >= static_cast<float>(p.x) && mx < static_cast<float>(p.x + p.w) &&
+        my >= static_cast<float>(p.y) && my < static_cast<float>(p.y + p.h))
+      return w->view;
+  }
   if (!app.split) return 0;
   return (mx >= static_cast<float>(app.panes[1].x)) ? 1 : 0;
 }
@@ -672,7 +681,9 @@ float local_x(App& app, float mx, int pi) {
   return mx - static_cast<float>(app.panes[pi].x);
 }
 
-float content_y(App& app, float window_y) { return window_y - app.ui_top; }
+float content_y(App& app, float window_y, int pi) {
+  return window_y - static_cast<float>(app.panes[pi].y);
+}
 
 std::tuple<int, int, int, int> outline_client_rect(App& app) {
   return std::tuple{app.ol.x + help_pad, app.ol.y + help_title_h + 4,

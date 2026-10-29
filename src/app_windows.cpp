@@ -77,7 +77,7 @@ void close_window(App& app, FloatWindow& w) {
       toggle_sitemap(app);
       break;
     case WindowRole::Document:
-      app.soft_wins.erase(app.soft_wins.begin() + (&w - app.soft_wins.data()));
+      close_doc_window(app, static_cast<size_t>(&w - app.soft_wins.data()));
       break;
   }
 }
@@ -176,53 +176,6 @@ void click_help(App& app, FloatWindow& w, int mx, int my) {
   }
 }
 
-void click_document(App& app, FloatWindow& w, int mx, int my) {
-  auto [cx, cy, cw, ch] = float_client_rect(app, w);
-  const float lx = static_cast<float>(mx - cx);
-  const float ly = static_cast<float>(my - cy);
-  if (lx < 0 || ly < 0 || lx > cw || ly > ch) return;
-  auto& sdoc = soft_doc(app, w);
-  if (auto sid = xanatoo::hit_test_stretch(w.layout, lx, ly, w.scroll)) {
-    if (sdoc.get(*sid).kind == xanatoo::NodeKind::Stretch) {
-      // Shared buffer: stretch state is document-owned.
-      if (DocBuffer* b = find_buf(app, w.buf)) {
-        b->history.push(sdoc, w.sel);  // snapshot for undo
-        sdoc.get(*sid).expanded = !sdoc.get(*sid).expanded;
-        note_edit(app, *b);
-      } else {
-        sdoc.get(*sid).expanded = !sdoc.get(*sid).expanded;
-      }
-      w.needs_layout = true;
-      app.needs_layout = true;
-      for (auto& osw : app.soft_wins)
-        if (osw.buf == w.buf) osw.needs_layout = true;
-    }
-  }
-  if (auto href = xanatoo::hit_test_link(sdoc, w.layout, lx, ly, w.scroll)) {
-    if (!href->empty() && (*href)[0] == '#') {
-      if (auto dest = xanatoo::jump_to_href(sdoc, *href)) {
-        auto cpos = xanatoo::caret_screen_pos(
-            w.layout, *dest, 0.f,
-            static_cast<float>(app.fonts.regular.line_height()));
-        if (cpos.valid) w.scroll = std::max(0.f, cpos.y - 24.f);
-      }
-    } else if (!href->empty()) {
-      // Always load into the focused pane (same as main-pane clicks);
-      // open_browse here left stale soft layouts and carets.
-      std::string abs = *href;
-      if (is_in_app_remote_url(abs)) {
-        navigate_to_url(app, abs);
-      } else if (is_inapp_doc_href(app, abs)) {
-        std::string resolved = resolve_doc_href(app, abs, soft_path(app, w));
-        navigate_to_url(app, resolved.empty() ? abs : resolved);
-      } else if (abs[0] != '#') {
-        xanatoo::open_external_url(abs);
-        flash_status(app, "Opening " + abs);
-      }
-    }
-  }
-}
-
 void press_title(App& app, FloatWindow& w, int mx, int my) {
   if (mx >= w.x + w.w - float_close_w) {
     close_window(app, w);
@@ -293,8 +246,7 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
       click_help(app, w, mx, my);
       break;
     case WindowRole::Document:
-      click_document(app, w, mx, my);
-      break;
+      break;  // the view takes its clicks through the pane path
   }
 }
 
@@ -349,7 +301,8 @@ float float_max_scroll(App& app, const FloatWindow& w) {
     case WindowRole::Help:
       return std::max(0.f, app.help_layout.content_height - view_h + 40.f);
     case WindowRole::Document:
-      return std::max(0.f, w.layout.content_height - view_h + 40.f);
+      return view_live(app, w.view) ? pane_max_scroll(app, app.panes[w.view])
+                                    : 0.f;
     case WindowRole::Outline:
       return std::max(
           0.f, static_cast<float>(app.outline.size()) * outline_row_step(app) +
@@ -406,6 +359,14 @@ bool float_press(App& app, int mx, int my) {
       const size_t idx = static_cast<size_t>(w - app.soft_wins.data());
       raise_soft(app, idx);
       w = &app.soft_wins.back();
+      // Content clicks belong to the view (caret, links, selection, its
+      // scrollbar): focus it and let the pane path handle the press.
+      if (!bits && my >= w->y + help_title_h &&
+          pane_at(app, static_cast<float>(mx), static_cast<float>(my)) ==
+              w->view) {
+        focus_view(app, w->view);
+        return false;
+      }
     }
     if (bits) {
       begin_resize(*w, bits, mx, my);
@@ -457,7 +418,6 @@ bool float_motion(App& app, int mx, int my) {
       if (w->resize & 1) {
         w->w = std::clamp(w->resize_start_w + dx, min_w,
                           std::max(min_w, app.win_w - 20));
-        if (w->role == WindowRole::Document) w->needs_layout = true;
         if (w->role == WindowRole::Help) app.help_needs_layout = true;
       }
       if (w->resize & 2)
@@ -490,7 +450,7 @@ void float_release(App& app, int mx, int my) {
 
 bool float_wheel(App& app, int mx, int my, int wheel_y) {
   FloatWindow* w = float_at(app, mx, my);
-  if (!w) return false;
+  if (!w || w->role == WindowRole::Document) return false;  // pane scrolls
   w->scroll -= static_cast<float>(wheel_y) * scroll_wheel_step(*w);
   clamp_scroll_min(*w);
   return true;
@@ -498,7 +458,7 @@ bool float_wheel(App& app, int mx, int my, int wheel_y) {
 
 bool float_page_scroll(App& app, int mx, int my, bool up) {
   FloatWindow* w = float_at(app, mx, my);
-  if (!w) return false;
+  if (!w || w->role == WindowRole::Document) return false;
   auto [cx, cy, cw, ch] = float_client_rect(app, *w);
   const float view_h = static_cast<float>(std::max(1, ch));
   const float max_s = float_max_scroll(app, *w);
@@ -508,6 +468,13 @@ bool float_page_scroll(App& app, int mx, int my, bool up) {
   return true;
 }
 
+bool over_float_chrome(App& app, int x, int y) {
+  FloatWindow* w = float_at(app, x, y);
+  if (!w) return false;
+  return w->role != WindowRole::Document ||
+         pane_at(app, static_cast<float>(x), static_cast<float>(y)) != w->view;
+}
+
 bool close_top_float(App& app) {
   auto st = float_stack(app);
   if (st.empty()) return false;
@@ -515,33 +482,30 @@ bool close_top_float(App& app) {
   return true;
 }
 
-static void draw_soft_window(App& app, FloatWindow& sw, bool active) {
+// Frame, then the view through the ordinary pane drawing (caret, overlays,
+// raster, footnotes, scrollbar).
+static void draw_soft_window(App& app, FloatWindow& sw) {
   if (sw.dock == Dock::None) {
     sw.w = std::max(sw.w, 280);
     sw.h = std::max(sw.h, 200);
   }
-  if (sw.needs_layout) layout_soft(app, sw);
-  auto [cx, cy, cw, ch] = soft_client_rect(app, sw);
-  sw.scroll = std::min(sw.scroll, float_max_scroll(app, sw));
   draw_floating_frame(app, SDL_Rect{sw.x, sw.y, sw.w, sw.h},
-                      soft_title(app, sw), active, sw.dock == Dock::None);
-  SDL_Rect clip{cx, cy, cw, ch};
+                      soft_title(app, sw), app.focus == sw.view,
+                      sw.dock == Dock::None);
+  if (!view_live(app, sw.view)) return;
+  const Pane& p = app.panes[sw.view];
+  SDL_Rect clip{p.x, p.y, p.w, p.h};
   SDL_RenderSetClipRect(app.sdl, &clip);
   fill_doc_paper(app, clip);
-  app.renderer.draw(sw.layout, sw.scroll - static_cast<float>(cy),
-                    static_cast<float>(cx));
+  draw_pane(app, sw.view);
   SDL_RenderSetClipRect(app.sdl, nullptr);
-  draw_client_scrollbar(app, cx, cy, cw, ch, sw.scroll,
-                        float_max_scroll(app, sw));
 }
 
 void draw_floats(App& app) {
   place_windows(app);
-  app.soft_wins.erase(std::remove_if(app.soft_wins.begin(), app.soft_wins.end(),
-                                     [&](const FloatWindow& sw) {
-                                       return !find_buf(app, sw.buf);
-                                     }),
-                      app.soft_wins.end());
+  for (size_t i = app.soft_wins.size(); i-- > 0;)
+    if (!find_buf(app, app.panes[app.soft_wins[i].view].buf))
+      close_doc_window(app, i);
   for (FloatWindow* w : float_stack(app)) {
     switch (w->role) {
       case WindowRole::Outline:
@@ -557,7 +521,7 @@ void draw_floats(App& app) {
         draw_help_window(app);
         break;
       case WindowRole::Document:
-        draw_soft_window(app, *w, w == &app.soft_wins.back());
+        draw_soft_window(app, *w);
         break;
     }
   }

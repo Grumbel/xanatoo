@@ -91,11 +91,13 @@ static void on_dropfile(App& app, SDL_Event& ev, bool imgui_mouse,
   if (static_cast<float>(my_raw) < app.ui_top) return;
   if (my_raw >= app.win_h - status_bar_h) return;
 
-  app.focus = pane_at(app, static_cast<float>(mx));
+  if (over_float_chrome(app, mx, my_raw)) return;
+  focus_view(app, pane_at(app, static_cast<float>(mx),
+                          static_cast<float>(my_raw)));
   Pane& p = focused_pane(app);
   auto& d = doc_of(app, p);
   float lx = local_x(app, static_cast<float>(mx), app.focus);
-  float my = content_y(app, static_cast<float>(my_raw));
+  float my = content_y(app, static_cast<float>(my_raw), app.focus);
 
   // Place caret at drop location when possible; otherwise keep current.
   if (auto hit = xanatoo::hit_test(p.layout, lx, my, p.scroll_y)) {
@@ -146,16 +148,10 @@ static void on_mousewheel(App& app, SDL_Event& ev, bool imgui_mouse,
   if (float_wheel(app, mxw, myw, ev.wheel.y)) return;
   if (imgui_mouse) return;
   if (myw >= app.win_h - status_bar_h) return;
-  int pi = pane_at(app, static_cast<float>(mxw));
+  int pi = pane_at(app, static_cast<float>(mxw), static_cast<float>(myw));
   Pane& p = app.panes[pi];
   p.scroll_y -= static_cast<float>(ev.wheel.y) * 48.f;
-  p.scroll_y = std::max(0.f, p.scroll_y);
-  {
-    float view_h = static_cast<float>(app.win_h - status_bar_h) - app.ui_top -
-                   app.ui_bottom;
-    float max_s = std::max(0.f, p.layout.content_height - view_h + 40.f);
-    if (p.scroll_y > max_s) p.scroll_y = max_s;
-  }
+  p.scroll_y = std::clamp(p.scroll_y, 0.f, pane_max_scroll(app, p));
   ensure_virtual_layout(app, p);
   return;
 }
@@ -176,18 +172,17 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
     if (prompt_active(app) && !prompt_is_search(app)) close_prompt(app);
 
     float mx = static_cast<float>(x);
-    float my = content_y(app, static_cast<float>(y));
+    const int at = pane_at(app, mx, static_cast<float>(y));
+    float my = content_y(app, static_cast<float>(y), at);
 
     // Classic scrollbar (right edge): arrows page, track jumps/drags.
     {
-      int pi = pane_at(app, mx);
+      const int pi = at;
       int sx = app.panes[pi].x + app.panes[pi].w - kSbW;
-      // `my` is content Y (0 at top of viewport). Usable height excludes
-      // the menu/toolbar and the status bar.
-      float view_h = static_cast<float>(app.win_h - status_bar_h) - app.ui_top -
-                     app.ui_bottom;
+      // `my` is content Y (0 at top of viewport).
+      const float view_h = static_cast<float>(app.panes[pi].h);
       if (mx >= sx && my >= 0.f && my < view_h) {
-        app.focus = pi;
+        focus_view(app, pi);
         Pane& sp = app.panes[pi];
         float content_h = std::max(view_h, sp.layout.content_height);
         float max_s = std::max(0.f, content_h - view_h + 40.f);
@@ -237,7 +232,7 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
     }
 
     // Drag the split gutter?
-    if (app.split) {
+    if (app.split && at < kCentreViews) {
       int gutter_x = app.panes[1].x - 3;
       if (mx >= gutter_x && mx <= gutter_x + 6) {
         app.dragging_split = true;
@@ -245,7 +240,7 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
       }
     }
 
-    app.focus = pane_at(app, mx);
+    focus_view(app, at);
     // Any press in the right pane keeps the hover preview it shows.
     if (app.focus == 1) commit_split_preview(app);
     Pane& p = focused_pane(app);
@@ -352,11 +347,11 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
         expand_ancestors_for_node(app, dest->node);
         // Ctrl+click: open target in the other pane (enable split)
         if (ctrl_click) {
-          if (!app.split) {
+          if (!app.split && app.focus < kCentreViews) {
             app.split = true;
             app.needs_layout = true;
           }
-          int other = 1 - app.focus;
+          int other = other_pane(app);
           app.panes[other].sel.focus = *dest;
           app.panes[other].sel.anchor = *dest;
           scroll_caret_into_view(app, app.panes[other]);
@@ -367,8 +362,8 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
           p.sel.anchor = p.sel.focus;
           scroll_caret_into_view(app, p);
           // Dual-pane shared doc: mirror target in the other view
-          if (app.split && shared_doc(app)) {
-            int other = 1 - app.focus;
+          if (app.split && shared_doc(app) && app.focus < kCentreViews) {
+            int other = other_pane(app);
             app.panes[other].sel.focus = *dest;
             app.panes[other].sel.anchor = *dest;
             scroll_caret_into_view(app, app.panes[other]);
@@ -450,8 +445,8 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
           p.sel.focus = *dest;
           p.sel.anchor = p.sel.focus;
           scroll_caret_into_view(app, p);
-          if (app.split && shared_doc(app)) {
-            int other = 1 - app.focus;
+          if (app.split && shared_doc(app) && app.focus < kCentreViews) {
+            int other = other_pane(app);
             app.panes[other].sel.focus = *dest;
             app.panes[other].sel.anchor = *dest;
             scroll_caret_into_view(app, app.panes[other]);
@@ -525,11 +520,11 @@ static void mouse_middle_down(App& app, SDL_Event& ev, bool imgui_mouse) {
     if (browsing(app)) return;
     if (imgui_mouse) return;
     const int mxw = ev.button.x, myw = ev.button.y;
-    const bool over_soft = float_at(app, mxw, myw) != nullptr;
+    const bool over_soft = over_float_chrome(app, mxw, myw);
     if (!over_soft && SDL_HasClipboardText()) {
       float mx = static_cast<float>(mxw);
-      float my = content_y(app, static_cast<float>(myw));
-      app.focus = pane_at(app, mx);
+      focus_view(app, pane_at(app, mx, static_cast<float>(myw)));
+      float my = content_y(app, static_cast<float>(myw), app.focus);
       Pane& pp = focused_pane(app);
       float lx = local_x(app, mx, app.focus);
       if (auto hit = xanatoo::hit_test(pp.layout, lx, my, pp.scroll_y)) {
@@ -553,12 +548,12 @@ static void mouse_right_down(App& app, SDL_Event& ev, bool imgui_mouse) {
     // Soft windows / outline / help absorb right-clicks (no doc menu under
     // them).
     const int rx = ev.button.x, ry = ev.button.y;
-    const bool over_soft = float_at(app, rx, ry) != nullptr;
+    const bool over_soft = over_float_chrome(app, rx, ry);
     // Document context menu (ImGui popup).
     if (!over_soft && !imgui_mouse) {
       float mx = static_cast<float>(ev.button.x);
-      float my = content_y(app, static_cast<float>(ev.button.y));
-      app.focus = pane_at(app, mx);
+      focus_view(app, pane_at(app, mx, static_cast<float>(ev.button.y)));
+      float my = content_y(app, static_cast<float>(ev.button.y), app.focus);
       Pane& p = focused_pane(app);
       float lx = local_x(app, mx, app.focus);
       // Keep an existing selection when the click lands inside it
@@ -666,17 +661,14 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
     // drive pane selection, scroll-hover, or gutter feedback underneath.
     if (!app.dragging_sel && !app.dragging_scroll && !app.dragging_split &&
         !app.dragging_image && !app.dragging_block && !app.dragging_col_gap) {
-      const int mxw = mx_i, myw = my_i;
-      const bool over_soft = float_at(app, mxw, myw) != nullptr;
-      if (over_soft) return;
+      if (over_float_chrome(app, mx_i, my_i)) return;
     }
 
     // Scrollbar hover (focused pane) for arrow highlight.
     if (!app.dragging_scroll) {
       app.sb_hover = 0;
-      float myh = app.mouse_y - app.ui_top;
-      float view_h = static_cast<float>(app.win_h - status_bar_h) - app.ui_top -
-                     app.ui_bottom;
+      float myh = content_y(app, app.mouse_y, app.focus);
+      const float view_h = static_cast<float>(app.panes[app.focus].h);
       int sx = app.panes[app.focus].x + app.panes[app.focus].w - kSbW;
       if (app.mouse_x >= sx &&
           app.mouse_x < app.panes[app.focus].x + app.panes[app.focus].w &&
@@ -691,10 +683,9 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
     }
 
     if (app.dragging_scroll) {
-      float my = app.mouse_y - app.ui_top;
+      float my = content_y(app, app.mouse_y, app.scroll_drag_pane);
       Pane& sp = app.panes[app.scroll_drag_pane];
-      float view_h = static_cast<float>(app.win_h - status_bar_h) - app.ui_top -
-                     app.ui_bottom;
+      const float view_h = static_cast<float>(sp.h);
       float content_h = std::max(view_h, sp.layout.content_height);
       float max_s = std::max(0.f, content_h - view_h + 40.f);
       float track_h =
@@ -758,7 +749,7 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
     }
     if (app.dragging_block && app.drag_block_id != xanatoo::INVALID_NODE) {
       Pane& p = focused_pane(app);
-      float adj_y = content_y(app, app.mouse_y) + p.scroll_y;
+      float adj_y = content_y(app, app.mouse_y, app.focus) + p.scroll_y;
       app.drop_target_id = xanatoo::INVALID_NODE;
       app.drop_line_y = -1.f;
       for (const auto& box : p.layout.boxes) {
@@ -780,7 +771,7 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
     }
     if (app.dragging_sel) {
       float mx = app.mouse_x;
-      float my = content_y(app, app.mouse_y);
+      float my = content_y(app, app.mouse_y, app.focus);
       // Keep focus on the pane where drag started
       Pane& p = focused_pane(app);
       float lx = local_x(app, mx, app.focus);
@@ -792,9 +783,9 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
       // Track interactive elements under the cursor for status, tooltip,
       // highlight, and pointer shape.
       float mx = app.mouse_x;
-      float my = content_y(app, app.mouse_y);
       // mouse_x/y already set above (stick or hardware); do not clobber.
-      int hover_pane = pane_at(app, mx);
+      int hover_pane = pane_at(app, mx, app.mouse_y);
+      float my = content_y(app, app.mouse_y, hover_pane);
       Pane& hp = app.panes[hover_pane];
       float lx = local_x(app, mx, hover_pane);
       auto& hd = doc_of(app, hp);
@@ -1480,10 +1471,9 @@ static bool handle_nav_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
       int mxk = 0, myk = 0;
       SDL_GetMouseState(&mxk, &myk);
       if (float_page_scroll(app, mxk, myk, up)) break;
-      const float view_h = static_cast<float>(app.win_h - status_bar_h) -
-                           app.ui_top - app.ui_bottom;
+      const float view_h = static_cast<float>(p.h);
       const float step = view_h * 0.85f;
-      float max_s = std::max(0.f, p.layout.content_height - view_h + 40.f);
+      const float max_s = pane_max_scroll(app, p);
       if (up)
         p.scroll_y = std::max(0.f, p.scroll_y - step);
       else
@@ -1776,7 +1766,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       } else if (app.help_mode) {
         app.help_mode = false;
       } else if (!app.soft_wins.empty()) {
-        app.soft_wins.pop_back();
+        close_doc_window(app, app.soft_wins.size() - 1);
       } else if (!p.sel.empty()) {
         p.sel.anchor = p.sel.focus;
         reset_blink(app);
@@ -1854,7 +1844,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       if (ctrl) {
         // Soft window → help → outline → document tab
         if (!app.soft_wins.empty()) {
-          app.soft_wins.pop_back();
+          close_doc_window(app, app.soft_wins.size() - 1);
           flash_status(app, "Closed window");
         } else if (close_top_float(app)) {
         } else {
@@ -1991,8 +1981,14 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
           break;
         }
       }
-      if (app.split) {
-        app.focus = 1 - app.focus;
+      // Next view: centre panes, then document windows.
+      if (const auto views = live_views(app); views.size() > 1) {
+        auto at = std::find(views.begin(), views.end(), app.focus);
+        const size_t i =
+            at == views.end() ? 0 : static_cast<size_t>(at - views.begin());
+        focus_view(app, views[(i + 1) % views.size()]);
+        if (FloatWindow* w = window_of_view(app, app.focus))
+          raise_soft(app, static_cast<size_t>(w - app.soft_wins.data()));
         reset_blink(app);
       }
       break;
@@ -2005,8 +2001,10 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
           app.panes[1].buf = app.panes[0].buf;
           app.panes[1].sel = app.panes[0].sel;
           app.panes[1].scroll_y = app.panes[0].scroll_y;
+        } else if (app.focus == 1) {
+          focus_view(app, 0);
         } else {
-          app.focus = 0;
+          app.centre_focus = 0;
         }
         app.needs_layout = true;
       }

@@ -293,10 +293,7 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
       p.sel.anchor = p.sel.focus;
       p.scroll_y = 0.f;
       b.history.reset(b.doc, p.sel);
-      if (app.panes[0].buf == app.panes[1].buf) {
-        app.panes[1 - app.focus].sel = p.sel;
-        app.panes[1 - app.focus].scroll_y = 0.f;
-      }
+      refresh_views_of_buf(app, p.buf, app.focus, true);
       // Ensure path is on the tab strip
       if (std::find(app.tab_order.begin(), app.tab_order.end(), p.buf) ==
           app.tab_order.end())

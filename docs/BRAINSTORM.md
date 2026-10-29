@@ -380,8 +380,10 @@ property of pane 0 / pane 1. Direction: give views ids (`ViewId`, like
 so a diff can be between a pane and a docked window, or three-way later.
 
 Steps, each useful alone:
-- Merge `Pane` and Document-role `FloatWindow` into one `DocView` record;
-  placement becomes `{CentreSlot n | Dock | Float | Max}`.
+- Merge `Pane` and Document-role `FloatWindow` into one document view.
+  *Done (2026-10-29):* windows own a `Pane` slot (`FloatWindow::view`)
+  with its own rect; next, placement `{CentreSlot n | Dock | Float | Max}`
+  on the view itself, so "Move Window to Tab" is only a placement change.
 - Tool views take an explicit target view instead of `focused_pane`.
 - Diff / split preview reference `ViewId`s.
 - Per-slot tab strips; "Move Window to Tab" = change placement.

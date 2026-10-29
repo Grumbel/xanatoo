@@ -19,8 +19,10 @@ Jump to: [Files](#Files) · [Edit](#Edit) · [Navigate](#Navigate) · [View](#Vi
 - **Ctrl+T** — New tab
 - **Ctrl+W** — Close floating window, help, outline, or document tab
 - **Ctrl+Tab** / **Ctrl+Shift+Tab** — Next / previous tab
-- **Ctrl+Shift+P** — Pop focused document out to a floating window
-- **Ctrl+Shift+I** — Move the top floating window back into a tab
+- **Ctrl+Shift+P** — Pop focused document out to a floating window (a full
+  view: edit, select, follow links inside it)
+- **File → Move Window to Tab** — put the top floating window's page back
+  into the centre
 - **Alt+F / E / O / I / V / B / H** — File / Edit / Format / Insert / View / Bookmarks / Help menu
 - **Middle-click** — Paste at caret
 - **Drag .md / .sexp** — Open in a software window
@@ -81,6 +83,8 @@ Export via *File → Export as S-expression…* or *Export as Markdown…*.
 - **Ctrl+Shift+D** — toggle diff marks (needs two independent files)
 
 - **Ctrl+\\** — Toggle dual pane
+- **Tab** (outside lists and tables) — move the caret to the next view:
+  the other pane, then document windows
 - **Dual pane browsing** — hover a link in the left pane to preview it on the
   right, click to keep it; a link clicked on the right moves that page to the
   left and opens the target on the right (Ctrl+click keeps the old behaviour)

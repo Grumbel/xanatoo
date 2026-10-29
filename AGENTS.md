@@ -43,6 +43,17 @@ behaviour is free functions ("systems") taking `App&`:
 | `theme.cpp` | classic palette (`Palette`) + stateless bevel/gradient/window primitives shared with the ImGui theme |
 | `style.cpp` | document style sheets (`styles/*.xss`, S-expressions): `DocStyle` roles → layout spacing/fonts/glyph colours + renderer decoration colours; `apply_style` in `app_view.cpp` |
 
+Document views: `App::panes[kMaxViews]` — slots 0 / 1 are the centre
+(split), document windows own a slot from `kCentreViews` up
+(`FloatWindow::view`, `alloc_view` / `release_view` / `close_doc_window`).
+Every view has its own rect (`Pane::x/y/w/h`, centre rows from
+`place_centre_rows`, windows from `place_windows`), so the whole pane path
+(layout, raster, caret, editing, overlays, footnotes) serves windows too.
+`app.focus` may be any live slot; tabs act on `app.centre_focus`. Use
+`focus_view`, `live_views` (never `pi < 2`), `other_pane` (never
+`1 - app.focus`), `pane_at(app, x, y)` and `content_y(app, y, pi)`;
+after replacing a buffer's document call `refresh_views_of_buf`.
+
 Buffers are addressed by stable `BufferId` (`DocBuffer::id`, never reused,
 `kNoBuffer` = 0): use `buf(app, id)` / `find_buf` / `add_buffer` /
 `remove_buffer` / `close_tab` (`app_buffers.cpp`); never index

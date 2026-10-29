@@ -246,10 +246,12 @@ static void leave_tab(App& app, BufferId id) {
 void remove_buffer(App& app, BufferId id) {
   if (!find_buf(app, id)) return;
   stash_draft(app, id);
-  app.soft_wins.erase(
-      std::remove_if(app.soft_wins.begin(), app.soft_wins.end(),
-                     [&](const FloatWindow& sw) { return sw.buf == id; }),
-      app.soft_wins.end());
+  for (size_t i = app.soft_wins.size(); i-- > 0;) {
+    if (app.panes[app.soft_wins[i].view].buf != id) continue;
+    release_view(app, app.soft_wins[i].view);
+    app.soft_wins.erase(app.soft_wins.begin() +
+                        static_cast<std::ptrdiff_t>(i));
+  }
   leave_tab(app, id);
   app.buffers.erase(
       std::remove_if(app.buffers.begin(), app.buffers.end(),
@@ -261,7 +263,9 @@ void remove_buffer(App& app, BufferId id) {
 void close_tab(App& app, BufferId id) {
   const bool floated =
       std::any_of(app.soft_wins.begin(), app.soft_wins.end(),
-                  [&](const FloatWindow& sw) { return sw.buf == id; });
+                  [&](const FloatWindow& sw) {
+                    return app.panes[sw.view].buf == id;
+                  });
   if (floated)
     leave_tab(app, id);  // MDI: floating windows keep the buffer alive
   else
@@ -321,6 +325,62 @@ bool shared_doc(App& app) { return app.panes[0].buf == app.panes[1].buf; }
 
 Pane& focused_pane(App& app) { return app.panes[app.focus]; }
 
+bool view_live(const App& app, int pi) {
+  if (pi == 0) return true;
+  if (pi == 1) return app.split;
+  if (pi < kCentreViews || pi >= kMaxViews) return false;
+  return std::any_of(app.soft_wins.begin(), app.soft_wins.end(),
+                     [&](const FloatWindow& w) { return w.view == pi; });
+}
+
+std::vector<int> live_views(const App& app) {
+  std::vector<int> v{0};
+  if (app.split) v.push_back(1);
+  for (const FloatWindow& w : app.soft_wins)
+    if (w.view >= kCentreViews) v.push_back(w.view);
+  return v;
+}
+
+int other_pane(const App& app) {
+  return app.focus < kCentreViews ? 1 - app.focus : app.centre_focus;
+}
+
+void focus_view(App& app, int pi) {
+  if (pi < 0 || pi >= kMaxViews) return;
+  app.focus = pi;
+  if (pi < kCentreViews) app.centre_focus = pi;
+}
+
+int alloc_view(App& app) {
+  for (int pi = kCentreViews; pi < kMaxViews; ++pi)
+    if (!view_live(app, pi)) return pi;
+  return -1;
+}
+
+void refresh_views_of_buf(App& app, BufferId bi, int except, bool top) {
+  DocBuffer* b = find_buf(app, bi);
+  if (!b) return;
+  for (int pi : live_views(app)) {
+    Pane& v = app.panes[pi];
+    if (pi == except || v.buf != bi) continue;
+    xanatoo::ensure_valid_caret(b->doc, v.sel.focus);
+    v.sel.anchor = v.sel.focus;
+    v.layout = {};
+    if (top) v.scroll_y = 0.f;
+  }
+}
+
+void release_view(App& app, int pi) {
+  if (pi < kCentreViews || pi >= kMaxViews) return;
+  cancel_fetches(app, pi);
+  clear_interaction_hover(app);  // may point into this view
+  Pane& p = app.panes[pi];
+  release_raster(p.raster);
+  p = Pane{};
+  if (app.focus == pi) app.focus = app.centre_focus;
+  if (app.scroll_drag_pane == pi) app.dragging_scroll = false;
+}
+
 void checkpoint(App& app) {
   Pane& p = focused_pane(app);
   buf(app, p.buf).history.push(doc_of(app, p), p.sel);
@@ -331,12 +391,9 @@ void mark_dirty(App& app) {
   app.discard_armed = false;  // new edits require a fresh discard warning
   if (find_buf(app, di)) {
     note_edit(app, buf(app, di));
-    // Soft windows sharing this buffer must re-layout.
-    for (auto& sw : app.soft_wins)
-      if (sw.buf == di) sw.needs_layout = true;
     // Virtualization: drop height hints for the edited node and ancestors
     // so the next layout remeasures only the affected spine (not the world).
-    for (int pi = 0; pi < 2; ++pi) {
+    for (int pi : live_views(app)) {
       if (app.panes[pi].buf == di)
         invalidate_height_around(app, app.panes[pi],
                                  focused_pane(app).sel.focus.node);
@@ -460,21 +517,23 @@ BufferId ensure_buffer(App& app, const std::string& path) {
   return bi;
 }
 
-void pop_out_focused(App& app) {
-  Pane& p = focused_pane(app);
-  const BufferId bi = p.buf;
-  for (size_t i = 0; i < app.soft_wins.size(); ++i) {
-    if (app.soft_wins[i].buf == bi) {
-      raise_soft(app, i);
-      flash_status(app, "Already in a window");
-      return;
-    }
+namespace {
+
+// New document window showing `bi` in a fresh view (cascaded from the help
+// window's spot); nullptr when every view slot is taken.
+FloatWindow* new_doc_window(App& app, BufferId bi) {
+  const int view = alloc_view(app);
+  if (view < 0) {
+    flash_status(app, "Too many windows");
+    return nullptr;
   }
+  Pane& p = app.panes[view];
+  p = Pane{};
+  p.buf = bi;
+  xanatoo::ensure_valid_caret(buf(app, bi).doc, p.sel.focus);
+  p.sel.anchor = p.sel.focus;
   FloatWindow sw;
-  sw.buf = bi;
-  sw.sel = p.sel;
-  sw.scroll = p.scroll_y;
-  sw.needs_layout = true;
+  sw.view = view;
   const int cascade = static_cast<int>(app.soft_wins.size()) * 28;
   const int top = static_cast<int>(app.ui_top);
   sw.x = app.help.x + 30 + cascade;
@@ -483,29 +542,73 @@ void pop_out_focused(App& app) {
   if (sw.y < top) sw.y = top + 20 + (cascade % 40);
   if (sw.y + sw.h > app.win_h - 40) sw.y = top + 20 + (cascade % 40);
   snap_soft_geom(app, sw.x, sw.y, sw.w, sw.h);
+  sw.restore_x = sw.x;
+  sw.restore_y = sw.y;
   app.soft_wins.push_back(std::move(sw));
+  app.needs_layout = true;
+  place_windows(app);
+  return &app.soft_wins.back();
+}
+
+// Raise the window already showing `bi`; false when there is none.
+bool raise_window_of(App& app, BufferId bi) {
+  for (size_t i = 0; i < app.soft_wins.size(); ++i) {
+    if (app.panes[app.soft_wins[i].view].buf != bi) continue;
+    const int view = app.soft_wins[i].view;
+    raise_soft(app, i);
+    focus_view(app, view);
+    return true;
+  }
+  return false;
+}
+
+}  // namespace
+
+void pop_out_focused(App& app) {
+  if (app.focus >= kCentreViews) {
+    flash_status(app, "Already in a window");
+    return;
+  }
+  Pane& p = focused_pane(app);
+  const BufferId bi = p.buf;
+  if (raise_window_of(app, bi)) {
+    flash_status(app, "Already in a window");
+    return;
+  }
+  const xanatoo::Selection sel = p.sel;
+  const float scroll = p.scroll_y;
+  FloatWindow* w = new_doc_window(app, bi);
+  if (!w) return;
+  Pane& v = app.panes[w->view];
+  v.sel = sel;
+  v.scroll_y = scroll;
+  focus_view(app, w->view);
   flash_status(app, "Popped out to window");
 }
 
 void pop_in_soft(App& app, size_t si) {
   if (si >= app.soft_wins.size()) return;
-  const BufferId bi = app.soft_wins[si].buf;
-  if (!find_buf(app, bi)) {
-    app.soft_wins.erase(app.soft_wins.begin() +
-                        static_cast<std::ptrdiff_t>(si));
-    return;
+  const int view = app.soft_wins[si].view;
+  Pane& v = app.panes[view];
+  const int to = app.centre_focus;
+  if (find_buf(app, v.buf)) {
+    Pane& c = app.panes[to];
+    c.buf = v.buf;
+    c.sel = v.sel;
+    c.scroll_y = v.scroll_y;
+    c.layout = {};
+    c.height_cache.clear();
+    xanatoo::ensure_valid_caret(doc_of(app, c), c.sel.focus);
+    if (std::find(app.tab_order.begin(), app.tab_order.end(), c.buf) ==
+        app.tab_order.end())
+      app.tab_order.push_back(c.buf);
   }
-  app.panes[app.focus].buf = bi;
-  app.panes[app.focus].sel = app.soft_wins[si].sel;
-  app.panes[app.focus].scroll_y = app.soft_wins[si].scroll;
-  xanatoo::ensure_valid_caret(doc_of(app, app.panes[app.focus]),
-                              app.panes[app.focus].sel.focus);
-  app.panes[app.focus].sel.anchor = app.panes[app.focus].sel.focus;
-  app.panes[app.focus].layout = {};
+  release_view(app, view);
   app.soft_wins.erase(app.soft_wins.begin() + static_cast<std::ptrdiff_t>(si));
+  focus_view(app, to);
   app.needs_layout = true;
   update_title(app);
-  flash_status(app, "Docked to tab");
+  flash_status(app, "Moved window to tab");
 }
 
 void open_browse(App& app, const std::string& path, const std::string& title) {
@@ -514,30 +617,10 @@ void open_browse(App& app, const std::string& path, const std::string& title) {
     return;
   }
   const BufferId bi = ensure_buffer(app, path);
-  // Focus existing floating window for this buffer.
-  for (size_t i = 0; i < app.soft_wins.size(); ++i) {
-    if (app.soft_wins[i].buf == bi) {
-      raise_soft(app, i);
-      std::cout << "Software window (focus): " << path << "\n";
-      return;
-    }
-  }
-  FloatWindow sw;
-  sw.buf = bi;
-  if (!title.empty()) sw.title = title;
-  sw.needs_layout = true;
-  sw.scroll = 0.f;
-  xanatoo::ensure_valid_caret(buf(app, bi).doc, sw.sel.focus);
-  sw.sel.anchor = sw.sel.focus;
-  const int cascade = static_cast<int>(app.soft_wins.size()) * 28;
-  const int top = static_cast<int>(app.ui_top);
-  sw.x = app.help.x + 30 + cascade;
-  sw.y = std::max(app.help.y, top) + 30 + cascade;
-  if (sw.x + sw.w > app.win_w - 20) sw.x = 40 + (cascade % 60);
-  if (sw.y < top) sw.y = top + 20 + (cascade % 40);
-  if (sw.y + sw.h > app.win_h - 40) sw.y = top + 20 + (cascade % 40);
-  snap_soft_geom(app, sw.x, sw.y, sw.w, sw.h);
-  app.soft_wins.push_back(std::move(sw));
+  if (raise_window_of(app, bi)) return;
+  FloatWindow* w = new_doc_window(app, bi);
+  if (!w) return;
+  if (!title.empty()) w->title = title;
   std::cout << "Software window: " << path << "\n";
 }
 

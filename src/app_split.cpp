@@ -19,6 +19,12 @@ namespace fs = std::filesystem;
 
 namespace xanatoo::app {
 
+bool shown_anywhere_else(App& app, BufferId b, int except_pane) {
+  for (int i : live_views(app))
+    if (i != except_pane && app.panes[i].buf == b) return true;
+  return false;
+}
+
 namespace {
 
 constexpr Uint32 kPreviewDwellMs = 250;        // local docs / anchors
@@ -99,12 +105,6 @@ void jump_to_fragment(App& app, int pi, const std::string& fragment) {
     show_anchor(app, pi, p.buf, *dest);
 }
 
-bool shown_anywhere_else(App& app, BufferId b, int except_pane) {
-  for (int i = 0; i < 2; ++i)
-    if (i != except_pane && app.panes[i].buf == b) return true;
-  return std::any_of(app.soft_wins.begin(), app.soft_wins.end(),
-                     [&](const FloatWindow& sw) { return sw.buf == b; });
-}
 
 // Free the preview's scratch buffer unless something displays it.
 void drop_scratch(App& app) {
@@ -240,7 +240,7 @@ void open_in_right(App& app, const LinkTarget& t, bool placeholder) {
 bool split_browsing(const App& app) { return app.split && !app.diff_mode; }
 
 bool follow_link_split(App& app, int pi, const std::string& href) {
-  if (!split_browsing(app)) return false;
+  if (!split_browsing(app) || pi >= kCentreViews) return false;
   SplitPreview& pv = app.split_preview;
   const LinkTarget t = resolve_link(app, pi, href);
   if (t.kind == LinkKind::None || t.kind == LinkKind::External) return false;
@@ -252,7 +252,7 @@ bool follow_link_split(App& app, int pi, const std::string& href) {
       open_in_right(app, t, /*placeholder=*/false);
     }
     pv.shown = href;  // no fresh preview while the pointer stays on it
-    app.focus = 0;
+    focus_view(app, 0);
     if (t.kind != LinkKind::Remote) flash_status(app, "→ right pane: " + href);
     return true;
   }
@@ -264,7 +264,7 @@ bool follow_link_split(App& app, int pi, const std::string& href) {
   // The pointer's hover data belongs to the page that just moved away.
   app.hover.href.clear();
   app.hover.link_pane = -1;
-  app.focus = 1;
+  focus_view(app, 1);
   if (t.kind != LinkKind::Remote) flash_status(app, "Trail ← " + href);
   return true;
 }
@@ -334,7 +334,7 @@ void update_split_preview(App& app) {
   const bool in_content = SDL_GetMouseFocus() == app.window &&
                           my >= static_cast<int>(app.ui_top) &&
                           my < app.win_h - status_bar_h &&
-                          !float_at(app, mx, my) &&
+                          !over_float_chrome(app, mx, my) &&
                           !app.ui.want_capture_mouse();
   const bool busy = app.dragging_sel || app.dragging_scroll ||
                     app.dragging_split || app.dragging_block ||
@@ -380,9 +380,9 @@ void draw_preview_badge(App& app, int pi) {
   namespace th = xanatoo::theme;
   const th::Palette& pal = th::palette();
   const Pane& p = app.panes[1];
-  const int top = static_cast<int>(app.ui_top);
+  const int top = p.y;
   const int w = std::max(1, p.w - kSbW);
-  const int h = app.win_h - status_bar_h - top - static_cast<int>(app.ui_bottom);
+  const int h = p.h;
   SDL_RenderSetClipRect(app.sdl, nullptr);
   SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
   SDL_SetRenderDrawColor(app.sdl, pal.accent.r, pal.accent.g, pal.accent.b,

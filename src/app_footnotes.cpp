@@ -82,7 +82,7 @@ void draw_footnote_overlay(App& app, int pi, const SDL_Rect& clip) {
   // Step aside while the caret is under the strip so typing stays visible.
   if (!browsing(app) && pi == app.focus) {
     const auto cp = xanatoo::caret_screen_pos(
-        pane.layout, pane.sel.focus, pane.scroll_y - app.ui_top,
+        pane.layout, pane.sel.focus, pane.scroll_y - static_cast<float>(pane.y),
         static_cast<float>(app.fonts.regular.line_height()));
     if (cp.valid && cp.y + 4.f > static_cast<float>(strip.y)) return;
   }
@@ -120,7 +120,7 @@ void draw_footnote_overlay(App& app, int pi, const SDL_Rect& clip) {
   }
   SDL_RenderSetClipRect(app.sdl, &clip);
 
-  fo.y = static_cast<float>(strip.y) - app.ui_top;
+  fo.y = static_cast<float>(strip.y - pane.y);
   fo.h = static_cast<float>(h);
   fo.w = static_cast<float>(strip.w);
 }

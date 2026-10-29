@@ -203,7 +203,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   for (int ti = 0; ti < static_cast<int>(app.tab_order.size()); ++ti) {
     const BufferId bi = app.tab_order[static_cast<size_t>(ti)];
     ui_state.tab_labels.push_back(buffer_tab_label(app, bi));
-    if (bi == app.panes[app.focus].buf) ui_state.active_tab = ti;
+    if (bi == app.panes[app.centre_focus].buf) ui_state.active_tab = ti;
   }
   ui_state.has_floating = !app.soft_wins.empty();
   // Right-stick software cursor (extra pointer; never touches OS mouse).
@@ -335,17 +335,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       drop_height_hints_for_buf(app, p.buf);
       buf(app, p.buf).history.reset(
           buf(app, p.buf).doc, p.sel);
-      if (app.panes[0].buf == app.panes[1].buf) {
-        app.panes[1 - app.focus].sel = p.sel;
-        app.panes[1 - app.focus].scroll_y = 0.f;
-        app.panes[1 - app.focus].layout = {};
-      }
-      for (auto& sw : app.soft_wins)
-        if (sw.buf == p.buf) {
-          sw.needs_layout = true;
-          sw.scroll = 0.f;
-          sw.sel = p.sel;
-        }
+      refresh_views_of_buf(app, p.buf, app.focus, true);
       app.needs_layout = true;
       update_title(app);
       flash_status(app, "New document");
@@ -444,7 +434,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         // Close focused pane's buffer tab
         for (int ti = 0; ti < static_cast<int>(app.tab_order.size()); ++ti) {
           if (app.tab_order[static_cast<size_t>(ti)] ==
-              app.panes[app.focus].buf) {
+              app.panes[app.centre_focus].buf) {
             tab_i = ti;
             break;
           }
@@ -466,13 +456,14 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       }
       if (tab_i < 0 || tab_i >= static_cast<int>(app.tab_order.size())) break;
       const BufferId bi = app.tab_order[static_cast<size_t>(tab_i)];
-      if (app.panes[app.focus].buf == bi) break;  // already showing
-      app.panes[app.focus].buf = bi;
+      focus_view(app, app.centre_focus);  // tabs are the centre's buffers
+      Pane& c = focused_pane(app);
+      if (c.buf == bi) break;  // already showing
+      c.buf = bi;
       // Fresh layout + caret for the newly focused buffer.
-      xanatoo::ensure_valid_caret(doc_of(app, app.panes[app.focus]),
-                                  app.panes[app.focus].sel.focus);
-      app.panes[app.focus].sel.anchor = app.panes[app.focus].sel.focus;
-      app.panes[app.focus].layout = {};
+      xanatoo::ensure_valid_caret(doc_of(app, c), c.sel.focus);
+      c.sel.anchor = c.sel.focus;
+      c.layout = {};
       app.needs_layout = true;
       update_title(app);
       break;
@@ -483,7 +474,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         int cur = 0;
         for (int ti = 0; ti < static_cast<int>(app.tab_order.size()); ++ti)
           if (app.tab_order[static_cast<size_t>(ti)] ==
-              app.panes[app.focus].buf) {
+              app.panes[app.centre_focus].buf) {
             cur = ti;
             break;
           }
@@ -492,11 +483,12 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
           cur = (cur + 1) % ntabs;
         else
           cur = (cur - 1 + ntabs) % ntabs;
-        app.panes[app.focus].buf = app.tab_order[static_cast<size_t>(cur)];
-        xanatoo::ensure_valid_caret(doc_of(app, app.panes[app.focus]),
-                                    app.panes[app.focus].sel.focus);
-        app.panes[app.focus].sel.anchor = app.panes[app.focus].sel.focus;
-        app.panes[app.focus].layout = {};
+        focus_view(app, app.centre_focus);
+        Pane& c = focused_pane(app);
+        c.buf = app.tab_order[static_cast<size_t>(cur)];
+        xanatoo::ensure_valid_caret(doc_of(app, c), c.sel.focus);
+        c.sel.anchor = c.sel.focus;
+        c.layout = {};
         app.needs_layout = true;
         update_title(app);
       }
@@ -615,24 +607,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       attach_draft(app, p.buf);
       buf(app, p.buf).history.reset(
           buf(app, p.buf).doc, p.sel);
-      for (int pi = 0; pi < 2; ++pi) {
-        Pane& rp = app.panes[pi];
-        if (rp.buf != p.buf) continue;
-        xanatoo::ensure_valid_caret(buf(app, p.buf).doc,
-                                    rp.sel.focus);
-        rp.sel.anchor = rp.sel.focus;
-        rp.scroll_y = 0.f;
-        rp.layout = {};
-      }
+      refresh_views_of_buf(app, p.buf, -1, true);
       drop_height_hints_for_buf(app, p.buf);
       reset_blink(app);
-      for (auto& sw : app.soft_wins)
-        if (sw.buf == p.buf) {
-          sw.needs_layout = true;
-          sw.scroll = 0.f;
-          sw.layout = {};
-          sw.sel = p.sel;
-        }
       update_title(app);
       app.needs_layout = true;
       flash_status(app, (cmd == C::RevertToSaved ? "Reverted to " : "Reloaded ") +
@@ -644,20 +621,10 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         xanatoo::ensure_valid_caret(d, p.sel.focus);
         p.sel.anchor = p.sel.focus;
         p.layout = {};
-        if (app.panes[0].buf == app.panes[1].buf) {
-          Pane& other = app.panes[1 - app.focus];
-          xanatoo::ensure_valid_caret(d, other.sel.focus);
-          other.sel.anchor = other.sel.focus;
-        }
+        refresh_views_of_buf(app, p.buf, app.focus, false);
         reset_blink(app);
         drop_height_hints_for_buf(app, p.buf);
         app.needs_layout = true;
-        for (auto& sw : app.soft_wins)
-          if (sw.buf == p.buf) {
-            sw.needs_layout = true;
-            sw.layout = {};
-            sw.sel = p.sel;
-          }
       }
       break;
     case C::Redo:
@@ -665,20 +632,10 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         xanatoo::ensure_valid_caret(d, p.sel.focus);
         p.sel.anchor = p.sel.focus;
         p.layout = {};
-        if (app.panes[0].buf == app.panes[1].buf) {
-          Pane& other = app.panes[1 - app.focus];
-          xanatoo::ensure_valid_caret(d, other.sel.focus);
-          other.sel.anchor = other.sel.focus;
-        }
+        refresh_views_of_buf(app, p.buf, app.focus, false);
         reset_blink(app);
         drop_height_hints_for_buf(app, p.buf);
         app.needs_layout = true;
-        for (auto& sw : app.soft_wins)
-          if (sw.buf == p.buf) {
-            sw.needs_layout = true;
-            sw.layout = {};
-            sw.sel = p.sel;
-          }
       }
       break;
     case C::Cut: {
@@ -1271,6 +1228,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         break;
       }
       // Drop floats — their layouts refer to old trees.
+      for (const FloatWindow& w : app.soft_wins) release_view(app, w.view);
       app.soft_wins.clear();
       clear_interaction_hover(app);
       app.buffers.clear();
@@ -1280,8 +1238,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       app.panes[0].buf = d0;
       app.panes[1].buf = d1;
       app.split = true;
-      app.focus = 0;
-      for (int pi = 0; pi < 2; ++pi) {
+      focus_view(app, 0);
+      for (int pi = 0; pi < kCentreViews; ++pi) {
         Pane& dp = app.panes[pi];
         DocBuffer& db = buf(app, dp.buf);
         xanatoo::ensure_valid_caret(db.doc, dp.sel.focus);
@@ -1383,6 +1341,7 @@ void run_chrome(App& app) {
   auto ui_frame = app.ui.begin_frame(ui_state);
   app.ui_top = ui_frame.top_reserved;
   app.ui_bottom = ui_frame.bottom_reserved;
+  place_centre_rows(app);  // the toolbar may have changed height
   execute_command(app, ui_frame.cmd, ui_frame.arg);
   if (ui_frame.cmd != xanatoo::UiCommand::None) app.ui.release_input_capture();
 }
@@ -1399,9 +1358,7 @@ void poll_gamepad_axes(App& app) {
     float ly = axis(SDL_CONTROLLER_AXIS_LEFTY);
     if (ly != 0.f) {
       Pane& p = focused_pane(app);
-      float view_h = static_cast<float>(app.win_h - status_bar_h) - app.ui_top -
-                     app.ui_bottom;
-      float max_s = std::max(0.f, p.layout.content_height - view_h + 40.f);
+      const float max_s = pane_max_scroll(app, p);
       p.scroll_y = std::max(0.f, std::min(max_s, p.scroll_y + ly * 18.f));
     }
     // Triggers as page up/down
@@ -1436,9 +1393,10 @@ static void draw_pane_overlays(App& app, int i) {
   [[maybe_unused]] const float lh =
       static_cast<float>(app.fonts.regular.line_height());
   [[maybe_unused]] Pane& pane = app.panes[i];
-  [[maybe_unused]] const int clip_y = static_cast<int>(app.ui_top);
+  [[maybe_unused]] const int clip_y = pane.y;
+  [[maybe_unused]] const float py = static_cast<float>(pane.y);
   [[maybe_unused]] const float ox = static_cast<float>(pane.x);
-  [[maybe_unused]] const float draw_scroll = pane.scroll_y - app.ui_top;
+  [[maybe_unused]] const float draw_scroll = pane.scroll_y - py;
   // Hover affordances for interactive elements in this pane
   {
     SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
@@ -1515,7 +1473,7 @@ static void draw_pane_overlays(App& app, int i) {
           h = static_cast<float>(app.fonts.regular.line_height()) + 6.f;
         SDL_SetRenderDrawColor(app.sdl, 40, 130, 90, 50);
         SDL_Rect r{pane.x + static_cast<int>(box.x),
-                   static_cast<int>(box.y - pane.scroll_y + app.ui_top),
+                   static_cast<int>(box.y - pane.scroll_y + py),
                    static_cast<int>(box.width), static_cast<int>(h)};
         SDL_RenderFillRect(app.sdl, &r);
         SDL_SetRenderDrawColor(app.sdl, 30, 120, 80, 200);
@@ -1529,7 +1487,7 @@ static void draw_pane_overlays(App& app, int i) {
         if (pi.node != app.hover.image) continue;
         if (pi.thumb > 0) break;  // collection card: hand cursor only
         int ix = pane.x + static_cast<int>(pi.x);
-        int iy = static_cast<int>(pi.y - pane.scroll_y + app.ui_top);
+        int iy = static_cast<int>(pi.y - pane.scroll_y + py);
         int iw = static_cast<int>(pi.width);
         int ih = static_cast<int>(pi.height);
         SDL_SetRenderDrawColor(app.sdl, 25, 90, 170, 180);
@@ -1551,14 +1509,14 @@ static void draw_pane_overlays(App& app, int i) {
     // Column gutter highlight
     if (app.hover.col_gap_pane == i && app.hover.col_gap) {
       float mx = app.mouse_x - static_cast<float>(pane.x);
-      float my = content_y(app, app.mouse_y);
+      float my = content_y(app, app.mouse_y, i);
       for (const auto& gap : pane.layout.column_gaps) {
         float gx = gap.x;
         float gy0 = gap.y - pane.scroll_y;
         float gy1 = gy0 + gap.height;
         if (mx >= gx - 5.f && mx <= gx + 5.f && my >= gy0 && my <= gy1) {
           int gx_i = pane.x + static_cast<int>(gx);
-          int gy_i = static_cast<int>(gy0 + app.ui_top);
+          int gy_i = static_cast<int>(gy0 + py);
           int gh = static_cast<int>(gap.height);
           SDL_SetRenderDrawColor(app.sdl, 25, 90, 170, 90);
           SDL_Rect wide{gx_i - 4, gy_i, 9, gh};
@@ -1575,7 +1533,7 @@ static void draw_pane_overlays(App& app, int i) {
       for (const auto& box : pane.layout.boxes) {
         if (box.node != app.hover.task) continue;
         int x = pane.x + static_cast<int>(box.x);
-        int y = static_cast<int>(box.y - pane.scroll_y + app.ui_top);
+        int y = static_cast<int>(box.y - pane.scroll_y + py);
         int h = static_cast<int>(box.height);
         SDL_SetRenderDrawColor(app.sdl, 40, 140, 80, 55);
         SDL_Rect r{x, y, 26, h};
@@ -1591,7 +1549,7 @@ static void draw_pane_overlays(App& app, int i) {
         if (box.node != app.hover.grip) continue;
         int gw = static_cast<int>(kBlockGripW);
         int x = pane.x + static_cast<int>(box.x) - gw;
-        int y = static_cast<int>(box.y - pane.scroll_y + app.ui_top);
+        int y = static_cast<int>(box.y - pane.scroll_y + py);
         int h = static_cast<int>(box.height);
         SDL_SetRenderDrawColor(app.sdl, 80, 120, 180, 50);
         SDL_Rect r{x, y, gw, h};
@@ -1613,7 +1571,7 @@ static void draw_pane_overlays(App& app, int i) {
       for (const auto& box : pane.layout.boxes) {
         if (box.node != app.hover.transclude) continue;
         int x = pane.x + static_cast<int>(box.x);
-        int y = static_cast<int>(box.y - pane.scroll_y + app.ui_top);
+        int y = static_cast<int>(box.y - pane.scroll_y + py);
         int w = static_cast<int>(box.width);
         int h = static_cast<int>(box.height);
         SDL_SetRenderDrawColor(app.sdl, 180, 120, 40, 40);
@@ -1846,7 +1804,7 @@ static void draw_pane_overlays(App& app, int i) {
         default:
           break;
       }
-      int by = static_cast<int>(box.y - pane.scroll_y + app.ui_top);
+      int by = static_cast<int>(box.y - pane.scroll_y + py);
       int bh = static_cast<int>(box.height);
       if (by + bh < clip_y || by > app.win_h - status_bar_h) continue;
       // Leave room on the right for the kind tag.
@@ -1904,8 +1862,9 @@ static void draw_pane_overlays(App& app, int i) {
     SDL_RenderFillRect(app.sdl, &bar);
   }
 
-  // Version-diff marks (orange bars on changed text blocks)
-  if (app.diff_mode && !shared_doc(app)) {
+  // Version-diff marks (orange bars on changed text blocks); the diff is
+  // between the two centre views.
+  if (app.diff_mode && !shared_doc(app) && i < kCentreViews) {
     const auto& marks = app.diff_marks[i];
     if (!marks.empty()) {
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
@@ -1919,7 +1878,7 @@ static void draw_pane_overlays(App& app, int i) {
         }
         if (!hit) continue;
         // Content → screen: same convention as structure overlay (+ ui_top).
-        int by = static_cast<int>(box.y - pane.scroll_y + app.ui_top);
+        int by = static_cast<int>(box.y - pane.scroll_y + py);
         int bh = static_cast<int>(box.height);
         if (by + bh < clip_y || by > app.win_h - status_bar_h) continue;
         SDL_SetRenderDrawColor(app.sdl, 200, 120, 40, 200);
@@ -1971,7 +1930,7 @@ static void draw_pane_overlays(App& app, int i) {
         if (!hit) continue;
         int gx = pane.x + static_cast<int>(g.x);
         int gy =
-            static_cast<int>(g.y - pane.scroll_y + app.ui_top - lh * 0.85f);
+            static_cast<int>(g.y - pane.scroll_y + py - lh * 0.85f);
         // Width: advance to next glyph on the same baseline/node when possible.
         int gw = 8;
         {
@@ -1998,7 +1957,7 @@ static void draw_pane_overlays(App& app, int i) {
   // Column gutters (subtle vertical handles)
   for (const auto& gap : pane.layout.column_gaps) {
     int gx = pane.x + static_cast<int>(gap.x);
-    int gy = static_cast<int>(gap.y - pane.scroll_y + app.ui_top);
+    int gy = static_cast<int>(gap.y - pane.scroll_y + py);
     int gh = static_cast<int>(gap.height);
     bool active = app.dragging_col_gap && gap.left == app.col_gap_left;
     SDL_SetRenderDrawColor(app.sdl, active ? 25 : 190, active ? 90 : 188,
@@ -2015,13 +1974,13 @@ static void draw_pane_overlays(App& app, int i) {
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
       SDL_SetRenderDrawColor(app.sdl, 80, 140, 220, 60);
       SDL_Rect r{pane.x + static_cast<int>(box.x),
-                 static_cast<int>(box.y - pane.scroll_y + app.ui_top),
+                 static_cast<int>(box.y - pane.scroll_y + py),
                  static_cast<int>(box.width), static_cast<int>(box.height)};
       SDL_RenderFillRect(app.sdl, &r);
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
     }
     if (app.drop_line_y >= 0.f) {
-      int ly = static_cast<int>(app.drop_line_y - pane.scroll_y + app.ui_top);
+      int ly = static_cast<int>(app.drop_line_y - pane.scroll_y + py);
       SDL_SetRenderDrawColor(app.sdl, 25, 90, 170, 255);
       SDL_Rect line{pane.x + 24, ly - 1, pane.w - 40, 3};
       SDL_RenderFillRect(app.sdl, &line);
@@ -2029,7 +1988,7 @@ static void draw_pane_overlays(App& app, int i) {
   } else if (i == app.focus && !app.dragging_block) {
     // Subtle grip dots in the left gutter (not over the text)
     // mouse_y is window space; boxes are content space.
-    float adj_y = content_y(app, app.mouse_y) + pane.scroll_y;
+    float adj_y = content_y(app, app.mouse_y, i) + pane.scroll_y;
     float lx = app.mouse_x - static_cast<float>(pane.x);
     for (const auto& box : pane.layout.boxes) {
       if (adj_y < box.y || adj_y > box.y + box.height) continue;
@@ -2042,7 +2001,7 @@ static void draw_pane_overlays(App& app, int i) {
         continue;
       int gx = pane.x + static_cast<int>(box.x) -
                static_cast<int>(kBlockGripW) / 2 - 1;
-      int gy = static_cast<int>(box.y - pane.scroll_y + app.ui_top +
+      int gy = static_cast<int>(box.y - pane.scroll_y + py +
                                 box.height * 0.5f);
       SDL_SetRenderDrawColor(app.sdl, 160, 158, 150, 255);
       for (int d = -6; d <= 6; d += 6) {
@@ -2059,15 +2018,10 @@ static void draw_pane_scrollbar(App& app, int i) {
   [[maybe_unused]] const float lh =
       static_cast<float>(app.fonts.regular.line_height());
   [[maybe_unused]] Pane& pane = app.panes[i];
-  const float view_h_pane =
-      static_cast<float>(app.win_h - status_bar_h) - app.ui_top - app.ui_bottom;
-  const float max_scroll =
-      std::max(0.f, pane.layout.content_height - view_h_pane + 40.f);
+  const float max_scroll = pane_max_scroll(app, pane);
   // Classic scrollbar: track, ↑/↓, chapter/search markers, thumb.
   {
-    float view_h = static_cast<float>(app.win_h - status_bar_h) - app.ui_top -
-                   app.ui_bottom;
-    if (view_h < 1.f) view_h = 1.f;
+    const float view_h = std::max(1.f, static_cast<float>(pane.h));
     float content_h = std::max(view_h, pane.layout.content_height);
     const float arrow = static_cast<float>(kSbArrow);
     float track_h = std::max(1.f, view_h - 2.f * arrow);
@@ -2076,9 +2030,9 @@ static void draw_pane_scrollbar(App& app, int i) {
     if (thumb_h > track_h) thumb_h = track_h;
     float track_travel = std::max(0.f, track_h - thumb_h);
     float ratio = (max_scroll > 0.f) ? (pane.scroll_y / max_scroll) : 0.f;
-    float thumb_y = app.ui_top + arrow + ratio * track_travel;
+    float thumb_y = static_cast<float>(pane.y) + arrow + ratio * track_travel;
     int sx = pane.x + pane.w - kSbW;
-    int top = static_cast<int>(app.ui_top);
+    int top = pane.y;
     int vh = static_cast<int>(view_h);
 
     // Track (sunken trough)
@@ -2278,7 +2232,7 @@ static void draw_pane_layer(App& app, int i, const SDL_Rect& area, float ox,
   app.renderer.draw(pane.layout, scroll, ox);
 }
 
-static void release_raster(PaneRaster& r) {
+void release_raster(PaneRaster& r) {
   for (SDL_Texture*& t : r.tex) {
     if (t) SDL_DestroyTexture(t);
     t = nullptr;
@@ -2361,25 +2315,19 @@ static bool update_pane_raster(App& app, int i, int w, int h, float scroll) {
 // Text, selection and the three layers above, then the scrollbar.
 void draw_pane(App& app, int i) {
   Pane& pane = app.panes[i];
-  float view_h_pane =
-      static_cast<float>(app.win_h - status_bar_h) - app.ui_top - app.ui_bottom;
-  float max_scroll =
-      std::max(0.f, pane.layout.content_height - view_h_pane + 40.f);
-  if (pane.scroll_y > max_scroll) pane.scroll_y = max_scroll;
+  pane.scroll_y = std::min(pane.scroll_y, pane_max_scroll(app, pane));
 
-  const int clip_y = static_cast<int>(app.ui_top);
-  SDL_Rect clip{
-      pane.x, clip_y, std::max(1, pane.w - kSbW),
-      std::max(1, app.win_h - status_bar_h - clip_y -
-                      static_cast<int>(app.ui_bottom))};
+  const int clip_y = pane.y;
+  SDL_Rect clip{pane.x, clip_y, std::max(1, pane.w - kSbW),
+                std::max(1, pane.h)};
 
   // Draw at a whole-pixel scroll so the cached raster can be blitted; the
   // fractional part (touch / fling / scrollbar drag) stays in pane.scroll_y.
   const float exact_scroll = pane.scroll_y;
   pane.scroll_y = std::round(exact_scroll);
 
-  // screen_y = content_y - scroll_y + ui_top = content_y - (scroll_y - ui_top)
-  const float draw_scroll = pane.scroll_y - app.ui_top;
+  // screen_y = content_y - scroll_y + pane.y
+  const float draw_scroll = pane.scroll_y - static_cast<float>(pane.y);
   // Same mapping relative to the clip top (texture space).
   const float tex_scroll = draw_scroll + static_cast<float>(clip_y);
   if (update_pane_raster(app, i, clip.w, clip.h, tex_scroll)) {
@@ -2427,8 +2375,8 @@ void draw_split_chrome(App& app) {
       app.panes[0].sel.focus.node == app.panes[1].sel.focus.node) {
     float lh = static_cast<float>(app.fonts.regular.line_height());
     // draw_scroll matches pane rendering (content → screen under the toolbar).
-    const float ds0 = app.panes[0].scroll_y - app.ui_top;
-    const float ds1 = app.panes[1].scroll_y - app.ui_top;
+    const float ds0 = app.panes[0].scroll_y - static_cast<float>(app.panes[0].y);
+    const float ds1 = app.panes[1].scroll_y - static_cast<float>(app.panes[1].y);
     auto c0 = xanatoo::caret_screen_pos(app.panes[0].layout,
                                         app.panes[0].sel.focus, ds0, lh);
     auto c1 = xanatoo::caret_screen_pos(app.panes[1].layout,

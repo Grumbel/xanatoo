@@ -94,10 +94,7 @@ std::vector<FloatWindow*> dock_column(App& app, Dock side) {
 
 // Move / resize; a new width lays the window's content out again.
 void set_geom(App& app, FloatWindow& w, int x, int y, int ww, int hh) {
-  if (w.w != ww) {
-    if (w.role == WindowRole::Document) w.needs_layout = true;
-    if (w.role == WindowRole::Help) app.help_needs_layout = true;
-  }
+  if (w.w != ww && w.role == WindowRole::Help) app.help_needs_layout = true;
   w.x = x;
   w.y = y;
   w.w = ww;
@@ -220,14 +217,23 @@ void place_windows(App& app) {
       snap_soft_geom(app, w->x, w->y, w->w, w->h);
     }
   }
-}
-
-xanatoo::Document& soft_doc(App& app, FloatWindow& sw) {
-  return buf(app, sw.buf).doc;
+  // Document windows: the view fills the client area (a new size lays it
+  // out again).
+  for (FloatWindow& w : app.soft_wins) {
+    if (!view_live(app, w.view)) continue;
+    Pane& p = app.panes[w.view];
+    auto [cx, cy, cw, ch] = soft_client_rect(app, w);
+    if (p.w != cw || p.h != ch) app.needs_layout = true;
+    p.x = cx;
+    p.y = cy;
+    p.w = cw;
+    p.h = ch;
+  }
 }
 
 const std::string& soft_path(App& app, const FloatWindow& sw) {
-  const DocBuffer* b = find_buf(app, sw.buf);
+  const DocBuffer* b =
+      view_live(app, sw.view) ? find_buf(app, app.panes[sw.view].buf) : nullptr;
   if (!b) {
     static const std::string empty;
     return empty;
@@ -242,26 +248,25 @@ std::string soft_title(App& app, const FloatWindow& sw) {
   return path_title(path);
 }
 
-void layout_soft(App& app, FloatWindow& sw) {
-  float mw = static_cast<float>(std::max(120, sw.w - help_pad * 2));
-  std::string base = parent_dir(soft_path(app, sw));
-  try {
-    xanatoo::Document& d = soft_doc(app, sw);
-    xanatoo::ensure_valid_caret(d, sw.sel.focus);
-    sw.sel.anchor = sw.sel.focus;
-    sw.layout = app.layout_engine.layout(d, mw, base);
-  } catch (const std::exception& e) {
-    std::cerr << "soft layout failed: " << e.what() << "\n";
-    sw.layout = {};
-  }
-  sw.needs_layout = false;
-}
-
 void raise_soft(App& app, size_t i) {
   if (i + 1 >= app.soft_wins.size()) return;
   FloatWindow sw = std::move(app.soft_wins[i]);
   app.soft_wins.erase(app.soft_wins.begin() + static_cast<std::ptrdiff_t>(i));
   app.soft_wins.push_back(std::move(sw));
+}
+
+void close_doc_window(App& app, size_t i) {
+  if (i >= app.soft_wins.size()) return;
+  release_view(app, app.soft_wins[i].view);
+  app.soft_wins.erase(app.soft_wins.begin() + static_cast<std::ptrdiff_t>(i));
+  app.needs_layout = true;
+}
+
+FloatWindow* window_of_view(App& app, int pi) {
+  if (pi < kCentreViews) return nullptr;
+  for (FloatWindow& w : app.soft_wins)
+    if (w.view == pi) return &w;
+  return nullptr;
 }
 
 }  // namespace xanatoo::app

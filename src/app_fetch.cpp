@@ -191,7 +191,7 @@ void finish_navigate(App& app, const FetchJob& job) {
     // Input request — open URL bar with query for the user to complete.
     std::string q = r.final_url;
     if (!q.empty() && q.back() != '?') q.push_back('?');
-    app.focus = job.pane;
+    focus_view(app, job.pane);
     open_prompt(app, PromptKind::UrlBar, std::move(q));
     flash_status(app, std::string(r.input_status == 11 ? "Sensitive input: "
                                                        : "Input: ") +
@@ -402,7 +402,7 @@ void draw_load_indicator(App& app, int pi) {
   const Uint32 now = SDL_GetTicks();
   const float t = static_cast<float>(now - job->started) / 1000.f;
   // ImGui's tab strip (drawn last) overlaps the pane's first pixels.
-  const int top = static_cast<int>(app.ui_top) + 2;
+  const int top = p.y + 2;
   const int w = std::max(1, p.w - kSbW);
   SDL_RenderSetClipRect(app.sdl, nullptr);
   SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);

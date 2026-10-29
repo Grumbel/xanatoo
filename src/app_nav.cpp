@@ -122,7 +122,7 @@ std::string link_base_url(App& app, int pi) {
 // draft could not be written (then a new tab).
 static BufferId page_buffer(App& app, int pi) {
   Pane& p = app.panes[pi];
-  const bool shared = app.split && app.panes[1 - pi].buf == p.buf;
+  const bool shared = shown_anywhere_else(app, p.buf, pi);
   const DocBuffer* b = find_buf(app, p.buf);
   if (b && !shared && stash_draft(app, p.buf)) return p.buf;
   return add_buffer(app, xanatoo::parse_document("", {}), {});
@@ -148,20 +148,7 @@ void show_doc_in_pane(App& app, int pi, xanatoo::Document doc,
   p.layout = {};
   drop_height_hints_for_buf(app, p.buf);
   b.history.reset(nd, p.sel);
-  Pane& o = app.panes[1 - pi];
-  if (o.buf == p.buf) {
-    o.sel = p.sel;
-    o.scroll_y = 0.f;
-    o.layout = {};
-  }
-  for (auto& sw : app.soft_wins)
-    if (sw.buf == p.buf) {
-      sw.needs_layout = true;
-      sw.scroll = 0.f;
-      sw.layout = {};
-      xanatoo::ensure_valid_caret(nd, sw.sel.focus);
-      sw.sel.anchor = sw.sel.focus;
-    }
+  refresh_views_of_buf(app, p.buf, pi, true);
   if (std::find(app.tab_order.begin(), app.tab_order.end(), p.buf) ==
       app.tab_order.end())
     app.tab_order.push_back(p.buf);
@@ -327,11 +314,11 @@ void open_transclude_in_other_pane(App& app) {
   }
   const auto& tn = d.get(tid);
   xanatoo::NodeId local = xanatoo::resolve_transclude_local(d, tn.src);
-  if (!app.split) {
+  if (!app.split && app.focus < kCentreViews) {
     app.split = true;
     app.needs_layout = true;
   }
-  int other = 1 - app.focus;
+  const int other = other_pane(app);
   if (local != xanatoo::INVALID_NODE) {
     app.panes[other].buf = p.buf;  // same doc
     app.panes[other].sel.focus = {local, 0, 0};
