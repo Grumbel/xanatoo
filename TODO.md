@@ -8,6 +8,38 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-29) — Nostr links / media, remote images, thumtoo on Android
+
+- Nostr: author names link to `nostr:npub1…` (author feed: profile +
+  recent notes), dates to `nostr:note1…`; note text linkifies URLs,
+  NIP-27 refs and NIP-08 `#[n]`, labels media from NIP-92 `imeta`.
+- Remote images (`app_images.cpp`): `ImageCache` queues http(s) URLs,
+  workers download into `cache_dir()/images/` + 512px thumbnail, pruned
+  at startup. stb_image only (no WebP / AVIF). Not yet used by web pages.
+- Plan: replace the stb path with vendored thumtoo
+  (`~/projects/thumtoo/thumtoo.git`, git subtree in `external/thumtoo`
+  like galapix / biltoo) behind the same `ImageCache` seam, and adopt its
+  Location model (`//` pipes, e.g. `book.epub//markdown` for pandoc).
+- Android probe (aarch64, API 21, NDK 27): nixpkgs cross set
+  (`crossSystem.useAndroidPrebuilt`) + `makeStaticLibraries` stdenv (not
+  `pkgsStatic`: that is musl). Builds statically: zlib, libffi, pcre2,
+  GNU libiconv (bionic has none before API 28), expat, libjpeg-turbo,
+  libpng, libwebp (library only), glib 2.88 (meson, proxy-libintl in
+  `subprojects/`, no libmount / selinux / xattr), libvips 8.18 (JPEG / PNG
+  / WebP / GIF only, `prefer_static`), libarchive 3.8 (zlib + iconv,
+  `-I contrib/android/include`), SQLite amalgamation, **libthumtoo**
+  (no MuPDF / DjVu / curl / tesseract / dbus / unarr); `thumtoo-prepare`
+  links (13 MB unstripped). ~20 MB of `.a` files.
+  nixpkgs' own glib / libarchive / sqlite / libjxl / libwebp derivations
+  fail (attr, elfutils, bash, tools) — minimal derivations needed.
+- Blocker: thumtoo's cache codec is hard-wired JXL (`kDefaultCodec`,
+  `encode_jxl_level`, `vips_jxlload_buffer`); cache format only has to be
+  fast → JPEG by default, WebP for alpha, codec per blob (exists). Change
+  in thumtoo, then libjxl optional.
+- Open: run on a device; armeabi-v7a / x86_64; move the probe into
+  `nix/` and feed prebuilt `.a` into ndk-build; R36S (eoan sysroot,
+  `std::span` shim for GCC 9).
+
 ## Status (2026-10-29) — desktop integration (gamepkgstd INTEGRATION.md)
 
 - App ID `xanatoo` everywhere: `data/xanatoo.desktop` (opens files: `%F`,
