@@ -1115,12 +1115,7 @@ static void on_controllerbuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
       break;
     case SDL_CONTROLLER_BUTTON_Y:
       // Forward in history when possible; else structure overlay.
-      if (app.nav_hist_pos + 1 < static_cast<int>(app.nav_history.size())) {
-        ++app.nav_hist_pos;
-        navigate_to_url(app,
-                        app.nav_history[static_cast<size_t>(app.nav_hist_pos)],
-                        /*record_history=*/false);
-      } else {
+      if (!nav_step(app, 1)) {
         app.structure_mode = !app.structure_mode;
         flash_status(app,
                      app.structure_mode ? "Structure on" : "Structure off");
@@ -1140,11 +1135,7 @@ static void on_controllerbuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
       break;
     case SDL_CONTROLLER_BUTTON_BACK:
       // Prefer capsule history when available; else toggle browse.
-      if (app.nav_hist_pos > 0) {
-        --app.nav_hist_pos;
-        navigate_to_url(app,
-                        app.nav_history[static_cast<size_t>(app.nav_hist_pos)],
-                        /*record_history=*/false);
+      if (nav_step(app, -1)) {
       } else if (focused_read_only(app)) {
         flash_status(app, kReadOnlyNotice);
       } else {
@@ -1379,15 +1370,8 @@ static bool handle_nav_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
   switch (ev.key.keysym.sym) {
     case SDLK_LEFT:
       if (alt && !ctrl) {
-        // Capsule history back
-        if (app.nav_hist_pos > 0) {
-          --app.nav_hist_pos;
-          navigate_to_url(
-              app, app.nav_history[static_cast<size_t>(app.nav_hist_pos)],
-              /*record_history=*/false);
-        } else {
-          flash_status(app, "No previous page");
-        }
+        // This view's history back
+        if (!nav_step(app, -1)) flash_status(app, "No previous page");
         return true;
       }
       move_and_sel([&] {
@@ -1403,15 +1387,8 @@ static bool handle_nav_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
 
     case SDLK_RIGHT:
       if (alt && !ctrl) {
-        // Capsule history forward
-        if (app.nav_hist_pos + 1 < static_cast<int>(app.nav_history.size())) {
-          ++app.nav_hist_pos;
-          navigate_to_url(
-              app, app.nav_history[static_cast<size_t>(app.nav_hist_pos)],
-              /*record_history=*/false);
-        } else {
-          flash_status(app, "No next page");
-        }
+        // This view's history forward
+        if (!nav_step(app, 1)) flash_status(app, "No next page");
         return true;
       }
       move_and_sel([&] {

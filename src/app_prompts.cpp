@@ -277,7 +277,7 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
         p.buf = existing;
         app.needs_layout = true;
         update_title(app);
-        push_nav_history(app, path);
+        push_nav_history(app, app.focus, path);
         flash_status(app, "Switched to " + path);
         minibuf_commit_path_hist(app);
         close_prompt(app);
@@ -300,7 +300,7 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
         app.tab_order.push_back(p.buf);
       app.needs_layout = true;
       update_title(app);
-      push_nav_history(app, path);
+      push_nav_history(app, app.focus, path);
       flash_status(app, "Opened " + path);
       std::cout << "Opened: " << path << "\n";
       minibuf_commit_path_hist(app);

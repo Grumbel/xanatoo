@@ -137,6 +137,14 @@ void draw_client_scrollbar(App& app, int cx, int cy, int cw, int ch,
 }
 
 // First running page navigation (status line + toolbar Stop button).
+// "  ·  3/7": the focused view's place in its own Back / Forward trail.
+static std::string nav_position(App& app) {
+  const NavHistory& h = focused_pane(app).nav;
+  if (h.pos < 0 || h.urls.empty()) return {};
+  return "  ·  " + std::to_string(h.pos + 1) + "/" +
+         std::to_string(static_cast<int>(h.urls.size()));
+}
+
 static const FetchJob* loading_job(const App& app) {
   for (const FetchJob& j : app.fetches)
     if (j.purpose == FetchPurpose::Navigate) return &j;
@@ -233,12 +241,7 @@ StatusLine compute_status(App& app) {
     if (page.empty()) page = app.gemini_current_url;
     if (!page.empty() && xanatoo::is_gemini_url(page)) {
       label = page;
-      if (app.nav_hist_pos >= 0 && !app.nav_history.empty()) {
-        label += "  ·  ";
-        label += std::to_string(app.nav_hist_pos + 1);
-        label += "/";
-        label += std::to_string(static_cast<int>(app.nav_history.size()));
-      }
+      label += nav_position(app);
       label += "  ·  browse · F2 edit";
     } else {
       label = "Browse (read-only) · arrows / gamepad · A/Space open · F2 edit";
@@ -247,12 +250,7 @@ StatusLine compute_status(App& app) {
   } else if (!path_of(app, focused_pane(app)).empty() &&
              xanatoo::is_gemini_url(path_of(app, focused_pane(app)))) {
     label = path_of(app, focused_pane(app));
-    if (app.nav_hist_pos >= 0 && !app.nav_history.empty()) {
-      label += "  ·  ";
-      label += std::to_string(app.nav_hist_pos + 1);
-      label += "/";
-      label += std::to_string(static_cast<int>(app.nav_history.size()));
-    }
+    label += nav_position(app);
     tone = StatusTone::Browse;
   } else if (app.structure_mode) {
     label =

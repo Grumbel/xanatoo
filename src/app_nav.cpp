@@ -27,18 +27,42 @@ namespace fs = std::filesystem;
 
 namespace xanatoo::app {
 
-void push_nav_history(App& app, const std::string& url) {
-  if (url.empty()) return;
-  if (app.nav_hist_pos >= 0 &&
-      app.nav_hist_pos < static_cast<int>(app.nav_history.size()) &&
-      app.nav_history[static_cast<size_t>(app.nav_hist_pos)] == url)
+void push_nav_history(App& app, int pi, const std::string& url) {
+  if (url.empty() || pi < 0 || pi >= kMaxViews) return;
+  if (app.visited.empty() || app.visited.back() != url) {
+    app.visited.push_back(url);
+    if (static_cast<int>(app.visited.size()) > kMaxNavHistory)
+      app.visited.erase(app.visited.begin());
+  }
+  NavHistory& h = app.panes[pi].nav;
+  if (h.pos >= 0 && h.pos < static_cast<int>(h.urls.size()) &&
+      h.urls[static_cast<size_t>(h.pos)] == url)
     return;
-  if (app.nav_hist_pos + 1 < static_cast<int>(app.nav_history.size()))
-    app.nav_history.resize(static_cast<size_t>(app.nav_hist_pos + 1));
-  app.nav_history.push_back(url);
-  while (static_cast<int>(app.nav_history.size()) > kMaxNavHistory)
-    app.nav_history.erase(app.nav_history.begin());
-  app.nav_hist_pos = static_cast<int>(app.nav_history.size()) - 1;
+  if (h.pos + 1 < static_cast<int>(h.urls.size()))
+    h.urls.resize(static_cast<size_t>(h.pos + 1));
+  h.urls.push_back(url);
+  while (static_cast<int>(h.urls.size()) > kMaxNavHistory)
+    h.urls.erase(h.urls.begin());
+  h.pos = static_cast<int>(h.urls.size()) - 1;
+}
+
+bool can_nav_step(App& app, int dir) {
+  const NavHistory& h = focused_pane(app).nav;
+  const int to = h.pos + dir;
+  return h.pos >= 0 && to >= 0 && to < static_cast<int>(h.urls.size());
+}
+
+bool nav_step(App& app, int dir) {
+  if (!can_nav_step(app, dir)) return false;
+  NavHistory& h = focused_pane(app).nav;
+  const int from = h.pos;
+  h.pos += dir;
+  // A copy: navigation may replace the view's buffer, never its trail,
+  // but keep the string independent of the vector anyway.
+  const std::string url = h.urls[static_cast<size_t>(h.pos)];
+  if (!navigate_to_url(app, url, /*record_history=*/false))
+    focused_pane(app).nav.pos = from;
+  return true;
 }
 
 bool is_bookmarked(App& app, const std::string& url) {
@@ -192,12 +216,12 @@ bool navigate_pane(App& app, int pi, std::string target, bool record_history) {
     app.focus = pi;  // open_drafts_page shows in the focused pane
     open_drafts_page(app);
     app.focus = saved;
-    if (record_history) push_nav_history(app, target);
+    if (record_history) push_nav_history(app, pi, target);
     return true;
   }
   if (xanatoo::starts_with(target, "draft:")) {
     if (!open_draft(app, pi, target)) return false;
-    if (record_history) push_nav_history(app, target);
+    if (record_history) push_nav_history(app, pi, target);
     return true;
   }
 
@@ -214,7 +238,7 @@ bool navigate_pane(App& app, int pi, std::string target, bool record_history) {
           app.gemini_current_url = final_url;
           app.browse_mode = true;
         }
-        if (record_history) push_nav_history(app, final_url);
+        if (record_history) push_nav_history(app, pi, final_url);
         flash_status(app, "Opened " + final_url);
         return true;
       }
@@ -273,7 +297,7 @@ bool navigate_pane(App& app, int pi, std::string target, bool record_history) {
         p.layout = {};
         app.needs_layout = true;
         update_title(app);
-        if (record_history) push_nav_history(app, path);
+        if (record_history) push_nav_history(app, pi, path);
         flash_status(app, "Switched to " + path);
         return true;
       }
@@ -288,7 +312,7 @@ bool navigate_pane(App& app, int pi, std::string target, bool record_history) {
       return false;
     }
     show_doc_in_pane(app, pi, load_doc(app, open_path), open_path);
-    if (record_history) push_nav_history(app, open_path);
+    if (record_history) push_nav_history(app, pi, open_path);
     flash_status(app, was_import ? ("Imported " + path + " → " + open_path)
                                : ("Opened " + open_path));
   }

@@ -530,6 +530,7 @@ FloatWindow* new_doc_window(App& app, BufferId bi) {
   Pane& p = app.panes[view];
   p = Pane{};
   p.buf = bi;
+  push_nav_history(app, view, buf(app, bi).path);
   xanatoo::ensure_valid_caret(buf(app, bi).doc, p.sel.focus);
   p.sel.anchor = p.sel.focus;
   FloatWindow sw;
@@ -580,6 +581,7 @@ void pop_out_focused(App& app) {
   FloatWindow* w = new_doc_window(app, bi);
   if (!w) return;
   Pane& v = app.panes[w->view];
+  v.nav = p.nav;  // the window takes the tab's trail along
   v.sel = sel;
   v.scroll_y = scroll;
   focus_view(app, w->view);
@@ -602,6 +604,7 @@ void pop_in_soft(App& app, size_t si) {
     if (std::find(app.tab_order.begin(), app.tab_order.end(), c.buf) ==
         app.tab_order.end())
       app.tab_order.push_back(c.buf);
+    push_nav_history(app, to, path_of(app, c));
   }
   release_view(app, view);
   app.soft_wins.erase(app.soft_wins.begin() + static_cast<std::ptrdiff_t>(si));

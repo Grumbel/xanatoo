@@ -384,6 +384,7 @@ Steps, each useful alone:
   *Done (2026-10-29):* windows own a `Pane` slot (`FloatWindow::view`)
   with its own rect; next, placement `{CentreSlot n | Dock | Float | Max}`
   on the view itself, so "Move Window to Tab" is only a placement change.
+- Per-view Back / Forward (`Pane::nav`). *Done (2026-10-29).*
 - Tool views take an explicit target view instead of `focused_pane`.
 - Diff / split preview reference `ViewId`s.
 - Per-slot tab strips; "Move Window to Tab" = change placement.

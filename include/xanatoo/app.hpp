@@ -115,8 +115,15 @@ struct FootnoteOverlay {
 // view); document windows own one of the slots from kCentreViews up
 // (FloatWindow::view). x / y / w / h is the content rect in window pixels
 // (the scrollbar strip is the rightmost kSbW of it).
+// Back / Forward trail of one view: pages it showed, `pos` = current.
+struct NavHistory {
+  std::vector<std::string> urls;
+  int pos = -1;
+};
+
 struct Pane {
   BufferId buf = kNoBuffer;
+  NavHistory nav;  // this view's own Back / Forward
   xanatoo::Selection sel{};
   float scroll_y = 0.f;
   float preferred_x = 0.f;
@@ -481,8 +488,9 @@ struct App {
   std::vector<std::string> minibuf_hist_path;
   std::vector<std::string> minibuf_hist_url;
   std::string gemini_current_url;
-  std::vector<std::string> nav_history;
-  int nav_hist_pos = -1;
+  // Pages opened this session in any view, oldest first (History panel);
+  // Back / Forward use each view's own `Pane::nav`.
+  std::vector<std::string> visited;
   std::vector<std::string> bookmarks;
   bool history_panel_open = false;
   bool preferences_open = false;  // Edit → Preferences (ImGui window)
@@ -774,7 +782,12 @@ void touch_finger_up(App& app, const SDL_TouchFingerEvent& tf);
 void update_touch(App& app);
 
 // ---- nav ----
-void push_nav_history(App& app, const std::string& url);
+// Records `url` as the page view `pi` now shows (its trail + session log).
+void push_nav_history(App& app, int pi, const std::string& url);
+// Back (dir −1) / Forward (+1) in the focused view; false when there is
+// no page that way.
+bool can_nav_step(App& app, int dir);
+bool nav_step(App& app, int dir);
 bool is_bookmarked(App& app, const std::string& url);
 void add_bookmark(App& app, const std::string& url);
 void remove_bookmark(App& app, const std::string& url);

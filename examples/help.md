@@ -153,7 +153,9 @@ green. Use this for reading and navigating.
 
 ## Navigation (history & bookmarks)
 
-- **Alt+Left** / **Alt+Right** — Back / Forward in session history
+- **Alt+Left** / **Alt+Right** — Back / Forward in this view: each pane
+  and document window keeps its own trail (a popped-out window takes the
+  tab's trail along); the History panel lists every page of the session
 - **Alt+Up** (read-only pages) — Up one level: parent directory, URL path, subreddit
 - **Alt+Home** — Home page (`welcome.md`; toolbar house button)
 - **Browse toolbar** — Back, Forward, Up, Home, Reload, Native view (web page ↔ `wikipedia:` / `hn:` / `reddit:` / `lemmy:` form; pressed while native), location field, Bookmark, History, Browse mode

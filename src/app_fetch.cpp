@@ -214,7 +214,7 @@ void finish_navigate(App& app, const FetchJob& job) {
     app.gemini_current_url = r.final_url;
     app.browse_mode = true;
   }
-  if (job.record_history) push_nav_history(app, r.final_url);
+  if (job.record_history) push_nav_history(app, job.pane, r.final_url);
   char secs[32];
   std::snprintf(secs, sizeof(secs), "  (%.1f s)",
                 static_cast<double>(SDL_GetTicks() - job.started) / 1000.0);

@@ -202,6 +202,7 @@ void shift_left(App& app) {
   Pane& r = app.panes[1];
   const BufferId old_left = l.buf;
   set_pane_view(app, 0, r.buf, r.sel, r.scroll_y);
+  push_nav_history(app, 0, path_of(app, l));  // the trail moved left
   const DocBuffer* ob = find_buf(app, old_left);
   if (ob && old_left != l.buf && !ob->dirty &&
       !shown_anywhere_else(app, old_left, 1))
@@ -292,9 +293,9 @@ void commit_split_preview(App& app) {
       app.gemini_current_url = label;
       app.browse_mode = true;
     }
-    push_nav_history(app, label);
+    push_nav_history(app, 1, label);
   } else if (!path_of(app, r).empty() && r.buf != app.panes[0].buf) {
-    push_nav_history(app, path_of(app, r));
+    push_nav_history(app, 1, path_of(app, r));
   }
   pv.saved_buf = kNoBuffer;
 }

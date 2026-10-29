@@ -132,7 +132,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.doc_label = path_of(app, focused_pane(app)).empty()
                            ? std::string("untitled")
                            : path_of(app, focused_pane(app));
-  ui_state.can_nav_back = app.nav_hist_pos > 0;
+  ui_state.can_nav_back = can_nav_step(app, -1);
   {
     const std::string& path = path_of(app, focused_pane(app));
     ui_state.alternate_url = xanatoo::alternate_view_url(path);
@@ -189,12 +189,20 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
     ui_state.collection_sort = static_cast<int>(v.sort);
     ui_state.collection_thumb = v.thumb_px;
   }
-  ui_state.can_nav_forward =
-      app.nav_hist_pos + 1 < static_cast<int>(app.nav_history.size());
+  ui_state.can_nav_forward = can_nav_step(app, 1);
   ui_state.history_open = app.history_panel_open;
   ui_state.bookmarks_open = app.bookmarks_panel_open;
-  ui_state.history_entries = app.nav_history;
-  ui_state.history_pos = app.nav_hist_pos;
+  ui_state.history_entries = app.visited;
+  {
+    // The latest visit of the focused page is the "current" entry.
+    const std::string& here = path_of(app, focused_pane(app));
+    ui_state.history_pos = -1;
+    for (int i = static_cast<int>(app.visited.size()) - 1; i >= 0; --i)
+      if (app.visited[static_cast<size_t>(i)] == here) {
+        ui_state.history_pos = i;
+        break;
+      }
+  }
   ui_state.bookmarks = app.bookmarks;
   {
     const std::string& cur = path_of(app, focused_pane(app));
@@ -373,24 +381,10 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       if (cancel_fetches(app)) flash_status(app, "Stopped loading");
       break;
     case C::NavBack:
-      if (app.nav_hist_pos > 0) {
-        --app.nav_hist_pos;
-        navigate_to_url(app,
-                        app.nav_history[static_cast<size_t>(app.nav_hist_pos)],
-                        /*record_history=*/false);
-      } else {
-        flash_status(app, "No previous page");
-      }
+      if (!nav_step(app, -1)) flash_status(app, "No previous page");
       break;
     case C::NavForward:
-      if (app.nav_hist_pos + 1 < static_cast<int>(app.nav_history.size())) {
-        ++app.nav_hist_pos;
-        navigate_to_url(app,
-                        app.nav_history[static_cast<size_t>(app.nav_hist_pos)],
-                        /*record_history=*/false);
-      } else {
-        flash_status(app, "No next page");
-      }
+      if (!nav_step(app, 1)) flash_status(app, "No next page");
       break;
     case C::GoHome: {
       const std::string home = home_page(app);

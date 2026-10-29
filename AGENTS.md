@@ -53,6 +53,9 @@ Every view has its own rect (`Pane::x/y/w/h`, centre rows from
 `focus_view`, `live_views` (never `pi < 2`), `other_pane` (never
 `1 - app.focus`), `pane_at(app, x, y)` and `content_y(app, y, pi)`;
 after replacing a buffer's document call `refresh_views_of_buf`.
+Back / Forward are per view (`Pane::nav`): record a shown page with
+`push_nav_history(app, pi, url)`, step with `nav_step`; `App::visited`
+is only the session log for the History panel.
 
 Buffers are addressed by stable `BufferId` (`DocBuffer::id`, never reused,
 `kNoBuffer` = 0): use `buf(app, id)` / `find_buf` / `add_buffer` /

@@ -33,10 +33,23 @@ Next bundle number: **263** (this delivery is **262**)
   tables) cycles live views. Split preview, diff and the shared-doc
   caret mirror stay centre-only.
 - Pages opened inside a window still join the tab strip (tabs = buffer
-  list) and the one session history. Open: per-view history, per-slot
-  tab strips, `ViewId` relations (BRAINSTORM §11).
+  list). Open: per-slot tab strips, `ViewId` relations (BRAINSTORM §11);
+  per-view history done (below).
 - Ctrl+Shift+P toggles: pop out, or (caret in a window) back to a tab
   (Ctrl+Shift+I stays Insert Image).
+
+## Status (2026-10-29) — per-view Back / Forward
+
+- `Pane::nav` (`NavHistory`): every view (centre panes, document
+  windows) has its own trail; `push_nav_history(app, pi, url)` records,
+  `nav_step` / `can_nav_step` walk the focused view. The global list is
+  now `App::visited`, a session log for the History panel only.
+- New window: trail starts at its page; pop out copies the tab's trail;
+  Move Window to Tab pushes the page onto the centre slot's trail; split
+  "shift left" pushes the moved page onto the left pane's trail.
+- Status line "3/7" counts the focused view's trail.
+- Open: tab switches are not navigation (no trail entry); a tab strip per
+  centre slot would make the trail and the tab list one thing.
 
 ## Status (2026-10-29) — preferences, hover previews off
 

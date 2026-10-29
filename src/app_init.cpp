@@ -165,9 +165,9 @@ bool app_init(App& app) {
   apply_font_sizes(app);
   open_first_gamepad(app);
   if (app.gamepad) app.stick_cursor_on = true;
-  for (const auto& b : app.buffers) {
-    if (!b.path.empty()) push_nav_history(app, b.path);
-  }
+  for (int pi = 0; pi < kCentreViews; ++pi)
+    if (const DocBuffer* b = find_buf(app, app.panes[pi].buf))
+      push_nav_history(app, pi, b->path);
   // A remote URL given on the command line loads through the navigator
   // (the pane's buffer starts as a "Loading…" placeholder).
   for (int pi = 0; pi < (app.buffers.size() > 1 ? 2 : 1); ++pi) {
