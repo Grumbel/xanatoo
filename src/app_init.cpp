@@ -101,6 +101,7 @@ bool app_init(App& app) {
   app.minibuf_hist_path = load_minibuffer_history("path");
   app.minibuf_hist_url = load_minibuffer_history("url");
   app.bookmarks = load_bookmarks();
+  prune_image_caches();
 
   {
     std::string p0 = app.opt.file_path;

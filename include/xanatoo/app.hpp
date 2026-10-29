@@ -6,7 +6,9 @@
 
 #include <atomic>
 #include <cstdint>
+#include <deque>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -287,6 +289,15 @@ struct FetchShared {
   // Gemini 10/11: the server asks for input (meta = prompt text).
   int input_status = 0;
   std::string input_meta;
+};
+
+// Remote image downloads (app_images.cpp): URLs ImageCache asked for,
+// fetched by a few worker threads into cache_dir()/images/.
+struct ImageFetchShared {
+  std::mutex mutex;
+  std::deque<std::string> queue;
+  std::vector<std::pair<std::string, bool>> done;  // url, ok
+  int workers = 0;
 };
 
 struct FetchJob {
@@ -588,6 +599,8 @@ struct App {
   Touch touch;
   std::vector<FetchJob> fetches;
   uint64_t next_fetch_id = 1;
+  std::shared_ptr<ImageFetchShared> image_fetch =
+      std::make_shared<ImageFetchShared>();
   std::vector<CachedPage> page_cache;
   SplitPreview split_preview;
   SplitTrail split_trail;
@@ -899,13 +912,21 @@ xanatoo::NodeId current_collection(App& app);
 // UiCommand::CollectionView: "grid" / "list" / "full", "small" / "medium" /
 // "large", "sort-doc" / "sort-name" / "sort-name-desc", "view" (lightbox).
 void collection_command(App& app, const std::string& arg);
-// Press on a collection card in pane `pi`: open the lightbox at that item.
+// Press on a collection card or inline thumbnail (remote image) in pane
+// `pi`: open the lightbox at that item.
 bool click_collection_card(App& app, int pi, float lx, float my);
 // Right-click: remember the collection under the point for the menu.
 void note_collection_target(App& app, int pi, float lx, float my);
 // While the lightbox is open it takes every event. True = consumed.
 bool lightbox_event(App& app, const SDL_Event& ev);
 void draw_lightbox(App& app);
+
+// ---- remote images (app_images.cpp) ----
+// Start downloads ImageCache asked for and apply finished ones (relayout).
+// Once per frame, after layout.
+void poll_images(App& app);
+// Trim the download and thumbnail caches (background, at startup).
+void prune_image_caches();
 
 // ---- split browsing (app_split.cpp) ----
 // Split view with independent panes (not diff mode): left links open on the

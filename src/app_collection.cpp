@@ -59,6 +59,29 @@ void open_lightbox(App& app, Pane& pane, NodeId coll, NodeId image) {
   lb.open = true;
 }
 
+// Inline image (no collection): every image of the document, in order.
+void open_image_lightbox(App& app, Pane& pane, NodeId image) {
+  const auto& doc = doc_of(app, pane);
+  Lightbox& lb = app.lightbox;
+  lb.items.clear();
+  lb.index = 0;
+  std::vector<NodeId> stack{doc.root};
+  while (!stack.empty()) {
+    const NodeId id = stack.back();
+    stack.pop_back();
+    if (id == xanatoo::INVALID_NODE) continue;
+    const xanatoo::Node& n = doc.get(id);
+    if (n.kind == xanatoo::NodeKind::Image && !n.src.empty()) {
+      if (id == image) lb.index = static_cast<int>(lb.items.size());
+      lb.items.push_back({n.src, n.alt});
+    }
+    stack.insert(stack.end(), n.children.rbegin(), n.children.rend());
+  }
+  if (lb.items.empty()) return;
+  lb.base = base_of(app, pane);
+  lb.open = true;
+}
+
 void step(Lightbox& lb, int delta) {
   const int n = static_cast<int>(lb.items.size());
   if (n == 0) return;
@@ -115,11 +138,14 @@ void collection_command(App& app, const std::string& arg) {
 bool click_collection_card(App& app, int pi, float lx, float my) {
   Pane& p = app.panes[pi];
   for (const auto& im : p.layout.images) {
-    if (im.thumb <= 0 || im.group == xanatoo::INVALID_NODE) continue;
+    if (im.thumb <= 0) continue;
     const float y0 = im.y - p.scroll_y;
     if (lx >= im.x && lx <= im.x + im.width && my >= y0 &&
         my <= y0 + im.height) {
-      open_lightbox(app, p, im.group, im.node);
+      if (im.group != xanatoo::INVALID_NODE)
+        open_lightbox(app, p, im.group, im.node);
+      else
+        open_image_lightbox(app, p, im.node);
       return app.lightbox.open;
     }
   }
@@ -246,7 +272,8 @@ void draw_lightbox(App& app) {
     SDL_Rect dst{(app.win_w - w) / 2, pad + (avail_h - h) / 2, w, h};
     SDL_RenderCopy(app.sdl, img.texture, nullptr, &dst);
   } else {
-    const std::string msg = "Cannot load " + item.src;
+    const std::string msg =
+        std::string(img.pending ? "Loading " : "Cannot load ") + item.src;
     app.renderer.draw_text(font, static_cast<float>(pad),
                            static_cast<float>(app.win_h / 2), msg, 220, 120,
                            120);

@@ -71,6 +71,7 @@ add_executable(xanatoo
   src/app_sitemap.cpp
   src/app_collection.cpp
   src/app_drafts.cpp
+  src/app_images.cpp
   src/theme.cpp
   src/font.cpp
   src/document.cpp
@@ -165,6 +166,8 @@ set(XANATOO_TLS "openssl" CACHE STRING "TLS backend: openssl or mbedtls")
 set_property(CACHE XANATOO_TLS PROPERTY STRINGS openssl mbedtls)
 if(XANATOO_NEED_OPENSSL)
   target_sources(xanatoo PRIVATE src/https.cpp)
+  # https.hpp is available: remote images download (app_images.cpp).
+  target_compile_definitions(xanatoo PRIVATE XANATOO_HTTPS=1)
   if(XANATOO_TLS STREQUAL "mbedtls")
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(MBEDTLS REQUIRED IMPORTED_TARGET mbedtls mbedx509 mbedcrypto)
@@ -372,6 +375,7 @@ target_compile_definitions(xanatoo_tests PRIVATE
   XANATOO_FEEDS=0
   XANATOO_WEB=0
   XANATOO_WIKIPEDIA=0
+  XANATOO_HTTPS=0
   XANATOO_FONTCONFIG=$<BOOL:${XANATOO_FONTCONFIG}>
   XANATOO_SQLITE=$<BOOL:${XANATOO_SQLITE}>
   "XANATOO_STYLE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/styles\""

@@ -35,6 +35,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_touch.cpp` | touchscreen gestures: tap → click, drag/fling scroll, long-press select, pinch zoom |
 | `app_buffers.cpp` / `app_view.cpp` / `app_nav.cpp` / `app_softwin.cpp` / `app_prompts.cpp` / `app_pointer.cpp` | document buffers, scroll/fold/outline, URL history + bookmarks, floating windows, minibuffer, cursor/gamepad |
 | `app_fetch.cpp` | background page fetches (`FetchJob` on a worker thread → `poll_fetches`), page cache, loading indicator |
+| `app_images.cpp` | remote (http/https) images: worker downloads of what `ImageCache` queued → `cache_dir()/images/`, thumbnail prebuilt, relayout on completion (`poll_images`); cache pruning at startup |
 | `app_collection.cpp` | collection view state (layout / size / sort), card clicks, fullscreen `Lightbox` viewer |
 | `app_drafts.cpp` | unsaved edits → drafts in the revision store (`revstore.hpp`): autosave, restore on load (`attach_draft`), save / revert, `drafts:` page |
 | `app_footnotes.cpp` | footnote overlay: notes of on-screen `FootnoteRef` marks laid out in a strip at the pane bottom (`FootnoteOverlay` per pane), click jumps to the note |
@@ -333,6 +334,19 @@ mechanism; historical bundle numbers in TODO.md are archival).
 - `npub1` / `nprofile1` open the author's profile + recent notes. Message
   headers link the author (`nostr:npub1…`) and date (`nostr:note1…`) via
   Link spans on the Message node (`[0]` author, `[1]` date; see `types.hpp`).
+- Note text goes through `nostr_append_content`: URLs / `nostr:` refs /
+  NIP-08 `#[n]` → links (mentions as `@name`), media labelled `[image]` /
+  `[video]` / `[audio]` (NIP-92 `imeta` type, else extension), images also
+  as remote Image nodes.
+
+## Remote images
+
+- An Image whose `src` is http(s) is remote: `ImageCache` never fetches,
+  it queues the URL (`take_requests`) and returns a `pending` placeholder;
+  `poll_images` (app_images.cpp) downloads it and calls `remote_done`.
+- Layout draws remote images from their `kRemoteThumbEdge` thumbnail
+  (`layout_remote_image`); a click opens the lightbox over all document
+  images. Decoding is stb_image only (PNG / JPEG / GIF / BMP — no WebP / AVIF).
 - No posting or key management in v1.
 
 ## Gemini

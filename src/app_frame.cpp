@@ -2855,6 +2855,7 @@ void run_frame(App& app) {
   // the first layout pass. Relayout before draw so glyphs/carets never
   // reference node ids from the previous document tree.
   relayout_if_needed(app);
+  poll_images(app);
   poll_gamepad_axes(app);
   draw_panes(app);
   draw_split_chrome(app);

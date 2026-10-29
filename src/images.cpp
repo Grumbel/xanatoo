@@ -16,6 +16,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <functional>
+#include <utility>
 #include <iostream>
 #include <vector>
 
@@ -56,9 +57,26 @@ Image ImageCache::to_texture(const unsigned char* rgba, int w, int h) {
   return img;
 }
 
+namespace {
+
+// Downloaded files are untrusted: refuse absurd dimensions before decoding.
+constexpr long long kMaxPixels = 64ll * 1024 * 1024;
+
+unsigned char* load_rgba(const std::string& path, int& w, int& h) {
+  int comp = 0;
+  if (stbi_info(path.c_str(), &w, &h, &comp) &&
+      static_cast<long long>(w) * h > kMaxPixels) {
+    std::cerr << "image too large: " << path << " (" << w << "x" << h << ")\n";
+    return nullptr;
+  }
+  return stbi_load(path.c_str(), &w, &h, &comp, 4);
+}
+
+}  // namespace
+
 Image ImageCache::load(const std::string& resolved_path) {
-  int w = 0, h = 0, comp = 0;
-  unsigned char* data = stbi_load(resolved_path.c_str(), &w, &h, &comp, 4);
+  int w = 0, h = 0;
+  unsigned char* data = load_rgba(resolved_path, w, h);
   if (!data) {
     std::cerr << "image load failed: " << resolved_path
               << " (" << stbi_failure_reason() << ")\n";
@@ -110,24 +128,20 @@ std::string thumb_cache_path(const std::string& resolved, int edge) {
 
 }  // namespace
 
-Image ImageCache::load_thumb(const std::string& resolved, int edge) {
-  const std::string cached = thumb_cache_path(resolved, edge);
-  if (!cached.empty() && fs::exists(cached)) {
-    int w = 0, h = 0, comp = 0;
-    if (unsigned char* data = stbi_load(cached.c_str(), &w, &h, &comp, 4)) {
-      Image img = to_texture(data, w, h);
-      stbi_image_free(data);
-      if (img.ok) return img;
-    }
-  }
-  int w = 0, h = 0, comp = 0;
-  unsigned char* data = stbi_load(resolved.c_str(), &w, &h, &comp, 4);
+namespace {
+
+// Decoded thumbnail pixels of `resolved` (longer edge ≤ edge), or empty.
+std::vector<unsigned char> thumb_pixels(const std::string& resolved, int edge,
+                                        int& tw, int& th) {
+  int w = 0, h = 0;
+  unsigned char* data = load_rgba(resolved, w, h);
   if (!data) {
     std::cerr << "thumbnail: cannot load " << resolved << " ("
               << stbi_failure_reason() << ")\n";
     return {};
   }
-  int tw = w, th = h;
+  tw = w;
+  th = h;
   if (std::max(w, h) > edge) {
     if (w >= h) {
       tw = edge;
@@ -142,21 +156,122 @@ Image ImageCache::load_thumb(const std::string& resolved, int edge) {
           ? std::vector<unsigned char>(data, data + static_cast<size_t>(w) * h * 4)
           : downscale(data, w, h, tw, th);
   stbi_image_free(data);
-  if (!cached.empty()) {
-    std::error_code ec;
-    fs::create_directories(fs::path(cached).parent_path(), ec);
-    if (SDL_Surface* surf = SDL_CreateRGBSurfaceWithFormatFrom(
-            small.data(), tw, th, 32, tw * 4, SDL_PIXELFORMAT_RGBA32)) {
-      if (SDL_SaveBMP(surf, cached.c_str()) != 0)
-        std::cerr << "thumbnail: cannot write " << cached << "\n";
-      SDL_FreeSurface(surf);
+  return small;
+}
+
+// Write via a temporary name so a reader never sees half a file.
+void save_thumb(const std::string& cached, std::vector<unsigned char>& px,
+                int w, int h) {
+  std::error_code ec;
+  fs::create_directories(fs::path(cached).parent_path(), ec);
+  const std::string tmp = cached + ".tmp";
+  SDL_Surface* surf = SDL_CreateRGBSurfaceWithFormatFrom(
+      px.data(), w, h, 32, w * 4, SDL_PIXELFORMAT_RGBA32);
+  if (!surf) return;
+  if (SDL_SaveBMP(surf, tmp.c_str()) != 0) {
+    std::cerr << "thumbnail: cannot write " << cached << "\n";
+  } else {
+    fs::rename(tmp, cached, ec);
+  }
+  SDL_FreeSurface(surf);
+}
+
+}  // namespace
+
+bool build_thumb_file(const std::string& resolved, int edge) {
+  const std::string cached = thumb_cache_path(resolved, edge);
+  if (cached.empty()) return false;
+  if (fs::exists(cached)) return true;
+  int tw = 0, th = 0;
+  std::vector<unsigned char> px = thumb_pixels(resolved, edge, tw, th);
+  if (px.empty()) return false;
+  save_thumb(cached, px, tw, th);
+  return fs::exists(cached);
+}
+
+Image ImageCache::load_thumb(const std::string& resolved, int edge) {
+  const std::string cached = thumb_cache_path(resolved, edge);
+  if (!cached.empty() && fs::exists(cached)) {
+    int w = 0, h = 0, comp = 0;
+    if (unsigned char* data = stbi_load(cached.c_str(), &w, &h, &comp, 4)) {
+      Image img = to_texture(data, w, h);
+      stbi_image_free(data);
+      if (img.ok) return img;
     }
   }
-  return to_texture(small.data(), tw, th);
+  int tw = 0, th = 0;
+  std::vector<unsigned char> px = thumb_pixels(resolved, edge, tw, th);
+  if (px.empty()) return {};
+  if (!cached.empty()) save_thumb(cached, px, tw, th);
+  return to_texture(px.data(), tw, th);
+}
+
+bool is_remote_image(std::string_view src) {
+  return starts_with_ci(src, "https://") || starts_with_ci(src, "http://");
+}
+
+std::string remote_image_path(std::string_view url) {
+  // FNV-1a: stable across builds, unlike std::hash.
+  uint64_t h = 1469598103934665603ull;
+  for (unsigned char c : url) {
+    h ^= c;
+    h *= 1099511628211ull;
+  }
+  char name[32];
+  std::snprintf(name, sizeof(name), "%016llx",
+                static_cast<unsigned long long>(h));
+  return (fs::path(cache_dir()) / "images" / name).string();
+}
+
+void prune_cache_dir(const std::string& dir, uint64_t max_bytes) {
+  std::error_code ec;
+  struct Entry {
+    fs::path path;
+    fs::file_time_type mtime;
+    uint64_t size;
+  };
+  std::vector<Entry> files;
+  uint64_t total = 0;
+  for (const auto& de : fs::directory_iterator(dir, ec)) {
+    if (!de.is_regular_file(ec)) continue;
+    Entry e{de.path(), de.last_write_time(ec), de.file_size(ec)};
+    if (ec) continue;
+    total += e.size;
+    files.push_back(std::move(e));
+  }
+  if (total <= max_bytes) return;
+  std::sort(files.begin(), files.end(),
+            [](const Entry& a, const Entry& b) { return a.mtime < b.mtime; });
+  for (const Entry& e : files) {
+    if (total <= max_bytes) break;
+    if (fs::remove(e.path, ec)) total -= e.size;
+  }
+}
+
+std::vector<std::string> ImageCache::take_requests() {
+  return std::exchange(requests_, {});
+}
+
+void ImageCache::remote_done(const std::string& url, bool ok) {
+  pending_.erase(url);
+  if (!ok) failed_.insert(url);
+}
+
+const Image* ImageCache::remote_placeholder(const std::string& url) {
+  static const Image kPending{nullptr, 0, 0, false, true};
+  static const Image kFailed{};
+  if (failed_.count(url)) return &kFailed;
+  if (pending_.count(url)) return &kPending;
+  std::error_code ec;
+  if (fs::exists(remote_image_path(url), ec)) return nullptr;
+  pending_.insert(url);
+  requests_.push_back(url);
+  return &kPending;
 }
 
 std::string ImageCache::resolve(const std::string& path,
                                 const std::string& base) const {
+  if (is_remote_image(path)) return remote_image_path(path);
   const std::string& root = !base.empty() ? base : base_dir_;
   fs::path resolved = path;
   if (!resolved.is_absolute() && !root.empty()) resolved = fs::path(root) / path;
@@ -166,6 +281,8 @@ std::string ImageCache::resolve(const std::string& path,
 const Image& ImageCache::thumb(const std::string& path, const std::string& base,
                                int max_px) {
   const int edge = max_px <= 128 ? 128 : max_px <= 256 ? 256 : 512;
+  if (is_remote_image(path))
+    if (const Image* ph = remote_placeholder(path)) return *ph;
   const std::string resolved = resolve(path, base);
   std::string key = resolved;
   key.push_back('\0');
@@ -177,6 +294,12 @@ const Image& ImageCache::thumb(const std::string& path, const std::string& base,
 }
 
 const Image& ImageCache::get(const std::string& path, const std::string& base) {
+  if (is_remote_image(path)) {
+    if (auto it = cache_.find(path); it != cache_.end()) return it->second;
+    if (const Image* ph = remote_placeholder(path)) return *ph;
+    auto [ins, _] = cache_.emplace(path, load(remote_image_path(path)));
+    return ins->second;
+  }
   const std::string& root = !base.empty() ? base : base_dir_;
   // Cache key includes root so the same relative name from two docs does not clash.
   // Separator must be a real NUL: root + "\0" is a no-op (C string stops at NUL).

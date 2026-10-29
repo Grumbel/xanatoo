@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/layout.hpp"
+#include "xanatoo/images.hpp"
 #include "xanatoo/parse.hpp"
 #include "xanatoo/util.hpp"
 
@@ -219,6 +220,45 @@ std::vector<CollectionItem> collection_items(const Document& doc,
 // Cards for a Collection: a grid of thumbnails with captions, a list
 // (small thumbnail + caption), or the plain children (Full). Other
 // children (intro paragraphs, …) come first at full width.
+void LayoutEngine::layout_remote_image(const Document& doc, const Node& node,
+                                       float x, float& y, float max_width,
+                                       LayoutResult& out) {
+  const float dp = options_.px_scale;
+  const float max_h = 360.f * dp;
+  float w = std::min(max_width, 320.f * dp);
+  float h = 180.f * dp;
+  if (images_) {
+    const Image& img = images_->thumb(node.src, image_base_, kRemoteThumbEdge);
+    if (!img.ok && !img.pending) {
+      out.boxes.push_back({node.id, x, y, max_width, 0.f});
+      return;
+    }
+    if (img.ok && img.width > 0 && img.height > 0) {
+      // Thumbnail size at most: never blown up past what was downloaded.
+      const float sc = std::min({dp, max_width / img.width, max_h / img.height});
+      w = img.width * sc;
+      h = img.height * sc;
+    }
+  }
+  const float start_y = y;
+  PositionedImage pi{node.id, x, y, w, h, node.src, image_base_};
+  pi.thumb = kRemoteThumbEdge;
+  out.images.push_back(std::move(pi));
+  y += h + 6.f * dp;
+  if (!node.alt.empty()) {
+    Node cap = node;
+    cap.kind = NodeKind::Paragraph;
+    cap.spans.clear();
+    InlineSpan s;
+    s.kind = InlineKind::Emphasis;
+    s.text = node.alt;
+    cap.spans.push_back(std::move(s));
+    layout_paragraph(doc, cap, x, y, max_width, out, FontRole::Body);
+  }
+  y += 8.f * dp;
+  out.boxes.push_back({node.id, x, start_y, max_width, y - start_y});
+}
+
 void LayoutEngine::layout_collection(const Document& doc, NodeId id, float x,
                                      float& y, float max_width,
                                      LayoutResult& out) {
@@ -1345,6 +1385,10 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
     }
 
     case NodeKind::Image: {
+      if (is_remote_image(node.src)) {
+        layout_remote_image(doc, node, x, y, max_width, out);
+        break;
+      }
       float disp_w = max_width;
       float disp_h = 120.f;
       if (images_ && !node.src.empty()) {

@@ -240,6 +240,10 @@ private:
                         BlockRole block = BlockRole::Paragraph);
   void layout_collection(const Document& doc, NodeId id, float x, float& y,
                          float max_width, LayoutResult& out);
+  // http(s) Image: drawn from its kRemoteThumbEdge thumbnail; a placeholder
+  // while it downloads, nothing once it failed.
+  void layout_remote_image(const Document& doc, const Node& node, float x,
+                           float& y, float max_width, LayoutResult& out);
   // Paragraph in the role's font.
   void layout_role_text(const Document& doc, const Node& node, BlockRole role,
                         float x, float& y, float max_width, LayoutResult& out);
