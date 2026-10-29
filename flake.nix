@@ -129,6 +129,40 @@
           else { }
         ));
 
+      # Desktop integration (gamepkgstd FLAKE-11 / INT-6..8): every launcher
+      # file is installed, and the .desktop / metainfo files validate.
+      checks = forAllSystems (system:
+        let
+          pkgs = import nixpkgs { inherit system; };
+          pkg = self.packages.${system}.xanatoo-unwrapped;
+        in {
+          layout = pkgs.runCommand "xanatoo-check-layout" { } ''
+            for f in \
+              bin/xanatoo \
+              share/applications/xanatoo.desktop \
+              share/metainfo/xanatoo.metainfo.xml \
+              share/icons/hicolor/scalable/apps/xanatoo.svg \
+              share/icons/hicolor/{16x16,32x32,48x48,64x64,128x128,256x256}/apps/xanatoo.png
+            do
+              if [ ! -e ${pkg}/$f ]; then
+                echo "missing: $f" >&2
+                exit 1
+              fi
+            done
+            touch $out
+          '';
+          integration = pkgs.runCommand "xanatoo-check-integration" {
+            nativeBuildInputs = [ pkgs.desktop-file-utils pkgs.appstream ];
+          } ''
+            desktop-file-validate ${pkg}/share/applications/xanatoo.desktop
+            # The app ID is the bare executable name on purpose (INT-1).
+            appstreamcli validate --no-net \
+              --override=cid-desktopapp-is-not-rdns=info \
+              ${pkg}/share/metainfo/xanatoo.metainfo.xml
+            touch $out
+          '';
+        });
+
       apps = nixpkgs.lib.genAttrs
         (builtins.filter (nixpkgs.lib.hasSuffix "-linux") systems)
         (system: {

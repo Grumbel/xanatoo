@@ -199,6 +199,8 @@ let
       cp ${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSans.ttf \
          $out/xanatoo/fonts/DejaVuSans.ttf
       cp ${../LICENSE} $out/xanatoo/LICENSE.txt
+      cp ${../data/icons/hicolor/256x256/apps/xanatoo.png} $out/xanatoo/cover.png
+      cp ${../docs/screenshot.png} $out/screenshot.png
       cp ${../mk/r36s/Xanatoo.sh} $out/Xanatoo.sh
       chmod +x $out/Xanatoo.sh
       substitute ${../mk/r36s/port.json} $out/port.json --subst-var-by version ${version}

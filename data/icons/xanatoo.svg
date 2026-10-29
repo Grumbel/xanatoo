@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com> -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- Launcher icon source; mipmap-*/ic_launcher.png are rasterized from it. -->
+<!-- App icon source; tools/make_icons.py rasterizes the hicolor and Android launcher icons from it. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
   <rect x="12" y="12" width="168" height="168" rx="28" fill="#F8F6F0" stroke="#7E7B74" stroke-width="4"/>
   <rect x="12" y="12" width="168" height="34" rx="28" fill="#F2BE1A"/>

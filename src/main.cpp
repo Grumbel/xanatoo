@@ -12,13 +12,66 @@
 #include "xanatoo/platform.hpp"
 
 #include <SDL.h>
+#include <filesystem>
 #include <iostream>
 #include <utility>
+#include <vector>
+
+#include "stb_image.h"
+
+namespace {
+
+// Window icon for X11 (Wayland takes it from the .desktop file matched by
+// app_id instead). Build tree first, then the installed hicolor theme.
+void set_window_icon(SDL_Window* window) {
+#ifndef __ANDROID__
+  namespace fs = std::filesystem;
+  std::vector<fs::path> cands;
+#ifdef XANATOO_APP_ICON
+  cands.emplace_back(XANATOO_APP_ICON);
+#endif
+#ifdef __linux__
+  std::error_code ec;
+  fs::path exe = fs::read_symlink("/proc/self/exe", ec);
+  if (!ec)
+    cands.push_back(exe.parent_path() / ".." / "share" / "icons" / "hicolor" /
+                    "64x64" / "apps" / "xanatoo.png");
+#endif
+  for (const auto& path : cands) {
+    int w = 0, h = 0, comp = 0;
+    unsigned char* data = stbi_load(path.string().c_str(), &w, &h, &comp, 4);
+    if (!data) continue;
+    SDL_Surface* surf = SDL_CreateRGBSurfaceWithFormatFrom(
+        data, w, h, 32, w * 4, SDL_PIXELFORMAT_RGBA32);
+    if (surf) {
+      SDL_SetWindowIcon(window, surf);
+      SDL_FreeSurface(surf);
+    }
+    stbi_image_free(data);
+    return;
+  }
+#else
+  (void)window;
+#endif
+}
+
+}  // namespace
 
 int main(int argc, char** argv) {
   xanatoo::platform_pre_init();
   xanatoo::CliOptions opt;
   if (!xanatoo::parse_cli(argc, argv, opt)) return 1;
+
+  // App ID for window matching: Nix's wrapper renames the binary to
+  // .xanatoo-wrapped, which SDL would otherwise use as WM_CLASS / app_id.
+  // SDL2's headers have no macros for the WM class hints, and sdl2-compat
+  // (nixpkgs SDL2) takes SDL3's SDL_APP_ID, so set them by name.
+  SDL_SetHint("SDL_VIDEO_X11_WMCLASS", "xanatoo");
+  SDL_SetHint("SDL_VIDEO_WAYLAND_WMCLASS", "xanatoo");
+  SDL_SetHint("SDL_APP_ID", "xanatoo");
+#ifdef SDL_HINT_APP_NAME
+  SDL_SetHint(SDL_HINT_APP_NAME, "xanatoo");
+#endif
 
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER) !=
       0) {
@@ -45,6 +98,7 @@ int main(int argc, char** argv) {
     SDL_Quit();
     return 1;
   }
+  set_window_icon(window);
   SDL_Renderer* sdl = SDL_CreateRenderer(
       window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
   if (!sdl) {

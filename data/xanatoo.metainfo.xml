@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com> -->
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+<component type="desktop-application">
+  <id>xanatoo</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>xanatoo</name>
+  <summary>Interactive hypertext document editor and browser</summary>
+  <description>
+    <p>
+      xanatoo is a lightweight, realtime document composition engine in the
+      spirit of HyperCard, Xanadu and the Canon Cat. Documents are edited
+      live with immediate visual feedback, and every passage is addressable.
+    </p>
+    <ul>
+      <li>Markdown, Org and Gemtext documents with foldable sections and an outline</li>
+      <li>Split view, tabs and floating document windows</li>
+      <li>Read-only views of web pages, feeds, Wikipedia, Gemini, Hacker News, Reddit, Lemmy and Nostr</li>
+      <li>Drafts of unsaved edits are kept in a local revision store</li>
+      <li>Style sheets for document appearance</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">xanatoo.desktop</launchable>
+  <url type="homepage">https://github.com/Grumbel/xanatoo</url>
+  <url type="bugtracker">https://github.com/Grumbel/xanatoo/issues</url>
+  <developer>
+    <name>Ingo Ruhnke</name>
+  </developer>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/Grumbel/xanatoo/master/docs/screenshot.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <recommends>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </recommends>
+  <supports>
+    <control>touch</control>
+    <control>gamepad</control>
+  </supports>
+  <provides>
+    <binary>xanatoo</binary>
+  </provides>
+  <releases>
+    <release version="0.1.0" type="development" date="2026-10-29"/>
+  </releases>
+</component>

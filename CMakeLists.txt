@@ -280,7 +280,8 @@ add_dependencies(xanatoo xanatoo_icons)
 # XANATOO_ICON_DIR env or <exe>/../share/xanatoo/icons (see Ui::load_icons).
 target_compile_definitions(xanatoo PRIVATE
   "XANATOO_ICON_DIR=\"${XANATOO_ICON_DIR}\""
-  "XANATOO_STYLE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/styles\"")
+  "XANATOO_STYLE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/styles\""
+  "XANATOO_APP_ICON=\"${CMAKE_CURRENT_SOURCE_DIR}/data/icons/hicolor/64x64/apps/xanatoo.png\"")
 
 install(DIRECTORY ${XANATOO_ICON_DIR}/
         DESTINATION share/xanatoo/icons
@@ -289,6 +290,15 @@ install(DIRECTORY ${XANATOO_ICON_DIR}/
 install(DIRECTORY icons/svg/
         DESTINATION share/xanatoo/icons/svg
         FILES_MATCHING PATTERN "*.svg")
+# Desktop integration: launcher, AppStream metainfo, hicolor app icons
+# (generated from data/icons/xanatoo.svg by tools/make_icons.py).
+install(FILES data/xanatoo.desktop DESTINATION share/applications)
+install(FILES data/xanatoo.metainfo.xml DESTINATION share/metainfo)
+install(DIRECTORY data/icons/hicolor/
+        DESTINATION share/icons/hicolor
+        FILES_MATCHING PATTERN "*.png")
+install(FILES data/icons/xanatoo.svg
+        DESTINATION share/icons/hicolor/scalable/apps)
 install(DIRECTORY styles/
         DESTINATION share/xanatoo/styles
         FILES_MATCHING PATTERN "*.xss")

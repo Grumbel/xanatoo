@@ -8,6 +8,22 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-29) — desktop integration (gamepkgstd INTEGRATION.md)
+
+- App ID `xanatoo` everywhere: `data/xanatoo.desktop` (opens files: `%F`,
+  Markdown / Org / Gemini MIME types), `data/xanatoo.metainfo.xml`,
+  hicolor icons 16–256 + scalable, installed by CMake. One icon source
+  `data/icons/xanatoo.svg` (was `mk/android/app/ic_launcher.svg`);
+  `tools/make_icons.py` regenerates the committed hicolor and Android
+  mipmap PNGs. `main()` sets the WM class / app ID hints by name (SDL2 has
+  no macros for them; sdl2-compat reads `SDL_APP_ID`) and the 64×64 window
+  icon. Flake `checks.layout` / `checks.integration` (desktop-file-validate,
+  appstreamcli). PortMaster gets `xanatoo/cover.png` and `screenshot.png`.
+- Open: Android `package` is `io.github.grumbel.xanatoo` (spec wants
+  `org.grumbel.xanatoo`; changing it loses installed data), no adaptive
+  icon (INT-14); PortMaster launcher `Xanatoo.sh` vs display name
+  `xanatoo` (INT-15); no `--version` / `version` check; no Windows build.
+
 ## Status (2026-10-29) — middle-click opens links in a new tab
 
 - Middle-click on a link (`open_link_in_tab`, `app_nav.cpp`) adds a tab

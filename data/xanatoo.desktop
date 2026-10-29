@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+[Desktop Entry]
+Type=Application
+Name=xanatoo
+GenericName=Document Editor
+Comment=Interactive hypertext document editor and browser
+Exec=xanatoo %F
+Icon=xanatoo
+Terminal=false
+Categories=Office;WordProcessor;
+Keywords=markdown;org;gemini;hypertext;notes;editor;browser;
+MimeType=text/markdown;text/x-markdown;text/org;text/gemini;
+StartupWMClass=xanatoo
+SingleMainWindow=true

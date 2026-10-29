@@ -16,8 +16,8 @@ Same pipeline as Kurvenrausch / Pingus (`nix/android.nix`, `mk/android/`):
    the debug keystore in `mk/android/keystore/`.
 
 Targets Android 5.0+ (`minSdkVersion` 21), ABIs `armeabi-v7a arm64-v8a
-x86_64`, NDK 29. The launcher icon is `mk/android/app/ic_launcher.svg`,
-rasterized into `res/mipmap-*/`.
+x86_64`, NDK 29. The launcher icon is rasterized into `res/mipmap-*/`
+from the app icon `data/icons/xanatoo.svg` by `tools/make_icons.py`.
 
 SQLite (side store: persisted folds) is the amalgamation generated from
 nixpkgs' `sqlite.src` (`sqliteAmalgamation` in `nix/android.nix`) and built
