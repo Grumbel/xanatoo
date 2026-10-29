@@ -21,8 +21,8 @@ Next bundle number: **263** (this delivery is **262**)
   KMSDRM 640x480 @ 61 Hz; with the preloaded SDL 2.30.10 the pad's GUID
   gains a CRC, but SDL still applies PortMaster's SDL_GAMECONTROLLERCONFIG
   bindings (same layout as on 2.0.10).
-- Not checked: the Android build (new code: `SDL_GetAndroidSDKVersion`,
-  `ro.product.model`).
+- `nix build .#xanatoo-android` builds (new code: `SDL_GetAndroidSDKVersion`,
+  `ro.product.model`); the report has not been looked at in logcat yet.
 
 ## Status (2026-10-29) — R36S: ImGui via runtime SDL_RenderGeometryRaw
 
