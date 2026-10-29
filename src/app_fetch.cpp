@@ -17,6 +17,7 @@
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/hackernews.hpp"
 #include "xanatoo/html_page.hpp"
+#include "xanatoo/sitemap.hpp"
 #include "xanatoo/wikipedia.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/native.hpp"
@@ -115,6 +116,11 @@ void fetch_page(std::string url, std::shared_ptr<FetchShared> out) {
     std::string local;
     out->doc = xanatoo::ebook_fetch(url, &out->error, &local);
     if (!local.empty()) out->final_url = local;
+#endif
+  } else if (xanatoo::is_sitemap_ref(url)) {
+#if defined(XANATOO_WEB) && XANATOO_WEB
+    out->service = "Site map";
+    out->doc = xanatoo::sitemap_fetch(url, &out->error);
 #endif
   } else if (xanatoo::is_wikipedia_ref(url)) {
 #if defined(XANATOO_WIKIPEDIA) && XANATOO_WIKIPEDIA
@@ -266,6 +272,13 @@ bool remote_fetch_supported(std::string_view url, std::string* why) {
     return true;
 #else
     return no("Ebook downloads need build with -DXANATOO_EBOOKS=ON");
+#endif
+  }
+  if (xanatoo::is_sitemap_ref(url)) {
+#if defined(XANATOO_WEB) && XANATOO_WEB
+    return true;
+#else
+    return no("sitemap: needs build with -DXANATOO_WEB=ON");
 #endif
   }
   if (xanatoo::is_wikipedia_ref(url)) {

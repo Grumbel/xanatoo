@@ -16,6 +16,7 @@
 #include "xanatoo/ebooks.hpp"
 #include "xanatoo/feed.hpp"
 #include "xanatoo/hackernews.hpp"
+#include "xanatoo/sitemap.hpp"
 #include "xanatoo/wikipedia.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/native.hpp"
@@ -71,11 +72,30 @@ std::string fit_text(xanatoo::Font& font, const std::string& text,
   return out + ell;
 }
 
-SDL_Rect outline_focus_rect(App& app, const SDL_Rect& outer) {
-  const int w = app.ui_font.measure("Focus") + 16;
+SDL_Rect title_button_rect(App& app, const SDL_Rect& outer, const char* label) {
+  const int w = app.ui_font.measure(label) + 16;
   const int h = help_title_h - 10;
   return SDL_Rect{outer.x + outer.w - float_close_w - 4 - w,
                   outer.y + (help_title_h - h) / 2, w, h};
+}
+
+void draw_title_button(App& app, const SDL_Rect& r, const char* label,
+                       bool latched) {
+  namespace th = xanatoo::theme;
+  const th::Palette& pal = th::palette();
+  xanatoo::Font& font = app.ui_font;
+  th::draw_button_face(app.sdl, r, latched, false);
+  const th::Rgb ink = latched ? pal.accent_dark : pal.text;
+  const int off = latched ? 1 : 0;
+  app.renderer.draw_text(
+      font, static_cast<float>(r.x + (r.w - font.measure(label)) / 2 + off),
+      static_cast<float>(r.y + (r.h - font.line_height()) / 2 +
+                         font.ascender() + off),
+      label, ink.r, ink.g, ink.b);
+}
+
+SDL_Rect outline_focus_rect(App& app, const SDL_Rect& outer) {
+  return title_button_rect(app, outer, "Focus");
 }
 
 void draw_floating_frame(App& app, const SDL_Rect& outer,
@@ -317,6 +337,8 @@ StatusLine compute_status(App& app) {
       label = "Nostr: ";
     else if (xanatoo::is_wikipedia_ref(app.hover.href))
       label = "Wikipedia: ";
+    else if (xanatoo::is_sitemap_ref(app.hover.href))
+      label = "Site map: ";
     else if (app.hover.href.rfind("http://", 0) == 0 ||
              app.hover.href.rfind("https://", 0) == 0)
       label = "Web: ";

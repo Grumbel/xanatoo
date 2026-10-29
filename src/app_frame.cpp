@@ -86,6 +86,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.justify = app.view_settings.justify;
   ui_state.footnote_overlay = app.view_settings.footnote_overlay;
   ui_state.backlinks = app.backlinks_mode;
+  ui_state.sitemap = app.sitemap.shown;
   ui_state.diff = app.diff_mode;
   ui_state.can_diff = !shared_doc(app) &&
                       app.panes[0].buf != app.panes[1].buf;
@@ -296,7 +297,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::Copy ||
         c == C::CopyPageUrl || c == C::SelectAll || c == C::SelectBlock ||
         c == C::Find || c == C::ToggleSplit || c == C::ToggleOutline ||
-        c == C::ToggleBacklinks || c == C::OpenTranscludeOther ||
+        c == C::ToggleBacklinks || c == C::ToggleSitemap ||
+        c == C::OpenTranscludeOther ||
         c == C::ToggleDiff || c == C::ToggleStructure || c == C::ToggleBrowse ||
         c == C::ToggleNative || c == C::CollectionView ||
         c == C::ToggleHelp || c == C::ToggleVirtualKeyboard ||
@@ -1100,6 +1102,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       }
       app.needs_layout = true;
       layout_panes(app);
+      break;
+    case C::ToggleSitemap:
+      toggle_sitemap(app);
       break;
     case C::ToggleBacklinks:
       app.backlinks_mode = !app.backlinks_mode;
@@ -2488,17 +2493,7 @@ void draw_outline_panel(App& app) {
     draw_floating_frame(app, outer, ol_title, keys, app.ol.dock == Dock::None,
                         outer.x + outer.w - float_close_w - fb.x);
     // Focus toggle (section isolation): latched push button left of close.
-    {
-      th::draw_button_face(app.sdl, fb, app.section_focus_mode, false);
-      const th::Rgb ink = app.section_focus_mode ? pal.accent_dark : pal.text;
-      const int off = app.section_focus_mode ? 1 : 0;
-      app.renderer.draw_text(
-          font,
-          static_cast<float>(fb.x + (fb.w - font.measure("Focus")) / 2 + off),
-          static_cast<float>(fb.y + (fb.h - font.line_height()) / 2 +
-                             font.ascender() + off),
-          "Focus", ink.r, ink.g, ink.b);
-    }
+    draw_title_button(app, fb, "Focus", app.section_focus_mode);
 
     SDL_Rect clip{cx, cy, cw, ch};
     SDL_RenderSetClipRect(app.sdl, &clip);
@@ -2812,6 +2807,7 @@ void run_frame(App& app) {
   poll_fetches(app);
   autosave_drafts(app);
   update_split_preview(app);
+  update_sitemap(app);
   sync_window_size(app);
   relayout_if_needed(app);
   run_chrome(app);

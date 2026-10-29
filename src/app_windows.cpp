@@ -22,6 +22,7 @@ namespace {
 std::pair<int, int> min_size(const FloatWindow& w) {
   switch (w.role) {
     case WindowRole::Outline:
+    case WindowRole::Sitemap:
       return {200, 140};
     case WindowRole::Backlinks:
       return {200, 120};
@@ -71,6 +72,9 @@ void close_window(App& app, FloatWindow& w) {
       break;
     case WindowRole::Backlinks:
       app.backlinks_mode = false;
+      break;
+    case WindowRole::Sitemap:
+      toggle_sitemap(app);
       break;
     case WindowRole::Document:
       app.soft_wins.erase(app.soft_wins.begin() + (&w - app.soft_wins.data()));
@@ -224,6 +228,15 @@ void press_title(App& app, FloatWindow& w, int mx, int my) {
     close_window(app, w);
     return;
   }
+  if (w.role == WindowRole::Sitemap) {
+    // "Page" button just left of ×.
+    const SDL_Rect pb =
+        title_button_rect(app, SDL_Rect{w.x, w.y, w.w, w.h}, "Page");
+    if (mx >= pb.x - 2 && mx < pb.x + pb.w + 2) {
+      click_sitemap(app, mx, my);
+      return;
+    }
+  }
   if (w.role == WindowRole::Outline) {
     // Focus toggle sits just left of ×.
     const SDL_Rect fb = outline_focus_rect(app, SDL_Rect{w.x, w.y, w.w, w.h});
@@ -273,6 +286,9 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
     case WindowRole::Outline:
       click_outline(app, w, mx, my);
       break;
+    case WindowRole::Sitemap:
+      click_sitemap(app, mx, my);
+      break;
     case WindowRole::Help:
       click_help(app, w, mx, my);
       break;
@@ -288,6 +304,7 @@ std::vector<FloatWindow*> float_stack(App& app) {
   std::vector<FloatWindow*> st;
   if (app.outline_mode) st.push_back(&app.ol);
   if (app.backlinks_mode) st.push_back(&app.bl);
+  if (app.sitemap.shown) st.push_back(&app.sm);
   if (app.help_mode) st.push_back(&app.help);
   for (auto& sw : app.soft_wins) st.push_back(&sw);
   // Docked columns under floating windows, maximized ones on top.
@@ -317,6 +334,8 @@ std::tuple<int, int, int, int> float_client_rect(App& app,
       return outline_client_rect(app);
     case WindowRole::Backlinks:
       return backlinks_client_rect(w);
+    case WindowRole::Sitemap:
+      return sitemap_client_rect(app);
     case WindowRole::Document:
       return soft_client_rect(app, w);
   }
@@ -339,6 +358,8 @@ float float_max_scroll(App& app, const FloatWindow& w) {
       return std::max(0.f, static_cast<float>(app.backlinks.size()) *
                                    backlinks_row_step(app) +
                                8.f - view_h);
+    case WindowRole::Sitemap:
+      return sitemap_max_scroll(app);
   }
   return 0.f;
 }
@@ -378,6 +399,7 @@ bool float_press(App& app, int mx, int my) {
     // Clicking a panel gives it the keyboard; any other window, the document.
     app.key_focus = w->role == WindowRole::Outline     ? KeyFocus::Outline
                     : w->role == WindowRole::Backlinks ? KeyFocus::Backlinks
+                    : w->role == WindowRole::Sitemap   ? KeyFocus::Sitemap
                                                        : KeyFocus::Document;
     if (w->role == WindowRole::Document) {
       // Raise to top of the document stack; `w` is stale afterwards.
@@ -527,6 +549,9 @@ void draw_floats(App& app) {
         break;
       case WindowRole::Backlinks:
         draw_backlinks_panel(app);
+        break;
+      case WindowRole::Sitemap:
+        draw_sitemap_panel(app);
         break;
       case WindowRole::Help:
         draw_help_window(app);

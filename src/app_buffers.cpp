@@ -19,6 +19,7 @@
 #include "xanatoo/feed.hpp"
 #include "xanatoo/hackernews.hpp"
 #include "xanatoo/html_page.hpp"
+#include "xanatoo/sitemap.hpp"
 #include "xanatoo/wikipedia.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/lemmy.hpp"
@@ -145,7 +146,7 @@ bool is_in_app_remote_url(std::string_view s) {
          xanatoo::is_lemmy_ref(s) || xanatoo::is_nostr_ref(s) ||
          xanatoo::is_hn_ref(s) || xanatoo::is_ebook_url(s) ||
          xanatoo::is_feed_url(s) || xanatoo::is_wikipedia_ref(s) ||
-         web_in_app(s);
+         xanatoo::is_sitemap_ref(s) || web_in_app(s);
 }
 
 bool is_foreign_path(std::string_view path) {

@@ -23,6 +23,7 @@
 #include "xanatoo/minibuffer.hpp"
 #include "xanatoo/render.hpp"
 #include "xanatoo/sidestore.hpp"
+#include "xanatoo/sitemap.hpp"
 #include "xanatoo/types.hpp"
 #include "xanatoo/ui.hpp"
 #include "xanatoo/view_settings.hpp"
@@ -129,7 +130,7 @@ struct Pane {
 // stack top to bottom by `dock_seq`); Max covers the whole client area.
 enum class Dock : uint8_t { None = 0, Left, Right, Max };
 
-enum class WindowRole : uint8_t { Help, Outline, Backlinks, Document };
+enum class WindowRole : uint8_t { Help, Outline, Backlinks, Sitemap, Document };
 
 // One floating window: help / outline / backlinks panels and document
 // windows share geometry, docking + interaction state; role picks the
@@ -291,6 +292,31 @@ struct CachedPage {
   Uint32 ticks = 0;
 };
 
+// Sitemap panel (app_sitemap.cpp): the path tree of the focused page's
+// site, read once per host on a worker thread.
+struct SitemapLoad {
+  std::atomic<bool> done{false};
+  std::optional<xanatoo::SiteTree> tree;
+  std::string error;
+};
+
+struct SiteCache {
+  std::string host;
+  std::shared_ptr<SitemapLoad> pending;  // set while the worker runs
+  std::optional<xanatoo::SiteTree> tree;
+  std::string error;
+  std::vector<uint8_t> open;  // per tree node: expanded in the panel
+};
+
+struct SitemapPanel {
+  bool shown = false;
+  std::vector<SiteCache> sites;
+  std::string host;       // site of the focused page; "" = not a web page
+  std::string page;       // page URL the selection was last moved to
+  std::vector<int> rows;  // visible tree nodes, top to bottom
+  int sel = 0;            // selected row
+};
+
 // Split browsing (app_split.cpp): hovering a link in the left pane previews
 // its target in the right pane; the right pane's own page is kept in
 // `saved_*` and comes back when the pointer leaves the link.
@@ -318,7 +344,7 @@ struct StatusLine {
 
 // Who receives plain keys (arrows, Enter, digits). Panels only while open;
 // see panel_has_keys(). Status prompts / minibuffer take precedence anyway.
-enum class KeyFocus : uint8_t { Document, Outline, Backlinks };
+enum class KeyFocus : uint8_t { Document, Outline, Backlinks, Sitemap };
 
 // The single active status-bar prompt (at most one at a time).
 enum class PromptKind : uint8_t {
@@ -493,6 +519,8 @@ struct App {
   FloatWindow help = make_float_panel(WindowRole::Help, 80, 100, 560, 480);
   FloatWindow bl = make_float_panel(WindowRole::Backlinks, 80, 120, 360, 320);
   FloatWindow ol = make_float_panel(WindowRole::Outline, 40, 100, 320, 420);
+  FloatWindow sm = make_float_panel(WindowRole::Sitemap, 140, 110, 340, 460);
+  SitemapPanel sitemap;
   Hover hover;
   Touch touch;
   std::vector<FetchJob> fetches;
@@ -647,6 +675,8 @@ inline bool panel_has_keys(const App& app, KeyFocus panel) {
       return app.outline_mode;
     case KeyFocus::Backlinks:
       return app.backlinks_mode;
+    case KeyFocus::Sitemap:
+      return app.sitemap.shown;
     default:
       return true;
   }
@@ -810,6 +840,19 @@ std::string soft_title(App& app, const FloatWindow& sw);
 void layout_soft(App& app, FloatWindow& sw);
 void raise_soft(App& app, size_t i);
 
+// ---- sitemap panel (app_sitemap.cpp) ----
+void toggle_sitemap(App& app);
+// Per frame while shown: follow the focused page, collect finished loads.
+void update_sitemap(App& app);
+void draw_sitemap_panel(App& app);
+std::tuple<int, int, int, int> sitemap_client_rect(App& app);
+float sitemap_max_scroll(App& app);
+void click_sitemap(App& app, int mx, int my);
+// Keys while the panel has focus (arrows, ←/→ fold, Enter); true = used.
+bool sitemap_key(App& app, SDL_Keycode sym);
+// `sitemap:host` of the panel's site in the focused pane.
+void open_sitemap_page(App& app);
+
 // ---- floating windows (app_windows.cpp) ----
 // z-order, back→front: docked columns, floating (outline, backlinks, help,
 // document windows), maximized.
@@ -838,6 +881,10 @@ void fill_doc_paper(App& app, const SDL_Rect& rect);
 std::string fit_text(xanatoo::Font& font, const std::string& text, int max_w);
 // Outline title-bar "Focus" toggle, left of the close box (paint + hit-test).
 SDL_Rect outline_focus_rect(App& app, const SDL_Rect& outer);
+// Push button `label` in a window title, left of the close box.
+SDL_Rect title_button_rect(App& app, const SDL_Rect& outer, const char* label);
+void draw_title_button(App& app, const SDL_Rect& r, const char* label,
+                       bool latched);
 // `title_reserve`: px kept free left of the close box (title buttons).
 void draw_floating_frame(App& app, const SDL_Rect& outer,
                          const std::string& title, bool active,

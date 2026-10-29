@@ -38,6 +38,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_collection.cpp` | collection view state (layout / size / sort), card clicks, fullscreen `Lightbox` viewer |
 | `app_drafts.cpp` | unsaved edits → drafts in the revision store (`revstore.hpp`): autosave, restore on load (`attach_draft`), save / revert, `drafts:` page |
 | `app_footnotes.cpp` | footnote overlay: notes of on-screen `FootnoteRef` marks laid out in a strip at the pane bottom (`FootnoteOverlay` per pane), click jumps to the note |
+| `app_sitemap.cpp` | Sitemap panel (`WindowRole::Sitemap`, `SitemapPanel`): site tree of the focused page's host, one `SiteCache` per host loaded on a worker thread; "Page" opens `sitemap:host` |
 | `app_split.cpp` | split browsing: left links open right, right links shift left, hover previews (`SplitPreview`) |
 | `theme.cpp` | classic palette (`Palette`) + stateless bevel/gradient/window primitives shared with the ImGui theme |
 | `style.cpp` | document style sheets (`styles/*.xss`, S-expressions): `DocStyle` roles → layout spacing/fonts/glyph colours + renderer decoration colours; `apply_style` in `app_view.cpp` |
@@ -244,6 +245,19 @@ mechanism; historical bundle numbers in TODO.md are archival).
 - `app_collection.cpp`: Collection menus (`UiCommand::CollectionView` +
   arg, context menu and View menu), click on a card → `Lightbox` (full-
   window viewer drawn after ImGui; `lightbox_event` takes all input first).
+
+## Site maps (`sitemap.hpp`)
+
+- `src/sitemap.cpp`: XML sitemap scanner (`parse_sitemap_xml`, urlset +
+  sitemapindex), `robots_sitemaps`, `build_site_tree` (flat URLs → path
+  tree in pre-order, page-less one-child chains folded to "a/b") and
+  `site_tree_document`; parsing / tree are always built and unit-tested,
+  the fetch (`sitemap_fetch_tree`: robots.txt, else /sitemap.xml,
+  /sitemap_index.xml, /wp-sitemap.xml; ≤ 25 files, ≤ 50k URLs; gzip
+  skipped) needs `XANATOO_WEB`.
+- `sitemap:host` is a read-only page (one Section per directory, so the
+  outline is the site structure). The panel is a tool view of the focused
+  pane, not a document; its keys run before the browse-mode key filter.
 
 ## Wikipedia (`wikipedia.hpp`)
 

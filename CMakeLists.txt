@@ -68,6 +68,7 @@ add_executable(xanatoo
   src/app_fetch.cpp
   src/app_split.cpp
   src/app_footnotes.cpp
+  src/app_sitemap.cpp
   src/app_collection.cpp
   src/app_drafts.cpp
   src/theme.cpp
@@ -96,6 +97,7 @@ add_executable(xanatoo
   src/hackernews.cpp
   src/ebooks.cpp
   src/feed.cpp
+  src/sitemap.cpp
   src/html_min.cpp
   src/html_page.cpp
   src/wikipedia.cpp
@@ -320,6 +322,7 @@ add_executable(xanatoo_tests
   src/hackernews.cpp
   src/ebooks.cpp
   src/feed.cpp
+  src/sitemap.cpp
   src/html_min.cpp
   src/html_page.cpp
   src/wikipedia.cpp

@@ -763,6 +763,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::TextDisabled("  Ctrl+Alt+O docks outline | body");
       if (ImGui::MenuItem("Backlinks", "Ctrl+Alt+B", state.backlinks))
         cmd = UiCommand::ToggleBacklinks;
+      if (ImGui::MenuItem("Site Map", "Ctrl+Alt+M", state.sitemap))
+        cmd = UiCommand::ToggleSitemap;
       if (ImGui::MenuItem("Diff Marks", "Ctrl+Shift+D", state.diff, state.can_diff))
         cmd = UiCommand::ToggleDiff;
       if (ImGui::MenuItem("Structure Highlight", "Ctrl+Shift+L", state.structure))
@@ -1142,6 +1144,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::Separator();
       if (ImGui::MenuItem("Backlinks", "Ctrl+Alt+B", state.backlinks))
         cmd = UiCommand::ToggleBacklinks;
+      if (ImGui::MenuItem("Site map", "Ctrl+Alt+M", state.sitemap))
+        cmd = UiCommand::ToggleSitemap;
       menu_item_cmd("Open include → other pane", UiCommand::OpenTranscludeOther,
                     cmd);
       if (ImGui::MenuItem("Structure highlight", "Ctrl+Shift+L", state.structure))

@@ -1269,6 +1269,25 @@ static bool handle_backlinks_key(App& app, const SDL_Event& ev, bool ctrl, bool 
   return false;
 }
 
+// Sitemap panel: Ctrl+Alt+M toggles; with keyboard focus Esc closes,
+// arrows / Home / End move, ←/→ fold, Enter opens. True = consumed.
+static bool handle_sitemap_key(App& app, const SDL_Event& ev, bool ctrl,
+                               bool alt) {
+  const SDL_Keycode k = ev.key.keysym.sym;
+  if (k == SDLK_m && ctrl && alt) {
+    toggle_sitemap(app);
+    return true;
+  }
+  if (!panel_has_keys(app, KeyFocus::Sitemap)) return false;
+  if (k == SDLK_ESCAPE) {
+    toggle_sitemap(app);
+    return true;
+  }
+  if (!ctrl && !alt && sitemap_key(app, k)) return true;
+  panel_key_unused(app, ev, ctrl, alt);
+  return false;
+}
+
 // Outline panel (when it has keyboard focus): Esc/toggle close; arrows,
 // 1-9, Enter navigate; Enter / 1-9 jump and hand focus to the document.
 // Other plain keys hand focus back and fall through. True = consumed.
@@ -1632,6 +1651,10 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
              ev.key.keysym.sym != SDLK_F1 && ev.key.keysym.sym != SDLK_F2) {
     return;
   }
+
+  // The site map is mostly used on (read-only) web pages: its keys come
+  // before the browse-mode filter below.
+  if (!status_prompt && handle_sitemap_key(app, ev, ctrl, alt)) return;
 
   // Browse mode: navigation and view toggles only (no document edits).
   // An open prompt (URL bar, Save as) keeps its own keys.

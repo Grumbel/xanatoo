@@ -15,6 +15,7 @@
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/reddit.hpp"
+#include "xanatoo/sitemap.hpp"
 #include "xanatoo/revstore.hpp"
 #include "xanatoo/util.hpp"
 #include "xanatoo/parse.hpp"
@@ -1838,7 +1839,96 @@ void test_parse_unclaimed_block_lines() {
   }
 }
 
+void test_sitemap() {
+  using namespace xanatoo;
+  // urlset with a prefix, CDATA, entities and a self-closing element.
+  const char* urlset = R"(<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://example.org/</loc><lastmod>2026-01-02</lastmod></url>
+  <url><loc>https://example.org/docs/intro.html</loc></url>
+  <url><loc>https://example.org/docs/api/v2/ref/</loc>
+       <lastmod>2026-03-04T10:00:00+00:00</lastmod></url>
+  <url><loc><![CDATA[https://example.org/a%20b?x=1&y=2]]></loc></url>
+  <url><loc>https://example.org/q?p=1&amp;s=2</loc><priority/></url>
+  <s:url><s:loc>https://www.example.org/docs/</s:loc></s:url>
+  <url><loc>https://cdn.example.net/file</loc></url>
+  <url><loc>https://example.org/docs/intro.html#dup</loc></url>
+</urlset>)";
+  SitemapFile f = parse_sitemap_xml(urlset);
+  EXPECT_EQ(f.urls.size(), size_t(8));
+  EXPECT(f.sitemaps.empty());
+  EXPECT_EQ(f.urls[0].lastmod, std::string("2026-01-02"));
+  EXPECT_EQ(f.urls[3].loc, std::string("https://example.org/a%20b?x=1&y=2"));
+  EXPECT_EQ(f.urls[4].loc, std::string("https://example.org/q?p=1&s=2"));
+  EXPECT_EQ(f.urls[5].loc, std::string("https://www.example.org/docs/"));
+
+  SitemapFile idx = parse_sitemap_xml(R"(<sitemapindex>
+    <sitemap><loc>https://example.org/s1.xml</loc></sitemap>
+    <sitemap><loc>https://example.org/s2.xml</loc><lastmod>2026</lastmod></sitemap>
+  </sitemapindex>)");
+  EXPECT_EQ(idx.sitemaps.size(), size_t(2));
+  EXPECT(idx.urls.empty());
+
+  auto rs = robots_sitemaps("User-agent: *\nDisallow: /x\r\nSITEMAP: "
+                            "https://e.org/a.xml # main\nsitemap:https://e.org/b.xml");
+  EXPECT_EQ(rs.size(), size_t(2));
+  if (rs.size() == 2) {
+    EXPECT_EQ(rs[0], std::string("https://e.org/a.xml"));
+    EXPECT_EQ(rs[1], std::string("https://e.org/b.xml"));
+  }
+
+  EXPECT(is_sitemap_ref("sitemap:example.org"));
+  EXPECT(!is_sitemap_ref("sitemap:"));
+  EXPECT_EQ(sitemap_ref_host("sitemap:Example.org/x"), std::string("example.org"));
+  EXPECT_EQ(sitemap_ref_host("sitemap:https://example.org/a"),
+            std::string("example.org"));
+  EXPECT_EQ(url_host("https://User@Example.ORG:8443/p"), std::string("example.org"));
+  EXPECT_EQ(site_url_key("http://www.example.org/docs/#x"),
+            site_url_key("https://example.org/docs"));
+
+  SiteTree t = build_site_tree("example.org", f.urls);
+  // The duplicate (fragment) entry is dropped: 7 distinct pages.
+  EXPECT_EQ(t.nodes[0].pages, 7);
+  EXPECT_EQ(t.nodes[0].url, std::string("https://example.org/"));
+  // Pre-order + parent/depth consistency.
+  for (size_t i = 1; i < t.nodes.size(); ++i) {
+    EXPECT(t.nodes[i].parent >= 0 && t.nodes[i].parent < static_cast<int>(i));
+    EXPECT_EQ(t.nodes[i].depth,
+              t.nodes[static_cast<size_t>(t.nodes[i].parent)].depth + 1);
+  }
+  const int docs = site_tree_find(t, "https://example.org/docs/");
+  EXPECT(docs > 0);
+  if (docs > 0) {
+    const SiteNode& d = t.nodes[static_cast<size_t>(docs)];
+    EXPECT_EQ(d.label, std::string("docs"));
+    EXPECT_EQ(d.kids.size(), size_t(2));
+    if (d.kids.size() == 2) {
+      // One-child chain without pages folds into one row (a page now).
+      EXPECT_EQ(t.nodes[static_cast<size_t>(d.kids[0])].label,
+                std::string("api/v2/ref"));
+      EXPECT_EQ(t.nodes[static_cast<size_t>(d.kids[1])].label, std::string("intro"));
+    }
+  }
+  EXPECT(site_tree_find(t, "https://example.org/a%20b?x=1&y=2") > 0);
+  EXPECT(site_tree_find(t, "https://example.org/nope") < 0);
+  bool other_host = false;
+  for (const SiteNode& n : t.nodes)
+    if (n.label == "cdn.example.net/file") other_host = true;
+  EXPECT(other_host);
+
+  Document doc = site_tree_document(t);
+  EXPECT_EQ(doc.meta.title, std::string("Site map — example.org"));
+  int sections = 0, items = 0;
+  for (size_t i = 0; i < doc.nodes.size(); ++i) {
+    if (doc.nodes[i].kind == NodeKind::Section) ++sections;
+    if (doc.nodes[i].kind == NodeKind::ListItem) ++items;
+  }
+  EXPECT(sections >= 3);  // Recently changed, root, docs
+  EXPECT(items >= 6);
+}
+
 int main() {
+  test_sitemap();
   test_sha256();
   test_revstore();
   test_front_matter_and_preamble();

@@ -108,6 +108,7 @@ enum class UiCommand {
   ToggleSplit,
   ToggleOutline,
   ToggleBacklinks,
+  ToggleSitemap,  // site structure panel of the focused web page
   OpenTranscludeOther,  // open include target in the other pane
   ToggleDiff,
   ToggleStructure,
@@ -159,6 +160,7 @@ struct UiState {
   bool justify = false;
   bool footnote_overlay = true;
   bool backlinks = false;
+  bool sitemap = false;
   bool diff = false;
   bool can_diff = false;  // two independent documents loaded
   bool structure = false;

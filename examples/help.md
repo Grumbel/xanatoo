@@ -64,6 +64,9 @@ Export via *File → Export as S-expression…* or *Export as Markdown…*.
 - **Ctrl+F** / **F3** — Leap search / next match
 - **Ctrl+H** — Find and replace
 - **Ctrl+Shift+O** — Outline (headers by section depth)
+- **Ctrl+Alt+M** — Site map of the current web page's site (from its
+  sitemap.xml): ↑/↓ move, ←/→ fold, Enter opens; **Page** shows it as a
+  `sitemap:host` document
 - **Click a link** — Follow `#anchor` or open http(s)
 
 ## View & layout

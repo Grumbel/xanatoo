@@ -8,6 +8,19 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-29) — site maps
+
+- `sitemap.hpp` / `src/sitemap.cpp`: robots.txt `Sitemap:` lines (else
+  /sitemap.xml, /sitemap_index.xml, /wp-sitemap.xml), indexes followed
+  (≤ 25 files, ≤ 50k URLs), URL list → path tree; `sitemap:host` page
+  with "Recently changed" (by `lastmod`) and one Section per directory.
+- View → Site Map (Ctrl+Alt+M): `WindowRole::Sitemap` panel, docked right
+  by default; follows the focused page (reveals and bolds it), ↑↓ ←→
+  Enter, click twisty folds, "Page" opens the document form.
+- Open: gzip sitemaps (no zlib yet), page titles instead of path
+  segments (known from history / page cache), coverage (visited pages),
+  prev / next page within a branch.
+
 ## Status (2026-10-29) — one docking model for all windows
 
 - `FloatWindow::dock` (`Dock::None / Left / Right / Max`) for every role
