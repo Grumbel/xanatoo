@@ -1764,6 +1764,9 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       } else if (!p.sel.empty()) {
         p.sel.anchor = p.sel.focus;
         reset_blink(app);
+      } else if (ev.key.keysym.scancode == SDL_SCANCODE_AC_BACK &&
+                 !imgui_keys) {
+        execute_command(app, UiCommand::NavBack);
       }
       // Esc no longer quits — use Ctrl+Q
       break;
@@ -2489,12 +2492,12 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
 }
 
 void handle_event(App& app, SDL_Event& ev) {
-  // Android Back (trapped, see platform_pre_init) acts like Escape everywhere:
-  // lightbox, ImGui popups, prompts, panels.
+  // Android Back (trapped, see platform_pre_init) acts like Escape
+  // everywhere: lightbox, ImGui popups, prompts, panels. The scancode stays
+  // AC_BACK, so where Escape has nothing to close Back steps history back.
   if ((ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP) &&
       ev.key.keysym.sym == SDLK_AC_BACK) {
     ev.key.keysym.sym = SDLK_ESCAPE;
-    ev.key.keysym.scancode = SDL_SCANCODE_ESCAPE;
   }
   if (lightbox_event(app, ev)) return;  // fullscreen viewer owns the input
   app.ui.process_event(ev);

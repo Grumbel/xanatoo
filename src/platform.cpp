@@ -109,7 +109,8 @@ void unpack_assets(const fs::path& dest) {
 
 void platform_pre_init() {
   // Back arrives as SDLK_AC_BACK instead of finishing the activity (which
-  // would drop unsaved edits); on_keydown treats it like Escape.
+  // would drop unsaved edits); handle_event treats it like Escape, and like
+  // history Back where Escape has nothing to close.
   SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
 }
 
