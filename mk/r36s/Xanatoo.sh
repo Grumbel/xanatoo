@@ -22,14 +22,13 @@ GAMEDIR="/$directory/ports/xanatoo"
 cd "$GAMEDIR" || exit 1
 > "$GAMEDIR/log.txt" && exec > >(tee "$GAMEDIR/log.txt") 2>&1
 
-# Config and bookmarks stay with the port on the SD card.
-mkdir -p "$GAMEDIR/conf"
-export XDG_CONFIG_HOME="$GAMEDIR/conf"
-export XDG_STATE_HOME="$GAMEDIR/conf"
+# User files stay with the port on the SD card (gamepkgstd DIR-10); the
+# game applies its normal Linux rules to these.
+export XDG_CONFIG_HOME="$GAMEDIR/conf/config"
+export XDG_STATE_HOME="$GAMEDIR/conf/state"
+export XDG_DATA_HOME="$GAMEDIR/conf/data"
+export XDG_CACHE_HOME="$GAMEDIR/conf/cache"
 
-# Data next to the binary (examples, icons, font)
-export XANATOO_DATA_DIR="$GAMEDIR"
-export XANATOO_ICON_DIR="$GAMEDIR/icons"
 if [ -f "$GAMEDIR/fonts/DejaVuSans.ttf" ]; then
   export XANATOO_FONT="$GAMEDIR/fonts/DejaVuSans.ttf"
 fi
@@ -41,10 +40,7 @@ export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
 $GPTOKEYB "xanatoo" &
 pm_platform_helper "$GAMEDIR/xanatoo"
 
-# Open the welcome document when present so examples are immediately reachable.
-if [ -f "$GAMEDIR/examples/welcome.md" ]; then
-  ./xanatoo --fullscreen "$GAMEDIR/examples/welcome.md" "$@"
-else
-  ./xanatoo --fullscreen "$@"
-fi
+# The port folder is the data directory (examples, styles, icons, font);
+# with no file given, examples/welcome.md opens.
+./xanatoo --fullscreen --data-dir "$GAMEDIR" "$@"
 pm_finish

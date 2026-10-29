@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/sidestore.hpp"
+#include "xanatoo/paths.hpp"
 #include "xanatoo/util.hpp"
 
 #ifndef XANATOO_SQLITE
@@ -18,9 +19,13 @@ namespace xanatoo {
 namespace {
 
 #if XANATOO_SQLITE
-sqlite3* open_db() {
+// Reading never creates the store; writing creates its directory.
+sqlite3* open_db(bool write) {
   std::string path = sidestore_path();
   if (path.empty()) return nullptr;
+  std::error_code ec;
+  if (write ? !ensure_dir(state_dir()) : !std::filesystem::exists(path, ec))
+    return nullptr;
   sqlite3* db = nullptr;
   if (sqlite3_open(path.c_str(), &db) != SQLITE_OK) {
     if (db) sqlite3_close(db);
@@ -73,7 +78,7 @@ std::string child_index_path(const Document& doc, NodeId section) {
 }  // namespace
 
 std::string sidestore_path() {
-  std::string dir = config_dir();
+  std::string dir = state_dir();
   if (dir.empty()) return {};
   return dir + "/sidestore.sqlite";
 }
@@ -98,7 +103,7 @@ void load_section_folds(std::string_view doc_key,
                         std::unordered_set<std::string>& folded_keys) {
   folded_keys.clear();
   if (doc_key.empty()) return;
-  sqlite3* db = open_db();
+  sqlite3* db = open_db(false);
   if (!db) return;
   sqlite3_stmt* st = nullptr;
   const char* sql =
@@ -120,8 +125,8 @@ void load_section_folds(std::string_view doc_key,
 
 void save_section_fold(std::string_view doc_key, std::string_view section_key,
                        bool folded) {
-  if (doc_key.empty() || section_key.empty()) return;
-  sqlite3* db = open_db();
+  if (doc_key.empty() || section_key.empty() || no_save()) return;
+  sqlite3* db = open_db(true);
   if (!db) return;
   if (folded) {
     sqlite3_stmt* st = nullptr;

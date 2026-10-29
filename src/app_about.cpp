@@ -12,6 +12,7 @@
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/image_backend.hpp"
 #include "xanatoo/parse.hpp"
+#include "xanatoo/paths.hpp"
 #include "xanatoo/tls.hpp"
 #include "xanatoo/util.hpp"
 
@@ -191,12 +192,13 @@ AboutSection libraries(App& app) {
                      {}, {}});
   s.items.push_back({"Drafts", true, "unsaved edits in the revision store",
                      "drafts:", {}});
-  const std::string cache = xanatoo::cache_dir();
-  if (!cache.empty())
-    s.items.push_back({"Cache", true, "`" + cache + "`", {}, {}});
-  const std::string config = xanatoo::config_dir();
-  if (!config.empty())
-    s.items.push_back({"Settings", true, "`" + config + "`", {}, {}});
+  for (const auto& [label, dir] :
+       {std::pair<const char*, std::string>{"Settings", xanatoo::config_dir()},
+        {"State", xanatoo::state_dir()},
+        {"User data", xanatoo::user_data_dir()},
+        {"Cache", xanatoo::cache_dir()},
+        {"Data", xanatoo::data_dir()}})
+    if (!dir.empty()) s.items.push_back({label, true, "`" + dir + "`", {}, {}});
   return s;
 }
 

@@ -6,6 +6,7 @@
 #include "xanatoo/view_settings.hpp"
 #include <cmath>
 #include "xanatoo/font.hpp"
+#include "xanatoo/paths.hpp"
 #include "xanatoo/platform.hpp"
 
 #include "imgui.h"
@@ -187,31 +188,10 @@ void Ui::load_icons(SDL_Renderer* renderer) {
   if (!renderer) return;
   renderer_ = renderer;
 
-  // Search order (first hit wins):
-  //  1. XANATOO_ICON_DIR env (Nix wrapper / explicit override)
-  //  2. Compile-time build-tree path (dev builds before install)
-  //  3. Next to the executable: ../share/xanatoo/icons  (installed layout)
-  //  4. Cwd-relative fallbacks for in-tree cmake builds
+  // Toolbar icons are installed data: <data dir>/icons (paths.hpp).
   std::vector<fs::path> roots;
-  if (const char* env = std::getenv("XANATOO_ICON_DIR")) {
-    if (env[0] != '\0') roots.emplace_back(env);
-  }
-#ifdef XANATOO_ICON_DIR
-  roots.emplace_back(XANATOO_ICON_DIR);
-#endif
-#ifdef __linux__
-  try {
-    fs::path exe = fs::read_symlink("/proc/self/exe");
-    fs::path dir = exe.parent_path();
-    roots.push_back(dir / ".." / "share" / "xanatoo" / "icons");
-    roots.push_back(dir / "icons");
-  } catch (...) {
-  }
-#endif
-  roots.emplace_back("icons");
-  roots.emplace_back("share/xanatoo/icons");
-  roots.emplace_back("../icons");
-  roots.emplace_back("build/icons");
+  if (const std::string data = xanatoo::data_dir(); !data.empty())
+    roots.push_back(fs::path(data) / "icons");
 
   const char* names[] = {
       "save", "undo", "redo", "bold", "italic", "code", "link", "list",
@@ -224,7 +204,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
       "format", "insert", "view", "lists",
   };
 
-  // Resolve candidate directories (may mix install tree + build tree).
+  // Keep the candidate directories that exist.
   std::vector<fs::path> dirs;
   for (const auto& root : roots) {
     std::error_code ec;
@@ -234,7 +214,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
   }
   if (dirs.empty()) {
     std::cerr << "xanatoo: toolbar icons not found "
-                 "(set XANATOO_ICON_DIR or install share/xanatoo/icons)\n";
+                 "(no icons/ in the data directory, see --data-dir)\n";
     return;
   }
 

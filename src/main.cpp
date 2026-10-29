@@ -9,6 +9,7 @@
 
 #include "xanatoo/app.hpp"
 #include "xanatoo/cli.hpp"
+#include "xanatoo/paths.hpp"
 #include "xanatoo/platform.hpp"
 
 #include <SDL.h>
@@ -22,21 +23,15 @@
 namespace {
 
 // Window icon for X11 (Wayland takes it from the .desktop file matched by
-// app_id instead). Build tree first, then the installed hicolor theme.
+// app_id instead): the hicolor theme beside the data directory
+// (<prefix>/share/icons next to <prefix>/share/xanatoo).
 void set_window_icon(SDL_Window* window) {
 #ifndef __ANDROID__
   namespace fs = std::filesystem;
   std::vector<fs::path> cands;
-#ifdef XANATOO_APP_ICON
-  cands.emplace_back(XANATOO_APP_ICON);
-#endif
-#ifdef __linux__
-  std::error_code ec;
-  fs::path exe = fs::read_symlink("/proc/self/exe", ec);
-  if (!ec)
-    cands.push_back(exe.parent_path() / ".." / "share" / "icons" / "hicolor" /
-                    "64x64" / "apps" / "xanatoo.png");
-#endif
+  if (const std::string data = xanatoo::data_dir(); !data.empty())
+    cands.push_back(fs::path(data) / ".." / "icons" / "hicolor" / "64x64" /
+                    "apps" / "xanatoo.png");
   for (const auto& path : cands) {
     int w = 0, h = 0, comp = 0;
     unsigned char* data = stbi_load(path.string().c_str(), &w, &h, &comp, 4);
@@ -60,7 +55,9 @@ void set_window_icon(SDL_Window* window) {
 int main(int argc, char** argv) {
   xanatoo::platform_pre_init();
   xanatoo::CliOptions opt;
-  switch (xanatoo::parse_cli(argc, argv, opt)) {
+  xanatoo::CliResult cli = xanatoo::parse_cli(argc, argv, opt);
+  if (cli == xanatoo::CliResult::Run) cli = xanatoo::apply_path_options(opt);
+  switch (cli) {
     case xanatoo::CliResult::Run: break;
     case xanatoo::CliResult::Exit: return 0;
     case xanatoo::CliResult::Error: return 1;
@@ -96,7 +93,8 @@ int main(int argc, char** argv) {
   if (opt.fullscreen) win_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
   SDL_Window* window =
       SDL_CreateWindow("xanatoo", SDL_WINDOWPOS_CENTERED,
-                       SDL_WINDOWPOS_CENTERED, 1024, 768, win_flags);
+                       SDL_WINDOWPOS_CENTERED, opt.width, opt.height,
+                       win_flags);
   if (!window) {
     std::cerr << "SDL_CreateWindow: " << SDL_GetError() << "\n";
     SDL_Quit();

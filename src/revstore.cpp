@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/revstore.hpp"
+#include "xanatoo/paths.hpp"
 #include "xanatoo/util.hpp"
 
 #ifndef XANATOO_SQLITE
@@ -43,7 +44,7 @@ std::string file_doc_key(std::string_view path) {
 
 namespace {
 
-std::string g_db_path;  // empty = config_dir()/revisions.sqlite
+std::string g_db_path;  // empty = state_dir()/revisions.sqlite
 
 #if XANATOO_SQLITE
 sqlite3* g_db = nullptr;
@@ -54,8 +55,10 @@ sqlite3* db() {
   if (g_db_failed) return nullptr;
   std::string path = g_db_path;
   if (path.empty()) {
-    const std::string dir = config_dir();
-    if (!dir.empty()) path = dir + "/revisions.sqlite";
+    // --no-save: no store at all, so edits are confirmed, never dropped.
+    if (no_save()) return nullptr;
+    const std::string dir = state_dir();
+    if (ensure_dir(dir)) path = dir + "/revisions.sqlite";
   }
   const char* schema =
       "CREATE TABLE IF NOT EXISTS objects ("

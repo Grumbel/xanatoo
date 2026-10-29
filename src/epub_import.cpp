@@ -3,6 +3,7 @@
 
 #include "xanatoo/epub_import.hpp"
 
+#include "xanatoo/paths.hpp"
 #include "xanatoo/util.hpp"
 
 #include <cctype>
@@ -77,14 +78,9 @@ static fs::path import_cache_dir(const std::string& epub_path) {
   // ~/.cache/xanatoo/epub-import/<stem>-<hash-of-abspath>/ (EPUB; other
   // formats under pandoc-import/)
   const char* sub = is_epub_path(epub_path) ? "epub-import" : "pandoc-import";
-  fs::path base;
-  if (const char* xdg = std::getenv("XDG_CACHE_HOME"); xdg && xdg[0]) {
-    base = fs::path(xdg) / "xanatoo" / sub;
-  } else if (const char* home = std::getenv("HOME"); home && home[0]) {
-    base = fs::path(home) / ".cache" / "xanatoo" / sub;
-  } else {
-    base = fs::temp_directory_path() / (std::string("xanatoo-") + sub);
-  }
+  const std::string cache = cache_dir();
+  if (cache.empty()) return {};
+  const fs::path base = fs::path(cache) / sub;
 
   std::string abs = epub_path;
   try {
@@ -397,6 +393,10 @@ ImportResult import_via_pandoc(const std::string& epub_path) {
   }
 
   fs::path dir = import_cache_dir(epub_path);
+  if (dir.empty()) {
+    out.error = "no cache directory for the import";
+    return out;
+  }
   fs::path md = dir / "content.md";
   fs::path media = dir / "media";
 

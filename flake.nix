@@ -113,7 +113,8 @@
           };
         in
         {
-          # Default package wraps the binary with font + installed icon path.
+          # Default package wraps the binary with a font and pandoc; data is
+          # found next to the binary (<exe>/../share/xanatoo).
           default = pkgs.symlinkJoin {
             name = "xanatoo-${version}";
             paths = [ xanatoo ];
@@ -122,8 +123,6 @@
               wrapProgram $out/bin/xanatoo \
                 --set-default XANATOO_FONT \
                   "${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSans.ttf" \
-                --set-default XANATOO_ICON_DIR \
-                  "${xanatoo}/share/xanatoo/icons" \
                 --prefix PATH : "${pkgs.pandoc}/bin"
             '';
             meta = xanatoo.meta;
@@ -235,9 +234,9 @@
 
             # Mirror packaged wrapper env for the unwrapped out-of-tree binary.
             export XANATOO_FONT="''${XANATOO_FONT:-${dejavuFont}}"
-            export XANATOO_ICON_DIR="''${XANATOO_ICON_DIR:-$XANATOO_BUILD_DIR/icons}"
-            # examples/, welcome.md, help: prefer the live source tree
-            export XANATOO_DATA_DIR="''${XANATOO_DATA_DIR:-$XANATOO_SOURCE}"
+            # Data directory of the build tree: generated icons, symlinks to
+            # the live sources (styles/, examples/, FORMAT.md); DEV-6.
+            XANATOO_DATA_ARGS=(--data-dir "$XANATOO_BUILD_DIR/share/xanatoo")
 
             # Host LD_LIBRARY_PATH often breaks sdl2-compat: wrong libSDL2 or
             # missing SDL3 → SIGABRT in dllinit() before main(). Prefer the
@@ -299,7 +298,7 @@
                 echo "xanatoo-run: $XANATOO_BUILD_DIR/xanatoo missing after build" >&2
                 exit 1
               fi
-              exec "$XANATOO_BUILD_DIR/xanatoo" "$@"
+              exec "$XANATOO_BUILD_DIR/xanatoo" "''${XANATOO_DATA_ARGS[@]}" "$@"
             ''
           );
 
@@ -330,7 +329,7 @@ try:
 except Exception:
   pass
 ' \
-                --args "$XANATOO_BUILD_DIR/xanatoo" "$@"
+                --args "$XANATOO_BUILD_DIR/xanatoo" "''${XANATOO_DATA_ARGS[@]}" "$@"
             ''
           );
 
@@ -373,8 +372,6 @@ except Exception:
               export XANATOO_SOURCE="$PWD"
               export XANATOO_BUILD_DIR="''${XANATOO_BUILD_DIR:-/tmp/xanatoo-build}"
               export XANATOO_FONT="''${XANATOO_FONT:-${dejavuFont}}"
-              export XANATOO_ICON_DIR="''${XANATOO_ICON_DIR:-$XANATOO_BUILD_DIR/icons}"
-              export XANATOO_DATA_DIR="''${XANATOO_DATA_DIR:-$XANATOO_SOURCE}"
               export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath (with pkgs; [
                 SDL2 sdl3 libx11 libGL freetype fontconfig openssl sqlite
               ])}''${XANATOO_EXTRA_LD_LIBRARY_PATH:+:$XANATOO_EXTRA_LD_LIBRARY_PATH}"
@@ -411,16 +408,14 @@ xanatoo — nix develop (out-of-tree CMake)
     • xanatoo-build compares CMAKE_HOME_DIRECTORY to $XANATOO_SOURCE and
       reconfigures when the checkout moved or the cache is stale/gone.
     • Develop defaults to Debug; `nix build` packages use RelWithDebInfo.
-    • Unwrapped binary gets the same runtime hints as the package wrapper
-      (XANATOO_FONT, XANATOO_ICON_DIR, XANATOO_DATA_DIR → live source tree).
+    • Unwrapped binary gets the package wrapper's font (XANATOO_FONT) and
+      --data-dir $XANATOO_BUILD_DIR/share/xanatoo (icons + live sources).
 
   Env (override anytime):
     XANATOO_SOURCE      this tree ($PWD)
     XANATOO_BUILD_DIR   default /tmp/xanatoo-build
     CMAKE_BUILD_TYPE    default Debug
     XANATOO_FONT        DejaVu Sans from nixpkgs
-    XANATOO_ICON_DIR    $XANATOO_BUILD_DIR/icons
-    XANATOO_DATA_DIR    $XANATOO_SOURCE (examples / welcome / help)
 
   Typical loop:
     xanatoo-configure && xanatoo-build

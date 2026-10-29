@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/util.hpp"
+#include "xanatoo/paths.hpp"
 
 #include <cctype>
 #include <cstdint>
@@ -110,36 +111,34 @@ bool is_raster_image_path(std::string_view path) {
          path_ends_with_ci(path, ".bmp");
 }
 
-std::string config_dir() {
-  const char* xdg = std::getenv("XDG_CONFIG_HOME");
-  fs::path base;
-  if (xdg && xdg[0]) {
-    base = fs::path(xdg) / "xanatoo";
-  } else {
-    const char* home = std::getenv("HOME");
-    if (!home || !home[0]) return {};
-    base = fs::path(home) / ".config" / "xanatoo";
+bool write_file_atomic(const std::string& path, std::string_view content) {
+  const fs::path target(path);
+  if (!ensure_dir(target.parent_path().string())) return false;
+  const fs::path tmp = fs::path(path + ".tmp");
+  {
+    std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+    out.write(content.data(), static_cast<std::streamsize>(content.size()));
+    out.flush();
+    if (!out) {
+      std::cerr << "xanatoo: cannot write " << tmp.string() << "\n";
+      std::error_code ec;
+      fs::remove(tmp, ec);
+      return false;
+    }
   }
   std::error_code ec;
-  fs::create_directories(base, ec);
+  fs::rename(tmp, target, ec);
   if (ec) {
-    std::cerr << "xanatoo: cannot create config dir " << base << ": "
-              << ec.message() << "\n";
-    return {};
+    std::cerr << "xanatoo: cannot replace " << path << ": " << ec.message()
+              << "\n";
+    fs::remove(tmp, ec);
+    return false;
   }
-  return base.string();
-}
-
-std::string cache_dir() {
-  if (const char* xdg = std::getenv("XDG_CACHE_HOME"); xdg && xdg[0])
-    return (fs::path(xdg) / "xanatoo").string();
-  if (const char* home = std::getenv("HOME"); home && home[0])
-    return (fs::path(home) / ".cache" / "xanatoo").string();
-  return {};
+  return true;
 }
 
 std::string bookmarks_path() {
-  std::string dir = config_dir();
+  std::string dir = state_dir();
   if (dir.empty()) return {};
   return (fs::path(dir) / "bookmarks").string();
 }
@@ -164,18 +163,14 @@ std::vector<std::string> load_bookmarks() {
 }
 
 bool save_bookmarks(const std::vector<std::string>& entries) {
+  if (no_save()) return true;
   std::string path = bookmarks_path();
   if (path.empty()) return false;
-  std::ofstream out(path, std::ios::trunc);
-  if (!out) {
-    std::cerr << "xanatoo: cannot write bookmarks to " << path << "\n";
-    return false;
-  }
-  out << "# xanatoo bookmarks — one URL or path per line\n";
+  std::string text = "# xanatoo bookmarks — one URL or path per line\n";
   for (const auto& e : entries) {
-    if (!e.empty()) out << e << '\n';
+    if (!e.empty()) text += e + '\n';
   }
-  return static_cast<bool>(out);
+  return write_file_atomic(path, text);
 }
 
 void utf8_pop_back(std::string& s) {

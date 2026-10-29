@@ -130,8 +130,7 @@ struct StyleEntry {
 };
 
 // Style directories, lowest priority first (later ones override by name):
-// build-tree styles/, <exe>/../share/xanatoo/styles, $XANATOO_DATA_DIR/styles,
-// ./styles, ~/.config/xanatoo/styles.
+// <data dir>/styles, then the user's <user data dir>/styles (paths.hpp).
 std::vector<std::string> style_dirs();
 // "default" always first (built in even without a file), rest by title.
 std::vector<StyleEntry> list_styles();

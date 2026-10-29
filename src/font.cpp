@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/font.hpp"
+#include "xanatoo/paths.hpp"
 #ifndef XANATOO_FONTCONFIG
 #define XANATOO_FONTCONFIG 1
 #endif
@@ -307,7 +308,7 @@ FontGroup font_group(const std::string& family) {
 
 std::vector<std::filesystem::path> font_dirs() {
   std::vector<std::filesystem::path> dirs;
-  if (const char* data = std::getenv("XANATOO_DATA_DIR"); data && data[0])
+  if (const std::string data = data_dir(); !data.empty())
     dirs.push_back(std::filesystem::path(data) / "fonts");
   dirs.emplace_back("/system/fonts");                    // Android
   dirs.emplace_back("/usr/share/fonts/truetype/dejavu");  // Debian
@@ -416,13 +417,8 @@ std::string ui_font_path(bool bold) {
   for (const char** f = files; *f; ++f) {
     if (std::filesystem::exists(*f)) return *f;
   }
-  // PortMaster ships DejaVu next to the binary.
-  if (const char* data = std::getenv("XANATOO_DATA_DIR")) {
-    if (data[0] != '\0') {
-      std::filesystem::path p = std::filesystem::path(data) / "fonts" / "DejaVuSans.ttf";
-      if (std::filesystem::exists(p)) return p.string();
-    }
-  }
+  // PortMaster ships DejaVu in its data directory.
+  if (std::string p = data_file("fonts/DejaVuSans.ttf"); !p.empty()) return p;
   if (const char* body = std::getenv("XANATOO_FONT")) {
     if (body[0] != '\0' && std::filesystem::exists(body)) return body;
   }

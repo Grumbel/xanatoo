@@ -236,7 +236,7 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
       if (!pr.text.empty()) {
         std::string path = xanatoo::expand_user_path(pr.text);
         if (!fs::exists(path)) {
-          std::string found = find_repo_file(app, path.c_str());
+          std::string found = find_data_file(app, path.c_str());
           if (!found.empty()) path = found;
         }
         open_browse(app, path, path);
@@ -263,7 +263,7 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
       }
       std::string path = xanatoo::expand_user_path(pr.text);
       if (!fs::exists(path)) {
-        std::string found = find_repo_file(app, path.c_str());
+        std::string found = find_data_file(app, path.c_str());
         if (!found.empty()) path = found;
       }
       if (!fs::exists(path)) {

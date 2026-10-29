@@ -2,6 +2,8 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/view_settings.hpp"
+#include "xanatoo/paths.hpp"
+#include "xanatoo/util.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -46,15 +48,9 @@ int measure_from_px(float px) {
 }  // namespace
 
 std::string view_settings_path() {
-  fs::path base;
-  if (const char* xdg = std::getenv("XDG_CONFIG_HOME"); xdg && xdg[0]) {
-    base = fs::path(xdg) / "xanatoo";
-  } else if (const char* home = std::getenv("HOME"); home && home[0]) {
-    base = fs::path(home) / ".config" / "xanatoo";
-  } else {
-    base = fs::temp_directory_path() / "xanatoo-config";
-  }
-  return (base / "view.conf").string();
+  const std::string dir = config_dir();
+  if (dir.empty()) return {};
+  return (fs::path(dir) / "view.conf").string();
 }
 
 bool load_view_settings(ViewSettings& out) {
@@ -115,14 +111,10 @@ bool load_view_settings(ViewSettings& out) {
 bool save_view_settings(const ViewSettings& in) {
   ViewSettings v = in;
   v.clamp();
-  fs::path path = view_settings_path();
-  try {
-    fs::create_directories(path.parent_path());
-  } catch (...) {
-    return false;
-  }
-  std::ofstream out(path, std::ios::trunc);
-  if (!out) return false;
+  if (no_save()) return true;
+  const std::string path = view_settings_path();
+  if (path.empty()) return false;
+  std::ostringstream out;
   out << "# xanatoo preferences (not document format)\n";
   out << "line_spacing=" << v.line_spacing << "\n";
   out << "margin_pct=" << v.margin_pct << "\n";
@@ -132,7 +124,7 @@ bool save_view_settings(const ViewSettings& in) {
   out << "footnotes=" << (v.footnote_overlay ? "1" : "0") << "\n";
   out << "hover_preview=" << (v.hover_preview ? "1" : "0") << "\n";
   out << "style=" << v.style << "\n";
-  return static_cast<bool>(out);
+  return write_file_atomic(path, out.str());
 }
 
 }  // namespace xanatoo

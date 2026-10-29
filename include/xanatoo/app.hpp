@@ -682,7 +682,7 @@ void mark_dirty(App& app);
 void note_edit(App& app, DocBuffer& b);
 void edit(App& app);
 std::string find_help_path(App& app);
-std::string find_repo_file(App& app, const char* name);
+std::string find_data_file(App& app, const char* name);
 std::string canon_path(App& app, const std::string& path);
 BufferId find_buffer(App& app, const std::string& path);
 BufferId ensure_buffer(App& app, const std::string& path);

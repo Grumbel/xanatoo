@@ -14,6 +14,7 @@
 #include <thread>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/paths.hpp"
 #include "xanatoo/util.hpp"
 #if defined(XANATOO_HTTPS) && XANATOO_HTTPS
 #include "xanatoo/https.hpp"
@@ -47,6 +48,7 @@ bool download_image(const std::string& url) {
     return false;
   }
   const std::string path = xanatoo::remote_image_path(url);
+  if (path.empty()) return false;  // no cache directory
   const std::string tmp = path + ".part";
   std::error_code ec;
   fs::create_directories(fs::path(path).parent_path(), ec);

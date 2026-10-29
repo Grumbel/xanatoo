@@ -7,6 +7,7 @@
 // any direct .epub link take the download path as well.
 
 #include "xanatoo/ebooks.hpp"
+#include "xanatoo/paths.hpp"
 #include "xanatoo/util.hpp"
 
 #include "xanatoo/epub_import.hpp"
@@ -239,11 +240,9 @@ const char* kUserAgent =
     "xanatoo/0.1.0 (ebook reader; +https://github.com/Grumbel/xanatoo)";
 
 fs::path download_dir() {
-  if (const char* xdg = std::getenv("XDG_CACHE_HOME"); xdg && xdg[0])
-    return fs::path(xdg) / "xanatoo" / "downloads";
-  if (const char* home = std::getenv("HOME"); home && home[0])
-    return fs::path(home) / ".cache" / "xanatoo" / "downloads";
-  return fs::temp_directory_path() / "xanatoo-downloads";
+  const std::string cache = cache_dir();
+  if (cache.empty()) return {};
+  return fs::path(cache) / "downloads";
 }
 
 // "<host>_<last segment>.epub", filesystem-safe.
@@ -272,7 +271,12 @@ std::optional<Document> fetch_listing(const std::string& url, std::string* err) 
 
 std::optional<Document> fetch_book(const std::string& epub_url,
                                    std::string* err, std::string* local_path) {
-  fs::path file = download_dir() / cache_name(epub_url);
+  const fs::path dir = download_dir();
+  if (dir.empty()) {
+    if (err) *err = "no cache directory for downloads";
+    return std::nullopt;
+  }
+  fs::path file = dir / cache_name(epub_url);
   std::error_code ec;
   if (!fs::exists(file, ec)) {
     std::cerr << "Ebooks: GET " << epub_url << "\n";

@@ -97,21 +97,18 @@ std::string detect_charset(std::string_view content_type,
 // pages are returned unchanged.
 std::string to_utf8(std::string body, std::string_view charset);
 
-// XDG config directory for xanatoo (~/.config/xanatoo). Created if missing.
-// Returns empty string if the home directory cannot be resolved.
-std::string config_dir();
+// Write a config / state file atomically (gamepkgstd DIR-14): <path>.tmp
+// in the same directory (created if missing), flushed, renamed over
+// <path>. False, with an error naming the path on stderr, on failure.
+bool write_file_atomic(const std::string& path, std::string_view content);
 
-// XDG cache directory for xanatoo (~/.cache/xanatoo); not created. Empty
-// if the home directory cannot be resolved.
-std::string cache_dir();
-
-// Full path to the bookmarks file under config_dir().
+// Full path to the bookmarks file under state_dir().
 std::string bookmarks_path();
 
 // Load bookmarks (one URL/path per line; blank lines and # comments ignored).
 std::vector<std::string> load_bookmarks();
 
-// Save bookmarks (creates config dir as needed). Returns false on I/O error.
+// Save bookmarks (atomically; nothing with --no-save). False on I/O error.
 bool save_bookmarks(const std::vector<std::string>& entries);
 
 }  // namespace xanatoo

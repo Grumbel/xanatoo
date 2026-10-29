@@ -100,6 +100,7 @@ add_executable(xanatoo
   src/style.cpp
   src/platform.cpp
   src/cli.cpp
+  src/paths.cpp
   src/gemini.cpp
   src/nostr.cpp
   src/reddit.cpp
@@ -288,9 +289,25 @@ endif()
 
 install(TARGETS xanatoo DESTINATION bin)
 
+# Data directory (gamepkgstd DIR-3, paths.hpp): --data-dir, else
+# <exe>/../share/xanatoo, else the install path compiled in here. The build
+# tree mirrors the installed share/ (generated icons, the rest symlinked to
+# the sources so edits show at once); nix develop passes
+# --data-dir $XANATOO_BUILD_DIR/share/xanatoo.
+set(XANATOO_BUILD_DATA_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/xanatoo)
+file(MAKE_DIRECTORY ${XANATOO_BUILD_DATA_DIR})
+foreach(_entry styles examples FORMAT.md)
+  file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/${_entry}
+       ${XANATOO_BUILD_DATA_DIR}/${_entry} SYMBOLIC)
+endforeach()
+file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/data/icons
+     ${CMAKE_CURRENT_BINARY_DIR}/share/icons SYMBOLIC)
+target_compile_definitions(xanatoo PRIVATE
+  "XANATOO_DATA_INSTALL_DIR=\"${CMAKE_INSTALL_PREFIX}/share/xanatoo\"")
+
 # Toolbar icons: SVG sources → PNG at build time (ImageMagick or pure-Python fallback)
 set(XANATOO_SVG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/icons/svg)
-set(XANATOO_ICON_DIR ${CMAKE_CURRENT_BINARY_DIR}/icons)
+set(XANATOO_ICON_DIR ${XANATOO_BUILD_DATA_DIR}/icons)
 file(GLOB XANATOO_SVGS "${XANATOO_SVG_DIR}/*.svg")
 add_custom_command(
   OUTPUT ${XANATOO_ICON_DIR}/.stamp
@@ -305,13 +322,6 @@ add_custom_command(
 )
 add_custom_target(xanatoo_icons ALL DEPENDS ${XANATOO_ICON_DIR}/.stamp)
 add_dependencies(xanatoo xanatoo_icons)
-
-# Build-tree path for dev runs. Installed layout is found at runtime via
-# XANATOO_ICON_DIR env or <exe>/../share/xanatoo/icons (see Ui::load_icons).
-target_compile_definitions(xanatoo PRIVATE
-  "XANATOO_ICON_DIR=\"${XANATOO_ICON_DIR}\""
-  "XANATOO_STYLE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/styles\""
-  "XANATOO_APP_ICON=\"${CMAKE_CURRENT_SOURCE_DIR}/data/icons/hicolor/64x64/apps/xanatoo.png\"")
 
 install(DIRECTORY ${XANATOO_ICON_DIR}/
         DESTINATION share/xanatoo/icons
@@ -329,6 +339,7 @@ install(DIRECTORY data/icons/hicolor/
         FILES_MATCHING PATTERN "*.png")
 install(FILES data/icons/xanatoo.svg
         DESTINATION share/icons/hicolor/scalable/apps)
+install(FILES FORMAT.md DESTINATION share/xanatoo)
 install(DIRECTORY styles/
         DESTINATION share/xanatoo/styles
         FILES_MATCHING PATTERN "*.xss")
@@ -353,6 +364,7 @@ add_executable(xanatoo_tests
   tests/unit_tests.cpp
   src/about.cpp
   src/util.cpp
+  src/paths.cpp
   src/revstore.cpp
   src/minibuffer.cpp
   src/document.cpp

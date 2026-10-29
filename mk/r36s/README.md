@@ -19,9 +19,11 @@ zip into `ports/PortMaster/autoinstall/` and start PortMaster once.
 /roms/ports/Xanatoo.sh
 /roms/ports/xanatoo/xanatoo          # binary
 /roms/ports/xanatoo/examples/        # welcome.md, help.md, …
+/roms/ports/xanatoo/styles/          # style sheets
 /roms/ports/xanatoo/icons/           # toolbar PNGs
 /roms/ports/xanatoo/fonts/           # DejaVuSans.ttf
-/roms/ports/xanatoo/conf/            # created at runtime (bookmarks, …)
+/roms/ports/xanatoo/conf/            # created at runtime: config/, state/
+                                     # (drafts, bookmarks), data/, cache/
 ```
 
 UI menus use DejaVu Sans when available (same as the body font).

@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/cli.hpp"
+#include "xanatoo/paths.hpp"
 
 #ifdef __ANDROID__
 #include <SDL.h>
@@ -10,6 +11,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <utility>
 
 #if defined(__linux__) || defined(__APPLE__)
 #include <sys/wait.h>
@@ -25,85 +27,105 @@ namespace fs = std::filesystem;
 
 const char* fallback_document() {
   return "# Untitled\n\n"
-         "Open a document with `xanatoo file.md`, or place "
-         "`examples/welcome.md` next to the binary.\n\n"
+         "Open a document with `xanatoo file.md`, or point `--data-dir` "
+         "at a directory with `examples/welcome.md`.\n\n"
          "Press **F1** for the keyboard reference.\n";
 }
 
 std::string find_default_document() {
-  // Prefer a real file so relative image paths resolve.
-  const char* candidates[] = {
-      "examples/welcome.md",
-      "../examples/welcome.md",
-      "../../examples/welcome.md",
-      nullptr,
-  };
-  for (const char** p = candidates; *p; ++p) {
-    if (fs::exists(*p)) return fs::absolute(*p).string();
-  }
-#ifdef __linux__
-  try {
-    fs::path exe = fs::read_symlink("/proc/self/exe");
-    fs::path dir = exe.parent_path();
-    const fs::path near[] = {
-        dir / "examples" / "welcome.md",
-        dir / ".." / "examples" / "welcome.md",
-        dir / ".." / "share" / "xanatoo" / "welcome.md",
-        dir / ".." / "share" / "xanatoo" / "examples" / "welcome.md",
-    };
-    for (const auto& c : near) {
-      std::error_code ec;
-      auto canon = fs::weakly_canonical(c, ec);
-      if (!ec && fs::exists(canon)) return canon.string();
-    }
-  } catch (...) {
-  }
-#endif
-  return {};
+  return data_file("examples/welcome.md");
 }
 
 void print_usage(std::ostream& out, const char* argv0) {
   out << "Usage: " << argv0 << " [options] [file] [file2]\n"
       << "\n"
+      << "Interactive document composition engine.\n"
+      << "\n"
+      << "One path (or gemini://, https://, … URL) opens that document; two\n"
+      << "open side by side. With none, examples/welcome.md from the data\n"
+      << "directory opens. .html opens as a read-only reader view; .epub,\n"
+      << ".docx, .odt, .rst, .tex, … are imported to Markdown via pandoc.\n"
+      << "\n"
       << "Options:\n"
-      << "  -f, --font <path>     TTF/OTF font file (body + headings)\n"
-      << "  -o, --open <path>     Open a markup document\n"
       << "  -h, --help            Show this help\n"
       << "  -v, --version         Show the version\n"
+      << "  -f, --fullscreen      Start fullscreen\n"
+      << "  -w, --windowed        Start windowed\n"
+      << "  -g, --geometry WxH    Window size (default 1024x768)\n"
+      << "  -o, --open PATH       Open PATH (same as a positional path)\n"
+      << "      --font PATH       TTF/OTF font for body text (else XANATOO_FONT,\n"
+      << "                        then FontConfig)\n"
+      << "      --ui-scale N      Chrome and default text scale (default 1;\n"
+      << "                        Android: dpi/160)\n"
       << "\n"
-      << "With no file, opens examples/welcome.md when found.\n"
-      << "One positional path opens that document (or gemini:// URL).\n"
-      << ".html opens as a read-only reader view; .epub, .docx, .odt, .rtf,\n"
-      << ".rst, .tex, .typ, .wiki, .ipynb, .csv, … are imported via pandoc to\n"
-      << "Markdown (original unchanged).\n"
-      << "Two paths open dual-pane: left=file1, right=file2.\n"
-      << "Ctrl+S saves the focused pane's document.\n"
-      << "Ctrl+\\ toggles split; drag the gutter to resize panes.\n"
-      << "\n"
-      << "  -F, --fullscreen      Borderless fullscreen\n"
-      << "  --ui-scale <n>        chrome + default text scale (default: 1; Android: dpi/160)\n"
-      << "\n"
-      << "Font resolution: --font / XANATOO_FONT, then FontConfig\n"
-      << "(regular/bold/italic/mono faces for styled text).\n";
+      << "Directories:\n"
+      << "      --data-dir DIR    Installed data: examples, help, style sheets,\n"
+      << "                        icons (default <exe>/../share/xanatoo)\n"
+      << "      --config-dir DIR  Settings (view.conf)\n"
+      << "      --state-dir DIR   Drafts, revisions, bookmarks, history\n"
+      << "      --user-data-dir DIR  Your own style sheets (styles/)\n"
+      << "      --cache-dir DIR   Thumbnails, downloads, imports\n"
+      << "      --portable        Keep everything in <exe dir>/userdata/ (also\n"
+      << "                        when portable.txt is next to the executable)\n"
+      << "      --no-save         Write no settings or state this run\n"
+      << "      --show-paths      Print every directory and where it came from\n";
 }
 
+namespace {
+
+// --name VALUE / --name=VALUE / -x VALUE. Returns true when argv[i] is this
+// option (value in *out, i advanced past it); sets err on a missing value.
+bool value_opt(int argc, char** argv, int& i, const char* shrt,
+               const char* lng, std::string* out, bool& err) {
+  const std::string a = argv[i];
+  const std::string eq = std::string(lng) + "=";
+  if (a.rfind(eq, 0) == 0) {
+    *out = a.substr(eq.size());
+    return true;
+  }
+  if (a != lng && !(shrt && a == shrt)) return false;
+  if (i + 1 >= argc) {
+    std::cerr << "xanatoo: " << a << " requires a value\n";
+    err = true;
+    return true;
+  }
+  *out = argv[++i];
+  return true;
+}
+
+bool parse_geometry(const std::string& v, int& w, int& h) {
+  char* end = nullptr;
+  const long pw = std::strtol(v.c_str(), &end, 10);
+  if (end == v.c_str() || (*end != 'x' && *end != 'X')) return false;
+  const char* hs = end + 1;
+  const long ph = std::strtol(hs, &end, 10);
+  if (end == hs || *end != '\0' || pw <= 0 || ph <= 0 || pw > 32768 ||
+      ph > 32768)
+    return false;
+  w = static_cast<int>(pw);
+  h = static_cast<int>(ph);
+  return true;
+}
+
+}  // namespace
+
 CliResult parse_cli(int argc, char** argv, CliOptions& opt) {
+  bool options_done = false;
   for (int i = 1; i < argc; ++i) {
-    std::string a = argv[i];
-    if (a == "--fullscreen" || a == "-F") {
-      opt.fullscreen = true;
-      continue;
-    }
-    if (a == "--ui-scale") {
-      if (i + 1 >= argc) {
-        std::cerr << "error: " << a << " requires a number\n";
+    const std::string a = argv[i];
+    if (options_done || a.empty() || a[0] != '-' || a == "-") {
+      if (opt.file_path.empty()) {
+        opt.file_path = a;
+      } else if (opt.file_path2.empty()) {
+        opt.file_path2 = a;
+      } else {
+        std::cerr << "xanatoo: unexpected argument: " << a << "\n";
         return CliResult::Error;
       }
-      opt.ui_scale = std::strtof(argv[++i], nullptr);
       continue;
     }
-    if (a.rfind("--ui-scale=", 0) == 0) {
-      opt.ui_scale = std::strtof(a.c_str() + 11, nullptr);
+    if (a == "--") {
+      options_done = true;
       continue;
     }
     if (a == "-h" || a == "--help") {
@@ -114,44 +136,78 @@ CliResult parse_cli(int argc, char** argv, CliOptions& opt) {
       std::cout << "xanatoo " << XANATOO_VERSION << "\n";
       return CliResult::Exit;
     }
-    if (a == "-f" || a == "--font") {
-      if (i + 1 >= argc) {
-        std::cerr << "error: " << a << " requires a path argument\n";
-        print_usage(std::cerr, argv[0]);
-        return CliResult::Error;
-      }
-      opt.font_path = argv[++i];
+    if (a == "-f" || a == "--fullscreen") {
+      opt.fullscreen = true;
       continue;
     }
-    if (a.rfind("--font=", 0) == 0) {
-      opt.font_path = a.substr(7);
+    if (a == "-w" || a == "--windowed") {
+      opt.fullscreen = false;
       continue;
     }
-    if (a == "-o" || a == "--open" || a == "--file") {
-      if (i + 1 >= argc) {
-        std::cerr << "error: " << a << " requires a path argument\n";
-        print_usage(std::cerr, argv[0]);
-        return CliResult::Error;
-      }
-      opt.file_path = argv[++i];
+    if (a == "--portable") {
+      opt.portable = true;
       continue;
     }
-    if (!a.empty() && a[0] != '-') {
-      if (opt.file_path.empty()) {
-        opt.file_path = a;
-        continue;
+    if (a == "--no-save") {
+      opt.no_save = true;
+      continue;
+    }
+    if (a == "--show-paths") {
+      opt.show_paths = true;
+      continue;
+    }
+    bool err = false;
+    std::string v;
+    if (value_opt(argc, argv, i, "-g", "--geometry", &v, err)) {
+      if (!err && !parse_geometry(v, opt.width, opt.height)) {
+        std::cerr << "xanatoo: --geometry: expected WxH, got '" << v << "'\n";
+        err = true;
       }
-      if (opt.file_path2.empty()) {
-        opt.file_path2 = a;
-        continue;
+    } else if (value_opt(argc, argv, i, nullptr, "--ui-scale", &v, err)) {
+      char* end = nullptr;
+      opt.ui_scale = err ? 0.f : std::strtof(v.c_str(), &end);
+      if (!err && (end == v.c_str() || *end != '\0' || opt.ui_scale <= 0.f)) {
+        std::cerr << "xanatoo: --ui-scale: expected a positive number, got '"
+                  << v << "'\n";
+        err = true;
       }
-      std::cerr << "error: unexpected argument: " << a << "\n";
-      print_usage(std::cerr, argv[0]);
+    } else if (value_opt(argc, argv, i, nullptr, "--font", &opt.font_path, err) ||
+               value_opt(argc, argv, i, "-o", "--open", &opt.file_path, err) ||
+               value_opt(argc, argv, i, nullptr, "--data-dir", &opt.data_dir, err) ||
+               value_opt(argc, argv, i, nullptr, "--config-dir", &opt.config_dir, err) ||
+               value_opt(argc, argv, i, nullptr, "--state-dir", &opt.state_dir, err) ||
+               value_opt(argc, argv, i, nullptr, "--user-data-dir", &opt.user_data_dir, err) ||
+               value_opt(argc, argv, i, nullptr, "--cache-dir", &opt.cache_dir, err)) {
+    } else {
+      std::cerr << "xanatoo: unknown option: " << a << " (see --help)\n";
       return CliResult::Error;
     }
-    std::cerr << "error: unknown argument: " << a << "\n";
-    print_usage(std::cerr, argv[0]);
+    if (err) return CliResult::Error;
+  }
+  return CliResult::Run;
+}
+
+CliResult apply_path_options(const CliOptions& opt) {
+  auto absolute = [](const std::string& p) {
+    std::error_code ec;
+    const fs::path a = fs::absolute(p, ec);
+    return ec ? p : a.lexically_normal().string();
+  };
+  if (!opt.data_dir.empty()) set_data_dir(absolute(opt.data_dir), "option");
+  const std::pair<DirKind, const std::string*> dirs[] = {
+      {DirKind::Config, &opt.config_dir},
+      {DirKind::State, &opt.state_dir},
+      {DirKind::UserData, &opt.user_data_dir},
+      {DirKind::Cache, &opt.cache_dir},
+  };
+  for (const auto& [kind, path] : dirs)
+    if (!path->empty()) set_dir_override(kind, absolute(*path));
+  if ((opt.portable || portable_marker_present()) && !enable_portable_mode())
     return CliResult::Error;
+  set_no_save(opt.no_save);
+  if (opt.show_paths) {
+    print_paths(std::cout);
+    return CliResult::Exit;
   }
   return CliResult::Run;
 }

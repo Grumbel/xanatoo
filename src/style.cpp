@@ -3,6 +3,7 @@
 
 #include "xanatoo/style.hpp"
 
+#include "xanatoo/paths.hpp"
 #include "xanatoo/sexpr.hpp"
 #include "xanatoo/view_settings.hpp"
 
@@ -504,22 +505,12 @@ void apply_style_source(DocStyle& style, std::string_view source,
 std::vector<std::string> style_dirs() {
   std::vector<fs::path> dirs;
 #ifdef XANATOO_STYLE_DIR
-  dirs.emplace_back(XANATOO_STYLE_DIR);
+  dirs.emplace_back(XANATOO_STYLE_DIR);  // unit tests: the source tree
 #endif
-#ifdef __linux__
-  {
-    std::error_code ec;
-    fs::path exe = fs::read_symlink("/proc/self/exe", ec);
-    if (!ec) {
-      dirs.push_back(exe.parent_path() / ".." / "share" / "xanatoo" / "styles");
-      dirs.push_back(exe.parent_path() / "styles");
-    }
-  }
-#endif
-  if (const char* data = std::getenv("XANATOO_DATA_DIR"); data && data[0])
-    dirs.push_back(fs::path(data) / "styles");
-  dirs.emplace_back("styles");
-  dirs.push_back(fs::path(view_settings_path()).parent_path() / "styles");
+  if (const std::string d = data_dir(); !d.empty())
+    dirs.push_back(fs::path(d) / "styles");
+  if (const std::string d = user_data_dir(); !d.empty())
+    dirs.push_back(fs::path(d) / "styles");
 
   std::vector<std::string> out;
   for (const fs::path& d : dirs) {

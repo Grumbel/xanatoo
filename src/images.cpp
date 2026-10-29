@@ -11,6 +11,7 @@
 #include "stb_image.h"
 
 #include "xanatoo/image_backend.hpp"
+#include "xanatoo/paths.hpp"
 #include "xanatoo/util.hpp"
 
 #include <algorithm>
@@ -136,7 +137,9 @@ std::string thumb_cache_path(const std::string& resolved, int edge) {
       resolved + "\n" + std::to_string(size) + "\n" + std::to_string(static_cast<long long>(mtime)));
   char name[64];
   std::snprintf(name, sizeof(name), "%016zx-%d.bmp", h, edge);
-  return (fs::path(cache_dir()) / "thumbs" / name).string();
+  const std::string cache = cache_dir();
+  if (cache.empty()) return {};
+  return (fs::path(cache) / "thumbs" / name).string();
 }
 
 }  // namespace
@@ -233,7 +236,9 @@ std::string remote_image_path(std::string_view url) {
   char name[32];
   std::snprintf(name, sizeof(name), "%016llx",
                 static_cast<unsigned long long>(h));
-  return (fs::path(cache_dir()) / "images" / name).string();
+  const std::string cache = cache_dir();
+  if (cache.empty()) return {};
+  return (fs::path(cache) / "images" / name).string();
 }
 
 void prune_cache_dir(const std::string& dir, uint64_t max_bytes) {
@@ -276,7 +281,9 @@ const Image* ImageCache::remote_placeholder(const std::string& url) {
   if (failed_.count(url)) return &kFailed;
   if (pending_.count(url)) return &kPending;
   std::error_code ec;
-  if (fs::exists(remote_image_path(url), ec)) return nullptr;
+  const std::string p = remote_image_path(url);
+  if (p.empty()) return &kFailed;  // no cache directory to download into
+  if (fs::exists(p, ec)) return nullptr;
   pending_.insert(url);
   requests_.push_back(url);
   return &kPending;

@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/platform.hpp"
+#include "xanatoo/paths.hpp"
 
 #include <SDL.h>
 
@@ -9,6 +10,7 @@
 
 #ifdef __ANDROID__
 #include <android/log.h>
+#include <jni.h>
 #include <unistd.h>
 
 #include <cstdlib>
@@ -105,6 +107,37 @@ void unpack_assets(const fs::path& dest) {
   SDL_Log("xanatoo: unpacked %d data files to %s", count, dest.c_str());
 }
 
+// Context.getCacheDir() (gamepkgstd DIR-5); SDL2 has no wrapper for it.
+std::string android_cache_dir() {
+  auto* env = static_cast<JNIEnv*>(SDL_AndroidGetJNIEnv());
+  auto activity = static_cast<jobject>(SDL_AndroidGetActivity());
+  if (!env || !activity) return {};
+  std::string out;
+  jclass cls = env->GetObjectClass(activity);
+  jmethodID get_cache =
+      env->GetMethodID(cls, "getCacheDir", "()Ljava/io/File;");
+  jobject file = get_cache ? env->CallObjectMethod(activity, get_cache) : nullptr;
+  if (file) {
+    jclass file_cls = env->GetObjectClass(file);
+    jmethodID abs =
+        env->GetMethodID(file_cls, "getAbsolutePath", "()Ljava/lang/String;");
+    auto str = abs ? static_cast<jstring>(env->CallObjectMethod(file, abs))
+                   : nullptr;
+    if (str) {
+      const char* chars = env->GetStringUTFChars(str, nullptr);
+      if (chars) out = chars;
+      env->ReleaseStringUTFChars(str, chars);
+      env->DeleteLocalRef(str);
+    }
+    env->DeleteLocalRef(file_cls);
+    env->DeleteLocalRef(file);
+  }
+  if (env->ExceptionCheck()) env->ExceptionClear();
+  env->DeleteLocalRef(cls);
+  env->DeleteLocalRef(activity);
+  return out;
+}
+
 }  // namespace
 
 void platform_pre_init() {
@@ -119,24 +152,32 @@ void platform_init() {
   std::cout.rdbuf(&out_buf);
   std::cerr.rdbuf(&err_buf);
 
-  // No HOME / writable /tmp on Android: point them at the app's private
-  // storage so config_dir(), view.conf, history and caches just work.
+  // User directories in the app's private storage (gamepkgstd DIR-5):
+  // <internal>/{config,state,data}, the cache in Context.getCacheDir().
   const char* internal = SDL_AndroidGetInternalStoragePath();
   if (!internal) return;
   const fs::path home = internal;
+  set_platform_dir(DirKind::Config, (home / "config").string());
+  set_platform_dir(DirKind::State, (home / "state").string());
+  set_platform_dir(DirKind::UserData, (home / "data").string());
+  const std::string cache = android_cache_dir();
+  set_platform_dir(DirKind::Cache,
+                   cache.empty() ? (home / "cache").string() : cache);
+  // No HOME / writable /tmp on Android otherwise (~ expansion, temp files).
   setenv("HOME", home.c_str(), 1);
   std::error_code ec;
   fs::create_directories(home / "tmp", ec);
   setenv("TMPDIR", (home / "tmp").c_str(), 1);
 
-  const fs::path data = home / "data";
-  fs::create_directories(data, ec);
-  unpack_assets(data);
-  setenv("XANATOO_DATA_DIR", data.c_str(), 1);
-  setenv("XANATOO_ICON_DIR", (data / "icons").c_str(), 1);
-  // Relative lookups (examples/…, styles/, icons/) and new files land here.
-  if (chdir(data.c_str()) != 0)
-    SDL_Log("xanatoo: chdir %s failed", data.c_str());
+  // The APK's data files are the installed data directory.
+  const fs::path assets = home / "assets";
+  fs::create_directories(assets, ec);
+  unpack_assets(assets);
+  set_data_dir(assets.string(), "platform");
+  // Documents saved under a relative name land in the user data directory.
+  const std::string user = user_data_dir();
+  if (ensure_dir(user) && chdir(user.c_str()) != 0)
+    SDL_Log("xanatoo: chdir %s failed", user.c_str());
 }
 
 void platform_request_keyboard() { SDL_StartTextInput(); }

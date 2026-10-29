@@ -26,6 +26,7 @@
 #include "xanatoo/native.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/parse.hpp"
+#include "xanatoo/paths.hpp"
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/util.hpp"
@@ -415,73 +416,14 @@ void edit(App& app) {
 }
 
 std::string find_help_path(App& app) {
-  const char* candidates[] = {
-      "examples/help.md",
-      "../examples/help.md",
-      "../../examples/help.md",
-      nullptr,
-  };
-  for (const char** c = candidates; *c; ++c) {
-    if (fs::exists(*c)) return fs::absolute(*c).string();
-  }
-#ifdef __linux__
-  try {
-    fs::path exe = fs::read_symlink("/proc/self/exe");
-    fs::path dir = exe.parent_path();
-    for (const auto& c : {
-             dir / "examples" / "help.md",
-             dir / ".." / "examples" / "help.md",
-             dir / ".." / "share" / "xanatoo" / "examples" / "help.md",
-         }) {
-      std::error_code ec;
-      auto canon = fs::weakly_canonical(c, ec);
-      if (!ec && fs::exists(canon)) return canon.string();
-    }
-  } catch (...) {
-  }
-#endif
-  return {};
+  return xanatoo::data_file("examples/help.md");
 }
 
-std::string find_repo_file(App& app, const char* name) {
-  const char* prefixes[] = {"",       "examples/",       "../",  "../examples/",
-                            "../../", "../../examples/", nullptr};
-  for (const char** pre = prefixes; *pre; ++pre) {
-    std::string pth = std::string(*pre) + name;
-    if (fs::exists(pth)) return fs::absolute(pth).string();
-  }
-  // PortMaster / installed layout: XANATOO_DATA_DIR points at the port
-  // folder that holds examples/, icons/, fonts/.
-  if (const char* data = std::getenv("XANATOO_DATA_DIR")) {
-    if (data[0] != '\0') {
-      for (const auto& c : {
-               fs::path(data) / name,
-               fs::path(data) / "examples" / name,
-           }) {
-        std::error_code ec;
-        auto canon = fs::weakly_canonical(c, ec);
-        if (!ec && fs::exists(canon)) return canon.string();
-      }
-    }
-  }
-#ifdef __linux__
-  try {
-    fs::path exe = fs::read_symlink("/proc/self/exe");
-    fs::path dir = exe.parent_path();
-    for (const auto& c : {
-             dir / name,
-             dir / "examples" / name,
-             dir / ".." / name,
-             dir / ".." / "examples" / name,
-             dir / ".." / "share" / "xanatoo" / "examples" / name,
-         }) {
-      std::error_code ec;
-      auto canon = fs::weakly_canonical(c, ec);
-      if (!ec && fs::exists(canon)) return canon.string();
-    }
-  } catch (...) {
-  }
-#endif
+std::string find_data_file(App& app, const char* name) {
+  // Installed data only (gamepkgstd DIR-3), never the working directory:
+  // <data dir>/<name>, then <data dir>/examples/<name>.
+  for (const std::string& rel : {std::string(name), "examples/" + std::string(name)})
+    if (std::string p = xanatoo::data_file(rel); !p.empty()) return p;
   return {};
 }
 
@@ -637,8 +579,8 @@ void ensure_help_doc(App& app) {
     // Minimal built-in so F1 always works offline
     app.help_doc = xanatoo::parse_document(
         "# xanatoo help\n\n"
-        "Place `examples/help.md` next to the binary for the full "
-        "reference.\n\n"
+        "The full reference is `examples/help.md` in the data directory "
+        "(`xanatoo --show-paths`, `--data-dir`).\n\n"
         "Press **F1** or **Esc** to close.\n",
         {});
     std::cerr << "examples/help.md not found; using short built-in help.\n";

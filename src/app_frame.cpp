@@ -1176,15 +1176,15 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     }
     case C::OpenFormatDoc: {
-      std::string path = find_repo_file(app, "FORMAT.md");
-      if (path.empty()) path = find_repo_file(app, "FORMAT.md");
+      std::string path = find_data_file(app, "FORMAT.md");
+      if (path.empty()) path = find_data_file(app, "FORMAT.md");
       open_browse(app, path, "FORMAT.md — format spec");
       break;
     }
     case C::OpenSemanticDoc: {
-      std::string path = find_repo_file(app, "semantic.sexp");
-      if (path.empty()) path = find_repo_file(app, "examples/semantic.sexp");
-      // find_repo_file already tries examples/
+      std::string path = find_data_file(app, "semantic.sexp");
+      if (path.empty()) path = find_data_file(app, "examples/semantic.sexp");
+      // find_data_file already tries examples/
       if (path.empty()) {
         for (const char* c :
              {"examples/semantic.sexp", "../examples/semantic.sexp"})
@@ -1202,14 +1202,14 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::OpenExample: {
       std::string name = arg;
       if (name.empty()) break;
-      // Prefer examples/<name> under data dir / cwd (PortMaster layout).
-      std::string path = find_repo_file(app, name.c_str());
+      // examples/<name> under the data dir (paths.hpp).
+      std::string path = find_data_file(app, name.c_str());
       if (path.empty())
-        path = find_repo_file(app, (std::string("examples/") + name).c_str());
+        path = find_data_file(app, (std::string("examples/") + name).c_str());
       if (path.empty() || !fs::exists(path)) {
         flash_status(app, "Example not found: " + name);
         std::cerr << "Example not found: " << name
-                  << " (set XANATOO_DATA_DIR to the port folder)\n";
+                  << " (see --data-dir)\n";
         break;
       }
       // Load into the focused pane (not a soft window). On R36S 640×480
@@ -1230,10 +1230,10 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     }
     case C::LoadDiffDemo: {
       if (!stash_all_or_confirm(app)) break;
-      std::string p0 = find_repo_file(app, "diff-v1.md");
-      std::string p1 = find_repo_file(app, "diff-v2.md");
-      if (p0.empty()) p0 = find_repo_file(app, "examples/diff-v1.md");
-      if (p1.empty()) p1 = find_repo_file(app, "examples/diff-v2.md");
+      std::string p0 = find_data_file(app, "diff-v1.md");
+      std::string p1 = find_data_file(app, "diff-v2.md");
+      if (p0.empty()) p0 = find_data_file(app, "examples/diff-v1.md");
+      if (p1.empty()) p1 = find_data_file(app, "examples/diff-v2.md");
       if (p0.empty() || p1.empty() || !fs::exists(p0) || !fs::exists(p1)) {
         flash_status(app,
                      "Diff demo files not found (diff-v1.md / diff-v2.md)");

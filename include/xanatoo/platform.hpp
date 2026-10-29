@@ -7,10 +7,11 @@
 
 namespace xanatoo {
 
-// Before SDL_Init: hints (trap the Back key). After: on Android point HOME /
-// TMPDIR at internal storage, unpack the APK's data files (examples, help,
-// style sheets, icons) into <internal>/data when their stamp changed, chdir
-// there and set XANATOO_DATA_DIR / XANATOO_ICON_DIR.
+// Before SDL_Init: hints (trap the Back key). After: on Android set the
+// user directories (paths.hpp) to internal storage, point HOME / TMPDIR
+// there, and unpack the APK's data files (examples, help, style sheets,
+// icons) into <internal>/assets, the data directory, when their stamp
+// changed.
 void platform_pre_init();
 void platform_init();
 

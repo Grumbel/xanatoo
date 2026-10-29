@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/minibuffer.hpp"
+#include "xanatoo/paths.hpp"
 #include "xanatoo/util.hpp"
 
 #include <algorithm>
@@ -141,8 +142,8 @@ std::vector<std::string> path_candidates(std::string_view typed) {
 
   // Relative bare names: also search project data/source (examples/, …).
   if (!expanded.empty() && expanded[0] != '/' && expanded[0] != '~') {
-    auto try_base = [&](const char* env) {
-      if (!env || !*env) return std::vector<std::string>{};
+    auto try_base = [&](const std::string& env) {
+      if (env.empty()) return std::vector<std::string>{};
       fs::path base(env);
       fs::path dir = base;
       if (expanded.back() == '/') {
@@ -156,9 +157,10 @@ std::vector<std::string> path_candidates(std::string_view typed) {
       }
       return list_path_matches(typed, dir);
     };
-    out = try_base(std::getenv("XANATOO_DATA_DIR"));
+    out = try_base(data_dir());
     if (!out.empty()) return out;
-    out = try_base(std::getenv("XANATOO_SOURCE"));
+    const char* source = std::getenv("XANATOO_SOURCE");  // nix develop
+    out = try_base(source ? source : "");
   }
   return out;
 }
@@ -345,7 +347,7 @@ std::string expand_user_path(std::string_view path) {
 
 std::vector<std::string> load_minibuffer_history(std::string_view name) {
   std::vector<std::string> out;
-  std::string dir = config_dir();
+  std::string dir = state_dir();
   if (dir.empty()) return out;
   std::ifstream in(dir + "/minibuf-" + std::string(name) + ".history");
   std::string line;
@@ -359,12 +361,13 @@ std::vector<std::string> load_minibuffer_history(std::string_view name) {
 void save_minibuffer_history(std::string_view name,
                              const std::vector<std::string>& entries,
                              size_t max_entries) {
-  std::string dir = config_dir();
+  if (no_save()) return;
+  std::string dir = state_dir();
   if (dir.empty()) return;
   size_t start = entries.size() > max_entries ? entries.size() - max_entries : 0;
-  std::ofstream out(dir + "/minibuf-" + std::string(name) + ".history",
-                    std::ios::trunc);
-  for (size_t i = start; i < entries.size(); ++i) out << entries[i] << '\n';
+  std::string text;
+  for (size_t i = start; i < entries.size(); ++i) text += entries[i] + '\n';
+  write_file_atomic(dir + "/minibuf-" + std::string(name) + ".history", text);
 }
 
 void push_minibuffer_history(std::vector<std::string>& hist,

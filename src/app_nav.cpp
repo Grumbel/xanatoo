@@ -133,8 +133,8 @@ std::string resolve_doc_href(App& app, const std::string& href,
       return (parent / href).string();
     }
   }
-  // Fall back to repo search (examples/, cwd, …).
-  std::string found = find_repo_file(app, href.c_str());
+  // Fall back to the installed data (examples/, …).
+  std::string found = find_data_file(app, href.c_str());
   if (!found.empty()) return found;
   return href;
 }
@@ -288,7 +288,7 @@ void open_link_in_tab(App& app, int pi, const std::string& href) {
 
 std::string home_page(App& app) {
   // Fixed for now; a user-chosen home page will be looked up here first.
-  std::string p = find_repo_file(app, "welcome.md");
+  std::string p = find_data_file(app, "welcome.md");
   if (p.empty()) p = xanatoo::find_default_document();
   return p;
 }
@@ -361,8 +361,8 @@ bool navigate_pane(App& app, int pi, std::string target, bool record_history) {
     flash_status(app, why);
     if (!xanatoo::is_gemini_url(target)) return false;
     // No TLS client in this build — still offer the local gemtext sample.
-    std::string sample = find_repo_file(app, "gemini-sample.gmi");
-    if (sample.empty()) sample = find_repo_file(app, "examples/gemini-sample.gmi");
+    std::string sample = find_data_file(app, "gemini-sample.gmi");
+    if (sample.empty()) sample = find_data_file(app, "examples/gemini-sample.gmi");
     if (sample.empty() || !fs::exists(sample)) return false;
     target = sample;
   }
@@ -370,7 +370,7 @@ bool navigate_pane(App& app, int pi, std::string target, bool record_history) {
   // Local path (or offline fallback for gemini:// when TLS is disabled)
   std::string path = target;
   if (!fs::exists(path)) {
-    std::string found = find_repo_file(app, path.c_str());
+    std::string found = find_data_file(app, path.c_str());
     if (!found.empty()) path = found;
   }
   if (!fs::exists(path)) {

@@ -10,6 +10,7 @@
 
 #include "xanatoo/image_backend.hpp"
 
+#include "xanatoo/paths.hpp"
 #include "xanatoo/util.hpp"
 
 #include <thumtoo/client.hpp>
