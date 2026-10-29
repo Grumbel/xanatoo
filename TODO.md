@@ -8,6 +8,21 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-29) — middle-click opens links in a new tab
+
+- Middle-click on a link (`open_link_in_tab`, `app_nav.cpp`) adds a tab
+  right after the pane's current one and keeps the view, like a browser
+  background tab. Local docs load at once (an open buffer is reused);
+  remote pages get a "Loading …" stand-in buffer filled by a
+  `FetchPurpose::Tab` job (`FetchJob::buf`, `finish_tab`; an error page
+  on failure, nothing if the tab was closed or navigated meanwhile).
+  Anchors into the page itself just jump; external links open outside.
+  Off links middle-click still pastes. `resolve_link` / `LinkTarget`
+  moved from `app_split.cpp` to `app_nav.cpp` (shared).
+- Open: several middle-clicks stack each new tab right after the current
+  one (reverse order); a `file#frag` fragment is not applied in the new
+  tab; no loading indicator on a pane that shows a stand-in tab.
+
 ## Status (2026-10-29) — split history
 
 - Split browsing Back / Forward walk one shared trail (`SplitHistory`):

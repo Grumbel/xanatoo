@@ -516,11 +516,23 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
 
 // Middle press: paste at the pointer (unless over a float).
 static void mouse_middle_down(App& app, SDL_Event& ev, bool imgui_mouse) {
-    // Middle-click paste at caret (common on Linux).
-    if (browsing(app)) return;
     if (imgui_mouse) return;
     const int mxw = ev.button.x, myw = ev.button.y;
     const bool over_soft = over_float_chrome(app, mxw, myw);
+    // On a link: open it in a new tab.
+    if (!over_soft) {
+      const float mx = static_cast<float>(mxw);
+      const int pi = pane_at(app, mx, static_cast<float>(myw));
+      Pane& lp = app.panes[pi];
+      if (auto href = xanatoo::hit_test_link(
+              doc_of(app, lp), lp.layout, local_x(app, mx, pi),
+              content_y(app, static_cast<float>(myw), pi), lp.scroll_y)) {
+        open_link_in_tab(app, pi, *href);
+        return;
+      }
+    }
+    // Middle-click paste at caret (common on Linux).
+    if (browsing(app)) return;
     if (!over_soft && SDL_HasClipboardText()) {
       float mx = static_cast<float>(mxw);
       focus_view(app, pane_at(app, mx, static_cast<float>(myw)));

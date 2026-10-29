@@ -33,7 +33,8 @@ public:
   void set_size(int pixel_size);
 
   const Glyph& glyph(uint32_t codepoint);
-  // True when the face maps `codepoint` (no .notdef fallback).
+  // True when the face maps `codepoint` (no .notdef fallback). glyph()
+  // still draws unmapped codepoints from a fallback face when one has it.
   bool has_glyph(uint32_t codepoint) const {
     return face_ && FT_Get_Char_Index(face_, codepoint) != 0;
   }
@@ -57,9 +58,24 @@ private:
   int ascender_ = 0;
   int descender_ = 0;
   std::unordered_map<uint32_t, Glyph> cache_;
+  // Faces opened for codepoints the primary face lacks, same pixel size.
+  struct FallbackFace {
+    std::string path;
+    FT_Face face = nullptr;
+  };
+  std::vector<FallbackFace> fallbacks_;
 
   Glyph load_glyph(uint32_t codepoint);
+  FT_Face fallback_face(uint32_t codepoint);
+  void drop_cache();
 };
+
+// Font files that may cover `codepoint` when a face of `family` lacks it,
+// best first (FontConfig: sorted by similarity, filtered by coverage;
+// without FontConfig: the usual broad-coverage system faces, unfiltered).
+std::vector<std::string> fallback_font_paths(uint32_t codepoint,
+                                             const std::string& family,
+                                             int weight, int slant);
 
 // Which face to use when laying out / drawing a glyph.
 enum class FontRole : uint8_t {

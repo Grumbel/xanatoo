@@ -23,7 +23,7 @@ Jump to: [Files](#Files) · [Edit](#Edit) · [Navigate](#Navigate) · [View](#Vi
   view: edit, select, follow links inside it); in a window, move its page
   back into a tab
 - **Alt+F / E / O / I / V / B / H** — File / Edit / Format / Insert / View / Bookmarks / Help menu
-- **Middle-click** — Paste at caret
+- **Middle-click** — On a link: open it in a new tab; elsewhere: paste at caret
 - **Drag .md / .sexp** — Open in a software window
 
 Export via *File → Export as S-expression…* or *Export as Markdown…*.

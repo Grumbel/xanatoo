@@ -146,6 +146,41 @@ std::string link_base_url(App& app, int pi) {
   return app.gemini_current_url;
 }
 
+LinkTarget resolve_link(App& app, int pi, const std::string& href) {
+  LinkTarget t;
+  Pane& p = app.panes[pi];
+  if (auto dest = xanatoo::jump_to_href(doc_of(app, p), href)) {
+    t.kind = LinkKind::Anchor;
+    t.dest = *dest;
+    return t;
+  }
+  if (href.empty() || href[0] == '#') return t;
+  std::string abs = href;
+  const std::string base = link_base_url(app, pi);
+  if (!xanatoo::is_gemini_url(abs) && !base.empty()) {
+    std::string r = xanatoo::resolve_gemini_url(base, abs);
+    if (!r.empty()) abs = std::move(r);
+  }
+  if (is_in_app_remote_url(abs)) {
+    t.kind = LinkKind::Remote;
+    t.url = std::move(abs);
+    return t;
+  }
+  if (is_inapp_doc_href(app, abs)) {
+    std::string path = abs;
+    if (size_t hash = path.find('#'); hash != std::string::npos) {
+      t.fragment = path.substr(hash);
+      path.resize(hash);
+    }
+    t.kind = LinkKind::Doc;
+    t.url = resolve_doc_href(app, path, path_of(app, p));
+    return t;
+  }
+  t.kind = LinkKind::External;
+  t.url = href;
+  return t;
+}
+
 // Buffer pane `pi` loads a new page into: its own (unsaved edits go to a
 // draft first), unless the other visible pane shows the same buffer or the
 // draft could not be written (then a new tab).
@@ -184,6 +219,71 @@ void show_doc_in_pane(App& app, int pi, xanatoo::Document doc,
     app.tab_order.push_back(p.buf);
   app.needs_layout = true;
   update_title(app);
+}
+
+void open_link_in_tab(App& app, int pi, const std::string& href) {
+  const LinkTarget t = resolve_link(app, pi, href);
+  BufferId bi = kNoBuffer;
+  switch (t.kind) {
+    case LinkKind::None:
+      return;
+    case LinkKind::Anchor: {
+      Pane& p = app.panes[pi];
+      expand_ancestors_for_node(app, t.dest.node);
+      p.sel.focus = t.dest;
+      p.sel.anchor = t.dest;
+      scroll_caret_into_view(app, p);
+      flash_status(app, "Followed " + href);
+      return;
+    }
+    case LinkKind::External:
+      flash_status(app, "Opening " + t.url);
+      xanatoo::open_external_url(t.url);
+      return;
+    case LinkKind::Doc: {
+      std::string path = t.url;
+      std::error_code ec;
+      if (fs::is_directory(path, ec)) {
+        std::string dir = fs::weakly_canonical(path, ec).string();
+        if (!ec) path = dir;
+        if (!xanatoo::ends_with(path, "/")) path += '/';
+      }
+      bi = find_buffer(app, path);
+      if (bi == kNoBuffer) {
+        const std::string open_path = resolve_open_path(app, path);
+        if (open_path.empty()) {
+          flash_status(app, "Import failed (need pandoc on PATH)");
+          return;
+        }
+        bi = add_buffer(app, load_doc(app, open_path), open_path);
+      }
+      break;
+    }
+    case LinkKind::Remote: {
+      std::string why;
+      if (!remote_fetch_supported(t.url, &why)) {
+        flash_status(app, why);
+        return;
+      }
+      if (const CachedPage* c = find_cached_page(app, t.url)) {
+        bi = add_buffer(app, c->doc, c->final_url);
+        break;
+      }
+      bi = add_buffer(
+          app, xanatoo::parse_document("# Loading…\n\n`" + t.url + "`\n", {}),
+          t.url);
+      buf(app, bi).placeholder = true;
+      start_fetch(app, FetchPurpose::Tab, -1, t.url, false, bi);
+      break;
+    }
+  }
+  auto& order = app.tab_order;
+  if (std::find(order.begin(), order.end(), bi) == order.end()) {
+    auto cur = std::find(order.begin(), order.end(), app.panes[pi].buf);
+    order.insert(cur == order.end() ? cur : cur + 1, bi);
+  }
+  update_title(app);
+  flash_status(app, "Opened in new tab: " + buf(app, bi).path);
 }
 
 std::string home_page(App& app) {

@@ -274,6 +274,7 @@ struct Touch {
 enum class FetchPurpose : uint8_t {
   Navigate,  // show in `pane` when done
   Preview,   // split-pane hover preview: goes to the page cache
+  Tab,       // fill the stand-in buffer `buf` of a background tab
 };
 
 // Written by the worker, read by the main thread once `done` is set.
@@ -294,6 +295,7 @@ struct FetchJob {
   int pane = 0;
   std::string url;
   bool record_history = true;
+  BufferId buf = kNoBuffer;  // Tab: the "Loading …" buffer to fill
   Uint32 started = 0;
   std::shared_ptr<FetchShared> shared;
 };
@@ -841,6 +843,18 @@ std::string page_up_url(App& app);
 bool navigate_to_url(App& app, std::string target, bool record_history = true);
 bool navigate_pane(App& app, int pi, std::string target,
                    bool record_history = true);
+// What a link `href` in pane `pi` points at.
+enum class LinkKind : uint8_t { None, Anchor, Doc, Remote, External };
+struct LinkTarget {
+  LinkKind kind = LinkKind::None;
+  std::string url;       // Doc: path without fragment; Remote: absolute URL
+  std::string fragment;  // Doc: "#heading" (may be empty)
+  xanatoo::Caret dest{};  // Anchor: target in the pane's own document
+};
+LinkTarget resolve_link(App& app, int pi, const std::string& href);
+// Middle click: open `href` (in pane `pi`) in a new tab right after the
+// current one; the view stays. Anchors into the page itself just jump.
+void open_link_in_tab(App& app, int pi, const std::string& href);
 // Put a freshly loaded page into pane `pi`: reuses the pane's buffer unless
 // the other visible pane shows it too or it has unsaved edits.
 void show_doc_in_pane(App& app, int pi, xanatoo::Document doc,
@@ -854,8 +868,10 @@ void activate_at_caret(App& app);
 // True when this build can fetch `url` (otherwise *why explains).
 bool remote_fetch_supported(std::string_view url, std::string* why);
 // Start fetching `url`; a Navigate job replaces the pane's running one.
+// Tab jobs have no pane (-1) and fill buffer `tab_buf`.
 uint64_t start_fetch(App& app, FetchPurpose purpose, int pane,
-                     const std::string& url, bool record_history = true);
+                     const std::string& url, bool record_history = true,
+                     BufferId tab_buf = kNoBuffer);
 // Apply finished jobs (once per frame).
 void poll_fetches(App& app);
 // Drop pane `pi`'s running navigation (-1: all navigations). True if any.

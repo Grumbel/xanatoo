@@ -31,50 +31,6 @@ constexpr Uint32 kPreviewDwellMs = 250;        // local docs / anchors
 constexpr Uint32 kRemotePreviewDwellMs = 450;  // network fetch
 constexpr Uint32 kPreviewGraceMs = 350;        // pointer off the link
 
-enum class LinkKind : uint8_t { None, Anchor, Doc, Remote, External };
-
-struct LinkTarget {
-  LinkKind kind = LinkKind::None;
-  std::string url;       // Doc: path without fragment; Remote: absolute URL
-  std::string fragment;  // Doc: "#heading" (may be empty)
-  xanatoo::Caret dest{};  // Anchor: target in the pane's own document
-};
-
-LinkTarget resolve_link(App& app, int pi, const std::string& href) {
-  LinkTarget t;
-  Pane& p = app.panes[pi];
-  if (auto dest = xanatoo::jump_to_href(doc_of(app, p), href)) {
-    t.kind = LinkKind::Anchor;
-    t.dest = *dest;
-    return t;
-  }
-  if (href.empty() || href[0] == '#') return t;
-  std::string abs = href;
-  const std::string base = link_base_url(app, pi);
-  if (!xanatoo::is_gemini_url(abs) && !base.empty()) {
-    std::string r = xanatoo::resolve_gemini_url(base, abs);
-    if (!r.empty()) abs = std::move(r);
-  }
-  if (is_in_app_remote_url(abs)) {
-    t.kind = LinkKind::Remote;
-    t.url = std::move(abs);
-    return t;
-  }
-  if (is_inapp_doc_href(app, abs)) {
-    std::string path = abs;
-    if (size_t hash = path.find('#'); hash != std::string::npos) {
-      t.fragment = path.substr(hash);
-      path.resize(hash);
-    }
-    t.kind = LinkKind::Doc;
-    t.url = resolve_doc_href(app, path, path_of(app, p));
-    return t;
-  }
-  t.kind = LinkKind::External;
-  t.url = href;
-  return t;
-}
-
 // Point pane `pi` at buffer `b` with a fresh layout.
 void set_pane_view(App& app, int pi, BufferId b, const xanatoo::Selection& sel,
                    float scroll) {

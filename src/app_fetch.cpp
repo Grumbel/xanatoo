@@ -169,19 +169,50 @@ void cache_page(App& app, const FetchJob& job) {
   if (c.size() > kPageCacheMax) c.erase(c.begin());
 }
 
-// Error page for a pane that only showed the "Loading …" stand-in.
-void show_load_error(App& app, const FetchJob& job) {
-  Pane& p = app.panes[job.pane];
-  const DocBuffer* b = find_buf(app, p.buf);
-  if (!b || !b->placeholder) return;
+xanatoo::Document load_error_doc(const FetchJob& job) {
   std::string md = "# Could not load page\n\n`" + job.url + "`\n\n" +
                    job.shared->error + "\n";
   if (xanatoo::starts_with(job.url, "http://") ||
       xanatoo::starts_with(job.url, "https://"))
     md += "\n[Open in browser](" + std::string(xanatoo::kExternalPrefix) +
           job.url + ")\n";
-  show_doc_in_pane(app, job.pane, xanatoo::parse_document(md, "error.md"),
-                   job.url);
+  return xanatoo::parse_document(md, "error.md");
+}
+
+// Error page for a pane that only showed the "Loading …" stand-in.
+void show_load_error(App& app, const FetchJob& job) {
+  Pane& p = app.panes[job.pane];
+  const DocBuffer* b = find_buf(app, p.buf);
+  if (!b || !b->placeholder) return;
+  show_doc_in_pane(app, job.pane, load_error_doc(job), job.url);
+}
+
+// A background tab's page arrived: fill its stand-in buffer, unless the tab
+// was closed or navigated elsewhere meanwhile.
+void finish_tab(App& app, const FetchJob& job) {
+  FetchShared& r = *job.shared;
+  DocBuffer* b = find_buf(app, job.buf);
+  if (!b || !b->placeholder) return;
+  if (r.doc) cache_page(app, job);
+  if (!r.doc && r.input_status != 0 && r.error.empty())
+    r.error = "The page asks for input: " + r.input_meta;
+  b->doc = r.doc ? std::move(*r.doc) : load_error_doc(job);
+  b->path = r.doc ? r.final_url : job.url;
+  b->placeholder = false;
+  b->dirty = false;
+  const std::string path = b->path;
+  attach_draft(app, job.buf);
+  DocBuffer& nb = buf(app, job.buf);
+  xanatoo::Selection sel;
+  xanatoo::ensure_valid_caret(nb.doc, sel.focus);
+  sel.anchor = sel.focus;
+  nb.history.reset(nb.doc, sel);
+  drop_height_hints_for_buf(app, job.buf);
+  if (r.doc) note_page_seen(app, path, nb.doc);
+  refresh_views_of_buf(app, job.buf, -1, true);
+  app.needs_layout = true;
+  update_title(app);
+  flash_status(app, (r.doc ? "Loaded in tab: " : "Tab failed: ") + path);
 }
 
 void finish_navigate(App& app, const FetchJob& job) {
@@ -302,18 +333,19 @@ bool remote_fetch_supported(std::string_view url, std::string* why) {
 }
 
 uint64_t start_fetch(App& app, FetchPurpose purpose, int pane,
-                     const std::string& url, bool record_history) {
-  if (purpose == FetchPurpose::Navigate) {
+                     const std::string& url, bool record_history,
+                     BufferId tab_buf) {
+  if (purpose == FetchPurpose::Navigate)
     cancel_fetches(app, pane);
-  } else {
+  else if (purpose == FetchPurpose::Preview)
     cancel_preview_fetch(app);
-  }
   FetchJob job;
   job.id = app.next_fetch_id++;
   job.purpose = purpose;
   job.pane = pane;
   job.url = url;
   job.record_history = record_history;
+  job.buf = tab_buf;
   job.started = SDL_GetTicks();
   job.shared = std::make_shared<FetchShared>();
   // Detached: a cancelled job just finishes into its (orphaned) shared state.
@@ -336,6 +368,8 @@ void poll_fetches(App& app) {
   for (FetchJob& job : done) {
     if (job.purpose == FetchPurpose::Navigate) {
       finish_navigate(app, job);
+    } else if (job.purpose == FetchPurpose::Tab) {
+      finish_tab(app, job);
     } else {
       if (job.shared->doc) cache_page(app, job);
       // update_split_preview shows it if the link is still hovered.
