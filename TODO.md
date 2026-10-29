@@ -8,6 +8,16 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-29) — scrollbar chapter marks per view
+
+- Marks blinked: they came from `App::outline` (built from the focused
+  pane, refreshed only while the Outline panel is open), so other views
+  and freshly loaded pages showed node ids of a different document.
+  `section_marks` (`app_frame.cpp`) now walks each pane's own document:
+  layout box Y where a box exists, height-hint estimates only inside a
+  stub box, nothing for blocks the layout left out (section focus).
+  The preamble row no longer gets a mark.
+
 ## Status (2026-10-29) — pandoc raw HTML residue
 
 - EPUB imports showed `<hgroup>` / `<footer>` / `<svg>` tag lines
