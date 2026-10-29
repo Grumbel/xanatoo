@@ -54,6 +54,33 @@
 #ifndef IMGUI_SDL_RENDERER_LEGACY
 #define IMGUI_SDL_RENDERER_LEGACY 0
 #endif
+#if IMGUI_SDL_RENDERER_LEGACY && defined(__unix__)
+#include <dlfcn.h>
+#endif
+
+#if IMGUI_SDL_RENDERER_LEGACY
+// Built against SDL < 2.0.17 headers, but the SDL loaded at runtime may be
+// newer (ArkOS ships its own build): use its SDL_RenderGeometryRaw when it
+// has one (2.0.18+) and fall back to the per-triangle path below otherwise.
+typedef int (SDLCALL *ImGui_ImplSDLRenderer2_GeometryRawFn)(
+    SDL_Renderer*, SDL_Texture*, const float*, int, const void*, int,
+    const float*, int, int, const void*, int, int);
+static ImGui_ImplSDLRenderer2_GeometryRawFn g_RenderGeometryRaw = nullptr;
+
+static ImGui_ImplSDLRenderer2_GeometryRawFn ImGui_ImplSDLRenderer2_LookupGeometryRaw()
+{
+    SDL_version v;
+    SDL_GetVersion(&v);
+    ImGui_ImplSDLRenderer2_GeometryRawFn fn = nullptr;
+#if defined(__unix__)
+    if (SDL_VERSIONNUM(v.major, v.minor, v.patch) >= SDL_VERSIONNUM(2, 0, 18))
+        fn = (ImGui_ImplSDLRenderer2_GeometryRawFn)dlsym(RTLD_DEFAULT, "SDL_RenderGeometryRaw");
+#endif
+    SDL_Log("imgui: SDL %d.%d.%d at runtime, %s", v.major, v.minor, v.patch,
+            fn ? "using SDL_RenderGeometryRaw" : "per-triangle fallback renderer");
+    return fn;
+}
+#endif
 
 // SDL_Renderer data
 struct ImGui_ImplSDLRenderer2_Data
@@ -85,6 +112,9 @@ bool ImGui_ImplSDLRenderer2_Init(SDL_Renderer* renderer)
     io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;  // We can honor the ImDrawCmd::VtxOffset field, allowing for large meshes.
 
     bd->Renderer = renderer;
+#if IMGUI_SDL_RENDERER_LEGACY
+    g_RenderGeometryRaw = ImGui_ImplSDLRenderer2_LookupGeometryRaw();
+#endif
 
     return true;
 }
@@ -308,12 +338,20 @@ void ImGui_ImplSDLRenderer2_RenderDrawData(ImDrawData* draw_data, SDL_Renderer* 
                                 // Bind texture, Draw
 				SDL_Texture* tex = (SDL_Texture*)pcmd->GetTexID();
 #if IMGUI_SDL_RENDERER_LEGACY
-                ImGui_ImplSDLRenderer2_RenderGeometryLegacy(renderer, tex,
-                    xy, (int)sizeof(ImDrawVert),
-                    color, (int)sizeof(ImDrawVert),
-                    uv, (int)sizeof(ImDrawVert),
-                    draw_list->VtxBuffer.Size - pcmd->VtxOffset,
-                    idx_buffer + pcmd->IdxOffset, pcmd->ElemCount, sizeof(ImDrawIdx));
+                if (g_RenderGeometryRaw)
+                    g_RenderGeometryRaw(renderer, tex,
+                        xy, (int)sizeof(ImDrawVert),
+                        color, (int)sizeof(ImDrawVert),
+                        uv, (int)sizeof(ImDrawVert),
+                        draw_list->VtxBuffer.Size - pcmd->VtxOffset,
+                        idx_buffer + pcmd->IdxOffset, pcmd->ElemCount, sizeof(ImDrawIdx));
+                else
+                    ImGui_ImplSDLRenderer2_RenderGeometryLegacy(renderer, tex,
+                        xy, (int)sizeof(ImDrawVert),
+                        (const int*)(const void*)color, (int)sizeof(ImDrawVert),
+                        uv, (int)sizeof(ImDrawVert),
+                        draw_list->VtxBuffer.Size - pcmd->VtxOffset,
+                        idx_buffer + pcmd->IdxOffset, pcmd->ElemCount, sizeof(ImDrawIdx));
 #else
                 SDL_RenderGeometryRaw(renderer, tex,
                     xy, (int)sizeof(ImDrawVert),

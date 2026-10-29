@@ -8,6 +8,22 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-29) — R36S: ImGui via runtime SDL_RenderGeometryRaw
+
+- Scrolling on the R36S was much smoother with the chrome hidden: built
+  against eoan's SDL 2.0.10 headers, the ImGui backend drew every triangle
+  with its own SDL_RenderCopy / FillRect (+ colour-mod changes), thousands
+  of GLES draw calls per frame for menu bar + toolbars.
+- The backend now looks up `SDL_RenderGeometryRaw` in the SDL loaded at
+  runtime (2.0.18+, ArkOS ships its own build) and only falls back to the
+  per-triangle path without it; it logs `imgui: SDL x.y.z at runtime, …`.
+  Checked on desktop with the fallback forced on
+  (`-DIMGUI_SDL_RENDERER_LEGACY=1`); not yet on the device.
+- Open: if the device SDL turns out < 2.0.18, cheapen the fallback (no AA /
+  rounding, one call per quad, cache the chrome in a target texture).
+- Later: SDL3 (desktop already runs on it via sdl2-compat; R36S would have
+  to bundle libSDL3 for KMSDRM / Mali; Android 5 = API 21 is SDL3's floor).
+
 ## Status (2026-10-29) — browse-mode chrome, content only
 
 - Browse mode hides the edit toolbar row, the Format / Insert menus and
