@@ -2253,13 +2253,16 @@ std::optional<LinkHit> hit_test_link_ex(const Document& doc,
     if (g.kind != InlineKind::Link && g.kind != InlineKind::Cite &&
         g.kind != InlineKind::FootnoteRef)
       continue;
+    // One rect per line: a wrapped link continues as a new run on the
+    // next line, tested on its own.
     float x0 = g.x;
     float x1 = x0 + 10.f;
     size_t j = i;
     while (j + 1 < layout.glyphs.size() &&
            layout.glyphs[j + 1].kind == g.kind &&
            layout.glyphs[j + 1].node == g.node &&
-           layout.glyphs[j + 1].span_index == g.span_index) {
+           layout.glyphs[j + 1].span_index == g.span_index &&
+           std::abs(layout.glyphs[j + 1].y - g.y) < 0.5f) {
       ++j;
       x1 = layout.glyphs[j].x + 10.f;
     }

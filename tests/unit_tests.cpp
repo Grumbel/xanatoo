@@ -1026,6 +1026,44 @@ void test_view_settings_migration() {
   fs::remove_all(dir);
 }
 
+void test_hit_test_wrapped_link() {
+  using namespace xanatoo;
+  Document doc = parse_document("[two words](https://example.org/)\n", "l.md");
+  NodeId para = INVALID_NODE;
+  size_t span = 0;
+  for (const Node& n : doc.nodes) {
+    for (size_t s = 0; s < n.spans.size(); ++s)
+      if (n.spans[s].kind == InlineKind::Link) {
+        para = n.id;
+        span = s;
+      }
+  }
+  EXPECT(para != INVALID_NODE);
+  if (para == INVALID_NODE) return;
+  // "two" ends line 1 at the right edge, "words" starts line 2 at the left.
+  LayoutResult lr;
+  auto put = [&](float x, float y, size_t ci) {
+    PositionedGlyph g;
+    g.codepoint = 'x';
+    g.x = x;
+    g.y = y;
+    g.advance = 10.f;
+    g.node = para;
+    g.span_index = span;
+    g.char_index = ci;
+    g.kind = InlineKind::Link;
+    lr.glyphs.push_back(g);
+  };
+  for (size_t i = 0; i < 3; ++i) put(400.f + 10.f * i, 100.f, i);
+  for (size_t i = 0; i < 5; ++i) put(30.f + 10.f * i, 130.f, 4 + i);
+  auto first = hit_test_link(doc, lr, 410.f, 95.f, 0.f);
+  auto second = hit_test_link(doc, lr, 50.f, 125.f, 0.f);
+  EXPECT(first && *first == "https://example.org/");
+  EXPECT(second && *second == "https://example.org/");
+  // Left of line 1's part is not part of the link.
+  EXPECT(!hit_test_link(doc, lr, 100.f, 95.f, 0.f));
+}
+
 void test_layout_wrap_respects_max_width() {
   using namespace xanatoo;
   // Metrics-only: no SDL window. Font textures may be null; advances still work.
@@ -2162,6 +2200,7 @@ int main() {
   test_json_array_and_bool();
   test_utf8_pop_back();
   test_sanitize_epub_markdown();
+  test_hit_test_wrapped_link();
   test_layout_wrap_respects_max_width();
   test_layout_margins_and_measure();
   test_view_settings_migration();
