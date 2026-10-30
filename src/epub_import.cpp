@@ -386,7 +386,8 @@ ImportResult import_via_pandoc(const std::string& epub_path) {
     out.error = "File not found: " + epub_path;
     return out;
   }
-  if (!pandoc_available()) {
+  const bool native = !pandoc_available() && is_epub_path(epub_path);
+  if (!native && !pandoc_available()) {
     out.error = "pandoc not found on PATH (install pandoc to import " +
                 reader + " → Markdown)";
     return out;
@@ -410,7 +411,7 @@ ImportResult import_via_pandoc(const std::string& epub_path) {
   // Reuse derived Markdown when it is at least as new as the EPUB and was
   // made by the current conversion (bump kFormat when the pandoc call
   // changes; the stamp file holds it).
-  static constexpr const char* kFormat = "3 strip-raw-html";
+  const char* const kFormat = native ? "native 1" : "3 strip-raw-html";
   const fs::path stamp = dir / ".format";
   bool reuse = false;
   try {
@@ -429,46 +430,69 @@ ImportResult import_via_pandoc(const std::string& epub_path) {
     } catch (...) {
     }
 
-    const fs::path filter = dir / "strip-raw-html.lua";
-    if (!write_text_file(filter, kStripRawHtmlLua)) {
-      out.error = "Cannot write pandoc filter: " + filter.string();
-      return out;
-    }
-
-    // pandoc book.epub -f epub -t gfm-raw_html+yaml_metadata_block -s
-    //   -L strip-raw-html.lua -o content.md --extract-media=media
-    // (-s writes the title / author / … as YAML front matter.)
-    // Run with cwd = cache dir so relative media paths in the MD resolve.
-    std::ostringstream cmd;
-    cmd << "cd " << shell_quote(dir.string()) << " && "
-        << "pandoc " << shell_quote(fs::absolute(epub_path).string())
-        // -raw_html: unwrap div/span/section markup instead of passing it
-        // through (EPUB XHTML leaves attribute lines in the text).
-        << " -f " << reader << " -t gfm-raw_html+yaml_metadata_block -s"
-        << " -L " << shell_quote(filter.filename().string())
-        << " -o " << shell_quote(md.filename().string())
-        << " --extract-media=" << shell_quote(media.filename().string())
-        << " 2>/tmp/xanatoo-pandoc-epub.err";
-
-    std::cout << "Importing " << reader << " via pandoc → " << md.string()
-              << "\n";
-    int rc = std::system(cmd.str().c_str());
-    if (rc != 0 || !fs::exists(md)) {
-      std::string detail;
-      {
-        std::ifstream err("/tmp/xanatoo-pandoc-epub.err");
-        if (err) {
-          std::ostringstream ss;
-          ss << err.rdbuf();
-          detail = ss.str();
-          if (detail.size() > 400) detail.resize(400);
+    if (native) {
+      std::string zip = read_text_file(epub_path);
+      std::string err;
+      auto book = epub_to_markdown(zip, &err);
+      if (!book) {
+        out.error = "EPUB import failed: " + err;
+        return out;
+      }
+      std::error_code ec;
+      fs::create_directories(media, ec);
+      for (const auto& [name, bytes] : book->media) {
+        if (!write_file_atomic((dir / name).string(), bytes)) {
+          out.error = "Cannot write " + (dir / name).string();
+          return out;
         }
       }
-      out.error = "pandoc failed";
-      if (!detail.empty()) out.error += ": " + detail;
-      return out;
+      if (!write_text_file(md, book->markdown)) {
+        out.error = "Cannot write " + md.string();
+        return out;
+      }
+      write_text_file(stamp, kFormat);
+    } else {
+      const fs::path filter = dir / "strip-raw-html.lua";
+      if (!write_text_file(filter, kStripRawHtmlLua)) {
+        out.error = "Cannot write pandoc filter: " + filter.string();
+        return out;
+      }
+
+      // pandoc book.epub -f epub -t gfm-raw_html+yaml_metadata_block -s
+      //   -L strip-raw-html.lua -o content.md --extract-media=media
+      // (-s writes the title / author / … as YAML front matter.)
+      // Run with cwd = cache dir so relative media paths in the MD resolve.
+      std::ostringstream cmd;
+      cmd << "cd " << shell_quote(dir.string()) << " && "
+          << "pandoc " << shell_quote(fs::absolute(epub_path).string())
+          // -raw_html: unwrap div/span/section markup instead of passing it
+          // through (EPUB XHTML leaves attribute lines in the text).
+          << " -f " << reader << " -t gfm-raw_html+yaml_metadata_block -s"
+          << " -L " << shell_quote(filter.filename().string())
+          << " -o " << shell_quote(md.filename().string())
+          << " --extract-media=" << shell_quote(media.filename().string())
+          << " 2>/tmp/xanatoo-pandoc-epub.err";
+
+      std::cout << "Importing " << reader << " via pandoc → " << md.string()
+                << "\n";
+      int rc = std::system(cmd.str().c_str());
+      if (rc != 0 || !fs::exists(md)) {
+        std::string detail;
+        {
+          std::ifstream err("/tmp/xanatoo-pandoc-epub.err");
+          if (err) {
+            std::ostringstream ss;
+            ss << err.rdbuf();
+            detail = ss.str();
+            if (detail.size() > 400) detail.resize(400);
+          }
+        }
+        out.error = "pandoc failed";
+        if (!detail.empty()) out.error += ": " + detail;
+        return out;
+      }
+      write_text_file(stamp, kFormat);
     }
-    write_text_file(stamp, kFormat);
   } else {
     std::cout << "Reusing import cache: " << md.string() << "\n";
   }

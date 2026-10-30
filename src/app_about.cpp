@@ -115,6 +115,8 @@ AboutSection formats() {
   s.items.push_back({"Gemtext", true, "`.gmi`, `.gemini`",
                      "examples/gemini-sample.gmi", {}});
   s.items.push_back({"HTML", true, "`.html`, read-only", {}, {}});
+  s.items.push_back({"EPUB", true, "`.epub`, read-only, built in when pandoc is missing",
+                     {}, {}});
   const bool pandoc = xanatoo::pandoc_available();
   s.items.push_back(
       {"Pandoc import", pandoc,

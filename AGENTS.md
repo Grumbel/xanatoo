@@ -346,6 +346,8 @@ mechanism; historical bundle numbers in TODO.md are archival).
   tex, typ, wiki, ipynb, csv, …); `is_pandoc_path` / `import_via_pandoc`
   convert to cached GFM Markdown with `--extract-media`. The original file
   is never touched and the import is read-only (foreign).
+- Without pandoc (Android), `.epub` goes through `epub_to_markdown`
+  (`src/epub_native.cpp`: zip + OPF spine → `parse_html_page` → Markdown).
 - Pandoc misbehaviour and our workarounds (Lua filter, post-passes) are
   collected in `docs/PANDOC.md`; add new findings there.
 

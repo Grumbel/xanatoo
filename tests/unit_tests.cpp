@@ -35,6 +35,7 @@
 #include <fstream>
 #include <unistd.h>
 #include <cstdlib>
+#include <iostream>
 #include <string>
 #include <algorithm>
 #include <string_view>
@@ -1182,6 +1183,87 @@ void test_utf8_pop_back() {
   EXPECT(c.empty());
 }
 
+// Stored (uncompressed) zip, enough for epub_to_markdown.
+std::string test_zip(const std::vector<std::pair<std::string, std::string>>& files) {
+  auto u = [](std::string& o, uint32_t v, int n) {
+    for (int i = 0; i < n; ++i) o.push_back(static_cast<char>(v >> (8 * i)));
+  };
+  std::string out, central;
+  for (const auto& [name, data] : files) {
+    const uint32_t offset = static_cast<uint32_t>(out.size());
+    u(out, 0x04034b50, 4); u(out, 20, 2); u(out, 0, 2); u(out, 0, 2);
+    u(out, 0, 4); u(out, 0, 4); u(out, data.size(), 4); u(out, data.size(), 4);
+    u(out, name.size(), 2); u(out, 0, 2);
+    out += name;
+    out += data;
+    u(central, 0x02014b50, 4); u(central, 20, 2); u(central, 20, 2);
+    u(central, 0, 2); u(central, 0, 2); u(central, 0, 4); u(central, 0, 4);
+    u(central, data.size(), 4); u(central, data.size(), 4);
+    u(central, name.size(), 2); u(central, 0, 2); u(central, 0, 2);
+    u(central, 0, 2); u(central, 0, 2); u(central, 0, 4); u(central, offset, 4);
+    central += name;
+  }
+  const uint32_t at = static_cast<uint32_t>(out.size());
+  out += central;
+  u(out, 0x06054b50, 4); u(out, 0, 2); u(out, 0, 2);
+  u(out, files.size(), 2); u(out, files.size(), 2);
+  u(out, central.size(), 4); u(out, at, 4); u(out, 0, 2);
+  return out;
+}
+
+void test_epub_native() {
+  const std::string zip = test_zip({
+      {"mimetype", "application/epub+zip"},
+      {"META-INF/container.xml",
+       "<container><rootfiles><rootfile full-path=\"OEBPS/book.opf\"/>"
+       "</rootfiles></container>"},
+      {"OEBPS/book.opf",
+       "<package><metadata><dc:title>A &amp; B</dc:title>"
+       "<dc:creator>Some One</dc:creator></metadata><manifest>"
+       "<item id=\"c1\" href=\"text/one.xhtml\" media-type=\"application/xhtml+xml\"/>"
+       "<item id=\"c2\" href=\"text/two.xhtml\" media-type=\"application/xhtml+xml\"/>"
+       "<item id=\"i\" href=\"img/a%20b.png\" media-type=\"image/png\"/>"
+       "</manifest><spine><itemref idref=\"c1\"/><itemref idref=\"c2\"/></spine>"
+       "</package>"},
+      {"OEBPS/text/one.xhtml",
+       "<html><head><title>x</title></head><body><h1>First</h1>"
+       "<p><a id=\"p1\"/>Go <a href=\"two.xhtml#n1\">note</a> or "
+       "<a href=\"two.xhtml\">next</a> or <a href=\"https://a.org/\">web</a>.</p>"
+       "<p><img src=\"../img/a%20b.png\" alt=\"Pic\"/></p></body></html>"},
+      {"OEBPS/text/two.xhtml",
+       "<html><body><h1>Second</h1><p id=\"n1\">Note text.</p></body></html>"},
+      {"OEBPS/img/a b.png", "PNGDATA"},
+  });
+  std::string err;
+  auto book = xanatoo::epub_to_markdown(zip, &err);
+  EXPECT(book.has_value());
+  if (!book) {
+    std::cerr << "epub: " << err << "\n";
+    return;
+  }
+  const std::string& md = book->markdown;
+  EXPECT(xanatoo::starts_with(md, "---\ntitle: \"A & B\"\nauthor: \"Some One\"\n---\n"));
+  EXPECT(md.find("First") != std::string::npos);
+  EXPECT(md.find("Second") != std::string::npos);
+  size_t sections = 0, images = 0;
+  const xanatoo::Document doc = xanatoo::parse_document(md, "book.md");
+  for (const xanatoo::Node& n : doc.nodes) {
+    sections += n.kind == xanatoo::NodeKind::Section;
+    images += n.kind == xanatoo::NodeKind::Image;
+  }
+  EXPECT_EQ(sections, size_t(2));
+  EXPECT_EQ(images, size_t(1));
+  EXPECT(md.find("](#n1)") != std::string::npos);
+  EXPECT(md.find("](#ch-1)") != std::string::npos);
+  EXPECT(md.find("](https://a.org/)") != std::string::npos);
+  EXPECT(md.find("![Pic](media/img0.png)") != std::string::npos);
+  EXPECT_EQ(book->media.size(), size_t(1));
+  if (!book->media.empty()) EXPECT_EQ(book->media[0].second, std::string("PNGDATA"));
+
+  EXPECT(!xanatoo::epub_to_markdown("not a zip at all, sorry about that", &err));
+  EXPECT(!xanatoo::epub_to_markdown(zip.substr(0, zip.size() / 2), &err));
+}
+
 void test_sanitize_epub_markdown() {
   using namespace xanatoo;
   // Empty calibre spacer spans (NBSP / spaces / entities)
@@ -2200,6 +2282,7 @@ int main() {
   test_json_array_and_bool();
   test_utf8_pop_back();
   test_sanitize_epub_markdown();
+  test_epub_native();
   test_hit_test_wrapped_link();
   test_layout_wrap_respects_max_width();
   test_layout_margins_and_measure();

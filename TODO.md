@@ -8,6 +8,16 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-31) — built-in EPUB reader
+
+- `src/epub_native.cpp` (`epub_to_markdown`): zip + OPF spine → chapters
+  through `parse_html_page` → cached Markdown. `import_via_pandoc` uses it
+  for `.epub` only when pandoc is missing, so Android reads books; desktop
+  stays on pandoc. Other formats still need pandoc.
+- Open: run it on a device; footnotes are plain jumps (no `[^n]`), ids are
+  not made unique across chapters, Zip64 is not read. A truncated download
+  stays in `cache_dir()/downloads` (seen with one Standard Ebooks file).
+
 ## Status (2026-10-29) — startup report (gamepkgstd LOGGING.md)
 
 - `print_startup_report` (`app_report.cpp`) runs first in `app_init`:
