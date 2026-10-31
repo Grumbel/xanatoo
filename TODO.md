@@ -8,6 +8,16 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Plan (2026-10-31) — passages: bookmarks into documents, cuts, marks
+
+- Design in `docs/PASSAGES.md`, nothing implemented yet. Bookmark, selection,
+  transclusion and image crop share one address: `//selector` cuts (the
+  passage as a document of its own), `#selector` points (whole document,
+  passage marked). Selectors: `id:`, `path:`, `text:`, `rect:`, `at:`.
+- Pipes are view state on `Pane`, never buffer identity, so Up from a cut to
+  the whole document needs no reload. Section Focus becomes a per-pane cut.
+- Next: slice 1, `parse_locator` / `format_locator` + unit tests.
+
 ## Status (2026-10-31) — view anchors (zoom keeps the text in place)
 
 - `ViewAnchor` (document position + spot in the pane), `view_anchor_at`,
