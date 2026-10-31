@@ -112,6 +112,7 @@ void poll_images(App& app) {
   if (done.empty() && !thumbs) return;
   for (const auto& [url, ok] : done) app.images.remote_done(url, ok);
   // Placeholders became images (or vanished): heights changed.
+  keep_views(app);
   for (Pane& p : app.panes) p.height_cache.clear();
   app.needs_layout = true;
 }

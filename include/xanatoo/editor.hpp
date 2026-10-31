@@ -47,6 +47,12 @@ struct Selection {
 std::optional<Caret> hit_test(const LayoutResult& layout,
                               float sx, float sy, float scroll_y);
 
+// Caret of the glyph whose baseline is nearest to content y (`scroll_y` not
+// involved), among equals the one nearest to x. Unlike hit_test it finds
+// text at any distance, so a point over an image still has an answer.
+std::optional<Caret> nearest_caret(const LayoutResult& layout, float x,
+                                   float y);
+
 // Hit-test for stretchtext toggle boxes.
 std::optional<NodeId> hit_test_stretch(const LayoutResult& layout,
                                        float sx, float sy, float scroll_y);

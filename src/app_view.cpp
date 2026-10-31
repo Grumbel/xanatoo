@@ -27,6 +27,7 @@ namespace fs = std::filesystem;
 namespace xanatoo::app {
 
 void apply_view_settings(App& app) {
+  keep_views(app);
   app.view_settings.clamp();
   app.layout_engine.set_options(
       xanatoo::LayoutOptions::from_view(app.view_settings, app.ui_scale));
@@ -234,6 +235,44 @@ void place_centre_rows(App& app) {
   }
 }
 
+namespace {
+
+constexpr int kAnchorPasses = 4;
+
+void keep_view(App& app, Pane& p) {
+  if (p.view_anchor || p.scroll_y <= 0.f) return;  // the top stays the top
+  p.view_anchor = view_anchor_at(app, p, 0.f, 0.f);
+}
+
+// Scroll so the held position is back on its spot. True when that needs a
+// new layout (the view left the materialised band).
+bool restore_view_anchor(App& app, Pane& p) {
+  if (!p.view_anchor || p.view_anchor->buf != p.buf) return false;
+  const auto y = caret_doc_y(app, p, p.view_anchor->pos);
+  if (!y) return false;
+  p.scroll_y =
+      std::clamp(*y - p.view_anchor->view_y, 0.f, pane_max_scroll(app, p));
+  return p.layout.virtualized &&
+         (p.scroll_y < p.materialised_top ||
+          p.scroll_y + static_cast<float>(p.h) > p.materialised_bottom);
+}
+
+}  // namespace
+
+std::optional<ViewAnchor> view_anchor_at(App& app, Pane& p, float x,
+                                         float view_y) {
+  if (p.layout_buf != p.buf) return std::nullopt;  // layout of another page
+  auto pos = xanatoo::nearest_caret(p.layout, x, p.scroll_y + view_y);
+  if (!pos) return std::nullopt;
+  auto y = caret_doc_y(app, p, *pos);
+  if (!y) return std::nullopt;
+  return ViewAnchor{p.buf, *pos, *y - p.scroll_y};
+}
+
+void keep_views(App& app) {
+  for (int pi : live_views(app)) keep_view(app, app.panes[pi]);
+}
+
 void layout_panes(App& app) {
   // Window views take their rects from the window placement.
   place_windows(app);
@@ -265,6 +304,7 @@ void layout_panes(App& app) {
   // Block heights depend on width; drop hints when this pane's width changed.
   for (int pi : live_views(app)) {
     if (app.panes[pi].w != app.panes[pi].last_layout_pane_w) {
+      keep_view(app, app.panes[pi]);
       app.panes[pi].height_cache.clear();
       app.panes[pi].last_layout_pane_w = app.panes[pi].w;
     }
@@ -285,6 +325,7 @@ void layout_panes(App& app) {
           static_cast<float>(std::max(40, pane.w - kSbLayoutGutter)),
           base_of(app, pane), vp, hints, &app.folded_sections,
           active_focus_section(app));
+      pane.layout_buf = pane.buf;
       // Refresh height hints from measured (and skipped-stub) boxes.
       for (const auto& b : pane.layout.boxes) {
         if (b.node != xanatoo::INVALID_NODE && b.height > 0.f)
@@ -305,7 +346,15 @@ void layout_panes(App& app) {
       pane.layout = {};
     }
   };
-  for (int pi : live_views(app)) layout_one(app.panes[pi]);
+  for (int pi : live_views(app)) {
+    Pane& p = app.panes[pi];
+    layout_one(p);
+    // A far move leaves the materialised band: lay out there and look again.
+    for (int pass = 0; pass < kAnchorPasses && restore_view_anchor(app, p);
+         ++pass)
+      layout_one(p);
+    p.view_anchor.reset();
+  }
   app.needs_layout = false;
   app.last_layout_w = app.win_w;
   app.last_layout_h = app.win_h;
@@ -320,16 +369,18 @@ void ensure_virtual_layout(App& app, Pane& p) {
   const float vis_bot = p.scroll_y + view_h;
   if (vis_top < p.materialised_top + margin ||
       vis_bot > p.materialised_bottom - margin) {
+    // Hints of blocks entering the band may be estimates (zoom).
+    keep_view(app, p);
     app.needs_layout = true;
   }
 }
 
-std::optional<float> caret_doc_y(App& app, Pane& p) {
+std::optional<float> caret_doc_y(App& app, Pane& p, const xanatoo::Caret& c) {
   const float lh = static_cast<float>(app.fonts.regular.line_height());
-  auto cpos = xanatoo::caret_screen_pos(p.layout, p.sel.focus, 0.f, lh);
+  auto cpos = xanatoo::caret_screen_pos(p.layout, c, 0.f, lh);
   if (cpos.valid) return cpos.y;
   const auto& d = doc_of(app, p);
-  for (xanatoo::NodeId id = p.sel.focus.node;
+  for (xanatoo::NodeId id = c.node;
        id != xanatoo::INVALID_NODE && id < d.next_id; id = d.get(id).parent) {
     for (const auto& box : p.layout.boxes) {
       if (box.node == id) return box.y;
@@ -358,11 +409,11 @@ void force_full_pane_layout(App& app, Pane& p) {
 }
 
 void scroll_caret_into_view(App& app, Pane& p) {
-  auto yopt = caret_doc_y(app, p);
+  auto yopt = caret_doc_y(app, p, p.sel.focus);
   if (!yopt) {
     // Target not in the current (virtualized) band — full pass then retry.
     force_full_pane_layout(app, p);
-    yopt = caret_doc_y(app, p);
+    yopt = caret_doc_y(app, p, p.sel.focus);
   }
   if (!yopt) return;
   float doc_y = *yopt;
@@ -399,7 +450,7 @@ void scroll_caret_to_top(App& app, Pane& p) {
       if (auto y = box_top_of(id)) return y;
     }
     // Last resort: caret baseline minus roughly one line so glyphs fit.
-    if (auto cy = caret_doc_y(app, p)) {
+    if (auto cy = caret_doc_y(app, p, p.sel.focus)) {
       const float lh = static_cast<float>(app.fonts.regular.line_height());
       return std::max(0.f, *cy - lh);
     }
@@ -428,6 +479,8 @@ float pane_max_scroll(App& app, const Pane& p) {
 
 void zoom_by(App& app, int steps) {
   if (steps == 0) return;
+  keep_views(app);
+  const int old_body_px = app.body_px;
   for (; steps > 0; --steps) {
     app.body_px = std::min(48, app.body_px + 1);
     app.heading_px = std::min(64, app.heading_px + 2);
@@ -437,6 +490,11 @@ void zoom_by(App& app, int steps) {
     app.heading_px = std::max(14, app.heading_px - 2);
   }
   apply_font_sizes(app);
+  // Estimates: a full pass per pinch step is too slow for a whole book.
+  const float scale =
+      static_cast<float>(app.body_px) / static_cast<float>(old_body_px);
+  for (Pane& p : app.panes)
+    for (auto& [node, h] : p.height_cache) h *= scale;
   app.needs_layout = true;
 }
 

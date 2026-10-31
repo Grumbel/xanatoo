@@ -8,6 +8,22 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-10-31) — view anchors (zoom keeps the text in place)
+
+- `ViewAnchor` (document position + spot in the pane), `view_anchor_at`,
+  `keep_views`; `layout_panes` scrolls a held anchor back to its spot,
+  relaying out while that leaves the materialised band. Pinch holds the
+  text between the fingers from the first to the last step; zoom keys, view
+  settings, style change, collection view, arriving images and pane width
+  changes hold each view's top line.
+- `zoom_by` scales the height hints instead of dropping them (no full layout
+  per pinch step on a whole book); `ensure_virtual_layout` holds the view
+  while the estimates become measured heights on scrolling.
+- Checked under Xvfb with an injected pinch on a 3000-section document
+  (LD_PRELOAD shim for fake touches), not yet on a real touchscreen. The
+  anchor is one character, so a rewrap can still shift the lines around it
+  by one line per zoom step. Folding does not use the anchor yet.
+
 ## Status (2026-10-31) — built-in EPUB reader
 
 - `src/epub_native.cpp` (`epub_to_markdown`): zip + OPF spine → chapters

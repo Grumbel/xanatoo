@@ -57,6 +57,11 @@ Every view has its own rect (`Pane::x/y/w/h`, centre rows from
 `focus_view`, `live_views` (never `pi < 2`), `other_pane` (never
 `1 - app.focus`), `pane_at(app, x, y)` and `content_y(app, y, pi)`;
 after replacing a buffer's document call `refresh_views_of_buf`.
+To change a page without moving the view, call `keep_views(app)` before the
+change (it needs the old layout): the top line of each view stays on its
+spot through the next `layout_panes`. To hold another spot, set
+`Pane::view_anchor` from `view_anchor_at` first (pinch: the text between the
+fingers). Pane width changes do this by themselves.
 Back / Forward are per view (`Pane::nav`): record a shown page with
 `push_nav_history(app, pi, url)`, step with `nav_step`; `App::visited`
 is only the session log for the History panel. While split browsing, the

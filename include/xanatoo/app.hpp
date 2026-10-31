@@ -124,6 +124,15 @@ struct NavHistory {
   int pos = -1;
 };
 
+// A document position and where in its view it is to stay while the page
+// changes around it (zoom, reflow, images arriving). `view_y` is the
+// position's baseline relative to the pane content.
+struct ViewAnchor {
+  BufferId buf = kNoBuffer;
+  xanatoo::Caret pos;
+  float view_y = 0.f;
+};
+
 struct Pane {
   BufferId buf = kNoBuffer;
   NavHistory nav;  // this view's own Back / Forward
@@ -131,6 +140,9 @@ struct Pane {
   float scroll_y = 0.f;
   float preferred_x = 0.f;
   xanatoo::LayoutResult layout{};
+  BufferId layout_buf = kNoBuffer;  // buffer `layout` was made from
+  // layout_panes brings this back to its spot, then drops it.
+  std::optional<ViewAnchor> view_anchor;
   int x = 0;
   int w = 0;
   int y = 0;
@@ -266,9 +278,11 @@ struct Touch {
   Uint32 last_move_ticks = 0;
   bool flinging = false;
   Uint32 fling_ticks = 0;
-  // Pinch: finger distance and body size when the second finger landed.
+  // Pinch: finger distance, body size and the text between the fingers when
+  // the second finger landed.
   float pinch_dist = 0.f;
   int pinch_body_px = 0;
+  std::optional<ViewAnchor> pinch_anchor;
 };
 
 // ---- background page fetches (app_fetch.cpp) ----
@@ -725,7 +739,14 @@ void refresh_diff(App& app);
 void expand_ancestors_for_node(App& app, xanatoo::NodeId target);
 void layout_panes(App& app);
 void ensure_virtual_layout(App& app, Pane& p);
-std::optional<float> caret_doc_y(App& app, Pane& p);
+std::optional<float> caret_doc_y(App& app, Pane& p, const xanatoo::Caret& c);
+// The text at (x, view_y) of the pane's current layout, as it shows now.
+std::optional<ViewAnchor> view_anchor_at(App& app, Pane& p, float x,
+                                         float view_y);
+// Call before anything that moves the page under a view: the top line of
+// every view (or the anchor one already holds) stays on its spot through the
+// next layout_panes. To hold another spot set Pane::view_anchor first.
+void keep_views(App& app);
 void force_full_pane_layout(App& app, Pane& p);
 void scroll_caret_into_view(App& app, Pane& p);
 void scroll_caret_to_top(App& app, Pane& p);

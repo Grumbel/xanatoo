@@ -2066,6 +2066,32 @@ void test_parse_unclaimed_block_lines() {
   }
 }
 
+void test_nearest_caret() {
+  xanatoo::LayoutResult l;
+  EXPECT(!xanatoo::nearest_caret(l, 0.f, 0.f));
+  auto glyph = [&](xanatoo::NodeId node, size_t ch, float x, float y) {
+    xanatoo::PositionedGlyph g;
+    g.node = node;
+    g.char_index = ch;
+    g.x = x;
+    g.y = y;
+    l.glyphs.push_back(g);
+  };
+  glyph(xanatoo::INVALID_NODE, 0, 0.f, 100.f);  // decoration: no caret
+  glyph(1, 0, 10.f, 20.f);
+  glyph(1, 1, 20.f, 20.f);
+  glyph(2, 0, 10.f, 500.f);
+  glyph(2, 1, 20.f, 500.f);
+  // Line by y, then glyph by x.
+  auto near = xanatoo::nearest_caret(l, 19.f, 30.f);
+  EXPECT(near && near->node == 1 && near->char_index == 1);
+  // Decorations are no target, distance does not matter.
+  near = xanatoo::nearest_caret(l, 0.f, 100.f);
+  EXPECT(near && near->node == 1 && near->char_index == 0);
+  near = xanatoo::nearest_caret(l, 0.f, 9000.f);
+  EXPECT(near && near->node == 2);
+}
+
 void test_inflate() {
   using namespace xanatoo;
   // Vectors from Python's gzip / zlib (fixed, dynamic and stored blocks).
@@ -2236,6 +2262,7 @@ void test_sitemap() {
 int main() {
   test_about_markdown();
   test_sitemap();
+  test_nearest_caret();
   test_inflate();
   test_sha256();
   test_revstore();

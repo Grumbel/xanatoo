@@ -138,6 +138,24 @@ std::optional<Caret> hit_test(const LayoutResult& layout,
   return std::nullopt;
 }
 
+std::optional<Caret> nearest_caret(const LayoutResult& layout, float x,
+                                   float y) {
+  std::optional<Caret> best;
+  float best_dy = std::numeric_limits<float>::max();
+  float best_dx = best_dy;
+  for (const auto& g : layout.glyphs) {
+    if (g.node == INVALID_NODE) continue;
+    const float dy = std::abs(g.y - y);
+    const float dx = std::abs(g.x - x);
+    if (dy < best_dy || (dy == best_dy && dx < best_dx)) {
+      best_dy = dy;
+      best_dx = dx;
+      best = Caret{g.node, g.span_index, g.char_index};
+    }
+  }
+  return best;
+}
+
 std::optional<NodeId> hit_test_stretch(const LayoutResult& layout,
                                        float sx, float sy, float scroll_y) {
   for (const auto& box : layout.boxes) {

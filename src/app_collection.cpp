@@ -131,6 +131,7 @@ void collection_command(App& app, const std::string& arg) {
   else if (arg == "sort-name-desc") v.sort = CollectionSort::NameReverse;
   else return;
   // Card heights changed: stale hints would misplace skipped blocks.
+  keep_views(app);
   for (auto& p : app.panes) p.height_cache.clear();
   app.needs_layout = true;
 }

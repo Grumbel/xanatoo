@@ -125,6 +125,14 @@ void begin_pinch(App& app) {
   t.flinging = false;
   t.pinch_dist = finger_distance(t);
   t.pinch_body_px = app.body_px;
+  t.pinch_anchor.reset();
+  if (!t.on_float) {
+    const float mx = (t.fingers[0].x + t.fingers[1].x) * 0.5f;
+    const float my = (t.fingers[0].y + t.fingers[1].y) * 0.5f;
+    t.pinch_anchor = view_anchor_at(app, app.panes[t.pane],
+                                    local_x(app, mx, t.pane),
+                                    content_y(app, my, t.pane));
+  }
   t.mode = TouchMode::Pinch;
 }
 
@@ -206,6 +214,8 @@ void touch_finger_motion(App& app, const SDL_TouchFingerEvent& tf) {
         const float scale = finger_distance(t) / t.pinch_dist;
         const int target = static_cast<int>(
             std::lround(static_cast<float>(t.pinch_body_px) * scale));
+        if (target != app.body_px && t.pinch_anchor)
+          app.panes[t.pane].view_anchor = t.pinch_anchor;
         zoom_by(app, target - app.body_px);
       }
       break;
