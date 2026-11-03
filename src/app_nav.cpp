@@ -70,31 +70,37 @@ bool nav_step(App& app, int dir) {
   return true;
 }
 
+namespace {
+auto find_bookmark(App& app, const std::string& url) {
+  return std::find_if(app.bookmarks.begin(), app.bookmarks.end(),
+                      [&](const xanatoo::Bookmark& b) { return b.address == url; });
+}
+}  // namespace
+
 bool is_bookmarked(App& app, const std::string& url) {
-  if (url.empty()) return false;
-  return std::find(app.bookmarks.begin(), app.bookmarks.end(), url) !=
-         app.bookmarks.end();
+  return !url.empty() && find_bookmark(app, url) != app.bookmarks.end();
 }
 
-void add_bookmark(App& app, const std::string& url) {
-  if (url.empty()) {
+void add_bookmark(App& app, xanatoo::Bookmark b) {
+  if (b.address.empty()) {
     flash_status(app, "Nothing to bookmark (no path/URL)");
     return;
   }
-  if (is_bookmarked(app, url)) {
+  if (is_bookmarked(app, b.address)) {
     flash_status(app, "Already bookmarked");
     return;
   }
-  app.bookmarks.push_back(url);
+  const std::string what = b.quote.empty() ? b.address : "“" + b.quote + "”";
+  app.bookmarks.push_back(std::move(b));
   if (xanatoo::save_bookmarks(app.bookmarks))
-    flash_status(app, "Bookmarked " + url);
+    flash_status(app, "Bookmarked " + what);
   else
     flash_status(app, "Bookmark added (could not persist to disk)");
 }
 
 void remove_bookmark(App& app, const std::string& url) {
   if (url.empty()) return;
-  auto it = std::find(app.bookmarks.begin(), app.bookmarks.end(), url);
+  auto it = find_bookmark(app, url);
   if (it == app.bookmarks.end()) {
     flash_status(app, "Not in bookmarks");
     return;

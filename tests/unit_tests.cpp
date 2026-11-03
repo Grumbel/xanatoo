@@ -1426,6 +1426,101 @@ void test_locator() {
   EXPECT_EQ(paths, 1);  // the second "Two"
 }
 
+void test_text_selectors() {
+  using xanatoo::Caret;
+  using xanatoo::Resolve;
+  using xanatoo::Selection;
+  using xanatoo::SelectorKind;
+
+  auto q = xanatoo::parse_text_quote("pre-,a%2Cb,end,-post");
+  EXPECT(q && q->prefix == "pre" && q->start == "a,b" && q->end == "end" &&
+         q->suffix == "post");
+  EXPECT_EQ(xanatoo::format_text_quote(*q), "pre-,a%2Cb,end,-post");
+  q = xanatoo::parse_text_quote("before-,,-after");
+  EXPECT(q && q->start.empty() && q->prefix == "before" &&
+         q->suffix == "after");
+  EXPECT_EQ(xanatoo::format_text_quote(*q), "before-,,-after");
+  EXPECT(xanatoo::parse_text_quote("-,,-after"));
+  EXPECT(!xanatoo::parse_text_quote(""));
+  EXPECT(!xanatoo::parse_text_quote("a,b,c"));
+  EXPECT(!xanatoo::parse_text_quote(",x"));
+
+  const xanatoo::Document d = xanatoo::parse_markup(
+      "# Title\n\nThe quick brown fox jumps over the lazy dog.\n\n"
+      "Another dog sleeps here, and   the quick brown fox **naps** today.\n\n"
+      "Ünïcode wörds stay whole.\n");
+  std::vector<xanatoo::NodeId> texts;
+  xanatoo::collect_text_nodes(d, d.root, texts);
+  EXPECT_EQ(texts.size(), 4u);
+  const xanatoo::NodeId p1 = texts[1], p2 = texts[2], p3 = texts[3];
+
+  Selection out;
+  // Case and whitespace do not matter; across spans of one block.
+  EXPECT(xanatoo::resolve_text(d, 0, {SelectorKind::Text, "LAZY%20DOG"}, out) ==
+         Resolve::Exact);
+  EXPECT(out.anchor.node == p1 && out.anchor.char_index == 35);
+  EXPECT(out.focus.node == p1 && out.focus.char_index == 43);
+  EXPECT(xanatoo::resolve_text(d, 0, {SelectorKind::Text, "fox%20naps%20today"},
+                               out) == Resolve::Exact);
+  EXPECT(out.anchor.node == p2 && out.focus.node == p2);
+  // The context picks the second "quick brown fox".
+  EXPECT(xanatoo::resolve_text(d, 0, {SelectorKind::Text, "the-,quick"}, out) ==
+         Resolve::Exact);
+  EXPECT(out.anchor.node == p1);
+  EXPECT(xanatoo::resolve_text(d, 0,
+                               {SelectorKind::Text, "and%20the-,quick"},
+                               out) == Resolve::Exact);
+  EXPECT(out.anchor.node == p2);
+  // start,end spans blocks.
+  EXPECT(xanatoo::resolve_text(d, 0, {SelectorKind::Text, "lazy,sleeps"},
+                               out) == Resolve::Exact);
+  EXPECT(out.anchor.node == p1 && out.focus.node == p2);
+  EXPECT(xanatoo::resolve_text(d, 0, {SelectorKind::Text, "missing"}, out) ==
+         Resolve::Lost);
+  EXPECT(xanatoo::resolve_text(d, p2, {SelectorKind::Text, "lazy"}, out) ==
+         Resolve::Lost);
+
+  // text_selector → resolve_text gives the selection back, and is unique.
+  auto round_trip = [&](const Selection& sel) {
+    const xanatoo::Selector s = xanatoo::text_selector(d, 0, sel);
+    Selection back;
+    const bool ok =
+        xanatoo::resolve_text(d, 0, s, back) == Resolve::Exact &&
+        xanatoo::caret_cmp(d, back.anchor, sel.anchor) == 0 &&
+        xanatoo::caret_cmp(d, back.focus, sel.focus) == 0;
+    if (!ok) std::fprintf(stderr, "  text selector: %s\n", s.value.c_str());
+    return ok;
+  };
+  const xanatoo::Node& n2 = d.get(p2);
+  const size_t last = n2.spans.size() - 1;
+  // "quick brown fox" in the second paragraph: needs a prefix.
+  const size_t at = std::string("Another dog sleeps here, and   the ").size();
+  EXPECT(round_trip({{p2, 0, at}, {p2, 0, at + 15}}));
+  EXPECT(round_trip({{p1, 0, 4}, {p1, 0, 9}}));    // "quick"
+  EXPECT(round_trip({{p1, 0, 10}, {p2, last, 3}}));  // long, two blocks
+  EXPECT(round_trip({{p3, 0, 0}, {p3, 0, 7}}));    // "Ünïcode"
+  // Points.
+  for (const Caret c : {Caret{p1, 0, 20}, Caret{p2, 0, 4}, Caret{p3, 0, 8},
+                        Caret{p1, 0, 0}}) {
+    EXPECT(round_trip({c, c}));
+  }
+}
+
+void test_bookmark_lines() {
+  auto b = xanatoo::parse_bookmark_line("  https://example.org/  ");
+  EXPECT(b && b->address == "https://example.org/" && b->quote.empty());
+  EXPECT(!xanatoo::parse_bookmark_line("# comment"));
+  EXPECT(!xanatoo::parse_bookmark_line("   "));
+  xanatoo::Bookmark in{"a.md#text:x", "Chapter\t1", "a\nquote", "2026-11-03"};
+  const std::string line = xanatoo::format_bookmark_line(in);
+  EXPECT(line.find('\n') == std::string::npos);
+  b = xanatoo::parse_bookmark_line(line);
+  EXPECT(b && b->address == in.address && b->title == "Chapter 1" &&
+         b->quote == "a quote" && b->created == in.created);
+  b = xanatoo::parse_bookmark_line("a.md\tunknown=1\tquote=q");
+  EXPECT(b && b->quote == "q");
+}
+
 void test_footnotes() {
   using namespace xanatoo;
   // Pandoc GFM output: refs, a one-line note, a two-paragraph note.
@@ -2431,6 +2526,8 @@ int main() {
   test_style_sheets_shipped();
   test_footnotes();
   test_locator();
+  test_text_selectors();
+  test_bookmark_lines();
 
   std::printf("%d passed, %d failed\n", g_passed, g_failed);
   return g_failed == 0 ? 0 : 1;

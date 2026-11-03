@@ -206,7 +206,9 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   }
   ui_state.bookmarks = app.bookmarks;
   {
+    // With a selection the star bookmarks the selection.
     ui_state.current_bookmarked =
+        focused_pane(app).sel.empty() &&
         is_bookmarked(app, pane_address(app, focused_pane(app)));
   }
   ui_state.tab_labels.clear();
@@ -300,7 +302,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::NavigateUrl || c == C::NavBack || c == C::NavForward ||
         c == C::GoHome || c == C::GoUp ||
         c == C::ToggleHistory || c == C::ToggleBookmarks ||
-        c == C::AddBookmark || c == C::RemoveBookmark || c == C::NewTab ||
+        c == C::AddBookmark || c == C::RemoveBookmark ||
+        c == C::BookmarkPosition || c == C::NewTab ||
         c == C::CloseTab || c == C::NextTab || c == C::PrevTab ||
         c == C::SelectTab || c == C::PopOut || c == C::PopIn || c == C::Save ||
         c == C::SaveAs || c == C::ExportSexpr || c == C::ExportMarkdown ||
@@ -517,10 +520,12 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::ToggleBookmarks:
       app.bookmarks_panel_open = !app.bookmarks_panel_open;
       break;
-    case C::AddBookmark: {
-      add_bookmark(app, pane_address(app, p));
+    case C::AddBookmark:
+      add_bookmark(app, bookmark_for_view(app, p, false));
       break;
-    }
+    case C::BookmarkPosition:
+      add_bookmark(app, bookmark_for_view(app, p, true));
+      break;
     case C::RemoveBookmark: {
       std::string url = arg;
       if (url.empty()) url = pane_address(app, p);
@@ -1497,21 +1502,11 @@ static void draw_pane_overlays(App& app, int i) {
       }
     }
     // The `#` passage of this view's address.
-    if (!pane.mark.empty()) {
+    for (const xanatoo::Selection& m : pane.marks) {
       const xanatoo::Rgba& c = app.style.mark;
-      for_each_link_run(
-          app, pane,
-          [&](const xanatoo::PositionedGlyph& pg) {
-            return pane.mark.count(pg.node) != 0;
-          },
-          [&](float x0, float x1, float top, float) {
-            SDL_Rect r{static_cast<int>(x0 + ox) - 2,
-                       static_cast<int>(top - draw_scroll) - 2,
-                       static_cast<int>(x1 - x0) + 4,
-                       app.fonts.regular.line_height() + 4};
-            SDL_SetRenderDrawColor(app.sdl, c.r, c.g, c.b, c.a);
-            SDL_RenderFillRect(app.sdl, &r);
-          });
+      const auto rects = xanatoo::selection_rects(
+          pane.layout, m, draw_scroll, app.renderer.glyph_extents());
+      app.renderer.draw_selection(rects, ox, c.r, c.g, c.b, c.a);
     }
     // ... and its target on the right: the same wash and a ◂ at the edge
     // towards the left pane.

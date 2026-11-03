@@ -2303,10 +2303,10 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       }
       if (ctrl && shift) {
         const std::string url = pane_address(app, p);
-        if (is_bookmarked(app, url))
+        if (p.sel.empty() && is_bookmarked(app, url))
           remove_bookmark(app, url);
         else
-          add_bookmark(app, url);
+          add_bookmark(app, bookmark_for_view(app, p, false));
         break;
       }
       if (ctrl && !p.sel.empty()) {

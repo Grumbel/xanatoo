@@ -8,6 +8,28 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-11-03) — passages: text selectors, bookmarks of a passage (slice 3)
+
+- `text:` selectors resolve (`resolve_text`, web text-fragment grammar,
+  whitespace / ASCII case folded) and are made by `text_selector` (short
+  range whole, long range first + last four words, context until unique;
+  empty selection = a point `prefix-,,-suffix`). `#:~:text=` is an alias.
+- `Pane::marks` is a list of ranges drawn like the selection: `#text:` marks
+  the range, `#id:` the node's text. A `//text:` pipe cuts to the smallest
+  block holding the range (clipping it is slice 4).
+- `Bookmark` record (address, title, quote, date); the `bookmarks` file keeps
+  one address per line with tab-separated `title=` / `quote=` / `at=`, so
+  old files still load. Ctrl+Shift+B bookmarks the selection, else the page
+  (menu label said Ctrl+Alt+B before); Bookmarks → Bookmark Reading Position
+  stores a point at the caret. Panel and menu show title + quote.
+- Checked under Xvfb: selection and reading-position bookmarks land in the
+  file with title and quote, the panel lists them, reopening a selection
+  bookmark marks exactly that range.
+- Open: marks of bookmarks inside the current page (and the star lighting up
+  for them); "Moved" resolution (nearest of several matches); bookmarks
+  panel grouped by document; Open as cut.
+- Next: slice 4, clipped text cuts, "Show only this", Copy address.
+
 ## Status (2026-10-31) — passages: cuts, marks, addresses (slices 1 + 2)
 
 - Design and the remaining slices in `docs/PASSAGES.md`. Bookmark, selection,
@@ -16,8 +38,8 @@ Next bundle number: **263** (this delivery is **262**)
   passage marked).
 - `locator.hpp` (`parse_locator`, `format_locator`, `locator_up`,
   `resolve_node`, `node_selector`), unit-tested. `text:` / `rect:` / `at:`
-  parse, but only `id:` and `path:` resolve yet; the others report
-  "Passage not found".
+  parse; `id:` and `path:` resolve here (`text:` in slice 3), the others
+  report "Passage not found".
 - `app_passage.cpp`: selectors are view state on `Pane`, only the base gets
   opened or fetched. `navigate_pane` splits the address, same page = no load.
   Location bar, history, bookmarks, Copy URL use `pane_address`. Up steps
@@ -33,7 +55,6 @@ Next bundle number: **263** (this delivery is **262**)
   a cut still shows the headers of parent sections; the caret can leave a cut
   with the keyboard (as in Section Focus); Forward/Up from a hover preview's
   cached page refetches when the URL had a fragment.
-- Next: slice 3, `text:` selectors, `Pane::marks`, bookmarks of a selection.
 
 ## Status (2026-10-31) — view anchors (zoom keeps the text in place)
 

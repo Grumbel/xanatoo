@@ -143,32 +143,64 @@ std::string bookmarks_path() {
   return (fs::path(dir) / "bookmarks").string();
 }
 
-std::vector<std::string> load_bookmarks() {
-  std::vector<std::string> out;
+std::optional<Bookmark> parse_bookmark_line(std::string_view line) {
+  std::vector<std::string_view> fields;
+  for (size_t at = 0;;) {
+    const size_t tab = line.find('\t', at);
+    fields.push_back(line.substr(at, tab == std::string_view::npos
+                                         ? std::string_view::npos
+                                         : tab - at));
+    if (tab == std::string_view::npos) break;
+    at = tab + 1;
+  }
+  std::string_view address = fields[0];
+  trim_ascii(address);
+  if (address.empty() || address[0] == '#') return std::nullopt;
+  Bookmark b;
+  b.address = std::string(address);
+  for (size_t i = 1; i < fields.size(); ++i) {
+    const size_t eq = fields[i].find('=');
+    if (eq == std::string_view::npos) continue;
+    const std::string_view key = fields[i].substr(0, eq);
+    const std::string value(fields[i].substr(eq + 1));
+    if (key == "title") b.title = value;
+    else if (key == "quote") b.quote = value;
+    else if (key == "at") b.created = value;
+  }
+  return b;
+}
+
+std::string format_bookmark_line(const Bookmark& b) {
+  auto field = [](std::string_view key, std::string_view value) {
+    std::string out = "\t" + std::string(key) + "=";
+    for (char c : value) out.push_back(c == '\t' || c == '\n' || c == '\r' ? ' ' : c);
+    return value.empty() ? std::string() : out;
+  };
+  return b.address + field("title", b.title) + field("quote", b.quote) +
+         field("at", b.created);
+}
+
+std::vector<Bookmark> load_bookmarks() {
+  std::vector<Bookmark> out;
   std::string path = bookmarks_path();
   if (path.empty()) return out;
   std::ifstream in(path);
   if (!in) return out;
   std::string line;
-  while (std::getline(in, line)) {
-    while (!line.empty() &&
-           (line.back() == '\r' || line.back() == ' ' || line.back() == '\t'))
-      line.pop_back();
-    size_t i = 0;
-    while (i < line.size() && (line[i] == ' ' || line[i] == '\t')) ++i;
-    if (i >= line.size() || line[i] == '#') continue;
-    out.push_back(line.substr(i));
-  }
+  while (std::getline(in, line))
+    if (auto b = parse_bookmark_line(line)) out.push_back(std::move(*b));
   return out;
 }
 
-bool save_bookmarks(const std::vector<std::string>& entries) {
+bool save_bookmarks(const std::vector<Bookmark>& entries) {
   if (no_save()) return true;
   std::string path = bookmarks_path();
   if (path.empty()) return false;
-  std::string text = "# xanatoo bookmarks — one URL or path per line\n";
+  std::string text =
+      "# xanatoo bookmarks — one address per line, then optional\n"
+      "# tab-separated title= / quote= / at= fields\n";
   for (const auto& e : entries) {
-    if (!e.empty()) text += e + '\n';
+    if (!e.address.empty()) text += format_bookmark_line(e) + '\n';
   }
   return write_file_atomic(path, text);
 }

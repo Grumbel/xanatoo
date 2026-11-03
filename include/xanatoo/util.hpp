@@ -3,6 +3,7 @@
 #pragma once
 
 #include "xanatoo/types.hpp"
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -105,10 +106,25 @@ bool write_file_atomic(const std::string& path, std::string_view content);
 // Full path to the bookmarks file under state_dir().
 std::string bookmarks_path();
 
-// Load bookmarks (one URL/path per line; blank lines and # comments ignored).
-std::vector<std::string> load_bookmarks();
+// One bookmark: an address (docs/PASSAGES.md), which may name a passage, and
+// what it showed when it was made.
+struct Bookmark {
+  std::string address;
+  std::string title;    // section or page it was made in
+  std::string quote;    // the passage text then (display, re-anchoring)
+  std::string created;  // YYYY-MM-DD
+};
+
+// File line: the address, then optional tab-separated key=value fields
+// (title, quote, at), so plain one-URL-per-line files stay valid. Empty for
+// blank lines and # comments.
+std::optional<Bookmark> parse_bookmark_line(std::string_view line);
+std::string format_bookmark_line(const Bookmark& b);
+
+// Load bookmarks (blank lines and # comments ignored).
+std::vector<Bookmark> load_bookmarks();
 
 // Save bookmarks (atomically; nothing with --no-save). False on I/O error.
-bool save_bookmarks(const std::vector<std::string>& entries);
+bool save_bookmarks(const std::vector<Bookmark>& entries);
 
 }  // namespace xanatoo

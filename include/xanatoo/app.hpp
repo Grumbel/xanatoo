@@ -150,7 +150,7 @@ struct Pane {
   xanatoo::Locator locator;
   BufferId locator_buf = kNoBuffer;
   xanatoo::NodeId cut = xanatoo::INVALID_NODE;  // what the pipes selected
-  std::unordered_set<xanatoo::NodeId> mark;     // text nodes of the `#` passage
+  std::vector<xanatoo::Selection> marks;        // the `#` passage
   bool section_focus = false;  // Section Focus: the outline picks the cut
   int x = 0;
   int w = 0;
@@ -564,7 +564,7 @@ struct App {
   // Pages opened this session in any view, oldest first (History panel);
   // Back / Forward use each view's own `Pane::nav`.
   std::vector<std::string> visited;
-  std::vector<std::string> bookmarks;
+  std::vector<xanatoo::Bookmark> bookmarks;
   bool history_panel_open = false;
   bool preferences_open = false;  // Edit → Preferences (ImGui window)
   bool bookmarks_panel_open = false;
@@ -881,7 +881,7 @@ void push_nav_history(App& app, int pi, const std::string& url);
 bool can_nav_step(App& app, int dir);
 bool nav_step(App& app, int dir);
 bool is_bookmarked(App& app, const std::string& url);
-void add_bookmark(App& app, const std::string& url);
+void add_bookmark(App& app, xanatoo::Bookmark b);
 void remove_bookmark(App& app, const std::string& url);
 bool is_inapp_doc_href(App& app, const std::string& href);
 std::string resolve_doc_href(App& app, const std::string& href,
@@ -904,6 +904,9 @@ std::string pane_address(App& app, Pane& p);
 void apply_locator(App& app, int pi, xanatoo::Locator loc);
 // Cut the view to `node` (INVALID_NODE: the whole document).
 void set_pane_cut(App& app, Pane& p, xanatoo::NodeId node);
+// Bookmark of what the view shows: the selection when there is one, with
+// `position` the caret, else the page.
+xanatoo::Bookmark bookmark_for_view(App& app, Pane& p, bool position);
 // Forget the passage, for a view that gets another document.
 void reset_pane_locator(Pane& p);
 // Drop the `#` passage: address and mark, the view stays.

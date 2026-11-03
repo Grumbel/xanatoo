@@ -1,6 +1,6 @@
 # Passages: bookmarks, selections, transclusion
 
-Design note. Slices 1 and 2 below are implemented (`locator.hpp`,
+Design note. Slices 1 to 3 below are implemented (`locator.hpp`,
 `app_passage.cpp`), the rest is the plan. Bookmarks, selections, the
 "part of a document as a document" view and image crops are one concept with
 different lifetimes and presentations, so they should share one address
@@ -126,7 +126,22 @@ Resolve resolve_node(const Document&, NodeId within, const Selector&, NodeId&);
 Selector node_selector(const Document&, NodeId);
 ```
 
-Planned with slice 3, when text and rects get resolved:
+Text (slice 3):
+
+```cpp
+struct TextQuote { std::string prefix, start, end, suffix; };
+std::optional<TextQuote> parse_text_quote(std::string_view);
+std::string format_text_quote(const TextQuote&);
+Resolve resolve_text(const Document&, NodeId within, const Selector&, Selection&);
+Selector text_selector(const Document&, NodeId within, const Selection&);
+```
+
+Matching runs over a flat text of the scope (whitespace collapsed, ASCII
+lower case). `text_selector` keeps a short range whole and a long one as its
+first and last four words, then adds context words until the match is unique.
+An empty selection gives a point (`prefix-,,-suffix`).
+
+Still planned, with images (slice 5), the Extent that a mark or cut holds:
 
 ```cpp
 struct Extent {
@@ -135,7 +150,6 @@ struct Extent {
   Selection text;        // Text
   FRect rect;            // Rect
 };
-Selector selector_for(const Document&, const Selection&);
 ```
 
 **The pipes are view state, not buffer identity.** `Locator::base` is the only
@@ -146,7 +160,7 @@ happens once, at the top of `navigate_pane`. Consequences:
   reload, and edits in a cut are ordinary edits of the document.
 - `is_*_url` dispatch never sees a pipe.
 - `Pane` holds the selectors (`locator`, valid while `locator_buf == buf`),
-  the resolved `cut` and the text nodes of the `#` passage (`mark`).
+  the resolved `cut` and the marked ranges (`marks`, `Selection`s).
   `pane_address` gives the address for the location bar, history and
   bookmarks, `pane_cut` is what layout uses.
 
@@ -178,11 +192,13 @@ step from cut to whole document needs no fetch and no reload, as the buffer is
 shared. It keeps the passage on its spot on screen with `Pane::view_anchor`.
 Back returns to the cut through the normal per-view `nav` history.
 
-**Mark / overlay.** Today `Pane::mark`: the `#` passage, whole text nodes,
-in the `mark` colour of the page style. Slice 3 turns it into `Pane::marks`, a
-list of `{Extent, role}` drawn over the page. One draw path for `#` targets,
-bookmarks of this document, search hits later, and images (a frame over the
-image, in the pane and the Lightbox).
+**Mark / overlay.** `Pane::marks`: text ranges drawn over the page like the
+selection, in the `mark` colour of the page style. A `#text:` point marks its
+range, a `#id:` point the whole text of the node. A `//text:` pipe cuts to the
+smallest block holding the range and marks the range in it, until slice 4
+clips the cut. Later the list holds `{Extent, role}`: one draw path for `#`
+targets, bookmarks of this document, search hits, and images (a frame over
+the image, in the pane and the Lightbox).
 
 - Generalises the `SplitTrail` wash and the selection wash.
 - Bookmark roles come from `DocStyle` as well.
@@ -212,8 +228,11 @@ book.md//id:ch3//text:the%20best,of%20times	title=Chapter 3	quote=…	rev=…	at
 for display and for re-anchoring, and `rev` is the content id of the revision
 seen, where a store exists.
 
-- Ctrl+Alt+B with a selection bookmarks the selection; with only a caret, a
-  point (position in a book); without a document position, the page, as today.
+- Ctrl+Shift+B (Bookmarks → Bookmark Selection / This Page) bookmarks the
+  selection when there is one, else the page (a second press on a bookmarked
+  page removes it). Bookmarks → Bookmark Reading Position bookmarks a point at
+  the caret (a position in a book). Selection and position bookmarks carry the
+  title of the enclosing section and the quote (`‸` at a point).
 - `is_bookmarked` stays "this exact address"; the toolbar star also lights up
   when the page has bookmarks inside it.
 - Bookmarks panel: grouped by document, each row shows title + quote; the
@@ -238,7 +257,7 @@ address format does not change: `id:` can then hold a unit id.
 
 ## Slices
 
-Each is useful on its own. 1 and 2 are done:
+Each is useful on its own. 1 to 3 are done:
 
 1. `parse_locator` / `format_locator` + unit tests, including the
    web.archive.org and `hn:item?id=1` cases. No behaviour change.

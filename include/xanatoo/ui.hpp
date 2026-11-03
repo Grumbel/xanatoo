@@ -7,6 +7,8 @@
 #include <vector>
 #include <unordered_map>
 
+#include "xanatoo/util.hpp"
+
 namespace xanatoo {
 
 // Commands requested by the ImGui menu / toolbar / context menu.
@@ -24,7 +26,8 @@ enum class UiCommand {
   GoUp,        // one level up the page hierarchy (UiState::up_url)
   StopLoading, // cancel running page fetches (toolbar Stop, Esc)
   ToggleHistory,   // View → History panel
-  AddBookmark,     // bookmark current page URL/path
+  AddBookmark,     // bookmark the selection, else the current page
+  BookmarkPosition,  // bookmark the caret position in the page
   RemoveBookmark,  // remove current (or arg) from bookmarks
   ToggleBookmarks, // Bookmarks manager panel
   // Tabs / MDI
@@ -216,7 +219,7 @@ struct UiState {
   std::vector<std::string> history_entries;
   int history_pos = -1;  // current index, or -1
   // Persistent bookmarks for the Bookmarks menu / panel.
-  std::vector<std::string> bookmarks;
+  std::vector<Bookmark> bookmarks;
   // Tab strip (labels left→right); active_tab is index into tab_labels.
   std::vector<std::string> tab_labels;
   int active_tab = 0;

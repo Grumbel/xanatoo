@@ -32,6 +32,24 @@ namespace xanatoo {
 
 namespace {
 
+// "Section — “quote”" for a passage, else the address.
+std::string bookmark_label(const Bookmark& b) {
+  if (b.quote.empty()) return b.title.empty() ? b.address : b.title;
+  if (b.title.empty()) return "“" + b.quote + "”";
+  return b.title + " — “" + b.quote + "”";
+}
+
+// First and last `keep` bytes (on character boundaries) around an ellipsis.
+std::string elide_middle(const std::string& s, size_t keep) {
+  auto cont = [&](size_t i) {
+    return i < s.size() && (static_cast<unsigned char>(s[i]) & 0xc0) == 0x80;
+  };
+  size_t head = keep, tail = s.size() - keep;
+  while (head > 0 && cont(head)) --head;
+  while (cont(tail)) ++tail;
+  return s.substr(0, head) + "…" + s.substr(tail);
+}
+
 bool near_eq(float a, float b, float eps) { return std::fabs(a - b) < eps; }
 
 // Shared View / toolbar items for display prefs (not document format).
@@ -792,8 +810,9 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
 
     {
       const char* bm_tip =
-          state.current_bookmarked ? "Remove bookmark (Ctrl+Alt+B)"
-                                   : "Bookmark this page (Ctrl+Alt+B)";
+          state.current_bookmarked ? "Remove bookmark (Ctrl+Shift+B)"
+          : state.selection        ? "Bookmark the selection (Ctrl+Shift+B)"
+                                   : "Bookmark this page (Ctrl+Shift+B)";
       tool_button("tb_bookmark", "bookmark", bm_tip,
                   state.current_bookmarked ? UiCommand::RemoveBookmark
                                            : UiCommand::AddBookmark,
@@ -1213,12 +1232,16 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     }
     force_menu("Bookmarks");
     if (ImGui::BeginMenu("Bookmarks")) {
-      const char* add_label =
-          state.current_bookmarked ? "Remove Bookmark" : "Bookmark This Page";
-      if (ImGui::MenuItem(add_label, "Ctrl+Alt+B", false, state.has_path)) {
+      const char* add_label = state.current_bookmarked ? "Remove Bookmark"
+                              : state.selection        ? "Bookmark Selection"
+                                                       : "Bookmark This Page";
+      if (ImGui::MenuItem(add_label, "Ctrl+Shift+B", false, state.has_path)) {
         cmd = state.current_bookmarked ? UiCommand::RemoveBookmark
                                        : UiCommand::AddBookmark;
       }
+      if (ImGui::MenuItem("Bookmark Reading Position", nullptr, false,
+                          state.has_path))
+        cmd = UiCommand::BookmarkPosition;
       if (ImGui::MenuItem("Show Bookmarks…", nullptr, state.bookmarks_open))
         cmd = UiCommand::ToggleBookmarks;
       if (!state.bookmarks.empty()) {
@@ -1227,16 +1250,16 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         const int n = static_cast<int>(state.bookmarks.size());
         const int start = n > 30 ? n - 30 : 0;
         for (int i = start; i < n; ++i) {
-          const std::string& b = state.bookmarks[static_cast<size_t>(i)];
+          const Bookmark& b = state.bookmarks[static_cast<size_t>(i)];
           // Truncate long labels for the menu.
-          std::string label = b;
-          if (label.size() > 64) {
-            label = label.substr(0, 28) + "…" + label.substr(label.size() - 28);
-          }
+          std::string label = bookmark_label(b);
+          if (label.size() > 64) label = elide_middle(label, 28);
+          ImGui::PushID(i);
           if (ImGui::MenuItem(label.c_str())) {
             cmd = UiCommand::NavigateUrl;
-            result.arg = b;
+            result.arg = b.address;
           }
+          ImGui::PopID();
         }
       }
       ImGui::EndMenu();
@@ -1417,10 +1440,11 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     bool open = true;
     ImGui::SetNextWindowSize(ImVec2(480.f, 360.f), ImGuiCond_FirstUseEver);
     if (ImGui::Begin("Bookmarks", &open)) {
-      ImGui::TextDisabled("Persistent bookmarks (~/.config/xanatoo/bookmarks)");
+      ImGui::TextDisabled("Persistent bookmarks (state dir: bookmarks)");
       ImGui::Separator();
       if (ImGui::Button(state.current_bookmarked ? "Remove current page"
-                                                : "Bookmark current page")) {
+                        : state.selection        ? "Bookmark selection"
+                                                 : "Bookmark current page")) {
         cmd = state.current_bookmarked ? UiCommand::RemoveBookmark
                                        : UiCommand::AddBookmark;
       }
@@ -1433,28 +1457,41 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ImGui::TextWrapped("No bookmarks yet.");
       } else {
         for (int i = 0; i < static_cast<int>(state.bookmarks.size()); ++i) {
-          const std::string& b = state.bookmarks[static_cast<size_t>(i)];
+          const Bookmark& b = state.bookmarks[static_cast<size_t>(i)];
           ImGui::PushID(i);
-          if (ImGui::Selectable(b.c_str(), false,
+          // The quote gets a wrapped line of its own below.
+          const std::string label =
+              b.quote.empty() || b.title.empty() ? bookmark_label(b) : b.title;
+          if (ImGui::Selectable(label.c_str(), false,
                                 ImGuiSelectableFlags_AllowDoubleClick)) {
             if (ImGui::IsMouseDoubleClicked(0)) {
               cmd = UiCommand::NavigateUrl;
-              result.arg = b;
+              result.arg = b.address;
             }
           }
+          if (ImGui::IsItemHovered() && label != b.address)
+            ImGui::SetTooltip("%s", b.address.c_str());
           if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(1)) {
             ImGui::OpenPopup("##bm_ctx");
           }
           if (ImGui::BeginPopup("##bm_ctx")) {
             if (ImGui::MenuItem("Open")) {
               cmd = UiCommand::NavigateUrl;
-              result.arg = b;
+              result.arg = b.address;
             }
             if (ImGui::MenuItem("Remove")) {
               cmd = UiCommand::RemoveBookmark;
-              result.arg = b;
+              result.arg = b.address;
             }
             ImGui::EndPopup();
+          }
+          if (!b.quote.empty() && !b.title.empty()) {
+            ImGui::Indent();
+            ImGui::PushStyleColor(ImGuiCol_Text,
+                                  ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            ImGui::TextWrapped("%s", b.quote.c_str());
+            ImGui::PopStyleColor();
+            ImGui::Unindent();
           }
           ImGui::PopID();
         }

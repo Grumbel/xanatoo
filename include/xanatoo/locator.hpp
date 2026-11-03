@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 #pragma once
 
+#include "xanatoo/editor.hpp"
 #include "xanatoo/types.hpp"
 
 #include <optional>
@@ -58,5 +59,28 @@ Resolve resolve_node(const Document& doc, NodeId within, const Selector& sel,
 // The selector that names `node`: its label or heading, else a child-index
 // path.
 Selector node_selector(const Document& doc, NodeId node);
+
+// From the first to the last character of the text below `node`.
+Selection node_range(const Document& doc, NodeId node);
+
+// Text selectors, grammar of the web's text fragments, parts percent-encoded:
+//   [prefix-,]start[,end][,-suffix]   a range
+//   prefix-,,-suffix                  a point between two contexts
+// Matching collapses whitespace and ignores ASCII case.
+struct TextQuote {
+  std::string prefix, start, end, suffix;  // decoded
+};
+std::optional<TextQuote> parse_text_quote(std::string_view value);
+std::string format_text_quote(const TextQuote& q);
+
+// Range (or empty selection for a point) a Text selector names below
+// `within` (INVALID_NODE = the whole document); the first match wins.
+Resolve resolve_text(const Document& doc, NodeId within, const Selector& sel,
+                     Selection& out);
+
+// Text selector for `sel` (empty: a point at its caret), with as much
+// context as it takes to be unique below `within`.
+Selector text_selector(const Document& doc, NodeId within,
+                       const Selection& sel);
 
 }  // namespace xanatoo
