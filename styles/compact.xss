@@ -16,5 +16,5 @@
   (role note       (space-after 0.4em))
   (role code-block (space-after 0.4em))
   (role definition (space-after 0.3em))
-  (role message    (space-after 0.4em))
+  (role message    (font small) (space-after 0.4em))
   (role rule       (space-before 0.3em) (space-after 0.3em)))

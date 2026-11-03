@@ -20,7 +20,7 @@
   (role block-quote (border strong-line))
   (role note        (border "#b35900"))
   (role code-block  (background "#f0f0f0") (border strong-line))
-  (role message     (border strong-line) (background "#ffffff"))
+  (role message     (font small) (border strong-line) (background "#ffffff"))
   (role message-alt (background "#ebebeb"))
   (role message-author (color "#0000c8"))
   (role message-op  (color "#a00000"))

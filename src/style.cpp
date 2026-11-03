@@ -487,6 +487,7 @@ DocStyle builtin_style() {
   blk(BlockRole::Thread).font = FontRole::Heading;
   {
     BlockStyle& b = blk(BlockRole::Message);
+    b.font = FontRole::Small;
     b.space_after = px(8);
     b.border = {40, 130, 140, 255};
     b.background = {255, 255, 255, 150};

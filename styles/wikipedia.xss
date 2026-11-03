@@ -38,7 +38,7 @@
   (role footnote    (border grey-rule))
   (role bibliography-entry (indent 1.6em))
   (role thread      (border grey-rule))
-  (role message     (border frame) (background box))
+  (role message     (font small) (border frame) (background box))
   (role message-alt (background "#ffffff"))
   (role message-author (color blue))
   (role message-meta (color "#54595d"))

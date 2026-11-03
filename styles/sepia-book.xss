@@ -33,7 +33,7 @@
   (role table       (border muted) (background (rgba 232 218 188 255)))
   (role rule        (border muted) (space-before 1.2em) (space-after 1.2em))
   (role transclusion (border muted))
-  (role message     (border muted) (background (rgba 255 250 238 140)))
+  (role message     (font small) (border muted) (background (rgba 255 250 238 140)))
   (role message-alt (background (rgba 120 90 40 20)))
   (role message-author (color accent))
   (role message-op  (color "#6d3f6f"))

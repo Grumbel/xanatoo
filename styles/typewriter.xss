@@ -21,7 +21,7 @@
   (role header     (space-before 1.5em) (space-after 1em))
   (role code-block (background none) (border "#999999"))
   (role table      (background none))
-  (role message    (background none))
+  (role message    (font small) (background none))
   (role message-alt (background none))
   (role message-author (color "#222222"))
   (role message-op (color "#222222"))
