@@ -1198,11 +1198,6 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     }
     force_menu("View");
     if (ImGui::BeginMenu("View")) {
-      menu_item_cmd("Back", UiCommand::NavBack, cmd, state.can_nav_back, "Alt+Left");
-      menu_item_cmd("Forward", UiCommand::NavForward, cmd, state.can_nav_forward,
-                    "Alt+Right");
-      menu_item_cmd("Up", UiCommand::GoUp, cmd, !state.up_url.empty(), "Alt+Up");
-      menu_item_cmd("Home", UiCommand::GoHome, cmd, true, "Alt+Home");
       menu_item_cmd(state.native_view ? "Web Page View" : "Native View",
                     UiCommand::ToggleNative, cmd, !state.alternate_url.empty());
       if (ImGui::MenuItem("Reader Mode", "F9", state.reader,
@@ -1215,19 +1210,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::Separator();
       if (ImGui::MenuItem("Split Pane", "Ctrl+\\", state.split))
         cmd = UiCommand::ToggleSplit;
-      if (ImGui::MenuItem("Heading Outline", "Ctrl+Shift+O", state.outline))
-        cmd = UiCommand::ToggleOutline;
       if (ImGui::MenuItem("Focus current section", "Ctrl+Alt+F", state.section_focus))
         cmd = UiCommand::ToggleSectionFocus;
-      ImGui::TextDisabled("  Ctrl+Alt+O docks outline | body");
-      if (ImGui::MenuItem("Backlinks", "Ctrl+Alt+B", state.backlinks))
-        cmd = UiCommand::ToggleBacklinks;
-      if (ImGui::MenuItem("Site Map", "Ctrl+Alt+M", state.sitemap))
-        cmd = UiCommand::ToggleSitemap;
-      menu_item_cmd("  Previous Page in Site", UiCommand::SitemapPrev, cmd, true,
-                    "Alt+PgUp");
-      menu_item_cmd("  Next Page in Site", UiCommand::SitemapNext, cmd, true,
-                    "Alt+PgDn");
       if (ImGui::MenuItem("Diff Marks", "Ctrl+Shift+D", state.diff, state.can_diff))
         cmd = UiCommand::ToggleDiff;
       if (ImGui::MenuItem("Structure Highlight", "Ctrl+Shift+L", state.structure))
@@ -1236,8 +1220,6 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleBrowse;
       menu_item_cmd("Content Only (hide menus, toolbars)",
                     UiCommand::ToggleChrome, cmd, true, "F11");
-      if (ImGui::MenuItem("History", "Ctrl+Shift+H", state.history_open))
-        cmd = UiCommand::ToggleHistory;
       ImGui::Separator();
       menu_item_cmd("Zoom In", UiCommand::ZoomIn, cmd, true, "Ctrl++");
       menu_item_cmd("Zoom Out", UiCommand::ZoomOut, cmd, true, "Ctrl+-");
@@ -1264,6 +1246,31 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         fill_style_items(state, cmd, result.arg);
         ImGui::EndMenu();
       }
+      ImGui::EndMenu();
+    }
+    // Go: moving through and between pages, plus the panels that do so.
+    force_menu("Go");
+    if (ImGui::BeginMenu("Go")) {
+      menu_item_cmd("Back", UiCommand::NavBack, cmd, state.can_nav_back, "Alt+Left");
+      menu_item_cmd("Forward", UiCommand::NavForward, cmd, state.can_nav_forward,
+                    "Alt+Right");
+      menu_item_cmd("Up", UiCommand::GoUp, cmd, !state.up_url.empty(), "Alt+Up");
+      menu_item_cmd("Home", UiCommand::GoHome, cmd, true, "Alt+Home");
+      ImGui::Separator();
+      menu_item_cmd("Previous Page in Site", UiCommand::SitemapPrev, cmd, true,
+                    "Alt+PgUp");
+      menu_item_cmd("Next Page in Site", UiCommand::SitemapNext, cmd, true,
+                    "Alt+PgDn");
+      ImGui::Separator();
+      if (ImGui::MenuItem("Heading Outline", "Ctrl+Shift+O", state.outline))
+        cmd = UiCommand::ToggleOutline;
+      ImGui::TextDisabled("  Ctrl+Alt+O docks outline | body");
+      if (ImGui::MenuItem("Backlinks", "Ctrl+Alt+B", state.backlinks))
+        cmd = UiCommand::ToggleBacklinks;
+      if (ImGui::MenuItem("Site Map", "Ctrl+Alt+M", state.sitemap))
+        cmd = UiCommand::ToggleSitemap;
+      if (ImGui::MenuItem("History", "Ctrl+Shift+H", state.history_open))
+        cmd = UiCommand::ToggleHistory;
       ImGui::EndMenu();
     }
     force_menu("Bookmarks");

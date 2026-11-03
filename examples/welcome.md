@@ -29,7 +29,7 @@ Inspired by *Xanadu*, **HyperCard**, and the *Canon Cat*.
 | **Ctrl+B** / **I** / **K** | Bold / italic / link |
 | **F1** | Keyboard help document |
 
-Menus: **Alt+F** File · **E** Edit · **V** View · **B** Bookmarks · **H** Help.
+Menus: **Alt+F** File · **E** Edit · **V** View · **G** Go · **B** Bookmarks · **H** Help.
 :::
 
 ## Example documents

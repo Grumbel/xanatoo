@@ -401,7 +401,7 @@ Next bundle number: **263** (this delivery is **262**)
   /sitemap.xml, /sitemap_index.xml, /wp-sitemap.xml), indexes followed
   (≤ 25 files, ≤ 50k URLs), URL list → path tree; `sitemap:host` page
   with "Recently changed" (by `lastmod`) and one Section per directory.
-- View → Site Map (Ctrl+Alt+M): `WindowRole::Sitemap` panel, docked right
+- Go → Site Map (Ctrl+Alt+M): `WindowRole::Sitemap` panel, docked right
   by default; follows the focused page (reveals and bolds it), ↑↓ ←→
   Enter, click twisty folds, "Page" opens the document form.
 - `.xml.gz` sitemaps through the built-in `inflate.hpp` (gzip / zlib /
@@ -410,7 +410,7 @@ Next bundle number: **263** (this delivery is **262**)
   `show_doc_in_pane` + the requested URL of a redirect): the panel labels
   them by title (site suffix "Post | Site" cut when a heading matches),
   marks them with a dot and counts "seen/total" per directory.
-- Alt+PgUp / Alt+PgDn (View menu): previous / next page of the site in
+- Alt+PgUp / Alt+PgDn (Go menu): previous / next page of the site in
   tree order, panel open or not (starts reading the map on first use).
 - Open: seen pages are per session (persist with history?); sitemap
   files are fetched one after another (nytimes.com ~40 s) — parallel
@@ -641,13 +641,13 @@ Next bundle number: **263** (this delivery is **262**)
 
 ## Status (2026-10-27) — Home button, directory listings
 
-- Home (toolbar house, View → Home, Alt+Home, `UiCommand::GoHome`) opens
+- Home (toolbar house, Go → Home, Alt+Home, `UiCommand::GoHome`) opens
   `home_page(app)` = welcome.md; the hook for a user-chosen home page later.
 - Opening a directory no longer aborts (ifstream on a dir threw): `load_doc`
   renders a read-only Markdown index (dirs first, absolute links, dot files
   hidden); `navigate_pane` normalises to a trailing '/'.
 - Open: non-document files in a listing (images, …) still open as text.
-- Up (toolbar ↑, View → Up, Alt+Up on read-only pages, `UiCommand::GoUp`):
+- Up (toolbar ↑, Go → Up, Alt+Up on read-only pages, `UiCommand::GoUp`):
   `up_url` (native.hpp, pure + unit-tested) — local dirs, URL path levels
   (http / gemini), reddit post → subreddit → front page, hn: → hn:,
   lemmy: → instance web page; wikipedia: / nostr: / feed: have no parent.

@@ -1633,6 +1633,9 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       case SDLK_v:
         menu = "View";
         break;
+      case SDLK_g:
+        menu = "Go";
+        break;
       case SDLK_b:
         menu = "Bookmarks";
         break;
