@@ -285,6 +285,7 @@ void append_content(Document& doc, NodeId msg, std::string_view src,
   std::string out_of_line = html_attr(n.attrs, "src");
   HtmlOptions opt;
   opt.base_url = base;
+  opt.images = true;
   if (!out_of_line.empty()) {
     NodeId p = doc.create(NodeKind::Paragraph, msg);
     InlineSpan s;

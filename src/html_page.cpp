@@ -186,6 +186,7 @@ Document parse_html_page(std::string_view html, std::string_view page_url,
   opt.anchors = true;
   opt.drop_chrome = true;
   opt.chrome_nodes = keep_chrome;
+  opt.images = true;
 
   if (is_remote(page_url)) {
     NodeId p = doc.create(NodeKind::Paragraph, root);

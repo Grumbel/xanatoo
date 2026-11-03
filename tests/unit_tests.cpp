@@ -1841,6 +1841,36 @@ void test_html_min() {
     }
     EXPECT(doc.get(k[7]).kind == NodeKind::HorizontalRule);
   }
+
+  // images: block-level <img> → Image node; icons, images in list items
+  // and data: placeholders stay links.
+  Document idoc;
+  NodeId iroot = idoc.create(NodeKind::Document);
+  opt.images = true;
+  html_append_blocks(
+      idoc, iroot,
+      "<p>Before <img src=\"i.png\" alt=\"cat\"> after"
+      " <img src=\"flag.png\" width=\"16\" height=\"11\" alt=\"DE\">"
+      "<figure><img src=\"data:image/gif;base64,R0\" data-src=\"/lazy.jpg\">"
+      "<figcaption>Cap</figcaption></figure>"
+      "<p><img srcset=\"//cdn.example/s.webp 1x, //cdn.example/l.webp 2x\">"
+      "<ul><li>x <img src=\"li.png\"></ul>",
+      opt);
+  auto ik = kids_of(idoc, iroot);
+  EXPECT_EQ(ik.size(), 7u);
+  if (ik.size() == 7) {
+    EXPECT_EQ(plain_text(idoc, ik[0]), "Before");
+    EXPECT(idoc.get(ik[1]).kind == NodeKind::Image);
+    EXPECT_EQ(idoc.get(ik[1]).src, "https://blog.example/posts/i.png");
+    EXPECT_EQ(idoc.get(ik[1]).alt, "cat");
+    EXPECT_EQ(plain_text(idoc, ik[2]), "after [image: DE]");
+    EXPECT(idoc.get(ik[3]).kind == NodeKind::Image);
+    EXPECT_EQ(idoc.get(ik[3]).src, "https://blog.example/lazy.jpg");
+    EXPECT_EQ(plain_text(idoc, ik[4]), "Cap");
+    EXPECT(idoc.get(ik[5]).kind == NodeKind::Image);
+    EXPECT_EQ(idoc.get(ik[5]).src, "https://cdn.example/s.webp");
+    EXPECT(idoc.get(ik[6]).kind == NodeKind::List);
+  }
 }
 
 void test_feed_urls() {

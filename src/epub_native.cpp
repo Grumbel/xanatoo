@@ -268,8 +268,8 @@ std::string chapter_body(std::string_view xhtml, const std::string& member,
   return out;
 }
 
-// parse_html_page leaves images as "[image: alt]" links; a paragraph of
-// nothing else becomes a real Image node.
+// parse_html_page leaves images inside list items / quotes as "[image: alt]"
+// links; a paragraph of nothing else becomes a real Image node.
 void promote_images(Document& doc) {
   for (Node& n : doc.nodes) {
     if (n.kind != NodeKind::Paragraph || n.spans.size() != 1) continue;

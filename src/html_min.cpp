@@ -124,6 +124,9 @@ struct Frame {
   int em_add = 0;
 };
 
+// <img> with a declared edge up to this is an icon in the text.
+constexpr int kIconEdge = 48;
+
 class Builder {
  public:
   Builder(Document& doc, NodeId parent, const HtmlOptions& opt)
@@ -478,24 +481,41 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
     return;
   }
   if (tag == "img") {
-    std::string src = html_attr(attrs, "src");
+    std::string src = html_img_src(attrs);
     if (src.empty()) return;
     // alt="" marks a decorative image.
     if (opt_.drop_chrome && html_has_attr(attrs, "alt") &&
         html_attr(attrs, "alt").empty())
       return;
+    // Declared size; 0 when absent or not a number ("auto").
+    const int w = std::atoi(html_attr(attrs, "width").c_str());
+    const int h = std::atoi(html_attr(attrs, "height").c_str());
     // 1×1 spacers / tracking pixels.
-    if (opt_.drop_chrome) {
-      std::string w = html_attr(attrs, "width"), h = html_attr(attrs, "height");
-      if ((!w.empty() && std::atoi(w.c_str()) <= 2) ||
-          (!h.empty() && std::atoi(h.c_str()) <= 2))
-        return;
-    }
+    if (opt_.drop_chrome && ((w > 0 && w <= 2) || (h > 0 && h <= 2) ||
+                             html_attr(attrs, "width") == "0" ||
+                             html_attr(attrs, "height") == "0"))
+      return;
     std::string alt = html_to_plain(html_attr(attrs, "alt"));
+    src = resolve_url(opt_.base_url, src);
+    // A real Image at block level; icons (small declared size) and images
+    // inside quotes, list items or cells stay links in the text.
+    const bool icon = (w > 0 && w <= kIconEdge) || (h > 0 && h <= kIconEdge);
+    if (opt_.images && !in_leaf && !icon && !starts_with(src, "data:")) {
+      const NodeKind ck = doc_.get(container()).kind;
+      if (ck != NodeKind::List && ck != NodeKind::Table &&
+          ck != NodeKind::TableRow) {
+        close_para();
+        NodeId im = doc_.create(NodeKind::Image, container());
+        doc_.get(im).src = std::move(src);
+        doc_.get(im).alt = std::move(alt);
+        take_pending_id(im);
+        return;
+      }
+    }
     NodeId t = ensure_target();
     if (t == INVALID_NODE) return;
     push_text(t, InlineKind::Link, alt.empty() ? "[image]" : "[image: " + alt + "]",
-              resolve_url(opt_.base_url, src));
+              src);
     return;
   }
 
@@ -842,6 +862,28 @@ size_t html_tag_end(std::string_view html, size_t lt) {
 
 bool html_has_attr(std::string_view attrs, std::string_view name) {
   return find_attr(attrs, name).has_value();
+}
+
+std::string html_img_src(std::string_view attrs) {
+  std::string src = html_attr(attrs, "src");
+  if (!src.empty() && !starts_with(src, "data:")) return src;
+  // Lazy loading: a placeholder (or nothing) in src, the image elsewhere.
+  for (std::string_view a : {"data-src", "data-lazy-src", "data-original"}) {
+    std::string v = html_attr(attrs, a);
+    if (!v.empty() && !starts_with(v, "data:")) return v;
+  }
+  for (std::string_view a : {"srcset", "data-srcset"}) {
+    const std::string all = html_attr(attrs, a);
+    std::string_view set = all;
+    trim_ascii(set);
+    // First candidate: URL up to whitespace (or the ',' before the next).
+    size_t e = 0;
+    while (e < set.size() && !is_space(set[e])) ++e;
+    std::string v(set.substr(0, e));
+    if (!v.empty() && v.back() == ',') v.pop_back();
+    if (!v.empty() && !starts_with(v, "data:")) return v;
+  }
+  return src;
 }
 
 size_t html_element_end(std::string_view html, size_t after_open,

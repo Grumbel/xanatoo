@@ -27,13 +27,17 @@ struct HtmlOptions {
   // nodes with chrome_nodes (whole pages: reader mode hides them).
   bool drop_chrome = false;
   bool chrome_nodes = false;
+  // <img> at block level → Image node (remote http(s) images are fetched
+  // by the app); otherwise, and always inside quotes / list items / cells
+  // or for icons, an "[image: alt]" link.
+  bool images = false;
 };
 
 // Append the blocks of `html` as children of `parent`:
 // p / div → Paragraph, h1–h6 → Heading, ul / ol / li → List / ListItem,
 // blockquote → BlockQuote, pre → CodeBlock, table → Table, hr; inline
-// a / em / strong / code / del → spans, br → line break. Images become
-// "[image: alt]" links (remote images are not fetched).
+// a / em / strong / code / del → spans, br → line break. Images: see
+// HtmlOptions::images.
 void html_append_blocks(Document& doc, NodeId parent, std::string_view html,
                         const HtmlOptions& opt = {});
 
@@ -49,6 +53,11 @@ std::string html_to_plain(std::string_view html);
 // (`href="x" class=y`), entities decoded; empty when absent.
 std::string html_attr(std::string_view attrs, std::string_view name);
 bool html_has_attr(std::string_view attrs, std::string_view name);
+
+// Image URL of an <img>'s attributes: src, else the lazy-loading
+// data-src / data-lazy-src / data-original, else the first srcset entry
+// (data: placeholders skipped); unresolved, empty when there is none.
+std::string html_img_src(std::string_view attrs);
 
 // Index of the '>' closing the tag that starts at `lt` (quote-aware);
 // npos when unterminated.

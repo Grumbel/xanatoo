@@ -275,7 +275,10 @@ mechanism; historical bundle numbers in TODO.md are archival).
   Strong / Code / Strike spans; script / style / iframe dropped, unknown
   wrappers unwrapped. BlockQuote, ListItem and TableCell are leaves, so
   nested blocks inside them flatten to line breaks / "• " lines.
-- Images become `[image: alt]` links (no remote image fetch yet).
+- `HtmlOptions::images` (web pages, feeds): block-level `<img>` → Image
+  node (remote ones load like any remote image; lazy `data-src` / `srcset`
+  via `html_img_src`); icons (declared edge ≤ 48) and images inside
+  quotes / list items / cells stay `[image: alt]` links.
 - `chrome_nodes` (with `drop_chrome`): chrome blocks become Chrome nodes
   (`html_append_chrome`); inside running text, list items or cells they are
   dropped. EPUB chapters pass `keep_chrome = false` to `parse_html_page`.
