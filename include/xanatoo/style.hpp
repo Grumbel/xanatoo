@@ -61,7 +61,6 @@ enum class BlockRole : uint8_t {
   Rule,
   Transclusion,
   Aside,          // text box beside the flow (in the page margin)
-  Sidebar,        // page chrome in the margin: navigation, side bars
   Count
 };
 constexpr size_t kBlockRoleCount = static_cast<size_t>(BlockRole::Count);

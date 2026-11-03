@@ -19,9 +19,13 @@ Next bundle number: **263** (this delivery is **262**)
   ≥ 8 em), else the box goes into the flow at full width. `float` stays as
   the HTML compatibility placement.
 - Web page chrome: navigation / sidebar Chrome (`margin_chrome`: not with
-  tables, code, columns or collections inside) goes into the left margin
-  outside reader mode, as a `sidebar` box with a label ("Navigation") and
-  a bar facing the text; headers, footers, forms stay in the flow.
+  tables, code, columns or collections inside) is not margin text but a
+  separate dockable, resizable "Page" panel (View → Page Navigation,
+  Ctrl+Alt+P; `app_page.cpp`, `WindowRole::Page`, docked left by default,
+  like frames): link rows grouped by region, Enter / click follows the
+  link. While it is open the panes leave those regions out; headers,
+  footers, forms stay in the flow. (An earlier margin `sidebar` role was
+  dropped for this.)
 - Distinct look: `FontRole::Small` … `SmallCode` (body faces at 0.85 ×,
   `(font small)` …), the box role's colour for the text inside
   (`ctx_role_`), fill + frame for asides; Night and High contrast sheets
@@ -36,10 +40,10 @@ Next bundle number: **263** (this delivery is **262**)
   `test_tour_example` keeps it showing every block kind.
 - Checked under Xvfb: tour at 1280 px (right and left margin asides,
   include, collections, thread, footnote overlay), a local page with
-  `<nav>` + `<aside>` (nav in the left margin with label and bar).
+  `<nav>` + `<aside>` (aside in the right margin; nav in the Page panel).
 - Open:
-  - Navigation as a "Page" tool window (like Outline / Sitemap) instead
-    of, or besides, the margin: to be decided.
+  - Page panel: hides the regions in every pane (not only the focused
+    one); only link and text rows, no nested folding; no hover preview.
   - Margin boxes inside a skipped (off-screen) section are not laid out,
     so a tall box from above the viewport can be missing and stacking
     may differ from the full layout.

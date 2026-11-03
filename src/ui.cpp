@@ -674,6 +674,8 @@ static void view_tools_items(const UiState& state, UiCommand& cmd,
     cmd = UiCommand::ToggleBacklinks;
   if (ImGui::MenuItem("Site map", "Ctrl+Alt+M", state.sitemap))
     cmd = UiCommand::ToggleSitemap;
+  if (ImGui::MenuItem("Page navigation", "Ctrl+Alt+P", state.page_panel))
+    cmd = UiCommand::TogglePage;
   menu_item_cmd("Open include → other pane", UiCommand::OpenTranscludeOther,
                 cmd);
   if (ImGui::MenuItem("Structure highlight", "Ctrl+Shift+L", state.structure))
@@ -1266,6 +1268,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleBacklinks;
       if (ImGui::MenuItem("Site Map", "Ctrl+Alt+M", state.sitemap))
         cmd = UiCommand::ToggleSitemap;
+      if (ImGui::MenuItem("Page Navigation", "Ctrl+Alt+P", state.page_panel))
+        cmd = UiCommand::TogglePage;
       if (ImGui::MenuItem("History", "Ctrl+Shift+H", state.history_open))
         cmd = UiCommand::ToggleHistory;
       ImGui::EndMenu();

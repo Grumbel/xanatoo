@@ -114,6 +114,7 @@ enum class UiCommand {
   ToggleOutline,
   ToggleBacklinks,
   ToggleSitemap,  // site structure panel of the focused web page
+  TogglePage,     // navigation / side bars of the focused page, as a panel
   SitemapPrev,    // previous / next page in the site map's order
   SitemapNext,
   OpenTranscludeOther,  // open include target in the other pane
@@ -181,6 +182,8 @@ struct UiState {
   bool preferences_open = false;
   bool backlinks = false;
   bool sitemap = false;
+  bool page_panel = false;
+  bool has_nav = false;  // focused page has navigation for the panel
   bool diff = false;
   bool can_diff = false;  // two independent documents loaded
   bool structure = false;

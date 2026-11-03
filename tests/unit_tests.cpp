@@ -2081,8 +2081,8 @@ void test_inline_images_and_asides() {
   }
   engine.set_style(nullptr);
 
-  // Navigation chrome goes into the left margin with a label; in reader
-  // mode it is gone and the column keeps its width.
+  // Navigation chrome stays in the flow, unless the Page panel shows it
+  // (then the panes leave it out); reader mode hides it, too.
   Document nav = parse_html_page(
       "<html><body><nav><ul><li><a href=\"/a\">Alpha</a></li>"
       "<li><a href=\"/b\">Beta</a></li></ul></nav><main><p>" + words +
@@ -2095,21 +2095,12 @@ void test_inline_images_and_asides() {
   EXPECT(nav_node != INVALID_NODE);
   if (nav_node != INVALID_NODE) {
     EXPECT(margin_chrome(nav, nav.get(nav_node)));
-    LayoutResult nr = engine.layout(nav, 1000.f);
-    const LayoutBox nbox = box_of(nr, nav_node);
-    EXPECT(nbox.width > 0.f && nbox.x < 300.f);
-    bool label = false;
-    float text_left = 1e9f;
-    for (const auto& g : nr.glyphs) {
-      if (g.node == INVALID_NODE && g.codepoint == 'N') label = true;
-      if (g.node != INVALID_NODE && nav.get(g.node).kind == NodeKind::Paragraph)
-        text_left = std::min(text_left, g.x);
-    }
-    EXPECT(label);
-    EXPECT(text_left >= nbox.x + nbox.width);
+    EXPECT(box_of(engine.layout(nav, 1000.f), nav_node).width > 0.f);
+    engine.set_hide_panel_chrome(true);
+    EXPECT_EQ(box_of(engine.layout(nav, 1000.f), nav_node).width, 0.f);
+    engine.set_hide_panel_chrome(false);
     engine.set_hide_chrome(true);
-    LayoutResult rr = engine.layout(nav, 1000.f);
-    EXPECT_EQ(box_of(rr, nav_node).width, 0.f);
+    EXPECT_EQ(box_of(engine.layout(nav, 1000.f), nav_node).width, 0.f);
     engine.set_hide_chrome(false);
   }
 }

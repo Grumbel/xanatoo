@@ -76,7 +76,7 @@ recolours every parent rule that uses `accent` (see `night-amber.xss`).
 `block-quote`, `note`, `code-block`, `term`, `definition`, `figure`,
 `caption`, `bibliography-entry`, `footnote`, `thread`, `message`,
 `message-alt`, `message-author`, `message-op`, `message-meta`, `table`,
-`rule`, `transclusion`, `aside`, `sidebar`.
+`rule`, `transclusion`, `aside`.
 
 Message headers (forum / Reddit / Lemmy / Nostr comments) colour the author
 with `message-author` (`message-op` when a reply comes from the thread
@@ -93,15 +93,15 @@ Their properties:
 | `font` | `body`, `bold`, `italic`, `bold-italic`, `heading`, `code`; `small`, `small-bold`, `small-italic`, `small-bold-italic`, `small-code` are the same faces at 0.85 × the body size |
 | `color` | text colour (else the page colour) |
 | `background` | code-block fill, table header fill, message card fill, band behind a `header` / `thread` title |
-| `border` | side bar, rule, table grid, code-block frame, footnote overlay rule, rule under a `header` / `thread` title, aside frame, the bar of a `sidebar` |
-| `width` | preferred width of a side box (`aside`, `sidebar`) |
+| `border` | side bar, rule, table grid, code-block frame, footnote overlay rule, rule under a `header` / `thread` title, aside frame |
+| `width` | preferred width of a side box (`aside`) |
 | `side` | `left`, `right` or `none`: which side of the page a side box goes to |
 | `placement` | `margin`, `float` or `flow`: where a side box goes (below) |
 
 Side boxes are `aside` (text boxes of the document: `:::aside`, HTML
-`<aside>` inside the article) and `sidebar` (navigation and side bars of web
-pages outside reader mode, headed by a small label such as "Navigation").
-With `placement margin` (the default for both) a box goes into the page
+`<aside>` inside the article). Navigation and side bars of web pages are not
+part of the text: they go into the Page panel (View → Page Navigation).
+With `placement margin` (the default) a box goes into the page
 margin beside the place where it stands; the text column keeps its lines,
 the box does not push the text down, and boxes on one side stack. When the
 margin is narrower than `width`, the text column gives up the difference as

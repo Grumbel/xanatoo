@@ -51,7 +51,6 @@ constexpr RoleName kBlockRoles[] = {
     {"rule", BlockRole::Rule},
     {"transclusion", BlockRole::Transclusion},
     {"aside", BlockRole::Aside},
-    {"sidebar", BlockRole::Sidebar},
 };
 
 struct InlineName {
@@ -521,18 +520,6 @@ DocStyle builtin_style() {
     b.color = {74, 66, 50, 255};
     b.background = {238, 232, 216, 200};
     b.border = {200, 190, 165, 255};
-  }
-  {
-    BlockStyle& b = blk(BlockRole::Sidebar);
-    b.indent = px(8);
-    b.space_after = px(12);
-    b.width = Length{13.f, true};
-    b.side = FloatSide::Left;
-    b.placement = Placement::Margin;
-    b.font = FontRole::Small;
-    b.has_color = true;
-    b.color = {80, 82, 92, 255};
-    b.border = {185, 188, 200, 255};  // bar on the side facing the text
   }
 
   auto inl = [&](InlineKind k) -> InlineStyle& {

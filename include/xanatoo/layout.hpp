@@ -147,8 +147,8 @@ std::vector<CollectionItem> collection_items(const Document& doc,
 // Top-level Chrome nodes (page chrome of a web page, not nested in another
 // Chrome node), in document order. Reader mode hides these.
 std::vector<NodeId> chrome_regions(const Document& doc);
-// Page chrome that goes into the page margin as a side bar (outside reader
-// mode): navigation and side bars without wide content (tables, code).
+// Page chrome the Page panel shows instead of the document: navigation and
+// side bars without wide content (tables, code).
 bool margin_chrome(const Document& doc, const Node& chrome);
 // "3 parts of the page hidden (navigation, sidebar, page footer)"; empty
 // for none.
@@ -212,6 +212,8 @@ public:
   // Reader mode for the next layout() calls: Chrome nodes are left out and a
   // notice at the top says what was hidden (LayoutResult::chrome_notice).
   void set_hide_chrome(bool hide) { hide_chrome_ = hide; }
+  // Leave navigation / side bar chrome out (the Page panel lists it).
+  void set_hide_panel_chrome(bool hide) { hide_panel_chrome_ = hide; }
 
   // height_hints: optional prior block heights (from a previous LayoutResult's
   // boxes). Used only when viewport is active to skip off-screen sequential
@@ -241,6 +243,7 @@ private:
   const std::unordered_set<NodeId>* folded_sections_ = nullptr;
   NodeId focus_section_ = INVALID_NODE;
   bool hide_chrome_ = false;
+  bool hide_panel_chrome_ = false;
   // Boxes beside the flow (floating asides) of the current layout() call:
   // text lines next to them get narrower, other blocks move below them.
   struct FloatBox {

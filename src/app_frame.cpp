@@ -93,6 +93,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.preferences_open = app.preferences_open;
   ui_state.backlinks = app.backlinks_mode;
   ui_state.sitemap = app.sitemap.shown;
+  ui_state.page_panel = app.page.shown;
   ui_state.diff = app.diff_mode;
   ui_state.can_diff = !shared_doc(app) &&
                       app.panes[0].buf != app.panes[1].buf;
@@ -323,7 +324,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::Copy ||
         c == C::CopyPageUrl || c == C::SelectAll || c == C::SelectBlock ||
         c == C::Find || c == C::ToggleSplit || c == C::ToggleOutline ||
-        c == C::ToggleBacklinks || c == C::ToggleSitemap ||
+        c == C::ToggleBacklinks || c == C::ToggleSitemap || c == C::TogglePage ||
         c == C::SitemapPrev || c == C::SitemapNext ||
         c == C::OpenTranscludeOther ||
         c == C::ToggleDiff || c == C::ToggleStructure || c == C::ToggleBrowse ||
@@ -1098,6 +1099,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     case C::ToggleSitemap:
       toggle_sitemap(app);
+      break;
+    case C::TogglePage:
+      toggle_page_panel(app);
       break;
     case C::SitemapPrev:
     case C::SitemapNext:
@@ -3011,6 +3015,7 @@ void run_frame(App& app) {
   autosave_drafts(app);
   update_split_preview(app);
   update_sitemap(app);
+  update_page_panel(app);
   sync_window_size(app);
   relayout_if_needed(app);
   run_chrome(app);

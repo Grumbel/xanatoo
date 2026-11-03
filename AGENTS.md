@@ -43,6 +43,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_about.cpp` | `about:` page (Help → About): services, document formats, images (thumtoo / libvips loaders, MuPDF / DjVu) and libraries of this build, gathered from the feature switches and runtime versions; `about_markdown` (`about.hpp`) formats it. New services and user-visible optional deps get an entry there |
 | `app_report.cpp` | startup report on stderr (gamepkgstd `LOGGING.md`): version / build / compiler, features, system, SDL / loader env, each library's runtime vs built-against version and the mapped file, video, renderer + GL strings, controllers with the mapping SDL applies, directories. New libraries get a line there too; choices made while loading (fonts, icons, style, ImGui render path) are logged where they are made, as `topic: details` on stderr |
 | `app_footnotes.cpp` | footnote overlay: notes of on-screen `FootnoteRef` marks laid out in a strip at the pane bottom (`FootnoteOverlay` per pane), click jumps to the note |
+| `app_page.cpp` | Page panel (`WindowRole::Page`, `PagePanel`, Ctrl+Alt+P): navigation / sidebar Chrome (`margin_chrome`, found at any depth) of the focused page as link rows in a dockable tool window; while it is open the panes leave those regions out (`LayoutEngine::set_hide_panel_chrome`, set by `update_page_panel`) |
 | `app_sitemap.cpp` | Sitemap panel (`WindowRole::Sitemap`, `SitemapPanel`): site tree of the focused page's host, one `SiteCache` per host loaded on a worker thread; "Page" opens `sitemap:host` |
 | `app_split.cpp` | split browsing: left links open right, right links shift left, hover previews (`SplitPreview`, only with `ViewSettings::hover_preview`, off by default) |
 | `theme.cpp` | classic palette (`Palette`) + stateless bevel/gradient/window primitives shared with the ImGui theme |
@@ -326,9 +327,7 @@ mechanism; historical bundle numbers in TODO.md are archival).
   muted `color`). `placement margin` (default) puts it into the page margin
   beside its flow position (`LayoutEngine::margins_`, set up per layout()
   by `setup_margins`, which narrows the column when a side is too narrow;
-  `layout_margin_box`); without room it goes into the flow. Margin chrome
-  (`margin_chrome`: navigation / sidebar Chrome without wide content, not in
-  reader mode) goes the same way with role `sidebar` and a label.
+  `layout_margin_box`); without room it goes into the flow.
   `placement float` is the HTML-compatible float: floats live in
   `LayoutEngine::floats_` for one layout() call, text lines take the band
   `float_band` leaves free, boxed blocks (`clears_floats`) start below.

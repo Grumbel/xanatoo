@@ -59,11 +59,6 @@
   (role aside       (indent 8) (space-after 10) (width 15em) (side right)
                     (placement margin) (font small) (color "#4a4232")
                     (background (rgba 238 232 216 200)) (border "#c8bea5"))
-  ;; Navigation and side bars of web pages (outside reader mode); the
-  ;; border is a bar on the side facing the text.
-  (role sidebar     (indent 8) (space-after 12) (width 13em) (side left)
-                    (placement margin) (font small) (color "#50525c")
-                    (border "#b9bcc8"))
 
   ;; Inline roles.
   (role link   (color "#1e5ab4") (underline #t))

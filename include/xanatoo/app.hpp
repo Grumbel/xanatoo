@@ -198,7 +198,9 @@ struct Pane {
 // stack top to bottom by `dock_seq`); Max covers the whole client area.
 enum class Dock : uint8_t { None = 0, Left, Right, Max };
 
-enum class WindowRole : uint8_t { Help, Outline, Backlinks, Sitemap, Document };
+enum class WindowRole : uint8_t {
+  Help, Outline, Backlinks, Sitemap, Page, Document
+};
 
 // One floating window: help / outline / backlinks panels and document
 // windows share geometry, docking + interaction state; role picks the
@@ -407,6 +409,22 @@ struct SitemapPanel {
   uint64_t seen_gen = 1;
 };
 
+// Page panel (app_page.cpp): navigation / side bar chrome of the focused page.
+struct PageRow {
+  enum Kind : uint8_t { Label, Group, Link, Text };
+  Kind kind = Text;
+  int depth = 0;
+  std::string text;
+  std::string href;  // Link rows
+};
+struct PagePanel {
+  bool shown = false;
+  bool built = false;
+  uint64_t key = 0;  // what `rows` were built from
+  std::vector<PageRow> rows;
+  int sel = 0;
+};
+
 // Split browsing (app_split.cpp): hovering a link in the left pane previews
 // its target in the right pane; the right pane's own page is kept in
 // `saved_*` and comes back when the pointer leaves the link.
@@ -469,7 +487,7 @@ struct StatusLine {
 
 // Who receives plain keys (arrows, Enter, digits). Panels only while open;
 // see panel_has_keys(). Status prompts / minibuffer take precedence anyway.
-enum class KeyFocus : uint8_t { Document, Outline, Backlinks, Sitemap };
+enum class KeyFocus : uint8_t { Document, Outline, Backlinks, Sitemap, Page };
 
 // The single active status-bar prompt (at most one at a time).
 enum class PromptKind : uint8_t {
@@ -653,6 +671,8 @@ struct App {
   FloatWindow ol = make_float_panel(WindowRole::Outline, 40, 100, 320, 420);
   FloatWindow sm = make_float_panel(WindowRole::Sitemap, 140, 110, 340, 460);
   SitemapPanel sitemap;
+  FloatWindow pg = make_float_panel(WindowRole::Page, 60, 110, 260, 420);
+  PagePanel page;
   Hover hover;
   Touch touch;
   std::vector<FetchJob> fetches;
@@ -855,6 +875,8 @@ inline bool panel_has_keys(const App& app, KeyFocus panel) {
       return app.backlinks_mode;
     case KeyFocus::Sitemap:
       return app.sitemap.shown;
+    case KeyFocus::Page:
+      return app.page.shown;
     default:
       return true;
   }
@@ -1104,6 +1126,15 @@ void raise_soft(App& app, size_t i);
 void close_doc_window(App& app, size_t i);
 // Document window showing view `pi`, nullptr for a centre view.
 FloatWindow* window_of_view(App& app, int pi);
+
+// ---- page panel (app_page.cpp) ----
+void toggle_page_panel(App& app);
+void update_page_panel(App& app);
+void draw_page_panel(App& app);
+std::tuple<int, int, int, int> page_client_rect(App& app);
+float page_max_scroll(App& app);
+void click_page(App& app, int mx, int my);
+bool page_key(App& app, SDL_Keycode sym);
 
 // ---- sitemap panel (app_sitemap.cpp) ----
 void toggle_sitemap(App& app);

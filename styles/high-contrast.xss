@@ -29,7 +29,6 @@
   (role rule        (border strong-line))
   (role transclusion (border strong-line))
   (role aside       (color "#000000") (background "#f0f0f0") (border strong-line))
-  (role sidebar     (color "#000000") (border strong-line))
 
   (role link   (color "#0000c8") (underline #t))
   (role cite   (color "#6a00a8") (underline #t))

@@ -24,6 +24,8 @@ std::pair<int, int> min_size(const FloatWindow& w) {
     case WindowRole::Outline:
     case WindowRole::Sitemap:
       return {200, 140};
+    case WindowRole::Page:
+      return {160, 120};
     case WindowRole::Backlinks:
       return {200, 120};
     case WindowRole::Help:
@@ -75,6 +77,9 @@ void close_window(App& app, FloatWindow& w) {
       break;
     case WindowRole::Sitemap:
       toggle_sitemap(app);
+      break;
+    case WindowRole::Page:
+      toggle_page_panel(app);
       break;
     case WindowRole::Document:
       close_doc_window(app, static_cast<size_t>(&w - app.soft_wins.data()));
@@ -242,6 +247,9 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
     case WindowRole::Sitemap:
       click_sitemap(app, mx, my);
       break;
+    case WindowRole::Page:
+      click_page(app, mx, my);
+      break;
     case WindowRole::Help:
       click_help(app, w, mx, my);
       break;
@@ -257,6 +265,7 @@ std::vector<FloatWindow*> float_stack(App& app) {
   if (app.outline_mode) st.push_back(&app.ol);
   if (app.backlinks_mode) st.push_back(&app.bl);
   if (app.sitemap.shown) st.push_back(&app.sm);
+  if (app.page.shown) st.push_back(&app.pg);
   if (app.help_mode) st.push_back(&app.help);
   for (auto& sw : app.soft_wins) st.push_back(&sw);
   // Docked columns under floating windows, maximized ones on top.
@@ -288,6 +297,8 @@ std::tuple<int, int, int, int> float_client_rect(App& app,
       return backlinks_client_rect(w);
     case WindowRole::Sitemap:
       return sitemap_client_rect(app);
+    case WindowRole::Page:
+      return page_client_rect(app);
     case WindowRole::Document:
       return soft_client_rect(app, w);
   }
@@ -313,6 +324,8 @@ float float_max_scroll(App& app, const FloatWindow& w) {
                                8.f - view_h);
     case WindowRole::Sitemap:
       return sitemap_max_scroll(app);
+    case WindowRole::Page:
+      return page_max_scroll(app);
   }
   return 0.f;
 }
@@ -353,6 +366,7 @@ bool float_press(App& app, int mx, int my) {
     app.key_focus = w->role == WindowRole::Outline     ? KeyFocus::Outline
                     : w->role == WindowRole::Backlinks ? KeyFocus::Backlinks
                     : w->role == WindowRole::Sitemap   ? KeyFocus::Sitemap
+                    : w->role == WindowRole::Page      ? KeyFocus::Page
                                                        : KeyFocus::Document;
     if (w->role == WindowRole::Document) {
       // Raise to top of the document stack; `w` is stale afterwards.
@@ -516,6 +530,9 @@ void draw_floats(App& app) {
         break;
       case WindowRole::Sitemap:
         draw_sitemap_panel(app);
+        break;
+      case WindowRole::Page:
+        draw_page_panel(app);
         break;
       case WindowRole::Help:
         draw_help_window(app);

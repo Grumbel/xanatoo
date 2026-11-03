@@ -240,7 +240,7 @@ void LayoutEngine::layout_children_sequential(
     if (!floats_.empty() && clears_floats(kind))
       y = clear_floats(x, max_width, y);
     // Side boxes may not advance y: their box height is no hint.
-    if (kind != NodeKind::Aside && kind != NodeKind::Chrome &&
+    if (kind != NodeKind::Aside &&
         try_skip_block(child, x, y, max_width, out))
       continue;
     layout_node(doc, child, x, y, max_width, out);
@@ -656,14 +656,8 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
     case NodeKind::Chrome: {
       if (hide_chrome_) break;  // reader mode
-      if (!in_margin_ && margin_chrome(doc, node)) {
-        std::string label = node.summary;
-        if (!label.empty() && label[0] >= 'a' && label[0] <= 'z')
-          label[0] = static_cast<char>(label[0] - 'a' + 'A');
-        if (layout_margin_box(doc, node, BlockRole::Sidebar,
-                              st[BlockRole::Sidebar].side, label, y, out))
-          break;
-      }
+      // Navigation / side bars shown in the Page panel instead.
+      if (hide_panel_chrome_ && margin_chrome(doc, node)) break;
       float start_y = y;
       layout_children_sequential(doc, node.children, x, y, max_width, out);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
@@ -1862,9 +1856,6 @@ void LayoutEngine::setup_margins(const Document& doc, float& mx,
       if (n.src == "left") side = FloatSide::Left;
       else if (n.src == "right") side = FloatSide::Right;
       need(BlockRole::Aside, side);
-    } else if (n.kind == NodeKind::Chrome && !hide_chrome_ &&
-               margin_chrome(doc, n)) {
-      need(BlockRole::Sidebar, st[BlockRole::Sidebar].side);
     }
   }
   if (want[0] <= 0.f && want[1] <= 0.f) return;
