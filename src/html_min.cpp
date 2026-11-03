@@ -7,6 +7,7 @@
 // markup never leaves empty blocks behind.
 
 #include "xanatoo/html_min.hpp"
+#include "xanatoo/json_min.hpp"
 #include "xanatoo/util.hpp"
 
 #include <algorithm>
@@ -143,6 +144,14 @@ class Builder {
   }
   void close(const std::string& tag);
   void text(std::string_view raw);
+  // A TeX formula: in the text, or a paragraph of its own when `display`.
+  void math(const std::string& tex, bool display) {
+    if (display && owner() == INVALID_NODE && !in_container()) close_para();
+    NodeId t = ensure_target();
+    if (t == INVALID_NODE) return;
+    doc_.get(t).spans.push_back(inline_math(tex, display));
+    if (display && owner() == INVALID_NODE && !in_container()) close_para();
+  }
   // Page chrome `inner` as a Chrome node at block level (`role` = what it
   // is); dropped inside running text, list items or table cells.
   void chrome_region(std::string role, std::string_view inner,
@@ -777,6 +786,45 @@ void for_each_class(std::string_view attrs, F&& fn) {
   }
 }
 
+size_t find_ci(std::string_view hay, std::string_view needle, size_t from);
+
+// The TeX source of a math element, `inner` being what lies between its tags:
+// MathML `<annotation encoding="application/x-tex">`, else the `alttext` of
+// <math>, else the "extsrc" of Wikipedia's data-mw. "" when it has none.
+std::string math_tex_source(std::string_view attrs, std::string_view inner) {
+  size_t a = 0;
+  while ((a = find_ci(inner, "<annotation", a)) != std::string_view::npos) {
+    const size_t te = inner.find('>', a);
+    if (te == std::string_view::npos) break;
+    const std::string_view tag = inner.substr(a, te - a);
+    const std::string enc = ascii_lower(html_attr(tag.substr(11), "encoding"));
+    if (enc.find("tex") != std::string::npos) {
+      const size_t ce = find_ci(inner, "</annotation", te);
+      std::string_view body = inner.substr(
+          te + 1, (ce == std::string_view::npos ? inner.size() : ce) - te - 1);
+      std::string tex = html_decode_entities(body);
+      std::string_view t = tex;
+      trim_ascii(t);
+      if (!t.empty()) return std::string(t);
+    }
+    a = te;
+  }
+  std::string alt = html_decode_entities(html_attr(attrs, "alttext"));
+  std::string_view t = alt;
+  trim_ascii(t);
+  if (!t.empty()) return std::string(t);
+  const std::string dm = html_decode_entities(html_attr(attrs, "data-mw"));
+  if (const size_t k = dm.find("\"extsrc\":\""); k != std::string::npos) {
+    size_t e = k + 10;
+    while (e < dm.size() && dm[e] != '"') e += dm[e] == '\\' ? 2 : 1;
+    std::string tex = json_unescape(std::string_view(dm).substr(k + 10, e - k - 10));
+    std::string_view u = tex;
+    trim_ascii(u);
+    return std::string(u);
+  }
+  return {};
+}
+
 // Hidden, aria-hidden, display:none or screen-reader-only: not shown by a
 // browser either, dropped in both modes.
 bool is_hidden(std::string_view attrs) {
@@ -1108,6 +1156,45 @@ void html_append_blocks(Document& doc, NodeId parent, std::string_view html,
     }
     std::string_view attrs = inside.substr(name.size());
     const bool self_close = ends_self_closed(attrs);
+    if (!self_close) {
+      // Math: <math> (MathML), MathJax's <script type="math/tex">, KaTeX and
+      // Wikipedia's wrappers, which all carry the TeX source along.
+      bool is_math = name == "math";
+      bool display = ascii_lower(html_attr(attrs, "display")) == "block";
+      if (name == "script") {
+        const std::string type = ascii_lower(html_attr(attrs, "type"));
+        is_math = starts_with(type, "math/tex");
+        display = type.find("mode=display") != std::string::npos;
+      } else if (!is_math && (name == "span" || name == "div")) {
+        for_each_class(attrs, [&](std::string_view tok) {
+          if (tok == "mwe-math-element" || tok == "katex" ||
+              tok == "katex-display")
+            is_math = true;
+          if (tok == "mwe-math-element-block" || tok == "katex-display")
+            display = true;
+          return false;
+        });
+        if (!is_math && html_attr(attrs, "typeof").find("mw:Extension/math") !=
+                            std::string::npos)
+          is_math = true;
+      }
+      if (is_math) {
+        const size_t end = html_element_end(html, e + 1, name);
+        const std::string_view inner = html.substr(e + 1, end - e - 1);
+        std::string tex =
+            name == "script"
+                ? html_decode_entities(inner.substr(0, inner.rfind("</")))
+                : math_tex_source(attrs, inner);
+        std::string_view t = tex;
+        trim_ascii(t);
+        if (!t.empty()) {
+          b.math(std::string(t), display);
+          i = end;
+          text_start = i;
+          continue;
+        }
+      }
+    }
     if (one_of(name, kSkipTags) && !self_close) {
       size_t c = find_ci(html, "</" + name, e + 1);
       size_t ce = c == std::string_view::npos ? std::string_view::npos

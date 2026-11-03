@@ -3002,6 +3002,12 @@ static std::string slice_node_text(const Node& n, size_t from_span, size_t from_
                                    size_t to_span, size_t to_ch) {
   if (n.spans.empty()) return {};
   auto slice_span = [](const InlineSpan& sp, size_t from, size_t to) {
+    if (sp.kind == InlineKind::Math) {
+      // A formula copies as its TeX with the dollar delimiters.
+      if (to <= from) return std::string{};
+      const char* d = sp.display ? "$$" : "$";
+      return d + sp.src + d;
+    }
     size_t from_b = utf8_byte_offset(sp.text, from);
     size_t to_b = utf8_byte_offset(sp.text, to);
     if (to_b < from_b) return std::string{};
@@ -3019,7 +3025,7 @@ static std::string slice_node_text(const Node& n, size_t from_span, size_t from_
     out += slice_span(n.spans[from_span], from_ch, len);
   }
   for (size_t si = from_span + 1; si < to_span && si < n.spans.size(); ++si) {
-    out += n.spans[si].text;
+    out += slice_span(n.spans[si], 0, utf8_char_count(n.spans[si].text));
   }
   if (to_span < n.spans.size()) {
     out += slice_span(n.spans[to_span], 0, to_ch);
@@ -3063,7 +3069,10 @@ std::string selected_text(const Document& doc, const Selection& sel) {
   }
   for (size_t i = ra + 1; i < rb && i < nodes.size(); ++i) {
     if (!out.empty()) out += "\n\n";
-    out += node_text(doc, nodes[i]);
+    const Node& mid = doc.get(nodes[i]);
+    if (mid.spans.empty()) continue;
+    const size_t last = mid.spans.size() - 1;
+    out += slice_node_text(mid, 0, 0, last, utf8_char_count(mid.spans[last].text));
   }
   {
     const Node& n = doc.get(b.node);

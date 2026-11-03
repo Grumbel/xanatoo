@@ -57,7 +57,46 @@ void parse_org_inlines(Node& node, std::string_view text) {
   };
 
   size_t i = 0;
+  // \(…\) and $…$ inline, \[…\] and $$…$$ display TeX math (the dollar
+  // forms follow pandoc: no space inside the borders, no digit after).
+  auto try_math = [&]() -> bool {
+    std::string_view rest = text.substr(i);
+    std::string_view close;
+    bool display = false;
+    size_t open = 1;
+    if (starts_with(rest, "\\(")) {
+      open = 2;
+      close = "\\)";
+    } else if (starts_with(rest, "\\[")) {
+      open = 2;
+      close = "\\]";
+      display = true;
+    } else if (starts_with(rest, "$$")) {
+      open = 2;
+      close = "$$";
+      display = true;
+    } else if (rest[0] == '$' && rest.size() > 2 && !is_ws(rest[1]) &&
+               rest[1] != '$') {
+      close = "$";
+    } else {
+      return false;
+    }
+    size_t end = rest.find(close, open);
+    while (close == "$" && end != std::string_view::npos &&
+           (is_ws(rest[end - 1]) ||
+            (end + 1 < rest.size() &&
+             std::isdigit(static_cast<unsigned char>(rest[end + 1])))))
+      end = rest.find(close, end + 1);
+    if (end == std::string_view::npos) return false;
+    std::string_view tex = trim_view(rest.substr(open, end - open));
+    if (tex.empty()) return false;
+    node.spans.push_back(inline_math(std::string(tex), display));
+    i += end + close.size();
+    return true;
+  };
+
   while (i < text.size()) {
+    if (try_math()) continue;
     // [fn:key] footnote reference
     if (starts_with(text.substr(i), "[fn:")) {
       size_t end = text.find(']', i + 4);
@@ -128,6 +167,9 @@ void parse_org_inlines(Node& node, std::string_view text) {
       char c = text[i];
       if (c == '[' && i + 1 < text.size() && text[i + 1] == '[') break;
       if (c == '[' && starts_with(text.substr(i), "[fn:")) break;
+      if (c == '$' || (c == '\\' && i + 1 < text.size() &&
+                       (text[i + 1] == '(' || text[i + 1] == '[')))
+        break;
       if (c == '*' || c == '/' || c == '=' || c == '~' || c == '+') {
         // Possible markup open — let outer loop decide
         bool open_ok = (i == 0 || is_ws(text[i - 1]) || text[i - 1] == '(');

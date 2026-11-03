@@ -3300,6 +3300,82 @@ void test_math() {
   EXPECT(!parse_math("a}").error.empty());
   EXPECT(!parse_math("\\begin{pmatrix} a").error.empty());
 
+  // Markdown: $…$ and $$…$$, with the dollar-sign rules of pandoc.
+  {
+    Document d = parse_markup(
+        "Let $x_1 + y$ and $$\\frac{a}{b}$$ then costs $5 and $6, \\$7.\n");
+    const Node& para = d.get(d.get(d.root).children[0]);
+    int math = 0, disp = 0;
+    std::string tex;
+    for (const InlineSpan& sp : para.spans)
+      if (sp.kind == InlineKind::Math) {
+        ++math;
+        disp += sp.display;
+        tex += sp.src + "|";
+      }
+    EXPECT_EQ(math, 2);
+    EXPECT_EQ(disp, 1);
+    EXPECT_EQ(tex, std::string("x_1 + y|\\frac{a}{b}|"));
+    const std::string back = serialize_markup(d);
+    EXPECT(back.find("$x_1 + y$") != std::string::npos);
+    EXPECT(back.find("$$\\frac{a}{b}$$") != std::string::npos);
+    EXPECT(back.find("costs \\$5") != std::string::npos);
+    Document block = parse_markup("$$\n\\begin{aligned}\na &= b\\\\\n+ c\n\\end{aligned}\n$$\n");
+    const Node& bp = block.get(block.get(block.root).children[0]);
+    EXPECT(bp.spans.size() == 1 && bp.spans[0].kind == InlineKind::Math &&
+           bp.spans[0].display);
+  }
+
+  // Org: \(…\), \[…\] and dollars; the clipboard gets the dollar form.
+  {
+    Document d = parse_org("Euler \\(e^{i\\pi}=-1\\), then $x_1$ and\n\n\\[ \\int_0^1 x\\,dx \\]\n");
+    std::string tex;
+    int disp = 0;
+    for (const Node& n : d.nodes)
+      for (const InlineSpan& sp : n.spans)
+        if (sp.kind == InlineKind::Math) {
+          tex += sp.src + "|";
+          disp += sp.display;
+        }
+    EXPECT_EQ(tex, std::string("e^{i\\pi}=-1|x_1|\\int_0^1 x\\,dx|"));
+    EXPECT_EQ(disp, 1);
+    Document md = parse_markup("a $x^2$ b\n");
+    Selection sel;
+    const NodeId pn = md.get(md.root).children[0];
+    sel.anchor = {pn, 0, 0};
+    sel.focus = {pn, 2, 2};
+    EXPECT_EQ(selected_text(md, sel), std::string("a $x^2$ b"));
+  }
+
+  // HTML: MathML annotation, Wikipedia / KaTeX wrappers, MathJax scripts.
+  {
+    HtmlOptions opt;
+    Document d;
+    d.root = d.create(NodeKind::Document);
+    html_append_blocks(
+        d, d.root,
+        "<p>A <span class=\"mwe-math-element mwe-math-element-inline\" "
+        "typeof=\"mw:Extension/math\"><span style=\"display: none;\"><math "
+        "alttext=\"{\\displaystyle x^{2}}\"><semantics><mi>x</mi><annotation "
+        "encoding=\"application/x-tex\">{\\displaystyle x^{2}}</annotation>"
+        "</semantics></math></span><img alt=\"x\" src=\"a.svg\"/></span> and "
+        "<span class=\"katex\"><span class=\"katex-mathml\"><math><semantics>"
+        "<annotation encoding=\"application/x-tex\">a &lt; b</annotation>"
+        "</semantics></math></span><span class=\"katex-html\">a&lt;b</span>"
+        "</span> and <script type=\"math/tex\">z^2</script> end.</p>",
+        opt);
+    std::string tex;
+    int others = 0;
+    for (const Node& n : d.nodes)
+      for (const InlineSpan& sp : n.spans) {
+        if (sp.kind == InlineKind::Math) tex += sp.src + "|";
+        else if (sp.kind == InlineKind::Image) ++others;
+      }
+    EXPECT_EQ(tex, std::string("{\\displaystyle x^{2}}|a < b|z^2|"));
+    EXPECT_EQ(others, 0);
+    EXPECT(plain_text(d, d.root).find("a<b") == std::string::npos);
+  }
+
   // Alphabets.
   EXPECT_EQ(math_alphabet('x', MathVariant::Italic), 0x1D465u);
   EXPECT_EQ(math_alphabet('h', MathVariant::Italic), 0x210Eu);

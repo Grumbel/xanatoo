@@ -74,7 +74,9 @@ author: …
 
 Inline: plain strings, `(em …)`, `(strong …)`, `(code …)`,
 `(a "href" …)`, `(a "href" :rel "glossary" …)`,
-`(cite :key "nelson65" "Nelson 1965")`.
+`(cite :key "nelson65" "Nelson 1965")`,
+`(math "e^{i\\pi}+1=0")` / `(math "…" :display t)` (TeX math; Markdown
+`$…$` and `$$…$$`, Org `\(…\)` and `\[…\]`; see `docs/MATH.md`).
 
 ### Typed links and citations
 

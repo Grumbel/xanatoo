@@ -131,7 +131,7 @@ in the style directories (or give an absolute path), tile from the top-left of
 the view and scroll with the text. `desk.xss` is an example.
 
 **Inline roles:** `text`, `emphasis`, `strong`, `strike`, `link`, `code`,
-`cite`, `footnote-ref`, `image` (inline images; no colour of their own), with the properties `color` (beats the block colour), `background`
+`cite`, `footnote-ref`, `image` (inline images; no colour of their own), `math` (TeX formulas; the colour is the glyphs' and rules'), with the properties `color` (beats the block colour), `background`
 (only `code` uses it) and `underline` (`#t` / `#f`).
 
 Unknown roles, properties or bad values become warnings on stderr, and the

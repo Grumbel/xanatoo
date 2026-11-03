@@ -11,6 +11,7 @@
 #include "xanatoo/app.hpp"
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/image_backend.hpp"
+#include "xanatoo/math_font.hpp"
 #include "xanatoo/parse.hpp"
 #include "xanatoo/paths.hpp"
 #include "xanatoo/tls.hpp"
@@ -131,6 +132,15 @@ AboutSection formats() {
        {}, "`pandoc` on PATH"});
   s.items.push_back({"Style sheets", true, "`styles/*.xss` (View → Style sheet)",
                      {}, {}});
+  // TeX formulas need an OpenType math font; without one they show their source.
+  const std::string math_font = xanatoo::find_math_font_path();
+  s.items.push_back({"TeX math", !math_font.empty(),
+                     "`$…$` and `$$…$$` formulas, also from web pages and "
+                     "Wikipedia; set from the MATH table of `" +
+                         (math_font.empty() ? std::string("a math font")
+                                            : math_font) +
+                         "`",
+                     "examples/math.md", "an installed math font (Latin Modern Math, STIX Two Math, …)"});
   return s;
 }
 

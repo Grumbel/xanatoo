@@ -8,6 +8,25 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-11-03) — TeX math
+
+- Own renderer (`docs/MATH.md`): `math_parse.cpp` (TeX subset →
+  `MathNode`), `math_layout.cpp` (TeXbook App. G on the OpenType MATH
+  constants / variants / assemblies), `math_font.cpp` (FreeType `MathFont`,
+  `draw_math`), `InlineKind::Math` spans (`src` = TeX, `display`), layout as
+  an inline atom with depth (`PositionedMath`), pagination, Markdown `$…$`
+  `$$…$$`, Org `\(…\)` / `\[…\]`, S-expression `(math …)`, HTML (`<math>`
+  annotations, Wikipedia `mwe-math-element`, KaTeX, MathJax scripts),
+  clipboard `$…$`, `examples/math.md`, About entry. Unit test `test_math`.
+- Checked under Xvfb: examples/math.md and `wikipedia:Quadratic_formula`.
+- Open: bundle a math font (Latin Modern Math is GFL, STIX Two Math OFL;
+  needed for Android and for systems without one — `find_math_font_path`
+  already looks for `fonts/latinmodern-math.otf` in the data dir), MathKernInfo
+  for script corners (integral limits), `\middle`, `\cancel`, wide display
+  formulas (overflow instead of scale / scroll), selection rectangles and
+  caret height around tall formulas, editing a formula in place (the span is
+  one caret position), optional MicroTeX backend on desktop.
+
 ## Status (2026-11-03) — lightbox zoom
 
 - Lightbox (`app_collection.cpp`): caption shows `W×H · zoom%`; wheel zooms
