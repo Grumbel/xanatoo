@@ -139,7 +139,7 @@ void collection_command(App& app, const std::string& arg) {
 bool click_collection_card(App& app, int pi, float lx, float my) {
   Pane& p = app.panes[pi];
   for (const auto& im : p.layout.images) {
-    if (im.thumb <= 0) continue;
+    if (im.thumb <= 0 || im.in_text) continue;  // inline: a link (editor.cpp)
     const float y0 = im.y - p.scroll_y;
     if (lx >= im.x && lx <= im.x + im.width && my >= y0 &&
         my <= y0 + im.height) {
@@ -171,22 +171,26 @@ bool open_link_image(App& app, int pi, const std::string& href) {
     if (id == xanatoo::INVALID_NODE) continue;
     const xanatoo::Node& n = doc.get(id);
     for (const auto& s : n.spans) {
-      if (s.kind != xanatoo::InlineKind::Link || !xanatoo::is_image_url(s.href))
+      // Image links, and inline images (their picture, not their link).
+      const bool inline_img = s.kind == xanatoo::InlineKind::Image;
+      const std::string& src = inline_img ? s.src : s.href;
+      if ((!inline_img && s.kind != xanatoo::InlineKind::Link) ||
+          !xanatoo::is_image_url(src))
         continue;
       if (std::any_of(lb.items.begin(), lb.items.end(),
-                      [&](const LightboxItem& it) { return it.src == s.href; }))
+                      [&](const LightboxItem& it) { return it.src == src; }))
         continue;
-      if (!found && s.href == href) {
+      if (!found && src == href) {
         lb.index = static_cast<int>(lb.items.size());
         found = true;
       }
       // "[image: alt]" labels: the alt text; "[image]": the file name.
-      std::string caption = s.text;
+      std::string caption = inline_img ? s.alt : s.text;
       if (xanatoo::starts_with(caption, "[image: ") && caption.back() == ']')
         caption = caption.substr(8, caption.size() - 9);
       else if (xanatoo::starts_with(caption, "[image"))
         caption.clear();
-      lb.items.push_back({s.href, std::move(caption)});
+      lb.items.push_back({src, std::move(caption)});
     }
     stack.insert(stack.end(), n.children.rbegin(), n.children.rend());
   }

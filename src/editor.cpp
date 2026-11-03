@@ -486,6 +486,11 @@ void insert_text(Document& doc, Caret& caret, const std::string& utf8) {
     caret.span_index = n.spans.size() - 1;
     caret.char_index = utf8_char_count(n.spans.back().text);
   }
+  if (n.spans[caret.span_index].kind == InlineKind::Image) {
+    // Text next to an inline image goes into a text span of its own.
+    insert_styled(doc, caret, utf8, InlineKind::Text, {});
+    return;
+  }
   InlineSpan& span = n.spans[caret.span_index];
   size_t byte_off = utf8_byte_offset(span.text, caret.char_index);
   span.text.insert(byte_off, utf8);
@@ -2264,6 +2269,23 @@ std::optional<LinkHit> hit_test_link_ex(const Document& doc,
                                         const LayoutResult& layout,
                                         float mx, float my, float scroll_y) {
   const float adj_y = my + scroll_y;
+  // Inline images: their link, else the image itself (opens the viewer).
+  for (const PositionedImage& im : layout.images) {
+    if (!im.in_text || mx < im.x || mx > im.x + im.width || adj_y < im.y ||
+        adj_y > im.y + im.height)
+      continue;
+    const Node& n = doc.get(im.node);
+    if (im.span_index >= n.spans.size()) continue;
+    const InlineSpan& sp = n.spans[im.span_index];
+    LinkHit hit;
+    hit.kind = InlineKind::Link;
+    hit.rel = sp.rel;
+    hit.node = im.node;
+    hit.span_index = im.span_index;
+    hit.href = sp.href.empty() ? sp.src : sp.href;
+    if (hit.href.empty()) continue;
+    return hit;
+  }
   for (size_t i = 0; i < layout.glyphs.size(); ++i) {
     const auto& g = layout.glyphs[i];
     // Skip far-away lines (glyphs are laid out top-to-bottom overall).

@@ -159,6 +159,48 @@ std::string fence_attr(std::string_view line, std::string_view key) {
   return std::string(line.substr(pos, end - pos));
 }
 
+// "![alt](src)" at text[i], with an optional pandoc-style
+// "{width=16 height=16}" after it: an inline image span. Returns the index
+// after it, or npos when text[i] starts no image.
+size_t parse_md_image(std::string_view text, size_t i, InlineSpan& out) {
+  if (text.compare(i, 2, "![") != 0) return std::string_view::npos;
+  const size_t mid = text.find("](", i + 2);
+  if (mid == std::string_view::npos) return std::string_view::npos;
+  const size_t end = text.find(')', mid + 2);
+  if (end == std::string_view::npos) return std::string_view::npos;
+  std::string_view src = text.substr(mid + 2, end - (mid + 2));
+  trim_ascii(src);
+  if (size_t sp = src.find(' '); sp != std::string_view::npos)
+    src = src.substr(0, sp);  // ![a](src "title")
+  if (src.size() >= 2 && src.front() == '<' && src.back() == '>')
+    src = src.substr(1, src.size() - 2);
+  if (src.empty()) return std::string_view::npos;
+  int w = 0, h = 0;
+  size_t next = end + 1;
+  if (next < text.size() && text[next] == '{') {
+    const size_t bend = text.find('}', next);
+    if (bend != std::string_view::npos) {
+      std::string_view attrs = text.substr(next + 1, bend - next - 1);
+      auto num = [&](std::string_view key) {
+        size_t k = attrs.find(key);
+        if (k == std::string_view::npos) return 0;
+        std::string v(attrs.substr(k + key.size()));
+        v = v.substr(0, v.find_first_of(" }"));
+        if (v.find('%') != std::string::npos) return 0;  // relative: natural
+        return std::atoi(v.c_str());
+      };
+      if (attrs.find('=') != std::string_view::npos) {
+        w = num("width=");
+        h = num("height=");
+        next = bend + 1;
+      }
+    }
+  }
+  out = inline_image(std::string(src),
+                     std::string(text.substr(i + 2, mid - (i + 2))), w, h);
+  return next;
+}
+
 // Parse inline spans for a single paragraph/heading line.
 void parse_inlines(Node& node, std::string_view text) {
   size_t i = 0;
@@ -268,6 +310,31 @@ void parse_inlines(Node& node, std::string_view text) {
           i = end + 1;
           continue;
         }
+      }
+    }
+    // ![alt](src) inline image; [![alt](src)](href) a linked one.
+    if (text[i] == '!' || (text[i] == '[' && text.compare(i + 1, 2, "![") == 0)) {
+      const bool linked = text[i] == '[';
+      InlineSpan im;
+      size_t next = parse_md_image(text, linked ? i + 1 : i, im);
+      if (next != std::string_view::npos && linked) {
+        if (text.compare(next, 2, "](") == 0) {
+          const size_t end = text.find(')', next + 2);
+          if (end != std::string_view::npos) {
+            im.href = std::string(text.substr(next + 2, end - (next + 2)));
+            next = end + 1;
+          } else {
+            next = std::string_view::npos;
+          }
+        } else {
+          next = std::string_view::npos;
+        }
+      }
+      if (next != std::string_view::npos) {
+        flush_plain();
+        node.spans.push_back(std::move(im));
+        i = next;
+        continue;
       }
     }
     // [text](url) or [text](#id) or [text](cite:key); optional {rel=…}
@@ -456,7 +523,7 @@ Document parse_markup(std::string_view source) {
     if (starts_with(trimmed, "::: ")) {
       std::string_view rest = trimmed.substr(4);
       trim_ascii(rest);
-      if (starts_with(rest, "collection")) {
+      if (starts_with(rest, "collection") || starts_with(rest, "aside")) {
         pandoc_open = ":::" + std::string(rest);
         trimmed = pandoc_open;
       }
@@ -530,6 +597,17 @@ Document parse_markup(std::string_view source) {
         }
       }
       doc.get(n).expanded = false; // start collapsed — classic stretchtext
+      push_fence(n);
+      ++i;
+      continue;
+    }
+    // :::aside [side=left|right] — a text box beside the flow
+    if (starts_with(trimmed, ":::aside")) {
+      NodeId n = doc.create(NodeKind::Aside, current_parent());
+      std::string id = fence_attr(trimmed, "id");
+      if (!id.empty()) doc.get(n).label = id;
+      std::string side = fence_attr(trimmed, "side");
+      if (side == "left" || side == "right") doc.get(n).src = side;
       push_fence(n);
       ++i;
       continue;
@@ -877,10 +955,23 @@ Document parse_markup(std::string_view source) {
     }
 
     // Image ![alt](src) optional {scale=1.5}
+    // A line that holds more than the image is a paragraph with an inline
+    // image in it.
     if (starts_with(trimmed, "![")) {
       size_t mid = trimmed.find("](");
       size_t end = trimmed.find(')', mid == std::string_view::npos ? 0 : mid);
-      if (mid != std::string_view::npos && end != std::string_view::npos) {
+      bool alone = end != std::string_view::npos;
+      if (alone) {
+        std::string_view rest = trimmed.substr(end + 1);
+        if (!rest.empty() && rest[0] == '{') {
+          size_t bend = rest.find('}');
+          rest = bend == std::string_view::npos ? std::string_view{}
+                                                : rest.substr(bend + 1);
+        }
+        trim_ascii(rest);
+        alone = rest.empty();
+      }
+      if (alone && mid != std::string_view::npos) {
         NodeId n = doc.create(NodeKind::Image, current_parent());
         doc.get(n).alt = std::string(trimmed.substr(2, mid - 2));
         doc.get(n).src = std::string(trimmed.substr(mid + 2, end - (mid + 2)));
@@ -1290,6 +1381,20 @@ void escape_md_plain(const std::string& text, std::string& out) {
   }
 }
 
+// ![alt](src){width=W height=H}, wrapped in [ … ](href) when linked.
+std::string md_inline_image(const InlineSpan& sp) {
+  std::string img = "![" + sp.alt + "](" + sp.src + ")";
+  if (sp.width > 0 || sp.height > 0) {
+    img += "{";
+    if (sp.width > 0) img += "width=" + std::to_string(sp.width);
+    if (sp.width > 0 && sp.height > 0) img += " ";
+    if (sp.height > 0) img += "height=" + std::to_string(sp.height);
+    img += "}";
+  }
+  if (sp.href.empty()) return img;
+  return "[" + img + "](" + sp.href + ")";
+}
+
 void serialize_inlines(const Node& node, std::string& out) {
   for (const auto& sp : node.spans) {
     switch (sp.kind) {
@@ -1336,6 +1441,9 @@ void serialize_inlines(const Node& node, std::string& out) {
         out += "[^";
         out += sp.href;
         out += "]";
+        break;
+      case InlineKind::Image:
+        out += md_inline_image(sp);
         break;
       default:
         escape_md_plain(sp.text, out);
@@ -1495,6 +1603,18 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
         out += "\"";
       }
       out += "\n\n";
+      break;
+    }
+
+    case NodeKind::Aside: {
+      out += pad;
+      out += ":::aside";
+      if (!node.label.empty()) out += " id=\"" + node.label + "\"";
+      if (!node.src.empty()) out += " side=" + node.src;
+      out += "\n";
+      for (NodeId c : node.children) serialize_node(doc, c, out, indent);
+      out += pad;
+      out += ":::\n\n";
       break;
     }
 
@@ -1955,8 +2075,34 @@ void append_inline_from_sexpr(Node& node, const SExpr& e) {
       !is_atom(head, "strike") && !is_atom(head, "s") &&
       !is_atom(head, "code") && !is_atom(head, "a") &&
       !is_atom(head, "cite") && !is_atom(head, "fnref") &&
-      !is_atom(head, "text"))
+      !is_atom(head, "text") && !is_atom(head, "img") &&
+      !is_atom(head, "image"))
     return;
+
+  if (is_atom(head, "img") || is_atom(head, "image")) {
+    // (img "src" :alt "…" :width 16 :height 16 :href "…") in running text
+    std::string src, alt, href;
+    int w = 0, h = 0;
+    for (size_t i = 1; i < e.kids.size(); ++i) {
+      const SExpr& k = e.kids[i];
+      if (k.kind == SExpr::Kind::Atom && !k.text.empty() && k.text[0] == ':' &&
+          i + 1 < e.kids.size()) {
+        const SExpr& v = e.kids[++i];
+        if (k.text == ":src") src = sexpr_text(v);
+        else if (k.text == ":alt") alt = sexpr_text(v);
+        else if (k.text == ":href") href = sexpr_text(v);
+        else if (k.text == ":width") w = sexpr_int(v, 0);
+        else if (k.text == ":height") h = sexpr_int(v, 0);
+      } else if (src.empty()) {
+        src = sexpr_text(k);
+      }
+    }
+    if (src.empty()) return;
+    InlineSpan sp = inline_image(std::move(src), std::move(alt), w, h);
+    sp.href = std::move(href);
+    node.spans.push_back(std::move(sp));
+    return;
+  }
 
   if (is_atom(head, "fnref")) {
     // (fnref "key") or (fnref :key "key" "mark")
@@ -2166,6 +2312,37 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
     if (!label.empty()) doc.get(n).label = label;
     fill_inlines(doc.get(n), e.kids, i);
     return;
+  }
+
+  // (aside :side "left" (p …) …): a box of blocks beside the flow; an
+  // aside of plain text stays a note, as before.
+  if (tag == "aside") {
+    bool blocks = false;
+    for (size_t k = 1; k < e.kids.size(); ++k) {
+      const SExpr& c = e.kids[k];
+      if (c.kind == SExpr::Kind::List && !c.kids.empty() &&
+          c.kids[0].kind == SExpr::Kind::Atom) {
+        const std::string& h = c.kids[0].text;
+        if (h != "em" && h != "strong" && h != "strike" && h != "s" &&
+            h != "code" && h != "a" && h != "cite" && h != "fnref" &&
+            h != "text" && h != "img" && h != "image")
+          blocks = true;
+      }
+    }
+    if (blocks) {
+      NodeId n = doc.create(NodeKind::Aside, parent);
+      size_t i = 1;
+      while (i + 1 < e.kids.size() && e.kids[i].kind == SExpr::Kind::Atom &&
+             !e.kids[i].text.empty() && e.kids[i].text[0] == ':') {
+        const std::string& k = e.kids[i].text;
+        const std::string v = sexpr_text(e.kids[i + 1]);
+        if (k == ":side" && (v == "left" || v == "right")) doc.get(n).src = v;
+        else if (k == ":label" || k == ":anchor") doc.get(n).label = v;
+        i += 2;
+      }
+      parse_sexpr_children(doc, n, e.kids, i);
+      return;
+    }
   }
 
   if (tag == "note" || tag == "aside" || tag == "callout") {
@@ -2701,6 +2878,21 @@ void serialize_sexpr_inlines(const Node& node, std::string& out) {
         escape_sexpr_string(sp.text, out);
         out += ")";
         break;
+      case InlineKind::Image:
+        out += "(img ";
+        escape_sexpr_string(sp.src, out);
+        if (!sp.alt.empty()) {
+          out += " :alt ";
+          escape_sexpr_string(sp.alt, out);
+        }
+        if (sp.width > 0) out += " :width " + std::to_string(sp.width);
+        if (sp.height > 0) out += " :height " + std::to_string(sp.height);
+        if (!sp.href.empty()) {
+          out += " :href ";
+          escape_sexpr_string(sp.href, out);
+        }
+        out += ")";
+        break;
       case InlineKind::FootnoteRef:
         out += "(fnref ";
         escape_sexpr_string(sp.href, out);
@@ -3060,6 +3252,20 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
       break;
     }
 
+    case NodeKind::Aside: {
+      out += pad;
+      out += "(aside";
+      emit_node_id(node, out);
+      emit_label(node, out);
+      if (!node.src.empty()) {
+        out += " :side ";
+        escape_sexpr_string(node.src, out);
+      }
+      serialize_sexpr_children(doc, node, out, indent + 2);
+      out += ")";
+      break;
+    }
+
     case NodeKind::Columns: {
       out += pad;
       out += "(columns";
@@ -3349,6 +3555,8 @@ static std::string gemtext_plain(const Node& n) {
   for (const auto& sp : n.spans) {
     if (sp.kind == InlineKind::FootnoteRef)
       s += "[" + sp.href + "]";
+    else if (sp.kind == InlineKind::Image)
+      s += sp.alt.empty() ? "[image]" : "[" + sp.alt + "]";
     else
       s += sp.text;
   }
@@ -3418,6 +3626,7 @@ static void serialize_gemtext_node(const Document& doc, NodeId id, std::string& 
     case NodeKind::Section:
     case NodeKind::Article:
     case NodeKind::Chrome:
+    case NodeKind::Aside:
       for (NodeId c : n.children) serialize_gemtext_node(doc, c, out);
       break;
     case NodeKind::HorizontalRule:

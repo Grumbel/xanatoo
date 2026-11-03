@@ -686,6 +686,13 @@ void ser_inlines_org(const Node& node, std::string& out) {
         out += sp.text;
         out.push_back('+');
         break;
+      case InlineKind::Image:
+        // Org shows a bare link to an image file as the image.
+        out += "[[";
+        out += sp.href.empty() ? sp.src : sp.href;
+        if (!sp.href.empty()) out += "][[[" + sp.src + "]]]";
+        out += "]]";
+        break;
       case InlineKind::FootnoteRef:
         out += "[fn:";
         out += sp.href;
@@ -750,6 +757,7 @@ void ser_node_org(const Document& doc, NodeId id, std::string& out,
     case NodeKind::Section:
     case NodeKind::Article:
     case NodeKind::Chrome:
+    case NodeKind::Aside:
       // Structure only — children serialise (header emits stars).
       for (NodeId c : node.children)
         ser_node_org(doc, c, out, list_indent);

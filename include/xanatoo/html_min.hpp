@@ -28,9 +28,13 @@ struct HtmlOptions {
   bool drop_chrome = false;
   bool chrome_nodes = false;
   // <img> at block level → Image node (remote http(s) images are fetched
-  // by the app); otherwise, and always inside quotes / list items / cells
-  // or for icons, an "[image: alt]" link.
+  // by the app); icons (declared edge ≤ 48) and images inside quotes / list
+  // items / cells → inline image spans (InlineKind::Image, linked when in
+  // an <a>). Without it, or for data: URIs, an "[image: alt]" link.
   bool images = false;
+  // <aside> → Aside box (content beside the flow) rather than page chrome;
+  // asides with chrome classes (sidebar, share, …) stay chrome.
+  bool asides = false;
 };
 
 // Append the blocks of `html` as children of `parent`:

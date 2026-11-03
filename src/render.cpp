@@ -51,6 +51,13 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
                  static_cast<int>(rb.box.height)};
       if (visible(r.x, r.y, r.w, r.h)) SDL_RenderFillRect(sdl_, &r);
     }
+    for (const RoleBox& rb : layout.role_frames) {
+      set_color(sdl_, st[rb.role].border);
+      SDL_Rect r{static_cast<int>(rb.box.x + origin_x), px(rb.box.y - scroll_y),
+                 static_cast<int>(rb.box.width),
+                 static_cast<int>(rb.box.height)};
+      if (visible(r.x, r.y, r.w, r.h)) SDL_RenderDrawRect(sdl_, &r);
+    }
     for (const auto& mc : layout.message_cards) {
       const Rgba& fill =
           st[mc.alt ? BlockRole::MessageAlt : BlockRole::Message].background;
@@ -85,7 +92,9 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
         SDL_SetRenderDrawColor(sdl_, 230, 230, 235, 255);
         SDL_RenderFillRect(sdl_, &dst);
       }
-      if (pi.thumb > 0) continue;  // collection card: click opens the viewer
+      // Collection cards / remote images (click opens the viewer) and
+      // images in the text are not resized by hand.
+      if (pi.thumb > 0 || pi.in_text) continue;
       // Resize handle (bottom-right corner)
       const int hs = 10;
       SDL_Rect handle{dst.x + dst.w - hs, dst.y + dst.h - hs, hs, hs};
@@ -252,6 +261,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
   const auto& glyphs = layout.glyphs;
   for (size_t i = 0; i < glyphs.size(); ++i) {
     const PositionedGlyph& pg = glyphs[i];
+    if (pg.kind == InlineKind::Image) continue;  // drawn with the images
     Font& font = fonts_.pick(pg.font);
     const Glyph& g = font.glyph(pg.codepoint);
 

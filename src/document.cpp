@@ -101,3 +101,19 @@ bool Document::insert_after(NodeId after, NodeId child) {
 }
 
 }  // namespace xanatoo
+
+namespace xanatoo {
+
+InlineSpan inline_image(std::string src, std::string alt, int width,
+                        int height) {
+  InlineSpan s;
+  s.kind = InlineKind::Image;
+  s.text = kInlineImageText;
+  s.src = std::move(src);
+  s.alt = std::move(alt);
+  s.width = static_cast<uint16_t>(std::clamp(width, 0, 4096));
+  s.height = static_cast<uint16_t>(std::clamp(height, 0, 4096));
+  return s;
+}
+
+}  // namespace xanatoo

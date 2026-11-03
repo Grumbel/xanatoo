@@ -45,6 +45,7 @@ enum class NodeKind : uint8_t {
   Footnote,        // note body (Paragraph children); label = key of its refs
   Collection,      // ordered set of items (Image / Figure) shown as cards
   Chrome,          // web page chrome (nav, aside, footer, …); reader mode hides it
+  Aside,           // text box beside the flow (HTML <aside>, sidebar, pull quote)
 };
 
 enum class InlineKind : uint8_t {
@@ -56,7 +57,13 @@ enum class InlineKind : uint8_t {
   Code,
   Cite,  // citation pointer; href holds bibliography key
   FootnoteRef,  // footnote mark; href holds the Footnote key, text the mark
+  Image,  // inline image: text = U+FFFC (one caret position), src / alt /
+          // width / height below, href = optional link target
 };
+
+// Text of an inline image span: the object replacement character.
+inline constexpr const char* kInlineImageText = "\xEF\xBF\xBC";
+inline constexpr uint32_t kInlineImageCp = 0xFFFC;
 
 struct InlineSpan {
   InlineKind kind = InlineKind::Text;
@@ -64,7 +71,16 @@ struct InlineSpan {
   std::string href;   // Link target, or Cite key
   std::string rel;    // typed relation: glossary, source, contra, …
   NodeId target = INVALID_NODE;
+  // InlineKind::Image only.
+  std::string src;      // image path / URL
+  std::string alt;      // alternative text
+  uint16_t width = 0;   // declared size in CSS px (0 = from the image)
+  uint16_t height = 0;
 };
+
+// Inline image span (text = kInlineImageText).
+InlineSpan inline_image(std::string src, std::string alt = {},
+                        int width = 0, int height = 0);
 
 struct Node {
   NodeId id = INVALID_NODE;
@@ -93,6 +109,8 @@ struct Node {
   // Collection: summary = default view hint ("grid", "list", "full");
   //             items are Image / Figure children (view-local layout).
   // Article/Section: containers grouping blocks.
+  // Aside: body blocks are children; src = side hint ("left" / "right",
+  //        empty = the style's); floats beside the following blocks.
   // Chrome: summary = what it is ("navigation", "sidebar", "page header",
   //         …); body blocks are children. Only HTML pages make these.
 };

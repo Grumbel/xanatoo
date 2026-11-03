@@ -8,6 +8,53 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-11-03) — inline images and asides (layout, HTML 3.0 flavour)
+
+- Inline images: `InlineKind::Image` span (`text` = U+FFFC, one caret
+  position; `src` / `alt` / `width` / `height`, `href` = optional link),
+  made by `inline_image()`. Layout treats it as an atom on the baseline
+  (taller images lower their line), `PositionedImage::in_text` (no resize
+  handle). Click: its link, else the viewer (which now steps through inline
+  images too). Typing next to one makes a text span.
+- Markdown `![alt](src){width=W height=H}` inside text, `[![alt](src)](href)`
+  linked; a line holding only an image is still a block Image. sexp
+  `(img "src" :alt … :width … :href …)` inside text; org writes `[[src]]`,
+  gemtext `[alt]`. HTML: icons (declared edge ≤ 48) and images in list
+  items / cells / quotes are inline spans now (was `[image: alt]` links);
+  percent `width` / `height` are ignored.
+- Asides: `NodeKind::Aside` (container of blocks; `src` = side hint).
+  `:::aside [side=left]` / pandoc `::: aside`, sexp `(aside :side … (p …))`
+  (a text-only `(aside "…")` stays a Note). HTML `<aside>` inside `<main>` /
+  the lone article is an Aside (`HtmlOptions::asides`), outside it or with
+  chrome classes still Chrome.
+- Style role `aside`: `width` (16em), `float` (right / left / none),
+  `indent` = padding, `background` / `border` (new `role_frames`). Floats
+  only while the box is ≤ 45 % of the column and ≥ 10 em of text stay
+  beside it, else it sits in the flow at full width.
+- Floats in layout: `LayoutEngine::floats_` per layout() call;
+  `layout_paragraph` places every line in the band the floats leave free
+  (`float_band`), blocks with a box of their own (tables, code, images,
+  figures, columns, threads, rules, transclusions) start below
+  (`clear_floats`). Asides are never skipped by virtualization.
+- Fixed on the way: a space that overflowed a line started the next one.
+- Merges of column / cell layouts go through `append_result` (cells now
+  keep message bars / cards and nested column gaps too).
+- Checked under Xvfb with `examples/boxes.md`: right and left floats, wrap
+  beside and below, fallback at a narrow width, images in table cells,
+  click → viewer (1 / 3).
+- Open / next (HTML 3.0 as the yardstick, not a clone):
+  - `align=left|right` on `<img>` / `<figure>` / `<table>` (and Wikipedia's
+    `infobox` tables) as floats; `<br clear=…>` / a `clear` for blocks.
+  - `align=top|middle` for inline images (only baseline now).
+  - List markers and quote / note bars beside a *left* float stay at x;
+    header bands and message cards run under floats.
+  - A failed inline image shows an empty box, not its alt text.
+  - Copying text copies U+FFFC for an image (plain_text keeps it so char
+    offsets hold); a paragraph of only an inline image saves as a block
+    image line.
+  - Floats inside a skipped (off-screen) section are not registered, so the
+    first lines after it may wrap differently from the hint.
+
 ## Status (2026-11-03) — reader mode for web pages
 
 - HTML pages keep their chrome (nav / aside / footer / form / dialog,

@@ -940,7 +940,9 @@ void test_style_sheets_shipped() {
     EXPECT(a.space_before.px(17.f) == b.space_before.px(17.f) &&
            a.space_after.px(17.f) == b.space_after.px(17.f) &&
            a.indent.px(17.f) == b.indent.px(17.f) && a.font == b.font &&
-           a.border == b.border && a.background == b.background);
+           a.border == b.border && a.background == b.background &&
+           a.width.px(17.f) == b.width.px(17.f) &&
+           a.float_side == b.float_side);
   }
   // Late-bound tokens: night-amber only redefines tokens of night.
   DocStyle night, amber;
@@ -1850,8 +1852,8 @@ void test_html_min() {
     EXPECT(doc.get(k[7]).kind == NodeKind::HorizontalRule);
   }
 
-  // images: block-level <img> → Image node; icons, images in list items
-  // and data: placeholders stay links.
+  // images: block-level <img> → Image node; icons and images in list items
+  // are inline image spans; data: placeholders stay links.
   Document idoc;
   NodeId iroot = idoc.create(NodeKind::Document);
   opt.images = true;
@@ -1871,14 +1873,173 @@ void test_html_min() {
     EXPECT(idoc.get(ik[1]).kind == NodeKind::Image);
     EXPECT_EQ(idoc.get(ik[1]).src, "https://blog.example/posts/i.png");
     EXPECT_EQ(idoc.get(ik[1]).alt, "cat");
-    EXPECT_EQ(plain_text(idoc, ik[2]), "after [image: DE]");
+    {
+      const auto& sp = idoc.get(ik[2]).spans;
+      EXPECT_EQ(sp.size(), 2u);
+      if (sp.size() == 2) {
+        EXPECT_EQ(sp[0].text, "after ");
+        EXPECT(sp[1].kind == InlineKind::Image);
+        EXPECT_EQ(sp[1].text, std::string(kInlineImageText));
+        EXPECT_EQ(sp[1].src, "https://blog.example/posts/flag.png");
+        EXPECT_EQ(sp[1].alt, "DE");
+        EXPECT(sp[1].width == 16 && sp[1].height == 11);
+      }
+    }
     EXPECT(idoc.get(ik[3]).kind == NodeKind::Image);
     EXPECT_EQ(idoc.get(ik[3]).src, "https://blog.example/lazy.jpg");
     EXPECT_EQ(plain_text(idoc, ik[4]), "Cap");
     EXPECT(idoc.get(ik[5]).kind == NodeKind::Image);
     EXPECT_EQ(idoc.get(ik[5]).src, "https://cdn.example/s.webp");
     EXPECT(idoc.get(ik[6]).kind == NodeKind::List);
+    const auto li = kids_of(idoc, ik[6]);
+    EXPECT(li.size() == 1 && idoc.get(li[0]).spans.size() == 2 &&
+           idoc.get(li[0]).spans[1].kind == InlineKind::Image);
   }
+}
+
+// Inline images (InlineKind::Image) and asides (NodeKind::Aside) through
+// Markdown, sexp and HTML; layout of floats and image atoms.
+void test_inline_images_and_asides() {
+  using namespace xanatoo;
+  // Markdown inline images: plain, sized, linked; a lone one is a block.
+  Document md = parse_markup(
+      "Flag ![DE](de.png){width=16 height=11} and "
+      "[![badge](b.svg)](https://ci.example) ok\n\n"
+      "![photo](p.jpg)\n\n"
+      ":::aside side=left\n"
+      "Box text\n\n"
+      "More\n"
+      ":::\n\n"
+      "After\n");
+  auto mk = kids_of(md, md.root);
+  EXPECT_EQ(mk.size(), 4u);
+  if (mk.size() == 4) {
+    const auto& sp = md.get(mk[0]).spans;
+    EXPECT_EQ(sp.size(), 5u);
+    if (sp.size() == 5) {
+      EXPECT(sp[1].kind == InlineKind::Image);
+      EXPECT_EQ(sp[1].src, "de.png");
+      EXPECT_EQ(sp[1].alt, "DE");
+      EXPECT(sp[1].width == 16 && sp[1].height == 11);
+      EXPECT(sp[3].kind == InlineKind::Image);
+      EXPECT_EQ(sp[3].src, "b.svg");
+      EXPECT_EQ(sp[3].href, "https://ci.example");
+    }
+    EXPECT(md.get(mk[1]).kind == NodeKind::Image);
+    EXPECT(md.get(mk[2]).kind == NodeKind::Aside);
+    EXPECT_EQ(md.get(mk[2]).src, "left");
+    EXPECT_EQ(kids_of(md, mk[2]).size(), 2u);
+  }
+  const std::string out = serialize_markup(md);
+  EXPECT(out.find("![DE](de.png){width=16 height=11}") != std::string::npos);
+  EXPECT(out.find("[![badge](b.svg)](https://ci.example)") != std::string::npos);
+  EXPECT(out.find(":::aside side=left\n") != std::string::npos);
+  EXPECT_EQ(serialize_markup(parse_markup(out)), out);
+
+  // Table cells take inline images.
+  Document tb = parse_markup("| a | b |\n|---|---|\n| ![x](x.png) | y |\n");
+  bool cell_img = false;
+  for (const Node& n : tb.nodes)
+    if (n.kind == NodeKind::TableCell)
+      for (const auto& sp : n.spans)
+        cell_img = cell_img || (sp.kind == InlineKind::Image && sp.src == "x.png");
+  EXPECT(cell_img);
+
+  // sexp: (img …) in text, (aside …) of blocks; a text-only aside is a note.
+  Document sx = parse_sexpr(
+      "(doc (p \"a \" (img \"i.png\" :alt \"b\" :width 4 :href \"#t\"))"
+      " (aside :side \"right\" (p \"box\")) (aside \"plain\"))");
+  auto sk = kids_of(sx, sx.root);
+  EXPECT_EQ(sk.size(), 3u);
+  if (sk.size() == 3) {
+    const auto& sp = sx.get(sk[0]).spans;
+    EXPECT(sp.size() == 2 && sp[1].kind == InlineKind::Image &&
+           sp[1].src == "i.png" && sp[1].width == 4 && sp[1].href == "#t");
+    EXPECT(sx.get(sk[1]).kind == NodeKind::Aside);
+    EXPECT_EQ(sx.get(sk[1]).src, "right");
+    EXPECT(sx.get(sk[2]).kind == NodeKind::Note);
+  }
+  const std::string so = serialize_sexpr(sx);
+  EXPECT_EQ(serialize_sexpr(parse_sexpr(so)), so);
+
+  // HTML: an aside in <main> is a box, one with chrome classes stays chrome.
+  Document hp = parse_html_page(
+      "<body><main><p>Text<aside><p>Box</aside>"
+      "<aside class=\"share\"><p>Share</aside></main></body>",
+      "page.html");
+  int asides = 0, chrome = 0;
+  for (const Node& n : hp.nodes) {
+    if (n.parent == INVALID_NODE) continue;  // unhooked empty regions
+    asides += n.kind == NodeKind::Aside;
+    chrome += n.kind == NodeKind::Chrome;
+  }
+  EXPECT_EQ(asides, 1);
+  EXPECT_EQ(chrome, 1);
+
+  // Editing next to an image: typed text gets a span of its own.
+  Document ed = parse_markup("![i](i.png) x\n");
+  NodeId para = kids_of(ed, ed.root).empty() ? INVALID_NODE
+                                             : kids_of(ed, ed.root)[0];
+  if (para != INVALID_NODE && ed.get(para).spans.size() == 2) {
+    Caret c{para, 0, 1};
+    insert_text(ed, c, "Q");
+    const auto& sp = ed.get(para).spans;
+    EXPECT(sp.size() == 3 && sp[0].kind == InlineKind::Image &&
+           sp[0].text == kInlineImageText && sp[1].text == "Q");
+  } else {
+    EXPECT(false);
+  }
+
+  FontSet fonts;
+  std::string path = fontconfig_find("DejaVu Sans", 0, 0);
+  if (path.empty() || !fonts.load(nullptr, path, 18, 24)) {
+    std::fprintf(stderr, "SKIP test_inline_images_and_asides layout (no font)\n");
+    return;
+  }
+  LayoutEngine engine(fonts, nullptr);
+  LayoutOptions lo;
+  lo.margin_x = 0.f;
+  lo.margin_y = 0.f;
+  engine.set_options(lo);
+
+  // Inline image: an atom on the baseline, raising its line.
+  Document il = parse_markup("a ![i](i.png){width=40 height=60} b\n");
+  LayoutResult lr = engine.layout(il, 600.f);
+  EXPECT_EQ(lr.images.size(), 1u);
+  if (lr.images.size() == 1) {
+    const PositionedImage& im = lr.images[0];
+    EXPECT(im.in_text && im.width == 40.f && im.height == 60.f);
+    float base = -1.f;
+    for (const auto& g : lr.glyphs)
+      if (g.codepoint == 'b') base = g.y;
+    EXPECT(std::abs(im.y + im.height - base) < 0.5f);
+    EXPECT(im.y >= 0.f);
+  }
+
+  // Float: lines beside the aside stop at its left edge; lines below it
+  // use the whole column again; a narrow column stacks it in the flow.
+  std::string words;
+  for (int k = 0; k < 120; ++k) words += "word ";
+  Document fl = parse_markup(":::aside\nSide box\n:::\n\n" + words + "\n");
+  LayoutResult fr = engine.layout(fl, 800.f);
+  NodeId aside = kids_of(fl, fl.root)[0];
+  LayoutBox abox{};
+  for (const auto& b : fr.boxes)
+    if (b.node == aside) abox = b;
+  EXPECT(abox.width > 0.f && abox.x > 400.f);
+  float beside_right = 0.f, below_right = 0.f;
+  for (const auto& g : fr.glyphs) {
+    if (g.node == aside || fl.get(g.node).parent == aside || g.codepoint == ' ')
+      continue;
+    const float r = g.x + g.advance;
+    if (g.y < abox.y + abox.height) beside_right = std::max(beside_right, r);
+    else below_right = std::max(below_right, r);
+  }
+  EXPECT(beside_right > 0.f && beside_right <= abox.x);
+  EXPECT(below_right > abox.x);
+  LayoutResult narrow = engine.layout(fl, 300.f);
+  for (const auto& b : narrow.boxes)
+    if (b.node == aside) EXPECT_EQ(b.width, 300.f);
 }
 
 void test_feed_urls() {
@@ -2657,6 +2818,7 @@ int main() {
   test_layout_wrap_respects_max_width();
   test_layout_margins_and_measure();
   test_layout_reader_mode();
+  test_inline_images_and_asides();
   test_view_settings_migration();
   test_style_sheet_parse();
   test_style_sheets_shipped();

@@ -488,8 +488,12 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
         html_attr(attrs, "alt").empty())
       return;
     // Declared size; 0 when absent or not a number ("auto").
-    const int w = std::atoi(html_attr(attrs, "width").c_str());
-    const int h = std::atoi(html_attr(attrs, "height").c_str());
+    auto edge = [&](std::string_view name) {
+      const std::string v = html_attr(attrs, name);
+      return v.find('%') != std::string::npos ? 0 : std::atoi(v.c_str());
+    };
+    const int w = edge("width");
+    const int h = edge("height");
     // 1×1 spacers / tracking pixels.
     if (opt_.drop_chrome && ((w > 0 && w <= 2) || (h > 0 && h <= 2) ||
                              html_attr(attrs, "width") == "0" ||
@@ -514,8 +518,28 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
     }
     NodeId t = ensure_target();
     if (t == INVALID_NODE) return;
+    if (opt_.images && !starts_with(src, "data:")) {
+      // In the text: an inline image, linked when inside an <a>.
+      InlineSpan im = inline_image(std::move(src), std::move(alt), w, h);
+      if (!links_.empty()) im.href = links_.back();
+      doc_.get(t).spans.push_back(std::move(im));
+      return;
+    }
     push_text(t, InlineKind::Link, alt.empty() ? "[image]" : "[image: " + alt + "]",
               src);
+    return;
+  }
+
+  // A box beside the flow (HtmlOptions::asides); inside running text, list
+  // items or cells just a paragraph boundary.
+  if (tag == "aside" && opt_.asides && !in_leaf && !in_container()) {
+    close_para();
+    Frame f;
+    f.tag = tag;
+    f.kind = FrameKind::Container;
+    f.node = doc_.create(NodeKind::Aside, container());
+    take_pending_id(f.node);
+    push(std::move(f));
     return;
   }
 
@@ -660,6 +684,10 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
 }
 
 void Builder::close(const std::string& tag) {
+  if (tag == "aside" && top_index("aside") >= 0) {
+    pop_to(tag);
+    return;
+  }
   if (tag == "a") {
     if (!links_.empty()) links_.pop_back();
     return;
@@ -1088,6 +1116,13 @@ void html_append_blocks(Document& doc, NodeId parent, std::string_view html,
     if (opt.drop_chrome && !self_close && !one_of(name, kVoidTags)) {
       std::string_view role =
           is_hidden(attrs) ? std::string_view{} : chrome_role(name, attrs);
+      // An aside in the content is chrome only by its classes or role
+      // (role=complementary is what every aside is).
+      if (name == "aside" && opt.asides && !is_hidden(attrs)) {
+        role = chrome_role("div", attrs);
+        if (ascii_lower(html_attr(attrs, "role")) == "complementary")
+          role = {};
+      }
       // ASP.NET-style pages wrap all of <body> in one <form>.
       if (role == "form") {
         std::string_view in = html.substr(

@@ -76,7 +76,7 @@ recolours every parent rule that uses `accent` (see `night-amber.xss`).
 `block-quote`, `note`, `code-block`, `term`, `definition`, `figure`,
 `caption`, `bibliography-entry`, `footnote`, `thread`, `message`,
 `message-alt`, `message-author`, `message-op`, `message-meta`, `table`,
-`rule`, `transclusion`.
+`rule`, `transclusion`, `aside`.
 
 Message headers (forum / Reddit / Lemmy / Nostr comments) colour the author
 with `message-author` (`message-op` when a reply comes from the thread
@@ -93,10 +93,16 @@ Their properties:
 | `font` | `body`, `bold`, `italic`, `bold-italic`, `heading`, `code` |
 | `color` | text colour (else the page colour) |
 | `background` | code-block fill, table header fill, message card fill, band behind a `header` / `thread` title |
-| `border` | side bar, rule, table grid, code-block frame, footnote overlay rule, rule under a `header` / `thread` title |
+| `border` | side bar, rule, table grid, code-block frame, footnote overlay rule, rule under a `header` / `thread` title, aside frame |
+| `width` | preferred width of a box beside the flow (`aside`) |
+| `float` | `left`, `right` or `none`: which side the box sits on, or in the flow. A box only floats while the column keeps room for text next to it (its width at most 45 % of the column, at least 10 em of text); otherwise it takes the full width in the flow |
+
+`aside` uses `indent` as the padding inside its box; a document may ask for
+a side (`:::aside side=left`), which beats the sheet's `float` unless that
+is `none`.
 
 **Inline roles:** `text`, `emphasis`, `strong`, `strike`, `link`, `code`,
-`cite`, `footnote-ref`, with the properties `color` (beats the block colour), `background`
+`cite`, `footnote-ref`, `image` (inline images; no colour of their own), with the properties `color` (beats the block colour), `background`
 (only `code` uses it) and `underline` (`#t` / `#f`).
 
 Unknown roles, properties or bad values become warnings on stderr, and the

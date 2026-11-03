@@ -278,7 +278,10 @@ mechanism; historical bundle numbers in TODO.md are archival).
 - `HtmlOptions::images` (web pages, feeds): block-level `<img>` → Image
   node (remote ones load like any remote image; lazy `data-src` / `srcset`
   via `html_img_src`); icons (declared edge ≤ 48) and images inside
-  quotes / list items / cells stay `[image: alt]` links.
+  quotes / list items / cells → inline image spans (`data:` ones stay
+  `[image: alt]` links).
+- `HtmlOptions::asides` (the main content of web pages): `<aside>` → Aside
+  box; elsewhere, or with chrome classes, it is page chrome.
 - `chrome_nodes` (with `drop_chrome`): chrome blocks become Chrome nodes
   (`html_append_chrome`); inside running text, list items or cells they are
   dropped. EPUB chapters pass `keep_chrome = false` to `parse_html_page`.
@@ -310,6 +313,21 @@ mechanism; historical bundle numbers in TODO.md are archival).
   any `is_pandoc_path` file, anything under `cache_dir()`) makes `browsing(app)` true.
   Gate document edits on `browsing(app)`, never on `app.browse_mode`
   alone (that is only the user's global toggle).
+
+## Inline images and asides
+
+- `InlineKind::Image` spans (`inline_image()`): `text` is U+FFFC so the
+  caret sees one character; `src` / `alt` / `width` / `height` on the span,
+  `href` = optional link. Layout places them as atoms on the baseline
+  (`PositionedImage::in_text`; never resizable, a click follows the link or
+  opens the viewer). Markdown `![a](s){width=… height=…}` inside text.
+- `NodeKind::Aside`: a container drawn as a box beside the flow (style role
+  `aside`: `width`, `float`, `indent` = padding). Floats live in
+  `LayoutEngine::floats_` for one layout() call: text lines take the band
+  `float_band` leaves free, boxed blocks (`clears_floats`) start below.
+  Never let a block that draws a full-width fill run under a float.
+- No general box model: new floating things (figures, `align=right`
+  tables) go through the same `FloatBox` list, not per-kind geometry.
 
 ## Collections
 

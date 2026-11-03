@@ -50,6 +50,7 @@ constexpr RoleName kBlockRoles[] = {
     {"table", BlockRole::Table},
     {"rule", BlockRole::Rule},
     {"transclusion", BlockRole::Transclusion},
+    {"aside", BlockRole::Aside},
 };
 
 struct InlineName {
@@ -61,6 +62,7 @@ constexpr InlineName kInlineRoles[] = {
     {"strong", InlineKind::Strong}, {"strike", InlineKind::Strike},
     {"link", InlineKind::Link},     {"code", InlineKind::Code},
     {"cite", InlineKind::Cite},     {"footnote-ref", InlineKind::FootnoteRef},
+    {"image", InlineKind::Image},
 };
 
 constexpr std::pair<const char*, FontRole> kFontRoles[] = {
@@ -300,7 +302,14 @@ class SheetReader {
       else if (prop == "color") b.has_color = color(v, b.color) || b.has_color;
       else if (prop == "background") color(v, b.background);
       else if (prop == "border") color(v, b.border);
-      else if (prop == "font") {
+      else if (prop == "width") length(v, b.width);
+      else if (prop == "float") {
+        const std::string side = sexpr_text(value(v));
+        if (side == "left") b.float_side = FloatSide::Left;
+        else if (side == "right") b.float_side = FloatSide::Right;
+        else if (side == "none") b.float_side = FloatSide::None;
+        else warn("float is left, right or none");
+      } else if (prop == "font") {
         const std::string s = sexpr_text(value(v));
         auto it = std::find_if(std::begin(kFontRoles), std::end(kFontRoles),
                                [&](const auto& fr) { return s == fr.first; });
@@ -486,6 +495,16 @@ DocStyle builtin_style() {
     b.indent = px(12);
     b.space_after = px(10);
     b.border = {140, 155, 180, 255};
+  }
+
+  {
+    BlockStyle& b = blk(BlockRole::Aside);
+    b.indent = px(10);  // padding inside the box
+    b.space_after = px(12);
+    b.width = Length{16.f, true};
+    b.float_side = FloatSide::Right;
+    b.background = {235, 230, 215, 160};
+    b.border = {200, 190, 165, 255};
   }
 
   auto inl = [&](InlineKind k) -> InlineStyle& {

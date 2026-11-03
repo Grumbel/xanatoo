@@ -221,7 +221,11 @@ Document parse_html_page(std::string_view html, std::string_view page_url,
     doc.get(h).spans.push_back(span(InlineKind::Text, std::move(title)));
   }
   const size_t before_nodes = doc.nodes.size();
-  html_append_blocks(doc, parent, body, opt);
+  // Inside <main> / the article an <aside> is part of the text (a box
+  // beside it); around it, or on a page without either, a sidebar.
+  HtmlOptions body_opt = opt;
+  body_opt.asides = body.data() != body_content(html).data();
+  html_append_blocks(doc, parent, body, body_opt);
   if (doc.nodes.size() == before_nodes) {
     NodeId p = doc.create(NodeKind::Paragraph, parent);
     doc.get(p).spans.push_back(span(

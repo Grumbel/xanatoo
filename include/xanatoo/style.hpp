@@ -60,10 +60,14 @@ enum class BlockRole : uint8_t {
   Table,
   Rule,
   Transclusion,
+  Aside,          // text box beside the flow
   Count
 };
 constexpr size_t kBlockRoleCount = static_cast<size_t>(BlockRole::Count);
-constexpr size_t kInlineKindCount = static_cast<size_t>(InlineKind::FootnoteRef) + 1;
+constexpr size_t kInlineKindCount = static_cast<size_t>(InlineKind::Image) + 1;
+
+// Where a box sits: in the flow, or beside it with text running past.
+enum class FloatSide : uint8_t { None, Left, Right };
 
 struct BlockStyle {
   Length space_before;
@@ -76,6 +80,10 @@ struct BlockStyle {
   Rgba background{0, 0, 0, 0};
   // Side bars, rules, grid lines, frames; the rule under a header.
   Rgba border{0, 0, 0, 0};
+  // Boxes beside the flow (aside): preferred width and side. A box floats
+  // only while the text column keeps room for the text next to it.
+  Length width;
+  FloatSide float_side = FloatSide::None;
 };
 
 struct InlineStyle {

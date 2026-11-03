@@ -47,6 +47,10 @@ struct PositionedImage {
   std::string base;  // directory for relative path resolution
   int thumb = 0;     // > 0: drawn from a thumbnail with this max edge (px)
   NodeId group = INVALID_NODE;  // Collection the card belongs to
+  // Inline image in running text: `node` is the text block, `span_index`
+  // its InlineKind::Image span. Not resizable; a click follows its link.
+  bool in_text = false;
+  size_t span_index = 0;
 };
 
 struct MessageCard {
@@ -95,6 +99,8 @@ struct LayoutResult {
   std::vector<RoleBox> role_fills;
   // Filled with the role's `border` (1 px rules under headers).
   std::vector<RoleBox> role_rules;
+  // Outlined with the role's `border` (aside frames).
+  std::vector<RoleBox> role_frames;
   std::vector<ColumnGap> column_gaps;
   float content_height = 0.f;
   // Reader mode: the "… hidden · Show all" notice at the top (click shows the
@@ -232,6 +238,25 @@ private:
   const std::unordered_set<NodeId>* folded_sections_ = nullptr;
   NodeId focus_section_ = INVALID_NODE;
   bool hide_chrome_ = false;
+  // Boxes beside the flow (floating asides) of the current layout() call:
+  // text lines next to them get narrower, other blocks move below them.
+  struct FloatBox {
+    float top = 0.f, bottom = 0.f;  // incl. the gap below
+    float left = 0.f, right = 0.f;  // incl. the gap towards the text
+    FloatSide side = FloatSide::Right;
+  };
+  std::vector<FloatBox> floats_;
+  // Narrow [x, x + w) to what the floats leave free between top and bottom.
+  void float_band(float top, float bottom, float& x, float& w) const;
+  // y below every float that reaches into [x, x + w) at y.
+  float clear_floats(float x, float w, float y) const;
+  void layout_aside(const Document& doc, const Node& node, float x, float& y,
+                    float max_width, LayoutResult& out);
+  // Display size of an inline image span (CSS px × px_scale, fitted to
+  // max_w); remote ones from their thumbnail, a 1 em box while pending.
+  void inline_image_size(const InlineSpan& sp, float max_w, float& w,
+                         float& h, bool& remote);
+
   // Author of the Thread's first Message while laying out that Thread.
   std::string thread_op_;
   bool skipped_any_ = false;

@@ -155,11 +155,83 @@ bool LayoutEngine::try_skip_block(NodeId id, float x, float& y, float max_width,
   return false;
 }
 
+// Everything `in` laid out (a column, a table cell) added to `out`.
+static void append_result(LayoutResult& out, const LayoutResult& in) {
+  auto add = [](auto& dst, const auto& src) {
+    dst.insert(dst.end(), src.begin(), src.end());
+  };
+  add(out.glyphs, in.glyphs);
+  add(out.boxes, in.boxes);
+  add(out.images, in.images);
+  add(out.quote_bars, in.quote_bars);
+  add(out.note_bars, in.note_bars);
+  add(out.message_bars, in.message_bars);
+  add(out.message_cards, in.message_cards);
+  add(out.code_blocks, in.code_blocks);
+  add(out.table_lines, in.table_lines);
+  add(out.table_header_fills, in.table_header_fills);
+  add(out.hr_lines, in.hr_lines);
+  add(out.role_fills, in.role_fills);
+  add(out.role_rules, in.role_rules);
+  add(out.role_frames, in.role_frames);
+  add(out.column_gaps, in.column_gaps);
+}
+
+// Blocks with a box of their own (fills, grids, pictures) that cannot run
+// past a floating aside: they start below it.
+static bool clears_floats(NodeKind k) {
+  switch (k) {
+    case NodeKind::Table:
+    case NodeKind::CodeBlock:
+    case NodeKind::Image:
+    case NodeKind::Figure:
+    case NodeKind::Columns:
+    case NodeKind::Collection:
+    case NodeKind::Thread:
+    case NodeKind::Transclude:
+    case NodeKind::HorizontalRule:
+      return true;
+    default:
+      return false;
+  }
+}
+
+void LayoutEngine::float_band(float top, float bottom, float& x,
+                              float& w) const {
+  float l = x, r = x + w;
+  for (const FloatBox& f : floats_) {
+    if (f.bottom <= top || f.top >= bottom) continue;
+    if (f.right <= l || f.left >= r) continue;  // not in this column
+    if (f.side == FloatSide::Right) r = std::min(r, f.left);
+    else l = std::max(l, f.right);
+  }
+  if (r - l < 1.f) return;  // no room at all: overlap rather than vanish
+  x = l;
+  w = r - l;
+}
+
+float LayoutEngine::clear_floats(float x, float w, float y) const {
+  float out = y;
+  for (const FloatBox& f : floats_) {
+    if (f.bottom <= y || f.top > y + 0.5f) continue;
+    if (f.right <= x || f.left >= x + w) continue;
+    out = std::max(out, f.bottom);
+  }
+  return out;
+}
+
 void LayoutEngine::layout_children_sequential(
     const Document& doc, const std::vector<NodeId>& children, float x, float& y,
     float max_width, LayoutResult& out) {
   for (NodeId child : children) {
-    if (try_skip_block(child, x, y, max_width, out)) continue;
+    if (child == INVALID_NODE) continue;
+    const NodeKind kind = doc.get(child).kind;
+    if (!floats_.empty() && clears_floats(kind))
+      y = clear_floats(x, max_width, y);
+    // A floating aside does not advance y: its box height is no hint.
+    if (kind != NodeKind::Aside &&
+        try_skip_block(child, x, y, max_width, out))
+      continue;
     layout_node(doc, child, x, y, max_width, out);
   }
 }
@@ -461,6 +533,7 @@ LayoutResult LayoutEngine::layout(
   folded_sections_ = folded_sections;
   focus_section_ = focus_section;
   skipped_any_ = false;
+  floats_.clear();
   if (viewport_.active()) {
     result.materialised_top = viewport_.top - viewport_.overscan;
     result.materialised_bottom = viewport_.bottom + viewport_.overscan;
@@ -494,6 +567,8 @@ LayoutResult LayoutEngine::layout(
     }
   }
   layout_node(doc, doc.root, mx, y, content_w, result);
+  for (const FloatBox& f : floats_) y = std::max(y, f.bottom);
+  floats_.clear();
   result.content_height = y + options_.margin_y + 24.f;
   result.virtualized = skipped_any_;
   height_hints_ = nullptr;
@@ -548,6 +623,10 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
     }
+
+    case NodeKind::Aside:
+      layout_aside(doc, node, x, y, max_width, out);
+      break;
 
     case NodeKind::List:
       y += before(BlockRole::List);
@@ -610,36 +689,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         LayoutResult col_out;
         layout_node(doc, cols[i], cx, cy, col_w, col_out);
 
-        out.glyphs.insert(out.glyphs.end(),
-                          col_out.glyphs.begin(), col_out.glyphs.end());
-        out.boxes.insert(out.boxes.end(),
-                         col_out.boxes.begin(), col_out.boxes.end());
-        out.images.insert(out.images.end(),
-                          col_out.images.begin(), col_out.images.end());
-        out.quote_bars.insert(out.quote_bars.end(),
-                              col_out.quote_bars.begin(),
-                              col_out.quote_bars.end());
-        out.note_bars.insert(out.note_bars.end(),
-                             col_out.note_bars.begin(),
-                             col_out.note_bars.end());
-        out.code_blocks.insert(out.code_blocks.end(),
-                               col_out.code_blocks.begin(),
-                               col_out.code_blocks.end());
-        out.table_lines.insert(out.table_lines.end(),
-                               col_out.table_lines.begin(),
-                               col_out.table_lines.end());
-        out.table_header_fills.insert(out.table_header_fills.end(),
-                                      col_out.table_header_fills.begin(),
-                                      col_out.table_header_fills.end());
-        out.hr_lines.insert(out.hr_lines.end(),
-                            col_out.hr_lines.begin(), col_out.hr_lines.end());
-        out.role_fills.insert(out.role_fills.end(), col_out.role_fills.begin(),
-                              col_out.role_fills.end());
-        out.role_rules.insert(out.role_rules.end(), col_out.role_rules.begin(),
-                              col_out.role_rules.end());
-        out.column_gaps.insert(out.column_gaps.end(),
-                               col_out.column_gaps.begin(),
-                               col_out.column_gaps.end());
+        append_result(out, col_out);
 
         if (cy > max_bottom) max_bottom = cy;
 
@@ -1318,35 +1368,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           LayoutResult cell_out;
           layout_node(doc, cells[i], cx + cell_pad, cy, col_w - cell_pad * 2.f,
                       cell_out);
-          out.glyphs.insert(out.glyphs.end(), cell_out.glyphs.begin(),
-                            cell_out.glyphs.end());
-          out.boxes.insert(out.boxes.end(), cell_out.boxes.begin(),
-                           cell_out.boxes.end());
-          out.images.insert(out.images.end(), cell_out.images.begin(),
-                            cell_out.images.end());
-          out.quote_bars.insert(out.quote_bars.end(),
-                                cell_out.quote_bars.begin(),
-                                cell_out.quote_bars.end());
-          out.note_bars.insert(out.note_bars.end(),
-                               cell_out.note_bars.begin(),
-                               cell_out.note_bars.end());
-          out.code_blocks.insert(out.code_blocks.end(),
-                                 cell_out.code_blocks.begin(),
-                                 cell_out.code_blocks.end());
-          out.table_lines.insert(out.table_lines.end(),
-                                 cell_out.table_lines.begin(),
-                                 cell_out.table_lines.end());
-          out.table_header_fills.insert(out.table_header_fills.end(),
-                                        cell_out.table_header_fills.begin(),
-                                        cell_out.table_header_fills.end());
-          out.hr_lines.insert(out.hr_lines.end(), cell_out.hr_lines.begin(),
-                              cell_out.hr_lines.end());
-          out.role_fills.insert(out.role_fills.end(),
-                                cell_out.role_fills.begin(),
-                                cell_out.role_fills.end());
-          out.role_rules.insert(out.role_rules.end(),
-                                cell_out.role_rules.begin(),
-                                cell_out.role_rules.end());
+          append_result(out, cell_out);
           if (cy > max_bottom) max_bottom = cy;
           cx += col_w;
         }
@@ -1675,6 +1697,120 @@ static void decode_utf8(const std::string& text,
   }
 }
 
+void LayoutEngine::layout_aside(const Document& doc, const Node& node,
+                                float x, float& y, float max_width,
+                                LayoutResult& out) {
+  const BlockStyle& bs = (*style_)[BlockRole::Aside];
+  const float em = static_cast<float>(fonts_.regular.pixel_size());
+  const float dp = options_.px_scale;
+  const float pad = bs.indent.px(em, dp);
+  const float gap = em;
+  FloatSide side = bs.float_side;
+  if (side != FloatSide::None) {
+    if (node.src == "left") side = FloatSide::Left;
+    else if (node.src == "right") side = FloatSide::Right;
+  }
+  float want = bs.width.px(em, dp);
+  if (want < 1.f) want = 16.f * em;
+  const float aw = std::min(want, max_width * 0.45f);
+  // Float only while it stays a box and the text beside it stays readable.
+  const bool floating = side != FloatSide::None && aw >= 6.f * em &&
+                        max_width - aw - gap >= 10.f * em;
+
+  auto frame = [&](float bx, float top, float w, float bottom) {
+    const LayoutBox box{node.id, bx, top, w, bottom - top};
+    if (bs.background.visible()) out.role_fills.push_back({box, BlockRole::Aside});
+    if (bs.border.visible()) out.role_frames.push_back({box, BlockRole::Aside});
+  };
+
+  if (!floating) {
+    y = clear_floats(x, max_width, y);
+    y += bs.space_before.px(em, dp);
+    const float top = y;
+    const size_t fill_at = out.role_fills.size();
+    float iy = top + pad;
+    layout_children_sequential(doc, node.children, x + pad, iy,
+                               std::max(40.f, max_width - 2.f * pad), out);
+    const float bottom = iy + pad;
+    frame(x, top, max_width, bottom);
+    // The fill goes under the children laid out before it.
+    if (bs.background.visible())
+      std::rotate(out.role_fills.begin() + static_cast<std::ptrdiff_t>(fill_at),
+                  out.role_fills.end() - 1, out.role_fills.end());
+    out.boxes.push_back({node.id, x, top, max_width, bottom - top});
+    y = bottom + bs.space_after.px(em, dp);
+    return;
+  }
+
+  float top = y + bs.space_before.px(em, dp);
+  const float bx = side == FloatSide::Right ? x + max_width - aw : x;
+  // Below earlier boxes on the same spot (stacked asides).
+  for (bool moved = true; moved;) {
+    moved = false;
+    for (const FloatBox& f : floats_) {
+      if (f.top <= top && f.bottom > top && f.right > bx && f.left < bx + aw) {
+        top = f.bottom;
+        moved = true;
+      }
+    }
+  }
+  const size_t fill_at = out.role_fills.size();
+  float iy = top + pad;
+  layout_children_sequential(doc, node.children, bx + pad, iy,
+                             std::max(20.f, aw - 2.f * pad), out);
+  // Trailing gap of the last child is padding enough.
+  const float bottom = iy + pad * 0.5f;
+  frame(bx, top, aw, bottom);
+  if (bs.background.visible())
+    std::rotate(out.role_fills.begin() + static_cast<std::ptrdiff_t>(fill_at),
+                out.role_fills.end() - 1, out.role_fills.end());
+  FloatBox fb;
+  fb.top = top;
+  fb.bottom = bottom + bs.space_after.px(em, dp);
+  fb.side = side;
+  fb.left = side == FloatSide::Right ? bx - gap : bx;
+  fb.right = side == FloatSide::Right ? bx + aw : bx + aw + gap;
+  floats_.push_back(fb);
+  out.boxes.push_back({node.id, bx, top, aw, bottom - top});
+  // y stays: the following blocks run beside the box.
+}
+
+void LayoutEngine::inline_image_size(const InlineSpan& sp, float max_w,
+                                     float& w, float& h, bool& remote) {
+  const float dp = options_.px_scale;
+  const float em = static_cast<float>(fonts_.regular.pixel_size());
+  remote = is_remote_image(sp.src);
+  float nat_w = 0.f, nat_h = 0.f;  // natural size in CSS px
+  if (images_ && !sp.src.empty()) {
+    const Image& img = remote
+                           ? images_->thumb(sp.src, image_base_, kRemoteThumbEdge)
+                           : images_->get(sp.src, image_base_);
+    if (img.ok && img.width > 0 && img.height > 0) {
+      nat_w = static_cast<float>(img.width);
+      nat_h = static_cast<float>(img.height);
+    }
+  }
+  if (sp.width > 0 && sp.height > 0) {
+    w = sp.width * dp;
+    h = sp.height * dp;
+  } else if (sp.width > 0 || sp.height > 0) {
+    const float aspect = nat_w > 0.f ? nat_h / nat_w : 1.f;
+    w = sp.width > 0 ? sp.width * dp : sp.height * dp / aspect;
+    h = sp.height > 0 ? sp.height * dp : sp.width * dp * aspect;
+  } else if (nat_w > 0.f) {
+    w = nat_w * dp;
+    h = nat_h * dp;
+  } else {
+    w = h = em;  // pending / missing: a box the size of a letter
+  }
+  if (w > max_w && w > 0.f) {
+    h *= max_w / w;
+    w = max_w;
+  }
+  w = std::max(1.f, w);
+  h = std::max(1.f, h);
+}
+
 void LayoutEngine::layout_chrome_notice(const Document& doc, float x,
                                         float& y, float max_width,
                                         LayoutResult& out) {
@@ -1742,6 +1878,9 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     InlineKind kind;
     FontRole role;
     float rise = 0.f;  // baseline lift (footnote marks without superscripts)
+    float img_w = 0.f;  // inline image: an atom of this size (else 0)
+    float img_h = 0.f;
+    bool remote = false;
   };
   std::vector<CharInfo> chars;
   for (size_t si = 0; si < node.spans.size(); ++si) {
@@ -1760,6 +1899,9 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
           c.cp = sup;
         else
           c.rise = static_cast<float>(f.ascender()) * 0.4f;
+      } else if (kind == InlineKind::Image && c.cp == kInlineImageCp) {
+        inline_image_size(node.spans[si], max_width, c.img_w, c.img_h,
+                          c.remote);
       }
       chars.push_back(c);
     }
@@ -1772,10 +1914,21 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     return;
   }
 
-  const float line_limit = x + max_width;  // exclusive right edge of measure
   float baseline = y + metrics.ascender();
+  // The current line: left edge and width, narrowed beside floating boxes.
+  float lx0 = x;
+  float lw = max_width;
+  auto place_line = [&]() {
+    lx0 = x;
+    lw = max_width;
+    if (floats_.empty()) return;
+    const float top = baseline - metrics.ascender();
+    float_band(top, top + metrics.line_height(), lx0, lw);
+  };
+  place_line();
 
   auto char_adv = [&](const CharInfo& c) -> float {
+    if (c.img_w > 0.f) return c.img_w;
     return static_cast<float>(fonts_.pick(c.role).glyph(c.cp).advance >> 6);
   };
 
@@ -1789,11 +1942,15 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     int gaps = 0;
     bool seen_nonspace = false;
     bool in_space = false;
+    float img_up = 0.f;  // inline images taller than the ascender lower the line
     float space_adv =
         static_cast<float>(metrics.glyph(' ').advance >> 6);
     if (space_adv < 1.f) space_adv = 4.f;
     for (size_t i = lo; i < content_hi; ++i) {
       natural += char_adv(chars[i]);
+      if (chars[i].img_h > 0.f)
+        img_up = std::max(img_up, chars[i].img_h -
+                                      static_cast<float>(metrics.ascender()));
       if (chars[i].cp == ' ') {
         if (seen_nonspace) in_space = true;
       } else {
@@ -1802,13 +1959,14 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
         seen_nonspace = true;
       }
     }
+    baseline += img_up;
 
     float gap_extra = 0.f;
     const bool can_justify =
         options_.justify && !last_or_hard && gaps > 0 &&
         base_role != FontRole::Code && base_role != FontRole::Heading;
     if (can_justify) {
-      float room = max_width - natural;
+      float room = lw - natural;
       if (room > 0.5f) {
         gap_extra = room / static_cast<float>(gaps);
         const float cap = space_adv * 3.f;
@@ -1816,13 +1974,11 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
       }
     }
 
-    float lx = x;
+    float lx = lx0;
     bool after_space_run = false;
     bool had_nonspace = false;
     for (size_t i = lo; i < hi; ++i) {
       const CharInfo& c = chars[i];
-      Font& font = fonts_.pick(c.role);
-      const Glyph& g = font.glyph(c.cp);
       if (i < content_hi) {
         if (c.cp == ' ') {
           if (had_nonspace) after_space_run = true;
@@ -1834,15 +1990,8 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
           had_nonspace = true;
         }
       }
-      // Never place the pen past the measure for content glyphs.
-      float adv = static_cast<float>(g.advance >> 6);
-      if (c.cp != ' ' && lx + adv > line_limit + 0.01f && lx > x + 0.01f) {
-        // Safety: should not happen if wrap is correct; still clamp.
-        // (Do not skip the glyph — caret indices must stay complete.)
-      }
       PositionedGlyph pg;
       pg.codepoint = c.cp;
-      pg.x = lx + static_cast<float>(g.bearing_x);
       pg.y = baseline - c.rise;
       pg.node = node.id;
       pg.span_index = c.span_idx;
@@ -1850,6 +1999,24 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
       pg.kind = c.kind;
       pg.font = c.role;
       pg.color = style_->text_color(block, c.kind);
+      if (c.img_w > 0.f) {
+        // Inline image: sits on the baseline; the glyph is its caret slot.
+        pg.x = lx;
+        pg.advance = c.img_w;
+        PositionedImage im{node.id, lx, baseline - c.img_h, c.img_w, c.img_h,
+                           node.spans[c.span_idx].src, image_base_};
+        if (c.remote) im.thumb = kRemoteThumbEdge;
+        im.in_text = true;
+        im.span_index = c.span_idx;
+        out.images.push_back(std::move(im));
+        out.glyphs.push_back(pg);
+        lx += c.img_w;
+        continue;
+      }
+      Font& font = fonts_.pick(c.role);
+      const Glyph& g = font.glyph(c.cp);
+      const float adv = static_cast<float>(g.advance >> 6);
+      pg.x = lx + static_cast<float>(g.bearing_x);
       pg.advance = lx + adv - pg.x;
       out.glyphs.push_back(pg);
       lx += adv;
@@ -1865,9 +2032,21 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
   bool in_word = false;
 
   auto flush_line = [&](size_t line_hi, bool hard) {
-    if (line_hi > line_lo) emit_line(line_lo, line_hi, hard);
+    if (line_hi > line_lo) {
+      emit_line(line_lo, line_hi, hard);
+      place_line();
+    }
     line_lo = line_hi;
     line_w = 0.f;
+  };
+  // Commit the word in progress: it moves to a new line when it does not fit.
+  auto end_word = [&]() {
+    if (!in_word) return;
+    if (line_w > 0.f && line_w + word_w > lw && word_w <= lw)
+      flush_line(word_lo, false);
+    line_w += word_w;
+    in_word = false;
+    word_w = 0.f;
   };
 
   for (size_t i = 0; i < chars.size(); ++i) {
@@ -1875,21 +2054,13 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
 
     if (cp == '\n' || cp == '\r') {
       // Commit any partial word, then hard-break.
-      if (in_word) {
-        // word is [word_lo, i)
-        if (line_w > 0.f && line_w + word_w > max_width && word_w <= max_width) {
-          flush_line(word_lo, false);
-        }
-        line_w += word_w;
-        in_word = false;
-        word_w = 0.f;
-      }
+      end_word();
       flush_line(i, true);
       // Placeholder so caret can sit on the newline index.
       {
         PositionedGlyph pg;
         pg.codepoint = ' ';
-        pg.x = x;
+        pg.x = lx0;
         pg.y = baseline;
         pg.node = node.id;
         pg.span_index = chars[i].span_idx;
@@ -1910,15 +2081,24 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
 
     float adv = char_adv(chars[i]);
 
+    if (chars[i].img_w > 0.f) {
+      // An inline image is a word of its own: breaks before and after it.
+      end_word();
+      if (line_w > 0.f && line_w + adv > lw) flush_line(i, false);
+      line_w += adv;
+      word_lo = i + 1;
+      continue;
+    }
+
     if (cp == ' ') {
       if (in_word) {
         // Finish word: does it fit on this line?
-        if (line_w > 0.f && line_w + word_w > max_width && word_w <= max_width) {
+        if (line_w > 0.f && line_w + word_w > lw && word_w <= lw) {
           flush_line(word_lo, false);
         }
         // If the word alone is wider than the measure, emit it on its own
         // line (may overflow slightly; rare for Latin body text).
-        if (line_w == 0.f && word_w > max_width) {
+        if (line_w == 0.f && word_w > lw) {
           flush_line(i, false);  // emit the overlong word
           word_lo = i;
           word_w = 0.f;
@@ -1932,10 +2112,10 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
       }
       // Space: only keep it if it still fits; otherwise start a new line
       // (space is discarded as trailing / not carried).
-      if (line_w > 0.f && line_w + adv > max_width) {
-        flush_line(i, false);
+      if (line_w > 0.f && line_w + adv > lw) {
+        // The space ends this line (trimmed there), never starts the next.
+        flush_line(i + 1, false);
         word_lo = i + 1;
-        // skip this space
         continue;
       }
       if (line_w > 0.f) {
@@ -1957,11 +2137,7 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
   }
 
   // Tail: last word + line.
-  if (in_word) {
-    if (line_w > 0.f && line_w + word_w > max_width && word_w <= max_width)
-      flush_line(word_lo, false);
-    line_w += word_w;
-  }
+  end_word();
   if (line_lo < chars.size()) flush_line(chars.size(), true);
 
   y = baseline - metrics.ascender() + metrics.line_height() * 0.2f;
