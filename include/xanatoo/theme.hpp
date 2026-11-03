@@ -29,6 +29,7 @@ struct Palette {
   Rgb face_light = rgb(0xF6, 0xF5, 0xF2);  // gradient top, menu
   Rgb face_dark = rgb(0xDA, 0xD6, 0xCF);   // gradient bottom, pressed
   Rgb field = rgb(0xFF, 0xFF, 0xFF);       // text entry / sunken well
+  Rgb scroll_trough = rgb(0x5C, 0x5A, 0x55);  // scrollbar trough (dark, vs light thumb)
   Rgb paper = rgb(0xF8, 0xF6, 0xF0);       // document canvas
   // Bevel edges
   Rgb highlight = rgb(0xFF, 0xFF, 0xFF);

@@ -165,7 +165,7 @@ void Ui::apply_classic_theme() {
   c[ImGuiCol_TitleBgActive] = P(pal.tab_top);
   c[ImGuiCol_TitleBgCollapsed] = header;
   c[ImGuiCol_MenuBarBg] = bg2;
-  c[ImGuiCol_ScrollbarBg] = C(0xE4, 0xE2, 0xDE);
+  c[ImGuiCol_ScrollbarBg] = C(0x5C, 0x5A, 0x55);
   c[ImGuiCol_ScrollbarGrab] = C(0xB8, 0xB6, 0xB0);
   c[ImGuiCol_ScrollbarGrabHovered] = C(0xA0, 0x9E, 0x98);
   c[ImGuiCol_ScrollbarGrabActive] = C(0x88, 0x86, 0x80);

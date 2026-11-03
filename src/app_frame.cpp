@@ -2433,7 +2433,7 @@ static void draw_pane_scrollbar(App& app, int i) {
     namespace th = xanatoo::theme;
     const th::Palette& pal = th::palette();
     SDL_Rect track_r{sx, top, kSbW, vh};
-    th::fill(app.sdl, track_r, pal.face_dark);
+    th::fill(app.sdl, track_r, pal.scroll_trough);
     th::bevel(app.sdl, track_r, th::Bevel::Sunken);
 
     // Metadata marks on the track (doc Y → track fraction).
