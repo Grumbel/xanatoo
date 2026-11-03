@@ -72,6 +72,10 @@ std::string plain_text(const Document& doc, NodeId id);
 // Raster formats supported by stb_image in this project.
 bool is_raster_image_path(std::string_view path);
 
+// Link target that is an image file by its extension (query / fragment
+// ignored): http(s) URLs and local paths; other schemes are not.
+bool is_image_url(std::string_view url);
+
 // Case-insensitive suffix check (e.g. ".sexp").
 bool path_ends_with_ci(std::string_view path, std::string_view suffix);
 

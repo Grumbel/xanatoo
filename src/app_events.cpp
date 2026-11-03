@@ -367,6 +367,7 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
     if (auto href = xanatoo::hit_test_link(doc_of(app, p), p.layout, lx, my,
                                            p.scroll_y)) {
       const bool ctrl_click = (SDL_GetModState() & KMOD_CTRL) != 0;
+      if (!ctrl_click && open_link_image(app, app.focus, *href)) return;
       // Split view: left links open on the right, right links shift left.
       if (!ctrl_click && follow_link_split(app, app.focus, *href)) {
         reset_blink(app);

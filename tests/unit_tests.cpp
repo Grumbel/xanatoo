@@ -432,6 +432,14 @@ void test_path_helpers() {
   EXPECT(is_raster_image_path("pic.PNG"));
   EXPECT(is_raster_image_path("a/b/c.jpeg"));
   EXPECT(!is_raster_image_path("doc.md"));
+  EXPECT(is_image_url("https://upload.example/a/Cat.JPG"));
+  EXPECT(is_image_url("https://cdn.example/p.webp?w=800#x"));
+  EXPECT(is_image_url("img/local.png"));
+  EXPECT(is_image_url("/abs/pic.gif"));
+  EXPECT(!is_image_url("https://example.org/page.png.html"));
+  EXPECT(!is_image_url("https://example.org/?img=a.png"));
+  EXPECT(!is_image_url("gemini://host/a.png"));
+  EXPECT(!is_image_url("mailto:a.png"));
 }
 
 void test_parse_org() {

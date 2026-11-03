@@ -407,6 +407,9 @@ mechanism; historical bundle numbers in TODO.md are archival).
 - Layout draws remote images from their `kRemoteThumbEdge` thumbnail
   (`layout_remote_image`); a click opens the lightbox over all document
   images.
+- Links to images (`is_image_url`: http(s) or local path by extension)
+  open the lightbox over every image link of the page (`open_link_image`,
+  checked before split / external handling), never the system browser.
 - No posting or key management in v1.
 
 ## Images through thumtoo (`image_backend.hpp`)

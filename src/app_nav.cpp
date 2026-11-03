@@ -254,6 +254,7 @@ void open_link_in_tab(App& app, int pi, const std::string& href) {
       return;
     }
     case LinkKind::External:
+      if (open_link_image(app, pi, t.url)) return;
       flash_status(app, "Opening " + t.url);
       xanatoo::open_external_url(t.url);
       return;
@@ -588,6 +589,7 @@ void activate_at_caret(App& app) {
   if (!cpos.valid) return;
   if (auto href =
           xanatoo::hit_test_link(d, p.layout, cpos.x, cpos.y, p.scroll_y)) {
+    if (open_link_image(app, app.focus, *href)) return;
     if (follow_link_split(app, app.focus, *href)) return;
     if (auto dest = xanatoo::jump_to_href(d, *href)) {
       expand_ancestors_for_node(app, dest->node);

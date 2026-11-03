@@ -1034,6 +1034,10 @@ void collection_command(App& app, const std::string& arg);
 // Press on a collection card or inline thumbnail (remote image) in pane
 // `pi`: open the lightbox at that item.
 bool click_collection_card(App& app, int pi, float lx, float my);
+// Link to an image (http(s) or a local file, `is_image_url`) in pane `pi`:
+// the lightbox over every image link of the page, at this one. False (and
+// nothing opened) when `href` is no image link.
+bool open_link_image(App& app, int pi, const std::string& href);
 // Right-click: remember the collection under the point for the menu.
 void note_collection_target(App& app, int pi, float lx, float my);
 // While the lightbox is open it takes every event. True = consumed.

@@ -111,6 +111,25 @@ bool is_raster_image_path(std::string_view path) {
          path_ends_with_ci(path, ".bmp");
 }
 
+bool is_image_url(std::string_view url) {
+  // Scheme-relative or relative paths are fine; other schemes are not
+  // images we can load ("gemini://…/a.png", "mailto:").
+  const size_t colon = url.find(':');
+  const size_t slash = url.find('/');
+  if (colon != std::string_view::npos &&
+      (slash == std::string_view::npos || colon < slash) &&
+      !starts_with_ci(url, "http://") && !starts_with_ci(url, "https://") &&
+      !(colon == 1 && slash == 2))  // C:/path
+    return false;
+  std::string_view path = url.substr(0, url.find_first_of("?#"));
+  static constexpr std::string_view kExts[] = {
+      ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp",
+      ".svg", ".avif", ".tif", ".tiff", ".jxl"};
+  for (std::string_view ext : kExts)
+    if (path_ends_with_ci(path, ext)) return true;
+  return false;
+}
+
 bool write_file_atomic(const std::string& path, std::string_view content) {
   const fs::path target(path);
   if (!ensure_dir(target.parent_path().string())) return false;

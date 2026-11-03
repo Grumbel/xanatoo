@@ -153,6 +153,52 @@ bool click_collection_card(App& app, int pi, float lx, float my) {
   return false;
 }
 
+bool open_link_image(App& app, int pi, const std::string& href) {
+  if (!xanatoo::is_image_url(href)) return false;
+  // Relative links of a Gemini page are gemini:// resources.
+  if (!link_base_url(app, pi).empty() && !xanatoo::starts_with_ci(href, "http"))
+    return false;
+  Pane& pane = app.panes[pi];
+  const auto& doc = doc_of(app, pane);
+  Lightbox& lb = app.lightbox;
+  lb.items.clear();
+  lb.index = 0;
+  bool found = false;
+  std::vector<NodeId> stack{doc.root};
+  while (!stack.empty()) {
+    const NodeId id = stack.back();
+    stack.pop_back();
+    if (id == xanatoo::INVALID_NODE) continue;
+    const xanatoo::Node& n = doc.get(id);
+    for (const auto& s : n.spans) {
+      if (s.kind != xanatoo::InlineKind::Link || !xanatoo::is_image_url(s.href))
+        continue;
+      if (std::any_of(lb.items.begin(), lb.items.end(),
+                      [&](const LightboxItem& it) { return it.src == s.href; }))
+        continue;
+      if (!found && s.href == href) {
+        lb.index = static_cast<int>(lb.items.size());
+        found = true;
+      }
+      // "[image: alt]" labels: the alt text; "[image]": the file name.
+      std::string caption = s.text;
+      if (xanatoo::starts_with(caption, "[image: ") && caption.back() == ']')
+        caption = caption.substr(8, caption.size() - 9);
+      else if (xanatoo::starts_with(caption, "[image"))
+        caption.clear();
+      lb.items.push_back({s.href, std::move(caption)});
+    }
+    stack.insert(stack.end(), n.children.rbegin(), n.children.rend());
+  }
+  if (!found) {  // link from outside the spans (e.g. a Message header)
+    lb.index = static_cast<int>(lb.items.size());
+    lb.items.push_back({href, {}});
+  }
+  lb.base = base_of(app, pane);
+  lb.open = true;
+  return true;
+}
+
 void note_collection_target(App& app, int pi, float lx, float my) {
   Pane& p = app.panes[pi];
   app.collection_target = xanatoo::INVALID_NODE;
