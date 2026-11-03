@@ -88,7 +88,7 @@ void begin_gesture(App& app, float x, float y) {
   }
   t.pane = pane_at(app, x, y);
   const Pane& p = app.panes[t.pane];
-  const bool on_scrollbar = xi >= p.x + p.w - kSbW;
+  const bool on_scrollbar = xi >= sb_x(p) && xi < sb_x(p) + kSbW;
   const bool on_gutter = app.split && std::abs(x - app.panes[1].x) <= 3.f;
   if (on_scrollbar || on_gutter) {
     t.mode = TouchMode::Direct;

@@ -616,7 +616,7 @@ void draw_preview_badge(App& app, int pi) {
   const th::Palette& pal = th::palette();
   const Pane& p = app.panes[1];
   const int top = p.y;
-  const int w = std::max(1, p.w - kSbW);
+  const int w = std::max(1, p.w - sb_reserve(p));
   const int h = p.h;
   SDL_RenderSetClipRect(app.sdl, nullptr);
   SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);

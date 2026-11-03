@@ -444,7 +444,7 @@ void draw_load_indicator(App& app, int pi) {
   const float t = static_cast<float>(now - job->started) / 1000.f;
   // ImGui's tab strip (drawn last) overlaps the pane's first pixels.
   const int top = p.y + 2;
-  const int w = std::max(1, p.w - kSbW);
+  const int w = std::max(1, p.w - sb_reserve(p));
   SDL_RenderSetClipRect(app.sdl, nullptr);
   SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
 

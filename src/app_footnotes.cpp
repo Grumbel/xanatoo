@@ -69,7 +69,7 @@ void draw_footnote_overlay(App& app, int pi, const SDL_Rect& clip) {
   std::vector<std::string> keys = xanatoo::visible_footnote_keys(
       doc_of(app, pane), pane.layout, top, bottom);
   if (keys.empty()) return;
-  const int width = std::max(40, pane.w - kSbLayoutGutter);
+  const int width = std::max(40, pane.w - sb_gutter(pane));
   if (keys != fo.keys || fo.layout_gen != pane.layout.generation ||
       fo.width != width)
     build_overlay(app, pane, std::move(keys), width);

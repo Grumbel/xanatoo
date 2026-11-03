@@ -47,7 +47,8 @@ void sync_window_size(App& app) {
   apply_window_size(app, nw, nh);
   // A docked window opened, closed or moved: the pane area changed.
   const Pane& last = app.split ? app.panes[1] : app.panes[0];
-  if (app.panes[0].x != dock_column_w(app, Dock::Left) ||
+  if (app.panes[0].x != dock_column_w(app, Dock::Left) +
+                              (app.panes[0].sb_left ? kSbW : 0) ||
       app.panes[0].y !=
           static_cast<int>(app.ui_top) + dock_band_h(app, Dock::Top) ||
       last.x + last.w != app.win_w - dock_column_w(app, Dock::Right))
@@ -1596,7 +1597,7 @@ static void draw_pane_overlays(App& app, int i) {
       if (last.w > 0) {
         // ▸ at the pane's right edge, level with the link's last line.
         const int h = std::max(4, last.h / 3);
-        const int x = pane.x + pane.w - kSbW - h - 3;
+        const int x = pane.x + pane.w - sb_reserve(pane) - h - 3;
         const int cy = last.y + last.h / 2;
         SDL_SetRenderDrawColor(app.sdl, 200, 120, 10, 255);
         for (int k = 0; k < h; ++k)
@@ -2397,7 +2398,7 @@ static void draw_pane_scrollbar(App& app, int i) {
     float track_travel = std::max(0.f, track_h - thumb_h);
     float ratio = (max_scroll > 0.f) ? (pane.scroll_y / max_scroll) : 0.f;
     float thumb_y = static_cast<float>(pane.y) + arrow + ratio * track_travel;
-    int sx = pane.x + pane.w - kSbW;
+    int sx = sb_x(pane);
     int top = pane.y;
     int vh = static_cast<int>(view_h);
 
@@ -2618,7 +2619,7 @@ void draw_pane(App& app, int i) {
   pane.scroll_y = std::min(pane.scroll_y, pane_max_scroll(app, pane));
 
   const int clip_y = pane.y;
-  SDL_Rect clip{pane.x, clip_y, std::max(1, pane.w - kSbW),
+  SDL_Rect clip{pane.x, clip_y, std::max(1, pane.w - sb_reserve(pane)),
                 std::max(1, pane.h)};
 
   // Draw at a whole-pixel scroll so the cached raster can be blitted; the

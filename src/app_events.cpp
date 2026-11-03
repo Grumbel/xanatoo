@@ -211,10 +211,10 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
     // Classic scrollbar (right edge): arrows page, track jumps/drags.
     {
       const int pi = at;
-      int sx = app.panes[pi].x + app.panes[pi].w - kSbW;
+      int sx = sb_x(app.panes[pi]);
       // `my` is content Y (0 at top of viewport).
       const float view_h = static_cast<float>(app.panes[pi].h);
-      if (mx >= sx && my >= 0.f && my < view_h) {
+      if (mx >= sx && mx < sx + kSbW && my >= 0.f && my < view_h) {
         focus_view(app, pi);
         Pane& sp = app.panes[pi];
         float content_h = std::max(view_h, sp.layout.content_height);
@@ -721,9 +721,8 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
       app.sb_hover = 0;
       float myh = content_y(app, app.mouse_y, app.focus);
       const float view_h = static_cast<float>(app.panes[app.focus].h);
-      int sx = app.panes[app.focus].x + app.panes[app.focus].w - kSbW;
-      if (app.mouse_x >= sx &&
-          app.mouse_x < app.panes[app.focus].x + app.panes[app.focus].w &&
+      int sx = sb_x(app.panes[app.focus]);
+      if (app.mouse_x >= sx && app.mouse_x < sx + kSbW &&
           myh >= 0.f && myh < view_h) {
         if (myh < static_cast<float>(kSbArrow))
           app.sb_hover = 1;

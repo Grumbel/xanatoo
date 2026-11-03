@@ -159,6 +159,9 @@ struct Pane {
   BufferId buf = kNoBuffer;
   NavHistory nav;  // this view's own Back / Forward
   xanatoo::Selection sel{};
+  // Scrollbar strip sits left of the rect (left pane of a split: the middle
+  // stays a bare divider). pane.x is then the content origin.
+  bool sb_left = false;
   float scroll_y = 0.f;
   float preferred_x = 0.f;
   xanatoo::LayoutResult layout{};
@@ -854,6 +857,13 @@ void place_centre_rows(App& app);
 // Over a floating window's frame or a panel, i.e. not over document text.
 bool over_float_chrome(App& app, int x, int y);
 float local_x(App& app, float mx, int pi);
+// Scrollbar strip of a view: x of the strip, width reserved at the right of
+// the content, and the layout width taken off the pane width.
+inline int sb_x(const Pane& p) { return p.sb_left ? p.x - kSbW : p.x + p.w - kSbW; }
+inline int sb_reserve(const Pane& p) { return p.sb_left ? 0 : kSbW; }
+inline int sb_gutter(const Pane& p) {
+  return p.sb_left ? kSbLayoutGutter - kSbW : kSbLayoutGutter;
+}
 // Window y → content y of view `pi` (0 = top of its viewport).
 float content_y(App& app, float window_y, int pi);
 std::tuple<int, int, int, int> outline_client_rect(App& app);

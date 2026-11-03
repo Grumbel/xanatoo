@@ -310,11 +310,13 @@ void layout_panes(App& app) {
   if (app.split) {
     int left_w = static_cast<int>(app.split_ratio * (ww - gutter));
     left_w = std::max(120, std::min(ww - gutter - 120, left_w));
-    app.panes[0].x = dock;
-    app.panes[0].w = left_w;
+    app.panes[0].sb_left = true;
+    app.panes[0].x = dock + kSbW;
+    app.panes[0].w = left_w - kSbW;
     app.panes[1].x = dock + left_w + gutter;
     app.panes[1].w = ww - left_w - gutter;
   } else {
+    app.panes[0].sb_left = false;
     app.panes[0].x = dock;
     app.panes[0].w = ww;
     app.panes[1].x = dock;
@@ -349,7 +351,7 @@ void layout_panes(App& app) {
       app.layout_engine.set_hide_chrome(pane_reader(app, pane));
       pane.layout = app.layout_engine.layout(
           doc_of(app, pane),
-          static_cast<float>(std::max(40, pane.w - kSbLayoutGutter)),
+          static_cast<float>(std::max(40, pane.w - sb_gutter(pane))),
           base_of(app, pane), vp, hints, &app.folded_sections,
           pane_cut(app, pane));
       pane.layout_buf = pane.buf;
@@ -423,7 +425,7 @@ void force_full_pane_layout(App& app, Pane& p) {
     xanatoo::ensure_valid_caret(doc_of(app, p), p.sel.focus);
     xanatoo::ensure_valid_caret(doc_of(app, p), p.sel.anchor);
     p.layout = app.layout_engine.layout(
-        doc_of(app, p), static_cast<float>(std::max(40, p.w - kSbLayoutGutter)),
+        doc_of(app, p), static_cast<float>(std::max(40, p.w - sb_gutter(p))),
         base_of(app, p), {}, nullptr, &app.folded_sections,
         pane_cut(app, p));
     for (const auto& b : p.layout.boxes) {
