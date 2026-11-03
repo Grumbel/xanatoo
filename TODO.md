@@ -41,6 +41,13 @@ Next bundle number: **263** (this delivery is **262**)
 - Checked under Xvfb: tour at 1280 px (right and left margin asides,
   include, collections, thread, footnote overlay), a local page with
   `<nav>` + `<aside>` (aside in the right margin; nav in the Page panel).
+- Footnotes are set in the small face (`footnote` role: `(font small)`,
+  muted colour; the key in the margin column too), so notes and the
+  overlay strip read as secondary text.
+- Every page under `examples/` is installed (the whole directory) and is
+  listed in Help → Examples (`include/xanatoo/examples.hpp`, used by
+  `ui.cpp`); `test_examples_in_menu` fails when a page is missing there
+  or a menu entry has no file. Biblio entries must stay on one line.
 - Open:
   - Page panel: hides the regions in every pane (not only the focused
     one); only link and text rows, no nested folding; no hover preview.

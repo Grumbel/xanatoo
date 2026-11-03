@@ -21,6 +21,7 @@
 #include "xanatoo/sitemap.hpp"
 #include "xanatoo/revstore.hpp"
 #include "xanatoo/paths.hpp"
+#include "xanatoo/examples.hpp"
 #include "xanatoo/util.hpp"
 #include "xanatoo/parse.hpp"
 #include "xanatoo/editor.hpp"
@@ -2105,6 +2106,43 @@ void test_inline_images_and_asides() {
   }
 }
 
+// Every page under examples/ is in Help → Examples (kExamples), and every
+// menu entry exists; the diff pair opens through its own item.
+void test_examples_in_menu() {
+  using namespace xanatoo;
+  namespace fs = std::filesystem;
+  const std::string tour = data_file("examples/tour.md");
+  if (tour.empty()) {
+    std::fprintf(stderr, "SKIP test_examples_in_menu (no data dir)\n");
+    return;
+  }
+  const fs::path dir = fs::path(tour).parent_path();
+  std::unordered_set<std::string> listed;
+  for (const ExampleEntry& e : kExamples) {
+    if (!e.file) continue;
+    listed.insert(e.file);
+    if (!fs::exists(dir / e.file))
+      std::fprintf(stderr, "menu lists missing example %s\n", e.file);
+    EXPECT(fs::exists(dir / e.file));
+  }
+  for (const char* f : kExampleDiffPair) {
+    listed.insert(f);
+    EXPECT(fs::exists(dir / f));
+  }
+  for (const auto& de : fs::directory_iterator(dir)) {
+    if (!de.is_regular_file()) continue;
+    const std::string ext = de.path().extension().string();
+    if (ext != ".md" && ext != ".gmi" && ext != ".gemini" && ext != ".org" &&
+        ext != ".sexp")
+      continue;  // pictures and the like
+    const std::string name = de.path().filename().string();
+    if (!listed.count(name))
+      std::fprintf(stderr, "examples/%s is not in the Examples menu "
+                           "(include/xanatoo/examples.hpp)\n", name.c_str());
+    EXPECT(listed.count(name));
+  }
+}
+
 // examples/tour.md is the feature tour: it keeps showing every block kind.
 void test_tour_example() {
   using namespace xanatoo;
@@ -2924,6 +2962,7 @@ int main() {
   test_layout_margins_and_measure();
   test_layout_reader_mode();
   test_inline_images_and_asides();
+  test_examples_in_menu();
   test_tour_example();
   test_view_settings_migration();
   test_style_sheet_parse();

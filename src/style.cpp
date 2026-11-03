@@ -463,6 +463,9 @@ DocStyle builtin_style() {
     BlockStyle& b = blk(BlockRole::Footnote);
     b.indent = px(24);
     b.space_after = px(8);
+    b.font = FontRole::Small;  // notes are set smaller than the text
+    b.has_color = true;
+    b.color = {88, 86, 80, 255};
     b.border = {170, 168, 160, 255};
   }
   blk(BlockRole::Thread).space_after = px(10);

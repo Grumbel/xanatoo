@@ -355,18 +355,9 @@ install(FILES FORMAT.md DESTINATION share/xanatoo)
 install(DIRECTORY styles/
         DESTINATION share/xanatoo/styles
         FILES_MATCHING PATTERN "*.xss")
-install(DIRECTORY examples/
-        DESTINATION share/xanatoo/examples
-        FILES_MATCHING
-          PATTERN "*.md"
-          PATTERN "*.png"
-          PATTERN "*.jpg"
-          PATTERN "*.jpeg"
-          PATTERN "*.gif"
-          PATTERN "*.sexp"
-          PATTERN "*.gmi"
-          PATTERN "*.gemini"
-          PATTERN "*.org")
+# Everything under examples/ (pages, pictures, collection/): a test checks
+# that the menu lists every page.
+install(DIRECTORY examples/ DESTINATION share/xanatoo/examples)
 
 
 # ---------------------------------------------------------------------------

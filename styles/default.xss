@@ -39,7 +39,8 @@
   (role figure      (space-after 10))
   (role caption     (font italic) (space-after 6))
   (role bibliography-entry (indent 16) (space-after 8))
-  (role footnote    (indent 24) (space-after 8) (border "#aaa8a0"))
+  (role footnote    (indent 24) (space-after 8) (font small) (color "#585650")
+                    (border "#aaa8a0"))
   (role thread      (font heading) (space-after 10))
   (role message     (space-after 8) (border "#28828c")
                     (background (rgba 255 255 255 150)))   ; comment card

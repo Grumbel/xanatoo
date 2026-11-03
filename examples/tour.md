@@ -261,8 +261,7 @@ Citations point into a bibliography:
 one long text.
 
 :::biblio
-[^nelson65]: Theodor H. Nelson. *A File Structure for the Complex, the
-Changing and the Indeterminate.* ACM National Conference, 1965.
+[^nelson65]: Theodor H. Nelson. *A File Structure for the Complex, the Changing and the Indeterminate.* ACM National Conference, 1965.
 [^raskin87]: Jef Raskin. *The Canon Cat.* Information Appliance, 1987.
 :::
 

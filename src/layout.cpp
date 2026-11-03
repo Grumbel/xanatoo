@@ -1215,7 +1215,8 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
                          max_width - hang, out);
         out.boxes.push_back({cid, x + hang, py, max_width - hang, y - py});
       }
-      Font& mf = fonts_.pick(FontRole::Body);
+      const FontRole mrole = st[BlockRole::Footnote].font;
+      Font& mf = fonts_.pick(mrole);
       float baseline = body_y + static_cast<float>(mf.ascender());
       for (size_t gi = first; gi < out.glyphs.size(); ++gi) {
         if (out.glyphs[gi].node == INVALID_NODE) continue;
@@ -1237,7 +1238,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         pg.y = baseline;
         pg.node = INVALID_NODE;  // decoration, not a caret target
         pg.kind = InlineKind::FootnoteRef;
-        pg.font = FontRole::Body;
+        pg.font = mrole;
         pg.color = st.text_color(BlockRole::Footnote, InlineKind::FootnoteRef);
         pg.advance = mx + static_cast<float>(g.advance >> 6) - pg.x;
         out.glyphs.push_back(pg);

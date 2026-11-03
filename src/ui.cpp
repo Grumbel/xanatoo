@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
+#include "xanatoo/examples.hpp"
 #include "xanatoo/ui.hpp"
 #include "xanatoo/theme.hpp"
 #include "xanatoo/view_settings.hpp"
@@ -552,15 +553,10 @@ static void menu_example_items(UiCommand& cmd, std::string& arg) {
       arg = file;
     }
   };
-  ex("Welcome", "welcome.md");
-  ex("Keyboard reference", "help.md");
-  ImGui::Separator();
-  ex("Feature tour (every block kind)", "tour.md");
-  ImGui::Separator();
-  ex("Gemini gemtext", "gemini-sample.gmi");
-  ex("Org-mode", "sample.org");
-  ex("Semantic format (S-expression)", "semantic.sexp");
-  ex("Sample (S-expression)", "sample.sexp");
+  for (const xanatoo::ExampleEntry& e : xanatoo::kExamples) {
+    if (e.label) ex(e.label, e.file);
+    else ImGui::Separator();
+  }
   ImGui::Separator();
   if (ImGui::MenuItem("Diff demo (v1 | v2, marks on)"))
     cmd = UiCommand::LoadDiffDemo;
