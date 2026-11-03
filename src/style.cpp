@@ -72,6 +72,10 @@ constexpr std::pair<const char*, FontRole> kFontRoles[] = {
     {"bold-italic", FontRole::BodyBoldItalic},
     {"heading", FontRole::Heading},
     {"code", FontRole::Code},
+    {"small", FontRole::Small},
+    {"small-bold", FontRole::SmallBold},
+    {"small-italic", FontRole::SmallItalic},
+    {"small-bold-italic", FontRole::SmallBoldItalic},
 };
 
 int hex_digit(char c) {

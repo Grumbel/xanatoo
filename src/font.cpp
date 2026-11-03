@@ -551,6 +551,17 @@ bool FontSet::load(SDL_Renderer* renderer, const std::string& preferred_path,
     try_load(mono, regular.path(), body_px, renderer, "mono(fallback)");
   }
 
+  // Margin text: the same faces, smaller.
+  const int spx = small_px(body_px);
+  auto path_of = [&](const Font& f) {
+    return f.loaded() ? f.path() : regular.path();
+  };
+  try_load(small, regular.path(), spx, renderer, "small");
+  try_load(small_bold, path_of(bold), spx, renderer, "small-bold");
+  try_load(small_italic, path_of(italic), spx, renderer, "small-italic");
+  try_load(small_bold_italic, path_of(bold_italic), spx, renderer,
+           "small-bold-italic");
+
   return regular.loaded();
 }
 
@@ -561,6 +572,20 @@ void FontSet::set_sizes(int body_px, int heading_px) {
   if (bold_italic.loaded()) bold_italic.set_size(body_px);
   if (heading.loaded()) heading.set_size(heading_px);
   if (mono.loaded()) mono.set_size(body_px);
+  const int spx = small_px(body_px);
+  for (Font* f : {&small, &small_bold, &small_italic, &small_bold_italic})
+    if (f->loaded()) f->set_size(spx);
+}
+
+FontRole small_role(FontRole role) {
+  switch (role) {
+    case FontRole::Body: return FontRole::Small;
+    case FontRole::BodyBold: return FontRole::SmallBold;
+    case FontRole::Heading: return FontRole::SmallBold;
+    case FontRole::BodyItalic: return FontRole::SmallItalic;
+    case FontRole::BodyBoldItalic: return FontRole::SmallBoldItalic;
+    default: return role;
+  }
 }
 
 Font& FontSet::pick(FontRole role) {
@@ -576,6 +601,15 @@ Font& FontSet::pick(FontRole role) {
       return heading.loaded() ? heading : regular;
     case FontRole::Code:
       return mono.loaded() ? mono : regular;
+    case FontRole::Small:
+      return small.loaded() ? small : regular;
+    case FontRole::SmallBold:
+      return small_bold.loaded() ? small_bold : pick(FontRole::Small);
+    case FontRole::SmallItalic:
+      return small_italic.loaded() ? small_italic : pick(FontRole::Small);
+    case FontRole::SmallBoldItalic:
+      return small_bold_italic.loaded() ? small_bold_italic
+                                        : pick(FontRole::SmallBold);
     case FontRole::Body:
     default:
       return regular;

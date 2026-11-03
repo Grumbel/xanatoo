@@ -85,7 +85,21 @@ enum class FontRole : uint8_t {
   BodyBoldItalic,
   Heading,
   Code,
+  // Margin text (asides, side bars): the body faces at kSmallScale.
+  Small,
+  SmallBold,
+  SmallItalic,
+  SmallBoldItalic,
 };
+
+// Size of the Small* faces relative to the body size.
+constexpr float kSmallScale = 0.85f;
+inline int small_px(int body_px) {
+  return static_cast<int>(static_cast<float>(body_px) * kSmallScale + 0.5f);
+}
+
+// The small face for a body face (Heading → SmallBold, Code stays Code).
+FontRole small_role(FontRole role);
 
 // Resolve a font file via FontConfig (family + weight + slant).
 // weight: 0=regular, 1=bold; slant: 0=roman, 1=italic.
@@ -120,6 +134,10 @@ public:
   Font bold_italic;
   Font heading;
   Font mono;
+  Font small;
+  Font small_bold;
+  Font small_italic;
+  Font small_bold_italic;
 
   // preferred_path may be empty (FontConfig defaults) or a concrete .ttf;
   // it wins over families.body (reader choice beats the style sheet).

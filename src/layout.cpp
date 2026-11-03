@@ -105,6 +105,16 @@ void LayoutEngine::set_style(const DocStyle* style) {
 // block face combines with the span's own emphasis).
 static FontRole style_role(FontRole base, InlineKind kind) {
   if (kind == InlineKind::Code || base == FontRole::Code) return FontRole::Code;
+  switch (base) {  // small block faces: the body logic, then made small
+    case FontRole::Small: return small_role(style_role(FontRole::Body, kind));
+    case FontRole::SmallBold:
+      return small_role(style_role(FontRole::BodyBold, kind));
+    case FontRole::SmallItalic:
+      return small_role(style_role(FontRole::BodyItalic, kind));
+    case FontRole::SmallBoldItalic:
+      return small_role(style_role(FontRole::BodyBoldItalic, kind));
+    default: break;
+  }
   if (base == FontRole::Heading) return FontRole::Heading;
   const bool strong = kind == InlineKind::Strong ||
                       base == FontRole::BodyBold ||
@@ -1907,8 +1917,11 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     }
   }
 
+  const bool small_base = small_role(base_role) == base_role &&
+                          base_role != FontRole::Code;
   Font& metrics = fonts_.pick(base_role == FontRole::Heading ? FontRole::Heading
-                                                             : FontRole::Body);
+                              : small_base                  ? FontRole::Small
+                                                            : FontRole::Body);
   if (chars.empty()) {
     y += metrics.line_height();
     return;
