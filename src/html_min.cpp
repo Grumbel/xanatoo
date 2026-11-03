@@ -502,9 +502,12 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
     std::string alt = html_to_plain(html_attr(attrs, "alt"));
     src = resolve_url(opt_.base_url, src);
     // A real Image at block level; icons (small declared size) and images
-    // inside quotes, list items or cells stay links in the text.
+    // inside quotes, list items or cells stay links in the text. So does an
+    // image inside an <a>: as a block it would lose the link and a click
+    // would show the thumbnail instead of the linked target.
     const bool icon = (w > 0 && w <= kIconEdge) || (h > 0 && h <= kIconEdge);
-    if (opt_.images && !in_leaf && !icon && !starts_with(src, "data:")) {
+    if (opt_.images && !in_leaf && !icon && links_.empty() &&
+        !starts_with(src, "data:")) {
       const NodeKind ck = doc_.get(container()).kind;
       if (ck != NodeKind::List && ck != NodeKind::Table &&
           ck != NodeKind::TableRow) {
