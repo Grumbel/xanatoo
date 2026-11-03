@@ -8,6 +8,14 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-11-03) — lightbox zoom
+
+- Lightbox (`app_collection.cpp`): caption shows `W×H · zoom%`; wheel zooms
+  around the pointer, `+` / `-` zoom, `0` fit, `1` 100%, drag pans
+  (`Lightbox::scale` 0 = fit, `pan_x/y`; reset on stepping). Wheel no longer
+  steps (arrows / edge clicks do). Built and unit tests pass; not yet checked
+  under Xvfb.
+
 ## Status (2026-11-03) — search bar and `search:` addresses
 
 - `search.cpp` / `search.hpp`: 15 engines (Wikipedia en / de, Hacker News,

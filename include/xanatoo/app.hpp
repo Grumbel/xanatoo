@@ -280,6 +280,12 @@ struct Lightbox {
   std::vector<LightboxItem> items;
   std::string base;  // directory for relative image paths
   int index = 0;
+  // Zoom of the current image: scale = screen px per image px, 0 = fit the
+  // window. pan = offset of the image centre from the view centre. Both reset
+  // when the image changes.
+  float scale = 0.f;
+  float pan_x = 0.f, pan_y = 0.f;
+  bool drag = false;
 };
 
 struct Hover {

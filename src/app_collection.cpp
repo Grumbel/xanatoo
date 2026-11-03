@@ -82,10 +82,18 @@ void open_image_lightbox(App& app, Pane& pane, NodeId image) {
   lb.open = true;
 }
 
+void reset_zoom(Lightbox& lb) {
+  lb.scale = 0.f;
+  lb.pan_x = lb.pan_y = 0.f;
+  lb.drag = false;
+}
+
 void step(Lightbox& lb, int delta) {
   const int n = static_cast<int>(lb.items.size());
   if (n == 0) return;
+  const int old = lb.index;
   lb.index = std::clamp(lb.index + delta, 0, n - 1);
+  if (lb.index != old) reset_zoom(lb);
 }
 
 void toggle_window_fullscreen(App& app) {
@@ -237,6 +245,57 @@ static LbZone lightbox_zone(const App& app, int x, int y) {
   return LbZone::None;
 }
 
+// Where the picture lives: the viewer minus padding and the caption lines.
+struct LbArea {
+  int x, y, w, h;
+  float cx() const { return x + w / 2.f; }
+  float cy() const { return y + h / 2.f; }
+};
+static LbArea lightbox_area(const App& app) {
+  const SDL_Rect all = lightbox_rect(app);
+  const int line = const_cast<App&>(app).ui_font.line_height();
+  const int pad = static_cast<int>(16.f * app.ui_scale);
+  const int bottom = line * 2 + pad;
+  return {all.x + pad, all.y + pad, std::max(1, all.w - 2 * pad),
+          std::max(1, all.h - pad - bottom)};
+}
+
+static float lightbox_fit(const LbArea& a, const xanatoo::Image& img) {
+  return std::min({static_cast<float>(a.w) / img.width,
+                   static_cast<float>(a.h) / img.height, 1.f});
+}
+
+// Keep the picture covering the area when larger, centred when smaller.
+static void lightbox_clamp_pan(Lightbox& lb, const LbArea& a, float w, float h) {
+  const float mx = std::max(0.f, (w - a.w) / 2.f);
+  const float my = std::max(0.f, (h - a.h) / 2.f);
+  lb.pan_x = std::clamp(lb.pan_x, -mx, mx);
+  lb.pan_y = std::clamp(lb.pan_y, -my, my);
+}
+
+// Zoom by `factor` around (px, py); scale <= fit goes back to fit.
+static void lightbox_zoom(App& app, float factor, float px, float py) {
+  Lightbox& lb = app.lightbox;
+  if (lb.items.empty()) return;
+  const xanatoo::Image& img =
+      app.images.get(lb.items[static_cast<size_t>(lb.index)].src, lb.base);
+  if (!img.ok || img.width <= 0 || img.height <= 0) return;
+  const LbArea a = lightbox_area(app);
+  const float fit = lightbox_fit(a, img);
+  const float cur = lb.scale > 0.f ? lb.scale : fit;
+  const float next = std::clamp(cur * factor, 0.02f, 64.f);
+  if (next <= fit * 1.001f) {
+    reset_zoom(lb);
+    return;
+  }
+  const float f = next / cur;
+  const float ox = px - (a.cx() + lb.pan_x), oy = py - (a.cy() + lb.pan_y);
+  lb.pan_x = px - a.cx() - ox * f;
+  lb.pan_y = py - a.cy() - oy * f;
+  lb.scale = next;
+  lightbox_clamp_pan(lb, a, img.width * next, img.height * next);
+}
+
 static bool in_rect(const SDL_Rect& r, int x, int y) {
   return x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h;
 }
@@ -294,6 +353,33 @@ bool lightbox_event(App& app, const SDL_Event& ev) {
         case SDLK_END:
           lb.index = static_cast<int>(lb.items.size()) - 1;
           break;
+        case SDLK_PLUS:
+        case SDLK_EQUALS:
+        case SDLK_KP_PLUS:
+          lightbox_zoom(app, 1.25f, lightbox_area(app).cx(),
+                        lightbox_area(app).cy());
+          break;
+        case SDLK_MINUS:
+        case SDLK_KP_MINUS:
+          lightbox_zoom(app, 0.8f, lightbox_area(app).cx(),
+                        lightbox_area(app).cy());
+          break;
+        case SDLK_0:
+        case SDLK_KP_0:
+          reset_zoom(lb);
+          break;
+        case SDLK_1:
+        case SDLK_KP_1: {  // actual size
+          const auto& im =
+              app.images.get(lb.items[static_cast<size_t>(lb.index)].src, lb.base);
+          if (im.ok && im.width > 0) {
+            reset_zoom(lb);
+            const LbArea a = lightbox_area(app);
+            if (lightbox_fit(a, im) < 1.f)
+              lightbox_zoom(app, 1.f / lightbox_fit(a, im), a.cx(), a.cy());
+          }
+          break;
+        }
         case SDLK_f:
         case SDLK_F11:
           toggle_window_fullscreen(app);
@@ -308,14 +394,28 @@ bool lightbox_event(App& app, const SDL_Event& ev) {
           case LbZone::Close: lb.open = false; break;
           case LbZone::Prev: step(lb, -1); break;
           case LbZone::Next: step(lb, 1); break;
-          default: break;
+          default: lb.drag = true; break;
         }
       }
       else
         lb.open = false;
       return true;
-    case SDL_MOUSEWHEEL:
-      step(lb, ev.wheel.y > 0 ? -1 : 1);
+    case SDL_MOUSEWHEEL: {
+      int px = 0, py = 0;
+      SDL_GetMouseState(&px, &py);
+      if (ev.wheel.y != 0)
+        lightbox_zoom(app, ev.wheel.y > 0 ? 1.25f : 0.8f,
+                      static_cast<float>(px), static_cast<float>(py));
+      return true;
+    }
+    case SDL_MOUSEMOTION:
+      if (lb.drag && lb.scale > 0.f) {
+        lb.pan_x += static_cast<float>(ev.motion.xrel);
+        lb.pan_y += static_cast<float>(ev.motion.yrel);
+      }
+      return true;
+    case SDL_MOUSEBUTTONUP:
+      lb.drag = false;
       return true;
     case SDL_CONTROLLERBUTTONDOWN:
       switch (ev.cbutton.button) {
@@ -336,8 +436,6 @@ bool lightbox_event(App& app, const SDL_Event& ev) {
           break;
       }
       return true;
-    case SDL_MOUSEBUTTONUP:
-    case SDL_MOUSEMOTION:
     case SDL_TEXTINPUT:
     case SDL_KEYUP:
     case SDL_FINGERDOWN:
@@ -365,17 +463,25 @@ void draw_lightbox(App& app) {
   const int pad = static_cast<int>(16.f * app.ui_scale);
   const int bottom = line * 2 + pad;
   const int avail_w = all.w - 2 * pad;
-  const int avail_h = all.h - pad - bottom;
   const int bot = all.y + all.h;  // bottom edge of the viewer
 
   const xanatoo::Image& img = app.images.get(item.src, lb.base);
+  std::string dims;
   if (img.ok && img.texture && img.width > 0 && img.height > 0) {
-    const float sc = std::min({static_cast<float>(avail_w) / img.width,
-                               static_cast<float>(avail_h) / img.height, 1.f});
-    const int w = static_cast<int>(img.width * sc);
-    const int h = static_cast<int>(img.height * sc);
-    SDL_Rect dst{all.x + (all.w - w) / 2, all.y + pad + (avail_h - h) / 2, w, h};
+    const LbArea area = lightbox_area(app);
+    const float sc = lb.scale > 0.f ? lb.scale : lightbox_fit(area, img);
+    const float fw = img.width * sc, fh = img.height * sc;
+    lightbox_clamp_pan(lb, area, fw, fh);
+    const SDL_Rect clip{area.x, area.y, area.w, area.h};
+    SDL_RenderSetClipRect(app.sdl, &clip);
+    SDL_Rect dst{static_cast<int>(area.cx() + lb.pan_x - fw / 2),
+                 static_cast<int>(area.cy() + lb.pan_y - fh / 2),
+                 std::max(1, static_cast<int>(fw)),
+                 std::max(1, static_cast<int>(fh))};
     SDL_RenderCopy(app.sdl, img.texture, nullptr, &dst);
+    SDL_RenderSetClipRect(app.sdl, nullptr);
+    dims = std::to_string(img.width) + "×" + std::to_string(img.height) + " · " +
+           std::to_string(static_cast<int>(sc * 100.f + 0.5f)) + "%";
   } else {
     const std::string msg =
         std::string(img.pending ? "Loading " : "Cannot load ") + item.src;
@@ -386,12 +492,14 @@ void draw_lightbox(App& app) {
 
   const std::string counter = std::to_string(lb.index + 1) + " / " +
                               std::to_string(lb.items.size());
-  const std::string hint = "←/→ step · F fullscreen · click top edge / Esc close";
+  const std::string hint =
+      "←/→ step · wheel / + − zoom · 0 fit · 1 100% · drag pan · F fullscreen · Esc close";
   const int base_y = bot - bottom + pad / 2 + font.ascender();
   std::string caption = item.caption.empty()
                             ? std::filesystem::path(item.src).filename().string()
                             : item.caption;
   const int counter_w = font.measure(counter);
+  if (!dims.empty()) caption += "  (" + dims + ")";
   caption = fit_text(font, caption, avail_w - counter_w - pad);
   const int cap_w = font.measure(caption);
   app.renderer.draw_text(font, static_cast<float>(all.x + (all.w - cap_w) / 2),
