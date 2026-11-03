@@ -241,11 +241,15 @@ void finish_navigate(App& app, const FetchJob& job) {
   if (job.url != r.final_url)
     note_page_seen(app, job.url, buf(app, app.panes[job.pane].buf).doc);
   jump_to_url_fragment(app, job.pane, job.url);
+  if (job.locator.has_selectors())
+    apply_locator(app, job.pane, job.locator);
   if (xanatoo::is_gemini_url(r.final_url)) {
     app.gemini_current_url = r.final_url;
     app.browse_mode = true;
   }
-  if (job.record_history) push_nav_history(app, job.pane, r.final_url);
+  if (job.record_history)
+    push_nav_history(app, job.pane,
+                     pane_address(app, app.panes[job.pane]));
   char secs[32];
   std::snprintf(secs, sizeof(secs), "  (%.1f s)",
                 static_cast<double>(SDL_GetTicks() - job.started) / 1000.0);

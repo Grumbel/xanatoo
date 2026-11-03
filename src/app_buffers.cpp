@@ -368,6 +368,7 @@ void refresh_views_of_buf(App& app, BufferId bi, int except, bool top) {
     v.sel.anchor = v.sel.focus;
     v.layout = {};
     if (top) v.scroll_y = 0.f;
+    refresh_pane_locator(app, v);
   }
 }
 

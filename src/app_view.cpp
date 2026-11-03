@@ -89,11 +89,6 @@ void drop_height_hints_for_buf(App& app, BufferId bi) {
   }
 }
 
-xanatoo::NodeId active_focus_section(App& app) {
-  if (!app.section_focus_mode) return xanatoo::INVALID_NODE;
-  return app.section_focus_id;
-}
-
 void toggle_section_fold(App& app, xanatoo::NodeId section) {
   if (section == xanatoo::INVALID_NODE) return;
   const auto& d = doc_of(app, focused_pane(app));
@@ -122,31 +117,26 @@ void toggle_section_fold(App& app, xanatoo::NodeId section) {
 }
 
 void toggle_section_focus_mode(App& app) {
-  app.section_focus_mode = !app.section_focus_mode;
-  if (app.section_focus_mode) {
+  Pane& fp = focused_pane(app);
+  fp.section_focus = !fp.section_focus;
+  if (fp.section_focus) {
     // Seed from outline selection or caret section.
-    app.section_focus_id = xanatoo::INVALID_NODE;
+    xanatoo::NodeId sec = xanatoo::INVALID_NODE;
     if (!app.outline.empty() && app.outline_sel >= 0 &&
         app.outline_sel < static_cast<int>(app.outline.size())) {
-      app.section_focus_id =
-          app.outline[static_cast<size_t>(app.outline_sel)].section;
+      sec = app.outline[static_cast<size_t>(app.outline_sel)].section;
     }
-    if (app.section_focus_id == xanatoo::INVALID_NODE) {
-      app.section_focus_id = xanatoo::enclosing_section(
-          doc_of(app, focused_pane(app)), focused_pane(app).sel.focus.node);
-    }
-    if (app.section_focus_id == xanatoo::INVALID_NODE) {
-      app.section_focus_mode = false;
+    if (sec == xanatoo::INVALID_NODE)
+      sec = xanatoo::enclosing_section(doc_of(app, fp), fp.sel.focus.node);
+    if (sec == xanatoo::INVALID_NODE) {
+      fp.section_focus = false;
       flash_status(app, "Focus: no section under caret / outline");
       return;
     }
-    drop_height_hints_for_buf(app, focused_pane(app).buf);
-    app.needs_layout = true;
+    set_pane_cut(app, fp, sec);
     flash_status(app, "Focus section on — outline picks what you see");
   } else {
-    app.section_focus_id = xanatoo::INVALID_NODE;
-    drop_height_hints_for_buf(app, focused_pane(app).buf);
-    app.needs_layout = true;
+    set_pane_cut(app, fp, xanatoo::INVALID_NODE);
     flash_status(app, "Focus section off — full document");
   }
 }
@@ -324,7 +314,7 @@ void layout_panes(App& app) {
           doc_of(app, pane),
           static_cast<float>(std::max(40, pane.w - kSbLayoutGutter)),
           base_of(app, pane), vp, hints, &app.folded_sections,
-          active_focus_section(app));
+          pane_cut(app, pane));
       pane.layout_buf = pane.buf;
       // Refresh height hints from measured (and skipped-stub) boxes.
       for (const auto& b : pane.layout.boxes) {
@@ -396,7 +386,7 @@ void force_full_pane_layout(App& app, Pane& p) {
     p.layout = app.layout_engine.layout(
         doc_of(app, p), static_cast<float>(std::max(40, p.w - kSbLayoutGutter)),
         base_of(app, p), {}, nullptr, &app.folded_sections,
-        active_focus_section(app));
+        pane_cut(app, p));
     for (const auto& b : p.layout.boxes) {
       if (b.node != xanatoo::INVALID_NODE && b.height > 0.f)
         p.height_cache[b.node] = b.height;
@@ -654,11 +644,7 @@ void jump_outline_sel(App& app) {
   xanatoo::Document& d = doc_of(app, p);
   if (er.preamble) {
     // Title row: back to the very top (cover image, byline, …).
-    if (app.section_focus_mode && app.section_focus_id != xanatoo::INVALID_NODE) {
-      app.section_focus_id = xanatoo::INVALID_NODE;
-      drop_height_hints_for_buf(app, p.buf);
-      app.needs_layout = true;
-    }
+    if (p.section_focus) set_pane_cut(app, p, xanatoo::INVALID_NODE);
     if (app.needs_layout) layout_panes(app);
     p.sel = {};
     xanatoo::move_to_document_start(d, p.sel.focus);
@@ -689,16 +675,12 @@ void jump_outline_sel(App& app) {
   }
   if (dest == xanatoo::INVALID_NODE) return;
   // Keep section-focus filter in sync with outline selection.
-  if (app.section_focus_mode) {
+  if (p.section_focus) {
     xanatoo::NodeId sec = er.section;
     if (sec == xanatoo::INVALID_NODE) {
       sec = xanatoo::enclosing_section(d, dest);
     }
-    if (sec != app.section_focus_id) {
-      app.section_focus_id = sec;
-      drop_height_hints_for_buf(app, p.buf);
-      app.needs_layout = true;
-    }
+    set_pane_cut(app, p, sec);
   }
   expand_ancestors_for_node(app, dest);
   if (app.needs_layout) layout_panes(app);

@@ -92,6 +92,7 @@ struct DocStyle {
   Rgba paper{248, 246, 240, 255};
   Rgba ink{28, 28, 32, 255};
   Rgba selection{160, 190, 230, 120};
+  Rgba mark{230, 160, 30, 70};  // passage named by the address (`#…`)
   FontFamilies fonts;
   float heading_scale = 0.f;  // heading px = body px × scale; 0 = app default
   float body_scale = 1.f;     // body px = zoom px × scale (small-print sites)

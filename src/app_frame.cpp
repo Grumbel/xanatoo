@@ -82,7 +82,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
         return j.purpose == FetchPurpose::Navigate;
       });
   ui_state.outline = app.outline_mode;
-  ui_state.section_focus = app.section_focus_mode;
+  ui_state.section_focus = focused_pane(app).section_focus;
   ui_state.justify = app.view_settings.justify;
   ui_state.footnote_overlay = app.view_settings.footnote_overlay;
   ui_state.hover_preview = app.view_settings.hover_preview;
@@ -132,7 +132,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   }
   ui_state.doc_label = path_of(app, focused_pane(app)).empty()
                            ? std::string("untitled")
-                           : path_of(app, focused_pane(app));
+                           : pane_address(app, focused_pane(app));
   ui_state.can_nav_back = can_nav_step(app, -1);
   {
     const std::string& path = path_of(app, focused_pane(app));
@@ -206,8 +206,8 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   }
   ui_state.bookmarks = app.bookmarks;
   {
-    const std::string& cur = path_of(app, focused_pane(app));
-    ui_state.current_bookmarked = is_bookmarked(app, cur);
+    ui_state.current_bookmarked =
+        is_bookmarked(app, pane_address(app, focused_pane(app)));
   }
   ui_state.tab_labels.clear();
   ui_state.active_tab = 0;
@@ -518,17 +518,12 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       app.bookmarks_panel_open = !app.bookmarks_panel_open;
       break;
     case C::AddBookmark: {
-      std::string url = path_of(app, p);
-      if (url.empty()) url = app.gemini_current_url;
-      add_bookmark(app, url);
+      add_bookmark(app, pane_address(app, p));
       break;
     }
     case C::RemoveBookmark: {
       std::string url = arg;
-      if (url.empty()) {
-        url = path_of(app, p);
-        if (url.empty()) url = app.gemini_current_url;
-      }
+      if (url.empty()) url = pane_address(app, p);
       remove_bookmark(app, url);
       break;
     }
@@ -607,8 +602,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         break;
       }
       if (is_in_app_remote_url(rpath)) {
-        forget_cached_page(app, rpath);  // really fetch again
-        navigate_to_url(app, rpath, /*record_history=*/false);
+        refetch_page(app, app.focus);
         break;
       }
       xanatoo::clear_external_doc_cache();
@@ -660,8 +654,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     }
     case C::CopyPageUrl: {
-      std::string url = path_of(app, p);
-      if (url.empty()) url = app.gemini_current_url;
+      const std::string url = pane_address(app, p);
       if (url.empty()) {
         flash_status(app, "No page URL");
         break;
@@ -1502,6 +1495,23 @@ static void draw_pane_overlays(App& app, int i) {
         for (int k = 0; k < h; ++k)
           SDL_RenderDrawLine(app.sdl, x + k, cy - (h - k), x + k, cy + (h - k));
       }
+    }
+    // The `#` passage of this view's address.
+    if (!pane.mark.empty()) {
+      const xanatoo::Rgba& c = app.style.mark;
+      for_each_link_run(
+          app, pane,
+          [&](const xanatoo::PositionedGlyph& pg) {
+            return pane.mark.count(pg.node) != 0;
+          },
+          [&](float x0, float x1, float top, float) {
+            SDL_Rect r{static_cast<int>(x0 + ox) - 2,
+                       static_cast<int>(top - draw_scroll) - 2,
+                       static_cast<int>(x1 - x0) + 4,
+                       app.fonts.regular.line_height() + 4};
+            SDL_SetRenderDrawColor(app.sdl, c.r, c.g, c.b, c.a);
+            SDL_RenderFillRect(app.sdl, &r);
+          });
     }
     // ... and its target on the right: the same wash and a ◂ at the edge
     // towards the left pane.
@@ -2538,7 +2548,8 @@ void draw_outline_panel(App& app) {
         app.ui_font_bold.loaded() ? app.ui_font_bold : app.ui_font;
 
     std::string ol_title = "Outline";
-    if (app.section_focus_mode && app.outline_sel >= 0 &&
+    const bool section_focus = focused_pane(app).section_focus;
+    if (section_focus && app.outline_sel >= 0 &&
         app.outline_sel < static_cast<int>(app.outline.size())) {
       const std::string& tx =
           app.outline[static_cast<size_t>(app.outline_sel)].text;
@@ -2551,7 +2562,7 @@ void draw_outline_panel(App& app) {
     draw_floating_frame(app, outer, ol_title, keys, app.ol.dock == Dock::None,
                         outer.x + outer.w - float_close_w - fb.x);
     // Focus toggle (section isolation): latched push button left of close.
-    draw_title_button(app, fb, "Focus", app.section_focus_mode);
+    draw_title_button(app, fb, "Focus", section_focus);
 
     SDL_Rect clip{cx, cy, cw, ch};
     SDL_RenderSetClipRect(app.sdl, &clip);

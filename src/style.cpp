@@ -134,6 +134,7 @@ class SheetReader {
         if (prop == "background") color(v, style_.paper);
         else if (prop == "color") color(v, style_.ink);
         else if (prop == "selection") color(v, style_.selection);
+        else if (prop == "mark") color(v, style_.mark);
         else warn("unknown page property " + prop);
       });
     } else if (head == "fonts") {

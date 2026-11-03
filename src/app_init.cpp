@@ -172,11 +172,15 @@ bool app_init(App& app) {
   for (int pi = 0; pi < kCentreViews; ++pi)
     if (const DocBuffer* b = find_buf(app, app.panes[pi].buf))
       push_nav_history(app, pi, b->path);
-  // A remote URL given on the command line loads through the navigator
+  // A remote URL or passage given on the command line loads through the navigator
   // (the pane's buffer starts as a "Loading…" placeholder).
   for (int pi = 0; pi < (app.buffers.size() > 1 ? 2 : 1); ++pi) {
     DocBuffer& b = buf(app, app.panes[pi].buf);
-    if (!is_in_app_remote_url(b.path)) continue;
+    std::error_code ec;
+    if (!is_in_app_remote_url(b.path) &&
+        (fs::exists(b.path, ec) ||
+         !xanatoo::parse_locator(b.path).has_selectors()))
+      continue;
     std::string u = std::move(b.path);
     b.path.clear();
     app.focus = pi;

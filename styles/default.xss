@@ -10,7 +10,8 @@
 
   (page (background "#f8f6f0")
         (color "#1c1c20")
-        (selection (rgba 160 190 230 120)))
+        (selection (rgba 160 190 230 120))
+        (mark (rgba 230 160 30 70)))
 
 ;; No (fonts …) here: without a body family, --font / XANATOO_FONT or the
   ;; FontConfig defaults (DejaVu Sans, Liberation Sans, …) apply. A sheet

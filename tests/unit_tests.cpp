@@ -14,6 +14,7 @@
 #include "xanatoo/hackernews.hpp"
 #include "xanatoo/json_min.hpp"
 #include "xanatoo/lemmy.hpp"
+#include "xanatoo/locator.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/inflate.hpp"
@@ -1313,6 +1314,118 @@ std::vector<xanatoo::NodeId> nodes_of(const xanatoo::Document& doc,
   return out;
 }
 
+void test_locator() {
+  using xanatoo::format_locator;
+  using xanatoo::Locator;
+  using xanatoo::parse_locator;
+  using xanatoo::SelectorKind;
+
+  Locator l = parse_locator("book.md//id:ch3//text:the%20best,of%20times");
+  EXPECT_EQ(l.base, "book.md");
+  EXPECT_EQ(l.pipes.size(), 2u);
+  EXPECT(l.pipes[0].kind == SelectorKind::Id);
+  EXPECT_EQ(l.pipes[0].value, "ch3");
+  EXPECT(l.pipes[1].kind == SelectorKind::Text);
+  EXPECT_EQ(l.pipes[1].value, "the%20best,of%20times");
+  EXPECT(!l.point);
+
+  l = parse_locator("map.png//rect:0.2,0.1,0.3,0.3#at:0.5,0.5");
+  EXPECT_EQ(l.base, "map.png");
+  EXPECT(l.pipes[0].kind == SelectorKind::Rect);
+  EXPECT_EQ(l.pipes[0].value, "0.2,0.1,0.3,0.3");
+  EXPECT(l.point && l.point->kind == SelectorKind::At);
+
+  // Bare fragments are labels, unknown names and colons included.
+  l = parse_locator("page.html#intro");
+  EXPECT_EQ(l.base, "page.html");
+  EXPECT(l.point && l.point->kind == SelectorKind::Id);
+  EXPECT_EQ(l.point->value, "intro");
+  l = parse_locator("page.html#fn:1");
+  EXPECT(l.point && l.point->kind == SelectorKind::Id);
+  EXPECT_EQ(l.point->value, "fn:1");
+  l = parse_locator("page.html#Some%20Heading");
+  EXPECT_EQ(l.point->value, "Some Heading");
+  l = parse_locator("page.html#:~:text=a,b");
+  EXPECT(l.point && l.point->kind == SelectorKind::Text);
+  EXPECT_EQ(l.point->value, "a,b");
+
+  // Not selectors: every `//` of ordinary addresses stays in the base.
+  for (const char* plain :
+       {"https://web.archive.org/web/2020/https://x.org/a", "file:///a/b.md",
+        "/abs//double/slash.md", "hn:item?id=1", "gemini://host/id:1",
+        "https://id:secret@host/", "book.pdf//page:12",
+        "a.zip//archive:b.jpg", "x//id:", "wikipedia:C#"}) {
+    l = parse_locator(plain);
+    EXPECT_EQ(l.base, plain);
+    EXPECT(!l.has_selectors());
+    EXPECT_EQ(format_locator(l), plain);
+  }
+
+  // Selectors after ordinary addresses, thumtoo pipes remain the base.
+  l = parse_locator("hn:item?id=1//id:x");
+  EXPECT_EQ(l.base, "hn:item?id=1");
+  EXPECT_EQ(l.pipes.size(), 1u);
+  l = parse_locator("https://a.org//b//path:0.1#c");
+  EXPECT_EQ(l.base, "https://a.org//b");
+  EXPECT_EQ(l.pipes[0].value, "0.1");
+  l = parse_locator("book.pdf//page:12#rect:0,0,1,1");
+  EXPECT_EQ(l.base, "book.pdf//page:12");
+
+  // Round trips, with escapes where a value would break the address.
+  for (const char* s :
+       {"a.md//id:b", "a.md//id:b#c", "a.md//id:b//path:0.2", "a.md#b",
+        "a.md#id:x:y", "a.md//text:a%2Cb,c#rect:0,0,.5,.5",
+        "a.md//id:a%2Fb%20c"}) {
+    EXPECT_EQ(format_locator(parse_locator(s)), s);
+  }
+
+  // Up: last pipe becomes the point, the point goes.
+  l = parse_locator("a.md//id:b//id:c");
+  EXPECT(xanatoo::locator_up(l));
+  EXPECT_EQ(format_locator(l), "a.md//id:b#c");
+  EXPECT(xanatoo::locator_up(l));
+  EXPECT_EQ(format_locator(l), "a.md//id:b");
+  EXPECT(xanatoo::locator_up(l));
+  EXPECT_EQ(format_locator(l), "a.md#b");
+  EXPECT(xanatoo::locator_up(l));
+  EXPECT_EQ(format_locator(l), "a.md");
+  EXPECT(!xanatoo::locator_up(l));
+
+  // Resolving against a document.
+  const xanatoo::Document d = xanatoo::parse_markup(
+      "# One\n\nfirst\n\n## Two\n\nsecond\n\n## Two\n\nthird\n\n"
+      "# Three\n\nfourth\n");
+  xanatoo::NodeId one = 0, three = 0, n = 0;
+  EXPECT(xanatoo::resolve_node(d, 0, {SelectorKind::Id, "One"}, one) ==
+         xanatoo::Resolve::Exact);
+  EXPECT(d.get(one).kind == xanatoo::NodeKind::Section);
+  EXPECT(xanatoo::resolve_node(d, 0, {SelectorKind::Id, "Three"}, three) ==
+         xanatoo::Resolve::Exact);
+  EXPECT(xanatoo::resolve_node(d, one, {SelectorKind::Id, "Two"}, n) ==
+         xanatoo::Resolve::Exact);
+  EXPECT(xanatoo::resolve_node(d, three, {SelectorKind::Id, "Two"}, n) ==
+         xanatoo::Resolve::Lost);
+  EXPECT(xanatoo::resolve_node(d, 0, {SelectorKind::Id, "nope"}, n) ==
+         xanatoo::Resolve::Lost);
+  EXPECT(xanatoo::resolve_node(d, 0, {SelectorKind::Path, "99"}, n) ==
+         xanatoo::Resolve::Lost);
+  EXPECT(xanatoo::resolve_node(d, 0, {SelectorKind::Path, "x"}, n) ==
+         xanatoo::Resolve::Lost);
+
+  // node_selector names every section so that it resolves back to it,
+  // through a path where the heading is not unique.
+  int paths = 0;
+  for (const xanatoo::Node& node : d.nodes) {
+    if (node.id == 0 || node.kind != xanatoo::NodeKind::Section) continue;
+    const xanatoo::Selector sel = xanatoo::node_selector(d, node.id);
+    paths += sel.kind == SelectorKind::Path;
+    xanatoo::NodeId back = 0;
+    EXPECT(xanatoo::resolve_node(d, 0, sel, back) == xanatoo::Resolve::Exact);
+    EXPECT_EQ(back, node.id);
+  }
+  EXPECT_EQ(paths, 1);  // the second "Two"
+}
+
 void test_footnotes() {
   using namespace xanatoo;
   // Pandoc GFM output: refs, a one-line note, a two-paragraph note.
@@ -2317,6 +2430,7 @@ int main() {
   test_style_sheet_parse();
   test_style_sheets_shipped();
   test_footnotes();
+  test_locator();
 
   std::printf("%d passed, %d failed\n", g_passed, g_failed);
   return g_failed == 0 ? 0 : 1;

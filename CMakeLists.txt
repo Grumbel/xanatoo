@@ -82,6 +82,7 @@ add_executable(xanatoo
   src/app_collection.cpp
   src/app_drafts.cpp
   src/app_about.cpp
+  src/app_passage.cpp
   src/app_report.cpp
   src/about.cpp
   src/app_images.cpp
@@ -119,6 +120,7 @@ add_executable(xanatoo
   src/html_min.cpp
   src/html_page.cpp
   src/wikipedia.cpp
+  src/locator.cpp
   src/native.cpp
   # Vendored Dear ImGui (MIT) — menu bar / toolbar shell
   external/imgui/imgui.cpp
@@ -391,6 +393,7 @@ add_executable(xanatoo_tests
   src/html_min.cpp
   src/html_page.cpp
   src/wikipedia.cpp
+  src/locator.cpp
   src/native.cpp
   src/nostr.cpp
   src/gemini.cpp

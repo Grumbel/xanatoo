@@ -166,6 +166,11 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
 
     // Below soft windows: let ImGui keep the event if it wants it.
     if (imgui_mouse) return;
+
+    // A click dismisses the `#` mark.
+    if (const int hit = pane_at(app, static_cast<float>(x), static_cast<float>(y));
+        hit >= 0)
+      clear_pane_point(app, app.panes[hit]);
     app.key_focus = KeyFocus::Document;
 
     // Clicking the document dismisses status-bar prompts (Esc also works).
@@ -2297,8 +2302,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         break;
       }
       if (ctrl && shift) {
-        std::string url = path_of(app, p);
-        if (url.empty()) url = app.gemini_current_url;
+        const std::string url = pane_address(app, p);
         if (is_bookmarked(app, url))
           remove_bookmark(app, url);
         else

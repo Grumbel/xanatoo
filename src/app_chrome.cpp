@@ -269,7 +269,7 @@ StatusLine compute_status(App& app) {
         "Structure highlight — colour bars + kind tags on the right · "
         "Ctrl+Shift+L toggles";
     tone = StatusTone::Info;
-  } else if (app.section_focus_mode) {
+  } else if (focused_pane(app).section_focus) {
     label =
         "Focus section — body shows one section · outline picks target · "
         "Ctrl+Alt+F off";

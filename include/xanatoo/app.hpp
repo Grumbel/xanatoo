@@ -22,6 +22,7 @@
 #include "xanatoo/font.hpp"
 #include "xanatoo/images.hpp"
 #include "xanatoo/layout.hpp"
+#include "xanatoo/locator.hpp"
 #include "xanatoo/minibuffer.hpp"
 #include "xanatoo/render.hpp"
 #include "xanatoo/sidestore.hpp"
@@ -143,6 +144,14 @@ struct Pane {
   BufferId layout_buf = kNoBuffer;  // buffer `layout` was made from
   // layout_panes brings this back to its spot, then drops it.
   std::optional<ViewAnchor> view_anchor;
+  // The passage this view shows (docs/PASSAGES.md): selectors of its address
+  // (`base` unused, the buffer's path is the base), valid while `locator_buf`
+  // is `buf`. Use pane_cut / pane_address.
+  xanatoo::Locator locator;
+  BufferId locator_buf = kNoBuffer;
+  xanatoo::NodeId cut = xanatoo::INVALID_NODE;  // what the pipes selected
+  std::unordered_set<xanatoo::NodeId> mark;     // text nodes of the `#` passage
+  bool section_focus = false;  // Section Focus: the outline picks the cut
   int x = 0;
   int w = 0;
   int y = 0;
@@ -320,6 +329,7 @@ struct FetchJob {
   FetchPurpose purpose = FetchPurpose::Navigate;
   int pane = 0;
   std::string url;
+  xanatoo::Locator locator;  // Navigate: selectors to show once it landed
   bool record_history = true;
   BufferId buf = kNoBuffer;  // Tab: the "Loading …" buffer to fill
   Uint32 started = 0;
@@ -581,8 +591,6 @@ struct App {
   xanatoo::NodeId collection_target = xanatoo::INVALID_NODE;
   Lightbox lightbox;
   std::string last_fold_doc_key;
-  bool section_focus_mode = false;
-  xanatoo::NodeId section_focus_id = xanatoo::INVALID_NODE;
   bool diff_mode = false;
   std::vector<xanatoo::NodeId> diff_marks[2];
   std::vector<xanatoo::DiffWordMark> diff_words[2];
@@ -730,7 +738,6 @@ void refresh_outline(App& app);
 void refresh_backlinks(App& app);
 void invalidate_height_around(App& app, Pane& pane, xanatoo::NodeId id);
 void drop_height_hints_for_buf(App& app, BufferId bi);
-xanatoo::NodeId active_focus_section(App& app);
 void toggle_section_fold(App& app, xanatoo::NodeId section);
 void toggle_section_focus_mode(App& app);
 void reload_folds_for_focused(App& app);
@@ -884,6 +891,25 @@ std::string home_page(App& app);
 // Parent of the focused page (directory, URL path level, subreddit, …) for
 // the Up button; "" at the top.
 std::string page_up_url(App& app);
+// Fetch the remote page of view `pi` again; its passage stays.
+void refetch_page(App& app, int pi);
+
+// app_passage.cpp: the passage a view shows (docs/PASSAGES.md).
+// Node the view is cut to, INVALID_NODE for the whole document.
+xanatoo::NodeId pane_cut(App& app, Pane& p);
+// Full address of what the view shows: page + selectors.
+std::string pane_address(App& app, Pane& p);
+// Show `loc`'s selectors in the page the view already shows, no load. A
+// passage that cannot be found drops out of the address with a status flash.
+void apply_locator(App& app, int pi, xanatoo::Locator loc);
+// Cut the view to `node` (INVALID_NODE: the whole document).
+void set_pane_cut(App& app, Pane& p, xanatoo::NodeId node);
+// Forget the passage, for a view that gets another document.
+void reset_pane_locator(Pane& p);
+// Drop the `#` passage: address and mark, the view stays.
+void clear_pane_point(App& app, Pane& p);
+// The document of `p` was replaced: find the passage in the new one.
+void refresh_pane_locator(App& app, Pane& p);
 // Open `target` (path, gemini://, Nostr, Reddit, Lemmy) in the focused pane /
 // in pane `pi`. Remote pages load in the background; true = opened or started.
 bool navigate_to_url(App& app, std::string target, bool record_history = true);

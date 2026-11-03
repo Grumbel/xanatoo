@@ -18,6 +18,10 @@ namespace xanatoo {
 namespace {
 
 // True if `id` is `root` or nested under `root`.
+bool is_section_kind(NodeKind kind) {
+  return kind == NodeKind::Section || kind == NodeKind::Article;
+}
+
 bool node_is_descendant(const Document& doc, NodeId root, NodeId id) {
   if (root == INVALID_NODE || id == INVALID_NODE) return false;
   for (NodeId cur = id; cur != INVALID_NODE && cur < doc.next_id;
@@ -472,6 +476,15 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
   switch (node.kind) {
     case NodeKind::Document:
       if (focus_section_ != INVALID_NODE) {
+        // A cut that is no part of the section tree is laid out on its own.
+        NodeId top = focus_section_;
+        while (doc.get(top).parent != id &&
+               is_section_kind(doc.get(top).kind))
+          top = doc.get(top).parent;
+        if (doc.get(top).parent != id || !is_section_kind(doc.get(top).kind)) {
+          layout_node(doc, focus_section_, x, y, max_width, out);
+          break;
+        }
         // Only section tree on the path to the focus; skip preamble blocks.
         for (NodeId child : node.children) {
           const Node& ch = doc.get(child);

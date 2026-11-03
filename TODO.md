@@ -8,15 +8,32 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
-## Plan (2026-10-31) — passages: bookmarks into documents, cuts, marks
+## Status (2026-10-31) — passages: cuts, marks, addresses (slices 1 + 2)
 
-- Design in `docs/PASSAGES.md`, nothing implemented yet. Bookmark, selection,
+- Design and the remaining slices in `docs/PASSAGES.md`. Bookmark, selection,
   transclusion and image crop share one address: `//selector` cuts (the
   passage as a document of its own), `#selector` points (whole document,
-  passage marked). Selectors: `id:`, `path:`, `text:`, `rect:`, `at:`.
-- Pipes are view state on `Pane`, never buffer identity, so Up from a cut to
-  the whole document needs no reload. Section Focus becomes a per-pane cut.
-- Next: slice 1, `parse_locator` / `format_locator` + unit tests.
+  passage marked).
+- `locator.hpp` (`parse_locator`, `format_locator`, `locator_up`,
+  `resolve_node`, `node_selector`), unit-tested. `text:` / `rect:` / `at:`
+  parse, but only `id:` and `path:` resolve yet; the others report
+  "Passage not found".
+- `app_passage.cpp`: selectors are view state on `Pane`, only the base gets
+  opened or fetched. `navigate_pane` splits the address, same page = no load.
+  Location bar, history, bookmarks, Copy URL use `pane_address`. Up steps
+  `a//id:b` → `a#b` → `a`, holding the text on its spot. Section Focus moved
+  from `App` to `Pane` and is a cut now, so it shows in the location bar.
+- `#` marks whole nodes in the page style's `mark` colour; a click dismisses
+  it. Remote `#fragment`s are marked as well. Cuts of non-section blocks work
+  in layout. `xanatoo 'a.md//id:b'` works on the command line.
+- Checked under Xvfb with a local file: cuts, chains, `#`, Up, Back, Section
+  Focus, bookmarking a cut, lost selectors. Not checked: remote pages, split
+  browsing, a passage across Reload.
+- Open: a link opened in a new tab shows the whole document (pipes dropped);
+  a cut still shows the headers of parent sections; the caret can leave a cut
+  with the keyboard (as in Section Focus); Forward/Up from a hover preview's
+  cached page refetches when the URL had a fragment.
+- Next: slice 3, `text:` selectors, `Pane::marks`, bookmarks of a selection.
 
 ## Status (2026-10-31) — view anchors (zoom keeps the text in place)
 
@@ -262,7 +279,8 @@ Next bundle number: **263** (this delivery is **262**)
   once the fetch lands). Hidden while a hover preview shows.
 - Its target is marked on the right too (`SplitTrail::target`, the caret
   node of an anchor / `file#frag` jump): same wash, ◂ at the pane edge.
-  Remote `#fragment` targets are not marked (no jump there yet).
+  Remote `#fragment` targets are not marked (no jump there yet); the
+  passage mark of `docs/PASSAGES.md` does that now.
 - Open: a failed remote fetch leaves the mark on the old right page.
 
 ## Status (2026-10-29) — scrollbar chapter marks per view

@@ -29,6 +29,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_init.cpp` | build initial world, shutdown |
 | `app_events.cpp` | `handle_event` → one `on_<sdl_event>` per event type |
 | `app_frame.cpp` | frame stages: sync size, relayout, `run_chrome` (UiState + `execute_command`), draw panes, overlays |
+| `app_passage.cpp` | the passage a view shows (`docs/PASSAGES.md`): selectors of the address are view state on `Pane`, `pane_address` / `pane_cut` / `apply_locator`; pure address parsing in `locator.hpp` |
 | `app_chrome.cpp` | status line (`compute_status` is pure data → `draw_status_bar`), floating window frame, client scrollbar |
 | `app_windows.cpp` | floating windows (`FloatWindow`, role = Help/Outline/Backlinks/Document): one z-stack, shared hit-test / drag / resize / scroll / draw |
 | `app_softwin.cpp` | window placement: `Dock` (None / Left / Right / Max) for every role — `dock_window` / `undock_window` / `toggle_maximize`, `place_windows` derives docked geometry, `dock_column_w` is what `layout_panes` leaves out |
@@ -62,6 +63,10 @@ change (it needs the old layout): the top line of each view stays on its
 spot through the next `layout_panes`. To hold another spot, set
 `Pane::view_anchor` from `view_anchor_at` first (pinch: the text between the
 fingers). Pane width changes do this by themselves.
+An address is `base//selector#selector` (`locator.hpp`, `docs/PASSAGES.md`):
+pipes cut the view to a passage, `#` marks one in the whole page. Only the base
+reaches buffers, caches and fetches. Use `pane_address` for what a view shows,
+never `path_of`, where the address is shown or stored.
 Back / Forward are per view (`Pane::nav`): record a shown page with
 `push_nav_history(app, pi, url)`, step with `nav_step`; `App::visited`
 is only the session log for the History panel. While split browsing, the

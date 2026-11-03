@@ -166,14 +166,17 @@ LinkTarget resolve_link(App& app, int pi, const std::string& href) {
     t.url = std::move(abs);
     return t;
   }
-  if (is_inapp_doc_href(app, abs)) {
+  if (is_inapp_doc_href(app, xanatoo::parse_locator(abs).base)) {
     std::string path = abs;
     if (size_t hash = path.find('#'); hash != std::string::npos) {
       t.fragment = path.substr(hash);
       path.resize(hash);
     }
+    // t.url keeps the pipes: "other.md//id:ch3" opens as a cut.
+    xanatoo::Locator loc = xanatoo::parse_locator(path);
+    loc.base = resolve_doc_href(app, loc.base, path_of(app, p));
     t.kind = LinkKind::Doc;
-    t.url = resolve_doc_href(app, path, path_of(app, p));
+    t.url = xanatoo::format_locator(loc);
     return t;
   }
   t.kind = LinkKind::External;
@@ -207,6 +210,7 @@ void show_doc_in_pane(App& app, int pi, xanatoo::Document doc,
   xanatoo::ensure_valid_caret(nd, p.sel.focus);
   p.sel.anchor = p.sel.focus;
   p.scroll_y = 0.f;
+  reset_pane_locator(p);  // of the old document
   // Drop stale layout boxes that still reference the previous tree —
   // otherwise the next frame can call doc.get() with dead node ids.
   p.layout = {};
@@ -241,7 +245,7 @@ void open_link_in_tab(App& app, int pi, const std::string& href) {
       xanatoo::open_external_url(t.url);
       return;
     case LinkKind::Doc: {
-      std::string path = t.url;
+      std::string path = xanatoo::parse_locator(t.url).base;
       std::error_code ec;
       if (fs::is_directory(path, ec)) {
         std::string dir = fs::weakly_canonical(path, ec).string();
@@ -294,7 +298,12 @@ std::string home_page(App& app) {
 }
 
 std::string page_up_url(App& app) {
-  std::string page = path_of(app, focused_pane(app));
+  Pane& fp = focused_pane(app);
+  // Out of a passage first: its context needs no load.
+  if (xanatoo::Locator loc = xanatoo::parse_locator(pane_address(app, fp));
+      xanatoo::locator_up(loc))
+    return xanatoo::format_locator(loc);
+  std::string page = path_of(app, fp);
   if (page.empty()) return {};
   // Local paths go up through absolute directories.
   if (!is_in_app_remote_url(page) && page.find("://") == std::string::npos &&
@@ -310,10 +319,65 @@ bool navigate_to_url(App& app, std::string target, bool record_history) {
   return navigate_pane(app, app.focus, std::move(target), record_history);
 }
 
+static bool open_page(App& app, int pi, std::string target,
+                      bool record_history);
+static bool open_at(App& app, int pi, xanatoo::Locator loc,
+                    bool record_history);
+
+void refetch_page(App& app, int pi) {
+  xanatoo::Locator loc =
+      xanatoo::parse_locator(pane_address(app, app.panes[pi]));
+  forget_cached_page(app, loc.base);
+  open_at(app, pi, std::move(loc), /*record_history=*/false);
+}
+
+// Pipes and fragment are view state: only the base gets opened or fetched.
 bool navigate_pane(App& app, int pi, std::string target, bool record_history) {
   while (!target.empty() && (target.back() == ' ' || target.back() == '\t'))
     target.pop_back();
   if (target.empty()) return false;
+  if (xanatoo::starts_with(target, "draft:"))
+    return open_page(app, pi, std::move(target), record_history);
+
+  Pane& p = app.panes[pi];
+  xanatoo::Locator loc = xanatoo::parse_locator(target);
+  const bool selectors = loc.has_selectors();
+  std::error_code ec;
+  if (selectors && fs::exists(target, ec))  // a file called "a#b.md"
+    return open_page(app, pi, std::move(target), record_history);
+  // Another view of the page on screen, nothing to load.
+  if (loc.base == path_of(app, p) && !loc.base.empty() &&
+      (selectors || pane_address(app, p) != loc.base)) {
+    apply_locator(app, pi, std::move(loc));
+    if (record_history) push_nav_history(app, pi, pane_address(app, p));
+    return true;
+  }
+  if (!selectors) {
+    return open_page(app, pi, std::move(target), record_history);
+  }
+  return open_at(app, pi, std::move(loc), record_history);
+}
+
+// Load `loc.base` and show the selectors once it is there.
+static bool open_at(App& app, int pi, xanatoo::Locator loc,
+                    bool record_history) {
+  Pane& p = app.panes[pi];
+  const std::string base = loc.base;
+  if (!open_page(app, pi, base, /*record_history=*/false)) return false;
+  for (FetchJob& job : app.fetches)
+    if (job.pane == pi && job.purpose == FetchPurpose::Navigate &&
+        job.url == base) {
+      job.locator = std::move(loc);  // finish_navigate shows it
+      job.record_history = record_history;
+      return true;
+    }
+  apply_locator(app, pi, std::move(loc));
+  if (record_history) push_nav_history(app, pi, pane_address(app, p));
+  return true;
+}
+
+static bool open_page(App& app, int pi, std::string target,
+                      bool record_history) {
   Pane& p = app.panes[pi];
 
   if (target == kDraftsPage) {

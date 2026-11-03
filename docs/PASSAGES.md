@@ -1,6 +1,7 @@
 # Passages: bookmarks, selections, transclusion
 
-Design note, nothing here is implemented yet. Bookmarks, selections, the
+Design note. Slices 1 and 2 below are implemented (`locator.hpp`,
+`app_passage.cpp`), the rest is the plan. Bookmarks, selections, the
 "part of a document as a document" view and image crops are one concept with
 different lifetimes and presentations, so they should share one address
 format and one data path.
@@ -58,7 +59,9 @@ Rules:
   are typed by what they apply to (document or image), so an image node
   selected from a document takes `rect:`.
 - At most one `#`, and it comes last.
-- Payloads are percent-encoded (`/`, `#`, `,`, `|`, `%`).
+- Payloads are percent-encoded (`/`, `#`, `?`, `|`, `%`, spaces). `text:`
+  stays encoded in `Selector::value`, since its grammar splits on `,` and `-`
+  first.
 - Only known selector names count as pipes. The parser strips
   `//<known>:…` segments from the right end, because plain URLs contain `//`
   (`https://web.archive.org/web/2020/https://x.org/`). Pipes are never sent to
@@ -67,7 +70,8 @@ Rules:
   HTML ids may contain colons.
 - Spelling follows thumtoo's Location model (`//page:12`). xanatoo needs its
   own small always-built parser: `XANATOO_THUMTOO` is optional and thumtoo's
-  pipe kinds are a closed set. Pipes for thumtoo pass through unchanged.
+  pipe kinds are a closed set. Thumtoo pipes are no selectors, so they stay in
+  the base: `book.pdf//page:12#rect:…` has the base `book.pdf//page:12`.
 - HTML compatibility is input and output aliasing. `#heading`, `#:~:text=…`
   and media fragments `#xywh=` are accepted, as thumtoo accepts `#page=` and
   rewrites it. A `#text:` address can be emitted as `#:~:text=` so that a
@@ -85,7 +89,7 @@ Rules:
 | `at:x,y` | image | point, same units |
 | `item:N` | collection | one item (later) |
 | `rev:ID` | anything | pin to a revision (later, `docs/REVISIONS.md` phase 5) |
-| `page:N`, `archive:…` | thumtoo | passed through |
+| `page:N`, `archive:…` | thumtoo | part of the base |
 
 Choices behind this:
 
@@ -107,26 +111,30 @@ Choices behind this:
 Plain data and free functions, pure parts unit-tested without SDL:
 
 ```cpp
-enum class SelectorKind : uint8_t { Id, Path, Text, Rect, At, Item, Rev, Foreign };
-struct Selector { SelectorKind kind; std::string name; std::string value; };
+enum class SelectorKind : uint8_t { Id, Path, Text, Rect, At };
+struct Selector { SelectorKind kind; std::string value; };
 
 struct Locator {
   std::string base;                // what buffers, caches and fetches see
   std::vector<Selector> pipes;
   std::optional<Selector> point;   // the `#` part
 };
-std::optional<Locator> parse_locator(std::string_view);
+Locator parse_locator(std::string_view);   // total: no selectors → all base
 std::string format_locator(const Locator&);
+bool locator_up(Locator&);
+Resolve resolve_node(const Document&, NodeId within, const Selector&, NodeId&);
+Selector node_selector(const Document&, NodeId);
+```
 
+Planned with slice 3, when text and rects get resolved:
+
+```cpp
 struct Extent {
   enum class Kind : uint8_t { Whole, Node, Text, Rect } kind;
   NodeId node;           // Node, Rect (the image), Text (enclosing block)
   Selection text;        // Text
   FRect rect;            // Rect
 };
-enum class Resolve : uint8_t { Exact, Moved, Lost };
-Resolve resolve_selector(const Document&, const Extent& within,
-                         const Selector&, Extent& out);
 Selector selector_for(const Document&, const Selection&);
 ```
 
@@ -137,22 +145,24 @@ happens once, at the top of `navigate_pane`. Consequences:
 - `book.md` and `book.md//id:intro` share one `DocBuffer`. A cut needs no
   reload, and edits in a cut are ordinary edits of the document.
 - `is_*_url` dispatch never sees a pipe.
-- `Pane` gets `std::optional<Locator> locator` (the address the location bar,
-  `push_nav_history` and Bookmark use) and the resolved `Extent cut`.
+- `Pane` holds the selectors (`locator`, valid while `locator_buf == buf`),
+  the resolved `cut` and the text nodes of the `#` passage (`mark`).
+  `pane_address` gives the address for the location bar, history and
+  bookmarks, `pane_cut` is what layout uses.
 
 ## Presentation
 
-**Cut.** Section Focus already filters layout to one Section / Article
+**Cut.** Section Focus filtered layout to one Section / Article
 (`layout(..., focus_section)`, the outline stays complete). A node cut is the
 same thing, generalised:
 
-- Move the focus from `App` (`section_focus_mode`, `section_focus_id`) to
-  `Pane`; it is global today, and a cut is per view.
-- Accept any block, not only Section / Article. Section Focus becomes a cut
-  without a typed address, and shows up in the location bar.
-- Text ranges: blocks from start to end, clipping the first and last block at
+- Per `Pane`, for any block. Section Focus is a cut the outline picks
+  (`Pane::section_focus`) and shows up in the location bar.
+- A section cut still shows the headers of its parent sections, as Section
+  Focus always did.
+- Text ranges (slice 4): blocks from start to end, clipping the first and last block at
   the carets (layout input: `Extent`, not `NodeId`).
-- Images: a source rect at draw time, in the pane, on the Image node and in
+- Images (slice 5): a source rect at draw time, in the pane, on the Image node and in
   the `Lightbox`. Same decode and tile cache, no new image.
 
 **Up.** `page_up_url` handles pipes before `up_url`:
@@ -168,18 +178,18 @@ step from cut to whole document needs no fetch and no reload, as the buffer is
 shared. It keeps the passage on its spot on screen with `Pane::view_anchor`.
 Back returns to the cut through the normal per-view `nav` history.
 
-**Mark / overlay.** `Pane::marks`: a list of `{Extent, role}` drawn over the
-page. One draw path for `#` targets, bookmarks of this document, search hits
-later, and images (a frame over the image, in the pane and the Lightbox).
+**Mark / overlay.** Today `Pane::mark`: the `#` passage, whole text nodes,
+in the `mark` colour of the page style. Slice 3 turns it into `Pane::marks`, a
+list of `{Extent, role}` drawn over the page. One draw path for `#` targets,
+bookmarks of this document, search hits later, and images (a frame over the
+image, in the pane and the Lightbox).
 
 - Generalises the `SplitTrail` wash and the selection wash.
-- The roles (`mark-target`, `mark-bookmark`) come from `DocStyle`, not
-  hard-coded colours.
+- Bookmark roles come from `DocStyle` as well.
 - Scrollbar ticks like the chapter marks; click selects the passage.
 - `#` targets clear on the next click or navigation; bookmark marks follow a
   View toggle.
-- Remote pages finally get their `#fragment`, applied when the fetch lands
-  (open item in `TODO.md`).
+- Remote pages get their `#fragment` when the fetch lands, marked as well.
 
 **Embed.** `Transclude` targets become Locators. Image `src` accepts a
 Locator, so `![](map.png//rect:…)` works. Since an embed always cuts, the
@@ -212,23 +222,23 @@ seen, where a store exists.
 
 ## When the document changes
 
-`resolve_selector` returns:
+Resolving returns:
 
 - **Exact**: one match.
-- **Moved**: found elsewhere, several matches (the nearest to the old position
+- **Moved** (with `text:`, slice 3): found elsewhere, several matches (the nearest to the old position
   wins), or found only with fuzzy matching.
 - **Lost**: not found. Never delete the bookmark: open the whole document,
   flash the status, and show the stored quote. With a `rev` the old text can be
   shown from the revision store, for local documents.
 
-Extents are rebuilt after `refresh_views_of_buf` and on the `mark_dirty`
-debounce rather than kept up to date through edits. Later, persistent text
+Passages are found again in `refresh_views_of_buf`; slice 3 adds the
+`mark_dirty` debounce for Extents, rather than kept up to date through edits. Later, persistent text
 units (`docs/REVISIONS.md` phase 4) replace matching for local documents. The
 address format does not change: `id:` can then hold a unit id.
 
 ## Slices
 
-Each is useful on its own:
+Each is useful on its own. 1 and 2 are done:
 
 1. `parse_locator` / `format_locator` + unit tests, including the
    web.archive.org and `hn:item?id=1` cases. No behaviour change.
@@ -247,6 +257,8 @@ Each is useful on its own:
 
 ## Open questions
 
+- Should a real cut drop the headers of parent sections? It would read more
+  like a document of its own; Section Focus wants them as context.
 - Should bookmark marks show by default on every page, or only on request?
 - Editing inside a cut of a *foreign* document stays impossible (`browsing`),
   but should a cut across two sections be editable at all at the seams?
