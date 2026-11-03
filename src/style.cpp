@@ -63,7 +63,7 @@ constexpr InlineName kInlineRoles[] = {
     {"strong", InlineKind::Strong}, {"strike", InlineKind::Strike},
     {"link", InlineKind::Link},     {"code", InlineKind::Code},
     {"cite", InlineKind::Cite},     {"footnote-ref", InlineKind::FootnoteRef},
-    {"image", InlineKind::Image},
+    {"image", InlineKind::Image},   {"math", InlineKind::Math},
 };
 
 constexpr std::pair<const char*, FontRole> kFontRoles[] = {

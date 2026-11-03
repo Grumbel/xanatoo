@@ -93,6 +93,9 @@ add_executable(xanatoo
   src/app_images.cpp
   src/theme.cpp
   src/font.cpp
+  src/math_parse.cpp
+  src/math_layout.cpp
+  src/math_font.cpp
   src/document.cpp
   src/layout.cpp
   src/render.cpp
@@ -404,6 +407,9 @@ add_executable(xanatoo_tests
   src/style.cpp
   src/layout.cpp
   src/font.cpp
+  src/math_parse.cpp
+  src/math_layout.cpp
+  src/math_font.cpp
   src/images.cpp
 )
 target_include_directories(xanatoo_tests PRIVATE

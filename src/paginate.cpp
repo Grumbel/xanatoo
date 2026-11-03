@@ -89,6 +89,9 @@ private:
       const PositionedImage& im = in_.images[i];
       atoms_.push_back({im.y, im.y + img_h_[i], false});
     }
+    for (const PositionedMath& m : in_.maths)
+      atoms_.push_back({m.y - m.box->ascent * m.px, m.y + m.box->depth * m.px,
+                        false});
     std::sort(atoms_.begin(), atoms_.end(), [](const Atom& a, const Atom& b) {
       return a.top != b.top ? a.top < b.top : a.bottom < b.bottom;
     });
@@ -255,6 +258,13 @@ private:
       im.width = img_w_[i];
       im.height = img_h_[i];
       out.images.push_back(std::move(im));
+    }
+    for (const PositionedMath& m : in_.maths) {
+      PositionedMath n = m;
+      const size_t pg = page_of(m.y - m.box->ascent * m.px * 0.5f);
+      n.x += dx(pg);
+      n.y += dy(pg);
+      out.maths.push_back(std::move(n));
     }
     split(in_.boxes, out.boxes);
     split(in_.quote_bars, out.quote_bars);

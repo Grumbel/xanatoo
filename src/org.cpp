@@ -686,6 +686,11 @@ void ser_inlines_org(const Node& node, std::string& out) {
         out += sp.text;
         out.push_back('+');
         break;
+      case InlineKind::Math:
+        out += sp.display ? "\\[" : "\\(";
+        out += sp.src;
+        out += sp.display ? "\\]" : "\\)";
+        break;
       case InlineKind::Image:
         // Org shows a bare link to an image file as the image.
         out += "[[";

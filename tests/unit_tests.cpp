@@ -31,6 +31,7 @@
 #include "xanatoo/types.hpp"
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/layout.hpp"
+#include "xanatoo/math.hpp"
 #include "xanatoo/paginate.hpp"
 #include "xanatoo/font.hpp"
 #include "xanatoo/style.hpp"
@@ -3224,6 +3225,130 @@ void test_sitemap() {
   EXPECT(items >= 6);
 }
 
+
+// A face with one size for every glyph: enough to test the structure of a
+// layout without a font file.
+class FakeMathFace : public xanatoo::MathFace {
+public:
+  uint32_t glyph(uint32_t cp) const override { return cp; }
+  xanatoo::MathGlyph metrics(uint32_t) const override {
+    xanatoo::MathGlyph g;
+    g.advance = 0.5f;
+    g.ascent = 0.7f;
+    g.descent = 0.f;
+    g.ink_w = 0.5f;
+    return g;
+  }
+  const xanatoo::MathConstants& constants() const override { return k; }
+  std::vector<xanatoo::MathVariantGlyph> variants(uint32_t gid,
+                                                  bool) const override {
+    return {{gid, 0.7f}};
+  }
+  bool assembly(uint32_t, bool, std::vector<xanatoo::MathPart>&) const override {
+    return false;
+  }
+  xanatoo::MathConstants k;
+};
+
+void test_math() {
+  using namespace xanatoo;
+  auto width = [](const char* tex, bool display = false) {
+    FakeMathFace face;
+    return layout_math(parse_math(tex).root, face, display).width;
+  };
+
+  // Structure.
+  MathParse p = parse_math("x_i^2 + \\frac{1}{2}");
+  EXPECT(p.error.empty());
+  EXPECT_EQ(p.root.kids.size(), 3u);
+  EXPECT(p.root.kids[0].kind == MathKind::Script);
+  EXPECT(p.root.kids[0].has_a && p.root.kids[0].has_b);
+  EXPECT(p.root.kids[0].kids[0].cp == 'x');
+  EXPECT(p.root.kids[2].kind == MathKind::Frac);
+
+  p = parse_math("\\sqrt[3]{x}");
+  EXPECT(p.root.kids[0].kind == MathKind::Radical && p.root.kids[0].has_b);
+
+  p = parse_math("\\left( a \\right]");
+  EXPECT(p.error.empty());
+  EXPECT(p.root.kids[0].kind == MathKind::Fenced);
+  EXPECT_EQ(p.root.kids[0].cp, static_cast<uint32_t>('('));
+  EXPECT_EQ(p.root.kids[0].cp2, static_cast<uint32_t>(']'));
+
+  p = parse_math("\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}");
+  EXPECT(p.error.empty());
+  EXPECT(p.root.kids[0].kind == MathKind::Fenced);
+  EXPECT_EQ(p.root.kids[0].kids[0].rows, 2);
+  EXPECT_EQ(p.root.kids[0].kids[0].cols, 2);
+
+  // `\\over` splits the group; a trailing `\\\\` adds no row.
+  p = parse_math("{a \\over b}");
+  EXPECT(p.root.kids[0].kids[0].kind == MathKind::Frac);
+  p = parse_math("\\begin{matrix} a \\\\ b \\\\ \\end{matrix}");
+  EXPECT_EQ(p.root.kids[0].rows, 2);
+
+  // Symbols, classes and errors.
+  p = parse_math("\\alpha \\leq \\infty -");
+  EXPECT_EQ(p.root.kids[0].cp, 0x3B1u);
+  EXPECT(p.root.kids[1].cls == MathClass::Rel);
+  EXPECT(p.root.kids[3].cls == MathClass::Bin);
+  p = parse_math("\\nosuchthing x");
+  EXPECT(!p.error.empty());
+  EXPECT(p.root.kids[0].kind == MathKind::Text);
+  EXPECT(!parse_math("\\frac{1}").error.empty());
+  EXPECT(!parse_math("{a").error.empty());
+  EXPECT(!parse_math("a}").error.empty());
+  EXPECT(!parse_math("\\begin{pmatrix} a").error.empty());
+
+  // Alphabets.
+  EXPECT_EQ(math_alphabet('x', MathVariant::Italic), 0x1D465u);
+  EXPECT_EQ(math_alphabet('h', MathVariant::Italic), 0x210Eu);
+  EXPECT_EQ(math_alphabet('R', MathVariant::DoubleStruck), 0x211Du);
+  EXPECT_EQ(math_alphabet('B', MathVariant::Script), 0x212Cu);
+  EXPECT_EQ(math_alphabet('g', MathVariant::Fraktur), 0x1D524u);
+  EXPECT_EQ(math_alphabet('x', MathVariant::Roman), static_cast<uint32_t>('x'));
+  EXPECT_EQ(math_alphabet('7', MathVariant::Bold), 0x1D7D5u);
+  EXPECT_EQ(math_alphabet(0x3B1, MathVariant::Auto), 0x1D6FCu);
+  EXPECT_EQ(math_alphabet(0x393, MathVariant::Auto), 0x393u);
+  EXPECT_EQ(math_alphabet('1', MathVariant::Auto), static_cast<uint32_t>('1'));
+
+  // Layout: spacing follows the atom classes.
+  const float ab = width("ab");
+  EXPECT(std::fabs(ab - 1.0f) < 1e-4f);
+  EXPECT(width("a=b") > width("a+b"));     // thick > medium
+  EXPECT(width("a+b") > ab);               // medium space around +
+  EXPECT(std::fabs(width("-b") - width("b") - 0.5f) < 1e-4f);  // unary: none
+  EXPECT(std::fabs(width("a,b") - (1.5f + 3.f / 18.f)) < 1e-4f);  // thin after ,
+  EXPECT(std::fabs(width("a\\quad b") - 2.0f) < 1e-4f);
+  EXPECT(width("a^2", false) < width("a^2", false) + 1);
+
+  // Scripts rise and sink, fractions have a rule, radicals a bar.
+  FakeMathFace face;
+  MathBox sup = layout_math(parse_math("a^b").root, face, false);
+  MathBox base = layout_math(parse_math("a").root, face, false);
+  EXPECT(sup.ascent > base.ascent);
+  MathBox sub = layout_math(parse_math("a_b").root, face, false);
+  EXPECT(sub.depth > 0.f);
+  MathBox fr = layout_math(parse_math("\\frac{a}{b}").root, face, false);
+  int rules = 0;
+  for (const MathItem& it : fr.items) rules += it.rule;
+  EXPECT_EQ(rules, 1);
+  EXPECT(fr.ascent > base.ascent && fr.depth > 0.f);
+  MathBox sq = layout_math(parse_math("\\sqrt{a}").root, face, false);
+  rules = 0;
+  for (const MathItem& it : sq.items) rules += it.rule;
+  EXPECT_EQ(rules, 1);
+  // Display style sets a sum's limits above and below.
+  MathBox lim = layout_math(parse_math("\\sum_a^b").root, face, true);
+  MathBox side = layout_math(parse_math("\\sum_a^b").root, face, false);
+  EXPECT(lim.width < side.width + 1.f && lim.ascent > side.ascent);
+  // Matrices: cells in rows, wider than one cell.
+  MathBox mx = layout_math(
+      parse_math("\\begin{matrix} a & b \\\\ c & d \\end{matrix}").root, face,
+      false);
+  EXPECT(mx.width > 1.f && mx.ascent + mx.depth > 2.f * base.ascent);
+}
+
 int main() {
   test_about_markdown();
   test_sitemap();
@@ -3294,6 +3419,7 @@ int main() {
   test_locator();
   test_text_selectors();
   test_bookmark_lines();
+  test_math();
 
   std::printf("%d passed, %d failed\n", g_passed, g_failed);
   return g_failed == 0 ? 0 : 1;

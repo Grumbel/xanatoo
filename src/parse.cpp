@@ -201,6 +201,42 @@ size_t parse_md_image(std::string_view text, size_t i, InlineSpan& out) {
   return next;
 }
 
+// "$tex$" or "$$tex$$" at text[i] (pandoc's tex_math_dollars rules: the
+// opening $ is followed and the closing one preceded by a non-space, and the
+// closing one is not followed by a digit, so "costs $5 and $6" stays text).
+// Returns the index after it, or npos when text[i] starts no math.
+size_t parse_md_math(std::string_view text, size_t i, InlineSpan& out) {
+  if (text[i] != '$') return std::string_view::npos;
+  const bool display = text.compare(i, 2, "$$") == 0;
+  const size_t open = display ? 2 : 1;
+  size_t j = i + open;
+  if (j >= text.size()) return std::string_view::npos;
+  if (!display && (std::isspace(static_cast<unsigned char>(text[j])) ||
+                   text[j] == '$'))
+    return std::string_view::npos;
+  for (; j < text.size(); ++j) {
+    if (text[j] == '\\') {
+      ++j;
+      continue;
+    }
+    if (text[j] != '$') continue;
+    if (display) {
+      if (text.compare(j, 2, "$$") != 0) continue;
+    } else {
+      if (std::isspace(static_cast<unsigned char>(text[j - 1]))) continue;
+      if (j + 1 < text.size() &&
+          std::isdigit(static_cast<unsigned char>(text[j + 1])))
+        continue;
+    }
+    std::string_view tex = text.substr(i + open, j - (i + open));
+    trim_ascii(tex);
+    if (tex.empty()) return std::string_view::npos;
+    out = inline_math(std::string(tex), display);
+    return j + open;
+  }
+  return std::string_view::npos;
+}
+
 // Parse inline spans for a single paragraph/heading line.
 void parse_inlines(Node& node, std::string_view text) {
   size_t i = 0;
@@ -223,9 +259,20 @@ void parse_inlines(Node& node, std::string_view text) {
       if (n == '\\' || n == '`' || n == '*' || n == '_' || n == '{' ||
           n == '}' || n == '[' || n == ']' || n == '(' || n == ')' ||
           n == '#' || n == '+' || n == '-' || n == '.' || n == '!' ||
-          n == '|' || n == '~' || n == '>') {
+          n == '|' || n == '~' || n == '>' || n == '$') {
         plain.push_back(n);
         i += 2;
+        continue;
+      }
+    }
+    // $inline$ and $$display$$ TeX math
+    if (text[i] == '$') {
+      InlineSpan m;
+      const size_t next = parse_md_math(text, i, m);
+      if (next != std::string_view::npos) {
+        flush_plain();
+        node.spans.push_back(std::move(m));
+        i = next;
         continue;
       }
     }
@@ -751,6 +798,35 @@ Document parse_markup(std::string_view source) {
       }
       if (!body.empty()) doc.append_text(n, body);
       continue;
+    }
+    // $$ … $$ display math over several lines (closing $$ ends the block)
+    if (starts_with(trimmed, "$$") && trimmed.find("$$", 2) == std::string_view::npos) {
+      std::string tex(trimmed.substr(2));
+      size_t k = i + 1;
+      bool closed = false;
+      for (; k < lines.size() && !lines[k].blank; ++k) {
+        std::string_view lt = lines[k].text;
+        const size_t close = lt.find("$$");
+        if (close != std::string_view::npos) {
+          std::string_view after = lt.substr(close + 2);
+          trim_ascii(after);
+          if (!after.empty()) break;  // text after the closing $$
+          tex += ' ';
+          tex.append(lt.substr(0, close));
+          closed = true;
+          break;
+        }
+        tex += ' ';
+        tex.append(lt);
+      }
+      std::string_view body = tex;
+      trim_ascii(body);
+      if (closed && !body.empty()) {
+        NodeId n = doc.create(NodeKind::Paragraph, current_parent());
+        doc.get(n).spans.push_back(inline_math(std::string(body), true));
+        i = k + 1;
+        continue;
+      }
     }
     // GFM fenced code: ```lang … ```
     if (starts_with(trimmed, "```") || starts_with(trimmed, "~~~")) {
@@ -1374,7 +1450,7 @@ void escape_md_plain(const std::string& text, std::string& out) {
     }
     if (c == '\\' || c == '`' || c == '*' || c == '_' || c == '[' || c == ']' ||
         c == '(' || c == ')' || c == '#' || c == '!' || c == '|' || c == '~' ||
-        c == '<' || c == '>') {
+        c == '<' || c == '>' || c == '$') {
       out.push_back('\\');
     }
     out.push_back(c);
@@ -1445,6 +1521,19 @@ void serialize_inlines(const Node& node, std::string& out) {
       case InlineKind::Image:
         out += md_inline_image(sp);
         break;
+      case InlineKind::Math: {
+        // One line; the delimiters must touch the formula.
+        std::string tex = sp.src;
+        for (char& c : tex)
+          if (c == '\n' || c == '\r') c = ' ';
+        std::string_view t = tex;
+        trim_ascii(t);
+        const char* d = sp.display ? "$$" : "$";
+        out += d;
+        out += t;
+        out += d;
+        break;
+      }
       default:
         escape_md_plain(sp.text, out);
         break;
@@ -2076,8 +2165,32 @@ void append_inline_from_sexpr(Node& node, const SExpr& e) {
       !is_atom(head, "code") && !is_atom(head, "a") &&
       !is_atom(head, "cite") && !is_atom(head, "fnref") &&
       !is_atom(head, "text") && !is_atom(head, "img") &&
-      !is_atom(head, "image"))
+      !is_atom(head, "image") && !is_atom(head, "math"))
     return;
+
+  if (is_atom(head, "math")) {
+    // (math "x^2" :display t) in running text
+    std::string tex;
+    bool display = false;
+    for (size_t i = 1; i < e.kids.size(); ++i) {
+      const SExpr& k = e.kids[i];
+      if (k.kind == SExpr::Kind::Atom && k.text == ":display") {
+        display = true;
+        if (i + 1 < e.kids.size() && e.kids[i + 1].kind == SExpr::Kind::Atom &&
+            (e.kids[i + 1].text == "nil" || e.kids[i + 1].text == "false")) {
+          display = false;
+        }
+        if (i + 1 < e.kids.size() && e.kids[i + 1].kind == SExpr::Kind::Atom &&
+            e.kids[i + 1].text[0] != ':')
+          ++i;
+      } else if (tex.empty()) {
+        tex = sexpr_text(k);
+      }
+    }
+    if (tex.empty()) return;
+    node.spans.push_back(inline_math(std::move(tex), display));
+    return;
+  }
 
   if (is_atom(head, "img") || is_atom(head, "image")) {
     // (img "src" :alt "…" :width 16 :height 16 :href "…") in running text
@@ -2325,7 +2438,7 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
         const std::string& h = c.kids[0].text;
         if (h != "em" && h != "strong" && h != "strike" && h != "s" &&
             h != "code" && h != "a" && h != "cite" && h != "fnref" &&
-            h != "text" && h != "img" && h != "image")
+            h != "text" && h != "img" && h != "image" && h != "math")
           blocks = true;
       }
     }
@@ -2876,6 +2989,12 @@ void serialize_sexpr_inlines(const Node& node, std::string& out) {
         escape_sexpr_string(sp.href, out);
         out.push_back(' ');
         escape_sexpr_string(sp.text, out);
+        out += ")";
+        break;
+      case InlineKind::Math:
+        out += "(math ";
+        escape_sexpr_string(sp.src, out);
+        if (sp.display) out += " :display t";
         out += ")";
         break;
       case InlineKind::Image:
@@ -3557,6 +3676,8 @@ static std::string gemtext_plain(const Node& n) {
       s += "[" + sp.href + "]";
     else if (sp.kind == InlineKind::Image)
       s += sp.alt.empty() ? "[image]" : "[" + sp.alt + "]";
+    else if (sp.kind == InlineKind::Math)
+      s += sp.src;
     else
       s += sp.text;
   }

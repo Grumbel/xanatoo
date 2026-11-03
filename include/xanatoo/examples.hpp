@@ -18,6 +18,7 @@ inline constexpr ExampleEntry kExamples[] = {
     {"Keyboard reference", "help.md"},
     {nullptr, nullptr},
     {"Feature tour (every block kind)", "tour.md"},
+    {"TeX math", "math.md"},
     {nullptr, nullptr},
     {"Directory (links and feeds)", "directory.md"},
     {"Books and long reads", "books.md"},

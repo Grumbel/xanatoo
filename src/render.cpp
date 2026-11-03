@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/render.hpp"
+#include "xanatoo/math_font.hpp"
 #include <cmath>
 
 namespace xanatoo {
@@ -333,6 +334,8 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
   for (size_t i = 0; i < glyphs.size(); ++i) {
     const PositionedGlyph& pg = glyphs[i];
     if (pg.kind == InlineKind::Image) continue;  // drawn with the images
+    // The caret slot of a formula (its fallback text is drawn as code).
+    if (pg.kind == InlineKind::Math && pg.codepoint == kInlineImageCp) continue;
     Font& font = fonts_.pick(pg.font);
     const Glyph& g = font.glyph(pg.codepoint);
 
@@ -378,6 +381,23 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
         const int mid =
             px(pg.y - static_cast<float>(g.bearing_y) * 0.35f - scroll_y);
         SDL_RenderDrawLine(sdl_, ux, mid, ux + uw, mid);
+      }
+    }
+  }
+
+  // TeX formulas (InlineKind::Math), over the text.
+  if (!layout.maths.empty()) {
+    if (MathFont* mf = fonts_.math_font()) {
+      for (const PositionedMath& pm : layout.maths) {
+        const MathBox& b = *pm.box;
+        const int bx = static_cast<int>(pm.x + origin_x);
+        const int by = px(pm.y - scroll_y);
+        if (!visible(bx, by - static_cast<int>(b.ascent * pm.px) - 2,
+                     static_cast<int>(b.width * pm.px) + 2,
+                     static_cast<int>((b.ascent + b.depth) * pm.px) + 4))
+          continue;
+        draw_math(sdl_, *mf, b, static_cast<float>(bx), static_cast<float>(by),
+                  pm.px, pm.color);
       }
     }
   }

@@ -116,4 +116,13 @@ InlineSpan inline_image(std::string src, std::string alt, int width,
   return s;
 }
 
+InlineSpan inline_math(std::string tex, bool display) {
+  InlineSpan s;
+  s.kind = InlineKind::Math;
+  s.text = kInlineImageText;
+  s.src = std::move(tex);
+  s.display = display;
+  return s;
+}
+
 }  // namespace xanatoo

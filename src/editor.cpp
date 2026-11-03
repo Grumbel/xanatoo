@@ -487,7 +487,7 @@ void insert_text(Document& doc, Caret& caret, const std::string& utf8) {
     caret.span_index = n.spans.size() - 1;
     caret.char_index = utf8_char_count(n.spans.back().text);
   }
-  if (n.spans[caret.span_index].kind == InlineKind::Image) {
+  if (is_inline_object(n.spans[caret.span_index].kind)) {
     // Text next to an inline image goes into a text span of its own.
     insert_styled(doc, caret, utf8, InlineKind::Text, {});
     return;

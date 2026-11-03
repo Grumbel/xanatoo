@@ -5,6 +5,7 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include <SDL.h>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -131,9 +132,16 @@ std::string ui_font_path(bool bold = false);
 // First family of `names` that FontConfig has installed, else "".
 std::string fontconfig_pick_family(const std::vector<std::string>& names);
 
+class MathFont;
+
 // Body regular/bold/italic + heading + monospace for code.
 class FontSet {
 public:
+  FontSet();
+  ~FontSet();
+  FontSet(const FontSet&) = delete;
+  FontSet& operator=(const FontSet&) = delete;
+
   Font regular;
   Font bold;
   Font italic;
@@ -155,6 +163,15 @@ public:
 
   Font& pick(FontRole role);
   const Font& pick(FontRole role) const;
+
+  // The math font (math_font.hpp), found and opened on first use; null when
+  // the system has none (math then shows its TeX source).
+  MathFont* math_font();
+
+private:
+  SDL_Renderer* renderer_ = nullptr;
+  std::unique_ptr<MathFont> math_;
+  bool math_tried_ = false;
 };
 
 }  // namespace xanatoo

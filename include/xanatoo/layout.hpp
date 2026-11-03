@@ -5,8 +5,10 @@
 #include "xanatoo/types.hpp"
 #include "xanatoo/font.hpp"
 #include "xanatoo/images.hpp"
+#include "xanatoo/math.hpp"
 #include "xanatoo/style.hpp"
 #include <cstdint>
+#include <memory>
 #include <vector>
 #include <string>
 #include <unordered_map>
@@ -53,6 +55,19 @@ struct PositionedImage {
   size_t span_index = 0;
 };
 
+// A TeX formula set in running text (InlineKind::Math): `y` is its baseline,
+// `px` the size of the em its box is measured in.
+struct PositionedMath {
+  NodeId node = INVALID_NODE;
+  size_t span_index = 0;
+  float x = 0.f;
+  float y = 0.f;
+  float px = 0.f;
+  bool display = false;
+  std::shared_ptr<const MathBox> box;
+  Rgba color;
+};
+
 struct MessageCard {
   LayoutBox box;
   bool alt = false;  // odd reply depth
@@ -81,6 +96,7 @@ struct LayoutResult {
   std::vector<PositionedGlyph> glyphs;
   std::vector<LayoutBox> boxes;
   std::vector<PositionedImage> images;
+  std::vector<PositionedMath> maths;
   // Vertical bars for block quotes (content coordinates).
   std::vector<LayoutBox> quote_bars;
   // Vertical bars for notes (distinct colour from quotes).
@@ -292,6 +308,11 @@ private:
   // max_w); remote ones from their thumbnail, a 1 em box while pending.
   void inline_image_size(const InlineSpan& sp, float max_w, float& w,
                          float& h, bool& remote);
+
+  // The set formula of a Math span (null without a math font or on a parse
+  // error); cached by source and style.
+  std::shared_ptr<const MathBox> math_box(const InlineSpan& sp);
+  std::unordered_map<std::string, std::shared_ptr<const MathBox>> math_cache_;
 
   // Author of the Thread's first Message while laying out that Thread.
   std::string thread_op_;

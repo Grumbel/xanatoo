@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/font.hpp"
+#include "xanatoo/math_font.hpp"
 #include "xanatoo/paths.hpp"
 #ifndef XANATOO_FONTCONFIG
 #define XANATOO_FONTCONFIG 1
@@ -465,8 +466,36 @@ std::string fontconfig_pick_family(const std::vector<std::string>& names) {
 #endif
 }
 
+FontSet::FontSet() = default;
+FontSet::~FontSet() = default;
+
+MathFont* FontSet::math_font() {
+  if (math_tried_) return math_ && math_->loaded() ? math_.get() : nullptr;
+  math_tried_ = true;
+  const std::string path = find_math_font_path();
+  if (path.empty()) {
+    std::cerr << "math font: none found (math shows its TeX source)\n";
+    return nullptr;
+  }
+  math_ = std::make_unique<MathFont>();
+  if (!math_->load(path, renderer_)) {
+    std::cerr << "math font: cannot load " << path << "\n";
+    math_.reset();
+    return nullptr;
+  }
+  std::cerr << "math font: " << path
+            << (math_->has_math_table() ? "" : " (no MATH table)") << "\n";
+  return math_.get();
+}
+
 bool FontSet::load(SDL_Renderer* renderer, const std::string& preferred_path,
                    int body_px, int heading_px, const FontFamilies& families) {
+  if (renderer != renderer_) {
+    // A new renderer cannot use the old textures.
+    math_.reset();
+    math_tried_ = false;
+  }
+  renderer_ = renderer;
   std::string family;
   if (!preferred_path.empty()) {
     family = fontconfig_family_from_file(preferred_path);

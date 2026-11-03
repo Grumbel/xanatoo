@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/layout.hpp"
+#include "xanatoo/math_font.hpp"
 #include "xanatoo/images.hpp"
 #include "xanatoo/parse.hpp"
 #include "xanatoo/util.hpp"
@@ -174,6 +175,7 @@ static void append_result(LayoutResult& out, const LayoutResult& in) {
   add(out.glyphs, in.glyphs);
   add(out.boxes, in.boxes);
   add(out.images, in.images);
+  add(out.maths, in.maths);
   add(out.quote_bars, in.quote_bars);
   add(out.note_bars, in.note_bars);
   add(out.message_bars, in.message_bars);
@@ -2046,6 +2048,23 @@ void LayoutEngine::layout_chrome_notice(const Document& doc, float x,
   out.chrome_notice = {INVALID_NODE, x, start_y, max_width, y - start_y};
 }
 
+std::shared_ptr<const MathBox> LayoutEngine::math_box(const InlineSpan& sp) {
+  MathFont* face = fonts_.math_font();
+  if (!face) return nullptr;
+  const std::string key = (sp.display ? "D" : "T") + sp.src;
+  auto it = math_cache_.find(key);
+  if (it != math_cache_.end()) return it->second;
+  const MathParse parsed = parse_math(sp.src);
+  std::shared_ptr<const MathBox> box;
+  // Unknown commands stay visible as text inside the formula; only a source
+  // that does not parse at all falls back to showing the TeX.
+  if (parsed.error.empty() || !parsed.root.kids.empty())
+    box = std::make_shared<MathBox>(layout_math(parsed.root, *face, sp.display));
+  if (math_cache_.size() > 2000) math_cache_.clear();
+  math_cache_[key] = box;
+  return box;
+}
+
 void LayoutEngine::layout_role_text(const Document& doc, const Node& node,
                                     BlockRole role, float x, float& y,
                                     float max_width, LayoutResult& out) {
@@ -2091,13 +2110,41 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     float img_w = 0.f;  // inline image: an atom of this size (else 0)
     float img_h = 0.f;
     bool remote = false;
+    // A formula (also an atom): `img_h` above the baseline, `img_d` below.
+    float img_d = 0.f;
+    float math_px = 0.f;
+    bool display = false;
+    std::shared_ptr<const MathBox> math;
   };
   std::vector<CharInfo> chars;
+  const bool small_base = is_small_role(base_role);
   for (size_t si = 0; si < node.spans.size(); ++si) {
     std::vector<uint32_t> cps;
     decode_utf8(node.spans[si].text, cps);
     const InlineKind kind = node.spans[si].kind;
     FontRole r = style_role(base_role, kind);
+    if (kind == InlineKind::Math) {
+      // One atom set from the font's math table; without a math font (or a
+      // formula that does not parse) the TeX source is shown as code.
+      const InlineSpan& sp = node.spans[si];
+      const float em = static_cast<float>(fonts_.pick(r).pixel_size());
+      if (auto box = math_box(sp)) {
+        CharInfo c{kInlineImageCp, si, 0, kind, r};
+        c.img_w = std::max(1.f, box->width * em);
+        c.img_h = box->ascent * em;
+        c.img_d = box->depth * em;
+        c.math_px = em;
+        c.display = sp.display;
+        c.math = std::move(box);
+        chars.push_back(std::move(c));
+      } else {
+        const FontRole code = small_base ? FontRole::SmallCode : FontRole::Code;
+        std::vector<uint32_t> src;
+        decode_utf8(sp.src, src);
+        for (uint32_t cp : src) chars.push_back(CharInfo{cp, si, 0, kind, code});
+      }
+      continue;
+    }
     for (size_t ci = 0; ci < cps.size(); ++ci) {
       CharInfo c{cps[ci], si, ci, kind, r};
       if (kind == InlineKind::FootnoteRef) {
@@ -2117,7 +2164,6 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     }
   }
 
-  const bool small_base = is_small_role(base_role);
   Font& metrics = fonts_.pick(base_role == FontRole::Heading ? FontRole::Heading
                               : small_base                  ? FontRole::Small
                                                             : FontRole::Body);
@@ -2155,6 +2201,7 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     bool seen_nonspace = false;
     bool in_space = false;
     float img_up = 0.f;  // inline images taller than the ascender lower the line
+    float img_down = 0.f;  // formulas deeper than the descender: extra below
     float space_adv =
         static_cast<float>(metrics.glyph(' ').advance >> 6);
     if (space_adv < 1.f) space_adv = 4.f;
@@ -2163,6 +2210,9 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
       if (chars[i].img_h > 0.f)
         img_up = std::max(img_up, chars[i].img_h -
                                       static_cast<float>(metrics.ascender()));
+      if (chars[i].img_d > 0.f)
+        img_down = std::max(img_down,
+                            chars[i].img_d + static_cast<float>(metrics.descender()));
       if (chars[i].cp == ' ') {
         if (seen_nonspace) in_space = true;
       } else {
@@ -2188,6 +2238,9 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     }
 
     float lx = lx0;
+    // A display formula alone on its line is centred.
+    if (content_hi == lo + 1 && chars[lo].display && natural < lw)
+      lx += (lw - natural) * 0.5f;
     bool after_space_run = false;
     bool had_nonspace = false;
     for (size_t i = lo; i < hi; ++i) {
@@ -2214,6 +2267,25 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
       pg.color = ctx_color && !(*style_)[c.kind].has_color
                      ? (*style_)[ctx_role_].color
                      : style_->text_color(block, c.kind);
+      if (c.math) {
+        // Formula: drawn from its box at the baseline; the glyph is its
+        // caret slot.
+        pg.x = lx;
+        pg.advance = c.img_w;
+        PositionedMath pm;
+        pm.node = node.id;
+        pm.span_index = c.span_idx;
+        pm.x = lx;
+        pm.y = baseline;
+        pm.px = c.math_px;
+        pm.display = c.display;
+        pm.box = c.math;
+        pm.color = pg.color;
+        out.maths.push_back(std::move(pm));
+        out.glyphs.push_back(pg);
+        lx += c.img_w;
+        continue;
+      }
       if (c.img_w > 0.f) {
         // Inline image: sits on the baseline; the glyph is its caret slot.
         pg.x = lx;
@@ -2236,7 +2308,7 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
       out.glyphs.push_back(pg);
       lx += adv;
     }
-    baseline += metrics.line_height() * options_.line_spacing;
+    baseline += metrics.line_height() * options_.line_spacing + img_down;
   };
 
   // Word-wrap: build runs separated by spaces / hard breaks.

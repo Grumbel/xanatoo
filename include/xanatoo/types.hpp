@@ -59,7 +59,14 @@ enum class InlineKind : uint8_t {
   FootnoteRef,  // footnote mark; href holds the Footnote key, text the mark
   Image,  // inline image: text = U+FFFC (one caret position), src / alt /
           // width / height below, href = optional link target
+  Math,   // TeX math: text = U+FFFC, src = the TeX source, display = own
+          // line (centred when alone in its block); see math.hpp
 };
+
+// Spans that are one object in the text (U+FFFC, one caret position).
+inline bool is_inline_object(InlineKind k) {
+  return k == InlineKind::Image || k == InlineKind::Math;
+}
 
 // Text of an inline image span: the object replacement character.
 inline constexpr const char* kInlineImageText = "\xEF\xBF\xBC";
@@ -76,11 +83,16 @@ struct InlineSpan {
   std::string alt;      // alternative text
   uint16_t width = 0;   // declared size in CSS px (0 = from the image)
   uint16_t height = 0;
+  // InlineKind::Math only (the TeX source is in `src`).
+  bool display = false;
 };
 
 // Inline image span (text = kInlineImageText).
 InlineSpan inline_image(std::string src, std::string alt = {},
                         int width = 0, int height = 0);
+
+// Inline math span (text = kInlineImageText, src = TeX).
+InlineSpan inline_math(std::string tex, bool display = false);
 
 struct Node {
   NodeId id = INVALID_NODE;

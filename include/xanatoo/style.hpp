@@ -65,7 +65,7 @@ enum class BlockRole : uint8_t {
   Count
 };
 constexpr size_t kBlockRoleCount = static_cast<size_t>(BlockRole::Count);
-constexpr size_t kInlineKindCount = static_cast<size_t>(InlineKind::Image) + 1;
+constexpr size_t kInlineKindCount = static_cast<size_t>(InlineKind::Math) + 1;
 
 // Which side of the page a box goes to.
 enum class FloatSide : uint8_t { None, Left, Right };
