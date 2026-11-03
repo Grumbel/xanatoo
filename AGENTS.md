@@ -412,6 +412,14 @@ mechanism; historical bundle numbers in TODO.md are archival).
 - Pandoc misbehaviour and our workarounds (Lua filter, post-passes) are
   collected in `docs/PANDOC.md`; add new findings there.
 
+## Directory (`examples/directory.md`)
+
+- A hand-written link directory (categories under `examples/directory/`):
+  feeds, native refs (`hn:` / `reddit:` / `lemmy:` / `wikipedia:`) and plain
+  pages. Check a new URL with curl before adding it; use the `feed:` prefix
+  where `is_feed_url` cannot tell it is a feed. Sub-pages live in the
+  subdirectory so the Examples-menu test only lists the front page.
+
 ## Ebooks
 
 - `src/ebooks.cpp`, gated by `XANATOO_EBOOKS` (default ON).

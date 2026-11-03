@@ -56,6 +56,7 @@ Open any of these from this page (links load in the same pane and join session h
 - [Ask Lemmy](lemmy:lemmy.world/c/asklemmy) — Lemmy community via API v3
 - [programming.dev /c/rust](lemmy:programming.dev/c/rust) — federated Lemmy community
 - [Hacker News](hn:) — front page and comment trees
+- [Directory](directory.md) — a mini Yahoo!: social, sci-fi magazines, tech, science, news, archives
 - [Books and long reads](books.md) — Standard Ebooks / Project Gutenberg EPUBs
 - [Feeds](feeds.md) — RSS / Atom: blogs, news, Mastodon, Reddit, arXiv
 - [Org-mode sample](sample.org) — headings, TODO, tags, source blocks

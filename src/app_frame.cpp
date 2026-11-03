@@ -172,6 +172,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
         {"Gemini (geminiprotocol.net)", "gemini://geminiprotocol.net/", false,
          true},
         {"Standard Ebooks", "https://standardebooks.org/ebooks", false, true},
+        {"Directory (links and feeds)", "directory.md", true, false},
         {"Books and long reads", "books.md", true, false},
         {"Feeds (RSS / Atom)", "feeds.md", true, false},
     };

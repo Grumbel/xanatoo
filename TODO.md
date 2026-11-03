@@ -8,6 +8,30 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-11-03) — Directory (mini Yahoo!)
+
+- `examples/directory.md` + `examples/directory/*.md` (social, sci-fi, tech,
+  science, culture, games, news, media, reference): ~265 links, mostly feeds.
+  In Help → Examples and the Services menu. Every external URL was fetched
+  with curl when the list was written (feeds returned entries); dead ones
+  were left out, not guessed. Feed URLs `is_feed_url` cannot recognise carry
+  a `feed:` prefix.
+- Findings: Twitter / X, Instagram and TikTok have no usable public feeds
+  (Nitter gone, login walls, JS-only). Open per-user / per-tag RSS: Mastodon,
+  Bluesky (`/profile/h/rss`), Tumblr, Pixelfed, Flickr, Pinterest, YouTube
+  (`channel_id`), Medium, Substack, DeviantArt, Stack Exchange, GitHub.
+  Telegram: `t.me/s/<channel>` as a web page. Reddit rate-limits (429) on
+  bursts. `[**bold**](url)` renders literal asterisks in link text (parser
+  gap, not fixed). YouTube watch links open as web pages in-app.
+- Next (step 2): interactive search. Candidate APIs, all keyless: Wikipedia
+  (`/w/api.php?action=opensearch`), Internet Archive
+  (`advancedsearch.php?output=json`), arXiv (`export.arxiv.org/api/query`,
+  Atom), Bluesky (`public.api.bsky.app/xrpc/app.bsky.feed.searchPosts`),
+  Mastodon (`/api/v2/search`, `/api/v1/timelines/tag/<t>`), Lemmy
+  (`/api/v3/search`), HN (Algolia), Reddit (`/search.json`), Gutenberg
+  (Gutendex), Standard Ebooks (`?query=`, already works). Needs a search
+  prompt kind (`PromptKind`) + `search:` result pages.
+
 ## Status (2026-11-03) — session restore
 
 - `app_session.cpp`: `state_dir()/session.conf` holds each centre view's

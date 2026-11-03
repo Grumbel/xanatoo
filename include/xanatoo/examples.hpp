@@ -19,6 +19,7 @@ inline constexpr ExampleEntry kExamples[] = {
     {nullptr, nullptr},
     {"Feature tour (every block kind)", "tour.md"},
     {nullptr, nullptr},
+    {"Directory (links and feeds)", "directory.md"},
     {"Books and long reads", "books.md"},
     {"Feeds (RSS / Atom)", "feeds.md"},
     {"Nostr discussions", "nostr-sample.md"},
