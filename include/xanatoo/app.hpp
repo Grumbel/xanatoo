@@ -538,6 +538,13 @@ struct Prompt {
   size_t span = 0;
 };
 
+// Scroll position from the last session, put back once the page is there
+// (app_session.cpp).
+struct PendingScroll {
+  float y = -1.f;  // < 0: none
+  std::string base;
+};
+
 struct App {
   App(SDL_Window* w, SDL_Renderer* r)
       : window(w),
@@ -711,7 +718,16 @@ struct App {
   SplitPreview split_preview;
   SplitTrail split_trail;
   SplitHistory split_history;
+  PendingScroll pending_scroll[2];
 };
+
+// ---- session (app_session.cpp) ----
+// Write state_dir()/session.conf (at shutdown); restore it at startup when
+// no document was named on the command line; put the saved scroll back once
+// its page has loaded (per frame).
+void save_session(App& app);
+void restore_session(App& app);
+void apply_pending_scroll(App& app);
 
 // ---- drafts (app_drafts.cpp) ----
 // Unsaved edits are written to the local revision store as drafts, so

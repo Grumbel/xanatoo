@@ -3125,6 +3125,7 @@ void run_frame(App& app) {
   // relayout so the exposed raster strip is drawn from a complete layout.
   poll_gamepad_axes(app);
   relayout_if_needed(app);
+  apply_pending_scroll(app);
   poll_images(app);
   draw_panes(app);
   draw_split_chrome(app);

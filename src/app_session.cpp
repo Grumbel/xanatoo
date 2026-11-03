@@ -1,0 +1,232 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
+//
+// Session: what the window looked like when xanatoo was closed (pages in the
+// centre views, split, scroll, panels and their docks, window size) in
+// state_dir()/session.conf, put back at the next start unless the command
+// line names a document.
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+
+#include "xanatoo/app.hpp"
+#include "xanatoo/paths.hpp"
+#include "xanatoo/util.hpp"
+
+namespace fs = std::filesystem;
+
+namespace xanatoo::app {
+
+namespace {
+
+std::string session_path() {
+  const std::string dir = state_dir();
+  if (dir.empty()) return {};
+  return (fs::path(dir) / "session.conf").string();
+}
+
+struct PanelRef {
+  const char* name;
+  FloatWindow* win;
+  bool open;
+};
+
+std::array<PanelRef, 5> panels(App& app) {
+  return {{{"help", &app.help, app.help_mode},
+           {"outline", &app.ol, app.outline_mode},
+           {"backlinks", &app.bl, app.backlinks_mode},
+           {"sitemap", &app.sm, app.sitemap.shown},
+           {"page", &app.pg, app.page.shown}}};
+}
+
+int unscale(const App& app, int v) {
+  return static_cast<int>(std::lround(v / app.ui_scale));
+}
+int rescale(const App& app, int v) {
+  return static_cast<int>(std::lround(v * app.ui_scale));
+}
+
+std::vector<int> ints(const std::string& s) {
+  std::vector<int> out;
+  std::istringstream in(s);
+  int v;
+  while (in >> v) out.push_back(v);
+  return out;
+}
+
+}  // namespace
+
+void save_session(App& app) {
+  if (no_save()) return;
+  const std::string path = session_path();
+  if (path.empty() || !ensure_dir(state_dir())) return;
+  std::ostringstream out;
+  out << "# xanatoo session (restored at the next start)\n";
+  if (!app.opt.fullscreen && app.win_w > 0 && app.win_h > 0)
+    out << "window=" << app.win_w << " " << app.win_h << "\n";
+  out << "split=" << (app.split ? 1 : 0) << "\n";
+  out << "split_ratio=" << app.split_ratio << "\n";
+  out << "focus=" << std::clamp(app.centre_focus, 0, 1) << "\n";
+  for (int pi = 0; pi < kCentreViews; ++pi) {
+    if (!view_live(app, pi) || !find_buf(app, app.panes[pi].buf)) continue;
+    Pane& p = app.panes[pi];
+    std::string addr = pane_address(app, p);
+    {  // a local file, from wherever xanatoo is started next time
+      const std::string base = parse_locator(addr).base;
+      std::error_code ec;
+      if (!base.empty() && !is_in_app_remote_url(base) &&
+          fs::exists(base, ec) && !fs::path(base).is_absolute())
+        addr = fs::absolute(base, ec).string() + addr.substr(base.size());
+    }
+    if (addr.empty() || addr.find('\n') != std::string::npos) continue;
+    out << "pane" << pi << "=" << addr << "\n";
+    out << "scroll" << pi << "=" << p.scroll_y << "\n";
+    if (p.reader) out << "reader" << pi << "=" << (*p.reader ? 1 : 0) << "\n";
+    if (p.paged) out << "paged" << pi << "=" << (*p.paged ? 1 : 0) << "\n";
+  }
+  for (int i = 0; i < 4; ++i)
+    out << "dock_w" << i << "=" << unscale(app, app.dock_w[i]) << "\n";
+  for (const PanelRef& r : panels(app)) {
+    const FloatWindow& w = *r.win;
+    out << r.name << ".open=" << (r.open ? 1 : 0) << "\n";
+    out << r.name << ".dock=" << static_cast<int>(w.dock) << " "
+        << static_cast<int>(w.restore_dock) << " " << w.dock_seq << "\n";
+    out << r.name << ".geom=" << unscale(app, w.x) << " "
+        << unscale(app, w.y) << " " << unscale(app, w.w) << " "
+        << unscale(app, w.h) << "\n";
+    out << r.name << ".free=" << unscale(app, w.restore_x) << " "
+        << unscale(app, w.restore_y) << " " << unscale(app, w.restore_w)
+        << " " << unscale(app, w.restore_h) << "\n";
+  }
+  write_file_atomic(path, out.str());
+}
+
+void restore_session(App& app) {
+  const std::string path = session_path();
+  if (path.empty()) return;
+  std::ifstream in(path);
+  if (!in) return;
+  std::unordered_map<std::string, std::string> kv;
+  std::string line;
+  while (std::getline(in, line)) {
+    if (line.empty() || line[0] == '#') continue;
+    const auto eq = line.find('=');
+    if (eq == std::string::npos) continue;
+    kv[line.substr(0, eq)] = line.substr(eq + 1);
+  }
+  auto get = [&](const std::string& k) -> const std::string* {
+    auto it = kv.find(k);
+    return it == kv.end() ? nullptr : &it->second;
+  };
+  try {
+    if (const std::string* v = get("window"); v && !app.opt.fullscreen) {
+      const auto n = ints(*v);
+      if (n.size() == 2 && n[0] >= 320 && n[1] >= 240 &&
+          n[0] <= 16384 && n[1] <= 16384) {
+        SDL_SetWindowSize(app.window, n[0], n[1]);
+        app.win_w = n[0];
+        app.win_h = n[1];
+      }
+    }
+    for (int i = 0; i < 4; ++i)
+      if (const std::string* v = get("dock_w" + std::to_string(i)))
+        app.dock_w[i] = std::clamp(rescale(app, std::stoi(*v)), 60, 4000);
+    for (const PanelRef& r : panels(app)) {
+      FloatWindow& w = *r.win;
+      const std::string n = r.name;
+      if (const std::string* v = get(n + ".dock")) {
+        const auto d = ints(*v);
+        if (d.size() == 3 && d[0] >= 0 && d[0] <= 5 && d[1] >= 0 && d[1] <= 5) {
+          w.dock = static_cast<Dock>(d[0]);
+          w.restore_dock = static_cast<Dock>(d[1]);
+          w.dock_seq = d[2];
+        }
+      }
+      if (const std::string* v = get(n + ".geom")) {
+        const auto g = ints(*v);
+        if (g.size() == 4 && g[2] > 40 && g[3] > 40) {
+          w.x = rescale(app, g[0]);
+          w.y = rescale(app, g[1]);
+          w.w = rescale(app, g[2]);
+          w.h = rescale(app, g[3]);
+        }
+      }
+      if (const std::string* v = get(n + ".free")) {
+        const auto g = ints(*v);
+        if (g.size() == 4 && g[2] > 40 && g[3] > 40) {
+          w.restore_x = rescale(app, g[0]);
+          w.restore_y = rescale(app, g[1]);
+          w.restore_w = rescale(app, g[2]);
+          w.restore_h = rescale(app, g[3]);
+        }
+      }
+    }
+    const bool split = get("split") && *get("split") == "1";
+    for (int pi = 0; pi < kCentreViews; ++pi) {
+      const std::string* a = get("pane" + std::to_string(pi));
+      if (!a || (pi == 1 && !split)) continue;
+      Pane& p = app.panes[pi];
+      if (const std::string* v = get("reader" + std::to_string(pi)))
+        p.reader = (*v == "1");
+      if (const std::string* v = get("paged" + std::to_string(pi)))
+        p.paged = (*v == "1");
+      if (!navigate_pane(app, pi, *a, /*record_history=*/true)) continue;
+      if (const std::string* v = get("scroll" + std::to_string(pi)))
+        if (!pane_paged(app, p)) {
+          app.pending_scroll[pi].y = std::stof(*v);
+          app.pending_scroll[pi].base = xanatoo::parse_locator(*a).base;
+        }
+    }
+    if (split && app.buffers.size() > 0) {
+      app.split = true;
+      if (const std::string* v = get("split_ratio"))
+        app.split_ratio = std::clamp(std::stof(*v), 0.1f, 0.9f);
+    }
+    if (const std::string* v = get("focus"))
+      focus_view(app, split && *v == "1" ? 1 : 0);
+    // Panels last: they read the pages just opened.
+    if (get("help.open") && *get("help.open") == "1") app.help_mode = true;
+    if (get("outline.open") && *get("outline.open") == "1") {
+      app.outline_mode = true;
+      refresh_outline(app);
+    }
+    if (get("backlinks.open") && *get("backlinks.open") == "1") {
+      app.backlinks_mode = true;
+      refresh_backlinks(app);
+    }
+    if (get("sitemap.open") && *get("sitemap.open") == "1" &&
+        !app.sitemap.shown)
+      toggle_sitemap(app);
+    if (get("page.open") && *get("page.open") == "1" && !app.page.shown)
+      toggle_page_panel(app);
+    app.needs_layout = true;
+    std::cerr << "session: restored from " << path << "\n";
+  } catch (...) {
+    std::cerr << "session: ignoring unreadable " << path << "\n";
+  }
+}
+
+void apply_pending_scroll(App& app) {
+  for (int pi = 0; pi < kCentreViews; ++pi) {
+    PendingScroll& ps = app.pending_scroll[pi];
+    if (ps.y < 0.f) continue;
+    bool loading = false;
+    for (const FetchJob& j : app.fetches)
+      if (j.pane == pi && j.purpose == FetchPurpose::Navigate) loading = true;
+    if (loading) continue;
+    Pane& p = app.panes[pi];
+    if (find_buf(app, p.buf) && path_of(app, p) == ps.base &&
+        !app.needs_layout) {
+      p.scroll_y = std::clamp(ps.y, 0.f, std::max(0.f, pane_max_scroll(app, p)));
+      app.needs_layout = true;
+    }
+    ps = PendingScroll{};
+  }
+}
+
+}  // namespace xanatoo::app

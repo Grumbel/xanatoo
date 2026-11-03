@@ -190,6 +190,7 @@ bool app_init(App& app) {
   }
   app.focus = 0;
   app.split = app.buffers.size() > 1;  // auto-split when two files given
+  if (app.opt.file_path.empty()) restore_session(app);
   {
     // Drafts nobody is looking at yet (untitled ones have no file to open).
     size_t hidden = 0;
@@ -209,6 +210,7 @@ void app_shutdown(App& app) {
   // Every way out (window close, Quit, signals reaching the loop) keeps
   // unsaved edits as drafts.
   for (const DocBuffer& b : app.buffers) stash_draft(app, b.id);
+  save_session(app);
   SDL_StopTextInput();
   release_pane_rasters(app);
   app.ui.shutdown();

@@ -65,6 +65,7 @@ add_executable(xanatoo
   src/app_init.cpp
   src/app_buffers.cpp
   src/app_view.cpp
+  src/app_session.cpp
   src/app_nav.cpp
   src/app_softwin.cpp
   src/app_windows.cpp
