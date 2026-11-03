@@ -167,7 +167,7 @@ void draw_window_chrome(SDL_Renderer* r, const WindowChrome& w) {
 void draw_vscrollbar(SDL_Renderer* r, const SDL_Rect& trough, float scroll,
                      float max_scroll, float view_h, SDL_Rect* thumb_out) {
   const Palette& p = palette();
-  fill(r, trough, p.face_dark);
+  fill(r, trough, rgb(0x8E, 0x8A, 0x84));  // dark trough: contrast with the light thumb
   bevel(r, trough, Bevel::Sunken);
   if (max_scroll <= 1.f) return;
   const float th = static_cast<float>(trough.h - 2);
