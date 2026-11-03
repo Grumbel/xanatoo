@@ -924,6 +924,8 @@ void test_style_sheets_shipped() {
   EXPECT(load_style("default", def));
   const DocStyle builtin = builtin_style();
   EXPECT(def.paper == builtin.paper && def.ink == builtin.ink);
+  EXPECT(def.selection == builtin.selection && def.mark == builtin.mark &&
+         def.bookmark == builtin.bookmark);
   for (size_t i = 0; i < kBlockRoleCount; ++i) {
     const BlockStyle& a = def.block[i];
     const BlockStyle& b = builtin.block[i];

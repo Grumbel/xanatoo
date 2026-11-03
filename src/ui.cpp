@@ -809,14 +809,27 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
     const float right_x0 = ImGui::GetCursorPosX();
 
     {
-      const char* bm_tip =
+      std::string bm_tip =
           state.current_bookmarked ? "Remove bookmark (Ctrl+Shift+B)"
           : state.selection        ? "Bookmark the selection (Ctrl+Shift+B)"
                                    : "Bookmark this page (Ctrl+Shift+B)";
-      tool_button("tb_bookmark", "bookmark", bm_tip,
+      if (state.page_bookmarks > 0)
+        bm_tip += state.page_bookmarks == 1
+                      ? " · 1 bookmark in this page"
+                      : " · " + std::to_string(state.page_bookmarks) +
+                            " bookmarks in this page";
+      // Lit while this address or a passage of the page is bookmarked.
+      const bool lit = state.current_bookmarked || state.page_bookmarks > 0;
+      if (lit) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                              ImVec4(0.4f, 0.5f, 0.75f, 1.f));
+      }
+      tool_button("tb_bookmark", "bookmark", bm_tip.c_str(),
                   state.current_bookmarked ? UiCommand::RemoveBookmark
                                            : UiCommand::AddBookmark,
                   cmd, state.has_path || !state.doc_label.empty());
+      if (lit) ImGui::PopStyleColor(2);
     }
     if (state.browse) {
       // The edit row is hidden: its reading tools move here, the display
@@ -1224,6 +1237,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleJustify;
       if (ImGui::MenuItem("Footnote overlay", nullptr, state.footnote_overlay))
         cmd = UiCommand::ToggleFootnoteOverlay;
+      if (ImGui::MenuItem("Bookmarks in the page", nullptr,
+                          state.bookmark_marks))
+        cmd = UiCommand::ToggleBookmarkMarks;
       if (ImGui::BeginMenu("Style sheet")) {
         fill_style_items(state, cmd, result.arg);
         ImGui::EndMenu();
@@ -1395,6 +1411,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       toggle("Footnote overlay", state.footnote_overlay,
              UiCommand::ToggleFootnoteOverlay,
              "Notes of on-screen footnote marks at the pane bottom");
+      toggle("Mark bookmarks in the page", state.bookmark_marks,
+             UiCommand::ToggleBookmarkMarks,
+             "Wash over bookmarked passages, a ribbon at reading positions");
       toggle("Justify text", state.justify, UiCommand::ToggleJustify,
              "Wrapped body lines fill the column");
       ImGui::Spacing();

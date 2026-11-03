@@ -42,7 +42,10 @@ Lowest priority first; a later directory replaces a sheet of the same name:
   (define accent "#ffb454")            ; tokens: usable wherever a value goes
   (define gap 0.9em)
 
-  (page (background "#221d18") (color "#e6d9c3") (selection (rgba 90 130 200 110)))
+  (page (background "#221d18") (color "#e6d9c3")
+        (selection (rgba 90 130 200 110))  ; washes over the text:
+        (mark (rgba 230 160 30 70))        ;   the passage of the address (#…)
+        (bookmark (rgba 90 180 110 60)))   ;   bookmarks inside the page
 
   (fonts (body "Charter" "DejaVu Serif" "serif")   ; first installed one wins
          (heading "DejaVu Sans" "sans-serif")      ; default: the body family

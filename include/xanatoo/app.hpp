@@ -134,6 +134,17 @@ struct ViewAnchor {
   float view_y = 0.f;
 };
 
+// Bookmarks inside the page a view shows, resolved for drawing over it
+// (update_bookmark_marks). Keyed on what they were found in.
+struct BookmarkMarks {
+  BufferId buf = kNoBuffer;
+  uint64_t bookmarks_gen = 0;
+  uint64_t layout_gen = 0;
+  Uint32 at = 0;  // SDL ticks of the last search (throttles while typing)
+  std::vector<xanatoo::Selection> ranges;
+  std::vector<xanatoo::Caret> points;  // reading positions
+};
+
 struct Pane {
   BufferId buf = kNoBuffer;
   NavHistory nav;  // this view's own Back / Forward
@@ -151,6 +162,7 @@ struct Pane {
   BufferId locator_buf = kNoBuffer;
   xanatoo::NodeId cut = xanatoo::INVALID_NODE;  // what the pipes selected
   std::vector<xanatoo::Selection> marks;        // the `#` passage
+  BookmarkMarks bookmark_marks;
   bool section_focus = false;  // Section Focus: the outline picks the cut
   int x = 0;
   int w = 0;
@@ -565,6 +577,7 @@ struct App {
   // Back / Forward use each view's own `Pane::nav`.
   std::vector<std::string> visited;
   std::vector<xanatoo::Bookmark> bookmarks;
+  uint64_t bookmarks_gen = 1;  // bumped by every change of `bookmarks`
   bool history_panel_open = false;
   bool preferences_open = false;  // Edit → Preferences (ImGui window)
   bool bookmarks_panel_open = false;
@@ -913,6 +926,11 @@ void reset_pane_locator(Pane& p);
 void clear_pane_point(App& app, Pane& p);
 // The document of `p` was replaced: find the passage in the new one.
 void refresh_pane_locator(App& app, Pane& p);
+// Find the bookmarks inside the page `p` shows again, when the page, its
+// layout or the bookmarks changed (ViewSettings::bookmark_marks).
+void update_bookmark_marks(App& app, Pane& p);
+// Number of bookmarks with selectors inside the page `p` shows.
+int bookmarks_in_page(App& app, Pane& p);
 // Open `target` (path, gemini://, Nostr, Reddit, Lemmy) in the focused pane /
 // in pane `pi`. Remote pages load in the background; true = opened or started.
 bool navigate_to_url(App& app, std::string target, bool record_history = true);

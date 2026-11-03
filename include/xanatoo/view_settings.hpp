@@ -25,6 +25,8 @@ struct ViewSettings {
   bool justify = false;
   // Show the notes of on-screen footnote marks at the bottom of each pane.
   bool footnote_overlay = true;
+  // Wash over the bookmarked passages of the page shown.
+  bool bookmark_marks = true;
   // Split view: hovering a link in the left pane previews it on the right.
   // Off by default: the right pane changing without a click confuses.
   bool hover_preview = false;

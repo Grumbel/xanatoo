@@ -15,6 +15,12 @@ namespace xanatoo::app {
 
 namespace {
 
+// The page a view shows, without its selectors (the base of pane_address).
+std::string pane_page(App& app, Pane& p) {
+  std::string page = path_of(app, p);
+  return page.empty() ? app.gemini_current_url : page;
+}
+
 bool locator_live(const Pane& p) {
   return p.locator_buf != kNoBuffer && p.locator_buf == p.buf;
 }
@@ -155,8 +161,7 @@ xanatoo::NodeId pane_cut(App& app, Pane& p) {
 }
 
 std::string pane_address(App& app, Pane& p) {
-  std::string page = path_of(app, p);
-  if (page.empty()) page = app.gemini_current_url;
+  std::string page = pane_page(app, p);
   if (!locator_live(p) || page.empty()) return page;
   xanatoo::Locator loc = p.locator;
   loc.base = std::move(page);
@@ -241,6 +246,61 @@ void refresh_pane_locator(App& app, Pane& p) {
   p.cut = r.cut;
   set_marks(p, r);
   if (!p.locator.has_selectors()) p.locator_buf = kNoBuffer;
+}
+
+namespace {
+
+// Bookmarks with selectors whose page is `page`.
+template <typename F>
+void for_page_bookmarks(App& app, const std::string& page, F&& f) {
+  if (page.empty()) return;
+  for (const xanatoo::Bookmark& b : app.bookmarks) {
+    xanatoo::Locator loc = xanatoo::parse_locator(b.address);
+    if (loc.has_selectors() && loc.base == page) f(loc);
+  }
+}
+
+}  // namespace
+
+int bookmarks_in_page(App& app, Pane& p) {
+  int n = 0;
+  for_page_bookmarks(app, pane_page(app, p),
+                     [&](const xanatoo::Locator&) { ++n; });
+  return n;
+}
+
+void update_bookmark_marks(App& app, Pane& p) {
+  BookmarkMarks& bm = p.bookmark_marks;
+  if (!app.view_settings.bookmark_marks || !find_buf(app, p.buf)) {
+    bm = {};
+    return;
+  }
+  if (bm.buf == p.buf && bm.bookmarks_gen == app.bookmarks_gen &&
+      bm.layout_gen == p.layout.generation)
+    return;
+  // Typing relayouts every key: search again once it pauses. Until then
+  // the marks are stale and not drawn.
+  const Uint32 now = SDL_GetTicks();
+  if (bm.buf == p.buf && bm.bookmarks_gen == app.bookmarks_gen &&
+      now - bm.at < 400)
+    return;
+  bm.buf = p.buf;
+  bm.bookmarks_gen = app.bookmarks_gen;
+  bm.layout_gen = p.layout.generation;
+  bm.at = now;
+  bm.ranges.clear();
+  bm.points.clear();
+  const xanatoo::Document& d = doc_of(app, p);
+  for_page_bookmarks(app, pane_page(app, p), [&](xanatoo::Locator loc) {
+    std::string lost;
+    const Resolved r = resolve_locator(d, loc, lost);
+    // A cut alone (a section bookmark) names no text to mark.
+    if (!r.mark) return;
+    if (r.mark->empty())
+      bm.points.push_back(r.mark->focus);
+    else
+      bm.ranges.push_back(*r.mark);
+  });
 }
 
 xanatoo::Bookmark bookmark_for_view(App& app, Pane& p, bool position) {

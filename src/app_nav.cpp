@@ -92,6 +92,7 @@ void add_bookmark(App& app, xanatoo::Bookmark b) {
   }
   const std::string what = b.quote.empty() ? b.address : "“" + b.quote + "”";
   app.bookmarks.push_back(std::move(b));
+  ++app.bookmarks_gen;
   if (xanatoo::save_bookmarks(app.bookmarks))
     flash_status(app, "Bookmarked " + what);
   else
@@ -106,6 +107,7 @@ void remove_bookmark(App& app, const std::string& url) {
     return;
   }
   app.bookmarks.erase(it);
+  ++app.bookmarks_gen;
   if (xanatoo::save_bookmarks(app.bookmarks))
     flash_status(app, "Removed bookmark");
   else

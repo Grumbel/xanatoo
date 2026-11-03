@@ -142,6 +142,7 @@ enum class UiCommand {
   ToggleSectionFocus,       // outline: body shows one section only
   ToggleJustify,            // view: justify wrapped lines
   ToggleFootnoteOverlay,    // view: notes of on-screen footnote marks
+  ToggleBookmarkMarks,      // view: wash over bookmarks inside the page
   ToggleHoverPreview,       // split view: preview hovered links on the right
   TogglePreferences,        // Edit → Preferences window
   SelectStyle,              // arg = style sheet name (styles/<name>.xss)
@@ -168,6 +169,7 @@ struct UiState {
   bool section_focus = false;
   bool justify = false;
   bool footnote_overlay = true;
+  bool bookmark_marks = true;
   bool hover_preview = false;
   bool preferences_open = false;
   bool backlinks = false;
@@ -215,6 +217,7 @@ struct UiState {
   bool history_open = false;
   bool bookmarks_open = false;
   bool current_bookmarked = false;
+  int page_bookmarks = 0;  // bookmarks of passages inside the focused page
   // Session history (oldest → newest) for the History panel.
   std::vector<std::string> history_entries;
   int history_pos = -1;  // current index, or -1

@@ -85,6 +85,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.section_focus = focused_pane(app).section_focus;
   ui_state.justify = app.view_settings.justify;
   ui_state.footnote_overlay = app.view_settings.footnote_overlay;
+  ui_state.bookmark_marks = app.view_settings.bookmark_marks;
   ui_state.hover_preview = app.view_settings.hover_preview;
   ui_state.preferences_open = app.preferences_open;
   ui_state.backlinks = app.backlinks_mode;
@@ -210,6 +211,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
     ui_state.current_bookmarked =
         focused_pane(app).sel.empty() &&
         is_bookmarked(app, pane_address(app, focused_pane(app)));
+    ui_state.page_bookmarks = bookmarks_in_page(app, focused_pane(app));
   }
   ui_state.tab_labels.clear();
   ui_state.active_tab = 0;
@@ -1332,6 +1334,13 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
                             ? "Footnote overlay on"
                             : "Footnote overlay off");
       break;
+    case C::ToggleBookmarkMarks:
+      app.view_settings.bookmark_marks = !app.view_settings.bookmark_marks;
+      xanatoo::save_view_settings(app.view_settings);
+      flash_status(app, app.view_settings.bookmark_marks
+                            ? "Bookmarks marked in the page"
+                            : "Bookmarks not marked in the page");
+      break;
     case C::ToggleHoverPreview:
       app.view_settings.hover_preview = !app.view_settings.hover_preview;
       xanatoo::save_view_settings(app.view_settings);
@@ -1500,6 +1509,40 @@ static void draw_pane_overlays(App& app, int i) {
         for (int k = 0; k < h; ++k)
           SDL_RenderDrawLine(app.sdl, x + k, cy - (h - k), x + k, cy + (h - k));
       }
+    }
+    // Bookmarks inside the page, under the `#` passage of this view's
+    // address (a bookmark just opened is that passage, washed once).
+    update_bookmark_marks(app, pane);
+    // Not drawn while an edit waits for them to be found again: the old
+    // offsets would wash the wrong text.
+    const bool bm_fresh =
+        pane.bookmark_marks.layout_gen == pane.layout.generation;
+    for (const xanatoo::Selection& m : pane.bookmark_marks.ranges) {
+      if (!bm_fresh) break;
+      if (std::find_if(pane.marks.begin(), pane.marks.end(),
+                       [&](const xanatoo::Selection& o) {
+                         return o.anchor == m.anchor && o.focus == m.focus;
+                       }) != pane.marks.end())
+        continue;
+      const xanatoo::Rgba& c = app.style.bookmark;
+      const auto rects = xanatoo::selection_rects(
+          pane.layout, m, draw_scroll, app.renderer.glyph_extents());
+      app.renderer.draw_selection(rects, ox, c.r, c.g, c.b, c.a);
+    }
+    for (const xanatoo::Caret& at : pane.bookmark_marks.points) {
+      if (!bm_fresh) break;
+      // A reading position: a bar with a tab at its top, like a ribbon.
+      const auto cp = xanatoo::caret_screen_pos(pane.layout, at, draw_scroll, lh);
+      if (!cp.valid) continue;
+      const xanatoo::Rgba& c = app.style.bookmark;
+      SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
+      SDL_SetRenderDrawColor(app.sdl, c.r, c.g, c.b, 220);
+      const int x = static_cast<int>(cp.x + ox);
+      const int top = static_cast<int>(cp.y - cp.height * 0.8f);
+      const SDL_Rect bar{x - 1, top, 3, static_cast<int>(cp.height)};
+      const SDL_Rect tab{x - 4, top - 4, 9, 5};
+      SDL_RenderFillRect(app.sdl, &bar);
+      SDL_RenderFillRect(app.sdl, &tab);
     }
     // The `#` passage of this view's address.
     for (const xanatoo::Selection& m : pane.marks) {

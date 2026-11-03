@@ -196,15 +196,27 @@ Back returns to the cut through the normal per-view `nav` history.
 selection, in the `mark` colour of the page style. A `#text:` point marks its
 range, a `#id:` point the whole text of the node. A `//text:` pipe cuts to the
 smallest block holding the range and marks the range in it, until slice 4
-clips the cut. Later the list holds `{Extent, role}`: one draw path for `#`
-targets, bookmarks of this document, search hits, and images (a frame over
-the image, in the pane and the Lightbox).
+clips the cut.
+
+Bookmarks inside the page are drawn the same way, in the style's `bookmark`
+colour (`Pane::bookmark_marks`, `update_bookmark_marks`): ranges washed, a
+reading position as a ribbon at its caret. They are found again when the
+page, its layout or the bookmark list changes, and while typing only after a
+pause of 400 ms (hidden until then, as the old offsets would wash the wrong
+text). A bookmark that is also the `#` passage gets only the `mark` wash.
+They show by default; View → Bookmarks in the page and Preferences turn them
+off (`ViewSettings::bookmark_marks`). The toolbar star is lit when the page
+or a passage in it is bookmarked, its tooltip counts the passages.
+
+Later the marks become one list of `{Extent, role}`: one draw path for `#`
+targets, bookmarks, search hits, and images (a frame over the image, in the
+pane and the Lightbox).
 
 - Generalises the `SplitTrail` wash and the selection wash.
 - Bookmark roles come from `DocStyle` as well.
 - Scrollbar ticks like the chapter marks; click selects the passage.
 - `#` targets clear on the next click or navigation; bookmark marks follow a
-  View toggle.
+  View toggle (done).
 - Remote pages get their `#fragment` when the fetch lands, marked as well.
 
 **Embed.** `Transclude` targets become Locators. Image `src` accepts a
@@ -234,7 +246,7 @@ seen, where a store exists.
   the caret (a position in a book). Selection and position bookmarks carry the
   title of the enclosing section and the quote (`‸` at a point).
 - `is_bookmarked` stays "this exact address"; the toolbar star also lights up
-  when the page has bookmarks inside it.
+  when the page has bookmarks inside it (done).
 - Bookmarks panel: grouped by document, each row shows title + quote; the
   panel can show a miniature cut, a passage card from `docs/BRAINSTORM.md`.
 - Opening picks mark by default (context first), with "Open as cut" beside it.
@@ -278,7 +290,8 @@ Each is useful on its own. 1 to 3 are done:
 
 - Should a real cut drop the headers of parent sections? It would read more
   like a document of its own; Section Focus wants them as context.
-- Should bookmark marks show by default on every page, or only on request?
+- Bookmark marks show by default, with a switch to turn them off. Is a
+  wash per bookmark too loud on a heavily bookmarked page?
 - Editing inside a cut of a *foreign* document stays impossible (`browsing`),
   but should a cut across two sections be editable at all at the seams?
 - `Transclude` of a `Transclude`: cuts go through the same depth limit and

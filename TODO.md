@@ -25,8 +25,13 @@ Next bundle number: **263** (this delivery is **262**)
 - Checked under Xvfb: selection and reading-position bookmarks land in the
   file with title and quote, the panel lists them, reopening a selection
   bookmark marks exactly that range.
-- Open: marks of bookmarks inside the current page (and the star lighting up
-  for them); "Moved" resolution (nearest of several matches); bookmarks
+- Bookmarks inside the page shown are marked: green wash (`bookmark` page
+  colour of the style) over ranges, a ribbon at reading positions; found
+  again after edits once typing pauses (400 ms, hidden meanwhile). View →
+  Bookmarks in the page / Preferences (`bookmark_marks` in view.conf). The
+  star is lit for bookmarked passages too, its tooltip counts them.
+- Open: scrollbar ticks for bookmarks, a click on a mark selecting the
+  passage / removing that bookmark; "Moved" resolution (nearest of several matches); bookmarks
   panel grouped by document; Open as cut.
 - Next: slice 4, clipped text cuts, "Show only this", Copy address.
 
