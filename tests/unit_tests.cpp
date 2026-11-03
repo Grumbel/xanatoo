@@ -18,6 +18,7 @@
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/inflate.hpp"
+#include "xanatoo/search.hpp"
 #include "xanatoo/sitemap.hpp"
 #include "xanatoo/revstore.hpp"
 #include "xanatoo/paths.hpp"
@@ -2143,6 +2144,87 @@ void test_inline_images_and_asides() {
   }
 }
 
+// Search engines and the search: address (docs/SEARCH.md).
+void test_search() {
+  using namespace xanatoo;
+  EXPECT_EQ(search_encode("electron spin"), "electron+spin");
+  EXPECT_EQ(search_encode("  a   b "), "a+b");  // blanks collapse and trim
+  EXPECT_EQ(search_encode("c# | x"), "c%23+%7C+x");
+  EXPECT_EQ(search_decode("c%23+%7C+x"), "c# | x");
+  EXPECT_EQ(search_decode("100%"), "100%");  // stray percent stays
+  EXPECT_EQ(search_decode(search_encode("Käse & Brot")), "Käse & Brot");
+
+  const std::string ref = search_ref("arxiv", "electron spin");
+  EXPECT_EQ(ref, "search:arxiv:electron+spin");
+  EXPECT(is_search_ref(ref));
+  EXPECT(!is_search_ref("search:arxiv:"));
+  EXPECT(!is_search_ref("search:Bad Id:x"));
+  EXPECT(!is_search_ref("https://example.org/search:a:b"));
+  EXPECT_EQ(search_ref("arxiv", "   "), "");
+  EXPECT_EQ(search_ref("Bad", "x"), "");
+  EXPECT_EQ(search_query_text(ref), "electron spin");
+  auto parsed = parse_search_ref(ref);
+  EXPECT(parsed && parsed->engine == "arxiv" && parsed->query == "electron+spin");
+
+  // The encoded query never holds what locator.hpp cuts at.
+  const std::string odd = search_ref("wikipedia", "a#b|c//d");
+  EXPECT(odd.find('#') == std::string::npos && odd.find('|') == std::string::npos &&
+         odd.find("//") == std::string::npos);
+
+  const std::vector<SearchEngine> eng = builtin_engines();
+  EXPECT_EQ(search_target(ref, eng),
+            "feed:https://export.arxiv.org/api/query?search_query=all:"
+            "electron+AND+all:spin&max_results=50");
+  EXPECT_EQ(search_target("search:wikipedia:xanadu", eng),
+            "https://en.wikipedia.org/w/index.php?search=xanadu");
+  EXPECT_EQ(search_target("search:mastodon-tag:space+opera", eng),
+            "feed:https://mastodon.social/tags/spaceopera.rss");  // space ""
+  EXPECT_EQ(search_target("search:flickr:moon+nasa", eng),
+            "feed:https://www.flickr.com/services/feeds/photos_public.gne?"
+            "tags=moon,nasa&format=rss2");
+  EXPECT_EQ(search_target("search:nope:x", eng), "");
+  EXPECT_EQ(search_target("https://x.org/", eng), "");
+
+  // Every built-in is well formed: unique id / keyword, one %s, https.
+  std::unordered_set<std::string> ids, keys;
+  for (const SearchEngine& e : eng) {
+    EXPECT(ids.insert(e.id).second);
+    if (!e.keyword.empty()) EXPECT(keys.insert(e.keyword).second);
+    EXPECT(!e.name.empty() && !e.badge.empty());
+    EXPECT(starts_with(e.url, "https://"));
+    const size_t at = e.url.find("%s");
+    EXPECT(at != std::string::npos && e.url.find("%s", at + 2) == std::string::npos);
+    EXPECT(is_search_ref(search_ref(e.id, "x")));
+  }
+
+  // Ctrl+L keywords.
+  EXPECT_EQ(search_from_keyword("ax electron spin", eng), "search:arxiv:electron+spin");
+  EXPECT_EQ(search_from_keyword("w xanadu", eng), "search:wikipedia:xanadu");
+  EXPECT_EQ(search_from_keyword("w", eng), "");          // no query
+  EXPECT_EQ(search_from_keyword("zz xanadu", eng), "");  // no such keyword
+  EXPECT_EQ(search_from_keyword("ia prelinger", eng), "");  // not built in
+  EXPECT_EQ(search_from_keyword("https://x.org/a b", eng), "");
+
+  // The user's file: replaces by id, adds new ones, skips bad entries.
+  std::vector<std::string> warn;
+  const std::vector<SearchEngine> user = parse_engines(
+      "(engine \"mine\" (name \"My Site\") (keyword \"ms\") "
+      "(url \"https://example.org/find?q=%s\") (kind feed))\n"
+      "(engine \"Bad Id\" (url \"https://x.org/%s\"))\n"
+      "(engine \"nourl\" (name \"x\"))\n"
+      "(engine \"twice\" (url \"https://x.org/%s/%s\"))\n"
+      "(engine \"plain\" (url \"ftp://x.org/%s\"))\n"
+      "(other)\n",
+      &warn);
+  EXPECT_EQ(user.size(), static_cast<size_t>(1));
+  EXPECT_EQ(warn.size(), static_cast<size_t>(4));
+  if (!user.empty()) {
+    EXPECT(user[0].feed && user[0].badge == "M" && user[0].space == "+");
+    EXPECT_EQ(search_target("search:mine:a+b", user),
+              "feed:https://example.org/find?q=a+b");
+  }
+}
+
 // Every page under examples/ is in Help → Examples (kExamples), and every
 // menu entry exists; the diff pair opens through its own item.
 void test_examples_in_menu() {
@@ -3070,6 +3152,7 @@ int main() {
   test_layout_margins_and_measure();
   test_layout_reader_mode();
   test_inline_images_and_asides();
+  test_search();
   test_examples_in_menu();
   test_tour_example();
   test_view_settings_migration();

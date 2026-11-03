@@ -101,6 +101,11 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.backlinks = app.backlinks_mode;
   ui_state.sitemap = app.sitemap.shown;
   ui_state.page_panel = app.page.shown;
+  ui_state.searchbar = app.search.open;
+  ui_state.search_engine = search_engine_id(app);
+  ui_state.search_engines.clear();
+  for (const auto& e : app.search.engines)
+    ui_state.search_engines.push_back({e.id, e.name, e.keyword, e.badge});
   ui_state.diff = app.diff_mode;
   ui_state.can_diff = !shared_doc(app) &&
                       app.panes[0].buf != app.panes[1].buf;
@@ -335,6 +340,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::CopyPageUrl || c == C::SelectAll || c == C::SelectBlock ||
         c == C::Find || c == C::ToggleSplit || c == C::ToggleOutline ||
         c == C::ToggleBacklinks || c == C::ToggleSitemap || c == C::TogglePage ||
+        c == C::ToggleSearchBar || c == C::FocusSearchBar || c == C::Search ||
+        c == C::SelectSearchEngine ||
         c == C::SitemapPrev || c == C::SitemapNext ||
         c == C::OpenTranscludeOther ||
         c == C::ToggleDiff || c == C::ToggleStructure || c == C::ToggleBrowse ||
@@ -434,7 +441,10 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     }
     case C::NavigateUrl:
       xanatoo::platform_release_keyboard();  // URL typed; page is read-only
-      if (!arg.empty()) navigate_to_url(app, arg);
+      if (!arg.empty()) {
+        const std::string kw = search_from_location(app, arg);
+        navigate_to_url(app, kw.empty() ? arg : kw);
+      }
       break;
     case C::StopLoading:
       if (cancel_fetches(app)) flash_status(app, "Stopped loading");
@@ -1167,6 +1177,18 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     case C::TogglePage:
       toggle_page_panel(app);
+      break;
+    case C::ToggleSearchBar:
+      toggle_search_bar(app);
+      break;
+    case C::FocusSearchBar:
+      show_search_bar(app);
+      break;
+    case C::Search:
+      run_search(app, arg);
+      break;
+    case C::SelectSearchEngine:
+      select_search_engine(app, arg);
       break;
     case C::SitemapPrev:
     case C::SitemapNext:

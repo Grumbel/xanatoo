@@ -76,6 +76,20 @@ void fetch_gemini(const std::string& url, FetchShared& out) {
 // Worker thread body: everything here must stay off App.
 void fetch_page(std::string url, std::shared_ptr<FetchShared> out) {
   out->final_url = url;
+  // A search is its expanded URL, fetched like any page; the address stays.
+  if (xanatoo::is_search_ref(url)) {
+    const std::string shown = url;
+    const std::string target =
+        xanatoo::search_target(url, xanatoo::load_engines());
+    if (target.empty()) {
+      out->error = "Unknown search engine: " + shown;
+      out->done.store(true, std::memory_order_release);
+      return;
+    }
+    fetch_page(target, out);
+    out->final_url = shown;
+    return;
+  }
   // Feeds first: /.rss, /feeds/… and /rss on Reddit / Lemmy / HN are feeds.
   if (xanatoo::is_feed_url(url)) {
 #if defined(XANATOO_FEEDS) && XANATOO_FEEDS
@@ -263,6 +277,12 @@ bool remote_fetch_supported(std::string_view url, std::string* why) {
     if (why) *why = msg;
     return false;
   };
+  if (xanatoo::is_search_ref(url)) {
+    const std::string target =
+        xanatoo::search_target(url, xanatoo::load_engines());
+    if (target.empty()) return no("unknown search engine");
+    return remote_fetch_supported(target, why);
+  }
   if (xanatoo::is_feed_url(url)) {
 #if defined(XANATOO_FEEDS) && XANATOO_FEEDS
     return true;

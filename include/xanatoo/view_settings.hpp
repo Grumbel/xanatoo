@@ -40,6 +40,8 @@ struct ViewSettings {
   int page_columns = 0;
   // Document style sheet (styles/<name>.xss); "default" = built in.
   std::string style = "default";
+  // Engine of the search bar (search.hpp id).
+  std::string search_engine = "wikipedia";
 
   static constexpr float kLineTight = 1.10f;
   static constexpr float kLineNormal = 1.30f;

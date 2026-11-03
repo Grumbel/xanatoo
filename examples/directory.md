@@ -20,6 +20,7 @@ plain Markdown files under `examples/directory/`.
 - [Games and comics](directory/games.md) — game news, devlogs, webcomics
 - [News](directory/news.md) — world news in English, German, French, Spanish, Italian and Japanese; text-only editions
 - [Video and podcasts](directory/media.md) — YouTube channels as feeds, audio fiction
+- [Search](directory/search.md) — engines and keywords
 - [Libraries, archives and the old web](directory/reference.md) — Internet Archive, Gutenberg, Wikimedia, RFCs, indexes of small sites
 
 ## Built-in services
@@ -61,4 +62,10 @@ any page. Patterns that work on many sites:
 | arXiv category | `https://rss.arxiv.org/rss/cs.AI` |
 | Internet Archive collection | `https://archive.org/services/collection-rss.php?collection=name` |
 
-Searching is a separate step (it needs an input box): see `TODO.md`.
+## Search
+
+**Ctrl+Alt+K** (View → Search Bar) shows the search bar: pick the engine with
+the button at its left, type, **Enter**. In the location bar (**Ctrl+L**) a
+keyword does the same: `w xanadu`, `ax electron spin`, `se wells`. Results
+are ordinary pages with the address `search:<engine>:<words>`, so Back,
+bookmarks and links work. [More about search](directory/search.md).

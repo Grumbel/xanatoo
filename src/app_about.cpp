@@ -86,6 +86,12 @@ AboutSection services() {
                      "`note1…` / `npub1…` / `nostr:…` notes, threads and "
                      "profiles over relay WebSockets",
                      "nostr:recent", "`-DXANATOO_NOSTR=ON`"});
+  s.items.push_back({"Search", true,
+                     "search bar (Ctrl+Alt+K) and `search:<engine>:<words>` "
+                     "pages over the engines of `search.sexp`; every engine "
+                     "is a URL template, so each needs the client that "
+                     "reads its results (web, feeds, ebooks)",
+                     "search:wikipedia:xanadu", ""});
   s.items.push_back({"Gemini", XANATOO_GEMINI, "`gemini://` capsules",
                      "gemini://geminiprotocol.net/", "`-DXANATOO_GEMINI=ON`"});
   s.items.push_back({"RSS / Atom feeds", XANATOO_FEEDS,

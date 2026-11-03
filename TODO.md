@@ -8,6 +8,23 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-11-03) — search bar and `search:` addresses
+
+- `search.cpp` / `search.hpp`: 11 engines (Wikipedia en / de, arXiv, Standard
+  Ebooks, Gutenberg, Reddit, Mastodon hashtag, Flickr tags, Marginalia,
+  Wiby, DuckDuckGo), user engines in `search.sexp`, the
+  `search:<engine>:<query>` address, Ctrl+L keywords (`w xanadu`).
+  `app_search.cpp` + the `##toolbar_search` row in `ui.cpp`: hidden by
+  default, Ctrl+Alt+K / View → Search Bar, engine button + dropdown, Esc
+  closes; engine saved as `search_engine` in view.conf. Design and the
+  engine check: `docs/SEARCH.md`. Unit test `test_search`.
+- Checked under Xvfb: bar, dropdown, Enter, `ax electron spin` in the
+  location bar (feed cards), Wikipedia / DuckDuckGo / Standard Ebooks /
+  Gutenberg / Wiby results.
+- Open: JSON engines with native result documents (Wikipedia, Internet
+  Archive, HN, Bluesky, Mastodon, Lemmy, Reddit, Gutendex); engine icons are
+  letter badges; no toolbar button; no suggestions.
+
 ## Status (2026-11-03) — Directory (mini Yahoo!)
 
 - `examples/directory.md` + `examples/directory/*.md` (social, sci-fi, tech,

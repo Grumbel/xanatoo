@@ -1,0 +1,245 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
+
+#include "xanatoo/search.hpp"
+
+#include "xanatoo/paths.hpp"
+#include "xanatoo/sexpr.hpp"
+#include "xanatoo/util.hpp"
+
+#include <algorithm>
+#include <cctype>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
+
+namespace xanatoo {
+
+namespace {
+
+bool valid_id(std::string_view id) {
+  if (id.empty()) return false;
+  for (char c : id)
+    if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-'))
+      return false;
+  return true;
+}
+
+bool unreserved(unsigned char c) {
+  return std::isalnum(c) || c == '-' || c == '.' || c == '_' || c == '~';
+}
+
+std::string encode(std::string_view raw, std::string_view space) {
+  static const char* hex = "0123456789ABCDEF";
+  std::string out;
+  for (unsigned char c : raw) {
+    if (unreserved(c))
+      out += static_cast<char>(c);
+    else if (c == ' ')
+      out += space;
+    else {
+      out += '%';
+      out += hex[c >> 4];
+      out += hex[c & 15];
+    }
+  }
+  return out;
+}
+
+std::string collapse_blanks(std::string_view raw) {
+  std::string out;
+  bool blank = true;  // also trims the front
+  for (char c : raw) {
+    if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+      blank = true;
+      continue;
+    }
+    if (blank && !out.empty()) out += ' ';
+    blank = false;
+    out += c;
+  }
+  return out;
+}
+
+bool read_text(const std::string& path, std::string& out) {
+  std::ifstream in(path, std::ios::binary);
+  if (!in) return false;
+  std::ostringstream ss;
+  ss << in.rdbuf();
+  out = ss.str();
+  return true;
+}
+
+const SearchEngine* find_engine(const std::vector<SearchEngine>& engines,
+                                std::string_view id) {
+  for (const SearchEngine& e : engines)
+    if (e.id == id) return &e;
+  return nullptr;
+}
+
+}  // namespace
+
+const std::vector<SearchEngine>& builtin_engines() {
+  // id, name, keyword, badge, url, feed, space
+  static const std::vector<SearchEngine> k = {
+      {"wikipedia", "Wikipedia", "w", "W",
+       "https://en.wikipedia.org/w/index.php?search=%s", false, "+"},
+      {"wikipedia-de", "Wikipedia (Deutsch)", "wd", "Wd",
+       "https://de.wikipedia.org/w/index.php?search=%s", false, "+"},
+      {"arxiv", "arXiv", "ax", "arX",
+       "https://export.arxiv.org/api/query?search_query=all:%s&max_results=50",
+       true, "+AND+all:"},  // every word must match (a bare blank is OR)
+      {"standard-ebooks", "Standard Ebooks", "se", "SE",
+       "https://standardebooks.org/ebooks?query=%s", false, "+"},
+      {"gutenberg", "Project Gutenberg", "pg", "PG",
+       "https://www.gutenberg.org/ebooks/search/?query=%s", false, "+"},
+      {"reddit", "Reddit", "r", "R", "https://www.reddit.com/search.rss?q=%s",
+       true, "+"},
+      {"mastodon-tag", "Mastodon hashtag", "mt", "#",
+       "https://mastodon.social/tags/%s.rss", true, ""},
+      {"flickr", "Flickr tags", "fl", "Fl",
+       "https://www.flickr.com/services/feeds/photos_public.gne?tags=%s"
+       "&format=rss2",
+       true, ","},
+      {"marginalia", "Marginalia (small web)", "mg", "Mg",
+       "https://marginalia-search.com/search?query=%s", false, "+"},
+      {"wiby", "Wiby (old web)", "wb", "Wb", "https://wiby.me/?q=%s", false, "+"},
+      {"duckduckgo", "DuckDuckGo", "dd", "DDG",
+       "https://html.duckduckgo.com/html/?q=%s", false, "+"},
+  };
+  return k;
+}
+
+std::vector<SearchEngine> parse_engines(std::string_view source,
+                                        std::vector<std::string>* warnings) {
+  auto warn = [&](const std::string& m) {
+    if (warnings) warnings->push_back(m);
+  };
+  std::vector<SearchEngine> out;
+  for (const SExpr& f : SExprParser(source).parse_all()) {
+    if (!is_form(f, "engine")) continue;
+    SearchEngine e;
+    if (f.kids.size() > 1) e.id = sexpr_text(f.kids[1]);
+    if (!valid_id(e.id)) {
+      warn("engine id must be lower-case letters, digits and '-': \"" + e.id +
+           "\"");
+      continue;
+    }
+    e.name = e.id;
+    for (size_t i = 2; i < f.kids.size(); ++i) {
+      const SExpr& p = f.kids[i];
+      if (p.kind != SExpr::Kind::List || p.kids.size() < 2) continue;
+      const std::string key = sexpr_text(p.kids[0]);
+      const std::string val = sexpr_text(p.kids[1]);
+      if (key == "name") e.name = val;
+      else if (key == "keyword") e.keyword = val;
+      else if (key == "badge") e.badge = val;
+      else if (key == "url") e.url = val;
+      else if (key == "kind") e.feed = (val == "feed");
+      else if (key == "space") e.space = val;
+      else warn("engine " + e.id + ": unknown property " + key);
+    }
+    const size_t pct = e.url.find("%s");
+    if (pct == std::string::npos || e.url.find("%s", pct + 2) != std::string::npos ||
+        !(starts_with(e.url, "http://") || starts_with(e.url, "https://"))) {
+      warn("engine " + e.id + ": url needs an http(s) address with one %s");
+      continue;
+    }
+    if (e.badge.empty()) e.badge = e.name.substr(0, 1);
+    out.push_back(std::move(e));
+  }
+  return out;
+}
+
+std::vector<SearchEngine> load_engines() {
+  std::vector<SearchEngine> all = builtin_engines();
+  const std::string dir = user_data_dir();
+  if (dir.empty()) return all;
+  std::string src;
+  if (!read_text((std::filesystem::path(dir) / "search.sexp").string(), src))
+    return all;
+  for (SearchEngine& e : parse_engines(src)) {
+    auto it = std::find_if(all.begin(), all.end(), [&](const SearchEngine& b) {
+      return b.id == e.id;
+    });
+    if (it != all.end())
+      *it = std::move(e);
+    else
+      all.push_back(std::move(e));
+  }
+  return all;
+}
+
+std::string search_encode(std::string_view raw) {
+  return encode(collapse_blanks(raw), "+");
+}
+
+std::string search_decode(std::string_view s) {
+  std::string out;
+  for (size_t i = 0; i < s.size(); ++i) {
+    if (s[i] == '+') {
+      out += ' ';
+    } else if (s[i] == '%' && i + 2 < s.size() && std::isxdigit(
+                   static_cast<unsigned char>(s[i + 1])) &&
+               std::isxdigit(static_cast<unsigned char>(s[i + 2]))) {
+      out += static_cast<char>(std::stoi(std::string(s.substr(i + 1, 2)), nullptr, 16));
+      i += 2;
+    } else {
+      out += s[i];
+    }
+  }
+  return out;
+}
+
+bool is_search_ref(std::string_view s) { return parse_search_ref(s).has_value(); }
+
+std::optional<SearchRef> parse_search_ref(std::string_view s) {
+  trim_ascii(s);
+  if (!starts_with(s, kSearchPrefix)) return std::nullopt;
+  s.remove_prefix(kSearchPrefix.size());
+  const size_t colon = s.find(':');
+  if (colon == std::string_view::npos) return std::nullopt;
+  SearchRef r;
+  r.engine = std::string(s.substr(0, colon));
+  r.query = std::string(s.substr(colon + 1));
+  if (!valid_id(r.engine) || r.query.empty()) return std::nullopt;
+  return r;
+}
+
+std::string search_ref(std::string_view engine, std::string_view raw) {
+  const std::string q = search_encode(raw);
+  if (q.empty() || !valid_id(engine)) return {};
+  return std::string(kSearchPrefix) + std::string(engine) + ":" + q;
+}
+
+std::string search_target(std::string_view ref,
+                          const std::vector<SearchEngine>& engines) {
+  auto r = parse_search_ref(ref);
+  if (!r) return {};
+  const SearchEngine* e = find_engine(engines, r->engine);
+  if (!e) return {};
+  std::string url = e->url;
+  const size_t at = url.find("%s");
+  if (at == std::string::npos) return {};
+  url.replace(at, 2, encode(search_decode(r->query), e->space));
+  return e->feed ? "feed:" + url : url;
+}
+
+std::string search_from_keyword(std::string_view text,
+                                const std::vector<SearchEngine>& engines) {
+  trim_ascii(text);
+  const size_t sp = text.find(' ');
+  if (sp == std::string_view::npos) return {};
+  const std::string_view word = text.substr(0, sp);
+  for (const SearchEngine& e : engines)
+    if (!e.keyword.empty() && e.keyword == word)
+      return search_ref(e.id, text.substr(sp + 1));
+  return {};
+}
+
+std::string search_query_text(std::string_view ref) {
+  auto r = parse_search_ref(ref);
+  return r ? search_decode(r->query) : std::string();
+}
+
+}  // namespace xanatoo

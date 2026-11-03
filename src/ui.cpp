@@ -522,6 +522,7 @@ void Ui::request_menu(const char* name) {
 }
 
 void Ui::focus_url_bar() { focus_url_bar_ = true; }
+void Ui::focus_search() { focus_search_ = true; }
 
 void Ui::open_context_menu(float x, float y) {
   context_open_ = true;
@@ -903,6 +904,67 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
   ImGui::End();
   ImGui::PopStyleVar(2);
   result.top_reserved += browse_h;
+
+  // -- Search bar (hidden by default): engine button + field, like the old
+  // Firefox search box. The engine only changes which search: address a
+  // search builds (docs/SEARCH.md).
+  if (state.searchbar) {
+    const float search_h = 32.f * scale_;
+    ImGui::SetNextWindowPos(ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
+    ImGui::SetNextWindowSize(ImVec2(vp->Size.x, search_h));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.f, 3.f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.f);
+    if (ImGui::Begin("##toolbar_search", nullptr, tb_flags)) {
+      const UiSearchEngine* cur = nullptr;
+      for (const UiSearchEngine& e : state.search_engines)
+        if (e.id == state.search_engine) cur = &e;
+      if (!cur && !state.search_engines.empty()) cur = &state.search_engines[0];
+
+      const std::string badge = (cur ? cur->badge : std::string("?")) + "##eng";
+      if (ImGui::Button(badge.c_str(), ImVec2(40.f * scale_, 0.f)))
+        ImGui::OpenPopup("##search_engines");
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+        ImGui::SetTooltip("Search engine: %s · click to change",
+                          cur ? cur->name.c_str() : "none");
+      if (ImGui::BeginPopup("##search_engines")) {
+        for (const UiSearchEngine& e : state.search_engines) {
+          std::string label = e.badge + "   " + e.name;
+          if (!e.keyword.empty()) label += "   (" + e.keyword + ")";
+          if (ImGui::Selectable(label.c_str(), cur && e.id == cur->id)) {
+            cmd = UiCommand::SelectSearchEngine;
+            result.arg = e.id;
+          }
+        }
+        ImGui::TextDisabled("(keyword): Ctrl+L, e.g. \"w xanadu\"");
+        ImGui::EndPopup();
+      }
+      ImGui::SameLine(0.f, 4.f);
+
+      const float go_w = 44.f * scale_;
+      ImGui::SetNextItemWidth(std::max(
+          100.f, ImGui::GetContentRegionAvail().x - go_w - 8.f * scale_));
+      if (focus_search_) {
+        ImGui::SetKeyboardFocusHere();
+        focus_search_ = false;
+      }
+      const std::string hint =
+          std::string("Search ") + (cur ? cur->name : "") + " …";
+      const bool enter = ImGui::InputTextWithHint(
+          "##searchfield", hint.c_str(), search_input_, sizeof(search_input_),
+          ImGuiInputTextFlags_EnterReturnsTrue);
+      if (ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+        cmd = UiCommand::ToggleSearchBar;
+      ImGui::SameLine(0.f, 4.f);
+      const bool go = ImGui::Button("Go", ImVec2(go_w, 0.f));
+      if (enter || go) {
+        cmd = UiCommand::Search;
+        result.arg = search_input_;
+      }
+    }
+    ImGui::End();
+    ImGui::PopStyleVar(2);
+    result.top_reserved += search_h;
+  }
 
   // -- Edit row (compact: primary icons + dropdown groups) --
   // Not while browsing: its reading tools are on the browse row then.
@@ -1333,6 +1395,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleSitemap;
       if (ImGui::MenuItem("Page Navigation", "Ctrl+Alt+P", state.page_panel))
         cmd = UiCommand::TogglePage;
+      if (ImGui::MenuItem("Search Bar", "Ctrl+Alt+K", state.searchbar))
+        cmd = state.searchbar ? UiCommand::ToggleSearchBar
+                              : UiCommand::FocusSearchBar;
       if (ImGui::MenuItem("History", "Ctrl+Shift+H", state.history_open))
         cmd = UiCommand::ToggleHistory;
       ImGui::EndMenu();

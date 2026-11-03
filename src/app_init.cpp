@@ -67,6 +67,7 @@ bool app_init(App& app) {
   // View prefs first: they name the style sheet, which picks the fonts.
   xanatoo::load_view_settings(app.view_settings);
   app.styles = xanatoo::list_styles();
+  init_search(app);
   {
     std::string err;
     if (!xanatoo::load_style(app.view_settings.style, app.style, &err)) {

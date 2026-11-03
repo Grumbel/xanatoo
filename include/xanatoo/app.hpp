@@ -27,6 +27,7 @@
 #include "xanatoo/paginate.hpp"
 #include "xanatoo/render.hpp"
 #include "xanatoo/sidestore.hpp"
+#include "xanatoo/search.hpp"
 #include "xanatoo/sitemap.hpp"
 #include "xanatoo/types.hpp"
 #include "xanatoo/ui.hpp"
@@ -418,6 +419,13 @@ struct SiteCache {
   uint64_t seen_gen = 0;
 };
 
+// Search bar (app_search.cpp). The engine in use is
+// ViewSettings::search_engine (saved in view.conf).
+struct SearchBar {
+  bool open = false;
+  std::vector<xanatoo::SearchEngine> engines;
+};
+
 struct SitemapPanel {
   bool shown = false;
   std::vector<SiteCache> sites;
@@ -706,6 +714,7 @@ struct App {
   FloatWindow ol = make_float_panel(WindowRole::Outline, 40, 100, 320, 420);
   FloatWindow sm = make_float_panel(WindowRole::Sitemap, 140, 110, 340, 460);
   SitemapPanel sitemap;
+  SearchBar search;
   FloatWindow pg = make_float_panel(WindowRole::Page, 60, 110, 260, 420);
   PagePanel page;
   Hover hover;
@@ -1239,6 +1248,16 @@ std::tuple<int, int, int, int> page_client_rect(App& app);
 float page_max_scroll(App& app);
 void click_page(App& app, int mx, int my);
 bool page_key(App& app, SDL_Keycode sym);
+
+// ---- search bar (app_search.cpp) ----
+void init_search(App& app);
+std::string search_engine_id(const App& app);  // the engine in use
+void show_search_bar(App& app);                // open and focus
+void toggle_search_bar(App& app);
+void select_search_engine(App& app, const std::string& id);
+void run_search(App& app, const std::string& text);  // → search: address
+// Ctrl+L text "w xanadu" → search address ("" when it is no keyword search).
+std::string search_from_location(const App& app, const std::string& text);
 
 // ---- sitemap panel (app_sitemap.cpp) ----
 void toggle_sitemap(App& app);

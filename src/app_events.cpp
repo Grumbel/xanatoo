@@ -1729,6 +1729,10 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   // before the browse-mode filter below.
   if (!status_prompt && handle_sitemap_key(app, ev, ctrl, alt)) return;
   if (!status_prompt && handle_page_key(app, ev, ctrl, alt)) return;
+  if (!status_prompt && ev.key.keysym.sym == SDLK_k && ctrl && alt) {
+    show_search_bar(app);
+    return;
+  }
 
   // Paged reading, read-only: ← → turn the page like PgUp / PgDn.
   if (!status_prompt && browsing(app) && focused_pane(app).pages.on && !ctrl &&

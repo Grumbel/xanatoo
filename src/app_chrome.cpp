@@ -350,6 +350,8 @@ StatusLine compute_status(App& app) {
       label = "Wikipedia: ";
     else if (xanatoo::is_sitemap_ref(app.hover.href))
       label = "Site map: ";
+    else if (xanatoo::is_search_ref(app.hover.href))
+      label = "Search: ";
     else if (app.hover.href.rfind("http://", 0) == 0 ||
              app.hover.href.rfind("https://", 0) == 0)
       label = "Web: ";

@@ -65,6 +65,9 @@ Export via *File → Export as S-expression…* or *Export as Markdown…*.
 - **Ctrl+F** / **F3** — Leap search / next match
 - **Ctrl+H** — Find and replace
 - **Ctrl+Shift+O** — Outline (headers by section depth)
+- **Ctrl+Alt+K** — Search bar (hidden by default; engine button + field,
+  Enter searches, Esc closes). **Ctrl+L** takes `w xanadu` / `ax electron
+  spin` too (engine keywords, see the Directory's Search page)
 - **Ctrl+Alt+P** — Page navigation: the `<nav>` / side bar parts of a web
   page in a dockable panel (↑/↓ select, Enter follows, Esc closes)
 - **Ctrl+Alt+M** — Site map of the current web page's site (from its

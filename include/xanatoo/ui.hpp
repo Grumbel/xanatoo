@@ -116,6 +116,10 @@ enum class UiCommand {
   ToggleOutline,
   ToggleBacklinks,
   ToggleSitemap,  // site structure panel of the focused web page
+  ToggleSearchBar,    // show / hide the search bar (Ctrl+Alt+K focuses it)
+  FocusSearchBar,     // show the search bar and focus its field
+  Search,             // search bar committed (arg = what was typed)
+  SelectSearchEngine, // arg = engine id (search.hpp)
   TogglePage,     // navigation / side bars of the focused page, as a panel
   SitemapPrev,    // previous / next page in the site map's order
   SitemapNext,
@@ -171,6 +175,11 @@ struct UiService {
   bool separator_before = false;
 };
 
+// One engine of the search bar's menu.
+struct UiSearchEngine {
+  std::string id, name, keyword, badge;
+};
+
 struct UiState {
   bool dirty = false;
   bool has_path = false;
@@ -191,6 +200,9 @@ struct UiState {
   bool backlinks = false;
   bool sitemap = false;
   bool page_panel = false;
+  bool searchbar = false;  // the search bar row is shown
+  std::vector<UiSearchEngine> search_engines;
+  std::string search_engine;  // id of the engine in use
   bool has_nav = false;  // focused page has navigation for the panel
   bool diff = false;
   bool can_diff = false;  // two independent documents loaded
@@ -297,6 +309,8 @@ public:
 
   // Focus the toolbar location / URL field (Ctrl+L).
   void focus_url_bar();
+  // Focus the search bar field (once the bar is shown).
+  void focus_search();
 
   // Request a context menu at window coordinates (call from main on right-click).
   void open_context_menu(float x, float y);
@@ -341,6 +355,8 @@ private:
   char url_input_[2048] = {};
   std::string url_synced_from_;  // last doc_label pushed into url_input_
   bool focus_url_bar_ = false;   // Ctrl+L / Open URL menu
+  char search_input_[512] = {};  // search bar text (kept between searches)
+  bool focus_search_ = false;    // Ctrl+Alt+K / View → Search Bar
   bool url_bar_editing_ = false;
   bool wanted_text_input_ = false;  // io.WantTextInput last frame
   // Width of the button group right of the URL field (last frame), so the

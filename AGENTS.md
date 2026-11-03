@@ -32,6 +32,8 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_passage.cpp` | the passage a view shows (`docs/PASSAGES.md`): selectors of the address are view state on `Pane`, `pane_address` / `pane_cut` / `apply_locator`; pure address parsing in `locator.hpp` |
 | `app_chrome.cpp` | status line (`compute_status` is pure data → `draw_status_bar`), floating window frame, client scrollbar |
 | `app_windows.cpp` | floating windows (`FloatWindow`, role = Help/Outline/Backlinks/Document): one z-stack, shared hit-test / drag / resize / scroll / draw |
+| `search.cpp` | search engines (built-in table + user `search.sexp`), the `search:<engine>:<query>` address, query encoding, Ctrl+L keywords — pure, `search.hpp`, `docs/SEARCH.md` |
+| `app_search.cpp` | search bar state (`App::search`, engine = `ViewSettings::search_engine`): show / toggle / select engine / `run_search`; the ImGui row is in `ui.cpp` |
 | `app_softwin.cpp` | window placement: `Dock` (None / Left / Right / Max) for every role — `dock_window` / `undock_window` / `toggle_maximize`, `place_windows` derives docked geometry, `dock_column_w` is what `layout_panes` leaves out |
 | `app_touch.cpp` | touchscreen gestures: tap → click, drag/fling scroll, long-press select, pinch zoom |
 | `app_buffers.cpp` / `app_view.cpp` / `app_nav.cpp` / `app_softwin.cpp` / `app_prompts.cpp` / `app_pointer.cpp` | document buffers, scroll/fold/outline, URL history + bookmarks, floating windows, minibuffer, cursor/gamepad |

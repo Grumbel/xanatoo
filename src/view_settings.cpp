@@ -110,6 +110,8 @@ bool load_view_settings(ViewSettings& out) {
         out.page_columns = std::stoi(val);
       else if (key == "style" && !val.empty())
         out.style = val;
+      else if (key == "search_engine" && !val.empty())
+        out.search_engine = val;
     } catch (...) {
     }
   }
@@ -137,6 +139,7 @@ bool save_view_settings(const ViewSettings& in) {
   out << "paged=" << (v.paged ? "1" : "0") << "\n";
   out << "page_columns=" << v.page_columns << "\n";
   out << "style=" << v.style << "\n";
+  out << "search_engine=" << v.search_engine << "\n";
   return write_file_atomic(path, out.str());
 }
 
