@@ -719,6 +719,11 @@ struct App {
   SplitTrail split_trail;
   SplitHistory split_history;
   PendingScroll pending_scroll[2];
+  // Session file as last written, when it was last compared, and whether
+  // the start-up restore is over (only then does autosave_session write).
+  std::string session_text;
+  Uint32 session_checked = 0;
+  bool session_live = false;
 };
 
 // ---- session (app_session.cpp) ----
@@ -727,6 +732,7 @@ struct App {
 // its page has loaded (per frame).
 void save_session(App& app);
 void restore_session(App& app);
+void autosave_session(App& app);  // per frame: write it when it changed
 void apply_pending_scroll(App& app);
 
 // ---- drafts (app_drafts.cpp) ----

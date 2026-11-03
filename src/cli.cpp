@@ -65,6 +65,7 @@ void print_usage(std::ostream& out, const char* argv0) {
       << "      --portable        Keep everything in <exe dir>/userdata/ (also\n"
       << "                        when portable.txt is next to the executable)\n"
       << "      --no-save         Write no settings or state this run\n"
+      << "      --new-session     Start fresh: do not restore the last session\n"
       << "      --show-paths      Print every directory and where it came from\n";
 }
 
@@ -147,6 +148,10 @@ CliResult parse_cli(int argc, char** argv, CliOptions& opt) {
     }
     if (a == "--no-save") {
       opt.no_save = true;
+      continue;
+    }
+    if (a == "--new-session") {
+      opt.new_session = true;
       continue;
     }
     if (a == "--show-paths") {

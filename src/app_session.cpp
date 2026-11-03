@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 //
-// Session: what the window looked like when xanatoo was closed (pages in the
-// centre views, split, scroll, panels and their docks, window size) in
-// state_dir()/session.conf, put back at the next start unless the command
-// line names a document.
+// Session: what xanatoo looked like last (pages in the centre views, tabs,
+// back / forward trails, history, split, scroll, panels and their docks) in
+// state_dir()/session.conf. It is rewritten shortly after anything changed
+// (autosave_session, per frame) and put back at the next start unless the
+// command line names a document or asks for --new-session.
 
 #include <algorithm>
 #include <array>
@@ -61,14 +62,11 @@ std::vector<int> ints(const std::string& s) {
 
 }  // namespace
 
-void save_session(App& app) {
-  if (no_save()) return;
-  const std::string path = session_path();
-  if (path.empty() || !ensure_dir(state_dir())) return;
+namespace {
+
+std::string session_text(App& app) {
   std::ostringstream out;
   out << "# xanatoo session (restored at the next start)\n";
-  if (!app.opt.fullscreen && app.win_w > 0 && app.win_h > 0)
-    out << "window=" << app.win_w << " " << app.win_h << "\n";
   out << "split=" << (app.split ? 1 : 0) << "\n";
   out << "split_ratio=" << app.split_ratio << "\n";
   out << "focus=" << std::clamp(app.centre_focus, 0, 1) << "\n";
@@ -88,7 +86,25 @@ void save_session(App& app) {
     out << "scroll" << pi << "=" << p.scroll_y << "\n";
     if (p.reader) out << "reader" << pi << "=" << (*p.reader ? 1 : 0) << "\n";
     if (p.paged) out << "paged" << pi << "=" << (*p.paged ? 1 : 0) << "\n";
+    if (p.nav.pos >= 0) {
+      out << "navpos" << pi << "=" << p.nav.pos << "\n";
+      for (const std::string& u : p.nav.urls)
+        if (u.find('\n') == std::string::npos) out << "nav" << pi << "=" << u << "\n";
+    }
   }
+  for (BufferId id : app.tab_order) {
+    const DocBuffer* b = find_buf(app, id);
+    if (!b || b->path.empty() || b->path.find('\n') != std::string::npos)
+      continue;
+    std::string path = b->path;
+    std::error_code ec;
+    if (!is_in_app_remote_url(path) && fs::exists(path, ec) &&
+        !fs::path(path).is_absolute())
+      path = fs::absolute(path, ec).string();
+    out << "tab=" << path << "\n";
+  }
+  for (const std::string& v : app.visited)
+    if (v.find('\n') == std::string::npos) out << "visit=" << v << "\n";
   for (int i = 0; i < 4; ++i)
     out << "dock_w" << i << "=" << unscale(app, app.dock_w[i]) << "\n";
   for (const PanelRef& r : panels(app)) {
@@ -103,7 +119,30 @@ void save_session(App& app) {
         << unscale(app, w.restore_y) << " " << unscale(app, w.restore_w)
         << " " << unscale(app, w.restore_h) << "\n";
   }
-  write_file_atomic(path, out.str());
+  return out.str();
+}
+
+}  // namespace
+
+void save_session(App& app) {
+  if (no_save()) return;
+  const std::string path = session_path();
+  if (path.empty() || !ensure_dir(state_dir())) return;
+  app.session_text = session_text(app);
+  write_file_atomic(path, app.session_text);
+}
+
+void autosave_session(App& app) {
+  if (!app.session_live || no_save()) return;
+  const Uint32 now = SDL_GetTicks();
+  if (now - app.session_checked < 1000) return;
+  app.session_checked = now;
+  // Pages still on their way would be saved as what they replace.
+  for (const FetchJob& j : app.fetches)
+    if (j.purpose != FetchPurpose::Preview) return;
+  for (const PendingScroll& ps : app.pending_scroll)
+    if (ps.y >= 0.f) return;
+  if (session_text(app) != app.session_text) save_session(app);
 }
 
 void restore_session(App& app) {
@@ -112,27 +151,20 @@ void restore_session(App& app) {
   std::ifstream in(path);
   if (!in) return;
   std::unordered_map<std::string, std::string> kv;
+  std::unordered_map<std::string, std::vector<std::string>> lists;
   std::string line;
   while (std::getline(in, line)) {
     if (line.empty() || line[0] == '#') continue;
     const auto eq = line.find('=');
     if (eq == std::string::npos) continue;
     kv[line.substr(0, eq)] = line.substr(eq + 1);
+    lists[line.substr(0, eq)].push_back(line.substr(eq + 1));
   }
   auto get = [&](const std::string& k) -> const std::string* {
     auto it = kv.find(k);
     return it == kv.end() ? nullptr : &it->second;
   };
   try {
-    if (const std::string* v = get("window"); v && !app.opt.fullscreen) {
-      const auto n = ints(*v);
-      if (n.size() == 2 && n[0] >= 320 && n[1] >= 240 &&
-          n[0] <= 16384 && n[1] <= 16384) {
-        SDL_SetWindowSize(app.window, n[0], n[1]);
-        app.win_w = n[0];
-        app.win_h = n[1];
-      }
-    }
     for (int i = 0; i < 4; ++i)
       if (const std::string* v = get("dock_w" + std::to_string(i)))
         app.dock_w[i] = std::clamp(rescale(app, std::stoi(*v)), 60, 4000);
@@ -166,6 +198,7 @@ void restore_session(App& app) {
         }
       }
     }
+    app.visited = lists["visit"];
     const bool split = get("split") && *get("split") == "1";
     for (int pi = 0; pi < kCentreViews; ++pi) {
       const std::string* a = get("pane" + std::to_string(pi));
@@ -181,6 +214,37 @@ void restore_session(App& app) {
           app.pending_scroll[pi].y = std::stof(*v);
           app.pending_scroll[pi].base = xanatoo::parse_locator(*a).base;
         }
+    }
+    for (int pi = 0; pi < kCentreViews; ++pi) {
+      // Back / Forward trail, when it still ends at the page just opened.
+      auto it = lists.find("nav" + std::to_string(pi));
+      const std::string* pos = get("navpos" + std::to_string(pi));
+      if (it == lists.end() || !pos || !get("pane" + std::to_string(pi)))
+        continue;
+      const int at = std::stoi(*pos);
+      NavHistory& h = app.panes[pi].nav;
+      if (at < 0 || at >= static_cast<int>(it->second.size()) ||
+          it->second[static_cast<size_t>(at)] != *get("pane" + std::to_string(pi)))
+        continue;
+      h.urls = it->second;
+      h.pos = at;
+    }
+    {
+      // Further tabs, in their saved order.
+      std::vector<std::string> tabs = lists["tab"];
+      for (const std::string& t : tabs)
+        if (find_buffer(app, t) == kNoBuffer) open_link_in_tab(app, 0, t);
+      std::vector<BufferId> order;
+      for (const std::string& t : tabs)
+        if (BufferId id = find_buffer(app, t);
+            id != kNoBuffer &&
+            std::find(order.begin(), order.end(), id) == order.end())
+          order.push_back(id);
+      for (BufferId id : app.tab_order)
+        if (std::find(order.begin(), order.end(), id) == order.end())
+          order.push_back(id);
+      app.tab_order = std::move(order);
+      update_title(app);
     }
     if (split && app.buffers.size() > 0) {
       app.split = true;

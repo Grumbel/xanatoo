@@ -190,7 +190,8 @@ bool app_init(App& app) {
   }
   app.focus = 0;
   app.split = app.buffers.size() > 1;  // auto-split when two files given
-  if (app.opt.file_path.empty()) restore_session(app);
+  if (app.opt.file_path.empty() && !app.opt.new_session) restore_session(app);
+  app.session_live = true;
   {
     // Drafts nobody is looking at yet (untitled ones have no file to open).
     size_t hidden = 0;

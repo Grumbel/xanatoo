@@ -24,6 +24,7 @@ struct CliOptions {
   std::string cache_dir;
   bool portable = false;
   bool no_save = false;
+  bool new_session = false;  // do not restore the last session
   bool show_paths = false;
 };
 

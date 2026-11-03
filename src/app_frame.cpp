@@ -3112,6 +3112,7 @@ void run_frame(App& app) {
   update_touch(app);
   poll_fetches(app);
   autosave_drafts(app);
+  autosave_session(app);
   update_split_preview(app);
   update_sitemap(app);
   update_page_panel(app);

@@ -10,14 +10,20 @@ Next bundle number: **263** (this delivery is **262**)
 
 ## Status (2026-11-03) — session restore
 
-- `app_session.cpp`: at shutdown `state_dir()/session.conf` gets window size,
-  split + ratio, centre focus, each centre view's address (absolute for local
-  files), scroll, reader / paged override, the dock widths and every panel
-  (open, dock, geometry). `restore_session` (app_init) puts it back unless a
-  document was named on the command line; scroll waits for the page
-  (`apply_pending_scroll`, per frame). `--no-save` writes nothing.
-- Open: extra tabs and document windows are not restored; saved only on a
-  clean exit (no periodic write); `--geometry` is overridden by the saved size.
+- `app_session.cpp`: `state_dir()/session.conf` holds each centre view's
+  address (absolute for local files), scroll, reader / paged override and
+  Back / Forward trail, the tabs in order, `App::visited` (History panel),
+  split + ratio, focus, dock widths and every panel (open, dock, geometry).
+  Window size is left to the window manager.
+- `autosave_session` (per frame, checked once a second) rewrites the file
+  whenever its text changed, so every opened page / tab / scroll lands in it
+  within a second. It waits while page loads or a restored scroll are still
+  pending, so a half-restored state never overwrites the saved one.
+- `restore_session` (app_init) runs unless a document is named on the command
+  line or `--new-session` is given; scroll waits for the page
+  (`apply_pending_scroll`). `--no-save` writes nothing.
+- Open: floating document windows are not restored; unsaved-draft tabs
+  without a path are not listed.
 
 ## Status (2026-11-03) — paged reading (ebook style pages)
 
