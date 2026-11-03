@@ -43,12 +43,12 @@ Open any of these from this page (links load in the same pane and join session h
 ### Guides
 
 - [Keyboard reference](help.md) — complete keybinding list (**F1**)
-- [Article / Section / Header](sectioning.md) — semantic sectioning model
-- [Footnotes](footnotes.md) — marks, notes and the footnote overlay
+- [Feature tour](tour.md) — every kind of block in one page: sections,
+  inline images, margin notes, tables, stretchtext, columns, collections,
+  includes, threads, footnotes and citations
 
 ### Demos
 
-- [Thread / RFC discussion](thread-rfc.md) — Thread and Message nodes
 - [Gemini gemtext sample](gemini-sample.gmi) — native gemtext layout
 - [Nostr discussions](nostr-sample.md) — relay-backed Thread/Message view
 - [Recent Nostr notes](nostr:recent) — live firehose sample from public relays
@@ -58,7 +58,6 @@ Open any of these from this page (links load in the same pane and join session h
 - [Hacker News](hn:) — front page and comment trees
 - [Books and long reads](books.md) — Standard Ebooks / Project Gutenberg EPUBs
 - [Feeds](feeds.md) — RSS / Atom: blogs, news, Mastodon, Reddit, arXiv
-- [Collections](collection.md) — image grids / lists with a fullscreen viewer
 - [Org-mode sample](sample.org) — headings, TODO, tags, source blocks
 - [Semantic format (S-expression)](semantic.sexp) — experimental sexpr form
 - [Sample (S-expression)](sample.sexp) — compact sexpr demo

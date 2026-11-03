@@ -60,14 +60,20 @@ enum class BlockRole : uint8_t {
   Table,
   Rule,
   Transclusion,
-  Aside,          // text box beside the flow
+  Aside,          // text box beside the flow (in the page margin)
+  Sidebar,        // page chrome in the margin: navigation, side bars
   Count
 };
 constexpr size_t kBlockRoleCount = static_cast<size_t>(BlockRole::Count);
 constexpr size_t kInlineKindCount = static_cast<size_t>(InlineKind::Image) + 1;
 
-// Where a box sits: in the flow, or beside it with text running past.
+// Which side of the page a box goes to.
 enum class FloatSide : uint8_t { None, Left, Right };
+// Where a side box goes: into the page margin (beside the text column, the
+// column untouched), floating inside the column with text running past
+// (HTML compatibility), or in the flow at full width. Margin and float fall
+// back to the flow when there is no room.
+enum class Placement : uint8_t { Flow, Float, Margin };
 
 struct BlockStyle {
   Length space_before;
@@ -80,10 +86,10 @@ struct BlockStyle {
   Rgba background{0, 0, 0, 0};
   // Side bars, rules, grid lines, frames; the rule under a header.
   Rgba border{0, 0, 0, 0};
-  // Boxes beside the flow (aside): preferred width and side. A box floats
-  // only while the text column keeps room for the text next to it.
+  // Side boxes (aside, sidebar): preferred width, side and placement.
   Length width;
-  FloatSide float_side = FloatSide::None;
+  FloatSide side = FloatSide::None;
+  Placement placement = Placement::Flow;
 };
 
 struct InlineStyle {

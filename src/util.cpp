@@ -98,6 +98,20 @@ NodeId find_anchor_node(const Document& doc, std::string_view href) {
   return INVALID_NODE;
 }
 
+NodeId transclude_text_node(const Document& doc, NodeId id) {
+  if (id == INVALID_NODE || id >= doc.next_id) return INVALID_NODE;
+  if (!doc.get(id).spans.empty()) return id;
+  std::vector<NodeId> nodes;
+  collect_text_nodes(doc, id, nodes);
+  for (NodeId n : nodes) {
+    const NodeKind k = doc.get(n).kind;
+    if (k != NodeKind::Header && k != NodeKind::Heading &&
+        !doc.get(n).spans.empty())
+      return n;
+  }
+  return INVALID_NODE;
+}
+
 bool path_ends_with_ci(std::string_view path, std::string_view suffix) {
   if (path.size() < suffix.size()) return false;
   auto a = ascii_lower(std::string(path.substr(path.size() - suffix.size())));

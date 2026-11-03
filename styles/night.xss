@@ -32,6 +32,8 @@
   (role table       (border line) (background panel))
   (role rule        (border line))
   (role transclusion (border dim))
+  (role aside       (color "#b9bec6") (background panel) (border line))
+  (role sidebar     (color dim) (border line))
 
   (role link   (color accent) (underline #t))
   (role cite   (color accent2) (underline #t))

@@ -20,6 +20,7 @@
 #include "xanatoo/inflate.hpp"
 #include "xanatoo/sitemap.hpp"
 #include "xanatoo/revstore.hpp"
+#include "xanatoo/paths.hpp"
 #include "xanatoo/util.hpp"
 #include "xanatoo/parse.hpp"
 #include "xanatoo/editor.hpp"
@@ -942,7 +943,9 @@ void test_style_sheets_shipped() {
            a.indent.px(17.f) == b.indent.px(17.f) && a.font == b.font &&
            a.border == b.border && a.background == b.background &&
            a.width.px(17.f) == b.width.px(17.f) &&
-           a.float_side == b.float_side);
+           a.side == b.side && a.placement == b.placement &&
+           a.has_color == b.has_color &&
+           (!a.has_color || a.color == b.color));
   }
   // Late-bound tokens: night-amber only redefines tokens of night.
   DocStyle night, amber;
@@ -2016,30 +2019,141 @@ void test_inline_images_and_asides() {
     EXPECT(im.y >= 0.f);
   }
 
-  // Float: lines beside the aside stop at its left edge; lines below it
-  // use the whole column again; a narrow column stacks it in the flow.
+  // Margin: the aside sits right of the text column, in small type; the
+  // column gives up width for it and no text line runs under it.
   std::string words;
   for (int k = 0; k < 120; ++k) words += "word ";
   Document fl = parse_markup(":::aside\nSide box\n:::\n\n" + words + "\n");
-  LayoutResult fr = engine.layout(fl, 800.f);
   NodeId aside = kids_of(fl, fl.root)[0];
-  LayoutBox abox{};
-  for (const auto& b : fr.boxes)
-    if (b.node == aside) abox = b;
-  EXPECT(abox.width > 0.f && abox.x > 400.f);
-  float beside_right = 0.f, below_right = 0.f;
-  for (const auto& g : fr.glyphs) {
-    if (g.node == aside || fl.get(g.node).parent == aside || g.codepoint == ' ')
-      continue;
-    const float r = g.x + g.advance;
-    if (g.y < abox.y + abox.height) beside_right = std::max(beside_right, r);
-    else below_right = std::max(below_right, r);
+  auto box_of = [](const LayoutResult& r, NodeId id) {
+    LayoutBox box{};
+    for (const auto& b : r.boxes)
+      if (b.node == id) box = b;
+    return box;
+  };
+  auto in_aside = [&](const PositionedGlyph& g) {
+    return g.node == aside || (g.node != INVALID_NODE &&
+                               fl.get(g.node).parent == aside);
+  };
+  {
+    LayoutResult mr = engine.layout(fl, 1000.f);
+    const LayoutBox abox = box_of(mr, aside);
+    EXPECT(abox.width > 0.f && abox.x > 600.f && abox.x + abox.width <= 1000.f);
+    float text_right = 0.f;
+    bool small = false;
+    for (const auto& g : mr.glyphs) {
+      if (in_aside(g)) {
+        small = small || g.font == FontRole::Small;
+        continue;
+      }
+      if (g.codepoint != ' ') text_right = std::max(text_right, g.x + g.advance);
+    }
+    EXPECT(small);
+    EXPECT(text_right > 0.f && text_right <= abox.x);
+    // The flow does not move for it: the paragraph starts at the top.
+    float first_y = 1e9f;
+    for (const auto& g : mr.glyphs)
+      if (!in_aside(g)) first_y = std::min(first_y, g.y);
+    EXPECT(first_y < abox.y + abox.height);
   }
-  EXPECT(beside_right > 0.f && beside_right <= abox.x);
-  EXPECT(below_right > abox.x);
+  // No room for a margin: in the flow at full width.
   LayoutResult narrow = engine.layout(fl, 300.f);
-  for (const auto& b : narrow.boxes)
-    if (b.node == aside) EXPECT_EQ(b.width, 300.f);
+  EXPECT_EQ(box_of(narrow, aside).width, 300.f);
+
+  // placement float: lines beside the box stop at its left edge, lines
+  // below it use the whole column again.
+  DocStyle fst = builtin_style();
+  fst.block[static_cast<size_t>(BlockRole::Aside)].placement = Placement::Float;
+  engine.set_style(&fst);
+  {
+    LayoutResult fr = engine.layout(fl, 800.f);
+    const LayoutBox abox = box_of(fr, aside);
+    EXPECT(abox.width > 0.f && abox.x > 400.f);
+    float beside_right = 0.f, below_right = 0.f;
+    for (const auto& g : fr.glyphs) {
+      if (in_aside(g) || g.codepoint == ' ') continue;
+      const float r = g.x + g.advance;
+      if (g.y < abox.y + abox.height) beside_right = std::max(beside_right, r);
+      else below_right = std::max(below_right, r);
+    }
+    EXPECT(beside_right > 0.f && beside_right <= abox.x);
+    EXPECT(below_right > abox.x);
+  }
+  engine.set_style(nullptr);
+
+  // Navigation chrome goes into the left margin with a label; in reader
+  // mode it is gone and the column keeps its width.
+  Document nav = parse_html_page(
+      "<html><body><nav><ul><li><a href=\"/a\">Alpha</a></li>"
+      "<li><a href=\"/b\">Beta</a></li></ul></nav><main><p>" + words +
+      "</p></main></body></html>", "https://example.org/");
+  NodeId nav_node = INVALID_NODE;
+  for (const Node& n : nav.nodes)
+    if (n.kind == NodeKind::Chrome && n.parent != INVALID_NODE &&
+        n.summary == "navigation")
+      nav_node = n.id;
+  EXPECT(nav_node != INVALID_NODE);
+  if (nav_node != INVALID_NODE) {
+    EXPECT(margin_chrome(nav, nav.get(nav_node)));
+    LayoutResult nr = engine.layout(nav, 1000.f);
+    const LayoutBox nbox = box_of(nr, nav_node);
+    EXPECT(nbox.width > 0.f && nbox.x < 300.f);
+    bool label = false;
+    float text_left = 1e9f;
+    for (const auto& g : nr.glyphs) {
+      if (g.node == INVALID_NODE && g.codepoint == 'N') label = true;
+      if (g.node != INVALID_NODE && nav.get(g.node).kind == NodeKind::Paragraph)
+        text_left = std::min(text_left, g.x);
+    }
+    EXPECT(label);
+    EXPECT(text_left >= nbox.x + nbox.width);
+    engine.set_hide_chrome(true);
+    LayoutResult rr = engine.layout(nav, 1000.f);
+    EXPECT_EQ(box_of(rr, nav_node).width, 0.f);
+    engine.set_hide_chrome(false);
+  }
+}
+
+// examples/tour.md is the feature tour: it keeps showing every block kind.
+void test_tour_example() {
+  using namespace xanatoo;
+  const std::string path = data_file("examples/tour.md");
+  if (path.empty()) {
+    std::fprintf(stderr, "SKIP test_tour_example (no data dir)\n");
+    return;
+  }
+  std::ifstream in(path, std::ios::binary);
+  const std::string src((std::istreambuf_iterator<char>(in)),
+                        std::istreambuf_iterator<char>());
+  Document doc = parse_document(src, path);
+  std::unordered_set<int> kinds;
+  bool inline_image = false, cite = false, task = false, link = false;
+  for (const Node& n : doc.nodes) {
+    if (n.parent == INVALID_NODE && n.id != doc.root) continue;
+    kinds.insert(static_cast<int>(n.kind));
+    task = task || n.label == "task" || n.label == "task-done";
+    for (const InlineSpan& sp : n.spans) {
+      inline_image = inline_image || sp.kind == InlineKind::Image;
+      cite = cite || sp.kind == InlineKind::Cite;
+      link = link || (sp.kind == InlineKind::Link && !sp.rel.empty());
+    }
+  }
+  for (NodeKind k :
+       {NodeKind::Article, NodeKind::Section, NodeKind::Header,
+        NodeKind::List, NodeKind::BlockQuote, NodeKind::HorizontalRule,
+        NodeKind::DefList, NodeKind::Note, NodeKind::CodeBlock,
+        NodeKind::Table, NodeKind::Aside, NodeKind::Stretch,
+        NodeKind::Columns, NodeKind::Figure, NodeKind::Collection,
+        NodeKind::Transclude, NodeKind::Thread, NodeKind::Message,
+        NodeKind::Footnote, NodeKind::Biblio, NodeKind::BiblioEntry}) {
+    if (!kinds.count(static_cast<int>(k)))
+      std::fprintf(stderr, "tour.md lacks node kind %d\n", static_cast<int>(k));
+    EXPECT(kinds.count(static_cast<int>(k)));
+  }
+  EXPECT(inline_image && cite && task && link);
+  // The include names a section: it shows the section's first paragraph.
+  const NodeId q = transclude_text_node(doc, find_anchor_node(doc, "#quotable"));
+  EXPECT(q != INVALID_NODE && doc.get(q).kind == NodeKind::Paragraph);
 }
 
 void test_feed_urls() {
@@ -2819,6 +2933,7 @@ int main() {
   test_layout_margins_and_measure();
   test_layout_reader_mode();
   test_inline_images_and_asides();
+  test_tour_example();
   test_view_settings_migration();
   test_style_sheet_parse();
   test_style_sheets_shipped();

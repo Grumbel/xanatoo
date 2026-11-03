@@ -104,8 +104,8 @@ void LayoutEngine::set_style(const DocStyle* style) {
 // Face for an inline span inside a block set in `base` (a bold / italic
 // block face combines with the span's own emphasis).
 static FontRole style_role(FontRole base, InlineKind kind) {
-  if (kind == InlineKind::Code || base == FontRole::Code) return FontRole::Code;
   switch (base) {  // small block faces: the body logic, then made small
+    case FontRole::SmallCode: return FontRole::SmallCode;
     case FontRole::Small: return small_role(style_role(FontRole::Body, kind));
     case FontRole::SmallBold:
       return small_role(style_role(FontRole::BodyBold, kind));
@@ -115,6 +115,7 @@ static FontRole style_role(FontRole base, InlineKind kind) {
       return small_role(style_role(FontRole::BodyBoldItalic, kind));
     default: break;
   }
+  if (kind == InlineKind::Code || base == FontRole::Code) return FontRole::Code;
   if (base == FontRole::Heading) return FontRole::Heading;
   const bool strong = kind == InlineKind::Strong ||
                       base == FontRole::BodyBold ||
@@ -238,8 +239,8 @@ void LayoutEngine::layout_children_sequential(
     const NodeKind kind = doc.get(child).kind;
     if (!floats_.empty() && clears_floats(kind))
       y = clear_floats(x, max_width, y);
-    // A floating aside does not advance y: its box height is no hint.
-    if (kind != NodeKind::Aside &&
+    // Side boxes may not advance y: their box height is no hint.
+    if (kind != NodeKind::Aside && kind != NodeKind::Chrome &&
         try_skip_block(child, x, y, max_width, out))
       continue;
     layout_node(doc, child, x, y, max_width, out);
@@ -264,6 +265,31 @@ std::vector<NodeId> chrome_regions(const Document& doc) {
       stack.push_back(*it);
   }
   return out;
+}
+
+bool margin_chrome(const Document& doc, const Node& chrome) {
+  if (chrome.kind != NodeKind::Chrome) return false;
+  if (chrome.summary != "navigation" && chrome.summary != "sidebar")
+    return false;
+  std::vector<NodeId> stack(chrome.children.begin(), chrome.children.end());
+  while (!stack.empty()) {
+    const NodeId id = stack.back();
+    stack.pop_back();
+    if (id == INVALID_NODE || id >= doc.next_id) continue;
+    const Node& n = doc.get(id);
+    if (n.id != id) continue;
+    switch (n.kind) {
+      case NodeKind::Table:
+      case NodeKind::CodeBlock:
+      case NodeKind::Columns:
+      case NodeKind::Collection:
+        return false;  // needs the column's width
+      default:
+        break;
+    }
+    stack.insert(stack.end(), n.children.begin(), n.children.end());
+  }
+  return true;
 }
 
 std::string chrome_hidden_text(const Document& doc,
@@ -576,9 +602,11 @@ LayoutResult LayoutEngine::layout(
       content_w = cap;
     }
   }
+  setup_margins(doc, mx, content_w, max_width);
   layout_node(doc, doc.root, mx, y, content_w, result);
   for (const FloatBox& f : floats_) y = std::max(y, f.bottom);
   floats_.clear();
+  for (const MarginArea& m : margins_) y = std::max(y, m.bottom);
   result.content_height = y + options_.margin_y + 24.f;
   result.virtualized = skipped_any_;
   height_hints_ = nullptr;
@@ -628,6 +656,14 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
     case NodeKind::Chrome: {
       if (hide_chrome_) break;  // reader mode
+      if (!in_margin_ && margin_chrome(doc, node)) {
+        std::string label = node.summary;
+        if (!label.empty() && label[0] >= 'a' && label[0] <= 'z')
+          label[0] = static_cast<char>(label[0] - 'a' + 'A');
+        if (layout_margin_box(doc, node, BlockRole::Sidebar,
+                              st[BlockRole::Sidebar].side, label, y, out))
+          break;
+      }
       float start_y = y;
       layout_children_sequential(doc, node.children, x, y, max_width, out);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
@@ -1573,7 +1609,8 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       std::vector<InlineSpan> body_spans;
       if (src_doc) {
         if (!href_part.empty()) {
-          target_id = find_anchor_node(*src_doc, href_part);
+          target_id = transclude_text_node(
+              *src_doc, find_anchor_node(*src_doc, href_part));
           if (target_id != INVALID_NODE)
             body_spans = src_doc->get(target_id).spans;
           // Range/excerpt: keep only the span(s) containing the phrase,
@@ -1715,17 +1752,29 @@ void LayoutEngine::layout_aside(const Document& doc, const Node& node,
   const float dp = options_.px_scale;
   const float pad = bs.indent.px(em, dp);
   const float gap = em;
-  FloatSide side = bs.float_side;
-  if (side != FloatSide::None) {
-    if (node.src == "left") side = FloatSide::Left;
-    else if (node.src == "right") side = FloatSide::Right;
-  }
+  FloatSide side = bs.side;
+  if (node.src == "left") side = FloatSide::Left;
+  else if (node.src == "right") side = FloatSide::Right;
+  if (bs.placement == Placement::Margin && side != FloatSide::None &&
+      !in_margin_ && layout_margin_box(doc, node, BlockRole::Aside, side, {},
+                                       y, out))
+    return;
+  // In the column: small text and the aside colour all the same.
+  const bool was_small = small_;
+  const BlockRole was_ctx = ctx_role_;
+  small_ = is_small_role(bs.font);
+  ctx_role_ = BlockRole::Aside;
+  struct Restore {
+    bool& s; BlockRole& c; bool sv; BlockRole cv;
+    ~Restore() { s = sv; c = cv; }
+  } restore{small_, ctx_role_, was_small, was_ctx};
   float want = bs.width.px(em, dp);
   if (want < 1.f) want = 16.f * em;
   const float aw = std::min(want, max_width * 0.45f);
   // Float only while it stays a box and the text beside it stays readable.
-  const bool floating = side != FloatSide::None && aw >= 6.f * em &&
-                        max_width - aw - gap >= 10.f * em;
+  const bool floating = bs.placement == Placement::Float &&
+                        side != FloatSide::None && !in_margin_ &&
+                        aw >= 6.f * em && max_width - aw - gap >= 10.f * em;
 
   auto frame = [&](float bx, float top, float w, float bottom) {
     const LayoutBox box{node.id, bx, top, w, bottom - top};
@@ -1783,6 +1832,130 @@ void LayoutEngine::layout_aside(const Document& doc, const Node& node,
   floats_.push_back(fb);
   out.boxes.push_back({node.id, bx, top, aw, bottom - top});
   // y stays: the following blocks run beside the box.
+}
+
+// Margin room for the side boxes of `doc`: the margin as the view settings
+// leave it, widened at the cost of the text column (down to kMinText) when
+// a side has boxes and is too narrow for them.
+void LayoutEngine::setup_margins(const Document& doc, float& mx,
+                                 float& content_w, float max_width) {
+  margins_[0] = margins_[1] = MarginArea{};
+  in_margin_ = 0;
+  small_ = false;
+  ctx_role_ = BlockRole::Count;
+  const DocStyle& st = *style_;
+  const float em = static_cast<float>(fonts_.regular.pixel_size());
+  const float dp = options_.px_scale;
+  float want[2] = {0.f, 0.f};
+  auto need = [&](BlockRole role, FloatSide side) {
+    const BlockStyle& bs = st[role];
+    if (bs.placement != Placement::Margin || side == FloatSide::None) return;
+    float w = bs.width.px(em, dp);
+    if (w < 1.f) w = 14.f * em;
+    float& slot = want[side == FloatSide::Left ? 0 : 1];
+    slot = std::max(slot, w);
+  };
+  for (const Node& n : doc.nodes) {
+    if (n.parent == INVALID_NODE) continue;  // unhooked arena entries
+    if (n.kind == NodeKind::Aside) {
+      FloatSide side = st[BlockRole::Aside].side;
+      if (n.src == "left") side = FloatSide::Left;
+      else if (n.src == "right") side = FloatSide::Right;
+      need(BlockRole::Aside, side);
+    } else if (n.kind == NodeKind::Chrome && !hide_chrome_ &&
+               margin_chrome(doc, n)) {
+      need(BlockRole::Sidebar, st[BlockRole::Sidebar].side);
+    }
+  }
+  if (want[0] <= 0.f && want[1] <= 0.f) return;
+  const float gap = 1.25f * em;  // margin box ↔ text column
+  const float edge = std::max(options_.margin_x, 0.5f * em);
+  const float min_text = 28.f * em;  // the column never gets narrower
+  const float min_box = 8.f * em;    // a margin box never gets narrower
+  for (int s = 0; s < 2; ++s) {
+    if (want[s] <= 0.f) continue;
+    const float free = s == 0 ? mx - edge - gap
+                              : max_width - (mx + content_w) - edge - gap;
+    float w = free;
+    if (free < want[s]) {
+      const float take =
+          std::min(want[s] - free, std::max(0.f, content_w - min_text));
+      w = free + take;
+      if (w < min_box) continue;  // no room: these boxes go into the flow
+      content_w -= take;
+      if (s == 0) mx += take;
+    }
+    w = std::min(w, want[s]);
+    MarginArea& m = margins_[s];
+    m.w = w;
+    m.x = s == 0 ? mx - gap - w : mx + content_w + gap;
+  }
+}
+
+bool LayoutEngine::layout_margin_box(const Document& doc, const Node& node,
+                                     BlockRole role, FloatSide side,
+                                     const std::string& label, float y,
+                                     LayoutResult& out) {
+  MarginArea& m = margins_[side == FloatSide::Left ? 0 : 1];
+  if (m.w <= 0.f) return false;
+  const BlockStyle& bs = (*style_)[role];
+  const float em = static_cast<float>(fonts_.regular.pixel_size());
+  const float dp = options_.px_scale;
+  const float pad = bs.indent.px(em, dp);
+  // Beside its flow position, below the boxes already in this margin.
+  const float top = std::max(y + bs.space_before.px(em, dp), m.bottom);
+
+  const bool was_small = small_;
+  const BlockRole was_ctx = ctx_role_;
+  small_ = is_small_role(bs.font);
+  ctx_role_ = role;
+  ++in_margin_;
+  const size_t fill_at = out.role_fills.size();
+  const float ix = m.x + pad;
+  const float iw = std::max(20.f, m.w - 2.f * pad);
+  float iy = top + pad;
+  if (!label.empty()) {
+    // Decoration: no node, so it is neither text to edit nor a link.
+    Node head;
+    head.id = INVALID_NODE;
+    head.kind = NodeKind::Paragraph;
+    InlineSpan sp;
+    sp.kind = InlineKind::Strong;
+    sp.text = label;
+    head.spans.push_back(std::move(sp));
+    layout_paragraph(doc, head, ix, iy, iw, out, FontRole::Body, role);
+    iy += 0.3f * em;
+  }
+  layout_children_sequential(doc, node.children, ix, iy, iw, out);
+  --in_margin_;
+  small_ = was_small;
+  ctx_role_ = was_ctx;
+  // The padding replaces the trailing gap of a last paragraph.
+  if (!node.children.empty() && node.children.back() != INVALID_NODE &&
+      doc.get(node.children.back()).kind == NodeKind::Paragraph)
+    iy -= std::min((*style_)[BlockRole::Paragraph].space_after.px(em, dp),
+                   iy - top);
+  const float bottom = iy + pad;
+  const LayoutBox box{node.id, m.x, top, m.w, bottom - top};
+  if (bs.background.visible()) {
+    out.role_fills.push_back({box, role});
+    // Under the text laid out before it.
+    std::rotate(out.role_fills.begin() + static_cast<std::ptrdiff_t>(fill_at),
+                out.role_fills.end() - 1, out.role_fills.end());
+  }
+  if (bs.border.visible()) {
+    if (bs.background.visible()) {
+      out.role_frames.push_back({box, role});
+    } else {
+      // A bar on the side facing the text.
+      const float bar = std::max(2.f, 2.f * dp);
+      const float bx = side == FloatSide::Left ? m.x + m.w - bar : m.x;
+      out.role_rules.push_back({{node.id, bx, top, bar, bottom - top}, role});
+    }
+  }
+  out.boxes.push_back(box);
+  m.bottom = bottom + bs.space_after.px(em, dp);
+  return true;
 }
 
 void LayoutEngine::inline_image_size(const InlineSpan& sp, float max_w,
@@ -1881,6 +2054,12 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
                                     LayoutResult& out, FontRole base_role,
                                     BlockRole block) {
   (void)doc;
+  if (small_) base_role = small_role(base_role);
+  // Text inside a side box takes the box's colour unless its own block or
+  // inline role has one.
+  const bool ctx_color = ctx_role_ != BlockRole::Count &&
+                         (*style_)[ctx_role_].has_color &&
+                         !(*style_)[block].has_color;
   struct CharInfo {
     uint32_t cp;
     size_t span_idx;
@@ -1917,8 +2096,7 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     }
   }
 
-  const bool small_base = small_role(base_role) == base_role &&
-                          base_role != FontRole::Code;
+  const bool small_base = is_small_role(base_role);
   Font& metrics = fonts_.pick(base_role == FontRole::Heading ? FontRole::Heading
                               : small_base                  ? FontRole::Small
                                                             : FontRole::Body);
@@ -1977,7 +2155,8 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     float gap_extra = 0.f;
     const bool can_justify =
         options_.justify && !last_or_hard && gaps > 0 &&
-        base_role != FontRole::Code && base_role != FontRole::Heading;
+        base_role != FontRole::Code && base_role != FontRole::SmallCode &&
+        base_role != FontRole::Heading;
     if (can_justify) {
       float room = lw - natural;
       if (room > 0.5f) {
@@ -2011,7 +2190,9 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
       pg.char_index = c.char_idx;
       pg.kind = c.kind;
       pg.font = c.role;
-      pg.color = style_->text_color(block, c.kind);
+      pg.color = ctx_color && !(*style_)[c.kind].has_color
+                     ? (*style_)[ctx_role_].color
+                     : style_->text_color(block, c.kind);
       if (c.img_w > 0.f) {
         // Inline image: sits on the baseline; the glyph is its caret slot.
         pg.x = lx;

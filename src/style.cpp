@@ -51,6 +51,7 @@ constexpr RoleName kBlockRoles[] = {
     {"rule", BlockRole::Rule},
     {"transclusion", BlockRole::Transclusion},
     {"aside", BlockRole::Aside},
+    {"sidebar", BlockRole::Sidebar},
 };
 
 struct InlineName {
@@ -76,6 +77,7 @@ constexpr std::pair<const char*, FontRole> kFontRoles[] = {
     {"small-bold", FontRole::SmallBold},
     {"small-italic", FontRole::SmallItalic},
     {"small-bold-italic", FontRole::SmallBoldItalic},
+    {"small-code", FontRole::SmallCode},
 };
 
 int hex_digit(char c) {
@@ -307,12 +309,18 @@ class SheetReader {
       else if (prop == "background") color(v, b.background);
       else if (prop == "border") color(v, b.border);
       else if (prop == "width") length(v, b.width);
-      else if (prop == "float") {
+      else if (prop == "side") {
         const std::string side = sexpr_text(value(v));
-        if (side == "left") b.float_side = FloatSide::Left;
-        else if (side == "right") b.float_side = FloatSide::Right;
-        else if (side == "none") b.float_side = FloatSide::None;
-        else warn("float is left, right or none");
+        if (side == "left") b.side = FloatSide::Left;
+        else if (side == "right") b.side = FloatSide::Right;
+        else if (side == "none") b.side = FloatSide::None;
+        else warn("side is left, right or none");
+      } else if (prop == "placement") {
+        const std::string pl = sexpr_text(value(v));
+        if (pl == "margin") b.placement = Placement::Margin;
+        else if (pl == "float") b.placement = Placement::Float;
+        else if (pl == "flow") b.placement = Placement::Flow;
+        else warn("placement is margin, float or flow");
       } else if (prop == "font") {
         const std::string s = sexpr_text(value(v));
         auto it = std::find_if(std::begin(kFontRoles), std::end(kFontRoles),
@@ -503,12 +511,28 @@ DocStyle builtin_style() {
 
   {
     BlockStyle& b = blk(BlockRole::Aside);
-    b.indent = px(10);  // padding inside the box
-    b.space_after = px(12);
-    b.width = Length{16.f, true};
-    b.float_side = FloatSide::Right;
-    b.background = {235, 230, 215, 160};
+    b.indent = px(8);  // padding inside the box
+    b.space_after = px(10);
+    b.width = Length{15.f, true};
+    b.side = FloatSide::Right;
+    b.placement = Placement::Margin;
+    b.font = FontRole::Small;
+    b.has_color = true;
+    b.color = {74, 66, 50, 255};
+    b.background = {238, 232, 216, 200};
     b.border = {200, 190, 165, 255};
+  }
+  {
+    BlockStyle& b = blk(BlockRole::Sidebar);
+    b.indent = px(8);
+    b.space_after = px(12);
+    b.width = Length{13.f, true};
+    b.side = FloatSide::Left;
+    b.placement = Placement::Margin;
+    b.font = FontRole::Small;
+    b.has_color = true;
+    b.color = {80, 82, 92, 255};
+    b.border = {185, 188, 200, 255};  // bar on the side facing the text
   }
 
   auto inl = [&](InlineKind k) -> InlineStyle& {

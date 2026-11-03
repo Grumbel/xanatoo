@@ -317,7 +317,8 @@ GlyphExtents Renderer::glyph_extents() const {
   for (FontRole role : {FontRole::Body, FontRole::BodyBold, FontRole::BodyItalic,
                         FontRole::BodyBoldItalic, FontRole::Heading,
                         FontRole::Code, FontRole::Small, FontRole::SmallBold,
-                        FontRole::SmallItalic, FontRole::SmallBoldItalic}) {
+                        FontRole::SmallItalic, FontRole::SmallBoldItalic,
+                        FontRole::SmallCode}) {
     const Font& f = fonts_.pick(role);
     ext.push_back({static_cast<float>(f.ascender()),
                    static_cast<float>(-f.descender())});

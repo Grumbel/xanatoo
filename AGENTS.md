@@ -321,11 +321,21 @@ mechanism; historical bundle numbers in TODO.md are archival).
   `href` = optional link. Layout places them as atoms on the baseline
   (`PositionedImage::in_text`; never resizable, a click follows the link or
   opens the viewer). Markdown `![a](s){width=… height=…}` inside text.
-- `NodeKind::Aside`: a container drawn as a box beside the flow (style role
-  `aside`: `width`, `float`, `indent` = padding). Floats live in
-  `LayoutEngine::floats_` for one layout() call: text lines take the band
+- `NodeKind::Aside`: a container of blocks, a side box (style role
+  `aside`: `width`, `side`, `placement`, `indent` = padding, small `font`,
+  muted `color`). `placement margin` (default) puts it into the page margin
+  beside its flow position (`LayoutEngine::margins_`, set up per layout()
+  by `setup_margins`, which narrows the column when a side is too narrow;
+  `layout_margin_box`); without room it goes into the flow. Margin chrome
+  (`margin_chrome`: navigation / sidebar Chrome without wide content, not in
+  reader mode) goes the same way with role `sidebar` and a label.
+  `placement float` is the HTML-compatible float: floats live in
+  `LayoutEngine::floats_` for one layout() call, text lines take the band
   `float_band` leaves free, boxed blocks (`clears_floats`) start below.
   Never let a block that draws a full-width fill run under a float.
+- Side box text uses `LayoutEngine::small_` (`FontRole::Small*`,
+  `small_role`) and `ctx_role_` (the box role's text colour); never
+  hard-code a smaller size or colour for margin content.
 - No general box model: new floating things (figures, `align=right`
   tables) go through the same `FloatBox` list, not per-kind geometry.
 

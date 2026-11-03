@@ -51,11 +51,19 @@
                     (background (rgba 230 235 245 220)))
   (role rule        (space-before 10) (space-after 10) (border "#aaa8a0"))
   (role transclusion (indent 12) (space-after 10) (border "#8c9bb4"))
-  ;; Text box beside the flow: indent = padding, width = preferred width,
-  ;; float left / right / none. It only floats while the column keeps room
-  ;; for text next to it, else it sits in the flow at full width.
-  (role aside       (indent 10) (space-after 12) (width 16em) (float right)
-                    (background (rgba 235 230 215 160)) (border "#c8bea5"))
+  ;; Side boxes: indent = padding, width = preferred width, side left /
+  ;; right. placement margin: in the page margin beside the text column
+  ;; (the column gives up width when the margin is too narrow); float:
+  ;; inside the column with text running past; flow: full width. Margin and
+  ;; float drop into the flow when there is no room.
+  (role aside       (indent 8) (space-after 10) (width 15em) (side right)
+                    (placement margin) (font small) (color "#4a4232")
+                    (background (rgba 238 232 216 200)) (border "#c8bea5"))
+  ;; Navigation and side bars of web pages (outside reader mode); the
+  ;; border is a bar on the side facing the text.
+  (role sidebar     (indent 8) (space-after 12) (width 13em) (side left)
+                    (placement margin) (font small) (color "#50525c")
+                    (border "#b9bcc8"))
 
   ;; Inline roles.
   (role link   (color "#1e5ab4") (underline #t))

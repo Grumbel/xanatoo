@@ -561,6 +561,7 @@ bool FontSet::load(SDL_Renderer* renderer, const std::string& preferred_path,
   try_load(small_italic, path_of(italic), spx, renderer, "small-italic");
   try_load(small_bold_italic, path_of(bold_italic), spx, renderer,
            "small-bold-italic");
+  try_load(small_mono, path_of(mono), spx, renderer, "small-mono");
 
   return regular.loaded();
 }
@@ -573,7 +574,8 @@ void FontSet::set_sizes(int body_px, int heading_px) {
   if (heading.loaded()) heading.set_size(heading_px);
   if (mono.loaded()) mono.set_size(body_px);
   const int spx = small_px(body_px);
-  for (Font* f : {&small, &small_bold, &small_italic, &small_bold_italic})
+  for (Font* f :
+       {&small, &small_bold, &small_italic, &small_bold_italic, &small_mono})
     if (f->loaded()) f->set_size(spx);
 }
 
@@ -584,6 +586,7 @@ FontRole small_role(FontRole role) {
     case FontRole::Heading: return FontRole::SmallBold;
     case FontRole::BodyItalic: return FontRole::SmallItalic;
     case FontRole::BodyBoldItalic: return FontRole::SmallBoldItalic;
+    case FontRole::Code: return FontRole::SmallCode;
     default: return role;
   }
 }
@@ -610,6 +613,8 @@ Font& FontSet::pick(FontRole role) {
     case FontRole::SmallBoldItalic:
       return small_bold_italic.loaded() ? small_bold_italic
                                         : pick(FontRole::SmallBold);
+    case FontRole::SmallCode:
+      return small_mono.loaded() ? small_mono : pick(FontRole::Code);
     case FontRole::Body:
     default:
       return regular;

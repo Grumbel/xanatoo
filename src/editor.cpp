@@ -458,7 +458,8 @@ bool redirect_transclude_caret(Document& doc, Caret& caret) {
     else
       href_part = std::string("#") + src;
   }
-  NodeId target = find_anchor_node(doc, href_part);
+  NodeId target =
+      transclude_text_node(doc, find_anchor_node(doc, href_part));
   if (target == INVALID_NODE || target == caret.node) return false;
   caret.node = target;
   caret.span_index = 0;
@@ -1435,7 +1436,7 @@ NodeId resolve_transclude_local(const Document& doc, std::string_view src) {
     anchor = "#" + anchor;
   if (!path.empty()) return INVALID_NODE;
   if (anchor.empty()) return INVALID_NODE;
-  return find_anchor_node(doc, anchor);
+  return transclude_text_node(doc, find_anchor_node(doc, anchor));
 }
 
 

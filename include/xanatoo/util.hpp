@@ -57,6 +57,10 @@ void collect_text_nodes(const Document& doc, NodeId id,
 // substring. "#fn:key" names a footnote (its first text node). Returns
 // INVALID_NODE if not found.
 NodeId find_anchor_node(const Document& doc, std::string_view href);
+// What an include of `id` shows: the node itself when it holds text, else
+// its first text block below the header (a labelled section → its first
+// paragraph); INVALID_NODE when there is none.
+NodeId transclude_text_node(const Document& doc, NodeId id);
 
 // The Footnote node whose label is `key` (ASCII case-insensitive).
 NodeId find_footnote(const Document& doc, std::string_view key);

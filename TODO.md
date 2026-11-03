@@ -8,6 +8,43 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-11-03) — side boxes in the margin, feature tour
+
+- Asides no longer float inside the column by default: the style roles
+  `aside` and new `sidebar` have `placement margin` (`(side …)` and
+  `(placement margin|float|flow)` replace the one-commit-old `(float …)`).
+  A margin box sits beside its flow position, does not move the text and
+  stacks with the other boxes on its side. `setup_margins` takes width
+  from the text column when the margin is too narrow (column ≥ 28 em, box
+  ≥ 8 em), else the box goes into the flow at full width. `float` stays as
+  the HTML compatibility placement.
+- Web page chrome: navigation / sidebar Chrome (`margin_chrome`: not with
+  tables, code, columns or collections inside) goes into the left margin
+  outside reader mode, as a `sidebar` box with a label ("Navigation") and
+  a bar facing the text; headers, footers, forms stay in the flow.
+- Distinct look: `FontRole::Small` … `SmallCode` (body faces at 0.85 ×,
+  `(font small)` …), the box role's colour for the text inside
+  (`ctx_role_`), fill + frame for asides; Night and High contrast sheets
+  set both roles.
+- Includes of a container (`:::include #section-id`) show its first text
+  block (`transclude_text_node`), was "[missing transclusion]".
+- Examples: `examples/tour.md` is the one long feature tour (sections,
+  inline markup and images, lists / tasks, deflist, note, code, tables,
+  side boxes, stretchtext, columns, figure, collections, include, thread,
+  footnotes, citations); boxes / sectioning / footnotes / collection /
+  thread-rfc are merged into it (Help → Examples, welcome.md).
+  `test_tour_example` keeps it showing every block kind.
+- Checked under Xvfb: tour at 1280 px (right and left margin asides,
+  include, collections, thread, footnote overlay), a local page with
+  `<nav>` + `<aside>` (nav in the left margin with label and bar).
+- Open:
+  - Navigation as a "Page" tool window (like Outline / Sitemap) instead
+    of, or besides, the margin: to be decided.
+  - Margin boxes inside a skipped (off-screen) section are not laid out,
+    so a tall box from above the viewport can be missing and stacking
+    may differ from the full layout.
+  - List bullets inside margin boxes keep the body size.
+
 ## Status (2026-11-03) — inline images and asides (layout, HTML 3.0 flavour)
 
 - Inline images: `InlineKind::Image` span (`text` = U+FFFC, one caret
@@ -39,7 +76,7 @@ Next bundle number: **263** (this delivery is **262**)
 - Fixed on the way: a space that overflowed a line started the next one.
 - Merges of column / cell layouts go through `append_result` (cells now
   keep message bars / cards and nested column gaps too).
-- Checked under Xvfb with `examples/boxes.md`: right and left floats, wrap
+- Checked under Xvfb with `examples/boxes.md` (now part of `tour.md`): right and left floats, wrap
   beside and below, fallback at a narrow width, images in table cells,
   click → viewer (1 / 3).
 - Open / next (HTML 3.0 as the yardstick, not a clone):

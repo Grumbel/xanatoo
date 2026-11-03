@@ -555,10 +555,7 @@ static void menu_example_items(UiCommand& cmd, std::string& arg) {
   ex("Welcome", "welcome.md");
   ex("Keyboard reference", "help.md");
   ImGui::Separator();
-  ex("Article / section / header", "sectioning.md");
-  ex("Thread / RFC discussion", "thread-rfc.md");
-  ex("Collections (image gallery)", "collection.md");
-  ex("Footnotes", "footnotes.md");
+  ex("Feature tour (every block kind)", "tour.md");
   ImGui::Separator();
   ex("Gemini gemtext", "gemini-sample.gmi");
   ex("Org-mode", "sample.org");

@@ -147,6 +147,9 @@ std::vector<CollectionItem> collection_items(const Document& doc,
 // Top-level Chrome nodes (page chrome of a web page, not nested in another
 // Chrome node), in document order. Reader mode hides these.
 std::vector<NodeId> chrome_regions(const Document& doc);
+// Page chrome that goes into the page margin as a side bar (outside reader
+// mode): navigation and side bars without wide content (tables, code).
+bool margin_chrome(const Document& doc, const Node& chrome);
 // "3 parts of the page hidden (navigation, sidebar, page footer)"; empty
 // for none.
 std::string chrome_hidden_text(const Document& doc,
@@ -252,6 +255,27 @@ private:
   float clear_floats(float x, float w, float y) const;
   void layout_aside(const Document& doc, const Node& node, float x, float& y,
                     float max_width, LayoutResult& out);
+  // Page margins of the current layout() call: [x, x + w) left of and
+  // right of the text column (w == 0: no room), and how far the boxes
+  // already set there reach down (stacking).
+  struct MarginArea {
+    float x = 0.f, w = 0.f;
+    float bottom = 0.f;
+  };
+  MarginArea margins_[2];  // [0] left, [1] right
+  int in_margin_ = 0;      // > 0 while laying out a margin box
+  // Side box text: small faces and the box role's text colour
+  // (BlockRole::Count = none) for the blocks inside.
+  bool small_ = false;
+  BlockRole ctx_role_ = BlockRole::Count;
+  // A side box in the margin at flow position y (y itself stays); false
+  // when that margin has no room. `label` heads the box ("Navigation").
+  bool layout_margin_box(const Document& doc, const Node& node,
+                         BlockRole role, FloatSide side,
+                         const std::string& label, float y,
+                         LayoutResult& out);
+  void setup_margins(const Document& doc, float& mx, float& content_w,
+                     float max_width);
   // Display size of an inline image span (CSS px × px_scale, fitted to
   // max_w); remote ones from their thumbnail, a 1 em box while pending.
   void inline_image_size(const InlineSpan& sp, float max_w, float& w,

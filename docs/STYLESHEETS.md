@@ -76,7 +76,7 @@ recolours every parent rule that uses `accent` (see `night-amber.xss`).
 `block-quote`, `note`, `code-block`, `term`, `definition`, `figure`,
 `caption`, `bibliography-entry`, `footnote`, `thread`, `message`,
 `message-alt`, `message-author`, `message-op`, `message-meta`, `table`,
-`rule`, `transclusion`, `aside`.
+`rule`, `transclusion`, `aside`, `sidebar`.
 
 Message headers (forum / Reddit / Lemmy / Nostr comments) colour the author
 with `message-author` (`message-op` when a reply comes from the thread
@@ -90,16 +90,30 @@ Their properties:
 |----------|---------|
 | `space-before`, `space-after` | vertical gap around the block |
 | `indent` | text inset: after the side bar (quote, note, transclusion), list marker slot, code padding, definition / bibliography / footnote hang, nested section inset |
-| `font` | `body`, `bold`, `italic`, `bold-italic`, `heading`, `code` |
+| `font` | `body`, `bold`, `italic`, `bold-italic`, `heading`, `code`; `small`, `small-bold`, `small-italic`, `small-bold-italic`, `small-code` are the same faces at 0.85 × the body size |
 | `color` | text colour (else the page colour) |
 | `background` | code-block fill, table header fill, message card fill, band behind a `header` / `thread` title |
-| `border` | side bar, rule, table grid, code-block frame, footnote overlay rule, rule under a `header` / `thread` title, aside frame |
-| `width` | preferred width of a box beside the flow (`aside`) |
-| `float` | `left`, `right` or `none`: which side the box sits on, or in the flow. A box only floats while the column keeps room for text next to it (its width at most 45 % of the column, at least 10 em of text); otherwise it takes the full width in the flow |
+| `border` | side bar, rule, table grid, code-block frame, footnote overlay rule, rule under a `header` / `thread` title, aside frame, the bar of a `sidebar` |
+| `width` | preferred width of a side box (`aside`, `sidebar`) |
+| `side` | `left`, `right` or `none`: which side of the page a side box goes to |
+| `placement` | `margin`, `float` or `flow`: where a side box goes (below) |
 
-`aside` uses `indent` as the padding inside its box; a document may ask for
-a side (`:::aside side=left`), which beats the sheet's `float` unless that
-is `none`.
+Side boxes are `aside` (text boxes of the document: `:::aside`, HTML
+`<aside>` inside the article) and `sidebar` (navigation and side bars of web
+pages outside reader mode, headed by a small label such as "Navigation").
+With `placement margin` (the default for both) a box goes into the page
+margin beside the place where it stands; the text column keeps its lines,
+the box does not push the text down, and boxes on one side stack. When the
+margin is narrower than `width`, the text column gives up the difference as
+long as 28 em of text remain; a margin under 8 em takes no boxes, and they
+go into the flow at full width. `placement float` is the HTML way: the box
+sits inside the column and the text runs past it (only while the box is at
+most 45 % of the column and 10 em of text stay beside it). `placement flow`
+always puts it in the text. Text inside a side box takes its `font` (small
+faces) and `color` unless its own role sets one. `indent` is the padding
+inside the box; with a `background` the box is filled and framed with
+`border`, without one `border` is a bar on the side facing the text. A
+document may pick the side (`:::aside side=left`).
 
 **Inline roles:** `text`, `emphasis`, `strong`, `strike`, `link`, `code`,
 `cite`, `footnote-ref`, `image` (inline images; no colour of their own), with the properties `color` (beats the block colour), `background`
