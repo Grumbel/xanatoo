@@ -122,6 +122,7 @@ add_executable(xanatoo
   src/feed.cpp
   src/sitemap.cpp
   src/search.cpp
+  src/search_results.cpp
   src/inflate.cpp
   src/html_min.cpp
   src/html_page.cpp
@@ -388,6 +389,7 @@ add_executable(xanatoo_tests
   src/feed.cpp
   src/sitemap.cpp
   src/search.cpp
+  src/search_results.cpp
   src/inflate.cpp
   src/html_min.cpp
   src/html_page.cpp

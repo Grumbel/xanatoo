@@ -24,6 +24,7 @@
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/parse.hpp"
 #include "xanatoo/reddit.hpp"
+#include "xanatoo/search_results.hpp"
 #include "xanatoo/theme.hpp"
 #include "xanatoo/util.hpp"
 
@@ -79,14 +80,22 @@ void fetch_page(std::string url, std::shared_ptr<FetchShared> out) {
   // A search is its expanded URL, fetched like any page; the address stays.
   if (xanatoo::is_search_ref(url)) {
     const std::string shown = url;
-    const std::string target =
-        xanatoo::search_target(url, xanatoo::load_engines());
-    if (target.empty()) {
+    const auto plan = xanatoo::search_plan(url, xanatoo::load_engines());
+    if (!plan) {
       out->error = "Unknown search engine: " + shown;
       out->done.store(true, std::memory_order_release);
       return;
     }
-    fetch_page(target, out);
+    if (xanatoo::is_json_search_kind(plan->kind)) {
+#if defined(XANATOO_HTTPS) && XANATOO_HTTPS
+      out->service = "Search";
+      out->doc = xanatoo::search_fetch(*plan, &out->error);
+#endif
+      if (!out->doc && out->error.empty()) out->error = "no client for " + shown;
+      out->done.store(true, std::memory_order_release);
+      return;
+    }
+    fetch_page(xanatoo::search_target(url, xanatoo::load_engines()), out);
     out->final_url = shown;
     return;
   }
@@ -278,10 +287,17 @@ bool remote_fetch_supported(std::string_view url, std::string* why) {
     return false;
   };
   if (xanatoo::is_search_ref(url)) {
-    const std::string target =
-        xanatoo::search_target(url, xanatoo::load_engines());
-    if (target.empty()) return no("unknown search engine");
-    return remote_fetch_supported(target, why);
+    const auto plan = xanatoo::search_plan(url, xanatoo::load_engines());
+    if (!plan) return no("unknown search engine");
+    if (xanatoo::is_json_search_kind(plan->kind)) {
+#if defined(XANATOO_HTTPS) && XANATOO_HTTPS
+      return true;
+#else
+      return no("this search needs HTTPS (build with a network feature)");
+#endif
+    }
+    return remote_fetch_supported(xanatoo::search_target(url, xanatoo::load_engines()),
+                                  why);
   }
   if (xanatoo::is_feed_url(url)) {
 #if defined(XANATOO_FEEDS) && XANATOO_FEEDS

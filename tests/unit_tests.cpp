@@ -19,6 +19,7 @@
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/inflate.hpp"
 #include "xanatoo/search.hpp"
+#include "xanatoo/search_results.hpp"
 #include "xanatoo/sitemap.hpp"
 #include "xanatoo/revstore.hpp"
 #include "xanatoo/paths.hpp"
@@ -2175,8 +2176,15 @@ void test_search() {
   EXPECT_EQ(search_target(ref, eng),
             "feed:https://export.arxiv.org/api/query?search_query=all:"
             "electron+AND+all:spin&max_results=50");
-  EXPECT_EQ(search_target("search:wikipedia:xanadu", eng),
-            "https://en.wikipedia.org/w/index.php?search=xanadu");
+  EXPECT_EQ(search_target("search:standard-ebooks:wells", eng),
+            "https://standardebooks.org/ebooks?query=wells");
+  EXPECT_EQ(search_target("search:wikipedia:xanadu", eng), "");  // JSON engine
+  {
+    auto plan = search_plan("search:wikipedia:Olivia+Newton-John", eng);
+    EXPECT(plan && plan->kind == "wikipedia" && plan->query == "Olivia Newton-John");
+    EXPECT(plan && plan->url.find("srsearch=Olivia+Newton-John&") != std::string::npos);
+    EXPECT(!search_plan("search:nope:x", eng));
+  }
   EXPECT_EQ(search_target("search:mastodon-tag:space+opera", eng),
             "feed:https://mastodon.social/tags/spaceopera.rss");  // space ""
   EXPECT_EQ(search_target("search:flickr:moon+nasa", eng),
@@ -2195,14 +2203,17 @@ void test_search() {
     const size_t at = e.url.find("%s");
     EXPECT(at != std::string::npos && e.url.find("%s", at + 2) == std::string::npos);
     EXPECT(is_search_ref(search_ref(e.id, "x")));
+    EXPECT(is_search_kind(e.kind));
   }
+  EXPECT(is_json_search_kind("hn") && !is_json_search_kind("feed") &&
+         !is_json_search_kind("page") && !is_search_kind("nope"));
 
   // Ctrl+L keywords.
   EXPECT_EQ(search_from_keyword("ax electron spin", eng), "search:arxiv:electron+spin");
   EXPECT_EQ(search_from_keyword("w xanadu", eng), "search:wikipedia:xanadu");
   EXPECT_EQ(search_from_keyword("w", eng), "");          // no query
   EXPECT_EQ(search_from_keyword("zz xanadu", eng), "");  // no such keyword
-  EXPECT_EQ(search_from_keyword("ia prelinger", eng), "");  // not built in
+  EXPECT_EQ(search_from_keyword("ia prelinger", eng), "search:archive:prelinger");
   EXPECT_EQ(search_from_keyword("https://x.org/a b", eng), "");
 
   // The user's file: replaces by id, adds new ones, skips bad entries.
@@ -2218,11 +2229,130 @@ void test_search() {
       &warn);
   EXPECT_EQ(user.size(), static_cast<size_t>(1));
   EXPECT_EQ(warn.size(), static_cast<size_t>(4));
+  {
+    std::vector<std::string> w2;
+    auto k = parse_engines("(engine \"a\" (url \"https://x.org/%s\") (kind lemmy))"
+                           "(engine \"b\" (url \"https://x.org/%s\") (kind bogus))", &w2);
+    EXPECT_EQ(k.size(), static_cast<size_t>(2));
+    EXPECT(k.size() == 2 && k[0].kind == "lemmy" && k[1].kind == "page");
+    EXPECT_EQ(w2.size(), static_cast<size_t>(1));
+  }
   if (!user.empty()) {
-    EXPECT(user[0].feed && user[0].badge == "M" && user[0].space == "+");
+    EXPECT(user[0].kind == "feed" && user[0].badge == "M" && user[0].space == "+");
     EXPECT_EQ(search_target("search:mine:a+b", user),
               "feed:https://example.org/find?q=a+b");
   }
+}
+
+// JSON engines → result documents (search_results.cpp), on canned answers.
+void test_search_results() {
+  using namespace xanatoo;
+  auto plan = [](const char* kind, const char* url, const char* q) {
+    return SearchPlan{url, kind, q};
+  };
+  auto has = [](const std::string& s, const char* part) {
+    const bool ok = s.find(part) != std::string::npos;
+    if (!ok) std::fprintf(stderr, "missing %s in:\n%s\n", part, s.c_str());
+    return ok;
+  };
+
+  EXPECT_EQ(search_md_escape("a*b_c [x] <y>"), "a\\*b\\_c \\[x\\] <y>");
+  EXPECT_EQ(search_md_escape("#tag\n- item\nx # y"), "\\#tag\n\\- item\nx # y");
+
+  {  // what the parser makes of the escapes and of link text
+    auto texts = [](const char* md) {
+      Document d = parse_document(md, "t.md");
+      std::string all;
+      for (const Node& n : d.nodes)
+        for (const InlineSpan& sp : n.spans) all += "<" + sp.text + ">";
+      return all;
+    };
+    EXPECT_EQ(texts("\\#tag \\* x \\[y\\]"), "<#tag * x [y]>");
+    EXPECT_EQ(texts("[a *b* c_d (v)](http://x)"), "<a *b* c_d (v)>");
+  }
+  // Wikipedia: native refs (parentheses encoded), matched words in bold.
+  const std::string wiki = search_results_markdown(
+      plan("wikipedia", "https://de.wikipedia.org/w/api.php?x=1", "xanadu"),
+      "{\"query\":{\"searchinfo\":{\"totalhits\":1845},\"search\":["
+      "{\"ns\":0,\"title\":\"Xanadu (film)\",\"snippet\":\"<span class=\\\"searchmatch\\\">"
+      "Xanadu</span> is a 1980 film &amp; more\"},"
+      "{\"ns\":0,\"title\":\"Xanadu\",\"snippet\":\"\"}]}}");
+  EXPECT(has(wiki, "# Wikipedia (de): xanadu"));
+  EXPECT(has(wiki, "1845 articles match."));
+  EXPECT(has(wiki, "[Xanadu (film)](wikipedia:de:Xanadu_%28film%29)"));
+  EXPECT(has(wiki, "**Xanadu** is a 1980 film & more"));
+  EXPECT(has(wiki, "[Xanadu](wikipedia:de:Xanadu)"));
+  EXPECT(has(wiki, "https://de.wikipedia.org/w/index.php?search=xanadu"));
+  {
+    // The result parses to a document with real links to native refs.
+    Document d = parse_document(wiki, "search.md");
+    int refs = 0;
+    for (NodeId id = 0; id < d.nodes.size(); ++id)
+      for (const InlineSpan& s : d.nodes[id].spans)
+        if (starts_with(s.href, "wikipedia:de:")) ++refs;
+    EXPECT_EQ(refs, 2);
+  }
+  EXPECT(has(search_results_markdown(plan("wikipedia", "https://en.wikipedia.org/w", "zzz"),
+                                     "{\"query\":{\"search\":[]}}"),
+             "No results."));
+  EXPECT(has(search_results_markdown(plan("wikipedia", "https://en.wikipedia.org/w", "q"),
+                                     "not json at all"),
+             "No results."));
+
+  // Hacker News: story link + thread link; Ask HN (no url) links the thread.
+  const std::string hn = search_results_markdown(
+      plan("hn", "https://hn.algolia.com/api/v1/search?query=x", "xanadu"),
+      "{\"hits\":[{\"author\":\"tagrun\",\"created_at\":\"2014-05-12T10:00:00Z\","
+      "\"num_comments\":21,\"points\":152,\"title\":\"Xanadu: a (working) deliverable\","
+      "\"url\":\"http://www.xanadu.com/a_(b)\",\"objectID\":\"7849389\"},"
+      "{\"author\":\"x\",\"created_at\":\"2020-01-01T00:00:00Z\",\"num_comments\":1,"
+      "\"points\":1,\"title\":\"Ask HN: Xanadu?\",\"url\":null,\"objectID\":\"42\"}]}");
+  EXPECT(has(hn, "(http://www.xanadu.com/a_%28b%29) (xanadu.com)"));
+  EXPECT(has(hn, "152 points · [21 comments](hn:item?id=7849389) · tagrun · 2014-05-12"));
+  EXPECT(has(hn, "[Ask HN: Xanadu?](hn:item?id=42)"));
+  EXPECT(has(search_results_markdown(
+                 plan("hn", "https://hn.algolia.com/api/v1/search?query=x", "x"),
+                 "{\"hits\":[{\"title\":\"A *b* [video] _c_\",\"url\":\"http://x.org/\","
+                 "\"objectID\":\"7\"}]}"),
+             "[A *b* (video) _c_](http://x.org/)"));
+  EXPECT(has(hn, "1 point · [1 comment](hn:item?id=42)"));
+
+  // Internet Archive: array-valued fields, plain identifiers.
+  const std::string ia = search_results_markdown(
+      plan("archive", "https://archive.org/advancedsearch.php?q=x", "prelinger"),
+      "{\"response\":{\"numFound\":16292,\"docs\":[{\"creator\":[\"Rick Prelinger\",\"x\"],"
+      "\"description\":[\"Films <b>from</b> the archive\"],\"identifier\":\"prelinger\","
+      "\"mediatype\":\"collection\",\"title\":\"Prelinger Archives\"}]}}");
+  EXPECT(has(ia, "16292 items match"));
+  EXPECT(has(ia, "[Prelinger Archives](https://archive.org/details/prelinger)"));
+  EXPECT(has(ia, "collection · Rick Prelinger. Films from the archive"));
+
+  // Lemmy: native post refs on the engine's instance.
+  const std::string lm = search_results_markdown(
+      plan("lemmy", "https://lemmy.world/api/v3/search?q=x", "linux"),
+      "{\"posts\":[{\"post\":{\"id\":53943997,\"name\":\"Fedora 45 is out\"},"
+      "\"creator\":{\"name\":\"alice\"},\"community\":{\"name\":\"linux\"},"
+      "\"counts\":{\"score\":120,\"comments\":33}}]}");
+  EXPECT(has(lm, "[Fedora 45 is out](lemmy:lemmy.world/post/53943997)"));
+  EXPECT(has(lm, "c/linux · 120 points · 33 comments · alice"));
+
+  // Bluesky: text kept (escaped), link to the post from the at:// uri.
+  const std::string bs = search_results_markdown(
+      plan("bluesky", "https://api.bsky.app/x", "xanadu"),
+      "{\"posts\":[{\"uri\":\"at://did:plc:abc/app.bsky.feed.post/3mzg\","
+      "\"author\":{\"handle\":\"rick.bsky.social\",\"displayName\":\"Rick\"},"
+      "\"record\":{\"createdAt\":\"2026-11-03T16:05:51.375Z\",\"text\":\"#xanadu * rules\\nline 2\"},"
+      "\"replyCount\":2,\"likeCount\":5}]}");
+  EXPECT(has(bs, "## Rick @rick.bsky.social · 2026-11-03"));
+  EXPECT(has(bs, "\\#xanadu \\* rules\nline 2"));
+  EXPECT(has(bs, "(https://bsky.app/profile/rick.bsky.social/post/3mzg) · 2 replies · 5 likes"));
+
+  // Gutendex.
+  const std::string gu = search_results_markdown(
+      plan("gutendex", "https://gutendex.com/books/?search=x", "wells"),
+      "{\"count\":396,\"results\":[{\"id\":35,\"title\":\"The Time Machine\","
+      "\"authors\":[{\"name\":\"Wells, H. G.\",\"birth_year\":1866}],\"download_count\":37773}]}");
+  EXPECT(has(gu, "[The Time Machine](https://www.gutenberg.org/ebooks/35) — Wells, H. G. · 37773 downloads"));
 }
 
 // Every page under examples/ is in Help → Examples (kExamples), and every
@@ -3153,6 +3283,7 @@ int main() {
   test_layout_reader_mode();
   test_inline_images_and_asides();
   test_search();
+  test_search_results();
   test_examples_in_menu();
   test_tour_example();
   test_view_settings_migration();

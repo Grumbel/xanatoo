@@ -80,34 +80,63 @@ const SearchEngine* find_engine(const std::vector<SearchEngine>& engines,
 }  // namespace
 
 const std::vector<SearchEngine>& builtin_engines() {
-  // id, name, keyword, badge, url, feed, space
+  // id, name, keyword, badge, url, kind, space
   static const std::vector<SearchEngine> k = {
       {"wikipedia", "Wikipedia", "w", "W",
-       "https://en.wikipedia.org/w/index.php?search=%s", false, "+"},
+       "https://en.wikipedia.org/w/api.php?action=query&list=search"
+       "&srsearch=%s&srlimit=30&format=json&formatversion=2",
+       "wikipedia", "+"},
       {"wikipedia-de", "Wikipedia (Deutsch)", "wd", "Wd",
-       "https://de.wikipedia.org/w/index.php?search=%s", false, "+"},
+       "https://de.wikipedia.org/w/api.php?action=query&list=search"
+       "&srsearch=%s&srlimit=30&format=json&formatversion=2",
+       "wikipedia", "+"},
+      {"hn", "Hacker News", "hn", "HN",
+       "https://hn.algolia.com/api/v1/search?query=%s&tags=story"
+       "&hitsPerPage=30",
+       "hn", "+"},
       {"arxiv", "arXiv", "ax", "arX",
        "https://export.arxiv.org/api/query?search_query=all:%s&max_results=50",
-       true, "+AND+all:"},  // every word must match (a bare blank is OR)
+       "feed", "+AND+all:"},  // every word must match (a bare blank is OR)
+      {"archive", "Internet Archive", "ia", "IA",
+       "https://archive.org/advancedsearch.php?q=%s&fl%5B%5D=identifier"
+       "&fl%5B%5D=title&fl%5B%5D=description&fl%5B%5D=mediatype"
+       "&fl%5B%5D=creator&sort%5B%5D=downloads+desc&rows=40&output=json",
+       "archive", "+"},
       {"standard-ebooks", "Standard Ebooks", "se", "SE",
-       "https://standardebooks.org/ebooks?query=%s", false, "+"},
+       "https://standardebooks.org/ebooks?query=%s", "page", "+"},
       {"gutenberg", "Project Gutenberg", "pg", "PG",
-       "https://www.gutenberg.org/ebooks/search/?query=%s", false, "+"},
+       "https://gutendex.com/books/?search=%s", "gutendex", "+"},
       {"reddit", "Reddit", "r", "R", "https://www.reddit.com/search.rss?q=%s",
-       true, "+"},
+       "feed", "+"},
+      {"lemmy", "Lemmy (lemmy.world)", "l", "Lm",
+       "https://lemmy.world/api/v3/search?q=%s&type_=Posts&limit=30", "lemmy",
+       "+"},
+      {"bluesky", "Bluesky", "bs", "Bs",
+       "https://api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=%s&limit=30",
+       "bluesky", "+"},
       {"mastodon-tag", "Mastodon hashtag", "mt", "#",
-       "https://mastodon.social/tags/%s.rss", true, ""},
+       "https://mastodon.social/tags/%s.rss", "feed", ""},
       {"flickr", "Flickr tags", "fl", "Fl",
        "https://www.flickr.com/services/feeds/photos_public.gne?tags=%s"
        "&format=rss2",
-       true, ","},
+       "feed", ","},
       {"marginalia", "Marginalia (small web)", "mg", "Mg",
-       "https://marginalia-search.com/search?query=%s", false, "+"},
-      {"wiby", "Wiby (old web)", "wb", "Wb", "https://wiby.me/?q=%s", false, "+"},
+       "https://marginalia-search.com/search?query=%s", "page", "+"},
+      {"wiby", "Wiby (old web)", "wb", "Wb", "https://wiby.me/?q=%s", "page",
+       "+"},
       {"duckduckgo", "DuckDuckGo", "dd", "DDG",
-       "https://html.duckduckgo.com/html/?q=%s", false, "+"},
+       "https://html.duckduckgo.com/html/?q=%s", "page", "+"},
   };
   return k;
+}
+
+bool is_json_search_kind(std::string_view kind) {
+  return kind == "wikipedia" || kind == "hn" || kind == "archive" ||
+         kind == "lemmy" || kind == "bluesky" || kind == "gutendex";
+}
+
+bool is_search_kind(std::string_view kind) {
+  return kind == "page" || kind == "feed" || is_json_search_kind(kind);
 }
 
 std::vector<SearchEngine> parse_engines(std::string_view source,
@@ -135,7 +164,12 @@ std::vector<SearchEngine> parse_engines(std::string_view source,
       else if (key == "keyword") e.keyword = val;
       else if (key == "badge") e.badge = val;
       else if (key == "url") e.url = val;
-      else if (key == "kind") e.feed = (val == "feed");
+      else if (key == "kind") {
+        if (is_search_kind(val))
+          e.kind = val;
+        else
+          warn("engine " + e.id + ": unknown kind " + val);
+      }
       else if (key == "space") e.space = val;
       else warn("engine " + e.id + ": unknown property " + key);
     }
@@ -212,17 +246,28 @@ std::string search_ref(std::string_view engine, std::string_view raw) {
   return std::string(kSearchPrefix) + std::string(engine) + ":" + q;
 }
 
-std::string search_target(std::string_view ref,
-                          const std::vector<SearchEngine>& engines) {
+std::optional<SearchPlan> search_plan(std::string_view ref,
+                                      const std::vector<SearchEngine>& engines) {
   auto r = parse_search_ref(ref);
-  if (!r) return {};
+  if (!r) return std::nullopt;
   const SearchEngine* e = find_engine(engines, r->engine);
-  if (!e) return {};
+  if (!e) return std::nullopt;
   std::string url = e->url;
   const size_t at = url.find("%s");
-  if (at == std::string::npos) return {};
-  url.replace(at, 2, encode(search_decode(r->query), e->space));
-  return e->feed ? "feed:" + url : url;
+  if (at == std::string::npos) return std::nullopt;
+  SearchPlan p;
+  p.query = search_decode(r->query);
+  url.replace(at, 2, encode(p.query, e->space));
+  p.url = std::move(url);
+  p.kind = e->kind;
+  return p;
+}
+
+std::string search_target(std::string_view ref,
+                          const std::vector<SearchEngine>& engines) {
+  auto p = search_plan(ref, engines);
+  if (!p || is_json_search_kind(p->kind)) return {};
+  return p->kind == "feed" ? "feed:" + p->url : p->url;
 }
 
 std::string search_from_keyword(std::string_view text,

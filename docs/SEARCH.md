@@ -22,33 +22,50 @@ Search is an address, not a widget in the document and not a panel.
   (`search_from_location`), unless a file of that name exists.
 - **Engines:** the table in `search.cpp` plus `user_data_dir()/search.sexp`
   (`(engine "id" (name …) (keyword …) (badge …) (url "…%s…") (kind feed)
-  (space "+"))`; a built-in id is replaced, a new one appended).
+  (space "+"))`; a built-in id is replaced, a new one appended). `kind` is
+  `page` (default), `feed` or a JSON mapper (below).
 - **No forms in documents.** A document can *link* to a search
   (`[x](search:arxiv:electron+spin)`); it cannot contain an input. That keeps
   the document format free of application state.
 
-## Engines checked on 2026-11-03
+## Engines (checked 2026-11-03)
 
-| Engine | Returns | Notes |
-|--------|---------|-------|
-| Wikipedia, Wikipedia (de) | HTML | exact title → the article; otherwise the result list. Heavy page chrome: F9 |
-| arXiv | Atom | blanks become `+AND+all:` |
-| Standard Ebooks, Gutenberg | HTML | list pages |
-| Reddit | Atom | rate-limited (429) on bursts |
-| Mastodon hashtag, Flickr tags | RSS | one tag / comma list, so `space` is `""` / `","` |
-| Marginalia, Wiby, DuckDuckGo (html) | HTML | |
+| Kind | Engines | Answer → document |
+|------|---------|-------------------|
+| `wikipedia` | Wikipedia en / de | `list=search` JSON → list with `wikipedia:` links (parentheses percent-encoded), matched words bold |
+| `hn` | Hacker News | Algolia JSON → story link + `hn:item?id=` thread link |
+| `archive` | Internet Archive | `advancedsearch … output=json`, most downloaded first → `archive.org/details/…` |
+| `gutendex` | Project Gutenberg | Gutendex JSON → `gutenberg.org/ebooks/N` (opens as epub) |
+| `lemmy` | Lemmy (lemmy.world) | `/api/v3/search` → `lemmy:host/post/N` |
+| `bluesky` | Bluesky | `searchPosts` → one card per post, link to bsky.app |
+| `feed` | arXiv, Reddit, Mastodon hashtag, Flickr tags | the feed path |
+| `page` | Standard Ebooks, Marginalia, Wiby, DuckDuckGo (html) | the web / ebook path |
 
-Tried and left out: Internet Archive `advancedsearch … output=rss` ignores
-the query (returns recent additions); Stack Overflow answers with a
-"Human verification" page; Twitter / Instagram / TikTok have nothing public.
+## JSON mappers (`search_results.cpp`)
 
-## Next: JSON engines → native result documents
+`search_results_markdown(plan, json)` is pure (no network, unit-tested on
+canned answers): it writes Markdown and `parse_document` makes the
+document, so a mapper is ~25 lines and results get every link feature for
+free. `search_fetch` (HTTPS builds) fetches and maps. Rules learned:
 
-Needs a result kind next to `feed` (a mapper per service, built on
-`json_min.hpp` plus a small array reader): Wikipedia `action=opensearch` /
-`list=search` (results as `wikipedia:` links, no page chrome), Internet
-Archive `advancedsearch.php?output=json`, Hacker News Algolia
-(`hn:item?id=` links), Bluesky `searchPosts`, Mastodon `/api/v2/search`,
-Lemmy `/api/v3/search`, Reddit `/search.json`, Gutendex.
-Also open: per-engine icons, a toolbar toggle button, suggestions while
-typing, "search this site" for the focused page's host.
+- The parser reads **link text literally** (no escapes, no emphasis): only
+  `[` / `]` are changed (to parentheses). Running text is escaped
+  (`search_md_escape`: `\ ` * _ [ ]`, and `# - +` at a line start); `\<` is
+  *not* unescaped, so `<` / `>` stay raw.
+- Link destinations: `(` `)` and blanks are percent-encoded.
+- The API's own fields can be arrays (Internet Archive `title`,
+  `creator`, `description`): `first_string`.
+- Wikipedia exact-title redirects are gone with the JSON engine: the first
+  hit is the article. A mapper for a service without keys only; Mastodon's
+  status search needs a login, so it stays a hashtag feed.
+
+Tried and left out: Internet Archive `output=rss` ignores the query;
+Stack Overflow answers with a "Human verification" page; Twitter /
+Instagram / TikTok have nothing public.
+
+## Open
+
+Mastodon `/api/v2/search` for accounts / hashtags, Reddit `search.json`
+(the feed is enough), per-engine icons, a toolbar toggle button, suggestions
+while typing, "search this site" for the focused page's host, paging
+("more results" links: Wikipedia `sroffset`, Algolia `page`, Lemmy `page`).

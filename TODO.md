@@ -10,9 +10,10 @@ Next bundle number: **263** (this delivery is **262**)
 
 ## Status (2026-11-03) — search bar and `search:` addresses
 
-- `search.cpp` / `search.hpp`: 11 engines (Wikipedia en / de, arXiv, Standard
-  Ebooks, Gutenberg, Reddit, Mastodon hashtag, Flickr tags, Marginalia,
-  Wiby, DuckDuckGo), user engines in `search.sexp`, the
+- `search.cpp` / `search.hpp`: 15 engines (Wikipedia en / de, Hacker News,
+  arXiv, Internet Archive, Standard Ebooks, Gutenberg, Reddit, Lemmy,
+  Bluesky, Mastodon hashtag, Flickr tags, Marginalia, Wiby, DuckDuckGo),
+  `kind` page / feed / JSON mapper; user engines in `search.sexp`, the
   `search:<engine>:<query>` address, Ctrl+L keywords (`w xanadu`).
   `app_search.cpp` + the `##toolbar_search` row in `ui.cpp`: hidden by
   default, Ctrl+Alt+K / View → Search Bar, engine button + dropdown, Esc
@@ -21,9 +22,14 @@ Next bundle number: **263** (this delivery is **262**)
 - Checked under Xvfb: bar, dropdown, Enter, `ax electron spin` in the
   location bar (feed cards), Wikipedia / DuckDuckGo / Standard Ebooks /
   Gutenberg / Wiby results.
-- Open: JSON engines with native result documents (Wikipedia, Internet
-  Archive, HN, Bluesky, Mastodon, Lemmy, Reddit, Gutendex); engine icons are
-  letter badges; no toolbar button; no suggestions.
+- JSON engines (`search_results.cpp`, pure `search_results_markdown` + unit
+  test on canned answers): Wikipedia, HN, Internet Archive, Gutendex, Lemmy,
+  Bluesky → result documents with native links (`wikipedia:`, `hn:item?id=`,
+  `lemmy:host/post/N`). Checked under Xvfb, and a click on
+  "Xanadu (film)" opens `wikipedia:Xanadu_(film)`. Parser findings: link
+  text is literal (no escapes / emphasis), `\<` is not unescaped.
+- Open: paging ("more results"), Mastodon accounts / hashtags, engine icons
+  (letter badges), toolbar button, suggestions, "search this site".
 
 ## Status (2026-11-03) — Directory (mini Yahoo!)
 
