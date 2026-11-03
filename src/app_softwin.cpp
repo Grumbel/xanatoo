@@ -61,7 +61,17 @@ std::tuple<int, int, int> soft_client_bounds(App& app) {
 
 namespace {
 
-int side_index(Dock side) { return side == Dock::Right ? 1 : 0; }
+// Slot in App::dock_w: Left, Right, Top, Bottom.
+int side_index(Dock side) {
+  switch (side) {
+    case Dock::Right: return 1;
+    case Dock::Top: return 2;
+    case Dock::Bottom: return 3;
+    default: return 0;
+  }
+}
+
+bool is_band(Dock d) { return d == Dock::Top || d == Dock::Bottom; }
 
 bool has_column(App& app, Dock side) {
   for (FloatWindow* w : float_stack(app))
@@ -80,7 +90,21 @@ int column_w(App& app, Dock side) {
   return std::clamp(app.dock_w[side_index(side)], 160, std::max(160, limit));
 }
 
-// Visible windows docked on `side`, top to bottom.
+// Bands keep at least kMinPaneRows px for the panes between them.
+constexpr int kMinPaneRows = 160;
+
+int band_h(App& app, Dock side) {
+  const Dock other = side == Dock::Top ? Dock::Bottom : Dock::Top;
+  auto [top, bottom, ch] = soft_client_bounds(app);
+  (void)top;
+  (void)bottom;
+  int limit = ch * 2 / 5;
+  if (has_column(app, other)) limit = std::min(limit, (ch - kMinPaneRows) / 2);
+  return std::clamp(app.dock_w[side_index(side)], 80, std::max(80, limit));
+}
+
+// Visible windows docked on `side`: a column top to bottom, a band left to
+// right.
 std::vector<FloatWindow*> dock_column(App& app, Dock side) {
   std::vector<FloatWindow*> col;
   for (FloatWindow* w : float_stack(app))
@@ -115,26 +139,39 @@ Dock compute_dock_zone(App& app, int mx, int my) {
   auto [top, bottom, ch] = soft_client_bounds(app);
   (void)ch;
   if (my < top || my > bottom) return Dock::None;
+  const int bh = dock_band_h(app, Dock::Bottom);
+  const int th = dock_band_h(app, Dock::Top);
   // Window edge, or anywhere over an existing column (stacks into it).
   if (mx < std::max(soft_dock_zone, dock_column_w(app, Dock::Left)))
     return Dock::Left;
   if (mx > app.win_w - std::max(soft_dock_zone, dock_column_w(app, Dock::Right)))
     return Dock::Right;
-  if (my < top + soft_dock_zone && mx > app.win_w / 4 &&
-      mx < (app.win_w * 3) / 4)
-    return Dock::Max;
+  if (my > bottom - std::max(soft_dock_zone, bh)) return Dock::Bottom;
+  if (my < top + std::max(soft_dock_zone, th)) {
+    // The middle of the top edge maximizes, unless a band is there already.
+    if (th == 0 && mx > app.win_w / 4 && mx < (app.win_w * 3) / 4)
+      return Dock::Max;
+    return Dock::Top;
+  }
   return Dock::None;
 }
 
 std::tuple<int, int, int, int> dock_rect(App& app, Dock d) {
   auto [top, bottom, ch] = soft_client_bounds(app);
-  (void)bottom;
   switch (d) {
     case Dock::Left:
       return {0, top, column_w(app, Dock::Left), ch};
     case Dock::Right: {
       const int cw = column_w(app, Dock::Right);
       return {app.win_w - cw, top, cw, ch};
+    }
+    case Dock::Top:
+    case Dock::Bottom: {
+      const int lw = dock_column_w(app, Dock::Left);
+      const int bw = std::max(
+          64, app.win_w - lw - dock_column_w(app, Dock::Right));
+      const int bh = band_h(app, d);
+      return {lw, d == Dock::Top ? top : bottom - bh, bw, bh};
     }
     case Dock::Max:
       return {0, top, app.win_w, ch};
@@ -148,7 +185,11 @@ int dock_column_w(App& app, Dock side) {
   return has_column(app, side) ? column_w(app, side) : 0;
 }
 
-void dock_window(App& app, FloatWindow& w, Dock d, int my) {
+int dock_band_h(App& app, Dock side) {
+  return has_column(app, side) ? band_h(app, side) : 0;
+}
+
+void dock_window(App& app, FloatWindow& w, Dock d, int mx, int my) {
   if (d == Dock::None) {
     undock_window(app, w);
     return;
@@ -161,7 +202,10 @@ void dock_window(App& app, FloatWindow& w, Dock d, int my) {
     auto col = dock_column(app, d);
     col.erase(std::remove(col.begin(), col.end(), &w), col.end());
     size_t at = 0;
-    while (at < col.size() && col[at]->y + col[at]->h / 2 < my) ++at;
+    while (at < col.size() &&
+           (is_band(d) ? col[at]->x + col[at]->w / 2 < mx
+                       : col[at]->y + col[at]->h / 2 < my))
+      ++at;
     col.insert(col.begin() + static_cast<std::ptrdiff_t>(at), &w);
     for (size_t i = 0; i < col.size(); ++i)
       col[i]->dock_seq = static_cast<int>(i);
@@ -183,7 +227,7 @@ void undock_window(App& app, FloatWindow& w) {
 
 void toggle_maximize(App& app, FloatWindow& w) {
   if (w.dock != Dock::Max) {
-    dock_window(app, w, Dock::Max, 0);
+    dock_window(app, w, Dock::Max, 0, 0);
   } else if (w.restore_dock == Dock::None) {
     undock_window(app, w);
   } else {
@@ -197,6 +241,16 @@ void toggle_maximize(App& app, FloatWindow& w) {
 void place_windows(App& app) {
   auto [top, bottom, ch] = soft_client_bounds(app);
   (void)bottom;
+  for (Dock side : {Dock::Top, Dock::Bottom}) {
+    auto row = dock_column(app, side);
+    auto [x, y, bw, bh] = dock_rect(app, side);
+    const int n = static_cast<int>(row.size());
+    for (int i = 0; i < n; ++i) {
+      const int x0 = x + bw * i / n;
+      const int x1 = x + bw * (i + 1) / n;
+      set_geom(app, *row[static_cast<size_t>(i)], x0, y, x1 - x0, bh);
+    }
+  }
   for (Dock side : {Dock::Left, Dock::Right}) {
     auto col = dock_column(app, side);
     auto [x, y, cw, h] = dock_rect(app, side);
@@ -229,6 +283,13 @@ void place_windows(App& app) {
     p.w = cw;
     p.h = ch;
   }
+}
+
+bool over_tab_strip(App& app, int x, int y) {
+  if (app.tab_order.empty() || x < 0 || x >= app.win_w) return false;
+  const int h = static_cast<int>(28.f * app.ui_scale);
+  const int bottom = static_cast<int>(app.ui_top);
+  return y >= bottom - h && y < bottom;
 }
 
 const std::string& soft_path(App& app, const FloatWindow& sw) {

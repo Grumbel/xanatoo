@@ -82,7 +82,7 @@ std::string fit_text(xanatoo::Font& font, const std::string& text,
 SDL_Rect title_button_rect(App& app, const SDL_Rect& outer, const char* label) {
   const int w = app.ui_font.measure(label) + 16;
   const int h = help_title_h - 10;
-  return SDL_Rect{outer.x + outer.w - float_close_w - 4 - w,
+  return SDL_Rect{outer.x + outer.w - 2 * float_close_w - 4 - w,
                   outer.y + (help_title_h - h) / 2, w, h};
 }
 
@@ -107,13 +107,14 @@ SDL_Rect outline_focus_rect(App& app, const SDL_Rect& outer) {
 
 void draw_floating_frame(App& app, const SDL_Rect& outer,
                          const std::string& title, bool active,
-                         bool resizable, int title_reserve) {
+                         bool resizable, int title_reserve, bool maximized) {
   namespace th = xanatoo::theme;
   th::WindowChrome w;
   w.outer = outer;
   w.title_h = help_title_h;
   w.active = active;
   w.resizable = resizable;
+  w.maximized = maximized;
   w.scale = app.ui_scale;
   th::draw_window_chrome(app.sdl, w);
   const th::Palette& p = th::palette();
@@ -127,7 +128,7 @@ void draw_floating_frame(App& app, const SDL_Rect& outer,
                                                   : app.ui_font;
   const int title_x = outer.x + 10;
   const int title_w =
-      outer.x + outer.w - float_close_w - title_reserve - 8 - title_x;
+      outer.x + outer.w - 2 * float_close_w - title_reserve - 8 - title_x;
   const int ty = outer.y + (help_title_h - font.line_height()) / 2 +
                  font.ascender();
   app.renderer.draw_text(font, static_cast<float>(title_x),

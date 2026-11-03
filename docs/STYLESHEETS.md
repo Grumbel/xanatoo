@@ -45,7 +45,10 @@ Lowest priority first; a later directory replaces a sheet of the same name:
   (page (background "#221d18") (color "#e6d9c3")
         (selection (rgba 90 130 200 110))  ; washes over the text:
         (mark (rgba 230 160 30 70))        ;   the passage of the address (#…)
-        (bookmark (rgba 90 180 110 60)))   ;   bookmarks inside the page
+        (bookmark (rgba 90 180 110 60))    ;   bookmarks inside the page
+        (margin-background "#4a5568")      ; desk around the page (see below)
+        (margin-image "felt.png")          ; pattern tiled over the desk
+        (image "paper.png"))               ; pattern tiled over the paper
 
   (fonts (body "Charter" "DejaVu Serif" "serif")   ; first installed one wins
          (heading "DejaVu Sans" "sans-serif")      ; default: the body family
@@ -76,7 +79,7 @@ recolours every parent rule that uses `accent` (see `night-amber.xss`).
 `block-quote`, `note`, `code-block`, `term`, `definition`, `figure`,
 `caption`, `bibliography-entry`, `footnote`, `thread`, `message`,
 `message-alt`, `message-author`, `message-op`, `message-meta`, `table`,
-`rule`, `transclusion`, `aside`.
+`rule`, `transclusion`, `aside`, `article`.
 
 Message headers (forum / Reddit / Lemmy / Nostr comments) colour the author
 with `message-author` (`message-op` when a reply comes from the thread
@@ -114,6 +117,18 @@ faces) and `color` unless its own role sets one. `indent` is the padding
 inside the box; with a `background` the box is filled and framed with
 `border`, without one `border` is a bar on the side facing the text. A
 document may pick the side (`:::aside side=left`).
+
+**Page and margins.** `background` is the paper, the sheet the text column
+sits on. Without `margin-background` / `margin-image` the paper fills the
+whole view. With one of them the paper shrinks to the text column (plus a
+little padding) and the margin colour / pattern shows left and right of it,
+behind side boxes, and in the gaps between articles. The `article` role
+makes those gaps: its `space-before` / `space-after` are bands across the
+sheet where the margin shows through, so every `:::article` (or HTML
+`<article>` that became one) looks like a separate sheet; a gap at the very
+top or bottom of the page is simply the margin. Pattern images are looked up
+in the style directories (or give an absolute path), tile from the top-left of
+the view and scroll with the text. `desk.xss` is an example.
 
 **Inline roles:** `text`, `emphasis`, `strong`, `strike`, `link`, `code`,
 `cite`, `footnote-ref`, `image` (inline images; no colour of their own), with the properties `color` (beats the block colour), `background`

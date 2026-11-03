@@ -1038,9 +1038,13 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4.f, 2.f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.f, 0.f));
     if (ImGui::Begin("##tabs", nullptr, tab_flags)) {
-      // Reorderable left off until tab_order is updated on drag.
+      // Dragging reorders; the new order goes back as ReorderTabs. Ids are
+      // the buffer ids, so a tab keeps its place when the order changes.
+      std::vector<std::pair<ImGuiID, uint32_t>> tab_item_ids;
+      const float strip_top = vp->Pos.y + result.top_reserved;
       if (ImGui::BeginTabBar("##doctabs",
-                             ImGuiTabBarFlags_FittingPolicyScroll)) {
+                             ImGuiTabBarFlags_FittingPolicyScroll |
+                                 ImGuiTabBarFlags_Reorderable)) {
         const bool force_sel = tab_force_select_;
         tab_force_select_ = false;
         for (int i = 0; i < static_cast<int>(state.tab_labels.size()); ++i) {
@@ -1051,10 +1055,25 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
             flags |= ImGuiTabItemFlags_SetSelected;
           bool open = true;
           std::string id = state.tab_labels[static_cast<size_t>(i)];
+          const uint32_t bid = i < static_cast<int>(state.tab_ids.size())
+                                   ? state.tab_ids[static_cast<size_t>(i)]
+                                   : static_cast<uint32_t>(i);
           id += "###tab";
-          id += std::to_string(i);
+          id += std::to_string(bid);
           if (ImGui::BeginTabItem(id.c_str(), &open, flags)) {
             ImGui::EndTabItem();
+          }
+          tab_item_ids.emplace_back(ImGui::GetItemID(), bid);
+          // Dragged well above / below the strip: a tear-off on release.
+          if (ImGui::IsItemActive() &&
+              ImGui::IsMouseDragging(ImGuiMouseButton_Left, 4.f)) {
+            const float my = ImGui::GetMousePos().y;
+            if (my > strip_top + tab_h * 1.5f || my < strip_top - tab_h * 0.5f) {
+              tab_tear_id_ = bid;
+              result.tab_drag_out = true;
+            } else if (tab_tear_id_ == bid) {
+              tab_tear_id_ = 0;
+            }
           }
           if (ImGui::IsItemClicked(ImGuiMouseButton_Left) &&
               i != state.active_tab && cmd == UiCommand::None) {
@@ -1066,12 +1085,47 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
             result.arg = std::to_string(i);
           }
         }
+        if (ImGuiTabBar* tb = ImGui::GetCurrentTabBar();
+            tb && cmd == UiCommand::None && !result.tab_drag_out &&
+            tab_tear_id_ == 0 &&
+            static_cast<int>(tab_item_ids.size()) == tb->Tabs.Size) {
+          std::string order;
+          bool known = true, changed = false;
+          for (int k = 0; k < tb->Tabs.Size; ++k) {
+            uint32_t bid = 0;
+            known = false;
+            for (const auto& [iid, b] : tab_item_ids)
+              if (iid == tb->Tabs[k].ID) {
+                bid = b;
+                known = true;
+              }
+            if (!known) break;
+            if (k < static_cast<int>(state.tab_ids.size()) &&
+                state.tab_ids[static_cast<size_t>(k)] != bid)
+              changed = true;
+            order += (k ? "," : "") + std::to_string(bid);
+          }
+          if (known && changed) {
+            cmd = UiCommand::ReorderTabs;
+            result.arg = order;
+          }
+        }
         ImGui::EndTabBar();
         // After main applies SelectTab/NextTab, active_tab changes → sync ImGui.
         if (state.active_tab != tab_synced_active_) {
           tab_synced_active_ = state.active_tab;
           tab_force_select_ = true;
         }
+      }
+      if (tab_tear_id_ != 0 && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+        const ImVec2 mp = ImGui::GetMousePos();
+        cmd = UiCommand::TearTab;
+        result.arg = std::to_string(tab_tear_id_) + "," +
+                     std::to_string(static_cast<int>(mp.x)) + "," +
+                     std::to_string(static_cast<int>(mp.y));
+        tab_tear_id_ = 0;
+      } else if (tab_tear_id_ != 0 && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        tab_tear_id_ = 0;
       }
       ImGui::SameLine();
       if (ImGui::SmallButton("+")) cmd = UiCommand::NewTab;

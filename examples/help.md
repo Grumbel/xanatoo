@@ -80,8 +80,12 @@ Export via *File → Export as S-expression…* or *Export as Markdown…*.
 - **File → Open in Window…** — open a path in a floating window
 - **Windows** (help, outline, backlinks, documents) all place the same way:
   drag a title to the left / right edge (or onto a column) to dock it as a
-  side column, drag it off again to float; double-click a title to
-  maximize / restore; **Ctrl+Alt+O** docks / floats the outline
+  side column, to the top / bottom edge as a band, drag it off again to
+  float; the □ button or a double-click on a title maximizes / restores;
+  **Ctrl+Alt+O** docks / floats the outline
+- **Tabs** — drag a tab to reorder; drag it down out of the strip to make
+  it a window (or drop it on a dock edge); drag a document window's title
+  onto the tab strip to turn it back into a tab
 - **Examples → Diff demo (v1 | v2)** — dual-pane load of `diff-v1.md` and `diff-v2.md` with diff marks on
 - **Ctrl+Shift+D** — toggle diff marks (needs two independent files)
 

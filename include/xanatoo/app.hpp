@@ -195,8 +195,10 @@ struct Pane {
 
 // Placement of a floating window. Left / Right dock it into a side column
 // that takes its width from the panes (windows docked on the same side
-// stack top to bottom by `dock_seq`); Max covers the whole client area.
-enum class Dock : uint8_t { None = 0, Left, Right, Max };
+// stack top to bottom by `dock_seq`); Top / Bottom into a band between the
+// columns that takes its height (windows side by side by `dock_seq`); Max
+// covers the whole client area.
+enum class Dock : uint8_t { None = 0, Left, Right, Top, Bottom, Max };
 
 enum class WindowRole : uint8_t {
   Help, Outline, Backlinks, Sitemap, Page, Document
@@ -586,6 +588,8 @@ struct App {
   xanatoo::NodeId col_gap_left = xanatoo::INVALID_NODE;
   xanatoo::NodeId col_gap_right = xanatoo::INVALID_NODE;
   float col_gap_start_x = 0.f;
+  float col_gap_px = 1.f;      // pixel width of the two columns together
+  float resize_start_w = 1.f;  // image width in px when the drag began
   float col_gap_left_w = 1.f;
   float col_gap_right_w = 1.f;
   Uint32 last_click_ticks = 0;
@@ -600,7 +604,9 @@ struct App {
   int last_layout_h = 0;
   std::vector<FloatWindow> soft_wins;  // Document-role floats, back→front
   Dock dock_preview = Dock::None;  // drop target while dragging a title
-  int dock_w[2] = {280, 360};       // Left / Right column width
+  bool tab_drag_preview = false;   // dock_preview comes from a dragged tab
+  bool tab_drop_preview = false;   // a dragged window would become a tab
+  int dock_w[4] = {280, 360, 200, 200};  // Left / Right width, Top / Bottom height
   Prompt prompt;
   // Last find / replace text, kept when another prompt displaces a search
   // so F3 / Replace All keep working.
@@ -778,6 +784,9 @@ void remove_buffer(App& app, BufferId id);
 // window still shows it.
 void close_tab(App& app, BufferId id);
 void pop_out_focused(App& app);
+// A tab dragged off the strip: its buffer moves into a window at (mx, my),
+// docked when that is a dock zone.
+void tear_tab(App& app, BufferId bi, int mx, int my);
 void pop_in_soft(App& app, size_t si);
 void open_browse(App& app, const std::string& path, const std::string& title);
 void ensure_help_doc(App& app);
@@ -1107,12 +1116,16 @@ std::tuple<int, int, int> soft_client_bounds(App& app);
 // Docking: one placement model for every FloatWindow role.
 // Drop target for a title dragged to (mx, my); None = keep floating.
 Dock compute_dock_zone(App& app, int mx, int my);
-// Area a Dock covers (column for Left / Right, client area for Max).
+// Area a Dock covers (column / band for Left, Right, Top, Bottom; client
+// area for Max).
 std::tuple<int, int, int, int> dock_rect(App& app, Dock d);
 // Width taken from the panes by visible windows docked on `side`; 0 = none.
 int dock_column_w(App& app, Dock side);
-// Dock `w` at `d`; for a column, `my` picks its slot among the others.
-void dock_window(App& app, FloatWindow& w, Dock d, int my);
+// Height taken from the panes by visible windows docked at Top / Bottom.
+int dock_band_h(App& app, Dock side);
+// Dock `w` at `d`; for a column or band, the pointer (`mx`, `my`) picks its
+// slot among the others.
+void dock_window(App& app, FloatWindow& w, Dock d, int mx, int my);
 // Back to free placement at the remembered geometry.
 void undock_window(App& app, FloatWindow& w);
 // Max ↔ previous placement (title double-click).
@@ -1122,6 +1135,8 @@ void place_windows(App& app);
 const std::string& soft_path(App& app, const FloatWindow& sw);
 std::string soft_title(App& app, const FloatWindow& sw);
 void raise_soft(App& app, size_t i);
+// True when (x, y) is over the document tab strip.
+bool over_tab_strip(App& app, int x, int y);
 // Close soft_wins[i] and free its view.
 void close_doc_window(App& app, size_t i);
 // Document window showing view `pi`, nullptr for a centre view.
@@ -1190,7 +1205,8 @@ void draw_title_button(App& app, const SDL_Rect& r, const char* label,
 // `title_reserve`: px kept free left of the close box (title buttons).
 void draw_floating_frame(App& app, const SDL_Rect& outer,
                          const std::string& title, bool active,
-                         bool resizable = true, int title_reserve = 0);
+                         bool resizable = true, int title_reserve = 0,
+                         bool maximized = false);
 void draw_client_scrollbar(App& app, int cx, int cy, int cw, int ch,
                            float scroll, float max_scroll);
 

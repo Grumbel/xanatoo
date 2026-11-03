@@ -66,6 +66,8 @@ struct ColumnGap {
   float x = 0.f;       // center of the gutter
   float y = 0.f;
   float height = 0.f;
+  float left_w = 0.f;   // pixel widths of the two neighbours (drag scale)
+  float right_w = 0.f;
 };
 
 // Band of a block filled / underlined with its role's colours (header and
@@ -102,6 +104,13 @@ struct LayoutResult {
   // Outlined with the role's `border` (aside frames).
   std::vector<RoleBox> role_frames;
   std::vector<ColumnGap> column_gaps;
+  // The page sheet (style `margin-background` / `margin-image`): the text
+  // column plus a little padding, in content x; width 0 = no separate
+  // margin. `page_gaps` (y, height) are bands across the sheet where the
+  // margin shows through: the space around `article` blocks.
+  float page_x = 0.f;
+  float page_w = 0.f;
+  std::vector<LayoutBox> page_gaps;
   float content_height = 0.f;
   // Reader mode: the "… hidden · Show all" notice at the top (click shows the
   // page chrome again); height 0 when nothing is hidden.

@@ -870,7 +870,9 @@ void test_style_sheet_parse() {
       (name "Test")
       (define accent "#102030")
       (define gap 1.5em)
-      (page (background "#fff") (color (rgb 1 2 3)))
+      (page (background "#fff") (color (rgb 1 2 3))
+            (margin-background "#102030") (margin-image "dots.png"))
+      (role article (space-before 20) (space-after 20))
       (fonts (body "Some Serif" "serif") (heading-weight regular)
              (heading-scale 1.5)
              (body-scale 0.85))
@@ -885,6 +887,11 @@ void test_style_sheet_parse() {
   EXPECT_EQ(st.title, "Test");
   EXPECT(st.paper == (Rgba{255, 255, 255, 255}));
   EXPECT(st.ink == (Rgba{1, 2, 3, 255}));
+  EXPECT(st.margin == (Rgba{0x10, 0x20, 0x30, 255}));
+  EXPECT_EQ(st.margin_image, "dots.png");
+  EXPECT(st.has_margin());
+  EXPECT(!builtin_style().has_margin());
+  EXPECT(st[BlockRole::Article].space_before.px(10.f) == 20.f);
   EXPECT_EQ(st.fonts.body.size(), 2u);
   EXPECT_EQ(st.fonts.body[0], "Some Serif");
   EXPECT(!st.fonts.heading_bold);
@@ -1006,6 +1013,35 @@ void test_layout_reader_mode() {
   collect_outline(d2, all);
   collect_outline(d2, rd, nullptr, {}, true);
   EXPECT_EQ(all.size(), rd.size() + 1);
+}
+
+// Articles are separate sheets on a margin: gaps between them, the page
+// sheet only when the style has a margin.
+void test_layout_article_gaps() {
+  using namespace xanatoo;
+  FontSet fonts;
+  std::string path = fontconfig_find("DejaVu Sans", 0, 0);
+  if (path.empty() || !fonts.load(nullptr, path, 18, 24)) {
+    std::fprintf(stderr, "SKIP test_layout_article_gaps (no font)\n");
+    return;
+  }
+  Document doc = parse_document(
+      ":::article id=\"a\"\nOne\n:::\n\n:::article id=\"b\"\nTwo\n:::\n",
+      "g.md");
+  DocStyle st = builtin_style();
+  LayoutEngine engine(fonts, nullptr);
+  engine.set_style(&st);
+  LayoutResult plain = engine.layout(doc, 800.f);
+  EXPECT(plain.page_w == 0.f);
+  EXPECT(plain.page_gaps.empty());
+  apply_style_source(st, "(page (margin-background \"#334455\"))"
+                         "(role article (space-before 30) (space-after 30))");
+  engine.set_style(&st);
+  LayoutResult lr = engine.layout(doc, 800.f);
+  EXPECT(lr.page_w > 0.f && lr.page_w < 800.f);
+  EXPECT_EQ(lr.page_gaps.size(), 4u);  // above, between (×2), below
+  EXPECT(lr.page_gaps.front().y == 0.f);
+  EXPECT(lr.page_gaps.back().height > 1000.f);
 }
 
 void test_layout_margins_and_measure() {
@@ -2966,6 +3002,7 @@ int main() {
   test_tour_example();
   test_view_settings_migration();
   test_style_sheet_parse();
+  test_layout_article_gaps();
   test_style_sheets_shipped();
   test_footnotes();
   test_locator();

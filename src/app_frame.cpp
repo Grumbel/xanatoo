@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include <algorithm>
+#include <cstdio>
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
@@ -47,6 +48,8 @@ void sync_window_size(App& app) {
   // A docked window opened, closed or moved: the pane area changed.
   const Pane& last = app.split ? app.panes[1] : app.panes[0];
   if (app.panes[0].x != dock_column_w(app, Dock::Left) ||
+      app.panes[0].y !=
+          static_cast<int>(app.ui_top) + dock_band_h(app, Dock::Top) ||
       last.x + last.w != app.win_w - dock_column_w(app, Dock::Right))
     app.needs_layout = true;
 }
@@ -224,10 +227,12 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
     }
   }
   ui_state.tab_labels.clear();
+  ui_state.tab_ids.clear();
   ui_state.active_tab = 0;
   for (int ti = 0; ti < static_cast<int>(app.tab_order.size()); ++ti) {
     const BufferId bi = app.tab_order[static_cast<size_t>(ti)];
     ui_state.tab_labels.push_back(buffer_tab_label(app, bi));
+    ui_state.tab_ids.push_back(bi);
     if (bi == app.panes[app.centre_focus].buf) ui_state.active_tab = ti;
   }
   ui_state.has_floating = !app.soft_wins.empty();
@@ -516,6 +521,37 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         update_title(app);
       }
       break;
+    case C::ReorderTabs: {
+      std::vector<BufferId> order;
+      size_t at = 0;
+      while (at <= arg.size()) {
+        size_t comma = arg.find(',', at);
+        if (comma == std::string::npos) comma = arg.size();
+        try {
+          order.push_back(static_cast<BufferId>(
+              std::stoul(arg.substr(at, comma - at))));
+        } catch (...) {
+          order.clear();
+          break;
+        }
+        at = comma + 1;
+      }
+      auto sorted = [](std::vector<BufferId> v) {
+        std::sort(v.begin(), v.end());
+        return v;
+      };
+      if (!order.empty() && sorted(order) == sorted(app.tab_order))
+        app.tab_order = order;
+      break;
+    }
+    case C::TearTab: {
+      unsigned long id = 0;
+      int mx = 0, my = 0;
+      if (std::sscanf(arg.c_str(), "%lu,%d,%d", &id, &mx, &my) != 3) break;
+      app.dock_preview = Dock::None;
+      tear_tab(app, static_cast<BufferId>(id), mx, my);
+      break;
+    }
     case C::PopOut:
       pop_out_focused(app);
       break;
@@ -1425,8 +1461,21 @@ void run_chrome(App& app) {
   app.ui_top = ui_frame.top_reserved;
   app.ui_bottom = ui_frame.bottom_reserved;
   place_centre_rows(app);  // the toolbar may have changed height
+  // A tab dragged off the strip previews where it would dock.
+  if (ui_frame.tab_drag_out) {
+    app.dock_preview = compute_dock_zone(app, static_cast<int>(app.mouse_x),
+                                         static_cast<int>(app.mouse_y));
+    app.tab_drag_preview = true;
+  } else if (app.tab_drag_preview) {
+    app.tab_drag_preview = false;
+    app.dock_preview = Dock::None;
+  }
   execute_command(app, ui_frame.cmd, ui_frame.arg);
-  if (ui_frame.cmd != xanatoo::UiCommand::None) app.ui.release_input_capture();
+  // A tab press selects it but may turn into a drag (reorder / tear off),
+  // so its mouse capture stays.
+  if (ui_frame.cmd != xanatoo::UiCommand::None &&
+      ui_frame.cmd != xanatoo::UiCommand::SelectTab)
+    app.ui.release_input_capture();
 }
 
 void poll_gamepad_axes(App& app) {
@@ -2470,9 +2519,7 @@ static void draw_pane_layer(App& app, int i, const SDL_Rect& area, float ox,
   Pane& pane = app.panes[i];
   SDL_RenderSetClipRect(app.sdl, &area);
   SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
-  const xanatoo::Rgba paper = app.style.paper;
-  SDL_SetRenderDrawColor(app.sdl, paper.r, paper.g, paper.b, 255);
-  SDL_RenderFillRect(app.sdl, &area);
+  app.renderer.draw_backdrop(pane.layout, area, scroll, ox);
   if (!pane.sel.empty()) {
     auto rects = xanatoo::selection_rects(pane.layout, pane.sel, scroll,
                                           app.renderer.glyph_extents());
@@ -2614,9 +2661,7 @@ void draw_split_chrome(App& app) {
   SDL_RenderSetClipRect(app.sdl, nullptr);
   if (app.split) {
     int mid = app.panes[1].x - 3;
-    SDL_Rect div{mid, static_cast<int>(app.ui_top), 6,
-                 app.win_h - status_bar_h - static_cast<int>(app.ui_top) -
-                     static_cast<int>(app.ui_bottom)};
+    SDL_Rect div{mid, app.panes[1].y, 6, app.panes[1].h};
     xanatoo::theme::fill(app.sdl, div, xanatoo::theme::palette().face);
     xanatoo::theme::vline(app.sdl, div.x, div.y, div.y + div.h - 1,
                           xanatoo::theme::palette().highlight);
@@ -2640,8 +2685,8 @@ void draw_split_chrome(App& app) {
       int x1 = app.panes[1].x + static_cast<int>(c1.x);
       int y1 = static_cast<int>(c1.y);
       // Clamp into content area below toolbar / above status bar
-      int min_y = static_cast<int>(app.ui_top);
-      int max_y = app.win_h - status_bar_h;
+      int min_y = app.panes[0].y;
+      int max_y = app.panes[0].y + app.panes[0].h;
       if (y0 >= min_y && y0 < max_y && y1 >= min_y && y1 < max_y) {
         SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
         SDL_SetRenderDrawColor(app.sdl, 25, 90, 170, 160);
@@ -2693,7 +2738,8 @@ void draw_outline_panel(App& app) {
     // Title tab + selection are lit only while the outline has the keyboard.
     const bool keys = panel_has_keys(app, KeyFocus::Outline);
     draw_floating_frame(app, outer, ol_title, keys, app.ol.dock == Dock::None,
-                        outer.x + outer.w - float_close_w - fb.x);
+                        outer.x + outer.w - 2 * float_close_w - fb.x,
+                        app.ol.dock == Dock::Max);
     // Focus toggle (section isolation): latched push button left of close.
     draw_title_button(app, fb, "Focus", section_focus);
 
@@ -2791,7 +2837,7 @@ void draw_backlinks_panel(App& app) {
                             ? "Backlinks (no label under caret)"
                             : ("Backlinks → #" + app.backlinks_label),
                         panel_has_keys(app, KeyFocus::Backlinks),
-                        app.bl.dock == Dock::None);
+                        app.bl.dock == Dock::None, 0, app.bl.dock == Dock::Max);
     SDL_Rect clip{cx, cy, cw, ch};
     SDL_RenderSetClipRect(app.sdl, &clip);
     xanatoo::Font& font = app.ui_font;
@@ -2855,15 +2901,17 @@ void draw_help_window(App& app) {
 
     draw_floating_frame(
         app, SDL_Rect{app.help.x, app.help.y, app.help.w, app.help.h},
-        "Help — xanatoo", true, app.help.dock == Dock::None);
+        "Help — xanatoo", true, app.help.dock == Dock::None, 0,
+        app.help.dock == Dock::Max);
 
     auto [cx, cy, cw, ch] = help_client_rect(app);
     SDL_Rect clip{cx, cy, cw, ch};
     SDL_RenderSetClipRect(app.sdl, &clip);
-    fill_doc_paper(app, clip);
     // screen_y = content_y - scroll + client_y  ⇒  draw_scroll = scroll -
     // client_y (mirrors pane path: draw_scroll = scroll_y - ui_top)
     const float help_draw_scroll = app.help.scroll - static_cast<float>(cy);
+    app.renderer.draw_backdrop(app.help_layout, clip, help_draw_scroll,
+                               static_cast<float>(cx));
     app.renderer.draw(app.help_layout, help_draw_scroll,
                       static_cast<float>(cx));
     SDL_RenderSetClipRect(app.sdl, nullptr);
@@ -2877,6 +2925,16 @@ void draw_help_window(App& app) {
 }
 
 void draw_dock_preview(App& app) {
+  if (app.tab_drop_preview) {
+    const int h = static_cast<int>(28.f * app.ui_scale);
+    SDL_Rect strip{0, static_cast<int>(app.ui_top) - h, app.win_w, h};
+    SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(app.sdl, 40, 100, 180, 90);
+    SDL_RenderFillRect(app.sdl, &strip);
+    SDL_SetRenderDrawColor(app.sdl, 40, 100, 180, 200);
+    SDL_RenderDrawRect(app.sdl, &strip);
+    SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
+  }
   if (app.dock_preview != Dock::None) {
     auto [dx, dy, dw, dh] = dock_rect(app, app.dock_preview);
     if (dw > 0 && dh > 0) {
@@ -2894,6 +2952,12 @@ void draw_dock_preview(App& app) {
           break;
         case Dock::Right:
           label = "Dock right";
+          break;
+        case Dock::Top:
+          label = "Dock top";
+          break;
+        case Dock::Bottom:
+          label = "Dock bottom";
           break;
         case Dock::Max:
           label = "Maximize";

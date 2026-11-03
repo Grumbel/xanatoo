@@ -21,6 +21,11 @@ public:
   void set_style(const DocStyle* style) { style_ = style; }
 
   void clear(uint8_t r, uint8_t g, uint8_t b);
+  // Page behind the text inside `area` (screen coordinates): the margin
+  // colour / pattern, the paper sheet of the text column with its gaps
+  // between articles, or just the paper when the style has no margin.
+  void draw_backdrop(const LayoutResult& layout, const SDL_Rect& area,
+                     float scroll_y, float origin_x);
   // origin_x shifts all content horizontally (for multi-pane views).
   void draw(const LayoutResult& layout, float scroll_y = 0.f,
             float origin_x = 0.f);

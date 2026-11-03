@@ -100,8 +100,16 @@ clicking a panel focuses it, a pane click / jump / unused plain key returns
 focus to the document. Never let a panel consume keys just because it is open.
 
 Windows place one way regardless of role: Left / Right docks are side
-columns that take width from the panes (stacked by `dock_seq`, shared
-`App::dock_w`), Max overlays the client area. Never add a per-panel
+columns that take width from the panes (stacked by `dock_seq`), Top /
+Bottom docks are bands between the columns that take height (side by side
+by `dock_seq`; `dock_band_h`, used by `place_centre_rows`); the size per
+side is `App::dock_w[4]` (L, R, T, B). Max overlays the client area; every
+frame has a maximize / restore box left of the close box.
+Tabs ↔ windows: dragging a tab past the strip (ImGui, `UiCommand::TearTab`
+→ `tear_tab`) opens its buffer in a window (docked at a zone), dragging a
+window title onto the strip (`over_tab_strip`) runs `pop_in_soft`; tab
+reorder is ImGui's own (ids = buffer ids, `ReorderTabs` copies the order
+into `tab_order`). Never add a per-panel
 "docked" flag; set `FloatWindow::dock` through the helpers above.
 See `docs/BRAINSTORM.md` "Views, arrangement, documents" for where tabs /
 split / windows are heading.
@@ -186,6 +194,7 @@ toolbar and shortcuts should route through `execute_command`.
 - GPLv3+ with short SPDX headers on every source file.
 - Author: Ingo Ruhnke <grumbel@gmail.com>
 - Commit directly to git; add a `Co-authored-by:` trailer for the AI agent that did the work.
+- Always commit your working changes when a task is done (no need to ask); never leave finished work uncommitted.
 - Prefer clear data layouts over clever abstractions.
 - No drive-by feature removal; discuss first.
 

@@ -36,7 +36,7 @@ std::pair<int, int> min_size(const FloatWindow& w) {
 }
 
 bool docked(const FloatWindow& w) {
-  return w.dock == Dock::Left || w.dock == Dock::Right;
+  return w.dock != Dock::None && w.dock != Dock::Max;
 }
 
 // Pointer travel before a title press on a docked window tears it off.
@@ -184,6 +184,11 @@ void click_help(App& app, FloatWindow& w, int mx, int my) {
 void press_title(App& app, FloatWindow& w, int mx, int my) {
   if (mx >= w.x + w.w - float_close_w) {
     close_window(app, w);
+    return;
+  }
+  if (mx >= w.x + w.w - 2 * float_close_w) {
+    toggle_maximize(app, w);
+    w.last_title_click = 0;
     return;
   }
   if (w.role == WindowRole::Sitemap) {
@@ -348,6 +353,9 @@ bool float_press(App& app, int mx, int my) {
                       my <= w->y + w->h;
     const bool on_b = my >= w->y + w->h - help_edge && mx >= w->x &&
                       mx <= w->x + w->w + help_edge;
+    // Top edge: a thin strip, the title bar is right below it.
+    const bool on_t = my <= w->y + 2 && my >= w->y - help_edge &&
+                      mx >= w->x && mx <= w->x + w->w;
     switch (w->dock) {
       case Dock::None:
         bits = (on_r ? 1 : 0) | (on_b ? 2 : 0);
@@ -357,6 +365,12 @@ bool float_press(App& app, int mx, int my) {
         break;
       case Dock::Right:
         bits = on_l ? 4 : 0;
+        break;
+      case Dock::Top:
+        bits = on_b ? 2 : 0;
+        break;
+      case Dock::Bottom:
+        bits = on_t ? 8 : 0;
         break;
       case Dock::Max:
         break;
@@ -405,7 +419,11 @@ bool float_motion(App& app, int mx, int my) {
       }
       w->x = std::max(0, mx - w->drag_dx);
       w->y = std::max(static_cast<int>(app.ui_top), my - w->drag_dy);
-      app.dock_preview = compute_dock_zone(app, mx, my);
+      // Over the tab strip a drop turns a document window into a tab.
+      app.tab_drop_preview =
+          w->role == WindowRole::Document && over_tab_strip(app, mx, my);
+      app.dock_preview =
+          app.tab_drop_preview ? Dock::None : compute_dock_zone(app, mx, my);
       return true;
     }
     if (w->scroll_dragging) {
@@ -420,10 +438,16 @@ bool float_motion(App& app, int mx, int my) {
       const int dx = mx - w->resize_start_x;
       const int dy = my - w->resize_start_y;
       if (docked(*w)) {
-        // Column width, shared by every window docked on that side.
-        int& cw = app.dock_w[w->dock == Dock::Right ? 1 : 0];
-        const int nw = w->resize_start_w + (w->resize & 4 ? -dx : dx);
-        cw = std::clamp(nw, 160, std::max(160, app.win_w * 2 / 5));
+        // Column width / band height, shared by every window docked there.
+        if (w->dock == Dock::Top || w->dock == Dock::Bottom) {
+          int& bh = app.dock_w[w->dock == Dock::Bottom ? 3 : 2];
+          const int nh = w->resize_start_h + (w->resize & 8 ? -dy : dy);
+          bh = std::clamp(nh, 80, std::max(80, app.win_h * 2 / 5));
+        } else {
+          int& cw = app.dock_w[w->dock == Dock::Right ? 1 : 0];
+          const int nw = w->resize_start_w + (w->resize & 4 ? -dx : dx);
+          cw = std::clamp(nw, 160, std::max(160, app.win_w * 2 / 5));
+        }
         app.needs_layout = true;
         place_windows(app);
         return true;
@@ -446,10 +470,17 @@ bool float_motion(App& app, int mx, int my) {
 void float_release(App& app, int mx, int my) {
   for (FloatWindow* w : float_stack(app)) {
     // A press on a docked title that never moved keeps it docked.
+    if (w->dragging && w->dock == Dock::None && app.tab_drop_preview &&
+        w->role == WindowRole::Document && over_tab_strip(app, mx, my)) {
+      app.tab_drop_preview = false;
+      app.dock_preview = Dock::None;
+      pop_in_soft(app, static_cast<size_t>(w - app.soft_wins.data()));
+      return;  // the window is gone; the stack changed under the loop
+    }
     if (w->dragging && w->dock == Dock::None) {
       const Dock zone = compute_dock_zone(app, mx, my);
       if (zone != Dock::None)
-        dock_window(app, *w, zone, my);
+        dock_window(app, *w, zone, mx, my);
       else
         snap_soft_geom(app, w->x, w->y, w->w, w->h);
     } else if (w->resize && w->dock == Dock::None) {
@@ -459,6 +490,7 @@ void float_release(App& app, int mx, int my) {
     w->resize = 0;
     w->scroll_dragging = false;
   }
+  app.tab_drop_preview = false;
   app.dock_preview = Dock::None;
 }
 
@@ -505,7 +537,7 @@ static void draw_soft_window(App& app, FloatWindow& sw) {
   }
   draw_floating_frame(app, SDL_Rect{sw.x, sw.y, sw.w, sw.h},
                       soft_title(app, sw), app.focus == sw.view,
-                      sw.dock == Dock::None);
+                      sw.dock == Dock::None, 0, sw.dock == Dock::Max);
   if (!view_live(app, sw.view)) return;
   const Pane& p = app.panes[sw.view];
   SDL_Rect clip{p.x, p.y, p.w, p.h};

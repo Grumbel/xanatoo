@@ -38,6 +38,8 @@ enum class UiCommand {
   NextTab,
   PrevTab,
   SelectTab,       // arg = tab index in tab_order
+  ReorderTabs,     // arg = buffer ids "3,1,2", the new tab_order (dragged)
+  TearTab,         // arg = "id,x,y": a tab dragged off the strip → window
   PopOut,          // focused buffer → floating window
   PopIn,           // top floating window → tab in focused pane
   Save,
@@ -239,6 +241,7 @@ struct UiState {
   std::vector<Bookmark> bookmarks;
   // Tab strip (labels left→right); active_tab is index into tab_labels.
   std::vector<std::string> tab_labels;
+  std::vector<uint32_t> tab_ids;  // buffer id of each tab (stable ImGui ids)
   int active_tab = 0;
   bool has_floating = false;
   std::string status_left;
@@ -252,6 +255,9 @@ struct UiFrameResult {
   float bottom_reserved = 0.f;  // virtual keyboard, etc.
   // Optional payload (e.g. example filename for OpenExample).
   std::string arg;
+  // A tab is being dragged away from the strip (the app shows where a drop
+  // would dock it).
+  bool tab_drag_out = false;
 };
 
 class Ui {
@@ -339,6 +345,8 @@ private:
   // fighting click selection every frame (which caused flicker).
   bool tab_force_select_ = false;
   int tab_synced_active_ = -1;
+  // Tab being dragged off the strip (buffer id, 0 = none) until release.
+  uint32_t tab_tear_id_ = 0;
 };
 
 }  // namespace xanatoo

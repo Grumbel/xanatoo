@@ -198,6 +198,16 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
         return;
       }
 
+    // Split gutter: checked before the scrollbars so the divider wins the
+    // pixels where the left scrollbar and the right pane meet.
+    if (app.split && at < kCentreViews) {
+      const float gx = static_cast<float>(app.panes[1].x);
+      if (mx >= gx - 6.f && mx <= gx + 4.f) {
+        app.dragging_split = true;
+        return;
+      }
+    }
+
     // Classic scrollbar (right edge): arrows page, track jumps/drags.
     {
       const int pi = at;
@@ -254,15 +264,6 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
       }
     }
 
-    // Drag the split gutter?
-    if (app.split && at < kCentreViews) {
-      int gutter_x = app.panes[1].x - 3;
-      if (mx >= gutter_x && mx <= gutter_x + 6) {
-        app.dragging_split = true;
-        return;
-      }
-    }
-
     focus_view(app, at);
     // Any press in the right pane keeps the hover preview it shows.
     if (app.focus == 1) commit_split_preview(app);
@@ -291,6 +292,7 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
           app.dragging_image = true;
           app.resize_image = pi.node;
           app.resize_start_x = mx;
+          app.resize_start_w = std::max(1.f, pi.width);
           app.resize_start_scale = doc_of(app, p).get(pi.node).display_scale;
           if (app.resize_start_scale < 0.05f) app.resize_start_scale = 1.f;
           break;
@@ -311,6 +313,7 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
         app.col_gap_left = gap.left;
         app.col_gap_right = gap.right;
         app.col_gap_start_x = mx;
+        app.col_gap_px = std::max(1.f, gap.left_w + gap.right_w);
         float lw = doc_of(app, p).get(gap.left).display_scale;
         float rw = doc_of(app, p).get(gap.right).display_scale;
         if (lw < 0.1f) lw = 1.f;
@@ -766,8 +769,9 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
     if (app.dragging_image && app.resize_image != xanatoo::INVALID_NODE) {
       float mx = app.mouse_x;
       float dx = mx - app.resize_start_x;
-      // 200px drag ≈ 1.0 scale change
-      float scale = app.resize_start_scale + dx / 200.f;
+      // Width follows the cursor: the scale grows with the pixel width.
+      float scale = app.resize_start_scale *
+                    std::max(0.f, app.resize_start_w + dx) / app.resize_start_w;
       scale = std::max(0.15f, std::min(3.0f, scale));
       doc_of(app, focused_pane(app)).get(app.resize_image).display_scale =
           scale;
@@ -780,7 +784,7 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
       float dx = mx - app.col_gap_start_x;
       // Shift weight from one column to the other; keep total constant
       float total = app.col_gap_left_w + app.col_gap_right_w;
-      float delta = dx / 200.f * total;
+      float delta = dx / app.col_gap_px * total;
       float nl = app.col_gap_left_w + delta;
       float nr = app.col_gap_right_w - delta;
       if (nl < 0.2f) {

@@ -414,7 +414,8 @@ void draw_sitemap_panel(App& app) {
   const std::string title =
       app.sitemap.host.empty() ? "Site map" : "Site map — " + app.sitemap.host;
   draw_floating_frame(app, outer, title, keys, w.dock == Dock::None,
-                      outer.x + outer.w - float_close_w - pb.x);
+                      outer.x + outer.w - 2 * float_close_w - pb.x,
+                      w.dock == Dock::Max);
   draw_title_button(app, pb, kPageButton, false);
 
   auto [cx, cy, cw, ch] = sitemap_client_rect(app);

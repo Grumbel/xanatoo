@@ -131,6 +131,27 @@ void draw_window_chrome(SDL_Renderer* r, const WindowChrome& w) {
       SDL_RenderDrawPoint(r, cx + d + 1, cy - d);
     }
   }
+  // Maximize / restore box, one hit zone (28px) left of the close box
+  if (w.max_box) {
+    auto px = [&](int v) { return static_cast<int>(v * w.scale + 0.5f); };
+    const int bw = px(18), bh = px(15);
+    SDL_Rect mb{o.x + o.w - px(24) - px(28), o.y + (w.title_h - bh) / 2, bw,
+                bh};
+    draw_button_face(r, mb, false, false);
+    set(r, p.text);
+    const int a = px(4);
+    const int cx = mb.x + mb.w / 2, cy = mb.y + mb.h / 2;
+    if (w.maximized) {  // two overlapping squares
+      SDL_Rect s1{cx - a, cy - a + 2, a * 2 - 1, a * 2 - 1};
+      SDL_Rect s2{cx - a + 2, cy - a, a * 2 - 1, a * 2 - 1};
+      SDL_RenderDrawRect(r, &s1);
+      SDL_RenderDrawRect(r, &s2);
+    } else {
+      SDL_Rect sq{cx - a, cy - a, a * 2 + 1, a * 2 + 1};
+      SDL_RenderDrawRect(r, &sq);
+      SDL_RenderDrawLine(r, sq.x, sq.y + 1, sq.x + sq.w - 1, sq.y + 1);
+    }
+  }
   // Resize grip (SE): diagonal ridges in light/dark pairs
   if (w.resizable) {
     const int gx = o.x + o.w - 3, gy = o.y + o.h - 3;

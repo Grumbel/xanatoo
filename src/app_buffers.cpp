@@ -531,6 +531,43 @@ void pop_out_focused(App& app) {
   flash_status(app, "Popped out to window");
 }
 
+void tear_tab(App& app, BufferId bi, int mx, int my) {
+  if (!find_buf(app, bi)) return;
+  if (raise_window_of(app, bi)) {
+    leave_tab(app, bi);
+    return;
+  }
+  // The pane showing the tab hands its place in the page to the window.
+  const Pane* from = nullptr;
+  for (int pi = 0; pi < kCentreViews; ++pi)
+    if (app.panes[pi].buf == bi) from = &app.panes[pi];
+  const xanatoo::Selection sel = from ? from->sel : xanatoo::Selection{};
+  const float scroll = from ? from->scroll_y : 0.f;
+  const NavHistory nav = from ? from->nav : NavHistory{};
+  FloatWindow* w = new_doc_window(app, bi);
+  if (!w) return;
+  w->x = std::max(0, mx - w->w / 2);
+  w->y = std::max(static_cast<int>(app.ui_top), my - help_title_h / 2);
+  w->restore_x = w->x;
+  w->restore_y = w->y;
+  Pane& v = app.panes[w->view];
+  v.nav = nav;
+  v.sel = sel;
+  v.scroll_y = scroll;
+  const int view = w->view;
+  leave_tab(app, bi);
+  // new_doc_window may have moved soft_wins; look the window up again.
+  if (FloatWindow* nw = window_of_view(app, view)) {
+    const Dock zone = compute_dock_zone(app, mx, my);
+    if (zone != Dock::None)
+      dock_window(app, *nw, zone, mx, my);
+    else
+      snap_soft_geom(app, nw->x, nw->y, nw->w, nw->h);
+  }
+  focus_view(app, view);
+  flash_status(app, "Tab moved to a window");
+}
+
 void pop_in_soft(App& app, size_t si) {
   if (si >= app.soft_wins.size()) return;
   const int view = app.soft_wins[si].view;

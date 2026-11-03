@@ -72,6 +72,8 @@ struct WindowChrome {
   bool active = true;     // yellow tab vs. grey
   bool close_box = true;  // right-aligned close widget (hit zone: last 28px)
   bool resizable = true;  // SE grip
+  bool max_box = true;    // maximize / restore widget left of the close box
+  bool maximized = false;  // shows the restore glyph
   float scale = 1.f;      // ui scale: close box size
 };
 

@@ -186,6 +186,7 @@ static void append_result(LayoutResult& out, const LayoutResult& in) {
   add(out.role_rules, in.role_rules);
   add(out.role_frames, in.role_frames);
   add(out.column_gaps, in.column_gaps);
+  add(out.page_gaps, in.page_gaps);
 }
 
 // Blocks with a box of their own (fills, grids, pictures) that cannot run
@@ -603,7 +604,22 @@ LayoutResult LayoutEngine::layout(
     }
   }
   setup_margins(doc, mx, content_w, max_width);
+  if (style_->has_margin()) {
+    const float pad = 0.75f * static_cast<float>(fonts_.regular.pixel_size());
+    result.page_x = mx - pad;
+    result.page_w = content_w + 2.f * pad;
+  }
   layout_node(doc, doc.root, mx, y, content_w, result);
+  if (!result.page_gaps.empty()) {
+    // A gap at the very top / bottom of the page is the margin itself.
+    LayoutBox& first = result.page_gaps.front();
+    if (first.y <= options_.margin_y + 0.5f) {
+      first.height += first.y;
+      first.y = 0.f;
+    }
+    LayoutBox& last = result.page_gaps.back();
+    if (last.y + last.height >= y - 0.5f) last.height += 1.0e5f;
+  }
   for (const FloatBox& f : floats_) y = std::max(y, f.bottom);
   floats_.clear();
   for (const MarginArea& m : margins_) y = std::max(y, m.bottom);
@@ -741,6 +757,8 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           gap.x = cx + col_w + gutter * 0.5f;
           gap.y = start_y;
           gap.height = 0.f;
+          gap.left_w = col_w;
+          gap.right_w = usable * (weights[i + 1] / weight_sum);
           out.column_gaps.push_back(gap);
         }
         cx += col_w + gutter;
@@ -890,6 +908,13 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         }
         // focus or descendant: fall through to full layout
       }
+      // Articles on one page are separated by a gap where the margin shows.
+      const bool article = node.kind == NodeKind::Article;
+      auto gap = [&](float h) {
+        if (h > 0.f) out.page_gaps.push_back({id, x, y, max_width, h});
+        y += h;
+      };
+      if (article) gap(before(BlockRole::Article));
       float start_y = y;
       // Nested sections indent slightly; articles keep full width.
       float inset =
@@ -911,11 +936,13 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         // Compact cue under the header (view-local fold; not Stretch).
         y += before(BlockRole::Section);
         out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+        if (article) gap(after(BlockRole::Article));
         break;
       }
       layout_children_sequential(doc, body, x + inset, y, max_width - inset, out);
       y += after(BlockRole::Section);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      if (article) gap(after(BlockRole::Article));
       break;
     }
 
@@ -1348,6 +1375,8 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
               gap.x = cx;
               gap.y = start_y;
               gap.height = table_h;
+              gap.left_w = col_widths[c];
+              gap.right_w = col_widths[c + 1];
               out.column_gaps.push_back(gap);
             }
           }

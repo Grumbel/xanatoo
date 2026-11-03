@@ -51,6 +51,7 @@ constexpr RoleName kBlockRoles[] = {
     {"rule", BlockRole::Rule},
     {"transclusion", BlockRole::Transclusion},
     {"aside", BlockRole::Aside},
+    {"article", BlockRole::Article},
 };
 
 struct InlineName {
@@ -139,6 +140,9 @@ class SheetReader {
     } else if (head == "page") {
       for_props(f, [&](const std::string& prop, const SExpr& v) {
         if (prop == "background") color(v, style_.paper);
+        else if (prop == "margin-background") color(v, style_.margin);
+        else if (prop == "margin-image") style_.margin_image = sexpr_text(value(v));
+        else if (prop == "image") style_.paper_image = sexpr_text(value(v));
         else if (prop == "color") color(v, style_.ink);
         else if (prop == "selection") color(v, style_.selection);
         else if (prop == "mark") color(v, style_.mark);
@@ -407,6 +411,17 @@ bool gather_forms(const std::string& name, std::vector<SExpr>& out, int depth,
 }
 
 }  // namespace
+
+std::string style_asset_path(const std::string& name) {
+  if (name.empty() || fs::path(name).is_absolute()) return name;
+  const std::vector<std::string> dirs = style_dirs();
+  for (auto it = dirs.rbegin(); it != dirs.rend(); ++it) {
+    std::error_code ec;
+    fs::path p = fs::path(*it) / name;
+    if (fs::is_regular_file(p, ec)) return p.string();
+  }
+  return name;
+}
 
 DocStyle builtin_style() {
   DocStyle s;

@@ -1,0 +1,13 @@
+;; SPDX-License-Identifier: GPL-3.0-or-later
+;;
+;; Desk — pages lie on a darker desk: the margins and the gaps between
+;; articles show `margin-background`, optionally with a tiled pattern
+;; (`(margin-image "file.png")`, looked up in the style directories).
+
+(stylesheet
+  (name "Desk")
+  (description "Paper sheets on a dark desk; articles are separate sheets")
+  (inherit "default")
+
+  (page (margin-background "#4a5568"))
+  (role article (space-before 22) (space-after 22)))

@@ -61,6 +61,7 @@ enum class BlockRole : uint8_t {
   Rule,
   Transclusion,
   Aside,          // text box beside the flow (in the page margin)
+  Article,        // gap (space-before / -after) between articles on one page
   Count
 };
 constexpr size_t kBlockRoleCount = static_cast<size_t>(BlockRole::Count);
@@ -102,7 +103,14 @@ struct DocStyle {
   std::string name = "default";  // file stem; key for view.conf
   std::string title = "Default";
   std::string description;
-  Rgba paper{248, 246, 240, 255};
+  Rgba paper{248, 246, 240, 255};  // the page: the text column's sheet
+  // What lies around the page (left / right of the column) and in the gaps
+  // between articles. Invisible = no separate margin: the paper fills the
+  // whole view. An image is tiled over the colour.
+  Rgba margin{0, 0, 0, 0};
+  std::string margin_image;  // file name (style dirs) or absolute path
+  std::string paper_image;   // tiled over the paper
+  bool has_margin() const { return margin.visible() || !margin_image.empty(); }
   Rgba ink{28, 28, 32, 255};
   Rgba selection{160, 190, 230, 120};
   Rgba mark{230, 160, 30, 70};  // passage named by the address (`#…`)
@@ -129,6 +137,10 @@ struct DocStyle {
     return bs.has_color ? bs.color : ink;
   }
 };
+
+// A file named by a sheet (pattern image): absolute paths stay, relative ones
+// are looked up in the style directories (later ones win).
+std::string style_asset_path(const std::string& name);
 
 // The hard-coded look (what xanatoo rendered before style sheets).
 DocStyle builtin_style();

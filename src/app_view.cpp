@@ -248,9 +248,11 @@ void expand_ancestors_for_node(App& app, xanatoo::NodeId target) {
 }
 
 void place_centre_rows(App& app) {
-  const int top = static_cast<int>(app.ui_top);
+  const int band_top = dock_band_h(app, Dock::Top);
+  const int top = static_cast<int>(app.ui_top) + band_top;
   const int view_h = std::max(
-      1, app.win_h - status_bar_h - top - static_cast<int>(app.ui_bottom));
+      1, app.win_h - status_bar_h - top - static_cast<int>(app.ui_bottom) -
+             dock_band_h(app, Dock::Bottom));
   for (int pi = 0; pi < kCentreViews; ++pi) {
     Pane& p = app.panes[pi];
     if (p.h != view_h) app.needs_layout = true;

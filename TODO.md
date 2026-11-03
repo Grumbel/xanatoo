@@ -8,6 +8,38 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-11-03) — page margins, article gaps (style sheets)
+
+- `(page (margin-background …) (margin-image "f.png") (image "p.png"))`:
+  the paper is the text column's sheet (`LayoutResult::page_x/page_w`), the
+  margin colour / tiled pattern shows around it and behind margin boxes.
+  `Renderer::draw_backdrop` paints it (pane raster, help window); without a
+  margin the old full-pane paper fill.
+- `(role article (space-before …) (space-after …))` → `page_gaps`: bands where
+  the margin shows between articles (leading / trailing gap extends to the
+  page edge). Default spacing 0, so nothing changes without a sheet.
+  `styles/desk.xss` shows it; unit tests in `test_layout_article_gaps`.
+- Open: web pages only get gaps where `<article>` becomes an Article node
+  (not checked on real pages); floating windows / footnote strip still fill
+  plain paper; no sheet border / shadow yet.
+
+## Status (2026-11-03) — top / bottom docks, tabs ↔ windows
+
+- `Dock::Top` / `Dock::Bottom`: bands between the side columns (windows
+  side by side, height `App::dock_w[2|3]`, resize at the edge facing the
+  panes); drop zones at the top / bottom edge (the middle of the top edge
+  still maximizes unless a top band exists); `place_centre_rows` leaves the
+  bands out of the panes.
+- Maximize / restore box on every window frame (left of ×); title buttons
+  moved one box left.
+- Tabs: drag to reorder (ImGui Reorderable, ids = buffer ids); drag a tab
+  down out of the strip → window (docks at a zone, preview while
+  dragging); drag a document window onto the strip → tab again.
+- Checked under Xvfb (dock bottom, maximize / restore, reorder, tear off,
+  window → tab). Open: dropping a window on the strip appends the tab
+  (no insertion point); the strip highlight is hidden under ImGui; only
+  Document windows turn into tabs (panels stay panels).
+
 ## Status (2026-11-03) — side boxes in the margin, feature tour
 
 - Asides no longer float inside the column by default: the style roles

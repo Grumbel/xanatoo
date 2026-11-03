@@ -28,6 +28,77 @@ void Renderer::clear(uint8_t r, uint8_t g, uint8_t b) {
   SDL_RenderClear(sdl_);
 }
 
+// `img` repeated over `rect`, the pattern anchored at (ax, ay).
+static void tile_image(SDL_Renderer* sdl, const Image& img, SDL_Rect rect,
+                       int ax, int ay) {
+  if (!img.ok || !img.texture || img.width <= 0 || img.height <= 0) return;
+  SDL_Rect old{};
+  const SDL_bool was = SDL_RenderIsClipEnabled(sdl);
+  if (was) SDL_RenderGetClipRect(sdl, &old);
+  SDL_Rect clip = rect;
+  if (was && !SDL_IntersectRect(&old, &rect, &clip)) return;
+  SDL_RenderSetClipRect(sdl, &clip);
+  SDL_SetTextureBlendMode(img.texture, SDL_BLENDMODE_BLEND);
+  auto first = [](int from, int anchor, int size) {
+    return anchor + static_cast<int>(std::floor(
+                        static_cast<float>(from - anchor) / size)) * size;
+  };
+  for (int y = first(clip.y, ay, img.height); y < clip.y + clip.h;
+       y += img.height)
+    for (int x = first(clip.x, ax, img.width); x < clip.x + clip.w;
+         x += img.width) {
+      SDL_Rect to{x, y, img.width, img.height};
+      SDL_RenderCopy(sdl, img.texture, nullptr, &to);
+    }
+  if (was) SDL_RenderSetClipRect(sdl, &old);
+  else SDL_RenderSetClipRect(sdl, nullptr);
+}
+
+void Renderer::draw_backdrop(const LayoutResult& layout, const SDL_Rect& area,
+                             float scroll_y, float origin_x) {
+  const DocStyle& st = style_ ? *style_ : fallback_style();
+  SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
+  const Image* margin_img = nullptr;
+  const Image* paper_img = nullptr;
+  if (images_) {
+    if (!st.margin_image.empty())
+      margin_img = &images_->get(style_asset_path(st.margin_image));
+    if (!st.paper_image.empty())
+      paper_img = &images_->get(style_asset_path(st.paper_image));
+  }
+  const int ox = static_cast<int>(std::floor(origin_x));
+  const int oy = px(-scroll_y);
+  auto paper = [&](SDL_Rect r, int ax) {
+    SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
+    SDL_SetRenderDrawColor(sdl_, st.paper.r, st.paper.g, st.paper.b, 255);
+    SDL_RenderFillRect(sdl_, &r);
+    if (paper_img) tile_image(sdl_, *paper_img, r, ax, oy);
+  };
+  if (!st.has_margin() || layout.page_w <= 0.f) {
+    paper(area, ox);
+    return;
+  }
+  const Rgba m = st.margin.visible() ? st.margin : st.paper;
+  auto margin = [&](SDL_Rect r) {
+    SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
+    SDL_SetRenderDrawColor(sdl_, m.r, m.g, m.b, 255);
+    SDL_RenderFillRect(sdl_, &r);
+    if (margin_img) tile_image(sdl_, *margin_img, r, ox, oy);
+  };
+  margin(area);
+  SDL_Rect sheet{px(layout.page_x + origin_x), area.y,
+                 static_cast<int>(layout.page_w), area.h};
+  SDL_Rect vis{};
+  if (!SDL_IntersectRect(&sheet, &area, &vis)) return;
+  paper(vis, sheet.x);
+  for (const LayoutBox& g : layout.page_gaps) {
+    SDL_Rect r{sheet.x, px(g.y - scroll_y), sheet.w,
+               std::max(1, static_cast<int>(g.height))};
+    SDL_Rect hit{};
+    if (SDL_IntersectRect(&r, &vis, &hit)) margin(hit);
+  }
+}
+
 void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) {
   const DocStyle& st = style_ ? *style_ : fallback_style();
   // Cull against the active SDL clip rect (pane / soft-window client area).
