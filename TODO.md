@@ -30,8 +30,13 @@ Next bundle number: **263** (this delivery is **262**)
   again after edits once typing pauses (400 ms, hidden meanwhile). View →
   Bookmarks in the page / Preferences (`bookmark_marks` in view.conf). The
   star is lit for bookmarked passages too, its tooltip counts them.
-- Open: scrollbar ticks for bookmarks, a click on a mark selecting the
-  passage / removing that bookmark; "Moved" resolution (nearest of several matches); bookmarks
+- Margin ribbon per bookmark (left of the drag grip): tooltip with title +
+  quote, click selects the passage, right-click menu (Select Passage, Go to
+  Bookmark, Show Only This, Copy Address, Remove, Show Bookmarks…).
+  Scrollbar ticks per bookmark, estimated off the materialised band.
+  Checked under Xvfb, including ticks on a 120-paragraph page.
+- Open: the ribbon needs a margin; with a narrow `margin_pct` it lands
+  on the grip. "Moved" resolution (nearest of several matches); bookmarks
   panel grouped by document; Open as cut.
 - Next: slice 4, clipped text cuts, "Show only this", Copy address.
 

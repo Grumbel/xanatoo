@@ -30,6 +30,8 @@ enum class UiCommand {
   BookmarkPosition,  // bookmark the caret position in the page
   RemoveBookmark,  // remove current (or arg) from bookmarks
   ToggleBookmarks, // Bookmarks manager panel
+  SelectBookmark,  // arg = address: select its passage in the focused view
+  CopyText,        // arg = text for the clipboard (an address)
   // Tabs / MDI
   NewTab,          // new empty buffer + tab
   CloseTab,        // close focused buffer (Ctrl+W)
@@ -218,6 +220,10 @@ struct UiState {
   bool bookmarks_open = false;
   bool current_bookmarked = false;
   int page_bookmarks = 0;  // bookmarks of passages inside the focused page
+  // The bookmark a margin-icon menu is for (empty address: none).
+  struct BookmarkMenu {
+    std::string address, label, cut;  // cut: the passage as a cut address
+  } bookmark_menu;
   // Session history (oldest → newest) for the History panel.
   std::vector<std::string> history_entries;
   int history_pos = -1;  // current index, or -1
@@ -274,6 +280,8 @@ public:
 
   // Request a context menu at window coordinates (call from main on right-click).
   void open_context_menu(float x, float y);
+  // The menu of a bookmark's margin icon (UiState::bookmark_menu).
+  void open_bookmark_menu(float x, float y);
 
   UiFrameResult begin_frame(const UiState& state);
   void end_frame(SDL_Renderer* renderer);
@@ -302,6 +310,7 @@ private:
   std::unordered_map<std::string, Icon> icons_;
 
   bool context_open_ = false;
+  bool bookmark_menu_open_ = false;
   float context_x_ = 0.f;
   float context_y_ = 0.f;
 

@@ -204,6 +204,15 @@ reading position as a ribbon at its caret. They are found again when the
 page, its layout or the bookmark list changes, and while typing only after a
 pause of 400 ms (hidden until then, as the old offsets would wash the wrong
 text). A bookmark that is also the `#` passage gets only the `mark` wash.
+Each one also gets a ribbon in the left margin, before the block's drag grip
+and level with its first line (`bookmark_icons`; several on one line sit side
+by side). The ribbon is what takes the clicks, so the text stays plain text.
+Hovering it shows the title and quote, a click selects the passage, and a
+right-click opens its menu: Select Passage, Go to Bookmark (the `#` address),
+Show Only This (the point turned into a pipe, `cut_address`), Copy Address,
+Remove Bookmark, Show Bookmarks…. The scrollbar gets a tick per bookmark,
+placed from the layout or, off the materialised band, from the estimated
+block position that the section ticks use.
 They show by default; View → Bookmarks in the page and Preferences turn them
 off (`ViewSettings::bookmark_marks`). The toolbar star is lit when the page
 or a passage in it is bookmarked, its tooltip counts the passages.
@@ -214,7 +223,8 @@ pane and the Lightbox).
 
 - Generalises the `SplitTrail` wash and the selection wash.
 - Bookmark roles come from `DocStyle` as well.
-- Scrollbar ticks like the chapter marks; click selects the passage.
+- Scrollbar ticks like the chapter marks; a click on the margin ribbon
+  selects the passage (done).
 - `#` targets clear on the next click or navigation; bookmark marks follow a
   View toggle (done).
 - Remote pages get their `#fragment` when the fetch lands, marked as well.

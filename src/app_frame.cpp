@@ -212,6 +212,12 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
         focused_pane(app).sel.empty() &&
         is_bookmarked(app, pane_address(app, focused_pane(app)));
     ui_state.page_bookmarks = bookmarks_in_page(app, focused_pane(app));
+    ui_state.bookmark_menu = {};
+    if (const xanatoo::Bookmark* b = find_bookmark(app, app.bookmark_menu)) {
+      ui_state.bookmark_menu.address = b->address;
+      ui_state.bookmark_menu.label = xanatoo::bookmark_label(*b);
+      ui_state.bookmark_menu.cut = cut_address(b->address);
+    }
   }
   ui_state.tab_labels.clear();
   ui_state.active_tab = 0;
@@ -660,6 +666,15 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       }
       break;
     }
+    case C::SelectBookmark:
+      if (!arg.empty()) select_bookmark(app, app.focus, arg);
+      break;
+    case C::CopyText:
+      if (!arg.empty()) {
+        SDL_SetClipboardText(arg.c_str());
+        flash_status(app, "Copied " + arg);
+      }
+      break;
     case C::CopyPageUrl: {
       const std::string url = pane_address(app, p);
       if (url.empty()) {
@@ -1515,10 +1530,11 @@ static void draw_pane_overlays(App& app, int i) {
     update_bookmark_marks(app, pane);
     // Not drawn while an edit waits for them to be found again: the old
     // offsets would wash the wrong text.
-    const bool bm_fresh =
-        pane.bookmark_marks.layout_gen == pane.layout.generation;
-    for (const xanatoo::Selection& m : pane.bookmark_marks.ranges) {
+    const bool bm_fresh = bookmark_marks_fresh(pane);
+    for (const BookmarkMark& bm : pane.bookmark_marks.items) {
       if (!bm_fresh) break;
+      const xanatoo::Selection& m = bm.range;
+      if (m.empty()) continue;
       if (std::find_if(pane.marks.begin(), pane.marks.end(),
                        [&](const xanatoo::Selection& o) {
                          return o.anchor == m.anchor && o.focus == m.focus;
@@ -1529,10 +1545,12 @@ static void draw_pane_overlays(App& app, int i) {
           pane.layout, m, draw_scroll, app.renderer.glyph_extents());
       app.renderer.draw_selection(rects, ox, c.r, c.g, c.b, c.a);
     }
-    for (const xanatoo::Caret& at : pane.bookmark_marks.points) {
+    for (const BookmarkMark& bm : pane.bookmark_marks.items) {
       if (!bm_fresh) break;
+      if (!bm.range.empty()) continue;
       // A reading position: a bar with a tab at its top, like a ribbon.
-      const auto cp = xanatoo::caret_screen_pos(pane.layout, at, draw_scroll, lh);
+      const auto cp = xanatoo::caret_screen_pos(pane.layout, bm.range.focus,
+                                                draw_scroll, lh);
       if (!cp.valid) continue;
       const xanatoo::Rgba& c = app.style.bookmark;
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
@@ -1543,6 +1561,31 @@ static void draw_pane_overlays(App& app, int i) {
       const SDL_Rect tab{x - 4, top - 4, 9, 5};
       SDL_RenderFillRect(app.sdl, &bar);
       SDL_RenderFillRect(app.sdl, &tab);
+    }
+    // A ribbon in the margin per bookmark: says what the wash is and takes
+    // the clicks (select, right-click menu).
+    for (const BookmarkIcon& ic : bookmark_icons(app, pane)) {
+      const bool hot = app.hover.bookmark_pane == i &&
+                       app.hover.bookmark ==
+                           pane.bookmark_marks.items[ic.item].address;
+      const xanatoo::Rgba& c = app.style.bookmark;
+      const int x = static_cast<int>(ox + ic.x);
+      const int y = static_cast<int>(py + ic.y);
+      const int w = static_cast<int>(ic.w), h = static_cast<int>(ic.h);
+      const auto shade = [&](int v) { return static_cast<Uint8>(v * 3 / 4); };
+      SDL_SetRenderDrawColor(app.sdl, hot ? shade(c.r) : c.r,
+                             hot ? shade(c.g) : c.g, hot ? shade(c.b) : c.b,
+                             hot ? 255 : 210);
+      // Body down to the notch, then two legs narrowing to its tip.
+      const int notch = std::max(3, w / 2);
+      const SDL_Rect body{x, y, w, h - notch};
+      SDL_RenderFillRect(app.sdl, &body);
+      for (int k = 0; k < notch; ++k) {
+        const int yy = y + h - notch + k;
+        const int leg = std::max(1, w / 2 - k);
+        SDL_RenderDrawLine(app.sdl, x, yy, x + leg - 1, yy);
+        SDL_RenderDrawLine(app.sdl, x + w - leg, yy, x + w - 1, yy);
+      }
     }
     // The `#` passage of this view's address.
     for (const xanatoo::Selection& m : pane.marks) {
@@ -2136,7 +2179,8 @@ static void draw_pane_overlays(App& app, int i) {
       SDL_Rect line{pane.x + 24, ly - 1, pane.w - 40, 3};
       SDL_RenderFillRect(app.sdl, &line);
     }
-  } else if (i == app.focus && !app.dragging_block) {
+  } else if (i == app.focus && !app.dragging_block &&
+             app.hover.bookmark.empty()) {
     // Subtle grip dots in the left gutter (not over the text)
     // mouse_y is window space; boxes are content space.
     float adj_y = content_y(app, app.mouse_y, i) + pane.scroll_y;
@@ -2173,7 +2217,10 @@ struct SectionMark {
 // Every block the layout skipped still has a stub box, so only the inside
 // of a stub is estimated (from height hints); nodes with no box outside a
 // stub were not laid out at all (section focus) and get no mark.
-static std::vector<SectionMark> section_marks(App& app, Pane& pane) {
+// `block_y`, when given, gets the (estimated) top of every block on the way.
+static std::vector<SectionMark> section_marks(
+    App& app, Pane& pane,
+    std::unordered_map<xanatoo::NodeId, float>* block_y = nullptr) {
   std::vector<SectionMark> marks;
   const auto& d = doc_of(app, pane);
   if (d.root == xanatoo::INVALID_NODE || d.root >= d.next_id) return marks;
@@ -2207,6 +2254,7 @@ static std::vector<SectionMark> section_marks(App& app, Pane& pane) {
           return;
         }
         const float y0 = box ? box->y : y;
+        if (block_y) block_y->emplace(id, y0);
         const bool sec = n.kind == xanatoo::NodeKind::Section ||
                          n.kind == xanatoo::NodeKind::Article;
         const bool parent_sec =
@@ -2300,6 +2348,24 @@ static void draw_pane_scrollbar(App& app, int i) {
         mark_at(m.y, 25, 90, 170);
       else
         mark_at(m.y, 140, 160, 190);
+    }
+    // Bookmarks inside the page: from the layout where it holds the text,
+    // else from the estimated position of the block.
+    if (bookmark_marks_fresh(pane) && !pane.bookmark_marks.items.empty()) {
+      std::unordered_map<xanatoo::NodeId, float> block_y;
+      section_marks(app, pane, &block_y);
+      const xanatoo::Document& bd = doc_of(app, pane);
+      const xanatoo::Rgba& c = app.style.bookmark;
+      for (const BookmarkMark& bm : pane.bookmark_marks.items) {
+        const auto cpos = xanatoo::caret_screen_pos(
+            pane.layout, bm.range.anchor, 0.f,
+            static_cast<float>(app.fonts.regular.line_height()));
+        float y = cpos.valid ? cpos.y : -1.f;
+        for (xanatoo::NodeId n = bm.range.anchor.node;
+             y < 0.f && n != xanatoo::INVALID_NODE; n = bd.get(n).parent)
+          if (auto it = block_y.find(n); it != block_y.end()) y = it->second;
+        if (y >= 0.f) mark_at(y, c.r, c.g, c.b);
+      }
     }
     // Search hits (cheap capped scan while leap search is active).
     if (prompt_is_search(app) && !app.prompt.text.empty() &&
@@ -2839,6 +2905,11 @@ void draw_hover_tooltip(App& app) {
         tip = "Drag to resize columns";
       } else if (app.hover.task != xanatoo::INVALID_NODE) {
         tip = "Click to toggle task";
+      } else if (!app.hover.bookmark.empty()) {
+        const xanatoo::Bookmark* b = find_bookmark(app, app.hover.bookmark);
+        tip = "Bookmark: " + (b ? xanatoo::bookmark_label(*b)
+                                : app.hover.bookmark) +
+              "  ·  right-click for more";
       } else if (app.hover.grip != xanatoo::INVALID_NODE) {
         tip = "Drag to move block";
       } else if (app.hover.transclude != xanatoo::INVALID_NODE) {
@@ -2889,7 +2960,7 @@ void present_frame(App& app) {
     set_cursor(app, app.cursor_sizenwse);
   else if (app.hover.grip != xanatoo::INVALID_NODE)
     set_cursor(app, app.cursor_sizeall);
-  else if (!app.hover.href.empty() ||
+  else if (!app.hover.href.empty() || !app.hover.bookmark.empty() ||
            app.hover.stretch != xanatoo::INVALID_NODE ||
            app.hover.image != xanatoo::INVALID_NODE ||
            app.hover.task != xanatoo::INVALID_NODE ||

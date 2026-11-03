@@ -134,6 +134,11 @@ struct ViewAnchor {
   float view_y = 0.f;
 };
 
+// A bookmark found in the page a view shows.
+struct BookmarkMark {
+  std::string address;      // the bookmark's, as stored
+  xanatoo::Selection range;  // empty: a reading position
+};
 // Bookmarks inside the page a view shows, resolved for drawing over it
 // (update_bookmark_marks). Keyed on what they were found in.
 struct BookmarkMarks {
@@ -141,8 +146,13 @@ struct BookmarkMarks {
   uint64_t bookmarks_gen = 0;
   uint64_t layout_gen = 0;
   Uint32 at = 0;  // SDL ticks of the last search (throttles while typing)
-  std::vector<xanatoo::Selection> ranges;
-  std::vector<xanatoo::Caret> points;  // reading positions
+  std::vector<BookmarkMark> items;
+};
+// Margin icon of a bookmark mark, in pane-local x / content-relative y
+// (bookmark_icons).
+struct BookmarkIcon {
+  size_t item = 0;  // into BookmarkMarks::items
+  float x = 0.f, y = 0.f, w = 0.f, h = 0.f;
 };
 
 struct Pane {
@@ -265,6 +275,8 @@ struct Hover {
   xanatoo::NodeId transclude = xanatoo::INVALID_NODE;
   int transclude_pane = -1;
   std::string transclude_src;
+  std::string bookmark;  // address of the bookmark whose margin icon is hovered
+  int bookmark_pane = -1;
 };
 
 // Touchscreen gestures (app_touch.cpp). Fingers on the document surface
@@ -578,6 +590,7 @@ struct App {
   std::vector<std::string> visited;
   std::vector<xanatoo::Bookmark> bookmarks;
   uint64_t bookmarks_gen = 1;  // bumped by every change of `bookmarks`
+  std::string bookmark_menu;   // bookmark of the open margin-icon menu
   bool history_panel_open = false;
   bool preferences_open = false;  // Edit → Preferences (ImGui window)
   bool bookmarks_panel_open = false;
@@ -931,6 +944,20 @@ void refresh_pane_locator(App& app, Pane& p);
 void update_bookmark_marks(App& app, Pane& p);
 // Number of bookmarks with selectors inside the page `p` shows.
 int bookmarks_in_page(App& app, Pane& p);
+// True while the marks match the layout (not waiting for a typing pause).
+bool bookmark_marks_fresh(const Pane& p);
+// Margin icons of the marks on screen (one per bookmark, those on one line
+// side by side), pane-local x, y relative to the pane's content top.
+std::vector<BookmarkIcon> bookmark_icons(App& app, Pane& p);
+// The bookmark whose margin icon is at (lx, my) (pane-local / content y),
+// or nullptr.
+const BookmarkMark* bookmark_icon_at(App& app, Pane& p, float lx, float my);
+// Select the passage of bookmark `address` in view `pi` and scroll to it.
+void select_bookmark(App& app, int pi, const std::string& address);
+// `address` with its point turned into the last pipe: the passage as a cut.
+std::string cut_address(const std::string& address);
+// The stored bookmark with `address`, or nullptr.
+const xanatoo::Bookmark* find_bookmark(App& app, const std::string& address);
 // Open `target` (path, gemini://, Nostr, Reddit, Lemmy) in the focused pane /
 // in pane `pi`. Remote pages load in the background; true = opened or started.
 bool navigate_to_url(App& app, std::string target, bool record_history = true);

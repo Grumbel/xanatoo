@@ -120,6 +120,8 @@ struct Bookmark {
 // blank lines and # comments.
 std::optional<Bookmark> parse_bookmark_line(std::string_view line);
 std::string format_bookmark_line(const Bookmark& b);
+// "Section — “quote”" for a passage, else the title or the address.
+std::string bookmark_label(const Bookmark& b);
 
 // Load bookmarks (blank lines and # comments ignored).
 std::vector<Bookmark> load_bookmarks();

@@ -9,6 +9,8 @@
 #include "xanatoo/parse.hpp"
 #include "xanatoo/util.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <ctime>
 
 namespace xanatoo::app {
@@ -256,7 +258,7 @@ void for_page_bookmarks(App& app, const std::string& page, F&& f) {
   if (page.empty()) return;
   for (const xanatoo::Bookmark& b : app.bookmarks) {
     xanatoo::Locator loc = xanatoo::parse_locator(b.address);
-    if (loc.has_selectors() && loc.base == page) f(loc);
+    if (loc.has_selectors() && loc.base == page) f(b, std::move(loc));
   }
 }
 
@@ -265,7 +267,9 @@ void for_page_bookmarks(App& app, const std::string& page, F&& f) {
 int bookmarks_in_page(App& app, Pane& p) {
   int n = 0;
   for_page_bookmarks(app, pane_page(app, p),
-                     [&](const xanatoo::Locator&) { ++n; });
+                     [&](const xanatoo::Bookmark&, const xanatoo::Locator&) {
+                       ++n;
+                     });
   return n;
 }
 
@@ -288,19 +292,94 @@ void update_bookmark_marks(App& app, Pane& p) {
   bm.bookmarks_gen = app.bookmarks_gen;
   bm.layout_gen = p.layout.generation;
   bm.at = now;
-  bm.ranges.clear();
-  bm.points.clear();
+  bm.items.clear();
   const xanatoo::Document& d = doc_of(app, p);
-  for_page_bookmarks(app, pane_page(app, p), [&](xanatoo::Locator loc) {
+  for_page_bookmarks(app, pane_page(app, p),
+                     [&](const xanatoo::Bookmark& b, xanatoo::Locator loc) {
     std::string lost;
     const Resolved r = resolve_locator(d, loc, lost);
     // A cut alone (a section bookmark) names no text to mark.
-    if (!r.mark) return;
-    if (r.mark->empty())
-      bm.points.push_back(r.mark->focus);
-    else
-      bm.ranges.push_back(*r.mark);
+    if (r.mark) bm.items.push_back({b.address, *r.mark});
   });
+}
+
+bool bookmark_marks_fresh(const Pane& p) {
+  return p.bookmark_marks.buf == p.buf &&
+         p.bookmark_marks.layout_gen == p.layout.generation;
+}
+
+std::vector<BookmarkIcon> bookmark_icons(App& app, Pane& p) {
+  std::vector<BookmarkIcon> out;
+  if (!bookmark_marks_fresh(p)) return out;
+  const xanatoo::Document& d = doc_of(app, p);
+  const float lh = static_cast<float>(app.fonts.regular.line_height());
+  const auto& items = p.bookmark_marks.items;
+  for (size_t i = 0; i < items.size(); ++i) {
+    const xanatoo::Caret& at = items[i].range.anchor;
+    const auto cp = xanatoo::caret_screen_pos(p.layout, at, p.scroll_y, lh);
+    if (!cp.valid || cp.y < -lh || cp.y > static_cast<float>(p.h) + lh)
+      continue;
+    // Left of the block's drag grip, level with the passage's first line.
+    float left = cp.x;
+    for (xanatoo::NodeId n = at.node; n != xanatoo::INVALID_NODE;
+         n = d.get(n).parent) {
+      const auto box = std::find_if(
+          p.layout.boxes.begin(), p.layout.boxes.end(),
+          [&](const xanatoo::LayoutBox& b) { return b.node == n; });
+      if (box != p.layout.boxes.end()) {
+        left = box->x;
+        break;
+      }
+    }
+    BookmarkIcon ic;
+    ic.item = i;
+    ic.w = 10.f;
+    ic.h = std::max(12.f, cp.height * 0.8f);
+    ic.x = std::max(2.f, left - kBlockGripW - ic.w - 2.f);
+    ic.y = cp.y - cp.height * 0.8f;
+    // Several bookmarks on one line: side by side, towards the edge.
+    for (const BookmarkIcon& o : out)
+      if (std::abs(o.y - ic.y) < 2.f && o.x - ic.x < ic.w + 2.f)
+        ic.x = std::max(2.f, o.x - ic.w - 3.f);
+    out.push_back(ic);
+  }
+  return out;
+}
+
+const BookmarkMark* bookmark_icon_at(App& app, Pane& p, float lx, float my) {
+  for (const BookmarkIcon& ic : bookmark_icons(app, p))
+    if (lx >= ic.x - 2.f && lx < ic.x + ic.w + 2.f && my >= ic.y &&
+        my < ic.y + ic.h + 2.f)
+      return &p.bookmark_marks.items[ic.item];
+  return nullptr;
+}
+
+void select_bookmark(App& app, int pi, const std::string& address) {
+  Pane& p = app.panes[pi];
+  for (const BookmarkMark& m : p.bookmark_marks.items) {
+    if (m.address != address) continue;
+    p.sel = m.range;
+    // Not inside a cut that leaves it out: the passage shows in the page.
+    const xanatoo::NodeId cut = pane_cut(app, p);
+    if (cut != xanatoo::INVALID_NODE &&
+        !within(doc_of(app, p), m.range.anchor.node, cut))
+      set_pane_cut(app, p, xanatoo::INVALID_NODE);
+    std::swap(p.sel.anchor, p.sel.focus);  // the caret at the start
+    scroll_caret_into_view(app, p);
+    std::swap(p.sel.anchor, p.sel.focus);
+    app.needs_layout = true;
+    return;
+  }
+  flash_status(app, "Bookmark not found in this page");
+}
+
+std::string cut_address(const std::string& address) {
+  xanatoo::Locator loc = xanatoo::parse_locator(address);
+  if (loc.point) {
+    loc.pipes.push_back(*loc.point);
+    loc.point.reset();
+  }
+  return xanatoo::format_locator(loc);
 }
 
 xanatoo::Bookmark bookmark_for_view(App& app, Pane& p, bool position) {

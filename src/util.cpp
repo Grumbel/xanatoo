@@ -170,6 +170,12 @@ std::optional<Bookmark> parse_bookmark_line(std::string_view line) {
   return b;
 }
 
+std::string bookmark_label(const Bookmark& b) {
+  if (b.quote.empty()) return b.title.empty() ? b.address : b.title;
+  if (b.title.empty()) return "“" + b.quote + "”";
+  return b.title + " — “" + b.quote + "”";
+}
+
 std::string format_bookmark_line(const Bookmark& b) {
   auto field = [](std::string_view key, std::string_view value) {
     std::string out = "\t" + std::string(key) + "=";

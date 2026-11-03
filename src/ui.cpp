@@ -32,13 +32,6 @@ namespace xanatoo {
 
 namespace {
 
-// "Section — “quote”" for a passage, else the address.
-std::string bookmark_label(const Bookmark& b) {
-  if (b.quote.empty()) return b.title.empty() ? b.address : b.title;
-  if (b.title.empty()) return "“" + b.quote + "”";
-  return b.title + " — “" + b.quote + "”";
-}
-
 // First and last `keep` bytes (on character boundaries) around an ellipsis.
 std::string elide_middle(const std::string& s, size_t keep) {
   auto cont = [&](size_t i) {
@@ -530,6 +523,12 @@ void Ui::focus_url_bar() { focus_url_bar_ = true; }
 
 void Ui::open_context_menu(float x, float y) {
   context_open_ = true;
+  context_x_ = x;
+  context_y_ = y;
+}
+
+void Ui::open_bookmark_menu(float x, float y) {
+  bookmark_menu_open_ = true;
   context_x_ = x;
   context_y_ = y;
 }
@@ -1321,6 +1320,39 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
 
   // ---- Toolbars + tab strip (all hidden while content only) ----
   if (!state.chrome_hidden) toolbars(state, result, cmd);
+
+  // ---- Menu of a bookmark's margin icon ----
+  if (bookmark_menu_open_) {
+    ImGui::SetNextWindowPos(ImVec2(context_x_, context_y_), ImGuiCond_Appearing);
+    ImGui::OpenPopup("##bookmark_menu");
+    bookmark_menu_open_ = false;
+  }
+  if (ImGui::BeginPopup("##bookmark_menu")) {
+    const auto& bm = state.bookmark_menu;
+    if (bm.address.empty()) {
+      ImGui::CloseCurrentPopup();
+    } else {
+      std::string label = bm.label;
+      if (label.size() > 64) label = elide_middle(label, 28);
+      ImGui::TextDisabled("%s", label.c_str());
+      ImGui::Separator();
+      auto item = [&](const char* text, UiCommand c, const std::string& arg) {
+        if (ImGui::MenuItem(text)) {
+          cmd = c;
+          result.arg = arg;
+        }
+      };
+      item("Select Passage", UiCommand::SelectBookmark, bm.address);
+      item("Go to Bookmark", UiCommand::NavigateUrl, bm.address);
+      item("Show Only This", UiCommand::NavigateUrl, bm.cut);
+      item("Copy Address", UiCommand::CopyText, bm.address);
+      ImGui::Separator();
+      item("Remove Bookmark", UiCommand::RemoveBookmark, bm.address);
+      if (ImGui::MenuItem("Show Bookmarks…", nullptr, state.bookmarks_open))
+        cmd = UiCommand::ToggleBookmarks;
+    }
+    ImGui::EndPopup();
+  }
 
   // ---- Context menu (right-click in document) ----
   if (context_open_) {

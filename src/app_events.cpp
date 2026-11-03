@@ -180,6 +180,16 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
     const int at = pane_at(app, mx, static_cast<float>(y));
     float my = content_y(app, static_cast<float>(y), at);
 
+    // A bookmark's margin icon selects its passage.
+    if (at >= 0)
+      if (const BookmarkMark* bm = bookmark_icon_at(
+              app, app.panes[at], local_x(app, mx, at), my)) {
+        const std::string address = bm->address;
+        focus_view(app, at);
+        select_bookmark(app, at, address);
+        return;
+      }
+
     // Classic scrollbar (right edge): arrows page, track jumps/drags.
     {
       const int pi = at;
@@ -573,6 +583,13 @@ static void mouse_right_down(App& app, SDL_Event& ev, bool imgui_mouse) {
       float my = content_y(app, static_cast<float>(ev.button.y), app.focus);
       Pane& p = focused_pane(app);
       float lx = local_x(app, mx, app.focus);
+      // A bookmark's margin icon has a menu of its own.
+      if (const BookmarkMark* bm = bookmark_icon_at(app, p, lx, my)) {
+        app.bookmark_menu = bm->address;
+        app.ui.open_bookmark_menu(static_cast<float>(ev.button.x),
+                                  static_cast<float>(ev.button.y));
+        return;
+      }
       // Keep an existing selection when the click lands inside it
       // (Cut/Copy/Bold from the menu need the range). Only move the
       // caret when there is no selection, or the click is outside.
@@ -829,6 +846,12 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
       app.hover.transclude = xanatoo::INVALID_NODE;
       app.hover.transclude_pane = -1;
       app.hover.transclude_src.clear();
+      app.hover.bookmark.clear();
+      app.hover.bookmark_pane = -1;
+      if (const BookmarkMark* bm = bookmark_icon_at(app, hp, lx, my)) {
+        app.hover.bookmark = bm->address;
+        app.hover.bookmark_pane = hover_pane;
+      }
 
       // Column gutters
       for (const auto& gap : hp.layout.column_gaps) {
@@ -914,7 +937,8 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
       }
 
       // Block drag grip (gutter left of the block text)
-      if (!app.hover.col_gap && app.hover.task == xanatoo::INVALID_NODE &&
+      if (app.hover.bookmark.empty() && !app.hover.col_gap &&
+          app.hover.task == xanatoo::INVALID_NODE &&
           app.hover.stretch == xanatoo::INVALID_NODE &&
           app.hover.link_node == xanatoo::INVALID_NODE &&
           app.hover.image == xanatoo::INVALID_NODE) {

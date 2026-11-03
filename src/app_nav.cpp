@@ -71,14 +71,19 @@ bool nav_step(App& app, int dir) {
 }
 
 namespace {
-auto find_bookmark(App& app, const std::string& url) {
+auto bookmark_it(App& app, const std::string& url) {
   return std::find_if(app.bookmarks.begin(), app.bookmarks.end(),
                       [&](const xanatoo::Bookmark& b) { return b.address == url; });
 }
 }  // namespace
 
+const xanatoo::Bookmark* find_bookmark(App& app, const std::string& address) {
+  auto it = bookmark_it(app, address);
+  return it == app.bookmarks.end() ? nullptr : &*it;
+}
+
 bool is_bookmarked(App& app, const std::string& url) {
-  return !url.empty() && find_bookmark(app, url) != app.bookmarks.end();
+  return !url.empty() && bookmark_it(app, url) != app.bookmarks.end();
 }
 
 void add_bookmark(App& app, xanatoo::Bookmark b) {
@@ -101,7 +106,7 @@ void add_bookmark(App& app, xanatoo::Bookmark b) {
 
 void remove_bookmark(App& app, const std::string& url) {
   if (url.empty()) return;
-  auto it = find_bookmark(app, url);
+  auto it = bookmark_it(app, url);
   if (it == app.bookmarks.end()) {
     flash_status(app, "Not in bookmarks");
     return;
