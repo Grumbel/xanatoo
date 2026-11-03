@@ -948,6 +948,52 @@ void test_style_sheets_shipped() {
 
 // Text column = min(pane * (1 - 2 * margin%), measure_chars * avg char),
 // centred; never closer to the edge than margin_x px.
+void test_layout_reader_mode() {
+  using namespace xanatoo;
+  FontSet fonts;
+  std::string path = fontconfig_find("DejaVu Sans", 0, 0);
+  if (path.empty() || !fonts.load(nullptr, path, 18, 24)) {
+    std::fprintf(stderr, "SKIP test_layout_reader_mode (no font)\n");
+    return;
+  }
+  Document doc = parse_html_page(
+      "<body><nav><p>Menu</nav><main><h1>T</h1><p>Body</main>"
+      "<aside><p>Side</aside></body>",
+      "page.html");
+  auto text_of = [](const LayoutResult& lr) {
+    std::string t;
+    for (const auto& g : lr.glyphs)
+      if (g.codepoint < 128) t.push_back(static_cast<char>(g.codepoint));
+    return t;
+  };
+  LayoutEngine engine(fonts, nullptr);
+  LayoutResult full = engine.layout(doc, 800.f);
+  EXPECT(text_of(full).find("Menu") != std::string::npos);
+  EXPECT_EQ(full.chrome_notice.height, 0.f);
+  engine.set_hide_chrome(true);
+  LayoutResult reader = engine.layout(doc, 800.f);
+  engine.set_hide_chrome(false);
+  const std::string rt = text_of(reader);
+  EXPECT(rt.find("Menu") == std::string::npos);
+  EXPECT(rt.find("Side") == std::string::npos);
+  EXPECT(rt.find("Body") != std::string::npos);
+  EXPECT(rt.find("2 parts of the page hidden (navigation, sidebar)") !=
+         std::string::npos);
+  EXPECT(reader.chrome_notice.height > 0.f);
+  // The notice is decoration: no glyph of it belongs to a node.
+  for (const auto& g : reader.glyphs)
+    if (g.y < reader.chrome_notice.y + reader.chrome_notice.height)
+      EXPECT(g.node == INVALID_NODE);
+  // Outline: headings inside the chrome only in the full view.
+  Document d2 = parse_html_page(
+      "<body><nav><h2>Menu</h2><p>x</nav><main><h1>T</h1><p>b</main>",
+      "p.html");
+  std::vector<OutlineEntry> all, rd;
+  collect_outline(d2, all);
+  collect_outline(d2, rd, nullptr, {}, true);
+  EXPECT_EQ(all.size(), rd.size() + 1);
+}
+
 void test_layout_margins_and_measure() {
   using namespace xanatoo;
   FontSet fonts;
@@ -1909,6 +1955,33 @@ std::string doc_span_href(const xanatoo::Document& d, xanatoo::NodeId n) {
   return sp.empty() ? std::string{} : sp.front().href;
 }
 
+void test_html_chrome_regions() {
+  using namespace xanatoo;
+  HtmlOptions opt;
+  opt.drop_chrome = true;
+  opt.chrome_nodes = true;
+  opt.sections = true;
+  Document doc;
+  NodeId root = doc.create(NodeKind::Document);
+  html_append_blocks(
+      doc, root,
+      "<p>a <span class=share>Share</span> b</p>"   // inline: dropped
+      "<ul><li>x<nav>in item</nav></li></ul>"       // inside a list: dropped
+      "<div class=\"navbox\"><p>Box</p></div>"       // block: region
+      "<div role=complementary></div>"              // empty: nothing
+      "<form><h1>Page</h1><p>All of it</form>",     // page-wide form: content
+      opt);
+  auto top = kids_of(doc, root);
+  EXPECT_EQ(top.size(), 4u);  // p, list, navbox region, Section "Page"
+  EXPECT_EQ(plain_text(doc, top[0]), "a b");
+  EXPECT(plain_text(doc, kids_of(doc, top[1])[0]).find("in item") ==
+         std::string::npos);
+  EXPECT(doc.get(top[2]).kind == NodeKind::Chrome);
+  EXPECT_EQ(doc.get(top[2]).summary, "navigation");
+  EXPECT(doc.get(top[3]).kind == NodeKind::Section);
+  EXPECT_EQ(chrome_regions(doc).size(), 1u);
+}
+
 void test_html_page() {
   using namespace xanatoo;
   EXPECT(is_web_url("https://example.org"));
@@ -1932,10 +2005,16 @@ void test_html_page() {
   EXPECT_EQ(html_page_title(page), "OG title");
   Document doc = parse_html_page(page, "https://ex.org/p");
   auto top = kids_of(doc, doc.root);
-  // "host · Open in browser" line, then the title section.
-  EXPECT_EQ(top.size(), 2u);
+  // "host · Open in browser" line, the <nav> before <main>, the title
+  // section, the <footer> after it.
+  EXPECT_EQ(top.size(), 4u);
   EXPECT_EQ(doc.get(top[0]).spans.back().href, "external:https://ex.org/p");
-  NodeId title = top[1];
+  EXPECT(doc.get(top[1]).kind == NodeKind::Chrome);
+  EXPECT_EQ(doc.get(top[1]).summary, "navigation");
+  EXPECT_EQ(plain_text(doc, kids_of(doc, top[1])[0]), "Home");
+  EXPECT(doc.get(top[3]).kind == NodeKind::Chrome);
+  EXPECT_EQ(doc.get(top[3]).summary, "footer");
+  NodeId title = top[2];
   EXPECT(doc.get(title).kind == NodeKind::Section);
   auto tk = kids_of(doc, title);
   EXPECT_EQ(tk.size(), 3u);  // Header, Intro, Two
@@ -1950,14 +2029,26 @@ void test_html_page() {
   EXPECT_EQ(doc.get(intro[2]).level, 3);
   EXPECT(jump_to_href(doc, "#more").has_value());
   EXPECT_EQ(plain_text(doc, jump_to_href(doc, "#more")->node), "Deep");
+  // Hidden text is gone in both modes.
   for (const Node& n : doc.nodes) {
     std::string t = plain_text(doc, n.id);
-    EXPECT(t.find("Home") == std::string::npos);
     EXPECT(t.find("hidden") == std::string::npos);
     EXPECT(t.find("gone") == std::string::npos);
-    EXPECT(t.find("foot") == std::string::npos);
     EXPECT(t.find("[image") == std::string::npos);
   }
+  EXPECT_EQ(chrome_regions(doc).size(), 2u);
+  EXPECT_EQ(chrome_hidden_text(doc, chrome_regions(doc)),
+            "2 parts of the page hidden (navigation, footer)");
+  // Without chrome (EPUB chapters) nav / footer are dropped as before.
+  Document dropped = parse_html_page(page, "https://ex.org/p", false);
+  EXPECT(chrome_regions(dropped).empty());
+  for (const Node& n : dropped.nodes) {
+    std::string t = plain_text(dropped, n.id);
+    EXPECT(t.find("Home") == std::string::npos);
+    EXPECT(t.find("foot") == std::string::npos);
+  }
+  // Markdown keeps the chrome as content.
+  EXPECT(serialize_markup(doc).find("foot") != std::string::npos);
 
   // Own <h1>: no synthetic title section; no <main>: <body> is used.
   Document d2 = parse_html_page("<title>X</title><h1>Real</h1><p>b", "a.html");
@@ -1974,7 +2065,10 @@ void test_html_page() {
       "<table><tr><td><table><tr><td>one<br><br>two "
       "<img src=s.gif width=1 height=1></table></table></main>",
       "https://e.org/");
-  auto k3 = kids_of(d3, kids_of(d3, d3.root)[1]);  // the <h1> section
+  // Host line, "nav" before <main> (page header), the <h1> section.
+  EXPECT(d3.get(kids_of(d3, d3.root)[1]).kind == NodeKind::Chrome);
+  EXPECT_EQ(d3.get(kids_of(d3, d3.root)[1]).summary, "page header");
+  auto k3 = kids_of(d3, kids_of(d3, d3.root)[2]);  // the <h1> section
   EXPECT_EQ(k3.size(), 4u);  // Header, link, one, two
   EXPECT_EQ(doc_span_href(d3, k3[1]), "https://e.org/x/");
   EXPECT_EQ(plain_text(d3, k3[2]), "one");
@@ -2481,6 +2575,7 @@ int main() {
   test_wikipedia();
   test_pandoc_formats();
   test_html_min();
+  test_html_chrome_regions();
   test_html_page();
   test_feed_urls();
   test_parse_feeds();
@@ -2523,6 +2618,7 @@ int main() {
   test_hit_test_wrapped_link();
   test_layout_wrap_respects_max_width();
   test_layout_margins_and_measure();
+  test_layout_reader_mode();
   test_view_settings_migration();
   test_style_sheet_parse();
   test_style_sheets_shipped();

@@ -8,6 +8,24 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-11-03) — reader mode for web pages
+
+- HTML pages keep their chrome (nav / aside / footer / form / dialog,
+  landmark roles, navbox / share / cookie classes, what lies around `<main>`)
+  as `NodeKind::Chrome` nodes instead of dropping it; whole pages are the
+  default now. Hidden / screen-reader-only text, `alt=""` images and
+  tracking pixels are still dropped; EPUB chapters still drop the chrome.
+- Reader mode is per-view state (`Pane::reader`, default
+  `ViewSettings::reader_mode` = `reader_mode` in view.conf, Preferences):
+  F9, View → Reader Mode, toolbar book button. Layout hides the Chrome
+  nodes and puts "Reader mode: N parts of the page hidden (…) · Show all"
+  at the top; the outline follows. Not part of the address
+  (docs/PASSAGES.md "Reader mode"). Jumps and find hits into hidden chrome
+  leave reader mode.
+- Checked under Xvfb on a local page: full page, F9, Show all, tooltip.
+- Open: per-region markers ("▸ navigation") to open one region; default
+  per host; Wikipedia native view could default to reader mode.
+
 ## Status (2026-11-03) — passages: text selectors, bookmarks of a passage (slice 3)
 
 - `text:` selectors resolve (`resolve_text`, web text-fragment grammar,

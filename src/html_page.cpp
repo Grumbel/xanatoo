@@ -77,6 +77,12 @@ std::string_view element_inner(std::string_view html, const TagRef& t) {
   return html.substr(t.gt + 1, end - t.gt - 1);
 }
 
+std::string_view body_content(std::string_view html) {
+  if (auto b = scan_tags(html, [](const TagRef& t) { return t.name == "body"; }))
+    return element_inner(html, *b);
+  return html;
+}
+
 // <main> or role="main", else the only <article>, else <body>.
 std::string_view main_content(std::string_view html) {
   if (auto m = scan_tags(html, [](const TagRef& t) {
@@ -91,9 +97,7 @@ std::string_view main_content(std::string_view html) {
     return false;
   });
   if (articles == 1) return element_inner(html, *first);
-  if (auto b = scan_tags(html, [](const TagRef& t) { return t.name == "body"; }))
-    return element_inner(html, *b);
-  return html;
+  return body_content(html);
 }
 
 bool is_remote(std::string_view url) {
@@ -163,7 +167,8 @@ std::string html_page_title(std::string_view html) {
   return title;
 }
 
-Document parse_html_page(std::string_view html, std::string_view page_url) {
+Document parse_html_page(std::string_view html, std::string_view page_url,
+                         bool keep_chrome) {
   Document doc;
   NodeId root = doc.create(NodeKind::Document);
 
@@ -180,6 +185,7 @@ Document parse_html_page(std::string_view html, std::string_view page_url) {
   opt.sections = true;
   opt.anchors = true;
   opt.drop_chrome = true;
+  opt.chrome_nodes = keep_chrome;
 
   if (is_remote(page_url)) {
     NodeId p = doc.create(NodeKind::Paragraph, root);
@@ -190,6 +196,17 @@ Document parse_html_page(std::string_view html, std::string_view page_url) {
   }
 
   std::string_view body = main_content(html);
+  // Around <main> / the article: the page's header and footer.
+  std::string_view before, after;
+  if (keep_chrome) {
+    std::string_view all = body_content(html);
+    if (body.data() >= all.data() &&
+        body.data() + body.size() <= all.data() + all.size()) {
+      before = all.substr(0, static_cast<size_t>(body.data() - all.data()));
+      after = all.substr(before.size() + body.size());
+    }
+  }
+  if (!before.empty()) html_append_chrome(doc, root, "page header", before, opt);
   const bool has_h1 = scan_tags(body, [](const TagRef& t) {
                         return t.name == "h1";
                       }).has_value();
@@ -202,14 +219,15 @@ Document parse_html_page(std::string_view html, std::string_view page_url) {
     doc.get(h).level = 1;
     doc.get(h).spans.push_back(span(InlineKind::Text, std::move(title)));
   }
-  const size_t before = doc.nodes.size();
+  const size_t before_nodes = doc.nodes.size();
   html_append_blocks(doc, parent, body, opt);
-  if (doc.nodes.size() == before) {
+  if (doc.nodes.size() == before_nodes) {
     NodeId p = doc.create(NodeKind::Paragraph, parent);
     doc.get(p).spans.push_back(span(
         InlineKind::Emphasis,
         "No readable content (the page may need JavaScript)."));
   }
+  if (!after.empty()) html_append_chrome(doc, root, "page footer", after, opt);
   return doc;
 }
 

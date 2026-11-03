@@ -3,9 +3,10 @@
 #pragma once
 
 // Whole HTML pages (web links, local .html files) → documents through the
-// html_min subset: the main content only (<main>, a lone <article>, else
-// <body>), page chrome dropped, headings as nested Sections. No CSS, no
-// scripts, no layout — a reader view, not a browser.
+// html_min subset: the main content (<main>, a lone <article>, else
+// <body>) with the page chrome around and inside it as Chrome nodes,
+// headings as nested Sections. No CSS, no
+// scripts, no layout — a reader, not a browser.
 
 #include "xanatoo/types.hpp"
 
@@ -31,8 +32,11 @@ std::string html_page_title(std::string_view html);
 // Page → Document: a title Section (unless the content has its own <h1>)
 // holding the main content. Remote pages (`page_url` http/https) start
 // with a "host · Open in browser" line; relative links resolve against
-// <base href> or `page_url`.
-Document parse_html_page(std::string_view html, std::string_view page_url = {});
+// <base href> or `page_url`. Page chrome (navigation, sidebars, footers,
+// what lies around <main>) is kept as Chrome nodes, for reader mode to hide;
+// `keep_chrome = false` drops it instead (EPUB chapters).
+Document parse_html_page(std::string_view html, std::string_view page_url = {},
+                         bool keep_chrome = true);
 
 // text/plain body: blank-line separated chunks as code blocks.
 Document plain_text_document(std::string_view text);

@@ -2866,7 +2866,7 @@ bool table_move_cell(Document& doc, Caret& caret, bool forward) {
 
 void collect_outline(const Document& doc, std::vector<OutlineEntry>& out,
                      const std::unordered_set<NodeId>* folded_sections,
-                     std::string_view fallback_title) {
+                     std::string_view fallback_title, bool skip_chrome) {
   out.clear();
   if (doc.root == INVALID_NODE) return;
 
@@ -2926,6 +2926,7 @@ void collect_outline(const Document& doc, std::vector<OutlineEntry>& out,
     stack.pop_back();
     const Node& n = doc.get(fr.id);
     if (n.id != fr.id) continue;
+    if (skip_chrome && n.kind == NodeKind::Chrome) continue;
 
     if (n.kind == NodeKind::Section || n.kind == NodeKind::Article) {
       const int depth = std::max(1, std::min(8, fr.depth + 1));

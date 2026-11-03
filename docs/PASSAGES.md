@@ -235,6 +235,48 @@ existing `:::include path.md#Heading` keeps working and means `//id:Heading`.
 The `:excerpt` summary becomes a `text:` selector in the same way. A click on
 an embed opens the cut; Up from there is the context.
 
+## Reader mode
+
+Reader mode hides the page chrome of a web page (navigation, sidebars,
+banners, footers, share and cookie boxes). It is **view state, not a
+selector**, so `//readermode` does not exist:
+
+- Pipes select a passage of the document. Reader mode decides how the whole
+  document is shown, like a fold or zoom.
+- In the address, a reading preference would get into history, bookmarks and
+  copied links, and whoever opens your link gets your preference.
+- It needs no answer to the open identity question of foreign pages (a URL
+  can return different content on each fetch, `docs/REVISIONS.md` phase 3):
+  there is only one document per fetch either way.
+
+The page is parsed **once**, with the chrome kept and marked:
+
+- `html_min` with `drop_chrome` + `chrome_nodes` turns chrome blocks into
+  `NodeKind::Chrome` containers (`summary` = what it is: "navigation",
+  "sidebar", "footer", …). What lies around `<main>` / the lone `<article>`
+  becomes "page header" / "page footer"; a region that only wraps one other
+  (`<header><nav>`) takes its role. Chrome inside running text, list items or
+  table cells is still dropped, as are hidden and screen-reader-only text,
+  `alt=""` images and tracking pixels. A `<form>` that holds `<main>`,
+  `<article>` or `<h1>` (ASP.NET pages) is content.
+- `Pane::reader` (unset = `ViewSettings::reader_mode`, off by default) is
+  passed to layout through `LayoutEngine::set_hide_chrome`. Layout leaves
+  the Chrome nodes out and puts a notice at the top: "Reader mode: 3 parts
+  of the page hidden (banner, sidebar, footer) · Show all", whose box
+  (`LayoutResult::chrome_notice`) takes the click. The outline drops headings
+  inside chrome the same way (`collect_outline(…, skip_chrome)`).
+- Toggling keeps the top line in place (`view_anchor`) and drops the height
+  hints, since the heights around the chrome change.
+- Selectors resolve against the whole document in both modes, so `path:` and
+  `text:` stay the same. A jump (`expand_ancestors_for_node`) or a find hit
+  inside hidden chrome leaves reader mode first (`reveal_chrome`), as a jump
+  into a folded section unfolds it.
+- Saving a web page as Markdown / Org / gemtext / `.sexp` writes the chrome as
+  ordinary content; the regions are not kept.
+
+Later: a marker where each region was hidden ("▸ navigation") to open just
+that one, as for a folded section; a default per host.
+
 ## Bookmarks
 
 The `bookmarks` file stays line-based and plain, with no SQLite dependency,

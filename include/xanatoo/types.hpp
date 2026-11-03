@@ -44,6 +44,7 @@ enum class NodeKind : uint8_t {
   Message,         // one post or comment; may reply to another Message
   Footnote,        // note body (Paragraph children); label = key of its refs
   Collection,      // ordered set of items (Image / Figure) shown as cards
+  Chrome,          // web page chrome (nav, aside, footer, …); reader mode hides it
 };
 
 enum class InlineKind : uint8_t {
@@ -92,6 +93,8 @@ struct Node {
   // Collection: summary = default view hint ("grid", "list", "full");
   //             items are Image / Figure children (view-local layout).
   // Article/Section: containers grouping blocks.
+  // Chrome: summary = what it is ("navigation", "sidebar", "page header",
+  //         …); body blocks are children. Only HTML pages make these.
 };
 
 // Document-level semantic metadata (not layout).

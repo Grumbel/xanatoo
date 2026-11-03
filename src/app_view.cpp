@@ -43,7 +43,8 @@ void refresh_outline(App& app) {
   std::string label = buffer_tab_label(app, focused_pane(app).buf);
   if (xanatoo::starts_with(label, "*")) label.erase(0, 1);
   xanatoo::collect_outline(doc_of(app, focused_pane(app)), app.outline,
-                           &app.folded_sections, label);
+                           &app.folded_sections, label,
+                           pane_reader(app, focused_pane(app)));
   if (app.outline_sel >= static_cast<int>(app.outline.size()))
     app.outline_sel = std::max(0, static_cast<int>(app.outline.size()) - 1);
   if (app.outline_sel < 0) app.outline_sel = 0;
@@ -184,8 +185,41 @@ void refresh_diff(App& app) {
                               &app.diff_words[0], &app.diff_words[1]);
 }
 
+bool pane_reader(const App& app, const Pane& p) {
+  return p.reader.value_or(app.view_settings.reader_mode);
+}
+
+void set_reader(App& app, Pane& p, bool on) {
+  if (pane_reader(app, p) == on) {
+    p.reader = on;
+    return;
+  }
+  if (!p.view_anchor && p.scroll_y > 0.f)  // as keep_view
+    p.view_anchor = view_anchor_at(app, p, 0.f, 0.f);
+  p.reader = on;
+  // Heights of the blocks around the chrome change with it.
+  p.height_cache.clear();
+  app.needs_layout = true;
+  if (app.outline_mode && &p == &focused_pane(app)) refresh_outline(app);
+  flash_status(app, on ? "Reader mode: page chrome hidden"
+                       : "Reader mode off: whole page");
+}
+
+void reveal_chrome(App& app, Pane& p, xanatoo::NodeId target) {
+  if (!pane_reader(app, p) || target == xanatoo::INVALID_NODE) return;
+  const auto& d = doc_of(app, p);
+  for (xanatoo::NodeId id = target; id != xanatoo::INVALID_NODE && id < d.next_id;
+       id = d.get(id).parent) {
+    if (d.get(id).kind == xanatoo::NodeKind::Chrome) {
+      set_reader(app, p, false);
+      return;
+    }
+  }
+}
+
 void expand_ancestors_for_node(App& app, xanatoo::NodeId target) {
   if (target == xanatoo::INVALID_NODE) return;
+  reveal_chrome(app, focused_pane(app), target);
   const auto& d = doc_of(app, focused_pane(app));
   bool any = false;
   std::string doc_key = path_of(app, focused_pane(app));
@@ -310,12 +344,15 @@ void layout_panes(App& app) {
       vp.overscan = std::max(800.f, view_h * 1.5f);
       const std::unordered_map<xanatoo::NodeId, float>* hints =
           pane.height_cache.empty() ? nullptr : &pane.height_cache;
+      app.layout_engine.set_hide_chrome(pane_reader(app, pane));
       pane.layout = app.layout_engine.layout(
           doc_of(app, pane),
           static_cast<float>(std::max(40, pane.w - kSbLayoutGutter)),
           base_of(app, pane), vp, hints, &app.folded_sections,
           pane_cut(app, pane));
       pane.layout_buf = pane.buf;
+      app.layout_engine.set_hide_chrome(false);
+      pane.chrome_parts = xanatoo::chrome_regions(doc_of(app, pane)).size();
       // Refresh height hints from measured (and skipped-stub) boxes.
       for (const auto& b : pane.layout.boxes) {
         if (b.node != xanatoo::INVALID_NODE && b.height > 0.f)

@@ -63,6 +63,7 @@ void clear_interaction_hover(App& app) {
   app.hover.transclude = xanatoo::INVALID_NODE;
   app.hover.transclude_pane = -1;
   app.hover.transclude_src.clear();
+  app.hover.chrome_notice = false;
 }
 
 void draw_stick_cursor(App& app, SDL_Renderer* r, int cx, int cy,

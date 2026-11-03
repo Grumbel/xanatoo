@@ -122,6 +122,7 @@ enum class UiCommand {
   ToggleBrowse,  // read-only navigation mode
   ToggleChrome,  // content only: hide menu bar, toolbars, tabs, status line
   ToggleNative,  // web page ↔ its native xanatoo form (wikipedia:, hn:, …)
+  ToggleReader,  // focused view: hide / show the page chrome (nav, aside, …)
   CollectionView,  // arg: layout / size / sort / "view" for the collection
   ToggleHelp,
   ToggleVirtualKeyboard,  // F3 / View — on-screen keyboard
@@ -146,6 +147,7 @@ enum class UiCommand {
   ToggleFootnoteOverlay,    // view: notes of on-screen footnote marks
   ToggleBookmarkMarks,      // view: wash over bookmarks inside the page
   ToggleHoverPreview,       // split view: preview hovered links on the right
+  ToggleReaderDefault,      // Preferences: reader mode for new views
   TogglePreferences,        // Edit → Preferences window
   SelectStyle,              // arg = style sheet name (styles/<name>.xss)
   ReloadStyles,             // rescan styles/ and re-read the active sheet
@@ -173,6 +175,9 @@ struct UiState {
   bool footnote_overlay = true;
   bool bookmark_marks = true;
   bool hover_preview = false;
+  bool reader_default = false;  // ViewSettings::reader_mode
+  bool reader = false;          // focused view hides the page chrome
+  bool has_chrome = false;      // focused page has page chrome to hide
   bool preferences_open = false;
   bool backlinks = false;
   bool sitemap = false;

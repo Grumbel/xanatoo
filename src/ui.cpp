@@ -210,7 +210,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
       "strike", "cite", "h1", "h2", "h3", "para", "task", "table",
       "figure", "note", "replace", "outline", "paste", "copy", "new", "open",
       "zoomin", "zoomout", "structure", "diff",
-      "back", "forward", "up", "home", "reload", "stop", "bookmark", "history", "browse", "native",
+      "back", "forward", "up", "home", "reload", "stop", "bookmark", "history", "browse", "native", "reader",
       "linespacing", "measure", "style",
       "format", "insert", "view", "lists",
   };
@@ -297,6 +297,7 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
     static const std::unordered_map<std::string, const char*> kShort = {
         {"back", "◀"}, {"forward", "▶"}, {"reload", "↻"}, {"stop", "✕"}, {"bookmark", "★"},
         {"history", "Hist"}, {"browse", "Browse"}, {"native", "Native"},
+        {"reader", "Reader"},
         {"linespacing", "≡↕"}, {"measure", "▣|"},
         {"format", "Aa▾"},
         {"insert", "+▾"}, {"view", "View▾"}, {"lists", "List▾"},
@@ -756,6 +757,23 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
                   cmd, !state.alternate_url.empty());
       if (state.native_view) ImGui::PopStyleColor(2);
     }
+    {
+      // Pressed in reader mode; enabled while there is chrome to hide.
+      const char* tip = !state.has_chrome && !state.reader
+                            ? "Reader mode (F9; only for web pages with "
+                              "navigation, sidebars or footers)"
+                        : state.reader ? "Reader mode on: show the whole page (F9)"
+                                       : "Reader mode: hide navigation, sidebars "
+                                         "and footers (F9)";
+      if (state.reader) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                              ImVec4(0.4f, 0.5f, 0.75f, 1.f));
+      }
+      tool_button("tb_reader", "reader", tip, UiCommand::ToggleReader, cmd,
+                  state.has_chrome || state.reader);
+      if (state.reader) ImGui::PopStyleColor(2);
+    }
 
     ImGui::TextDisabled("|");
     ImGui::SameLine(0.f, 4.f);
@@ -1187,6 +1205,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Home", UiCommand::GoHome, cmd, true, "Alt+Home");
       menu_item_cmd(state.native_view ? "Web Page View" : "Native View",
                     UiCommand::ToggleNative, cmd, !state.alternate_url.empty());
+      if (ImGui::MenuItem("Reader Mode", "F9", state.reader,
+                          state.has_chrome || state.reader))
+        cmd = UiCommand::ToggleReader;
       if (ImGui::BeginMenu("Collection", state.collection)) {
         menu_collection_items(state, cmd, result.arg);
         ImGui::EndMenu();
@@ -1439,6 +1460,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       toggle("Preview links on hover", state.hover_preview,
              UiCommand::ToggleHoverPreview,
              "Split view: a link hovered on the left shows on the right");
+      toggle("Reader mode by default", state.reader_default,
+             UiCommand::ToggleReaderDefault,
+             "Web pages without navigation, sidebars and footers (F9 per view)");
       ImGui::SeparatorText("Reading");
       toggle("Footnote overlay", state.footnote_overlay,
              UiCommand::ToggleFootnoteOverlay,

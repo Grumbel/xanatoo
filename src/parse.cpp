@@ -1375,6 +1375,7 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
 
   switch (node.kind) {
     case NodeKind::Document:
+    case NodeKind::Chrome:  // page chrome of a web page: saved as content
       for (NodeId c : node.children) {
         serialize_node(doc, c, out, indent);
       }
@@ -2755,6 +2756,13 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
       out += ")\n";
       break;
 
+    case NodeKind::Chrome:  // page chrome of a web page: saved as content
+      for (size_t i = 0; i < node.children.size(); ++i) {
+        if (i > 0) out.push_back('\n');
+        serialize_sexpr_node(doc, node.children[i], out, indent);
+      }
+      break;
+
     case NodeKind::Heading: {
       // Legacy path: emit as header with optional depth hint.
       out += pad;
@@ -3409,6 +3417,7 @@ static void serialize_gemtext_node(const Document& doc, NodeId id, std::string& 
     }
     case NodeKind::Section:
     case NodeKind::Article:
+    case NodeKind::Chrome:
       for (NodeId c : n.children) serialize_gemtext_node(doc, c, out);
       break;
     case NodeKind::HorizontalRule:

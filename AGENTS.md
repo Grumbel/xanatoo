@@ -276,6 +276,9 @@ mechanism; historical bundle numbers in TODO.md are archival).
   wrappers unwrapped. BlockQuote, ListItem and TableCell are leaves, so
   nested blocks inside them flatten to line breaks / "• " lines.
 - Images become `[image: alt]` links (no remote image fetch yet).
+- `chrome_nodes` (with `drop_chrome`): chrome blocks become Chrome nodes
+  (`html_append_chrome`); inside running text, list items or cells they are
+  dropped. EPUB chapters pass `keep_chrome = false` to `parse_html_page`.
 - Used by feeds and Hacker News (`gt_quotes` for HN's "> " convention)
   and web pages (page-mode options below); also `html_to_plain`,
   `html_attr`, `resolve_url`, `html_element_end`.
@@ -286,9 +289,17 @@ mechanism; historical bundle numbers in TODO.md are archival).
   URL that no other service claims and that `is_web_url` accepts (not an
   obvious download) opens in-app; it is checked last in dispatch.
 - `parse_html_page`: main content (`<main>`, lone `<article>`, `<body>`)
-  through `html_min` page mode (`sections`, `anchors`, `drop_chrome`);
-  also used for local `.html` files (`parse_document` dispatch). HTML is
-  read-only: Save asks for a `.md` name.
+  through `html_min` page mode (`sections`, `anchors`, `drop_chrome`,
+  `chrome_nodes`); also used for local `.html` files (`parse_document`
+  dispatch). HTML is read-only: Save asks for a `.md` name.
+- Page chrome (nav / aside / footer / form / dialog, landmark roles, navbox /
+  share / cookie classes, what lies around `<main>`) is kept as
+  `NodeKind::Chrome` nodes (`summary` = what it is); hidden / sr-only text is
+  always dropped. Reader mode is view state (`Pane::reader`, `pane_reader` /
+  `set_reader`, default `ViewSettings::reader_mode`): layout leaves Chrome out
+  (`set_hide_chrome`) and draws the "… hidden · Show all" notice
+  (`LayoutResult::chrome_notice`). Never put reader mode into the address or
+  parse a page twice for it (docs/PASSAGES.md "Reader mode").
 - `web_fetch` dispatches on Content-Type; bodies go through
   `detect_charset` / `to_utf8` (util.hpp) first.
 - `external:<url>` hrefs force the system browser (`open_external_url`).

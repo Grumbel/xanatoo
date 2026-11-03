@@ -148,6 +148,7 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
       // Find next
       size_t mlen = 0;
       if (auto hit = xanatoo::find_next(d, pr.text, p.sel.focus, mlen)) {
+        reveal_chrome(app, p, hit->node);
         p.sel.anchor = *hit;
         p.sel.focus = *hit;
         xanatoo::advance_caret(d, p.sel.focus, mlen);

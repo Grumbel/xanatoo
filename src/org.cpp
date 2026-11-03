@@ -749,6 +749,7 @@ void ser_node_org(const Document& doc, NodeId id, std::string& out,
 
     case NodeKind::Section:
     case NodeKind::Article:
+    case NodeKind::Chrome:
       // Structure only — children serialise (header emits stars).
       for (NodeId c : node.children)
         ser_node_org(doc, c, out, list_indent);

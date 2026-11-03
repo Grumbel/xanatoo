@@ -30,6 +30,9 @@ struct ViewSettings {
   // Split view: hovering a link in the left pane previews it on the right.
   // Off by default: the right pane changing without a click confuses.
   bool hover_preview = false;
+  // Reader mode for views that were not switched themselves: web pages show
+  // without their navigation, sidebars and footers. Off by default.
+  bool reader_mode = false;
   // Document style sheet (styles/<name>.xss); "default" = built in.
   std::string style = "default";
 

@@ -101,6 +101,8 @@ bool load_view_settings(ViewSettings& out) {
         out.bookmark_marks = (val == "1" || val == "true" || val == "yes");
       else if (key == "hover_preview")
         out.hover_preview = (val == "1" || val == "true" || val == "yes");
+      else if (key == "reader_mode")
+        out.reader_mode = (val == "1" || val == "true" || val == "yes");
       else if (key == "style" && !val.empty())
         out.style = val;
     } catch (...) {
@@ -126,6 +128,7 @@ bool save_view_settings(const ViewSettings& in) {
   out << "footnotes=" << (v.footnote_overlay ? "1" : "0") << "\n";
   out << "bookmark_marks=" << (v.bookmark_marks ? "1" : "0") << "\n";
   out << "hover_preview=" << (v.hover_preview ? "1" : "0") << "\n";
+  out << "reader_mode=" << (v.reader_mode ? "1" : "0") << "\n";
   out << "style=" << v.style << "\n";
   return write_file_atomic(path, out.str());
 }

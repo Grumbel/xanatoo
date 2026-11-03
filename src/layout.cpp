@@ -164,6 +164,50 @@ void LayoutEngine::layout_children_sequential(
   }
 }
 
+std::vector<NodeId> chrome_regions(const Document& doc) {
+  std::vector<NodeId> out;
+  if (doc.root == INVALID_NODE) return out;
+  std::vector<NodeId> stack{doc.root};
+  while (!stack.empty()) {
+    NodeId id = stack.back();
+    stack.pop_back();
+    if (id == INVALID_NODE || id >= doc.next_id) continue;
+    const Node& n = doc.get(id);
+    if (n.id != id) continue;
+    if (n.kind == NodeKind::Chrome) {
+      out.push_back(id);
+      continue;
+    }
+    for (auto it = n.children.rbegin(); it != n.children.rend(); ++it)
+      stack.push_back(*it);
+  }
+  return out;
+}
+
+std::string chrome_hidden_text(const Document& doc,
+                               const std::vector<NodeId>& regions) {
+  if (regions.empty()) return {};
+  std::vector<std::string> kinds;
+  for (NodeId id : regions) {
+    const std::string& k = doc.get(id).summary;
+    if (!k.empty() && std::find(kinds.begin(), kinds.end(), k) == kinds.end())
+      kinds.push_back(k);
+  }
+  std::string t = regions.size() == 1
+                      ? std::string("1 part of the page hidden")
+                      : std::to_string(regions.size()) + " parts of the page hidden";
+  if (!kinds.empty()) {
+    t += " (";
+    for (size_t i = 0; i < kinds.size() && i < 4; ++i) {
+      if (i) t += ", ";
+      t += kinds[i];
+    }
+    if (kinds.size() > 4) t += ", …";
+    t += ")";
+  }
+  return t;
+}
+
 CollectionView default_collection_view(const Node& collection) {
   CollectionView v;
   const std::string hint = ascii_lower(collection.summary);
@@ -492,9 +536,18 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
             layout_node(doc, child, x, y, max_width, out);
         }
       } else {
+        if (hide_chrome_) layout_chrome_notice(doc, x, y, max_width, out);
         layout_children_sequential(doc, node.children, x, y, max_width, out);
       }
       break;
+
+    case NodeKind::Chrome: {
+      if (hide_chrome_) break;  // reader mode
+      float start_y = y;
+      layout_children_sequential(doc, node.children, x, y, max_width, out);
+      out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+      break;
+    }
 
     case NodeKind::List:
       y += before(BlockRole::List);
@@ -1620,6 +1673,37 @@ static void decode_utf8(const std::string& text,
     }
     out.push_back(cp);
   }
+}
+
+void LayoutEngine::layout_chrome_notice(const Document& doc, float x,
+                                        float& y, float max_width,
+                                        LayoutResult& out) {
+  const std::string what = chrome_hidden_text(doc, chrome_regions(doc));
+  if (what.empty()) return;
+  // Laid out as the root's text, then made decoration: not editable, and
+  // the click goes through out.chrome_notice.
+  Node notice;
+  notice.id = doc.root;
+  notice.kind = NodeKind::Paragraph;
+  InlineSpan lead;
+  lead.kind = InlineKind::Emphasis;
+  lead.text = "Reader mode: " + what + " · ";
+  notice.spans.push_back(std::move(lead));
+  InlineSpan show;
+  show.kind = InlineKind::Link;
+  show.text = "Show all";
+  notice.spans.push_back(std::move(show));
+  const DocStyle& st = *style_;
+  const float em = static_cast<float>(fonts_.regular.pixel_size());
+  const float dp = options_.px_scale;
+  const float start_y = y;
+  y += st[BlockRole::Paragraph].space_before.px(em, dp);
+  const size_t first = out.glyphs.size();
+  layout_role_text(doc, notice, BlockRole::Paragraph, x, y, max_width, out);
+  for (size_t i = first; i < out.glyphs.size(); ++i)
+    if (out.glyphs[i].node == doc.root) out.glyphs[i].node = INVALID_NODE;
+  y += st[BlockRole::Paragraph].space_after.px(em, dp);
+  out.chrome_notice = {INVALID_NODE, x, start_y, max_width, y - start_y};
 }
 
 void LayoutEngine::layout_role_text(const Document& doc, const Node& node,

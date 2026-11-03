@@ -174,6 +174,11 @@ struct Pane {
   std::vector<xanatoo::Selection> marks;        // the `#` passage
   BookmarkMarks bookmark_marks;
   bool section_focus = false;  // Section Focus: the outline picks the cut
+  // Reader mode of this view: page chrome (Chrome nodes) hidden. Unset =
+  // ViewSettings::reader_mode; kept across navigation. View state, never
+  // part of the address (docs/PASSAGES.md "Reader mode"). Use pane_reader.
+  std::optional<bool> reader;
+  size_t chrome_parts = 0;  // top-level Chrome nodes at the last layout
   int x = 0;
   int w = 0;
   int y = 0;
@@ -277,6 +282,7 @@ struct Hover {
   std::string transclude_src;
   std::string bookmark;  // address of the bookmark whose margin icon is hovered
   int bookmark_pane = -1;
+  bool chrome_notice = false;  // reader mode notice ("Show all")
 };
 
 // Touchscreen gestures (app_touch.cpp). Fingers on the document surface
@@ -770,6 +776,12 @@ void reload_folds_for_focused(App& app);
 void toggle_fold_at_caret(App& app);
 void refresh_diff(App& app);
 void expand_ancestors_for_node(App& app, xanatoo::NodeId target);
+// Reader mode (Pane::reader): whether the view hides the page chrome, and
+// switching it (relayout, outline, status message).
+bool pane_reader(const App& app, const Pane& p);
+void set_reader(App& app, Pane& p, bool on);
+// A jump / find hit inside hidden page chrome: leave reader mode first.
+void reveal_chrome(App& app, Pane& p, xanatoo::NodeId target);
 void layout_panes(App& app);
 void ensure_virtual_layout(App& app, Pane& p);
 std::optional<float> caret_doc_y(App& app, Pane& p, const xanatoo::Caret& c);

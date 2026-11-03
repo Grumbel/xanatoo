@@ -47,25 +47,65 @@ constexpr std::array<std::string_view, 22> kBlockTags = {
     "dd",     "address", "center", "details", "summary", "fieldset",
     "legend", "caption", "body",   "html"};
 
-// Page chrome, dropped in drop_chrome mode.
-constexpr std::array<std::string_view, 5> kChromeTags = {
-    "nav", "aside", "form", "footer", "dialog"};
+// Page chrome (tag, class token or ARIA role) and what it is.
+struct ChromeClass {
+  std::string_view token;
+  std::string_view role;
+};
 
-// Class tokens of elements dropped in drop_chrome mode: screen-reader-only
-// text, edit links, navigation boxes, share / cookie banners.
-constexpr std::array<std::string_view, 9> kChromeClasses = {
-    "noprint", "navbox", "sidebar",     "share",        "social",
-    "hidden",  "metadata", "toc-toggle", "advertisement"};
+// Page chrome in drop_chrome mode, with what it is.
+constexpr std::array<ChromeClass, 5> kChromeTags = {{
+    {"nav", "navigation"},
+    {"aside", "sidebar"},
+    {"form", "form"},
+    {"footer", "footer"},
+    {"dialog", "dialog"},
+}};
+
+// Class tokens of page chrome in drop_chrome mode, with what they are:
+// navigation boxes, share / cookie banners, edit links.
+constexpr std::array<ChromeClass, 8> kChromeClasses = {{
+    {"noprint", "page tools"},
+    {"navbox", "navigation"},
+    {"sidebar", "sidebar"},
+    {"share", "sharing"},
+    {"social", "sharing"},
+    {"metadata", "page tools"},
+    {"toc-toggle", "page tools"},
+    {"advertisement", "advertisement"},
+}};
 
 // Substrings of class tokens that mark chrome ("vector-dropdown",
 // "page-toolbar", "mw-editsection", "cookie-banner", …).
-constexpr std::array<std::string_view, 10> kChromeClassParts = {
-    "dropdown",   "toolbar", "navbar",       "breadcrumb",    "editsection",
-    "cookie",     "sr-only", "visually-hidden", "screen-reader", "skip-link"};
+constexpr std::array<ChromeClass, 6> kChromeClassParts = {{
+    {"dropdown", "navigation"},
+    {"toolbar", "page tools"},
+    {"navbar", "navigation"},
+    {"breadcrumb", "navigation"},
+    {"editsection", "page tools"},
+    {"cookie", "cookie notice"},
+}};
+
+// Class tokens (whole or part) of text nobody sees: always dropped in
+// drop_chrome mode, reader mode or not.
+constexpr std::array<std::string_view, 4> kHiddenClassParts = {
+    "sr-only", "visually-hidden", "screen-reader", "skip-link"};
 
 // ARIA landmark roles that are not the content.
-constexpr std::array<std::string_view, 6> kChromeRoles = {
-    "navigation", "banner", "contentinfo", "search", "complementary", "dialog"};
+constexpr std::array<ChromeClass, 6> kChromeRoles = {{
+    {"navigation", "navigation"},
+    {"banner", "banner"},
+    {"contentinfo", "footer"},
+    {"search", "search"},
+    {"complementary", "sidebar"},
+    {"dialog", "dialog"},
+}};
+
+// Tags that are blocks of their own (a chrome region can stand in for
+// them); chrome inline elements are just dropped.
+constexpr std::array<std::string_view, 12> kRegionTags = {
+    "ul", "ol", "table", "menu", "pre", "blockquote",
+    "h1", "h2", "h3", "h4", "h5", "h6"};
 
 enum class FrameKind : uint8_t {
   Container,  // List / Table / TableRow: blocks go inside
@@ -100,6 +140,14 @@ class Builder {
   }
   void close(const std::string& tag);
   void text(std::string_view raw);
+  // Page chrome `inner` as a Chrome node at block level (`role` = what it
+  // is); dropped inside running text, list items or table cells.
+  void chrome_region(std::string role, std::string_view inner,
+                     const HtmlOptions& opt) {
+    if (owner() != INVALID_NODE || in_container()) return;
+    close_para();
+    html_append_chrome(doc_, container(), std::move(role), inner, opt);
+  }
   void finish() {
     close_para();
     while (!frames_.empty()) pop();
@@ -665,27 +713,55 @@ bool ends_self_closed(std::string_view tag) {
          tag.find('=') == std::string_view::npos;
 }
 
-// Hidden, aria-hidden or carrying a chrome class token.
-bool is_chrome(std::string_view attrs) {
-  if (html_has_attr(attrs, "hidden")) return true;
-  if (ascii_lower(html_attr(attrs, "aria-hidden")) == "true") return true;
-  std::string style = ascii_lower(html_attr(attrs, "style"));
-  style.erase(std::remove(style.begin(), style.end(), ' '), style.end());
-  if (style.find("display:none") != std::string::npos) return true;
-  if (one_of(std::string_view(ascii_lower(html_attr(attrs, "role"))), kChromeRoles))
-    return true;
+template <class F>
+void for_each_class(std::string_view attrs, F&& fn) {
   std::string cls = ascii_lower(html_attr(attrs, "class"));
   size_t p = 0;
   while (p < cls.size()) {
     size_t e = cls.find_first_of(" \t\n", p);
     if (e == std::string::npos) e = cls.size();
     std::string_view tok = std::string_view(cls).substr(p, e - p);
-    if (!tok.empty() && one_of(tok, kChromeClasses)) return true;
-    for (std::string_view part : kChromeClassParts)
-      if (tok.find(part) != std::string_view::npos) return true;
+    if (!tok.empty() && fn(tok)) return;
     p = e + 1;
   }
-  return false;
+}
+
+// Hidden, aria-hidden, display:none or screen-reader-only: not shown by a
+// browser either, dropped in both modes.
+bool is_hidden(std::string_view attrs) {
+  if (html_has_attr(attrs, "hidden")) return true;
+  if (ascii_lower(html_attr(attrs, "aria-hidden")) == "true") return true;
+  std::string style = ascii_lower(html_attr(attrs, "style"));
+  style.erase(std::remove(style.begin(), style.end(), ' '), style.end());
+  if (style.find("display:none") != std::string::npos) return true;
+  bool hidden = false;
+  for_each_class(attrs, [&](std::string_view tok) {
+    if (tok == "hidden") hidden = true;
+    for (std::string_view part : kHiddenClassParts)
+      if (tok.find(part) != std::string_view::npos) hidden = true;
+    return hidden;
+  });
+  return hidden;
+}
+
+// What a chrome element is ("navigation", "sidebar", …), from its tag,
+// ARIA role or class tokens; empty for content.
+std::string_view chrome_role(std::string_view tag, std::string_view attrs) {
+  for (const ChromeClass& c : kChromeTags)
+    if (tag == c.token) return c.role;
+  const std::string role = ascii_lower(html_attr(attrs, "role"));
+  for (const ChromeClass& c : kChromeRoles)
+    if (role == c.token) return c.role;
+  std::string_view found;
+  for_each_class(attrs, [&](std::string_view tok) {
+    for (const ChromeClass& c : kChromeClasses)
+      if (tok == c.token) found = c.role;
+    for (const ChromeClass& c : kChromeClassParts)
+      if (found.empty() && tok.find(c.token) != std::string_view::npos)
+        found = c.role;
+    return !found.empty();
+  });
+  return found;
 }
 
 size_t find_ci(std::string_view hay, std::string_view needle, size_t from);
@@ -878,6 +954,30 @@ std::string html_to_plain(std::string_view html) {
   return out;
 }
 
+NodeId html_append_chrome(Document& doc, NodeId parent, std::string role,
+                          std::string_view html, const HtmlOptions& opt) {
+  NodeId c = doc.create(NodeKind::Chrome, parent);
+  doc.get(c).summary = std::move(role);
+  html_append_blocks(doc, c, html, opt);
+  const std::vector<NodeId> inner = doc.get(c).children;
+  if (inner.size() > 1 ||
+      (inner.size() == 1 && doc.get(inner[0]).kind != NodeKind::Chrome))
+    return c;
+  // Nothing readable inside: unhook it again (the arena keeps the node). A
+  // lone inner region (<header><nav>) takes its place, with its own role.
+  auto& kids = doc.get(parent).children;
+  auto it = std::find(kids.begin(), kids.end(), c);
+  if (inner.empty()) {
+    kids.erase(it);
+  } else {
+    *it = inner[0];
+    doc.get(inner[0]).parent = parent;
+    doc.get(c).children.clear();
+  }
+  doc.get(c).parent = INVALID_NODE;
+  return inner.empty() ? INVALID_NODE : inner[0];
+}
+
 void html_append_blocks(Document& doc, NodeId parent, std::string_view html,
                         const HtmlOptions& opt) {
   Builder b(doc, parent, opt);
@@ -943,11 +1043,31 @@ void html_append_blocks(Document& doc, NodeId parent, std::string_view html,
       text_start = i;
       continue;
     }
-    if (opt.drop_chrome && !self_close && !one_of(name, kVoidTags) &&
-        (one_of(name, kChromeTags) || is_chrome(attrs))) {
-      i = html_element_end(html, e + 1, name);
-      text_start = i;
-      continue;
+    if (opt.drop_chrome && !self_close && !one_of(name, kVoidTags)) {
+      std::string_view role =
+          is_hidden(attrs) ? std::string_view{} : chrome_role(name, attrs);
+      // ASP.NET-style pages wrap all of <body> in one <form>.
+      if (role == "form") {
+        std::string_view in = html.substr(
+            e + 1, html_element_end(html, e + 1, name) - e - 1);
+        if (find_ci(in, "<main", 0) != std::string_view::npos ||
+            find_ci(in, "<article", 0) != std::string_view::npos ||
+            find_ci(in, "<h1", 0) != std::string_view::npos)
+          role = {};
+      }
+      if (is_hidden(attrs) || !role.empty()) {
+        i = html_element_end(html, e + 1, name);
+        text_start = i;
+        // A block of chrome becomes a Chrome region (reader mode hides it);
+        // hidden text and chrome inside running text are dropped.
+        if (!role.empty() && opt.chrome_nodes &&
+            (one_of(name, kBlockTags) || one_of(name, kRegionTags) ||
+             std::any_of(kChromeTags.begin(), kChromeTags.end(),
+                         [&](const ChromeClass& c) { return c.token == name; })))
+          b.chrome_region(std::string(role), html.substr(e + 1, i - e - 1),
+                          opt);
+        continue;
+      }
     }
     if (opt.drop_chrome && name == "table" && !self_close &&
         is_layout_table(html, e + 1, attrs)) {

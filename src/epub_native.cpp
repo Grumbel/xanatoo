@@ -372,7 +372,7 @@ std::optional<EpubBook> epub_to_markdown(std::string_view zip, std::string* err)
   }
   html += "</main></body></html>";
 
-  Document doc = parse_html_page(html);
+  Document doc = parse_html_page(html, {}, /*keep_chrome=*/false);
   promote_images(doc);
 
   const std::string title = dc_text(*opf, "title");

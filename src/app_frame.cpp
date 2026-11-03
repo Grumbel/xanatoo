@@ -87,6 +87,9 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.footnote_overlay = app.view_settings.footnote_overlay;
   ui_state.bookmark_marks = app.view_settings.bookmark_marks;
   ui_state.hover_preview = app.view_settings.hover_preview;
+  ui_state.reader_default = app.view_settings.reader_mode;
+  ui_state.reader = pane_reader(app, focused_pane(app));
+  ui_state.has_chrome = focused_pane(app).chrome_parts > 0;
   ui_state.preferences_open = app.preferences_open;
   ui_state.backlinks = app.backlinks_mode;
   ui_state.sitemap = app.sitemap.shown;
@@ -324,7 +327,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::SitemapPrev || c == C::SitemapNext ||
         c == C::OpenTranscludeOther ||
         c == C::ToggleDiff || c == C::ToggleStructure || c == C::ToggleBrowse ||
-        c == C::ToggleChrome || c == C::ToggleNative || c == C::CollectionView ||
+        c == C::ToggleChrome || c == C::ToggleNative ||
+        c == C::ToggleReader || c == C::ToggleReaderDefault ||
+        c == C::CollectionView ||
         c == C::ToggleHelp || c == C::ToggleVirtualKeyboard ||
         c == C::OpenFormatDoc || c == C::OpenSemanticDoc ||
         c == C::OpenInWindow || c == C::OpenExample || c == C::LoadDiffDemo ||
@@ -386,6 +391,12 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         navigate_to_url(app, other);
       break;
     }
+    case C::ToggleReader:
+      if (p.chrome_parts == 0 && !pane_reader(app, p))
+        flash_status(app, "Reader mode: this page has no page chrome to hide");
+      else
+        set_reader(app, p, !pane_reader(app, p));
+      break;
     case C::NavigateUrl:
       xanatoo::platform_release_keyboard();  // URL typed; page is read-only
       if (!arg.empty()) navigate_to_url(app, arg);
@@ -1363,6 +1374,20 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
                             ? "Link previews on hover on"
                             : "Link previews on hover off");
       break;
+    case C::ToggleReaderDefault: {
+      // Views that follow the default switch with it (keep_views first).
+      keep_views(app);
+      app.view_settings.reader_mode = !app.view_settings.reader_mode;
+      xanatoo::save_view_settings(app.view_settings);
+      for (Pane& v : app.panes)
+        if (!v.reader) v.height_cache.clear();
+      app.needs_layout = true;
+      if (app.outline_mode) refresh_outline(app);
+      flash_status(app, app.view_settings.reader_mode
+                            ? "Reader mode is the default"
+                            : "Whole pages are the default");
+      break;
+    }
     case C::TogglePreferences:
       app.preferences_open = !app.preferences_open;
       break;
@@ -2963,7 +2988,7 @@ void present_frame(App& app) {
   else if (!app.hover.href.empty() || !app.hover.bookmark.empty() ||
            app.hover.stretch != xanatoo::INVALID_NODE ||
            app.hover.image != xanatoo::INVALID_NODE ||
-           app.hover.task != xanatoo::INVALID_NODE ||
+           app.hover.task != xanatoo::INVALID_NODE || app.hover.chrome_notice ||
            app.hover.transclude != xanatoo::INVALID_NODE)
     set_cursor(app, app.cursor_hand);
   else

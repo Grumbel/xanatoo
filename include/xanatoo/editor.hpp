@@ -361,9 +361,11 @@ struct OutlineEntry {
   bool folded = false;        // view-local: body (and outline children) hidden
   bool preamble = false;      // top row: title + content before 1st heading
 };
+// skip_chrome: reader mode, headings inside Chrome nodes are left out.
 void collect_outline(const Document& doc, std::vector<OutlineEntry>& out,
                      const std::unordered_set<NodeId>* folded_sections = nullptr,
-                     std::string_view fallback_title = {});
+                     std::string_view fallback_title = {},
+                     bool skip_chrome = false);
 
 // ---------------------------------------------------------------------------
 // Undo / redo via document snapshots (simple, correct at current scale).

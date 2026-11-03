@@ -97,6 +97,9 @@ struct LayoutResult {
   std::vector<RoleBox> role_rules;
   std::vector<ColumnGap> column_gaps;
   float content_height = 0.f;
+  // Reader mode: the "… hidden · Show all" notice at the top (click shows the
+  // page chrome again); height 0 when nothing is hidden.
+  LayoutBox chrome_notice;
   // True when a viewport was active and some sequential blocks were skipped
   // via height hints (glyphs only materialised near the view).
   bool virtualized = false;
@@ -134,6 +137,14 @@ CollectionView default_collection_view(const Node& collection);
 std::vector<CollectionItem> collection_items(const Document& doc,
                                              NodeId collection,
                                              CollectionSort sort);
+
+// Top-level Chrome nodes (page chrome of a web page, not nested in another
+// Chrome node), in document order. Reader mode hides these.
+std::vector<NodeId> chrome_regions(const Document& doc);
+// "3 parts of the page hidden (navigation, sidebar, page footer)"; empty
+// for none.
+std::string chrome_hidden_text(const Document& doc,
+                               const std::vector<NodeId>& regions);
 
 // Optional viewport for large-document virtualization.
 // When bottom > top, sequential block children outside
@@ -189,6 +200,9 @@ public:
     collection_views_ = views;
   }
   const DocStyle& style() const { return *style_; }
+  // Reader mode for the next layout() calls: Chrome nodes are left out and a
+  // notice at the top says what was hidden (LayoutResult::chrome_notice).
+  void set_hide_chrome(bool hide) { hide_chrome_ = hide; }
 
   // height_hints: optional prior block heights (from a previous LayoutResult's
   // boxes). Used only when viewport is active to skip off-screen sequential
@@ -217,6 +231,7 @@ private:
   const std::unordered_map<NodeId, float>* height_hints_ = nullptr;
   const std::unordered_set<NodeId>* folded_sections_ = nullptr;
   NodeId focus_section_ = INVALID_NODE;
+  bool hide_chrome_ = false;
   // Author of the Thread's first Message while laying out that Thread.
   std::string thread_op_;
   bool skipped_any_ = false;
@@ -244,6 +259,9 @@ private:
   // while it downloads, nothing once it failed.
   void layout_remote_image(const Document& doc, const Node& node, float x,
                            float& y, float max_width, LayoutResult& out);
+  // Reader mode: "Reader mode: N parts of the page hidden · Show all".
+  void layout_chrome_notice(const Document& doc, float x, float& y,
+                            float max_width, LayoutResult& out);
   // Paragraph in the role's font.
   void layout_role_text(const Document& doc, const Node& node, BlockRole role,
                         float x, float& y, float max_width, LayoutResult& out);

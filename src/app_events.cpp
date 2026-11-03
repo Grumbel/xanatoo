@@ -28,6 +28,14 @@ namespace fs = std::filesystem;
 
 namespace xanatoo::app {
 
+// Pane-local x / content-relative y over the reader mode notice.
+static bool on_chrome_notice(const Pane& p, float lx, float my) {
+  const xanatoo::LayoutBox& nb = p.layout.chrome_notice;
+  const float y = my + p.scroll_y;
+  return nb.height > 0.f && lx >= nb.x && lx <= nb.x + nb.width && y >= nb.y &&
+         y <= nb.y + nb.height;
+}
+
 static void on_quit(App& app, SDL_Event& ev, bool imgui_mouse,
                     bool imgui_keys) {
   app.running = false;
@@ -346,6 +354,12 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
         app.needs_layout = true;
         return;
       }
+    }
+
+    // Reader mode notice: "… hidden · Show all".
+    if (on_chrome_notice(p, lx, my)) {
+      set_reader(app, p, false);
+      return;
     }
 
     // Follow links: internal #anchors jump in-document; http(s)/mailto open
@@ -848,6 +862,7 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
       app.hover.transclude_src.clear();
       app.hover.bookmark.clear();
       app.hover.bookmark_pane = -1;
+      app.hover.chrome_notice = on_chrome_notice(hp, lx, my);
       if (const BookmarkMark* bm = bookmark_icon_at(app, hp, lx, my)) {
         app.hover.bookmark = bm->address;
         app.hover.bookmark_pane = hover_pane;
@@ -1015,6 +1030,7 @@ static void on_textinput(App& app, SDL_Event& ev, bool imgui_mouse,
     xanatoo::Caret from = p.sel.focus;
     if (from.char_index > 0) from.char_index -= 1;
     if (auto hit = xanatoo::find_next(doc_of(app, p), pr.text, from, mlen)) {
+      reveal_chrome(app, p, hit->node);
       p.sel.anchor = *hit;
       p.sel.focus = *hit;
       xanatoo::advance_caret(doc_of(app, p), p.sel.focus, mlen);
@@ -1658,7 +1674,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
     if (!prompt_key) return;
   } else if (imgui_keys && ev.key.keysym.sym != SDLK_ESCAPE &&
              ev.key.keysym.sym != SDLK_F1 && ev.key.keysym.sym != SDLK_F2 &&
-             ev.key.keysym.sym != SDLK_F11) {
+             ev.key.keysym.sym != SDLK_F9 && ev.key.keysym.sym != SDLK_F11) {
     return;
   }
 
@@ -1671,8 +1687,8 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   if (browsing(app) && !status_prompt) {
     const SDL_Keycode k = ev.key.keysym.sym;
     const bool browse_ok =
-        k == SDLK_ESCAPE || k == SDLK_F1 || k == SDLK_F2 || k == SDLK_F11 ||
-        k == SDLK_LEFT ||
+        k == SDLK_ESCAPE || k == SDLK_F1 || k == SDLK_F2 || k == SDLK_F9 ||
+        k == SDLK_F11 || k == SDLK_LEFT ||
         k == SDLK_RIGHT || k == SDLK_UP || k == SDLK_DOWN || k == SDLK_PAGEUP ||
         k == SDLK_PAGEDOWN || k == SDLK_HOME || k == SDLK_END ||
         k == SDLK_TAB || k == SDLK_RETURN || k == SDLK_KP_ENTER ||
@@ -1808,6 +1824,10 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
 
     case SDLK_F11:
       toggle_chrome(app);
+      break;
+
+    case SDLK_F9:  // as in Firefox
+      execute_command(app, UiCommand::ToggleReader);
       break;
 
     case SDLK_F2:
@@ -1950,6 +1970,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
                        : xanatoo::find_next(doc_of(app, pp), app.prompt.text,
                                             pp.sel.focus, mlen);
         if (hit) {
+          reveal_chrome(app, pp, hit->node);
           pp.sel.anchor = *hit;
           pp.sel.focus = *hit;
           xanatoo::advance_caret(doc_of(app, pp), pp.sel.focus, mlen);

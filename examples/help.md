@@ -138,11 +138,20 @@ and the status line disappear and only the page is left. Prompts (Ctrl+F,
 Ctrl+L) and notices still bring up the status line; right-click → **Show
 Menus and Toolbars** also leaves it.
 
+**F9** (View → **Reader Mode**, the book button) hides the page chrome of a
+web page: navigation, sidebars, banners, footers, share and cookie boxes. A
+line at the top says what is hidden; **Show all** brings it back. Reader mode
+belongs to the view, not to the address: bookmarks and links stay the same,
+and a jump or search hit inside hidden chrome leaves reader mode. Edit →
+Preferences → **Reader mode by default** sets it for views not switched
+themselves.
+
 ### Keyboard (browse)
 - Arrows / Page / Home / End — move and scroll
 - **Space** or **Enter** — expand/collapse stretch or follow link under caret
 - **Ctrl+[** / **Ctrl+]** — collapse / expand all stretches
 - **F2** — return to edit mode
+- **F9** — reader mode (hide navigation, sidebars and footers of web pages)
 - **F11** — content only (hide menus, toolbars, tabs, status line)
 
 ### Gamepad
@@ -167,7 +176,7 @@ Menus and Toolbars** also leaves it.
   tab's trail along); the History panel lists every page of the session
 - **Alt+Up** (read-only pages) — Up one level: parent directory, URL path, subreddit
 - **Alt+Home** — Home page (`welcome.md`; toolbar house button)
-- **Browse toolbar** — Back, Forward, Up, Home, Reload, Native view (web page ↔ `wikipedia:` / `hn:` / `reddit:` / `lemmy:` form; pressed while native), location field, Bookmark, display menus, History, Browse mode; in browse mode Find, Split pane, Heading outline and View tools instead of the display menus
+- **Browse toolbar** — Back, Forward, Up, Home, Reload, Native view (web page ↔ `wikipedia:` / `hn:` / `reddit:` / `lemmy:` form; pressed while native), Reader mode (F9, pressed while on), location field, Bookmark, display menus, History, Browse mode; in browse mode Find, Split pane, Heading outline and View tools instead of the display menus
 - **Edit toolbar** (not in browse mode) — file, clipboard, bold/italic/link; menus for more format, structure, lists, insert; Find, Split pane and Heading outline toggles, and view tools
 - **Services menu** — front pages of the built-in clients: Wikipedia, Hacker News, Reddit, Lemmy, Nostr, Gemini, Standard Ebooks, books and feeds
 - **Ctrl+Shift+H** / **View → History** — session history panel (click to open)

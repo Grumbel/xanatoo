@@ -21,8 +21,12 @@ struct HtmlOptions {
   bool sections = false;     // h1–h6 open nested Section + Header (outline)
   bool anchors = false;      // id= → node label; same-page links stay "#id"
   std::string page_url;      // "same page" for anchors (default: base_url)
-  bool drop_chrome = false;  // drop nav / aside / form / footer, hidden and
-                             // screen-reader-only elements, alt="" images
+  // drop_chrome: drop hidden and screen-reader-only elements, alt="" images
+  // and tracking pixels; page chrome (nav / aside / form / footer, landmark
+  // roles, navbox / share / cookie classes) is dropped too, or becomes Chrome
+  // nodes with chrome_nodes (whole pages: reader mode hides them).
+  bool drop_chrome = false;
+  bool chrome_nodes = false;
 };
 
 // Append the blocks of `html` as children of `parent`:
@@ -32,6 +36,11 @@ struct HtmlOptions {
 // "[image: alt]" links (remote images are not fetched).
 void html_append_blocks(Document& doc, NodeId parent, std::string_view html,
                         const HtmlOptions& opt = {});
+
+// `html` as a Chrome node under `parent` (`role` = what it is, kept in
+// `summary`); INVALID_NODE and nothing added when it has no blocks.
+NodeId html_append_chrome(Document& doc, NodeId parent, std::string role,
+                          std::string_view html, const HtmlOptions& opt);
 
 // Tags stripped, entities decoded, whitespace collapsed and trimmed.
 std::string html_to_plain(std::string_view html);
