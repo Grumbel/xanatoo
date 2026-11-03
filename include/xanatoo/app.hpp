@@ -24,6 +24,7 @@
 #include "xanatoo/layout.hpp"
 #include "xanatoo/locator.hpp"
 #include "xanatoo/minibuffer.hpp"
+#include "xanatoo/paginate.hpp"
 #include "xanatoo/render.hpp"
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/sitemap.hpp"
@@ -155,6 +156,18 @@ struct BookmarkIcon {
   float x = 0.f, y = 0.f, w = 0.f, h = 0.f;
 };
 
+// Paged reading state of a view (app_pages.cpp, docs/PAGED.md), refreshed
+// by every layout_panes. While `on`, Pane::layout is the paginated stack of
+// spreads, scroll_y a multiple of `stride`, and the page bar sits below the
+// view (Pane::h is the page area only).
+struct PageView {
+  bool on = false;
+  int columns = 1;
+  float pitch = 0.f;   // width of one text column
+  float stride = 1.f;  // height of one spread = the scroll step
+  xanatoo::PageMap map;
+};
+
 struct Pane {
   BufferId buf = kNoBuffer;
   NavHistory nav;  // this view's own Back / Forward
@@ -182,6 +195,10 @@ struct Pane {
   // part of the address (docs/PASSAGES.md "Reader mode"). Use pane_reader.
   std::optional<bool> reader;
   size_t chrome_parts = 0;  // top-level Chrome nodes at the last layout
+  // Paged reading of this view (ebook style pages instead of scrolling).
+  // Unset = ViewSettings::paged; view state like `reader`. Use pane_paged.
+  std::optional<bool> paged;
+  PageView pages;
   int x = 0;
   int w = 0;
   int y = 0;
@@ -575,6 +592,8 @@ struct App {
   bool dragging_sel = false;
   bool dragging_split = false;
   bool dragging_scroll = false;
+  int page_slider_pane = -1;  // paged view whose bar slider is being dragged
+  Uint32 page_turn_at = 0;    // SDL ticks of the last wheel page turn
   int scroll_drag_pane = 0;
   float scroll_drag_grab = 0.f;
   int sb_hover = 0;
@@ -815,6 +834,41 @@ void set_reader(App& app, Pane& p, bool on);
 // A jump / find hit inside hidden page chrome: leave reader mode first.
 void reveal_chrome(App& app, Pane& p, xanatoo::NodeId target);
 void layout_panes(App& app);
+
+// ---- Paged reading (app_pages.cpp, docs/PAGED.md) ----
+bool pane_paged(const App& app, const Pane& p);
+void set_paged(App& app, Pane& p, bool on);
+// Text columns per spread of the view (the setting, or what fits).
+int pane_page_columns(const App& app, const Pane& p);
+// Height of the page bar below a paged view (0 for a scrolling one).
+int page_bar_h(const App& app);
+inline int pane_bar_h(const App& app, const Pane& p) {
+  return pane_paged(app, p) ? page_bar_h(app) : 0;
+}
+// layout_panes: cut the freshly laid out single-column pane.layout into
+// pages (replaces it) when the view is paged; else clears pane.pages.
+void paginate_pane(App& app, Pane& p, int columns, float column_w);
+// Scroll position of spread `s` / the spread a content y lies in.
+float spread_scroll(const Pane& p, size_t s);
+size_t spread_at(const Pane& p, float content_y);
+// Turn the page: spreads forward (+) or back (-); clamps. True if moved.
+bool page_turn(App& app, Pane& p, int spreads);
+void page_goto_spread(App& app, Pane& p, size_t spread);
+// Where the view stands: pages (1-based), locations, percent.
+struct PageStatus {
+  size_t first_page = 1, last_page = 1, pages = 1;
+  size_t location = 1, locations = 1;
+  int percent = 0;
+};
+PageStatus page_status(const Pane& p);
+// Pointer on the page bar or an edge zone of paged view `pi`: press /
+// drag / release. Return true when consumed.
+bool page_pointer_down(App& app, int pi, int x, int y);
+// Paged view whose area (page bar included) lies under a window point, or -1.
+int page_view_at(App& app, int x, int y);
+bool page_pointer_drag(App& app, int x, int y);
+void page_pointer_up(App& app);
+void draw_page_chrome(App& app, int pi);  // bar, edge arrows, dividers
 void ensure_virtual_layout(App& app, Pane& p);
 std::optional<float> caret_doc_y(App& app, Pane& p, const xanatoo::Caret& c);
 // The text at (x, view_y) of the pane's current layout, as it shows now.
@@ -860,8 +914,11 @@ float local_x(App& app, float mx, int pi);
 // Scrollbar strip of a view: x of the strip, width reserved at the right of
 // the content, and the layout width taken off the pane width.
 inline int sb_x(const Pane& p) { return p.sb_left ? p.x - kSbW : p.x + p.w - kSbW; }
-inline int sb_reserve(const Pane& p) { return p.sb_left ? 0 : kSbW; }
+inline int sb_reserve(const Pane& p) {
+  return p.pages.on || p.sb_left ? 0 : kSbW;
+}
 inline int sb_gutter(const Pane& p) {
+  if (p.pages.on) return 0;
   return p.sb_left ? kSbLayoutGutter - kSbW : kSbLayoutGutter;
 }
 // Window y → content y of view `pi` (0 = top of its viewport).

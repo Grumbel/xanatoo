@@ -8,6 +8,29 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **263** (this delivery is **262**)
 
+## Status (2026-11-03) — paged reading (ebook style pages)
+
+- F8 / View → Paged Reading (`Pane::paged`, default `ViewSettings::paged`,
+  `page_columns` 0 = fit / 1–3): the view shows spreads of pages instead of
+  scrolling. `paginate` (`paginate.hpp`) cuts the one-column layout into
+  pages at line boundaries and stacks them as spreads of a plain
+  `LayoutResult`, so hit-testing / carets / selection / overlays are
+  untouched; `scroll_y` is a multiple of the spread height. Design and
+  open points: `docs/PAGED.md`.
+- Bar below the page (`app_pages.cpp`): `Pages 7–8 of 78`, seek slider,
+  `Loc 42 of 539 · 10%` (locations = glyphs / 128, font independent), ‹ ›.
+  Turn: PgDn / PgUp, wheel, click on the page edges (arrow on hover), swipe,
+  ← / → in browse mode; caret moves, outline / search / link jumps turn to
+  the page of their target. Zoom / resize / column change keep the reading
+  position (view anchor).
+- Checked under Xvfb (1024×768 book of 12 chapters): two columns, turn by
+  key / edge / wheel / slider, zoom to one column, F8 back to scrolling at
+  the same spot, Ctrl+End / Ctrl+Home. Unit test `test_paginate`.
+- Open: whole page re-laid out per change (no virtualization while paged);
+  no chapter ticks on the slider; no page sheet / margin background; pop-out
+  / tear-off copy `scroll_y` between paged and scrolling views; the footnote
+  strip overlays the page foot; touch swipe not tried on a device.
+
 ## Status (2026-11-03) — page margins, article gaps (style sheets)
 
 - `(page (margin-background …) (margin-image "f.png") (image "p.png"))`:

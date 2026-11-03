@@ -49,6 +49,7 @@ bool scroll_target(App& app, float dy) {
     return moved;
   }
   Pane& p = app.panes[t.pane];
+  if (p.pages.on) return false;  // pages turn on release (touch_finger_up)
   const float s = std::clamp(p.scroll_y + dy, 0.f, pane_max_scroll(app, p));
   const bool moved = s != p.scroll_y;
   p.scroll_y = s;
@@ -242,7 +243,14 @@ void touch_finger_up(App& app, const SDL_TouchFingerEvent& tf) {
       }
       break;
     case TouchMode::Pan:
-      if (primary) {
+      if (primary && !t.on_float && app.panes[t.pane].pages.on) {
+        // A swipe turns the page: left / up → next, right / down → back.
+        const float dx = f->x - t.start_x, dy = f->y - t.start_y;
+        const float need = 48.f * app.ui_scale;
+        const bool horizontal = std::abs(dx) >= std::abs(dy);
+        const float d = horizontal ? dx : dy;
+        if (std::abs(d) >= need) page_turn(app, app.panes[t.pane], d < 0 ? 1 : -1);
+      } else if (primary) {
         const Uint32 now = SDL_GetTicks();
         t.flinging = now - t.last_move_ticks <= kFlingMaxIdleMs &&
                      std::abs(t.velocity) >= kFlingMinSpeed;

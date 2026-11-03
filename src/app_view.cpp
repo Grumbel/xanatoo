@@ -255,9 +255,10 @@ void place_centre_rows(App& app) {
              dock_band_h(app, Dock::Bottom));
   for (int pi = 0; pi < kCentreViews; ++pi) {
     Pane& p = app.panes[pi];
-    if (p.h != view_h) app.needs_layout = true;
+    const int h = std::max(1, view_h - pane_bar_h(app, p));  // page bar below
+    if (p.h != h) app.needs_layout = true;
     p.y = top;
-    p.h = view_h;
+    p.h = h;
   }
 }
 
@@ -276,6 +277,10 @@ bool restore_view_anchor(App& app, Pane& p) {
   if (!p.view_anchor || p.view_anchor->buf != p.buf) return false;
   const auto y = caret_doc_y(app, p, p.view_anchor->pos);
   if (!y) return false;
+  if (p.pages.on) {  // the spread the position lies in
+    p.scroll_y = spread_scroll(p, spread_at(p, *y));
+    return false;
+  }
   p.scroll_y =
       std::clamp(*y - p.view_anchor->view_y, 0.f, pane_max_scroll(app, p));
   return p.layout.virtualized &&
@@ -342,21 +347,34 @@ void layout_panes(App& app) {
       xanatoo::ensure_valid_caret(doc_of(app, pane), pane.sel.focus);
       xanatoo::ensure_valid_caret(doc_of(app, pane), pane.sel.anchor);
       const float view_h = std::max(80.f, static_cast<float>(pane.h));
+      // Paged reading lays the whole page out one column wide, then cuts it
+      // into pages (no virtualization: the page count needs it all).
+      const bool paged = pane_paged(app, pane) && pane.h >= 120;
+      const int columns = paged ? pane_page_columns(app, pane) : 1;
+      pane.pages.on = paged;
       xanatoo::LayoutViewport vp;
-      vp.top = pane.scroll_y;
-      vp.bottom = pane.scroll_y + view_h;
-      vp.overscan = std::max(800.f, view_h * 1.5f);
+      if (!paged) {
+        vp.top = pane.scroll_y;
+        vp.bottom = pane.scroll_y + view_h;
+        vp.overscan = std::max(800.f, view_h * 1.5f);
+      }
       const std::unordered_map<xanatoo::NodeId, float>* hints =
-          pane.height_cache.empty() ? nullptr : &pane.height_cache;
+          pane.height_cache.empty() || paged ? nullptr : &pane.height_cache;
       app.layout_engine.set_hide_chrome(pane_reader(app, pane));
+      const float layout_w = static_cast<float>(
+          std::max(40, (pane.w - sb_gutter(pane)) / columns));
       pane.layout = app.layout_engine.layout(
-          doc_of(app, pane),
-          static_cast<float>(std::max(40, pane.w - sb_gutter(pane))),
-          base_of(app, pane), vp, hints, &app.folded_sections,
-          pane_cut(app, pane));
+          doc_of(app, pane), layout_w, base_of(app, pane), vp, hints,
+          &app.folded_sections, pane_cut(app, pane));
       pane.layout_buf = pane.buf;
       app.layout_engine.set_hide_chrome(false);
       pane.chrome_parts = xanatoo::chrome_regions(doc_of(app, pane)).size();
+      if (paged) {
+        paginate_pane(app, pane, columns, layout_w);
+        pane.materialised_top = 0.f;
+        pane.materialised_bottom = pane.layout.content_height;
+        return;
+      }
       // Refresh height hints from measured (and skipped-stub) boxes.
       for (const auto& b : pane.layout.boxes) {
         if (b.node != xanatoo::INVALID_NODE && b.height > 0.f)
@@ -393,7 +411,7 @@ void layout_panes(App& app) {
 }
 
 void ensure_virtual_layout(App& app, Pane& p) {
-  if (p.height_cache.empty()) return;
+  if (p.pages.on || p.height_cache.empty()) return;
   const float view_h = std::max(80.f, static_cast<float>(p.h));
   const float margin = 64.f;
   const float vis_top = p.scroll_y;
@@ -421,6 +439,7 @@ std::optional<float> caret_doc_y(App& app, Pane& p, const xanatoo::Caret& c) {
 }
 
 void force_full_pane_layout(App& app, Pane& p) {
+  if (p.pages.on) return;  // a paged layout is always whole
   try {
     xanatoo::ensure_valid_caret(doc_of(app, p), p.sel.focus);
     xanatoo::ensure_valid_caret(doc_of(app, p), p.sel.anchor);
@@ -447,6 +466,10 @@ void scroll_caret_into_view(App& app, Pane& p) {
     yopt = caret_doc_y(app, p, p.sel.focus);
   }
   if (!yopt) return;
+  if (p.pages.on) {
+    page_goto_spread(app, p, spread_at(p, *yopt));
+    return;
+  }
   float doc_y = *yopt;
   float margin = 40.f;
   // Visible content height excludes menu/toolbar and status bar.
@@ -494,6 +517,10 @@ void scroll_caret_to_top(App& app, Pane& p) {
     yopt = resolve_top();
   }
   if (!yopt) return;
+  if (p.pages.on) {
+    page_goto_spread(app, p, spread_at(p, *yopt));
+    return;
+  }
   // Small pad so the box edge is not flush under the chrome.
   const float margin = 8.f;
   const float view_h = std::max(80.f, static_cast<float>(p.h));
@@ -504,6 +531,10 @@ void scroll_caret_to_top(App& app, Pane& p) {
 }
 
 float pane_max_scroll(App& app, const Pane& p) {
+  if (p.pages.on) {
+    const size_t n = p.pages.map.spread_count();
+    return spread_scroll(p, n > 0 ? n - 1 : 0);
+  }
   const float view_h = static_cast<float>(p.h);
   return std::max(0.f, p.layout.content_height - view_h + 40.f);
 }

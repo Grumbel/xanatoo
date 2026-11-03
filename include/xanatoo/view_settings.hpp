@@ -33,6 +33,11 @@ struct ViewSettings {
   // Reader mode for views that were not switched themselves: web pages show
   // without their navigation, sidebars and footers. Off by default.
   bool reader_mode = false;
+  // Paged reading for views that were not switched themselves: the page is
+  // cut into pages (docs/PAGED.md) instead of scrolling. Off by default.
+  bool paged = false;
+  // Text columns per spread when paged: 0 = as many as the width allows.
+  int page_columns = 0;
   // Document style sheet (styles/<name>.xss); "default" = built in.
   std::string style = "default";
 

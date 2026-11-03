@@ -158,6 +158,14 @@ static void on_mousewheel(App& app, SDL_Event& ev, bool imgui_mouse,
   if (myw >= app.win_h - status_bar_h) return;
   int pi = pane_at(app, static_cast<float>(mxw), static_cast<float>(myw));
   Pane& p = app.panes[pi];
+  if (p.pages.on) {  // a notch turns the page (not faster than a flip a beat)
+    const Uint32 now = SDL_GetTicks();
+    if (ev.wheel.y != 0 && now - app.page_turn_at > 140) {
+      app.page_turn_at = now;
+      page_turn(app, p, ev.wheel.y > 0 ? -1 : +1);
+    }
+    return;
+  }
   p.scroll_y -= static_cast<float>(ev.wheel.y) * 48.f;
   p.scroll_y = std::clamp(p.scroll_y, 0.f, pane_max_scroll(app, p));
   ensure_virtual_layout(app, p);
@@ -174,6 +182,13 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
 
     // Below soft windows: let ImGui keep the event if it wants it.
     if (imgui_mouse) return;
+
+    // Page bar and edge zones of a paged view.
+    if (const int pv = page_view_at(app, x, y);
+        pv >= 0 && page_pointer_down(app, pv, x, y)) {
+      focus_view(app, pv);
+      return;
+    }
 
     // A click dismisses the `#` mark.
     if (const int hit = pane_at(app, static_cast<float>(x), static_cast<float>(y));
@@ -672,6 +687,7 @@ void pointer_left_up(App& app, int x, int y) {
   app.dragging_sel = false;
   app.dragging_split = false;
   app.dragging_scroll = false;
+  page_pointer_up(app);
   app.dragging_image = false;
   app.dragging_block = false;
   app.drag_block_id = xanatoo::INVALID_NODE;
@@ -699,6 +715,7 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
     // Float drag/resize continue even if ImGui wants the mouse
     // (capture flag can lag one frame after a title-bar grab).
     if (float_motion(app, mx_i, my_i)) return;
+    if (app.page_slider_pane >= 0 && page_pointer_drag(app, mx_i, my_i)) return;
     // Soft-window interactions handled; rest of motion is for panes.
     if (imgui_mouse) return;
 
@@ -1535,7 +1552,9 @@ static bool handle_nav_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
       const float view_h = static_cast<float>(p.h);
       const float step = view_h * 0.85f;
       const float max_s = pane_max_scroll(app, p);
-      if (up)
+      if (p.pages.on)
+        page_turn(app, p, up ? -1 : +1);
+      else if (up)
         p.scroll_y = std::max(0.f, p.scroll_y - step);
       else
         p.scroll_y = std::min(max_s, p.scroll_y + step);
@@ -1701,7 +1720,8 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
     if (!prompt_key) return;
   } else if (imgui_keys && ev.key.keysym.sym != SDLK_ESCAPE &&
              ev.key.keysym.sym != SDLK_F1 && ev.key.keysym.sym != SDLK_F2 &&
-             ev.key.keysym.sym != SDLK_F9 && ev.key.keysym.sym != SDLK_F11) {
+             ev.key.keysym.sym != SDLK_F8 && ev.key.keysym.sym != SDLK_F9 &&
+             ev.key.keysym.sym != SDLK_F11) {
     return;
   }
 
@@ -1710,13 +1730,20 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   if (!status_prompt && handle_sitemap_key(app, ev, ctrl, alt)) return;
   if (!status_prompt && handle_page_key(app, ev, ctrl, alt)) return;
 
+  // Paged reading, read-only: ← → turn the page like PgUp / PgDn.
+  if (!status_prompt && browsing(app) && focused_pane(app).pages.on && !ctrl &&
+      !alt && !shift &&
+      (ev.key.keysym.sym == SDLK_LEFT || ev.key.keysym.sym == SDLK_RIGHT))
+    ev.key.keysym.sym =
+        ev.key.keysym.sym == SDLK_LEFT ? SDLK_PAGEUP : SDLK_PAGEDOWN;
+
   // Browse mode: navigation and view toggles only (no document edits).
   // An open prompt (URL bar, Save as) keeps its own keys.
   if (browsing(app) && !status_prompt) {
     const SDL_Keycode k = ev.key.keysym.sym;
     const bool browse_ok =
-        k == SDLK_ESCAPE || k == SDLK_F1 || k == SDLK_F2 || k == SDLK_F9 ||
-        k == SDLK_F11 || k == SDLK_LEFT ||
+        k == SDLK_ESCAPE || k == SDLK_F1 || k == SDLK_F2 || k == SDLK_F8 ||
+        k == SDLK_F9 || k == SDLK_F11 || k == SDLK_LEFT ||
         k == SDLK_RIGHT || k == SDLK_UP || k == SDLK_DOWN || k == SDLK_PAGEUP ||
         k == SDLK_PAGEDOWN || k == SDLK_HOME || k == SDLK_END ||
         k == SDLK_TAB || k == SDLK_RETURN || k == SDLK_KP_ENTER ||
@@ -1852,6 +1879,10 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
 
     case SDLK_F11:
       toggle_chrome(app);
+      break;
+
+    case SDLK_F8:
+      execute_command(app, UiCommand::TogglePaged);
       break;
 
     case SDLK_F9:  // as in Firefox

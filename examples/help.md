@@ -152,11 +152,21 @@ and a jump or search hit inside hidden chrome leaves reader mode. Edit →
 Preferences → **Reader mode by default** sets it for views not switched
 themselves.
 
+**F8** (View → **Paged Reading**) shows the page as ebook style pages
+instead of scrolling: one to three text columns per spread, a bar at the
+bottom with page numbers, a slider and *locations* (a position that does not
+change with the font size). Turn the page with **PgDn / PgUp**, the mouse
+wheel, a click on the left / right edge of the page, the bar's arrows or a
+swipe; in browse mode also with ← / →. View → **Page columns** sets the
+number of columns, Edit → Preferences → **Paged reading by default** the
+default for views not switched themselves. See `docs/PAGED.md`.
+
 ### Keyboard (browse)
 - Arrows / Page / Home / End — move and scroll
 - **Space** or **Enter** — expand/collapse stretch or follow link under caret
 - **Ctrl+[** / **Ctrl+]** — collapse / expand all stretches
 - **F2** — return to edit mode
+- **F8** — paged reading (ebook style pages instead of scrolling)
 - **F9** — reader mode (hide navigation, sidebars and footers of web pages)
 - **F11** — content only (hide menus, toolbars, tabs, status line)
 

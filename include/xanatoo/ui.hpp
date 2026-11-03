@@ -126,6 +126,9 @@ enum class UiCommand {
   ToggleChrome,  // content only: hide menu bar, toolbars, tabs, status line
   ToggleNative,  // web page ↔ its native xanatoo form (wikipedia:, hn:, …)
   ToggleReader,  // focused view: hide / show the page chrome (nav, aside, …)
+  TogglePaged,        // focused view: scrolling ↔ ebook style pages (F8)
+  TogglePagedDefault, // Preferences: paged reading for new views
+  PageColumns,        // arg: "0" (fit the width) … "3" columns per spread
   CollectionView,  // arg: layout / size / sort / "view" for the collection
   ToggleHelp,
   ToggleVirtualKeyboard,  // F3 / View — on-screen keyboard
@@ -180,6 +183,9 @@ struct UiState {
   bool hover_preview = false;
   bool reader_default = false;  // ViewSettings::reader_mode
   bool reader = false;          // focused view hides the page chrome
+  bool paged = false;           // focused view shows pages
+  bool paged_default = false;   // ViewSettings::paged
+  int page_columns = 0;         // ViewSettings::page_columns
   bool has_chrome = false;      // focused page has page chrome to hide
   bool preferences_open = false;
   bool backlinks = false;

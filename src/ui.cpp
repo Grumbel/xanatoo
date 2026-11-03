@@ -1252,6 +1252,19 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       if (ImGui::MenuItem("Reader Mode", "F9", state.reader,
                           state.has_chrome || state.reader))
         cmd = UiCommand::ToggleReader;
+      if (ImGui::MenuItem("Paged Reading", "F8", state.paged))
+        cmd = UiCommand::TogglePaged;
+      if (ImGui::BeginMenu("Page columns", state.paged)) {
+        static const struct { const char* label; const char* arg; int n; } cols[] = {
+            {"Fit the width", "0", 0}, {"1 column", "1", 1},
+            {"2 columns", "2", 2}, {"3 columns", "3", 3}};
+        for (const auto& c : cols)
+          if (ImGui::MenuItem(c.label, nullptr, state.page_columns == c.n)) {
+            cmd = UiCommand::PageColumns;
+            result.arg = c.arg;
+          }
+        ImGui::EndMenu();
+      }
       if (ImGui::BeginMenu("Collection", state.collection)) {
         menu_collection_items(state, cmd, result.arg);
         ImGui::EndMenu();
@@ -1521,6 +1534,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       toggle("Reader mode by default", state.reader_default,
              UiCommand::ToggleReaderDefault,
              "Web pages without navigation, sidebars and footers (F9 per view)");
+      toggle("Paged reading by default", state.paged_default,
+             UiCommand::TogglePagedDefault,
+             "Ebook style pages instead of scrolling (F8 per view)");
       ImGui::SeparatorText("Reading");
       toggle("Footnote overlay", state.footnote_overlay,
              UiCommand::ToggleFootnoteOverlay,

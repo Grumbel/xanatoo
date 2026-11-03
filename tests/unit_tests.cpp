@@ -29,6 +29,7 @@
 #include "xanatoo/types.hpp"
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/layout.hpp"
+#include "xanatoo/paginate.hpp"
 #include "xanatoo/font.hpp"
 #include "xanatoo/style.hpp"
 
@@ -2774,6 +2775,76 @@ void test_nearest_caret() {
   EXPECT(near && near->node == 2);
 }
 
+void test_paginate() {
+  using namespace xanatoo;
+  // 100 lines of 20 px from y = 24, a heading at line 20, a code box over
+  // lines 40..60 and a 1000 px image-free tail.
+  LayoutResult l;
+  for (int i = 0; i < 100; ++i) {
+    PositionedGlyph g;
+    g.node = 1;
+    g.char_index = static_cast<size_t>(i);
+    g.x = 10.f;
+    g.y = 24.f + 20.f * static_cast<float>(i) + 14.f;  // baseline
+    g.font = (i == 20) ? FontRole::Heading : FontRole::Body;
+    l.glyphs.push_back(g);
+  }
+  l.boxes.push_back({1, 0.f, 24.f, 300.f, 2000.f});
+  l.code_blocks.push_back({INVALID_NODE, 5.f, 24.f + 40 * 20.f, 290.f, 400.f});
+  l.content_height = 24.f + 2000.f + 24.f + 24.f;
+  PageSpec spec;
+  spec.page_h = 300.f;
+  spec.pad_top = 24.f;
+  spec.pad_bottom = 24.f;
+  spec.columns = 2;
+  spec.pitch = 320.f;
+  spec.first_y = 24.f;
+  spec.extents.assign(11, GlyphExtent{14.f, 4.f});
+  PageMap map;
+  LayoutResult out = paginate(l, spec, map);
+  // 252 px per page → 12 lines per page, 9 pages (the last short).
+  EXPECT(map.pages.size() == 9);
+  EXPECT(map.spread_count() == 5);
+  EXPECT(out.content_height == 5 * 300.f);
+  EXPECT(out.glyphs.size() == l.glyphs.size());
+  // Page 1 starts at the top, page 2 is the left column of... spread 0
+  // holds pages 0 and 1: the second one is shifted by the pitch.
+  EXPECT(out.glyphs[0].x == 10.f);
+  EXPECT(out.glyphs[12].x == 10.f + 320.f);
+  // Every page's first line lands at the same height, no line is cut.
+  for (size_t i = 0; i < map.pages.size(); ++i) {
+    const size_t g = map.pages[i].first_glyph;
+    const size_t spread = i / 2;
+    EXPECT(std::abs(out.glyphs[g].y - (spread * 300.f + 24.f + 4.f + 14.f)) <
+           1.f + 4.f);
+    EXPECT(out.glyphs[g].y - 14.f >= spread * 300.f + 24.f - 1.f);
+  }
+  for (const auto& g : out.glyphs) {
+    const float in_spread = std::fmod(g.y, 300.f);
+    EXPECT(in_spread - 14.f >= 23.f && in_spread + 4.f <= 300.f - 24.f + 1.f);
+  }
+  // Pages cut the long box, pieces never leave the page.
+  EXPECT(out.boxes.size() >= map.pages.size());
+  for (const auto& b : out.boxes) {
+    const float top = std::fmod(b.y, 300.f);
+    EXPECT(top >= 23.f && top + b.height <= 300.f - 23.f);
+  }
+  EXPECT(out.code_blocks.size() >= 2);
+  // The heading line is not the last on its page.
+  for (size_t i = 0; i + 1 < map.pages.size(); ++i)
+    EXPECT(map.pages[i + 1].first_glyph != 21u);
+  // Locations follow the glyph count, not the geometry.
+  EXPECT(glyph_location(0) == 1);
+  EXPECT(glyph_location(map.glyph_count) == 1);
+  // An empty layout is one empty page.
+  LayoutResult e;
+  e.content_height = 100.f;
+  PageMap em;
+  LayoutResult eo = paginate(e, spec, em);
+  EXPECT(em.pages.size() == 1);
+  EXPECT(eo.content_height == 300.f);
+}
+
 void test_inflate() {
   using namespace xanatoo;
   // Vectors from Python's gzip / zlib (fixed, dynamic and stored blocks).
@@ -2945,6 +3016,7 @@ int main() {
   test_about_markdown();
   test_sitemap();
   test_nearest_caret();
+  test_paginate();
   test_inflate();
   test_sha256();
   test_revstore();

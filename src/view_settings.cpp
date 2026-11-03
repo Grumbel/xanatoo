@@ -21,6 +21,7 @@ void ViewSettings::clamp() {
   line_spacing = std::clamp(line_spacing, 1.0f, 2.5f);
   margin_pct = std::clamp(margin_pct, 0.f, 40.f);
   margin_y = std::clamp(margin_y, 0.f, 120.f);
+  page_columns = std::clamp(page_columns, 0, 3);
   if (measure_chars < 0) measure_chars = 0;
   if (measure_chars > 0 && measure_chars < 20) measure_chars = 20;
   if (measure_chars > 400) measure_chars = 400;
@@ -103,6 +104,10 @@ bool load_view_settings(ViewSettings& out) {
         out.hover_preview = (val == "1" || val == "true" || val == "yes");
       else if (key == "reader_mode")
         out.reader_mode = (val == "1" || val == "true" || val == "yes");
+      else if (key == "paged")
+        out.paged = (val == "1" || val == "true" || val == "yes");
+      else if (key == "page_columns")
+        out.page_columns = std::stoi(val);
       else if (key == "style" && !val.empty())
         out.style = val;
     } catch (...) {
@@ -129,6 +134,8 @@ bool save_view_settings(const ViewSettings& in) {
   out << "bookmark_marks=" << (v.bookmark_marks ? "1" : "0") << "\n";
   out << "hover_preview=" << (v.hover_preview ? "1" : "0") << "\n";
   out << "reader_mode=" << (v.reader_mode ? "1" : "0") << "\n";
+  out << "paged=" << (v.paged ? "1" : "0") << "\n";
+  out << "page_columns=" << v.page_columns << "\n";
   out << "style=" << v.style << "\n";
   return write_file_atomic(path, out.str());
 }

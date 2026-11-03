@@ -93,6 +93,9 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.hover_preview = app.view_settings.hover_preview;
   ui_state.reader_default = app.view_settings.reader_mode;
   ui_state.reader = pane_reader(app, focused_pane(app));
+  ui_state.paged = pane_paged(app, focused_pane(app));
+  ui_state.paged_default = app.view_settings.paged;
+  ui_state.page_columns = app.view_settings.page_columns;
   ui_state.has_chrome = focused_pane(app).chrome_parts > 0;
   ui_state.preferences_open = app.preferences_open;
   ui_state.backlinks = app.backlinks_mode;
@@ -336,6 +339,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::ToggleDiff || c == C::ToggleStructure || c == C::ToggleBrowse ||
         c == C::ToggleChrome || c == C::ToggleNative ||
         c == C::ToggleReader || c == C::ToggleReaderDefault ||
+        c == C::TogglePaged || c == C::TogglePagedDefault ||
+        c == C::PageColumns ||
         c == C::CollectionView ||
         c == C::ToggleHelp || c == C::ToggleVirtualKeyboard ||
         c == C::OpenFormatDoc || c == C::OpenSemanticDoc ||
@@ -404,6 +409,28 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       else
         set_reader(app, p, !pane_reader(app, p));
       break;
+    case C::TogglePaged:
+      set_paged(app, p, !pane_paged(app, p));
+      break;
+    case C::TogglePagedDefault: {
+      keep_views(app);
+      app.view_settings.paged = !app.view_settings.paged;
+      xanatoo::save_view_settings(app.view_settings);
+      for (Pane& v : app.panes)
+        if (!v.paged) v.height_cache.clear();
+      app.needs_layout = true;
+      flash_status(app, app.view_settings.paged
+                            ? "Paged reading is the default"
+                            : "Scrolling is the default");
+      break;
+    }
+    case C::PageColumns: {
+      keep_views(app);
+      app.view_settings.page_columns = std::clamp(std::atoi(arg.c_str()), 0, 3);
+      xanatoo::save_view_settings(app.view_settings);
+      app.needs_layout = true;
+      break;
+    }
     case C::NavigateUrl:
       xanatoo::platform_release_keyboard();  // URL typed; page is read-only
       if (!arg.empty()) navigate_to_url(app, arg);
@@ -2617,6 +2644,10 @@ static bool update_pane_raster(App& app, int i, int w, int h, float scroll) {
 void draw_pane(App& app, int i) {
   Pane& pane = app.panes[i];
   pane.scroll_y = std::min(pane.scroll_y, pane_max_scroll(app, pane));
+  // Paged: always at the top of a spread.
+  if (pane.pages.on)
+    pane.scroll_y = spread_scroll(
+        pane, spread_at(pane, pane.scroll_y + pane.pages.stride * 0.5f));
 
   const int clip_y = pane.y;
   SDL_Rect clip{pane.x, clip_y, std::max(1, pane.w - sb_reserve(pane)),
@@ -2645,7 +2676,10 @@ void draw_pane(App& app, int i) {
   // Scrollbar lives in the strip excluded from the content clip.
   SDL_RenderSetClipRect(app.sdl, nullptr);
 
-  draw_pane_scrollbar(app, i);
+  if (pane.pages.on)
+    draw_page_chrome(app, i);
+  else
+    draw_pane_scrollbar(app, i);
   draw_preview_badge(app, i);
   draw_load_indicator(app, i);
   pane.scroll_y = exact_scroll;
