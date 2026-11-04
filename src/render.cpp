@@ -34,11 +34,11 @@ static void tile_image(SDL_Renderer* sdl, const Image& img, SDL_Rect rect,
                        int ax, int ay) {
   if (!img.ok || !img.texture || img.width <= 0 || img.height <= 0) return;
   SDL_Rect old{};
-  const SDL_bool was = SDL_RenderIsClipEnabled(sdl);
-  if (was) SDL_RenderGetClipRect(sdl, &old);
+  const bool was = xanatoo::sdl::clip_enabled(sdl);
+  if (was) xanatoo::sdl::get_clip_rect(sdl, &old);
   SDL_Rect clip = rect;
-  if (was && !SDL_IntersectRect(&old, &rect, &clip)) return;
-  SDL_RenderSetClipRect(sdl, &clip);
+  if (was && !xanatoo::sdl::intersect_rect(&old, &rect, &clip)) return;
+  xanatoo::sdl::set_clip_rect(sdl, &clip);
   SDL_SetTextureBlendMode(img.texture, SDL_BLENDMODE_BLEND);
   auto first = [](int from, int anchor, int size) {
     return anchor + static_cast<int>(std::floor(
@@ -49,10 +49,10 @@ static void tile_image(SDL_Renderer* sdl, const Image& img, SDL_Rect rect,
     for (int x = first(clip.x, ax, img.width); x < clip.x + clip.w;
          x += img.width) {
       SDL_Rect to{x, y, img.width, img.height};
-      SDL_RenderCopy(sdl, img.texture, nullptr, &to);
+      xanatoo::sdl::copy(sdl, img.texture, nullptr, &to);
     }
-  if (was) SDL_RenderSetClipRect(sdl, &old);
-  else SDL_RenderSetClipRect(sdl, nullptr);
+  if (was) xanatoo::sdl::set_clip_rect(sdl, &old);
+  else xanatoo::sdl::set_clip_rect(sdl, nullptr);
 }
 
 void Renderer::draw_backdrop(const LayoutResult& layout, const SDL_Rect& area,
@@ -72,7 +72,7 @@ void Renderer::draw_backdrop(const LayoutResult& layout, const SDL_Rect& area,
   auto paper = [&](SDL_Rect r, int ax) {
     SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
     SDL_SetRenderDrawColor(sdl_, st.paper.r, st.paper.g, st.paper.b, 255);
-    SDL_RenderFillRect(sdl_, &r);
+    xanatoo::sdl::fill_rect(sdl_, &r);
     if (paper_img) tile_image(sdl_, *paper_img, r, ax, oy);
   };
   if (!st.has_margin() || layout.page_w <= 0.f) {
@@ -83,20 +83,20 @@ void Renderer::draw_backdrop(const LayoutResult& layout, const SDL_Rect& area,
   auto margin = [&](SDL_Rect r) {
     SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
     SDL_SetRenderDrawColor(sdl_, m.r, m.g, m.b, 255);
-    SDL_RenderFillRect(sdl_, &r);
+    xanatoo::sdl::fill_rect(sdl_, &r);
     if (margin_img) tile_image(sdl_, *margin_img, r, ox, oy);
   };
   margin(area);
   SDL_Rect sheet{px(layout.page_x + origin_x), area.y,
                  static_cast<int>(layout.page_w), area.h};
   SDL_Rect vis{};
-  if (!SDL_IntersectRect(&sheet, &area, &vis)) return;
+  if (!xanatoo::sdl::intersect_rect(&sheet, &area, &vis)) return;
   paper(vis, sheet.x);
   for (const LayoutBox& g : layout.page_gaps) {
     SDL_Rect r{sheet.x, px(g.y - scroll_y), sheet.w,
                std::max(1, static_cast<int>(g.height))};
     SDL_Rect hit{};
-    if (SDL_IntersectRect(&r, &vis, &hit)) margin(hit);
+    if (xanatoo::sdl::intersect_rect(&r, &vis, &hit)) margin(hit);
   }
 }
 
@@ -104,8 +104,8 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
   const DocStyle& st = style_ ? *style_ : fallback_style();
   // Cull against the active SDL clip rect (pane / soft-window client area).
   SDL_Rect clip{};
-  const SDL_bool clipped = SDL_RenderIsClipEnabled(sdl_);
-  if (clipped) SDL_RenderGetClipRect(sdl_, &clip);
+  const bool clipped = xanatoo::sdl::clip_enabled(sdl_);
+  if (clipped) xanatoo::sdl::get_clip_rect(sdl_, &clip);
   auto visible = [&](int x, int y, int w, int h) -> bool {
     if (!clipped) return true;
     if (y + h < clip.y || y > clip.y + clip.h) return false;
@@ -121,14 +121,14 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
       SDL_Rect r{static_cast<int>(rb.box.x + origin_x), px(rb.box.y - scroll_y),
                  static_cast<int>(rb.box.width),
                  static_cast<int>(rb.box.height)};
-      if (visible(r.x, r.y, r.w, r.h)) SDL_RenderFillRect(sdl_, &r);
+      if (visible(r.x, r.y, r.w, r.h)) xanatoo::sdl::fill_rect(sdl_, &r);
     }
     for (const RoleBox& rb : layout.role_frames) {
       set_color(sdl_, st[rb.role].border);
       SDL_Rect r{static_cast<int>(rb.box.x + origin_x), px(rb.box.y - scroll_y),
                  static_cast<int>(rb.box.width),
                  static_cast<int>(rb.box.height)};
-      if (visible(r.x, r.y, r.w, r.h)) SDL_RenderDrawRect(sdl_, &r);
+      if (visible(r.x, r.y, r.w, r.h)) xanatoo::sdl::draw_rect(sdl_, &r);
     }
     for (const auto& mc : layout.message_cards) {
       const Rgba& fill =
@@ -141,7 +141,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
           static_cast<int>(mc.box.width),
           static_cast<int>(mc.box.height)};
       if (!visible(r.x, r.y, r.w, r.h)) continue;
-      SDL_RenderFillRect(sdl_, &r);
+      xanatoo::sdl::fill_rect(sdl_, &r);
     }
     SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
   }
@@ -157,12 +157,12 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
           static_cast<int>(pi.height)};
       if (!visible(dst.x, dst.y, dst.w, dst.h)) continue;
       if (img.ok && img.texture) {
-        SDL_RenderCopy(sdl_, img.texture, nullptr, &dst);
+        xanatoo::sdl::copy(sdl_, img.texture, nullptr, &dst);
       } else {
         SDL_SetRenderDrawColor(sdl_, 200, 200, 210, 255);
-        SDL_RenderDrawRect(sdl_, &dst);
+        xanatoo::sdl::draw_rect(sdl_, &dst);
         SDL_SetRenderDrawColor(sdl_, 230, 230, 235, 255);
-        SDL_RenderFillRect(sdl_, &dst);
+        xanatoo::sdl::fill_rect(sdl_, &dst);
       }
       // Collection cards / remote images (click opens the viewer) and
       // images in the text are not resized by hand.
@@ -171,7 +171,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
       const int hs = 10;
       SDL_Rect handle{dst.x + dst.w - hs, dst.y + dst.h - hs, hs, hs};
       SDL_SetRenderDrawColor(sdl_, 25, 90, 170, 255);
-      SDL_RenderFillRect(sdl_, &handle);
+      xanatoo::sdl::fill_rect(sdl_, &handle);
     }
   }
 
@@ -185,7 +185,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
           px(fill.y - scroll_y),
           static_cast<int>(fill.width),
           static_cast<int>(fill.height)};
-      SDL_RenderFillRect(sdl_, &r);
+      xanatoo::sdl::fill_rect(sdl_, &r);
     }
     SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
   }
@@ -201,9 +201,9 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
           px(cb.y - scroll_y),
           static_cast<int>(cb.width),
           static_cast<int>(cb.height)};
-      if (code.background.visible()) SDL_RenderFillRect(sdl_, &r);
+      if (code.background.visible()) xanatoo::sdl::fill_rect(sdl_, &r);
       set_color(sdl_, code.border);
-      if (code.border.visible()) SDL_RenderDrawRect(sdl_, &r);
+      if (code.border.visible()) xanatoo::sdl::draw_rect(sdl_, &r);
     }
     SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
   }
@@ -219,7 +219,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
         px(qb.y - scroll_y),
         bw,
         static_cast<int>(qb.height)};
-    SDL_RenderFillRect(sdl_, &bar);
+    xanatoo::sdl::fill_rect(sdl_, &bar);
   }
 
   // Note left bars (amber, distinct from quotes)
@@ -232,7 +232,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
         px(nb.y - scroll_y),
         bw,
         static_cast<int>(nb.height)};
-    SDL_RenderFillRect(sdl_, &bar);
+    xanatoo::sdl::fill_rect(sdl_, &bar);
   }
 
   // Message / comment bars (teal — discussion thread)
@@ -245,7 +245,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
         px(mb.y - scroll_y),
         bw,
         static_cast<int>(mb.height)};
-    SDL_RenderFillRect(sdl_, &bar);
+    xanatoo::sdl::fill_rect(sdl_, &bar);
   }
 
   // Table grid lines
@@ -259,7 +259,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
         static_cast<int>(tl.x + origin_x),
         px(tl.y - scroll_y),
         w, h};
-    SDL_RenderFillRect(sdl_, &line);
+    xanatoo::sdl::fill_rect(sdl_, &line);
   }
 
   // Rules under headers
@@ -268,7 +268,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
     SDL_Rect line{static_cast<int>(rb.box.x + origin_x), px(rb.box.y - scroll_y),
                   static_cast<int>(rb.box.width),
                   std::max(1, static_cast<int>(rb.box.height))};
-    SDL_RenderFillRect(sdl_, &line);
+    xanatoo::sdl::fill_rect(sdl_, &line);
   }
 
   // Horizontal rules
@@ -281,7 +281,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
         px(hr.y - scroll_y),
         static_cast<int>(hr.width),
         th};
-    SDL_RenderFillRect(sdl_, &line);
+    xanatoo::sdl::fill_rect(sdl_, &line);
   }
   SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
 
@@ -298,7 +298,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
       int h = fonts_.pick(FontRole::Code).line_height() + 2;
       set_color(sdl_, st[InlineKind::Code].background);
       SDL_Rect r{x, y, w, h};
-      SDL_RenderFillRect(sdl_, &r);
+      xanatoo::sdl::fill_rect(sdl_, &r);
       in_run = false;
     };
     for (const auto& pg : layout.glyphs) {
@@ -348,7 +348,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
       if (visible(dst.x, dst.y, dst.w, dst.h)) {
         SDL_SetTextureColorMod(g.texture, pg.color.r, pg.color.g, pg.color.b);
         SDL_SetTextureAlphaMod(g.texture, pg.color.a);
-        SDL_RenderCopy(sdl_, g.texture, nullptr, &dst);
+        xanatoo::sdl::copy(sdl_, g.texture, nullptr, &dst);
       }
     }
 
@@ -375,12 +375,12 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
       SDL_SetRenderDrawColor(sdl_, pg.color.r, pg.color.g, pg.color.b, 255);
       if (underline) {
         const int uy = px(pg.y + 2.f - scroll_y);
-        SDL_RenderDrawLine(sdl_, ux, uy, ux + uw, uy);
+        xanatoo::sdl::draw_line(sdl_, ux, uy, ux + uw, uy);
       }
       if (strike) {
         const int mid =
             px(pg.y - static_cast<float>(g.bearing_y) * 0.35f - scroll_y);
-        SDL_RenderDrawLine(sdl_, ux, mid, ux + uw, mid);
+        xanatoo::sdl::draw_line(sdl_, ux, mid, ux + uw, mid);
       }
     }
   }
@@ -430,7 +430,7 @@ void Renderer::draw_selection(const std::vector<SelRect>& rects, float origin_x,
     SDL_Rect sr{
         static_cast<int>(rect.x + origin_x), px(rect.y),
         static_cast<int>(rect.w), static_cast<int>(rect.h)};
-    SDL_RenderFillRect(sdl_, &sr);
+    xanatoo::sdl::fill_rect(sdl_, &sr);
   }
   SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
 }
@@ -443,7 +443,7 @@ void Renderer::draw_caret(const CaretScreenPos& pos, float origin_x) {
   r.y = static_cast<int>(pos.y - pos.height * 0.85f);
   r.w = 2;
   r.h = static_cast<int>(pos.height * 0.95f);
-  SDL_RenderFillRect(sdl_, &r);
+  xanatoo::sdl::fill_rect(sdl_, &r);
 }
 
 void Renderer::draw_text(Font& font, float x, float y_baseline,
@@ -480,7 +480,7 @@ void Renderer::draw_text(Font& font, float x, float y_baseline,
           static_cast<int>(pen + gl.bearing_x),
           static_cast<int>(y_baseline - gl.bearing_y),
           gl.width, gl.height};
-      SDL_RenderCopy(sdl_, gl.texture, nullptr, &dst);
+      xanatoo::sdl::copy(sdl_, gl.texture, nullptr, &dst);
     }
     pen += static_cast<float>(gl.advance >> 6);
   }

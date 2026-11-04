@@ -7,7 +7,7 @@
 #include "xanatoo/editor.hpp"
 #include "xanatoo/images.hpp"
 #include "xanatoo/style.hpp"
-#include <SDL.h>
+#include "xanatoo/sdl.hpp"
 #include <vector>
 
 namespace xanatoo {

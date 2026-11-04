@@ -94,7 +94,7 @@ void draw_stick_cursor(App& app, SDL_Renderer* r, int cx, int cy,
       edge(x0, y0, x1, y1, y, xL, xR);
       edge(x1, y1, x2, y2, y, xL, xR);
       edge(x2, y2, x0, y0, y, xL, xR);
-      if (xL <= xR) SDL_RenderDrawLine(r, cx + xL, cy + y, cx + xR, cy + y);
+      if (xL <= xR) xanatoo::sdl::draw_line(r, cx + xL, cy + y, cx + xR, cy + y);
     }
   };
   // Two triangles form the arrow head + stem-ish shape.
@@ -110,12 +110,12 @@ void draw_stick_cursor(App& app, SDL_Renderer* r, int cx, int cy,
   for (int i = 0; i < 7; ++i) {
     int j = (i + 1) % 7;
     // Outline only along silhouette edges (approximate)
-    SDL_RenderDrawLine(r, cx + ox[i], cy + oy[i], cx + ox[j], cy + oy[j]);
+    xanatoo::sdl::draw_line(r, cx + ox[i], cy + oy[i], cx + ox[j], cy + oy[j]);
   }
   // Explicit tip + left edge + bottom for a clearer outline
-  SDL_RenderDrawLine(r, cx + 0, cy + 0, cx + 0, cy + 14);
-  SDL_RenderDrawLine(r, cx + 0, cy + 0, cx + 11, cy + 8);
-  SDL_RenderDrawLine(r, cx + 0, cy + 14, cx + 4, cy + 11);
+  xanatoo::sdl::draw_line(r, cx + 0, cy + 0, cx + 0, cy + 14);
+  xanatoo::sdl::draw_line(r, cx + 0, cy + 0, cx + 11, cy + 8);
+  xanatoo::sdl::draw_line(r, cx + 0, cy + 14, cx + 4, cy + 11);
 }
 
 void set_cursor(App& app, SDL_Cursor* c) {
@@ -126,6 +126,6 @@ void set_cursor(App& app, SDL_Cursor* c) {
   }
 }
 
-void reset_blink(App& app) { app.caret_blink_start = SDL_GetTicks(); }
+void reset_blink(App& app) { app.caret_blink_start = xanatoo::sdl::ticks(); }
 
 }  // namespace xanatoo::app

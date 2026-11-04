@@ -37,6 +37,7 @@
 #include "xanatoo/paginate.hpp"
 #include "xanatoo/font.hpp"
 #include "xanatoo/style.hpp"
+#include "xanatoo/sdl.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -77,6 +78,15 @@ void expect(bool cond, const char* expr, const char* file, int line) {
 
 #define EXPECT(c) expect(!!(c), #c, __FILE__, __LINE__)
 #define EXPECT_EQ(a, b) expect((a) == (b), #a " == " #b, __FILE__, __LINE__)
+
+void test_sdl_time_bridge() {
+  using xanatoo::sdl::ticks_passed;
+  EXPECT(ticks_passed(100, 100));
+  EXPECT(ticks_passed(101, 100));
+  EXPECT(!ticks_passed(99, 100));
+  EXPECT(!ticks_passed(0xfffffff0u, 0x00000010u));
+  EXPECT(ticks_passed(0x00000010u, 0xfffffff0u));
+}
 
 void test_string_helpers() {
   using namespace xanatoo;
@@ -3717,6 +3727,7 @@ void test_math() {
 }
 
 int main() {
+  test_sdl_time_bridge();
   test_about_markdown();
   test_sitemap();
   test_nearest_caret();

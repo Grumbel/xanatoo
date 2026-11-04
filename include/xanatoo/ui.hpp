@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 #pragma once
 
-#include <SDL.h>
+#include "xanatoo/sdl.hpp"
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -342,6 +342,7 @@ private:
 
   bool ready_ = false;
   float scale_ = 1.f;
+  SDL_Window* window_ = nullptr;
   SDL_Renderer* renderer_ = nullptr;
   std::unordered_map<std::string, Icon> icons_;
 

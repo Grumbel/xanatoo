@@ -95,7 +95,7 @@ static void on_dropfile(App& app, SDL_Event& ev, bool imgui_mouse,
   }
 
   int mx = 0, my_raw = 0;
-  SDL_GetMouseState(&mx, &my_raw);
+  xanatoo::sdl::mouse_position(&mx, &my_raw);
   if (static_cast<float>(my_raw) < app.ui_top) return;
   if (my_raw >= app.win_h - status_bar_h) return;
 
@@ -151,7 +151,7 @@ static void on_dropfile(App& app, SDL_Event& ev, bool imgui_mouse,
 static void on_mousewheel(App& app, SDL_Event& ev, bool imgui_mouse,
                           bool imgui_keys) {
   int mxw = 0, myw = 0;
-  SDL_GetMouseState(&mxw, &myw);
+  xanatoo::sdl::mouse_position(&mxw, &myw);
   // Floating windows first (topmost under the pointer).
   if (float_wheel(app, mxw, myw, ev.wheel.y)) return;
   if (imgui_mouse) return;
@@ -159,7 +159,7 @@ static void on_mousewheel(App& app, SDL_Event& ev, bool imgui_mouse,
   int pi = pane_at(app, static_cast<float>(mxw), static_cast<float>(myw));
   Pane& p = app.panes[pi];
   if (p.pages.on) {  // a notch turns the page (not faster than a flip a beat)
-    const Uint32 now = SDL_GetTicks();
+    const Uint32 now = xanatoo::sdl::ticks();
     if (ev.wheel.y != 0 && now - app.page_turn_at > 140) {
       app.page_turn_at = now;
       page_turn(app, p, ev.wheel.y > 0 ? -1 : +1);
@@ -541,7 +541,7 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
     }
 
     if (auto hit = xanatoo::hit_test(p.layout, lx, my, p.scroll_y)) {
-      Uint32 now = SDL_GetTicks();
+      Uint32 now = xanatoo::sdl::ticks();
       bool near = (now - app.last_click_ticks) < 400 &&
                   std::abs(mx - app.last_click_x) < 4.f &&
                   std::abs(my - app.last_click_y) < 4.f;
@@ -569,7 +569,7 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
       p.preferred_x = lx;
       reset_blink(app);
       // Caret placed in the text: on-screen keyboard (Android).
-      if (!browsing(app)) xanatoo::platform_request_keyboard();
+      if (!browsing(app)) xanatoo::platform_request_keyboard(app.window);
     }
 }
 
@@ -1582,7 +1582,7 @@ static bool handle_nav_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
       // When the pointer is over soft chrome, page that surface instead
       // of the document (matches wheel routing).
       int mxk = 0, myk = 0;
-      SDL_GetMouseState(&mxk, &myk);
+      xanatoo::sdl::mouse_position(&mxk, &myk);
       if (float_page_scroll(app, mxk, myk, up)) break;
       const float view_h = static_cast<float>(p.h);
       const float step = view_h * 0.85f;

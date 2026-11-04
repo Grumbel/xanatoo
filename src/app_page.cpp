@@ -249,14 +249,14 @@ void draw_page_panel(App& app) {
   auto [cx, cy, cw, ch] = page_client_rect(app);
   w.scroll = std::min(w.scroll, page_max_scroll(app));
   SDL_Rect clip{cx, cy, cw, ch};
-  SDL_RenderSetClipRect(app.sdl, &clip);
+  xanatoo::sdl::set_clip_rect(app.sdl, &clip);
   if (app.page.rows.empty()) {
     app.renderer.draw_text(
         font, static_cast<float>(cx + 8),
         static_cast<float>(cy + 6 + font.ascender()),
         fit_text(font, "No navigation on this page", cw - 16),
         pal.text_dim.r, pal.text_dim.g, pal.text_dim.b);
-    SDL_RenderSetClipRect(app.sdl, nullptr);
+    xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
     return;
   }
   const float step = outline_row_step(app);
@@ -291,7 +291,7 @@ void draw_page_panel(App& app) {
                            fit_text(f, r.text, cx + text_right - x - 4),
                            ink.r, ink.g, ink.b);
   }
-  SDL_RenderSetClipRect(app.sdl, nullptr);
+  xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
   draw_client_scrollbar(app, cx, cy, cw, ch, w.scroll, page_max_scroll(app));
 }
 

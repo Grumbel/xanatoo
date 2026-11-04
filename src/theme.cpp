@@ -35,18 +35,18 @@ void fill(SDL_Renderer* r, const SDL_Rect& rc, Rgb c, uint8_t a) {
   SDL_SetRenderDrawBlendMode(
       r, a == 255 ? SDL_BLENDMODE_NONE : SDL_BLENDMODE_BLEND);
   set(r, c, a);
-  SDL_RenderFillRect(r, &rc);
+  xanatoo::sdl::fill_rect(r, &rc);
   SDL_SetRenderDrawBlendMode(r, old);
 }
 
 void hline(SDL_Renderer* r, int x0, int x1, int y, Rgb c) {
   set(r, c);
-  SDL_RenderDrawLine(r, x0, y, x1, y);
+  xanatoo::sdl::draw_line(r, x0, y, x1, y);
 }
 
 void vline(SDL_Renderer* r, int x, int y0, int y1, Rgb c) {
   set(r, c);
-  SDL_RenderDrawLine(r, x, y0, x, y1);
+  xanatoo::sdl::draw_line(r, x, y0, x, y1);
 }
 
 void vgradient(SDL_Renderer* r, const SDL_Rect& rc, Rgb top, Rgb bottom) {
@@ -81,7 +81,7 @@ void drop_shadow(SDL_Renderer* r, const SDL_Rect& rc, int offset) {
   for (int i = 0; i < offset; ++i) {
     SDL_SetRenderDrawColor(r, 0, 0, 0, static_cast<Uint8>(46 - i * 12));
     SDL_Rect s{rc.x + 2 + i, rc.y + 2 + i, rc.w, rc.h};
-    SDL_RenderFillRect(r, &s);
+    xanatoo::sdl::fill_rect(r, &s);
   }
   SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
 }
@@ -114,7 +114,7 @@ void draw_window_chrome(SDL_Renderer* r, const WindowChrome& w) {
         w.active ? Rgb{0x9A, 0x74, 0x08} : p.shadow);
   // Outer frame
   SDL_SetRenderDrawColor(r, p.frame.r, p.frame.g, p.frame.b, 255);
-  SDL_RenderDrawRect(r, &o);
+  xanatoo::sdl::draw_rect(r, &o);
   // Close box (right), 16x14 inside the 28px hit zone
   if (w.close_box) {
     auto px = [&](int v) { return static_cast<int>(v * w.scale + 0.5f); };
@@ -125,10 +125,10 @@ void draw_window_chrome(SDL_Renderer* r, const WindowChrome& w) {
     const int cx = cb.x + cb.w / 2, cy = cb.y + cb.h / 2;
     const int arm = px(3);
     for (int d = -arm; d <= arm; ++d) {
-      SDL_RenderDrawPoint(r, cx + d, cy + d);
-      SDL_RenderDrawPoint(r, cx + d + 1, cy + d);
-      SDL_RenderDrawPoint(r, cx + d, cy - d);
-      SDL_RenderDrawPoint(r, cx + d + 1, cy - d);
+      xanatoo::sdl::draw_point(r, cx + d, cy + d);
+      xanatoo::sdl::draw_point(r, cx + d + 1, cy + d);
+      xanatoo::sdl::draw_point(r, cx + d, cy - d);
+      xanatoo::sdl::draw_point(r, cx + d + 1, cy - d);
     }
   }
   // Maximize / restore box, one hit zone (28px) left of the close box
@@ -144,12 +144,12 @@ void draw_window_chrome(SDL_Renderer* r, const WindowChrome& w) {
     if (w.maximized) {  // two overlapping squares
       SDL_Rect s1{cx - a, cy - a + 2, a * 2 - 1, a * 2 - 1};
       SDL_Rect s2{cx - a + 2, cy - a, a * 2 - 1, a * 2 - 1};
-      SDL_RenderDrawRect(r, &s1);
-      SDL_RenderDrawRect(r, &s2);
+      xanatoo::sdl::draw_rect(r, &s1);
+      xanatoo::sdl::draw_rect(r, &s2);
     } else {
       SDL_Rect sq{cx - a, cy - a, a * 2 + 1, a * 2 + 1};
-      SDL_RenderDrawRect(r, &sq);
-      SDL_RenderDrawLine(r, sq.x, sq.y + 1, sq.x + sq.w - 1, sq.y + 1);
+      xanatoo::sdl::draw_rect(r, &sq);
+      xanatoo::sdl::draw_line(r, sq.x, sq.y + 1, sq.x + sq.w - 1, sq.y + 1);
     }
   }
   // Resize grip (SE): diagonal ridges in light/dark pairs
@@ -157,9 +157,9 @@ void draw_window_chrome(SDL_Renderer* r, const WindowChrome& w) {
     const int gx = o.x + o.w - 3, gy = o.y + o.h - 3;
     for (int i = 0; i < 3; ++i) {
       set(r, p.shadow);
-      SDL_RenderDrawLine(r, gx - i * 4 - 1, gy, gx, gy - i * 4 - 1);
+      xanatoo::sdl::draw_line(r, gx - i * 4 - 1, gy, gx, gy - i * 4 - 1);
       set(r, p.highlight);
-      SDL_RenderDrawLine(r, gx - i * 4, gy, gx, gy - i * 4);
+      xanatoo::sdl::draw_line(r, gx - i * 4, gy, gx, gy - i * 4);
     }
   }
 }

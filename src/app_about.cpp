@@ -18,7 +18,7 @@
 #include "xanatoo/util.hpp"
 #include "xanatoo/version.hpp"
 
-#include <SDL.h>
+#include "xanatoo/sdl.hpp"
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include <imgui.h>

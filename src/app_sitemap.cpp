@@ -421,7 +421,7 @@ void draw_sitemap_panel(App& app) {
   auto [cx, cy, cw, ch] = sitemap_client_rect(app);
   w.scroll = std::min(w.scroll, sitemap_max_scroll(app));
   SDL_Rect clip{cx, cy, cw, ch};
-  SDL_RenderSetClipRect(app.sdl, &clip);
+  xanatoo::sdl::set_clip_rect(app.sdl, &clip);
   const std::string status = status_line(app);
   if (!status.empty()) {
     // Word-wrapped: errors carry the URL and HTTP status.
@@ -446,7 +446,7 @@ void draw_sitemap_panel(App& app) {
     app.renderer.draw_text(font, static_cast<float>(cx + 8), y,
                            fit_text(font, line, cw - 16), pal.text_dim.r,
                            pal.text_dim.g, pal.text_dim.b);
-    SDL_RenderSetClipRect(app.sdl, nullptr);
+    xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
     return;
   }
   const SiteCache& c = *current_site(app);
@@ -488,10 +488,10 @@ void draw_sitemap_panel(App& app) {
       const int t = std::max(4, g.twist_w * 2 / 7);
       for (int k = 0; k <= t; ++k) {
         if (!open)
-          SDL_RenderDrawLine(app.sdl, tcx - t / 2 + k, tcy - t + k,
+          xanatoo::sdl::draw_line(app.sdl, tcx - t / 2 + k, tcy - t + k,
                              tcx - t / 2 + k, tcy + t - k);
         else
-          SDL_RenderDrawLine(app.sdl, tcx - t + k, tcy - t / 2 + k,
+          xanatoo::sdl::draw_line(app.sdl, tcx - t + k, tcy - t / 2 + k,
                              tcx + t - k, tcy - t / 2 + k);
       }
     }
@@ -524,7 +524,7 @@ void draw_sitemap_panel(App& app) {
         fit_text(f, label, text_right - g.text_x - count_w - 4), tink.r,
         tink.g, tink.b);
   }
-  SDL_RenderSetClipRect(app.sdl, nullptr);
+  xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
   draw_client_scrollbar(app, cx, cy, cw, ch, w.scroll,
                         sitemap_max_scroll(app));
 }

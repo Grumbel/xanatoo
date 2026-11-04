@@ -7,7 +7,7 @@
 // palette so the two never drift apart.
 #pragma once
 
-#include <SDL.h>
+#include "xanatoo/sdl.hpp"
 
 #include <cstdint>
 #include <string>

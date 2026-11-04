@@ -210,7 +210,7 @@ void press_title(App& app, FloatWindow& w, int mx, int my) {
   }
   // Double-click maximizes / restores; a drag moves the window (a docked
   // or maximized one tears off first, see float_motion).
-  const Uint32 now = SDL_GetTicks();
+  const Uint32 now = xanatoo::sdl::ticks();
   if (w.last_title_click != 0 && now - w.last_title_click < 400) {
     toggle_maximize(app, w);
     w.last_title_click = 0;
@@ -541,10 +541,10 @@ static void draw_soft_window(App& app, FloatWindow& sw) {
   if (!view_live(app, sw.view)) return;
   const Pane& p = app.panes[sw.view];
   SDL_Rect clip{p.x, p.y, p.w, p.h};
-  SDL_RenderSetClipRect(app.sdl, &clip);
+  xanatoo::sdl::set_clip_rect(app.sdl, &clip);
   fill_doc_paper(app, clip);
   draw_pane(app, sw.view);
-  SDL_RenderSetClipRect(app.sdl, nullptr);
+  xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
 }
 
 void draw_floats(App& app) {

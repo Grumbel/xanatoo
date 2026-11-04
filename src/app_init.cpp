@@ -102,7 +102,7 @@ bool app_init(App& app) {
   app.cursor_sizenwse = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENWSE);
   app.cursor_sizeall = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEALL);
   app.cursor_current = app.cursor_arrow;
-  app.caret_blink_start = SDL_GetTicks();
+  app.caret_blink_start = xanatoo::sdl::ticks();
   app.minibuf_hist_path = load_minibuffer_history("path");
   app.minibuf_hist_url = load_minibuffer_history("url");
   app.bookmarks = load_bookmarks();
@@ -213,7 +213,7 @@ void app_shutdown(App& app) {
   // unsaved edits as drafts.
   for (const DocBuffer& b : app.buffers) stash_draft(app, b.id);
   save_session(app);
-  SDL_StopTextInput();
+  xanatoo::sdl::stop_text_input(app.window);
   release_pane_rasters(app);
   app.ui.shutdown();
   if (app.gamepad) {

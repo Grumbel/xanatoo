@@ -390,7 +390,7 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
 
 void flash_status(App& app, const std::string& msg) {
   app.status_notice = msg;
-  app.status_notice_until = SDL_GetTicks() + 4000;
+  app.status_notice_until = xanatoo::sdl::ticks() + 4000;
 }
 
 }  // namespace xanatoo::app

@@ -4,7 +4,7 @@
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
-#include <SDL.h>
+#include "xanatoo/sdl.hpp"
 #include <memory>
 #include <string>
 #include <unordered_map>

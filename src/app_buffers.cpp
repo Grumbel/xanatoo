@@ -405,7 +405,7 @@ void mark_dirty(App& app) {
 }
 
 void note_edit(App& app, DocBuffer& b) {
-  if (!b.draft_due) b.draft_due = SDL_GetTicks() + kDraftDelayMs;
+  if (!b.draft_due) b.draft_due = xanatoo::sdl::ticks() + kDraftDelayMs;
   if (!b.dirty) {
     b.dirty = true;
     update_title(app);

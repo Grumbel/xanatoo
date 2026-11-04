@@ -146,7 +146,7 @@ void save_session(App& app) {
 
 void autosave_session(App& app) {
   if (!app.session_live || no_save()) return;
-  const Uint32 now = SDL_GetTicks();
+  const Uint32 now = xanatoo::sdl::ticks();
   if (now - app.session_checked < 1000) return;
   app.session_checked = now;
   // Pages still on their way would be saved as what they replace.

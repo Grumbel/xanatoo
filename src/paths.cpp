@@ -3,7 +3,7 @@
 
 #include "xanatoo/paths.hpp"
 
-#include <SDL.h>
+#include "xanatoo/sdl.hpp"
 
 #include <array>
 #include <cstdlib>

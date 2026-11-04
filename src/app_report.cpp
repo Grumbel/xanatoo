@@ -22,7 +22,7 @@
 #include <thumtoo/version.hpp>
 #endif
 
-#include <SDL.h>
+#include "xanatoo/sdl.hpp"
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include <imgui.h>
@@ -232,12 +232,16 @@ std::string video_line(App& app) {
   }
   int ww = 0, wh = 0, dw = 0, dh = 0;
   SDL_GetWindowSize(app.window, &ww, &wh);
-  SDL_GetRendererOutputSize(app.sdl, &dw, &dh);
+  xanatoo::sdl::renderer_output_size(app.sdl, &dw, &dh);
   const Uint32 flags = SDL_GetWindowFlags(app.window);
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  const char* mode_name = (flags & SDL_WINDOW_FULLSCREEN) ? "fullscreen" : "windowed";
+#else
   const char* mode_name =
       (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) == SDL_WINDOW_FULLSCREEN_DESKTOP
           ? "fullscreen desktop"
           : (flags & SDL_WINDOW_FULLSCREEN) ? "fullscreen" : "windowed";
+#endif
   s += ", window " + std::to_string(ww) + "x" + std::to_string(wh) +
        " (drawable " + std::to_string(dw) + "x" + std::to_string(dh) + ", " +
        mode_name + "), ui scale " + std::to_string(app.ui_scale).substr(0, 4);
@@ -252,7 +256,7 @@ std::string renderer_line(App& app) {
   if (ri.flags & SDL_RENDERER_SOFTWARE) fl.push_back("software");
   if (ri.flags & SDL_RENDERER_ACCELERATED) fl.push_back("accelerated");
   if (ri.flags & SDL_RENDERER_PRESENTVSYNC) fl.push_back("vsync");
-  if (SDL_RenderTargetSupported(app.sdl)) fl.push_back("render targets");
+  if (xanatoo::sdl::target_supported(app.sdl)) fl.push_back("render targets");
   s += " (" + join(fl, ", ") + "), max texture " +
        std::to_string(ri.max_texture_width) + "x" +
        std::to_string(ri.max_texture_height);

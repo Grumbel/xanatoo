@@ -246,15 +246,15 @@ void Ui::load_icons(SDL_Renderer* renderer) {
     unsigned char* data = stbi_load(path.string().c_str(), &w, &h, &comp, 4);
     if (!data) continue;
 
-    SDL_Surface* surf = SDL_CreateRGBSurfaceWithFormatFrom(
-        data, w, h, 32, w * 4, SDL_PIXELFORMAT_RGBA32);
+    SDL_Surface* surf = xanatoo::sdl::rgba_surface_from(
+        data, w, h, w * 4);
     if (!surf) {
       stbi_image_free(data);
       continue;
     }
     Icon ic;
     ic.texture = SDL_CreateTextureFromSurface(renderer, surf);
-    SDL_FreeSurface(surf);
+    xanatoo::sdl::destroy_surface(surf);
     stbi_image_free(data);
     if (!ic.texture) continue;
     SDL_SetTextureBlendMode(ic.texture, SDL_BLENDMODE_BLEND);
@@ -427,6 +427,7 @@ bool Ui::init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale) {
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
   io.IniFilename = nullptr;
   scale_ = ui_scale > 0.f ? ui_scale : 1.f;
+  window_ = window;
 
   load_ui_fonts(io, scale_);
   apply_classic_theme();
@@ -1833,7 +1834,7 @@ void Ui::end_frame(SDL_Renderer* renderer) {
   if (!ready_) return;
   // A text field (URL bar) just took focus: on-screen keyboard (Android).
   const bool wants_text = ImGui::GetIO().WantTextInput;
-  if (wants_text && !wanted_text_input_) platform_request_keyboard();
+  if (wants_text && !wanted_text_input_) platform_request_keyboard(window_);
   wanted_text_input_ = wants_text;
   ImGui::Render();
   ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);

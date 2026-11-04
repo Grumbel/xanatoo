@@ -10,7 +10,7 @@
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
-#include <SDL.h>
+#include "xanatoo/sdl.hpp"
 #include <cstdint>
 #include <string>
 #include <unordered_map>

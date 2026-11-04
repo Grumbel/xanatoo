@@ -49,12 +49,11 @@ void ImageCache::clear() {
 
 Image ImageCache::to_texture(const unsigned char* rgba, int w, int h) {
   Image img;
-  SDL_Surface* surf = SDL_CreateRGBSurfaceWithFormatFrom(
-      const_cast<unsigned char*>(rgba), w, h, 32, w * 4,
-      SDL_PIXELFORMAT_RGBA32);
+  SDL_Surface* surf = xanatoo::sdl::rgba_surface_from(
+      const_cast<unsigned char*>(rgba), w, h, w * 4);
   if (!surf) return img;
   img.texture = SDL_CreateTextureFromSurface(renderer_, surf);
-  SDL_FreeSurface(surf);
+  xanatoo::sdl::destroy_surface(surf);
   if (!img.texture) return img;
   SDL_SetTextureBlendMode(img.texture, SDL_BLENDMODE_BLEND);
   img.width = w;
@@ -181,15 +180,15 @@ void save_thumb(const std::string& cached, std::vector<unsigned char>& px,
   std::error_code ec;
   fs::create_directories(fs::path(cached).parent_path(), ec);
   const std::string tmp = cached + ".tmp";
-  SDL_Surface* surf = SDL_CreateRGBSurfaceWithFormatFrom(
-      px.data(), w, h, 32, w * 4, SDL_PIXELFORMAT_RGBA32);
+  SDL_Surface* surf = xanatoo::sdl::rgba_surface_from(
+      px.data(), w, h, w * 4);
   if (!surf) return;
-  if (SDL_SaveBMP(surf, tmp.c_str()) != 0) {
+  if (!xanatoo::sdl::save_bmp(surf, tmp.c_str())) {
     std::cerr << "thumbnail: cannot write " << cached << "\n";
   } else {
     fs::rename(tmp, cached, ec);
   }
-  SDL_FreeSurface(surf);
+  xanatoo::sdl::destroy_surface(surf);
 }
 
 }  // namespace

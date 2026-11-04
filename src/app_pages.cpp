@@ -86,9 +86,9 @@ void arrow_glyph(SDL_Renderer* r, const SDL_Rect& rc, bool right,
   SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
   SDL_SetRenderDrawColor(r, ink.r, ink.g, ink.b, alpha);
   for (int t = 0; t < 2; ++t) {
-    SDL_RenderDrawLine(r, cx - dir * s / 2 + t, cy - s, cx + dir * s / 2 + t,
+    xanatoo::sdl::draw_line(r, cx - dir * s / 2 + t, cy - s, cx + dir * s / 2 + t,
                        cy);
-    SDL_RenderDrawLine(r, cx + dir * s / 2 + t, cy, cx - dir * s / 2 + t,
+    xanatoo::sdl::draw_line(r, cx + dir * s / 2 + t, cy, cx - dir * s / 2 + t,
                        cy + s);
   }
 }
@@ -254,7 +254,7 @@ void draw_page_chrome(App& app, int pi) {
   if (!p.pages.on) return;
   SDL_Renderer* r = app.sdl;
   const th::Palette& pal = th::palette();
-  SDL_RenderSetClipRect(r, nullptr);
+  xanatoo::sdl::set_clip_rect(r, nullptr);
 
   // Rules between the columns of a spread.
   SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
@@ -263,7 +263,7 @@ void draw_page_chrome(App& app, int pi) {
     const int cx = p.x + static_cast<int>(std::lround(k * p.pages.pitch));
     const int pad = static_cast<int>(
         std::max(8.f, app.layout_engine.options().margin_y));
-    SDL_RenderDrawLine(r, cx, p.y + pad, cx, p.y + p.h - pad);
+    xanatoo::sdl::draw_line(r, cx, p.y + pad, cx, p.y + p.h - pad);
   }
 
   // Edge zones: an arrow while the pointer is over one.
@@ -277,7 +277,7 @@ void draw_page_chrome(App& app, int pi) {
     if (next ? spread + 1 >= spreads : spread == 0) continue;
     SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(r, pal.accent.r, pal.accent.g, pal.accent.b, 34);
-    SDL_RenderFillRect(r, &e);
+    xanatoo::sdl::fill_rect(r, &e);
     arrow_glyph(r, e, next, pal.accent_dark, 220);
   }
 

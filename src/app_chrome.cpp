@@ -51,7 +51,7 @@ void fill_doc_paper(App& app, const SDL_Rect& rect) {
   const xanatoo::Rgba& c = app.style.paper;
   SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
   SDL_SetRenderDrawColor(app.sdl, c.r, c.g, c.b, 255);
-  SDL_RenderFillRect(app.sdl, &rect);
+  xanatoo::sdl::fill_rect(app.sdl, &rect);
 }
 
 std::string fit_text(xanatoo::Font& font, const std::string& text,
@@ -225,13 +225,13 @@ StatusLine compute_status(App& app) {
   } else if (const FetchJob* job = loading_job(app)) {
     char secs[32];
     std::snprintf(secs, sizeof(secs), "%.1f s",
-                  static_cast<double>(SDL_GetTicks() - job->started) / 1000.0);
+                  static_cast<double>(xanatoo::sdl::ticks() - job->started) / 1000.0);
     label = "Loading " + job->url + " …  " + secs;
     if (app.split) label += job->pane == 0 ? "  (left pane)" : "  (right pane)";
     label += "  ·  Esc stops";
     tone = StatusTone::Info;
   } else if (!app.status_notice.empty() &&
-             SDL_GetTicks() < app.status_notice_until) {
+             xanatoo::sdl::ticks() < app.status_notice_until) {
     label = app.status_notice;
     tone = StatusTone::Notice;
   } else if (app.split_preview.active) {
@@ -471,15 +471,15 @@ void draw_status_bar(App& app) {
     // Focus ring on the active entry field.
     SDL_Rect ring{left.x + 1, left.y + 1, left.w - 2, left.h - 2};
     SDL_SetRenderDrawColor(app.sdl, p.accent.r, p.accent.g, p.accent.b, 255);
-    SDL_RenderDrawRect(app.sdl, &ring);
+    xanatoo::sdl::draw_rect(app.sdl, &ring);
   }
 
   const int ty = left.y + (left.h - font.line_height()) / 2 + font.ascender();
   SDL_Rect clip{left.x + 2, left.y + 1, left.w - 4, left.h - 2};
-  SDL_RenderSetClipRect(app.sdl, &clip);
+  xanatoo::sdl::set_clip_rect(app.sdl, &clip);
   app.renderer.draw_text(font, static_cast<float>(left.x + pad_x),
                          static_cast<float>(ty), st.text, ink.r, ink.g, ink.b);
-  SDL_RenderSetClipRect(app.sdl, nullptr);
+  xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
 
   if (stats_w) {
     th::bevel(app.sdl, right, th::Bevel::Sunken);

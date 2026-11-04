@@ -6,7 +6,7 @@
 #include "xanatoo/version.hpp"
 
 #if defined(__ANDROID__) || defined(_WIN32) || defined(__EMSCRIPTEN__)
-#include <SDL.h>
+#include "xanatoo/sdl.hpp"
 #endif
 
 #include <cstdlib>

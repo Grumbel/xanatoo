@@ -97,9 +97,8 @@ void step(Lightbox& lb, int delta) {
 }
 
 void toggle_window_fullscreen(App& app) {
-  const bool full =
-      (SDL_GetWindowFlags(app.window) & SDL_WINDOW_FULLSCREEN_DESKTOP) != 0;
-  SDL_SetWindowFullscreen(app.window, full ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
+  xanatoo::sdl::set_fullscreen(app.window,
+                            !xanatoo::sdl::fullscreen(app.window));
 }
 
 }  // namespace
@@ -319,7 +318,7 @@ bool lightbox_event(App& app, const SDL_Event& ev) {
         py = ev.motion.y;
         break;
       case SDL_MOUSEWHEEL:
-        SDL_GetMouseState(&px, &py);
+        xanatoo::sdl::mouse_position(&px, &py);
         break;
       default:
         pointer = false;
@@ -402,7 +401,7 @@ bool lightbox_event(App& app, const SDL_Event& ev) {
       return true;
     case SDL_MOUSEWHEEL: {
       int px = 0, py = 0;
-      SDL_GetMouseState(&px, &py);
+      xanatoo::sdl::mouse_position(&px, &py);
       if (ev.wheel.y != 0)
         lightbox_zoom(app, ev.wheel.y > 0 ? 1.25f : 0.8f,
                       static_cast<float>(px), static_cast<float>(py));
@@ -456,7 +455,7 @@ void draw_lightbox(App& app) {
   SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
   SDL_SetRenderDrawColor(app.sdl, 18, 18, 20, 255);
   const SDL_Rect all = lightbox_rect(app);
-  SDL_RenderFillRect(app.sdl, &all);
+  xanatoo::sdl::fill_rect(app.sdl, &all);
 
   xanatoo::Font& font = app.ui_font;
   const int line = font.line_height();
@@ -473,13 +472,13 @@ void draw_lightbox(App& app) {
     const float fw = img.width * sc, fh = img.height * sc;
     lightbox_clamp_pan(lb, area, fw, fh);
     const SDL_Rect clip{area.x, area.y, area.w, area.h};
-    SDL_RenderSetClipRect(app.sdl, &clip);
+    xanatoo::sdl::set_clip_rect(app.sdl, &clip);
     SDL_Rect dst{static_cast<int>(area.cx() + lb.pan_x - fw / 2),
                  static_cast<int>(area.cy() + lb.pan_y - fh / 2),
                  std::max(1, static_cast<int>(fw)),
                  std::max(1, static_cast<int>(fh))};
-    SDL_RenderCopy(app.sdl, img.texture, nullptr, &dst);
-    SDL_RenderSetClipRect(app.sdl, nullptr);
+    xanatoo::sdl::copy(app.sdl, img.texture, nullptr, &dst);
+    xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
     dims = std::to_string(img.width) + "×" + std::to_string(img.height) + " · " +
            std::to_string(static_cast<int>(sc * 100.f + 0.5f)) + "%";
   } else {
@@ -513,7 +512,7 @@ void draw_lightbox(App& app) {
 
   // Hover hints: the edge zone under the pointer shows its icon.
   int mx = 0, my = 0;
-  SDL_GetMouseState(&mx, &my);
+  xanatoo::sdl::mouse_position(&mx, &my);
   const LbZone z = lightbox_zone(app, mx, my);
   if (z != LbZone::None) {
     const int zh = std::max(48, all.h / 7);
@@ -529,12 +528,12 @@ void draw_lightbox(App& app) {
     }
     SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(app.sdl, 255, 255, 255, 22);
-    SDL_RenderFillRect(app.sdl, &zr);
+    xanatoo::sdl::fill_rect(app.sdl, &zr);
     const int d = static_cast<int>(40.f * app.ui_scale);
     const int cx = zr.x + zr.w / 2, cy = zr.y + zr.h / 2;
     SDL_Rect bg{cx - d / 2, cy - d / 2, d, d};
     SDL_SetRenderDrawColor(app.sdl, 0, 0, 0, 150);
-    SDL_RenderFillRect(app.sdl, &bg);
+    xanatoo::sdl::fill_rect(app.sdl, &bg);
     const std::string g = glyph;
     app.renderer.draw_text(
         font, static_cast<float>(cx - font.measure(g) / 2),

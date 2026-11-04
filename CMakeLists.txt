@@ -520,6 +520,7 @@ target_include_directories(xanatoo_tests PRIVATE
   ${FREETYPE_INCLUDE_DIRS}
   ${FONTCONFIG_INCLUDE_DIRS}
 )
+target_sources(xanatoo_tests PRIVATE tests/sdl_api_compile.cpp)
 target_link_libraries(xanatoo_tests PRIVATE
   xanatoo_sqlite3
   ${SDL2_LIBRARIES}

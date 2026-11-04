@@ -476,7 +476,7 @@ void update_split_preview(App& app) {
       sync_entry(app, 1, *e, h.restore[1]);
   }
 
-  const Uint32 now = SDL_GetTicks();
+  const Uint32 now = xanatoo::sdl::ticks();
   const int mx = static_cast<int>(app.mouse_x);
   const int my = static_cast<int>(app.mouse_y);
   const bool in_content = SDL_GetMouseFocus() == app.window &&
@@ -638,13 +638,13 @@ void draw_preview_badge(App& app, int pi) {
   const int top = p.y;
   const int w = std::max(1, p.w - sb_reserve(p));
   const int h = p.h;
-  SDL_RenderSetClipRect(app.sdl, nullptr);
+  xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
   SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
   SDL_SetRenderDrawColor(app.sdl, pal.accent.r, pal.accent.g, pal.accent.b,
                          200);
   for (int k = 0; k < 2; ++k) {
     SDL_Rect fr{p.x + k, top + k, w - 2 * k, h - 2 * k};
-    SDL_RenderDrawRect(app.sdl, &fr);
+    xanatoo::sdl::draw_rect(app.sdl, &fr);
   }
   Font& font = app.ui_font;
   const int pad = 8;
@@ -656,7 +656,7 @@ void draw_preview_badge(App& app, int pi) {
   th::fill(app.sdl, pill, pal.accent_soft, 235);
   SDL_SetRenderDrawColor(app.sdl, pal.accent.r, pal.accent.g, pal.accent.b,
                          255);
-  SDL_RenderDrawRect(app.sdl, &pill);
+  xanatoo::sdl::draw_rect(app.sdl, &pill);
   app.renderer.draw_text(font, static_cast<float>(pill.x + pad),
                          static_cast<float>(pill.y + 3 + font.ascender()),
                          label, pal.accent_dark.r, pal.accent_dark.g,

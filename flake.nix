@@ -198,6 +198,17 @@
                 touch $out
               '')) self.apps.${system};
         in self.packages.${system} // appChecks // {
+          # Compile the SDL-facing geometry/surface bridge directly against
+          # SDL3 headers before migrating the remaining event/ImGui paths.
+          sdl3-api = pkgs.runCommand "xanatoo-check-sdl3-api" {
+            nativeBuildInputs = [ pkgs.pkg-config ];
+            buildInputs = [ pkgs.sdl3 ];
+          } ''
+            c++ -std=c++20 -DXANATOO_SDL3=1 \
+              $(pkg-config --cflags sdl3) -I${./include} \
+              -fsyntax-only ${./tests/sdl_api_compile.cpp}
+            touch $out
+          '';
           version = pkgs.runCommand "xanatoo-check-version" { } ''
             out_v=$(${pkg}/bin/xanatoo --version)
             if [ "$out_v" != "xanatoo ${version}" ]; then

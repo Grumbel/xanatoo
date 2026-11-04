@@ -12,7 +12,7 @@
 #include "xanatoo/paths.hpp"
 #include "xanatoo/platform.hpp"
 
-#include <SDL.h>
+#include "xanatoo/sdl.hpp"
 #include <cstdio>
 #include <filesystem>
 #include <iostream>
@@ -42,11 +42,11 @@ void set_window_icon(SDL_Window* window) {
     int w = 0, h = 0, comp = 0;
     unsigned char* data = stbi_load(path.string().c_str(), &w, &h, &comp, 4);
     if (!data) continue;
-    SDL_Surface* surf = SDL_CreateRGBSurfaceWithFormatFrom(
-        data, w, h, 32, w * 4, SDL_PIXELFORMAT_RGBA32);
+    SDL_Surface* surf = xanatoo::sdl::rgba_surface_from(
+        data, w, h, w * 4);
     if (surf) {
       SDL_SetWindowIcon(window, surf);
-      SDL_FreeSurface(surf);
+      xanatoo::sdl::destroy_surface(surf);
     }
     stbi_image_free(data);
     return;
@@ -113,35 +113,29 @@ int main(int argc, char** argv) {
   SDL_SetHint(SDL_HINT_APP_NAME, "xanatoo");
 #endif
 
-  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER) !=
-      0) {
+  if (!xanatoo::sdl::init_video_and_gamepads()) {
     std::cerr << "SDL_Init: " << SDL_GetError() << "\n";
     return 1;
   }
-  SDL_GameControllerEventState(SDL_ENABLE);
+  xanatoo::sdl::enable_gamepad_events();
   xanatoo::platform_init();
-  if (xanatoo::platform_text_input_at_start())
-    SDL_StartTextInput();
-  else
-    SDL_StopTextInput();
 
   // Android: not fullscreen, so the activity's adjustResize shrinks the
   // surface when the on-screen keyboard opens (fullscreen windows ignore it)
   // and the caret stays visible.
-  Uint32 win_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN;
-  if (opt.fullscreen) win_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
-  SDL_Window* window =
-      SDL_CreateWindow("xanatoo", SDL_WINDOWPOS_CENTERED,
-                       SDL_WINDOWPOS_CENTERED, opt.width, opt.height,
-                       win_flags);
+  SDL_Window* window = xanatoo::sdl::create_window(
+      "xanatoo", opt.width, opt.height, opt.fullscreen);
   if (!window) {
     std::cerr << "SDL_CreateWindow: " << SDL_GetError() << "\n";
     SDL_Quit();
     return 1;
   }
+  if (xanatoo::platform_text_input_at_start())
+    xanatoo::sdl::start_text_input(window);
+  else
+    xanatoo::sdl::stop_text_input(window);
   set_window_icon(window);
-  SDL_Renderer* sdl = SDL_CreateRenderer(
-      window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+  SDL_Renderer* sdl = xanatoo::sdl::create_renderer(window);
   if (!sdl) {
     std::cerr << "SDL_CreateRenderer: " << SDL_GetError() << "\n";
     SDL_DestroyWindow(window);

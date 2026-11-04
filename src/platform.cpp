@@ -4,7 +4,7 @@
 #include "xanatoo/platform.hpp"
 #include "xanatoo/paths.hpp"
 
-#include <SDL.h>
+#include "xanatoo/sdl.hpp"
 
 #include <cmath>
 #include <filesystem>
@@ -180,8 +180,12 @@ void platform_init() {
     SDL_Log("xanatoo: chdir %s failed", user.c_str());
 }
 
-void platform_request_keyboard() { SDL_StartTextInput(); }
-void platform_release_keyboard() { SDL_StopTextInput(); }
+void platform_request_keyboard(SDL_Window* window) {
+  sdl::start_text_input(window);
+}
+void platform_release_keyboard(SDL_Window* window) {
+  sdl::stop_text_input(window);
+}
 
 bool platform_text_input_at_start() { return false; }
 
@@ -210,8 +214,8 @@ void platform_init() {
   }
 #endif
 }
-void platform_request_keyboard() {}
-void platform_release_keyboard() {}
+void platform_request_keyboard(SDL_Window*) {}
+void platform_release_keyboard(SDL_Window*) {}
 bool platform_text_input_at_start() { return true; }
 float platform_default_ui_scale() { return 1.f; }
 

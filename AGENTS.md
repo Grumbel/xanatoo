@@ -162,7 +162,10 @@ toolbar and shortcuts should route through `execute_command`.
   SDL2-compatible API over an SDL3 runtime, explicitly packaging SDL3.dll.
   The app and vendored ImGui still compile against SDL2 headers; WASM,
   Android, and R36S currently retain SDL2. Do not change their ABI until
-  the SDL3 API/backend migration and platform tests are complete.
+  the SDL3 API/backend migration and platform tests are complete. First-party
+  render, window, surface, time and mouse operations now use
+  `xanatoo/sdl.hpp` (switch `XANATOO_SDL3`); `checks.sdl3-api` compiles this
+  bridge with real SDL3 headers. This is not a full SDL3 application target.
 - New options go into `cli.cpp`, `print_usage` and `docs/xanatoo.1`
   (`checks.man` / `checks.help`).
 - Version strings: `version_string()`; network User-Agents via

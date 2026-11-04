@@ -155,9 +155,9 @@ bool stash_all_or_confirm(App& app) {
 }
 
 void autosave_drafts(App& app) {
-  const Uint32 now = SDL_GetTicks();
+  const Uint32 now = xanatoo::sdl::ticks();
   for (DocBuffer& b : app.buffers)
-    if (b.draft_due && SDL_TICKS_PASSED(now, b.draft_due)) {
+    if (b.draft_due && xanatoo::sdl::ticks_passed(now, b.draft_due)) {
       if (b.dirty && !b.placeholder &&
           (b.path.empty() || !is_foreign_path(b.path)))
         write_draft(app, b);

@@ -188,7 +188,7 @@ void cache_page(App& app, const FetchJob& job) {
                          [&](const CachedPage& e) { return e.url == job.url; }),
           c.end());
   c.push_back({job.url, job.shared->final_url, *job.shared->doc,
-               SDL_GetTicks()});
+               xanatoo::sdl::ticks()});
   if (c.size() > kPageCacheMax) c.erase(c.begin());
 }
 
@@ -279,7 +279,7 @@ void finish_navigate(App& app, const FetchJob& job) {
                      pane_address(app, app.panes[job.pane]));
   char secs[32];
   std::snprintf(secs, sizeof(secs), "  (%.1f s)",
-                static_cast<double>(SDL_GetTicks() - job.started) / 1000.0);
+                static_cast<double>(xanatoo::sdl::ticks() - job.started) / 1000.0);
   flash_status(app, "Opened " + r.final_url + secs);
 }
 
@@ -390,7 +390,7 @@ uint64_t start_fetch(App& app, FetchPurpose purpose, int pane,
   job.url = url;
   job.record_history = record_history;
   job.buf = tab_buf;
-  job.started = SDL_GetTicks();
+  job.started = xanatoo::sdl::ticks();
   job.shared = std::make_shared<FetchShared>();
   // There is no pthread runtime in the initial browser build. Its network
   // services are disabled, so resolve unsupported fetches synchronously.
@@ -465,7 +465,7 @@ const FetchJob* pane_fetch(const App& app, int pi) {
 }
 
 const CachedPage* find_cached_page(App& app, const std::string& url) {
-  const Uint32 now = SDL_GetTicks();
+  const Uint32 now = xanatoo::sdl::ticks();
   for (auto it = app.page_cache.rbegin(); it != app.page_cache.rend(); ++it)
     if (it->url == url && now - it->ticks < kPageCacheTtl) return &*it;
   return nullptr;
@@ -486,12 +486,12 @@ void draw_load_indicator(App& app, int pi) {
   namespace th = xanatoo::theme;
   const th::Palette& pal = th::palette();
   const Pane& p = app.panes[pi];
-  const Uint32 now = SDL_GetTicks();
+  const Uint32 now = xanatoo::sdl::ticks();
   const float t = static_cast<float>(now - job->started) / 1000.f;
   // ImGui's tab strip (drawn last) overlaps the pane's first pixels.
   const int top = p.y + 2;
   const int w = std::max(1, p.w - sb_reserve(p));
-  SDL_RenderSetClipRect(app.sdl, nullptr);
+  xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
   SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
 
   // Indeterminate bar: a segment sweeping across the pane's top edge.
@@ -522,7 +522,7 @@ void draw_load_indicator(App& app, int pi) {
   th::fill(app.sdl, pill, pal.notice, 235);
   SDL_SetRenderDrawColor(app.sdl, pal.shadow.r, pal.shadow.g, pal.shadow.b,
                          255);
-  SDL_RenderDrawRect(app.sdl, &pill);
+  xanatoo::sdl::draw_rect(app.sdl, &pill);
   app.renderer.draw_text(font, static_cast<float>(pill.x + pad),
                          static_cast<float>(pill.y + 3 + font.ascender()),
                          label, pal.notice_text.r, pal.notice_text.g,

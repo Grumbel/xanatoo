@@ -6,7 +6,25 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **273** (this delivery is **272**)
+Next bundle number: **274** (this delivery is **273**)
+
+## Status (2026-11-05) — Shared SDL2/SDL3 API bridge
+
+- Added `include/xanatoo/sdl.hpp`, a narrow backend boundary for window and
+  renderer creation, text input, gamepad startup, integer-pixel drawing,
+  render targets/clipping, surfaces, mouse coordinates, fullscreen, and SDL2's
+  wrap-safe 32-bit deadline semantics. First-party render call sites now use
+  this boundary; existing SDL2 and portable builds retain their ABI.
+- SDL3 accepts floating-point rectangles and mouse positions; the bridge keeps
+  document geometry integer based. Startup text input now occurs after the
+  window exists, which also supplies SDL3's required window argument.
+- `checks.sdl3-api` compiles a dedicated translation unit against real `sdl3`
+  headers through `flake.nix`. Native SDL2 minimal app build and CTest pass;
+  this environment does not have Nix/SDL3 available to run the new flake check.
+- **Still pending before `XANATOO_SDL3=1` can build the full application:**
+  SDL3 event/key/gamepad APIs, remaining renderer/report/display APIs, and
+  vendored ImGui SDL3 platform and renderer backends. Win32/Win64 remain on
+  SDL2 compatibility backed by SDL3 until that work is verified.
 
 ## Status (2026-11-04) — Start staged SDL3 migration; cross-build fix
 

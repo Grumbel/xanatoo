@@ -284,7 +284,7 @@ void update_bookmark_marks(App& app, Pane& p) {
     return;
   // Typing relayouts every key: search again once it pauses. Until then
   // the marks are stale and not drawn.
-  const Uint32 now = SDL_GetTicks();
+  const Uint32 now = xanatoo::sdl::ticks();
   if (bm.buf == p.buf && bm.bookmarks_gen == app.bookmarks_gen &&
       now - bm.at < 400)
     return;

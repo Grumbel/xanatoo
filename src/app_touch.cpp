@@ -64,7 +64,7 @@ void begin_gesture(App& app, float x, float y) {
   t.velocity = 0.f;
   t.start_x = x;
   t.start_y = y;
-  t.start_ticks = SDL_GetTicks();
+  t.start_ticks = xanatoo::sdl::ticks();
   t.last_move_ticks = t.start_ticks;
   t.on_float = false;
   const int xi = static_cast<int>(x), yi = static_cast<int>(y);
@@ -191,12 +191,12 @@ void touch_finger_motion(App& app, const SDL_TouchFingerEvent& tf) {
       t.mode = TouchMode::Pan;
       // Start from the origin so the content stays under the finger.
       scroll_target(app, t.start_y - y);
-      t.last_move_ticks = SDL_GetTicks();
+      t.last_move_ticks = xanatoo::sdl::ticks();
       break;
     case TouchMode::Pan: {
       if (!primary) break;
       scroll_target(app, -dy);
-      const Uint32 now = SDL_GetTicks();
+      const Uint32 now = xanatoo::sdl::ticks();
       const float dt =
           static_cast<float>(std::max<Uint32>(1, now - t.last_move_ticks)) /
           1000.f;
@@ -251,7 +251,7 @@ void touch_finger_up(App& app, const SDL_TouchFingerEvent& tf) {
         const float d = horizontal ? dx : dy;
         if (std::abs(d) >= need) page_turn(app, app.panes[t.pane], d < 0 ? 1 : -1);
       } else if (primary) {
-        const Uint32 now = SDL_GetTicks();
+        const Uint32 now = xanatoo::sdl::ticks();
         t.flinging = now - t.last_move_ticks <= kFlingMaxIdleMs &&
                      std::abs(t.velocity) >= kFlingMinSpeed;
         t.fling_ticks = now;
@@ -277,7 +277,7 @@ void touch_finger_up(App& app, const SDL_TouchFingerEvent& tf) {
 
 void update_touch(App& app) {
   Touch& t = app.touch;
-  const Uint32 now = SDL_GetTicks();
+  const Uint32 now = xanatoo::sdl::ticks();
   if (t.mode == TouchMode::Pending && !t.on_float &&
       now - t.start_ticks >= kLongPressMs)
     begin_select(app);

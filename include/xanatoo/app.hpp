@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 #pragma once
 
-#include <SDL.h>
+#include "xanatoo/sdl.hpp"
 
 #include <atomic>
 #include <cstdint>

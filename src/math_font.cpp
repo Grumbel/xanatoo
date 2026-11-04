@@ -278,13 +278,12 @@ const MathRaster& MathFont::raster(uint32_t gid, int px) {
                                                       static_cast<size_t>(slot->bitmap.pitch) +
                                                   static_cast<size_t>(x)];
           }
-        SDL_Surface* surf = SDL_CreateRGBSurfaceFrom(
-            rgba.data(), out.w, out.h, 32, out.w * 4, 0x000000ff, 0x0000ff00,
-            0x00ff0000, 0xff000000);
+        SDL_Surface* surf = xanatoo::sdl::rgba_surface_from(
+            rgba.data(), out.w, out.h, out.w * 4);
         if (surf) {
           out.texture = SDL_CreateTextureFromSurface(renderer_, surf);
           if (out.texture) SDL_SetTextureBlendMode(out.texture, SDL_BLENDMODE_BLEND);
-          SDL_FreeSurface(surf);
+          xanatoo::sdl::destroy_surface(surf);
         }
       }
     }
@@ -321,7 +320,7 @@ void draw_math(SDL_Renderer* r, MathFont& font, const MathBox& box, float x,
       SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
       SDL_SetRenderDrawColor(r, color.r, color.g, color.b, color.a);
       SDL_Rect rc{x0, y0, std::max(1, x1 - x0), y1 - y0};
-      SDL_RenderFillRect(r, &rc);
+      xanatoo::sdl::fill_rect(r, &rc);
       SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
       continue;
     }
@@ -333,7 +332,7 @@ void draw_math(SDL_Renderer* r, MathFont& font, const MathBox& box, float x,
                  g.h};
     SDL_SetTextureColorMod(g.texture, color.r, color.g, color.b);
     SDL_SetTextureAlphaMod(g.texture, color.a);
-    SDL_RenderCopy(r, g.texture, nullptr, &dst);
+    xanatoo::sdl::copy(r, g.texture, nullptr, &dst);
   }
 }
 

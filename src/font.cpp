@@ -132,14 +132,13 @@ Glyph Font::load_glyph(uint32_t codepoint) {
       rgba[i * 4 + 2] = 255;
       rgba[i * 4 + 3] = a;
     }
-    SDL_Surface* surf = SDL_CreateRGBSurfaceFrom(
-        rgba.data(), g.width, g.height, 32, g.width * 4,
-        0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000);
+    SDL_Surface* surf = xanatoo::sdl::rgba_surface_from(
+        rgba.data(), g.width, g.height, g.width * 4);
     if (surf) {
       g.texture = SDL_CreateTextureFromSurface(renderer_, surf);
       if (g.texture)
         SDL_SetTextureBlendMode(g.texture, SDL_BLENDMODE_BLEND);
-      SDL_FreeSurface(surf);
+      xanatoo::sdl::destroy_surface(surf);
     }
   }
   return g;

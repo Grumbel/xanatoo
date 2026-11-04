@@ -88,23 +88,23 @@ void draw_footnote_overlay(App& app, int pi, const SDL_Rect& clip) {
   }
 
   const xanatoo::DocStyle& st = app.style;
-  SDL_RenderSetClipRect(app.sdl, &clip);
+  xanatoo::sdl::set_clip_rect(app.sdl, &clip);
   SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
   for (int k = 1; k <= 4; ++k) {  // soft shadow onto the text above
     SDL_SetRenderDrawColor(app.sdl, 0, 0, 0, static_cast<Uint8>(32 / k));
-    SDL_RenderDrawLine(app.sdl, strip.x, strip.y - k, strip.x + strip.w - 1,
+    xanatoo::sdl::draw_line(app.sdl, strip.x, strip.y - k, strip.x + strip.w - 1,
                        strip.y - k);
   }
   SDL_SetRenderDrawColor(app.sdl, st.paper.r, st.paper.g, st.paper.b, 255);
-  SDL_RenderFillRect(app.sdl, &strip);
+  xanatoo::sdl::fill_rect(app.sdl, &strip);
   const xanatoo::Rgba rule = st[xanatoo::BlockRole::Footnote].border;
   if (rule.visible()) {
     SDL_SetRenderDrawColor(app.sdl, rule.r, rule.g, rule.b, rule.a);
-    SDL_RenderDrawLine(app.sdl, strip.x, strip.y, strip.x + strip.w - 1,
+    xanatoo::sdl::draw_line(app.sdl, strip.x, strip.y, strip.x + strip.w - 1,
                        strip.y);
   }
 
-  SDL_RenderSetClipRect(app.sdl, &strip);
+  xanatoo::sdl::set_clip_rect(app.sdl, &strip);
   app.renderer.draw(fo.layout, -static_cast<float>(strip.y),
                     static_cast<float>(pane.x));
   if (fo.content_h > static_cast<float>(h)) {
@@ -114,11 +114,11 @@ void draw_footnote_overlay(App& app, int pi, const SDL_Rect& clip) {
     for (int k = 0; k < kFadePx; ++k) {
       SDL_SetRenderDrawColor(app.sdl, st.paper.r, st.paper.g, st.paper.b,
                              static_cast<Uint8>(255 * (k + 1) / kFadePx));
-      SDL_RenderDrawLine(app.sdl, strip.x, y0 + k, strip.x + strip.w - 1,
+      xanatoo::sdl::draw_line(app.sdl, strip.x, y0 + k, strip.x + strip.w - 1,
                          y0 + k);
     }
   }
-  SDL_RenderSetClipRect(app.sdl, &clip);
+  xanatoo::sdl::set_clip_rect(app.sdl, &clip);
 
   fo.y = static_cast<float>(strip.y - pane.y);
   fo.h = static_cast<float>(h);

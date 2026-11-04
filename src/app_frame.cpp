@@ -444,7 +444,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     }
     case C::NavigateUrl:
-      xanatoo::platform_release_keyboard();  // URL typed; page is read-only
+      xanatoo::platform_release_keyboard(app.window);  // URL typed; page is read-only
       if (!arg.empty()) {
         const std::string kw = search_from_location(app, arg);
         navigate_to_url(app, kw.empty() ? arg : kw);
@@ -1507,7 +1507,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
 void run_chrome(App& app) {
   // Content only keeps the status line while a prompt or notice needs it.
   status_bar_h = app.chrome_hidden && app.prompt.kind == PromptKind::None &&
-                         SDL_GetTicks() >= app.status_notice_until
+                         xanatoo::sdl::ticks() >= app.status_notice_until
                      ? 0
                      : status_bar_full_h;
   xanatoo::UiState ui_state;
@@ -1642,10 +1642,10 @@ static void draw_pane_overlays(App& app, int i) {
                        static_cast<int>(x1 - x0) + 4,
                        app.fonts.regular.line_height() + 4};
             SDL_SetRenderDrawColor(app.sdl, 230, 160, 30, 70);
-            SDL_RenderFillRect(app.sdl, &r);
+            xanatoo::sdl::fill_rect(app.sdl, &r);
             const int uy = static_cast<int>(base + 3.f - draw_scroll);
             SDL_SetRenderDrawColor(app.sdl, 200, 120, 10, 255);
-            SDL_RenderDrawLine(app.sdl, r.x + 1, uy, r.x + r.w - 2, uy);
+            xanatoo::sdl::draw_line(app.sdl, r.x + 1, uy, r.x + r.w - 2, uy);
             last = r;
           });
       if (last.w > 0) {
@@ -1655,7 +1655,7 @@ static void draw_pane_overlays(App& app, int i) {
         const int cy = last.y + last.h / 2;
         SDL_SetRenderDrawColor(app.sdl, 200, 120, 10, 255);
         for (int k = 0; k < h; ++k)
-          SDL_RenderDrawLine(app.sdl, x + k, cy - (h - k), x + k, cy + (h - k));
+          xanatoo::sdl::draw_line(app.sdl, x + k, cy - (h - k), x + k, cy + (h - k));
       }
     }
     // Ordinary Back/Forward: wash the precise link which led to the next
@@ -1691,10 +1691,10 @@ static void draw_pane_overlays(App& app, int i) {
                        static_cast<int>(x1 - x0) + 4,
                        app.fonts.regular.line_height() + 4};
             SDL_SetRenderDrawColor(app.sdl, accent.r, accent.g, accent.b, 58);
-            SDL_RenderFillRect(app.sdl, &r);
+            xanatoo::sdl::fill_rect(app.sdl, &r);
             const int uy = static_cast<int>(base + 3.f - draw_scroll);
             SDL_SetRenderDrawColor(app.sdl, accent.r, accent.g, accent.b, 220);
-            SDL_RenderDrawLine(app.sdl, r.x + 1, uy, r.x + r.w - 2, uy);
+            xanatoo::sdl::draw_line(app.sdl, r.x + 1, uy, r.x + r.w - 2, uy);
           });
     }
     // Bookmarks inside the page, under the `#` passage of this view's
@@ -1731,8 +1731,8 @@ static void draw_pane_overlays(App& app, int i) {
       const int top = static_cast<int>(cp.y - cp.height * 0.8f);
       const SDL_Rect bar{x - 1, top, 3, static_cast<int>(cp.height)};
       const SDL_Rect tab{x - 4, top - 4, 9, 5};
-      SDL_RenderFillRect(app.sdl, &bar);
-      SDL_RenderFillRect(app.sdl, &tab);
+      xanatoo::sdl::fill_rect(app.sdl, &bar);
+      xanatoo::sdl::fill_rect(app.sdl, &tab);
     }
     // A ribbon in the margin per bookmark: says what the wash is and takes
     // the clicks (select, right-click menu).
@@ -1751,12 +1751,12 @@ static void draw_pane_overlays(App& app, int i) {
       // Body down to the notch, then two legs narrowing to its tip.
       const int notch = std::max(3, w / 2);
       const SDL_Rect body{x, y, w, h - notch};
-      SDL_RenderFillRect(app.sdl, &body);
+      xanatoo::sdl::fill_rect(app.sdl, &body);
       for (int k = 0; k < notch; ++k) {
         const int yy = y + h - notch + k;
         const int leg = std::max(1, w / 2 - k);
-        SDL_RenderDrawLine(app.sdl, x, yy, x + leg - 1, yy);
-        SDL_RenderDrawLine(app.sdl, x + w - leg, yy, x + w - 1, yy);
+        xanatoo::sdl::draw_line(app.sdl, x, yy, x + leg - 1, yy);
+        xanatoo::sdl::draw_line(app.sdl, x + w - leg, yy, x + w - 1, yy);
       }
     }
     // The `#` passage of this view's address.
@@ -1780,7 +1780,7 @@ static void draw_pane_overlays(App& app, int i) {
                        static_cast<int>(x1 - x0) + 4,
                        app.fonts.regular.line_height() + 4};
             SDL_SetRenderDrawColor(app.sdl, 230, 160, 30, 70);
-            SDL_RenderFillRect(app.sdl, &r);
+            xanatoo::sdl::fill_rect(app.sdl, &r);
             if (first.w == 0) first = r;
           });
       if (first.w > 0) {
@@ -1789,7 +1789,7 @@ static void draw_pane_overlays(App& app, int i) {
         const int cy = first.y + first.h / 2;
         SDL_SetRenderDrawColor(app.sdl, 200, 120, 10, 255);
         for (int k = 0; k < h; ++k)
-          SDL_RenderDrawLine(app.sdl, x + h - 1 - k, cy - (h - k),
+          xanatoo::sdl::draw_line(app.sdl, x + h - 1 - k, cy - (h - k),
                              x + h - 1 - k, cy + (h - k));
       }
     }
@@ -1813,11 +1813,11 @@ static void draw_pane_overlays(App& app, int i) {
             int h = app.fonts.regular.line_height() + 4;
             SDL_SetRenderDrawColor(app.sdl, 40, 110, 220, 45);
             SDL_Rect r{x, y, w, h};
-            SDL_RenderFillRect(app.sdl, &r);
+            xanatoo::sdl::fill_rect(app.sdl, &r);
             int uy = static_cast<int>(base + 3.f - draw_scroll);
             SDL_SetRenderDrawColor(app.sdl, 20, 80, 190, 255);
-            SDL_RenderDrawLine(app.sdl, x + 1, uy, x + w - 2, uy);
-            SDL_RenderDrawLine(app.sdl, x + 1, uy + 1, x + w - 2, uy + 1);
+            xanatoo::sdl::draw_line(app.sdl, x + 1, uy, x + w - 2, uy);
+            xanatoo::sdl::draw_line(app.sdl, x + 1, uy + 1, x + w - 2, uy + 1);
           });
     }
     // Stretch marker wash
@@ -1841,9 +1841,9 @@ static void draw_pane_overlays(App& app, int i) {
         SDL_Rect r{pane.x + static_cast<int>(box.x),
                    static_cast<int>(box.y - pane.scroll_y + py),
                    static_cast<int>(box.width), static_cast<int>(h)};
-        SDL_RenderFillRect(app.sdl, &r);
+        xanatoo::sdl::fill_rect(app.sdl, &r);
         SDL_SetRenderDrawColor(app.sdl, 30, 120, 80, 200);
-        SDL_RenderDrawRect(app.sdl, &r);
+        xanatoo::sdl::draw_rect(app.sdl, &r);
         break;
       }
     }
@@ -1858,16 +1858,16 @@ static void draw_pane_overlays(App& app, int i) {
         int ih = static_cast<int>(pi.height);
         SDL_SetRenderDrawColor(app.sdl, 25, 90, 170, 180);
         SDL_Rect hover_rect{ix, iy, iw, ih};
-        SDL_RenderDrawRect(app.sdl, &hover_rect);
+        xanatoo::sdl::draw_rect(app.sdl, &hover_rect);
         const int hs = app.hover.image_handle ? 14 : 10;
         SDL_Rect handle{ix + iw - hs, iy + ih - hs, hs, hs};
         SDL_SetRenderDrawColor(app.sdl, app.hover.image_handle ? 15 : 25,
                                app.hover.image_handle ? 70 : 90,
                                app.hover.image_handle ? 200 : 170, 255);
-        SDL_RenderFillRect(app.sdl, &handle);
+        xanatoo::sdl::fill_rect(app.sdl, &handle);
         if (app.hover.image_handle) {
           SDL_SetRenderDrawColor(app.sdl, 255, 255, 255, 220);
-          SDL_RenderDrawRect(app.sdl, &handle);
+          xanatoo::sdl::draw_rect(app.sdl, &handle);
         }
         break;
       }
@@ -1886,10 +1886,10 @@ static void draw_pane_overlays(App& app, int i) {
           int gh = static_cast<int>(gap.height);
           SDL_SetRenderDrawColor(app.sdl, 25, 90, 170, 90);
           SDL_Rect wide{gx_i - 4, gy_i, 9, gh};
-          SDL_RenderFillRect(app.sdl, &wide);
+          xanatoo::sdl::fill_rect(app.sdl, &wide);
           SDL_SetRenderDrawColor(app.sdl, 25, 90, 170, 255);
           SDL_Rect bar{gx_i - 1, gy_i, 3, gh};
-          SDL_RenderFillRect(app.sdl, &bar);
+          xanatoo::sdl::fill_rect(app.sdl, &bar);
           break;
         }
       }
@@ -1903,9 +1903,9 @@ static void draw_pane_overlays(App& app, int i) {
         int h = static_cast<int>(box.height);
         SDL_SetRenderDrawColor(app.sdl, 40, 140, 80, 55);
         SDL_Rect r{x, y, 26, h};
-        SDL_RenderFillRect(app.sdl, &r);
+        xanatoo::sdl::fill_rect(app.sdl, &r);
         SDL_SetRenderDrawColor(app.sdl, 30, 120, 70, 220);
-        SDL_RenderDrawRect(app.sdl, &r);
+        xanatoo::sdl::draw_rect(app.sdl, &r);
         break;
       }
     }
@@ -1919,14 +1919,14 @@ static void draw_pane_overlays(App& app, int i) {
         int h = static_cast<int>(box.height);
         SDL_SetRenderDrawColor(app.sdl, 80, 120, 180, 50);
         SDL_Rect r{x, y, gw, h};
-        SDL_RenderFillRect(app.sdl, &r);
+        xanatoo::sdl::fill_rect(app.sdl, &r);
         // Stronger grip dots centered in the gutter
         int gx = x + gw / 2 - 2;
         int gy = y + h / 2;
         SDL_SetRenderDrawColor(app.sdl, 40, 90, 160, 255);
         for (int d = -6; d <= 6; d += 6) {
           SDL_Rect dot{gx, gy + d, 4, 4};
-          SDL_RenderFillRect(app.sdl, &dot);
+          xanatoo::sdl::fill_rect(app.sdl, &dot);
         }
         break;
       }
@@ -1942,9 +1942,9 @@ static void draw_pane_overlays(App& app, int i) {
         int h = static_cast<int>(box.height);
         SDL_SetRenderDrawColor(app.sdl, 180, 120, 40, 40);
         SDL_Rect r{x, y, w, h};
-        SDL_RenderFillRect(app.sdl, &r);
+        xanatoo::sdl::fill_rect(app.sdl, &r);
         SDL_SetRenderDrawColor(app.sdl, 180, 120, 40, 200);
-        SDL_RenderDrawRect(app.sdl, &r);
+        xanatoo::sdl::draw_rect(app.sdl, &r);
         break;
       }
     }
@@ -2179,10 +2179,10 @@ static void draw_pane_overlays(App& app, int i) {
       if (wash_w < 20) wash_w = pane.w - 14;
       SDL_SetRenderDrawColor(app.sdl, r, g, b, a_bar);
       SDL_Rect mark{pane.x + 1, by, 5, bh};
-      SDL_RenderFillRect(app.sdl, &mark);
+      xanatoo::sdl::fill_rect(app.sdl, &mark);
       SDL_SetRenderDrawColor(app.sdl, r, g, b, a_wash);
       SDL_Rect wash{pane.x + 6, by, wash_w, bh};
-      SDL_RenderFillRect(app.sdl, &wash);
+      xanatoo::sdl::fill_rect(app.sdl, &wash);
 
       // Small kind label on the right edge of the region.
       // Skip pure table-row shells and plain paragraphs — the wash is
@@ -2202,7 +2202,7 @@ static void draw_pane_overlays(App& app, int i) {
         // Soft chip behind the tag for contrast on wash.
         SDL_SetRenderDrawColor(app.sdl, 248, 246, 240, 200);
         SDL_Rect chip{tx - 3, by + 1, tw + 6, std::min(bh - 2, tag_lh + 2)};
-        if (chip.h > 4) SDL_RenderFillRect(app.sdl, &chip);
+        if (chip.h > 4) xanatoo::sdl::fill_rect(app.sdl, &chip);
         app.renderer.draw_text(tag_font, static_cast<float>(tx), baseline, tag,
                                r, g, b);
       }
@@ -2216,7 +2216,7 @@ static void draw_pane_overlays(App& app, int i) {
     if (cpos.valid) pane.preferred_x = cpos.x;
     // Browse mode: steady caret (reading focus). Edit mode: blink.
     if (browsing(app) ||
-        ((SDL_GetTicks() - app.caret_blink_start) % 1000) < 600) {
+        ((xanatoo::sdl::ticks() - app.caret_blink_start) % 1000) < 600) {
       app.renderer.draw_caret(cpos, ox);
     }
   }
@@ -2225,7 +2225,7 @@ static void draw_pane_overlays(App& app, int i) {
   if (i == app.focus) {
     SDL_SetRenderDrawColor(app.sdl, 25, 90, 170, 255);
     SDL_Rect bar{pane.x, clip_y, pane.w, 3};
-    SDL_RenderFillRect(app.sdl, &bar);
+    xanatoo::sdl::fill_rect(app.sdl, &bar);
   }
 
   // Version-diff marks (orange bars on changed text blocks); the diff is
@@ -2249,10 +2249,10 @@ static void draw_pane_overlays(App& app, int i) {
         if (by + bh < clip_y || by > app.win_h - status_bar_h) continue;
         SDL_SetRenderDrawColor(app.sdl, 200, 120, 40, 200);
         SDL_Rect mark{pane.x + 2, by, 4, bh};
-        SDL_RenderFillRect(app.sdl, &mark);
+        xanatoo::sdl::fill_rect(app.sdl, &mark);
         SDL_SetRenderDrawColor(app.sdl, 200, 120, 40, 40);
         SDL_Rect wash{pane.x, by, pane.w - 6, bh};
-        SDL_RenderFillRect(app.sdl, &wash);
+        xanatoo::sdl::fill_rect(app.sdl, &wash);
       }
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
     }
@@ -2314,7 +2314,7 @@ static void draw_pane_overlays(App& app, int i) {
           continue;
         SDL_SetRenderDrawColor(app.sdl, 220, 160, 40, 110);
         SDL_Rect r{gx, gy, gw, static_cast<int>(lh)};
-        SDL_RenderFillRect(app.sdl, &r);
+        xanatoo::sdl::fill_rect(app.sdl, &r);
       }
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
     }
@@ -2329,7 +2329,7 @@ static void draw_pane_overlays(App& app, int i) {
     SDL_SetRenderDrawColor(app.sdl, active ? 25 : 190, active ? 90 : 188,
                            active ? 170 : 180, 255);
     SDL_Rect gbar{gx - 1, gy, 3, gh};
-    SDL_RenderFillRect(app.sdl, &gbar);
+    xanatoo::sdl::fill_rect(app.sdl, &gbar);
   }
 
   // Block drag-drop: insertion line + source highlight
@@ -2342,14 +2342,14 @@ static void draw_pane_overlays(App& app, int i) {
       SDL_Rect r{pane.x + static_cast<int>(box.x),
                  static_cast<int>(box.y - pane.scroll_y + py),
                  static_cast<int>(box.width), static_cast<int>(box.height)};
-      SDL_RenderFillRect(app.sdl, &r);
+      xanatoo::sdl::fill_rect(app.sdl, &r);
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
     }
     if (app.drop_line_y >= 0.f) {
       int ly = static_cast<int>(app.drop_line_y - pane.scroll_y + py);
       SDL_SetRenderDrawColor(app.sdl, 25, 90, 170, 255);
       SDL_Rect line{pane.x + 24, ly - 1, pane.w - 40, 3};
-      SDL_RenderFillRect(app.sdl, &line);
+      xanatoo::sdl::fill_rect(app.sdl, &line);
     }
   } else if (i == app.focus && !app.dragging_block &&
              app.hover.bookmark.empty()) {
@@ -2373,7 +2373,7 @@ static void draw_pane_overlays(App& app, int i) {
       SDL_SetRenderDrawColor(app.sdl, 160, 158, 150, 255);
       for (int d = -6; d <= 6; d += 6) {
         SDL_Rect dot{gx, gy + d, 3, 3};
-        SDL_RenderFillRect(app.sdl, &dot);
+        xanatoo::sdl::fill_rect(app.sdl, &dot);
       }
       break;
     }
@@ -2512,7 +2512,7 @@ static void draw_pane_scrollbar(App& app, int i) {
         return;
       SDL_SetRenderDrawColor(app.sdl, r, g, b, 255);
       SDL_Rect tick{sx + 1, my - 1, kSbW - 2, 2};
-      SDL_RenderFillRect(app.sdl, &tick);
+      xanatoo::sdl::fill_rect(app.sdl, &tick);
     };
     // Chapter / section breaks, from this pane's own document and layout.
     for (const SectionMark& m : section_marks(app, pane)) {
@@ -2575,13 +2575,13 @@ static void draw_pane_scrollbar(App& app, int i) {
       int cy = by + kSbArrow / 2;
       SDL_SetRenderDrawColor(app.sdl, 60, 58, 50, 255);
       if (up) {
-        SDL_RenderDrawLine(app.sdl, cx, cy - 3, cx - 4, cy + 2);
-        SDL_RenderDrawLine(app.sdl, cx, cy - 3, cx + 4, cy + 2);
-        SDL_RenderDrawLine(app.sdl, cx - 4, cy + 2, cx + 4, cy + 2);
+        xanatoo::sdl::draw_line(app.sdl, cx, cy - 3, cx - 4, cy + 2);
+        xanatoo::sdl::draw_line(app.sdl, cx, cy - 3, cx + 4, cy + 2);
+        xanatoo::sdl::draw_line(app.sdl, cx - 4, cy + 2, cx + 4, cy + 2);
       } else {
-        SDL_RenderDrawLine(app.sdl, cx, cy + 3, cx - 4, cy - 2);
-        SDL_RenderDrawLine(app.sdl, cx, cy + 3, cx + 4, cy - 2);
-        SDL_RenderDrawLine(app.sdl, cx - 4, cy - 2, cx + 4, cy - 2);
+        xanatoo::sdl::draw_line(app.sdl, cx, cy + 3, cx - 4, cy - 2);
+        xanatoo::sdl::draw_line(app.sdl, cx, cy + 3, cx + 4, cy - 2);
+        xanatoo::sdl::draw_line(app.sdl, cx - 4, cy - 2, cx + 4, cy - 2);
       }
     };
     draw_arrow_btn(top, true);
@@ -2611,7 +2611,7 @@ static void draw_pane_scrollbar(App& app, int i) {
 static void draw_pane_layer(App& app, int i, const SDL_Rect& area, float ox,
                             float scroll) {
   Pane& pane = app.panes[i];
-  SDL_RenderSetClipRect(app.sdl, &area);
+  xanatoo::sdl::set_clip_rect(app.sdl, &area);
   SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
   app.renderer.draw_backdrop(pane.layout, area, scroll, ox);
   if (!pane.sel.empty()) {
@@ -2661,7 +2661,7 @@ static bool ensure_raster_textures(App& app, PaneRaster& r, int w, int h) {
 // into the other texture and only the exposed strip is drawn; anything else
 // redraws the whole texture. False → render targets unavailable.
 static bool update_pane_raster(App& app, int i, int w, int h, float scroll) {
-  if (!SDL_RenderTargetSupported(app.sdl)) return false;
+  if (!xanatoo::sdl::target_supported(app.sdl)) return false;
   Pane& pane = app.panes[i];
   PaneRaster& r = pane.raster;
   if (!ensure_raster_textures(app, r, w, h)) return false;
@@ -2683,11 +2683,11 @@ static bool update_pane_raster(App& app, int i, int w, int h, float scroll) {
     SDL_Texture* src = r.tex[r.cur];
     r.cur ^= 1;
     SDL_SetRenderTarget(app.sdl, r.tex[r.cur]);
-    SDL_RenderSetClipRect(app.sdl, nullptr);
+    xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
     const int keep = r.h - std::abs(dy);
     const SDL_Rect from{0, std::max(dy, 0), r.w, keep};
     const SDL_Rect to{0, std::max(-dy, 0), r.w, keep};
-    SDL_RenderCopy(app.sdl, src, &from, &to);
+    xanatoo::sdl::copy(app.sdl, src, &from, &to);
     const SDL_Rect strip = dy > 0 ? SDL_Rect{0, keep, r.w, dy}
                                   : SDL_Rect{0, 0, r.w, -dy};
     draw_pane_layer(app, i, strip, 0.f, scroll);
@@ -2695,7 +2695,7 @@ static bool update_pane_raster(App& app, int i, int w, int h, float scroll) {
     SDL_SetRenderTarget(app.sdl, r.tex[r.cur]);
     draw_pane_layer(app, i, SDL_Rect{0, 0, r.w, r.h}, 0.f, scroll);
   }
-  SDL_RenderSetClipRect(app.sdl, nullptr);
+  xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
   SDL_SetRenderTarget(app.sdl, prev_target);
 
   r.valid = true;
@@ -2729,9 +2729,9 @@ void draw_pane(App& app, int i) {
   // Same mapping relative to the clip top (texture space).
   const float tex_scroll = draw_scroll + static_cast<float>(clip_y);
   if (update_pane_raster(app, i, clip.w, clip.h, tex_scroll)) {
-    SDL_RenderSetClipRect(app.sdl, nullptr);
-    SDL_RenderCopy(app.sdl, pane.raster.tex[pane.raster.cur], nullptr, &clip);
-    SDL_RenderSetClipRect(app.sdl, &clip);
+    xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
+    xanatoo::sdl::copy(app.sdl, pane.raster.tex[pane.raster.cur], nullptr, &clip);
+    xanatoo::sdl::set_clip_rect(app.sdl, &clip);
   } else {
     draw_pane_layer(app, i, clip, static_cast<float>(pane.x), draw_scroll);
   }
@@ -2740,7 +2740,7 @@ void draw_pane(App& app, int i) {
   draw_footnote_overlay(app, i, clip);
 
   // Scrollbar lives in the strip excluded from the content clip.
-  SDL_RenderSetClipRect(app.sdl, nullptr);
+  xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
 
   if (pane.pages.on)
     draw_page_chrome(app, i);
@@ -2759,7 +2759,7 @@ void draw_panes(App& app) {
 }
 
 void draw_split_chrome(App& app) {
-  SDL_RenderSetClipRect(app.sdl, nullptr);
+  xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
   if (app.split) {
     int mid = app.panes[1].x - 3;
     SDL_Rect div{mid, app.panes[1].y, 6, app.panes[1].h};
@@ -2792,11 +2792,11 @@ void draw_split_chrome(App& app) {
         SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
         SDL_SetRenderDrawColor(app.sdl, 25, 90, 170, 160);
         // Straight connector + soft endpoints
-        SDL_RenderDrawLine(app.sdl, x0, y0, x1, y1);
-        SDL_RenderDrawLine(app.sdl, x0, y0 + 1, x1, y1 + 1);
+        xanatoo::sdl::draw_line(app.sdl, x0, y0, x1, y1);
+        xanatoo::sdl::draw_line(app.sdl, x0, y0 + 1, x1, y1 + 1);
         auto dot = [&](int x, int y) {
           SDL_Rect r{x - 3, y - 3, 7, 7};
-          SDL_RenderFillRect(app.sdl, &r);
+          xanatoo::sdl::fill_rect(app.sdl, &r);
         };
         dot(x0, y0);
         dot(x1, y1);
@@ -2845,7 +2845,7 @@ void draw_outline_panel(App& app) {
     draw_title_button(app, fb, "Focus", section_focus);
 
     SDL_Rect clip{cx, cy, cw, ch};
-    SDL_RenderSetClipRect(app.sdl, &clip);
+    xanatoo::sdl::set_clip_rect(app.sdl, &clip);
     const bool scrolls =
         static_cast<float>(app.outline.size()) * step + 8.f >
         static_cast<float>(ch);
@@ -2886,10 +2886,10 @@ void draw_outline_panel(App& app) {
         const int t = std::max(4, g.twist_w * 2 / 7);  // half extent
         for (int k = 0; k <= t; ++k) {
           if (e.folded)  // ▸ pointing right
-            SDL_RenderDrawLine(app.sdl, tcx - t / 2 + k, tcy - t + k,
+            xanatoo::sdl::draw_line(app.sdl, tcx - t / 2 + k, tcy - t + k,
                                tcx - t / 2 + k, tcy + t - k);
           else  // ▾ pointing down
-            SDL_RenderDrawLine(app.sdl, tcx - t + k, tcy - t / 2 + k,
+            xanatoo::sdl::draw_line(app.sdl, tcx - t + k, tcy - t / 2 + k,
                                tcx + t - k, tcy - t / 2 + k);
         }
       }
@@ -2906,7 +2906,7 @@ void draw_outline_panel(App& app) {
           "No headings in this document", pal.text_dim.r, pal.text_dim.g,
           pal.text_dim.b);
     }
-    SDL_RenderSetClipRect(app.sdl, nullptr);
+    xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
 
     {
       const float content_h =
@@ -2940,7 +2940,7 @@ void draw_backlinks_panel(App& app) {
                         panel_has_keys(app, KeyFocus::Backlinks),
                         app.bl.dock == Dock::None, 0, app.bl.dock == Dock::Max);
     SDL_Rect clip{cx, cy, cw, ch};
-    SDL_RenderSetClipRect(app.sdl, &clip);
+    xanatoo::sdl::set_clip_rect(app.sdl, &clip);
     xanatoo::Font& font = app.ui_font;
     const auto& pal = xanatoo::theme::palette();
     const int text_off =
@@ -2973,7 +2973,7 @@ void draw_backlinks_panel(App& app) {
       }
       ty += step;
     }
-    SDL_RenderSetClipRect(app.sdl, nullptr);
+    xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
     {
       const float content_h =
           static_cast<float>(app.backlinks.size()) * step + 8.f;
@@ -3007,7 +3007,7 @@ void draw_help_window(App& app) {
 
     auto [cx, cy, cw, ch] = help_client_rect(app);
     SDL_Rect clip{cx, cy, cw, ch};
-    SDL_RenderSetClipRect(app.sdl, &clip);
+    xanatoo::sdl::set_clip_rect(app.sdl, &clip);
     // screen_y = content_y - scroll + client_y  ⇒  draw_scroll = scroll -
     // client_y (mirrors pane path: draw_scroll = scroll_y - ui_top)
     const float help_draw_scroll = app.help.scroll - static_cast<float>(cy);
@@ -3015,7 +3015,7 @@ void draw_help_window(App& app) {
                                static_cast<float>(cx));
     app.renderer.draw(app.help_layout, help_draw_scroll,
                       static_cast<float>(cx));
-    SDL_RenderSetClipRect(app.sdl, nullptr);
+    xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
 
     {
       const float max_s = std::max(
@@ -3031,9 +3031,9 @@ void draw_dock_preview(App& app) {
     SDL_Rect strip{0, static_cast<int>(app.ui_top) - h, app.win_w, h};
     SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(app.sdl, 40, 100, 180, 90);
-    SDL_RenderFillRect(app.sdl, &strip);
+    xanatoo::sdl::fill_rect(app.sdl, &strip);
     SDL_SetRenderDrawColor(app.sdl, 40, 100, 180, 200);
-    SDL_RenderDrawRect(app.sdl, &strip);
+    xanatoo::sdl::draw_rect(app.sdl, &strip);
     SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
   }
   if (app.dock_preview != Dock::None) {
@@ -3042,9 +3042,9 @@ void draw_dock_preview(App& app) {
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
       SDL_SetRenderDrawColor(app.sdl, 40, 100, 180, 70);
       SDL_Rect zone{dx, dy, dw, dh};
-      SDL_RenderFillRect(app.sdl, &zone);
+      xanatoo::sdl::fill_rect(app.sdl, &zone);
       SDL_SetRenderDrawColor(app.sdl, 40, 100, 180, 180);
-      SDL_RenderDrawRect(app.sdl, &zone);
+      xanatoo::sdl::draw_rect(app.sdl, &zone);
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
       const char* label = "";
       switch (app.dock_preview) {
@@ -3146,7 +3146,7 @@ void draw_hover_tooltip(App& app) {
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
       SDL_SetRenderDrawColor(app.sdl, 28, 36, 50, 235);
       SDL_Rect box{bx, by, box_w, box_h};
-      SDL_RenderFillRect(app.sdl, &box);
+      xanatoo::sdl::fill_rect(app.sdl, &box);
       // Accent by kind
       if (app.hover.stretch != xanatoo::INVALID_NODE)
         SDL_SetRenderDrawColor(app.sdl, 40, 140, 90, 255);
@@ -3154,7 +3154,7 @@ void draw_hover_tooltip(App& app) {
         SDL_SetRenderDrawColor(app.sdl, 40, 100, 180, 255);
       else
         SDL_SetRenderDrawColor(app.sdl, 90, 150, 220, 255);
-      SDL_RenderDrawRect(app.sdl, &box);
+      xanatoo::sdl::draw_rect(app.sdl, &box);
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
       float tip_baseline =
           static_cast<float>(by + pad_y + app.ui_font.ascender());

@@ -2,6 +2,8 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 #pragma once
 
+struct SDL_Window;
+
 // Platform glue that has no desktop equivalent. Everything is a no-op off
 // Android; see docs/ANDROID.md.
 
@@ -17,9 +19,9 @@ void platform_init();
 
 // The document took a tap / an ImGui text field gained focus: bring up the
 // on-screen keyboard (Android); desktop keeps text input on permanently.
-void platform_request_keyboard();
+void platform_request_keyboard(SDL_Window* window);
 // Text entry finished (URL committed): hide the on-screen keyboard (Android).
-void platform_release_keyboard();
+void platform_release_keyboard(SDL_Window* window);
 
 // Desktop starts text input once at launch; Android waits for a tap so the
 // on-screen keyboard does not cover the page on start.
