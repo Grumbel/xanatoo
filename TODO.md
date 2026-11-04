@@ -6,7 +6,16 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **267** (this delivery is **266**)
+Next bundle number: **268** (this delivery is **267**)
+
+## Status (2026-11-04) — Semantic markup design note
+
+- Captured the brainstorming in `docs/SEMANTIC_MARKUP.md`: composable
+  semantic primitives (temporal, entity, identifier, value, metric,
+  reference, place, state), typed hypertext relations, expected reader
+  capabilities, examples, prior art, design constraints, and an incremental
+  implementation order. Syntax examples are proposals, not implemented.
+- Linked the note from `docs/BRAINSTORM.md`; documentation-only change.
 
 ## Status (2026-11-04) — Hacker News comment links and semantic time
 

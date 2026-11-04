@@ -2,6 +2,8 @@
 
 > Working notes from ongoing design (2026-10). Not a roadmap commitment.
 > See also `PROPOSAL.md`, `FORMAT.md`, `AGENTS.md`, `TODO.md`.
+> [Semantic markup and reader capabilities](SEMANTIC_MARKUP.md) explores
+> typed values, identities, references, metrics, and semantic context menus.
 
 This document captures product decisions already made, open structural ideas,
 and longer-horizon hypertext / multi-document thinking (Xanadu-shaped, without
