@@ -6,7 +6,19 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **264** (this delivery is **263**)
+Next bundle number: **265** (this delivery is **264**)
+
+## Status (2026-11-04) — ChatGPT native CMake environment
+
+- Provisioned the Ubuntu 24.04 ChatGPT container with CMake, Ninja, SDL2,
+  FreeType, Fontconfig, SQLite, OpenSSL, and Xvfb; the default thumtoo build
+  additionally uses libvips and libarchive. Nix is not required for either
+  native build.
+- Recorded the tested install commands, APT sandbox/cache workaround, build
+  and test commands, and headless GUI smoke test in `docs/ENVIRONMENT.md`.
+- Both the lean and full thumtoo native Debug builds passed CTest (1/1 each)
+  and started under Xvfb with Mesa llvmpipe, the tour example opened, and
+  53/53 toolbar icons loaded. No application code changes.
 
 ## Status (2026-11-04) — README and website refresh
 

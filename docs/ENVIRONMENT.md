@@ -1,12 +1,105 @@
-# Develop environment — Nix develop shell pattern
+# Development environments — native CMake and Nix
 
-Out-of-tree CMake workflow for xanatoo via `nix develop`: **deps + env + PATH
-scripts** in the shell; packaged wrappers stay separate for `nix build` /
-`nix run`.
+Xanatoo builds out of tree with CMake either in a native Ubuntu environment
+(including ChatGPT's container, documented first) or through `nix develop`:
+**deps + env + PATH scripts** in the shell; packaged wrappers stay separate
+for `nix build` / `nix run`.
 
 Derived from [biltoo](https://github.com/Grumbel/biltoo) and applied similarly
 in [Pingus](https://github.com/Pingus/pingus). This file is the permanent
 reference; a shorter banner is printed when you enter `nix develop`.
+
+---
+
+## ChatGPT Ubuntu container: native CMake, without Nix
+
+Verified in the ChatGPT coding container on **2026-11-04** (Ubuntu 24.04,
+GCC 13.3, CMake 3.28, SDL2 2.30). This is an alternative to the Nix shell,
+not a replacement for the Nix package builds. Use it when the container has
+no `nix`, `cmake`, or SDL development headers installed. The commands below
+run as root in this disposable development environment; on an ordinary
+desktop use the system's normal package-management privileges instead.
+
+### Install dependencies
+
+The container's `apt-get` wrapper provides Ubuntu package repositories, but
+APT's usual `_apt` privilege drop can fail with `setgroups: Operation not
+permitted` or `setresuid: Invalid argument`. It also sometimes cannot write
+the stock `/var/cache/apt/archives/partial` directory (owned by `nobody`).
+The tested workaround is to run APT's download sandbox as the current user
+and give it a writable, temporary archive cache:
+
+```sh
+xanatoo_apt_cache="$(mktemp -d /tmp/xanatoo-apt.XXXXXX)"
+apt-get -o APT::Sandbox::User=root \
+  -o Dir::Cache::archives="$xanatoo_apt_cache" update
+
+apt-get -o APT::Sandbox::User=root \
+  -o Dir::Cache::archives="$xanatoo_apt_cache" \
+  install -y --no-install-recommends \
+  cmake ninja-build pkg-config \
+  libsdl2-dev libfreetype-dev libfontconfig1-dev \
+  libsqlite3-dev libssl-dev xvfb xauth
+```
+
+This enables the complete core application, SQLite draft store, and all the
+OpenSSL-based network clients. A fallback image decoder (stb_image) avoids
+the large optional image stack. For the default thumtoo/libvips configuration,
+also install:
+
+```sh
+apt-get -o APT::Sandbox::User=root \
+  -o Dir::Cache::archives="$xanatoo_apt_cache" \
+  install -y --no-install-recommends libvips-dev libarchive-dev
+```
+
+The latter pulls a sizeable image-codec dependency tree. On Ubuntu 24.04 it
+also detects DjVuLibre and libcurl. MuPDF (PDF/EPUB page backend), Tesseract
+(OCR text layers), and libunarr (solid RAR) remain optional and were absent
+in the verified setup; check CMake's thumtoo feature summary. The variable
+above only needs to remain set while installing packages; build commands
+do not depend on it.
+
+### Configure, build, test
+
+From the source checkout (replace `.` with its absolute path if running
+elsewhere):
+
+```sh
+# Fast core build: all network clients, stb_image instead of thumtoo
+cmake -S . -B /tmp/xanatoo-build -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug -DXANATOO_THUMTOO=OFF
+cmake --build /tmp/xanatoo-build --parallel 4
+ctest --test-dir /tmp/xanatoo-build --output-on-failure
+
+# Default desktop features, including thumtoo/libvips
+cmake -S . -B /tmp/xanatoo-build-full -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug
+cmake --build /tmp/xanatoo-build-full --parallel 4
+ctest --test-dir /tmp/xanatoo-build-full --output-on-failure
+```
+
+Do not build inside the Git checkout. Both build directories contain their
+own `share/xanatoo/` data mirror, so the unwrapped binary locates examples,
+styles, and rasterized toolbar icons without a Nix wrapper.
+
+### Headless GUI smoke test
+
+```sh
+timeout 6s xvfb-run -a -s '-screen 0 1280x800x24' \
+  /tmp/xanatoo-build/xanatoo --new-session --no-save examples/tour.md
+```
+
+`timeout` exit status **124** is expected: the GUI is interactive and is
+terminated after six seconds. Verify that the startup report says `Opened:`
+with the tour path, and reports a renderer and loaded icons. On the tested
+container this used SDL's offscreen display with Mesa llvmpipe and loaded
+53/53 icons. `XDG_RUNTIME_DIR is invalid or not set` was a harmless startup
+warning in that headless run.
+
+This setup does **not** cross-build Android or R36S packages; those still use
+the Nix-based workflows. It changes system packages and generated build
+directories only, not source files or Git history.
 
 ---
 
