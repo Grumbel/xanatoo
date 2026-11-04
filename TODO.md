@@ -6,7 +6,25 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **272** (this delivery is **271**)
+Next bundle number: **273** (this delivery is **272**)
+
+## Status (2026-11-04) — Start staged SDL3 migration; cross-build fix
+
+- Force relative CMake install directories for the Win32/Win64 SDL2
+  derivations. SDL2's generated `sdl2.pc` combines `${prefix}` with these
+  values; the Nix CMake hook's absolute directories gave malformed paths
+  such as `${exec_prefix}//nix/store/...`, rejected during fixup.
+- Apply the same relative-directory configuration to the manually built WASM
+  SDL2 and FreeType dependencies. This needs confirmation by a real Nix build.
+- Windows now defaults to nixpkgs' SDL2 compatibility package, backed by
+  SDL3, instead of our pinned SDL2 2.30.3 build. Package SDL3.dll explicitly
+  (sdl2-compat can load it dynamically), and recursively collect its PE
+  dependencies. Retain the classic builder as a fallback in the Nix code.
+- This is a runtime transition, **not** a completed SDL3 source-API migration:
+  SDL2 application calls, vendored ImGui SDL2 backends, R36S, Android, and
+  the current WASM build still use SDL2 interfaces. The remaining migration
+  requires SDL3-capable ImGui backends, event/renderer/surface/gamepad API
+  changes, and target-by-target validation on a Nix host.
 
 ## Status (2026-11-04) — Canonical Nix cross-platform packages
 

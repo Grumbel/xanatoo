@@ -7,7 +7,8 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    # Pinned SDL2 sources shared by Android, Windows and offline WASM builds.
+    # Pinned SDL2 sources used by Android and offline WASM; retained as a
+    # fallback for Windows while its default Nix package uses SDL3 compat.
     sdl2-src = {
       url = "https://github.com/libsdl-org/SDL/releases/download/release-2.30.3/SDL2-2.30.3.tar.gz";
       flake = false;

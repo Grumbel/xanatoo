@@ -34,6 +34,8 @@ let
       chmod -R u+w SDL2-src
       emcmake cmake -S SDL2-src -B build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$out \
+        -DCMAKE_INSTALL_BINDIR=bin \
+        -DCMAKE_INSTALL_INCLUDEDIR=include -DCMAKE_INSTALL_LIBDIR=lib \
         -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TEST=OFF
       cmake --build build --parallel ''${NIX_BUILD_CORES:-1}
       runHook postBuild
@@ -58,6 +60,8 @@ let
       ${setupEmCache "freetype"}
       emcmake cmake -S . -B build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$out \
+        -DCMAKE_INSTALL_BINDIR=bin \
+        -DCMAKE_INSTALL_INCLUDEDIR=include -DCMAKE_INSTALL_LIBDIR=lib \
         -DBUILD_SHARED_LIBS=OFF \
         -DFT_DISABLE_ZLIB=TRUE -DFT_DISABLE_BZIP2=TRUE \
         -DFT_DISABLE_PNG=TRUE -DFT_DISABLE_HARFBUZZ=TRUE \

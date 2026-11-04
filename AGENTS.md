@@ -158,6 +158,11 @@ toolbar and shortcuts should route through `execute_command`.
   `nix/windows.nix` and `nix/wasm.nix`. GitHub must build these exact flake
   outputs, never an independent CMake recipe. Build and limitations:
   `docs/PORTS.md`.
+- SDL3 transition (in progress): Win32/Win64 flake packages use nixpkgs'
+  SDL2-compatible API over an SDL3 runtime, explicitly packaging SDL3.dll.
+  The app and vendored ImGui still compile against SDL2 headers; WASM,
+  Android, and R36S currently retain SDL2. Do not change their ABI until
+  the SDL3 API/backend migration and platform tests are complete.
 - New options go into `cli.cpp`, `print_usage` and `docs/xanatoo.1`
   (`checks.man` / `checks.help`).
 - Version strings: `version_string()`; network User-Agents via

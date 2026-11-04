@@ -1,7 +1,7 @@
 # Portable desktop and web builds
 
 The first Windows and WebAssembly ports deliberately use a reduced, **offline**
-feature set. Their goal is to exercise the same document model, SDL2 rendering,
+feature set. Their goal is to exercise the same document model, SDL rendering,
 FreeType typography, editor, and hypertext navigation as the Linux application
 before bringing additional network and storage backends across platforms.
 
@@ -12,7 +12,7 @@ Emscripten, and **OFF** elsewhere. It disables:
 - the native TLS/HTTP clients (Gemini, Hacker News, Reddit, Lemmy, Nostr,
   feeds, Wikipedia, web pages, and remote ebooks).
 
-This keeps the required third-party dependencies to SDL2 and FreeType. Fonts
+This keeps the required third-party dependencies to SDL and FreeType. Fonts
 are loaded from `share/xanatoo/fonts/` (bundled DejaVu faces); images fall
 back to the built-in stb_image decoders. Local Markdown, Org, structured
 documents, simplified HTML, direct EPUB import, editing, links, and the
@@ -46,8 +46,15 @@ Nix, but are not the source of truth for releases.
 
 ## Windows (MinGW-w64)
 
-The flake cross-compiles both `x86_64` and `i686` with MinGW-w64. For an
-alternative local MINGW64 (or MINGW32) shell, install the corresponding
+The flake cross-compiles both `x86_64` and `i686` with MinGW-w64. The Windows
+packages now use nixpkgs' `SDL2` (sdl2-compat), backed by SDL3. They ship
+`SDL3.dll` as well as the SDL2-compatible DLL. This moves their runtime onto
+SDL3 without changing the application or vendored ImGui SDL2 APIs yet; full
+source migration is planned separately. A classic SDL2 source builder remains
+in `nix/windows.nix` as a fallback if the compatibility package cannot be
+cross-compiled on a given nixpkgs revision.
+
+For an alternative local MINGW64 (or MINGW32) shell, install the corresponding
 `mingw-w64-...-gcc`, `cmake`, `ninja`, `SDL2`, and `freetype` packages and run:
 
 ```sh
