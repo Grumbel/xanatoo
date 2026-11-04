@@ -131,8 +131,20 @@ in the style directories (or give an absolute path), tile from the top-left of
 the view and scroll with the text. `desk.xss` is an example.
 
 **Inline roles:** `text`, `emphasis`, `strong`, `strike`, `link`, `code`,
-`cite`, `footnote-ref`, `image` (inline images; no colour of their own), `math` (TeX formulas; the colour is the glyphs' and rules'), with the properties `color` (beats the block colour), `background`
-(only `code` uses it) and `underline` (`#t` / `#f`).
+`cite`, `footnote-ref`, `image` (inline images; no colour of their own),
+`math` (TeX formulas; the colour is the glyphs' and rules'), with the
+properties `color` (beats the block colour), `font` (one of the block face
+names above), `background` (only `code` uses it) and `underline` (`#t` /
+`#f`).
+
+**Inline semantic role:** `metadata` is independent of the kind of span.
+An article's source hostname can be metadata *inside its title line*;
+the link to its discussion can be metadata and still be a clickable `link`.
+`(role metadata (font small) (color "#828282"))` controls this presentation
+without needing site-specific renderer conditions. When present, the
+metadata role's `font` and `color` override the inline-kind and block
+styles; otherwise those existing styles apply. The built-in style gives
+metadata small, muted text.
 
 Unknown roles, properties or bad values become warnings on stderr, and the
 status line reports how many there were. The rest of the sheet still applies.
@@ -140,10 +152,11 @@ status line reports how many there were. The rest of the sheet still applies.
 ## Site looks
 
 `hackernews.xss`, `reddit.xss` (old.reddit) and `wikipedia.xss` imitate those
-sites in broad strokes: Verdana at `body-scale` 0.85 under an orange `thread`
-band, blue authors with zebra nesting under a pale blue band, serif titles
-over grey `header` rules. They are ordinary sheets — the selection is still
-global, not per site.
+sites in broad strokes: HN uses Verdana at `body-scale` 0.85 under an orange
+`thread` band, article headings with small inline source hostnames and
+caption-sized points / discussion links; Reddit uses blue authors with zebra
+nesting under a pale blue band; Wikipedia uses serif titles over grey `header`
+rules. They are ordinary sheets — the selection is still global, not per site.
 
 ## Implementation
 

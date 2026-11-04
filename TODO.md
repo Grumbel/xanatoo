@@ -6,7 +6,22 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **265** (this delivery is **264**)
+Next bundle number: **266** (this delivery is **265**)
+
+## Status (2026-11-04) — Hacker News semantic story hierarchy
+
+- HN lists now use `Article` entries rather than comment-style `Message`
+  cards. Each contains a linked `Header` title with its source hostname on
+  the same line, followed by a `Caption` for rank, points, author, timestamp,
+  and the discussion link. Item pages retain proper `Message` comment threads
+  but give the story its own heading and metadata caption.
+- Introduced the semantic `InlineSpan::role=Metadata`: independently of a
+  span's link/text kind, `(role metadata (font small) (color ...))` can set
+  quiet inline typography (including within a larger heading). General
+  inline style roles can now set `font` too. Kept sizes and colours in the
+  `.xss` style sheets and documented the new styling behaviour.
+- Offline unit test checks mixed-size title/hostname placement and metadata
+  discussion link hit-testing. Lean and full native builds/CTests verified.
 
 ## Status (2026-11-04) — ChatGPT native CMake environment
 

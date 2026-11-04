@@ -959,6 +959,24 @@ void test_style_sheets_shipped() {
            a.has_color == b.has_color &&
            (!a.has_color || a.color == b.color));
   }
+  EXPECT(def.metadata.has_color == builtin.metadata.has_color);
+  EXPECT(def.metadata.color == builtin.metadata.color);
+  EXPECT(def.metadata.has_font == builtin.metadata.has_font);
+  EXPECT(def.metadata.font == builtin.metadata.font);
+  DocStyle hn;
+  EXPECT(load_style("hackernews", hn));
+  EXPECT(hn[BlockRole::Header].font == FontRole::Heading);
+  EXPECT(hn[BlockRole::Caption].font == FontRole::Small);
+  EXPECT(hn.metadata.font == FontRole::Small);
+  EXPECT(hn.metadata.has_color);
+  DocStyle custom = builtin_style();
+  apply_style_source(custom,
+                     "(role metadata (font small-bold) (color \"#445566\"))"
+                     "(role link (font italic))");
+  EXPECT(custom.metadata.font == FontRole::SmallBold);
+  EXPECT(custom.metadata.color == (Rgba{0x44, 0x55, 0x66, 255}));
+  EXPECT(custom[InlineKind::Link].has_font);
+  EXPECT(custom[InlineKind::Link].font == FontRole::BodyItalic);
   // Late-bound tokens: night-amber only redefines tokens of night.
   DocStyle night, amber;
   if (load_style("night", night) && load_style("night-amber", amber)) {
@@ -969,6 +987,69 @@ void test_style_sheets_shipped() {
   }
   DocStyle missing;
   EXPECT(!load_style("no-such-sheet", missing));
+}
+
+// The hostname must share the title's line without inheriting its heading
+// size. A metadata discussion link keeps its Link kind / href but uses the
+// same muted inline role in a caption.
+void test_layout_inline_metadata() {
+  using namespace xanatoo;
+  FontSet fonts;
+  std::string path = fontconfig_find("DejaVu Sans", 0, 0);
+  if (path.empty() || !fonts.load(nullptr, path, 18, 24)) {
+    std::fprintf(stderr, "SKIP test_layout_inline_metadata (no font)\n");
+    return;
+  }
+  Document doc;
+  NodeId root = doc.create(NodeKind::Document);
+  NodeId article = doc.create(NodeKind::Article, root);
+  NodeId title = doc.create(NodeKind::Header, article);
+  InlineSpan story;
+  story.kind = InlineKind::Link;
+  story.text = "A story";
+  story.href = "https://example.org/story";
+  doc.get(title).spans.push_back(std::move(story));
+  InlineSpan host;
+  host.role = InlineRole::Metadata;
+  host.text = " (example.org)";
+  doc.get(title).spans.push_back(std::move(host));
+  NodeId caption = doc.create(NodeKind::Caption, article);
+  InlineSpan comments;
+  comments.kind = InlineKind::Link;
+  comments.role = InlineRole::Metadata;
+  comments.text = "42 comments";
+  comments.href = "https://news.ycombinator.com/item?id=42";
+  doc.get(caption).spans.push_back(std::move(comments));
+
+  DocStyle st = builtin_style();
+  LayoutEngine engine(fonts, nullptr);
+  engine.set_style(&st);
+  LayoutResult lr = engine.layout(doc, 900.f);
+  const PositionedGlyph* title_g = nullptr;
+  const PositionedGlyph* host_g = nullptr;
+  const PositionedGlyph* comment_g = nullptr;
+  for (const auto& g : lr.glyphs) {
+    if (g.node == title && g.codepoint == 'A') title_g = &g;
+    if (g.node == title && g.codepoint == '(') host_g = &g;
+    if (g.node == caption && g.codepoint == '4') comment_g = &g;
+  }
+  EXPECT(title_g && host_g && comment_g);
+  if (title_g && host_g && comment_g) {
+    EXPECT(title_g->font == FontRole::Heading);
+    EXPECT(host_g->font == FontRole::Small);
+    EXPECT(host_g->color == st.metadata.color);
+    EXPECT(host_g->y == title_g->y);
+    EXPECT(host_g->x > title_g->x);
+    EXPECT(comment_g->font == FontRole::Small);
+    EXPECT(comment_g->color == st.metadata.color);
+    const auto target = hit_test_link(
+        doc, lr, comment_g->x + 2.f, comment_g->y - 4.f, 0.f);
+    EXPECT(target.has_value());
+    if (target) EXPECT_EQ(*target, doc.get(caption).spans[0].href);
+  }
+  EXPECT_EQ(doc.get(title).spans[0].href, "https://example.org/story");
+  EXPECT_EQ(doc.get(caption).spans[0].href,
+            "https://news.ycombinator.com/item?id=42");
 }
 
 // Text column = min(pane * (1 - 2 * margin%), measure_chars * avg char),
@@ -3490,6 +3571,7 @@ int main() {
   test_view_settings_migration();
   test_style_sheet_parse();
   test_layout_article_gaps();
+  test_layout_inline_metadata();
   test_style_sheets_shipped();
   test_footnotes();
   test_locator();

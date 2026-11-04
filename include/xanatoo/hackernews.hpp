@@ -23,7 +23,8 @@ void hn_append_html(Document& doc, NodeId parent, std::string_view html);
 #if defined(XANATOO_HN) && XANATOO_HN
 // Listings: Firebase story ids (ranked) + one Algolia search for the
 // metadata. Items: the whole comment tree in one Algolia request.
-// Builds a Document with Thread + Message nodes (read-only).
+// Builds a read-only Document: ranked lists use Thread + Article entries;
+// item pages use Thread + Message for comments.
 std::optional<Document> hn_fetch(std::string_view url,
                                  std::string* err = nullptr);
 #endif

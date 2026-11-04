@@ -1,7 +1,7 @@
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
-;; Hacker News — beige page, small Verdana, an orange bar over each thread,
-;; grey meta lines and plain comments (no cards, no side bars).
+;; Hacker News — beige page, orange thread band, readable story headings with
+;; small inline hostnames and quiet metadata captions, plain comment threads.
 
 (stylesheet
   (name "Hacker News")
@@ -21,8 +21,11 @@
          (code "DejaVu Sans Mono" "monospace"))
 
   (role paragraph   (space-after 0.4em))
-  (role header      (space-before 0.8em) (space-after 0.4em))
-  (role section     (indent 0))
+  (role header      (font heading) (color "#000000")
+                    (space-before 0) (space-after 0.1em))
+  (role section     (indent 0) (space-before 0) (space-after 0))
+  (role article     (space-after 0.7em))
+  (role caption     (font small) (color grey) (space-after 0.1em))
   (role thread      (background orange) (color "#000000")
                     (space-before 0.4em) (space-after 0.6em))
   (role message     (font small) (space-after 0.5em) (border none) (background none))
@@ -37,6 +40,7 @@
   (role footnote    (border "#d8d8cc"))
 
   (role link   (color "#000000") (underline #f))
+  (role metadata (font small) (color grey))
   (role cite   (color "#000000"))
   (role footnote-ref (color grey))
   (role code   (color "#000000") (background none)))

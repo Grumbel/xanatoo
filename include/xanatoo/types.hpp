@@ -63,6 +63,10 @@ enum class InlineKind : uint8_t {
           // line (centred when alone in its block); see math.hpp
 };
 
+// Semantic meaning independent of the inline's behaviour (a metadata link
+// remains a Link for navigation, but may use a quieter font/colour).
+enum class InlineRole : uint8_t { Normal, Metadata };
+
 // Spans that are one object in the text (U+FFFC, one caret position).
 inline bool is_inline_object(InlineKind k) {
   return k == InlineKind::Image || k == InlineKind::Math;
@@ -74,6 +78,7 @@ inline constexpr uint32_t kInlineImageCp = 0xFFFC;
 
 struct InlineSpan {
   InlineKind kind = InlineKind::Text;
+  InlineRole role = InlineRole::Normal;
   std::string text;
   std::string href;   // Link target, or Cite key
   std::string rel;    // typed relation: glossary, source, contra, …

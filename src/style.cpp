@@ -300,6 +300,10 @@ class SheetReader {
       inline_props(f, style_.inl[static_cast<size_t>(r.kind)]);
       return;
     }
+    if (name == "metadata") {
+      inline_props(f, style_.metadata);
+      return;
+    }
     warn("unknown role " + name);
   }
 
@@ -341,6 +345,17 @@ class SheetReader {
       if (prop == "color") s.has_color = color(v, s.color) || s.has_color;
       else if (prop == "background") color(v, s.background);
       else if (prop == "underline") s.underline = sexpr_bool(value(v), s.underline);
+      else if (prop == "font") {
+        const std::string name = sexpr_text(value(v));
+        auto it = std::find_if(std::begin(kFontRoles), std::end(kFontRoles),
+                               [&](const auto& fr) { return name == fr.first; });
+        if (it != std::end(kFontRoles)) {
+          s.has_font = true;
+          s.font = it->second;
+        } else {
+          warn("unknown font " + name);
+        }
+      }
       else warn("unknown inline property " + prop);
     });
   }
@@ -545,6 +560,10 @@ DocStyle builtin_style() {
     return s.inl[static_cast<size_t>(k)];
   };
   inl(InlineKind::Link) = {true, {30, 90, 180, 255}, {0, 0, 0, 0}, true};
+  s.metadata.has_font = true;
+  s.metadata.font = FontRole::Small;
+  s.metadata.has_color = true;
+  s.metadata.color = {120, 118, 112, 255};
   inl(InlineKind::Cite) = {true, {90, 50, 140, 255}, {0, 0, 0, 0}, true};
   inl(InlineKind::FootnoteRef) = {true, {30, 90, 180, 255}, {0, 0, 0, 0}, false};
   inl(InlineKind::Code) = {true, {130, 55, 30, 255}, {245, 235, 220, 200}, false};

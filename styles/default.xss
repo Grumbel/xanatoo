@@ -65,6 +65,7 @@
                     (background (rgba 238 232 216 200)) (border "#c8bea5"))
 
   ;; Inline roles.
+  (role metadata (font small) (color "#787670"))  ; hostnames, points, discussion
   (role link   (color "#1e5ab4") (underline #t))
   (role cite   (color "#5a328c") (underline #t))
   (role footnote-ref (color "#1e5ab4"))

@@ -261,7 +261,10 @@ toolbar and shortcuts should route through `execute_command`.
 Read `TODO.md` first. Record plans and outcomes there.
 Longer design notes: `docs/BRAINSTORM.md`.
 Work is committed directly to git (bundles were only a Grok Web handover
-mechanism; historical bundle numbers in TODO.md are archival).
+mechanism originally; historical bundle numbers in TODO.md are archival).
+For the current ChatGPT handover, deliver **git bundles only**, cumulative
+from the original `568a91b` base through the current `HEAD`; never create a
+parallel history or distribute patch files. Keep the next number in TODO.md.
 
 ## Hacker News
 
@@ -270,6 +273,11 @@ mechanism; historical bundle numbers in TODO.md are archival).
   ids from the Firebase API + one Algolia search for titles / scores.
 - Items (`/item?id=N`): whole tree in one Algolia `/items/N` request; top
   level re-ordered by the Firebase item's `kids` (HN rank).
+- Lists contain semantic `Article` entries: `Header` for the linked story
+  title (source hostname is an inline `Metadata` span on the same line),
+  `Caption` for rank / points / author / time / discussion link. Item pages
+  remain `Message` threads. `styles/hackernews.xss` controls sizes and colours;
+  do not add site-specific geometry to the layout engine.
 - `hn_append_html` maps comment HTML → Paragraph / BlockQuote (`> …`) /
   CodeBlock with Link / Emphasis spans.
 

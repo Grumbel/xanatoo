@@ -97,6 +97,8 @@ struct InlineStyle {
   Rgba color;
   Rgba background{0, 0, 0, 0};
   bool underline = false;
+  bool has_font = false;
+  FontRole font = FontRole::Body;
 };
 
 struct DocStyle {
@@ -120,6 +122,7 @@ struct DocStyle {
   float body_scale = 1.f;     // body px = zoom px × scale (small-print sites)
   BlockStyle block[kBlockRoleCount];
   InlineStyle inl[kInlineKindCount];
+  InlineStyle metadata;  // semantic inline role, can also apply to links
   // Unknown roles / properties / values met while loading (with sheet name).
   std::vector<std::string> warnings;
 
@@ -130,7 +133,10 @@ struct DocStyle {
     return inl[static_cast<size_t>(k)];
   }
   // Glyph colour for inline `k` inside a block of role `r`.
-  Rgba text_color(BlockRole r, InlineKind k) const {
+  Rgba text_color(BlockRole r, InlineKind k,
+                  InlineRole role = InlineRole::Normal) const {
+    if (role == InlineRole::Metadata && metadata.has_color)
+      return metadata.color;
     const InlineStyle& is = (*this)[k];
     if (is.has_color) return is.color;
     const BlockStyle& bs = (*this)[r];

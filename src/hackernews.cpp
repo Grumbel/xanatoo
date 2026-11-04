@@ -4,7 +4,8 @@
 // Read-only Hacker News client. Ranked story lists come from the official
 // Firebase API (ids only); titles / scores and whole comment trees come
 // from the Algolia HN API, which returns a nested thread in one request.
-// Maps stories/comments into Thread + Message document nodes.
+// Maps ranked stories into Thread + Article entries, and comment trees into
+// Thread + Message nodes.
 
 #include "xanatoo/hackernews.hpp"
 #include "xanatoo/html_min.hpp"
@@ -213,27 +214,30 @@ void append_link(Document& doc, NodeId para, std::string text, std::string href)
   doc.get(para).spans.push_back(std::move(s));
 }
 
-// Story card: title (→ article), optional text, footer (host · comments).
+// A story is an article in a ranked list, and a message when opened with its
+// comments. Both use a heading for the story and a caption for its metadata.
+// The source hostname is part of the heading, but is semantically metadata
+// so the style sheet can make it small without changing the story link.
 NodeId append_story(Document& doc, NodeId thread, const HnItem& st,
                     const std::string& rank, bool with_text) {
-  NodeId msg = doc.create(NodeKind::Message, thread);
-  Node& n = doc.get(msg);
+  NodeId entry = doc.create(with_text ? NodeKind::Message : NodeKind::Article,
+                            thread);
+  Node& n = doc.get(entry);
   n.label = std::to_string(st.id);
-  n.src = st.author.empty() ? "[deleted]" : st.author;
-  std::string meta = rank;
-  if (st.points != 0) {
-    if (!meta.empty()) meta += " · ";
-    meta += std::to_string(st.points) + " points";
+  if (with_text) {
+    n.src = st.author.empty() ? "[deleted]" : st.author;
+    std::string meta;
+    if (st.points != 0) meta = std::to_string(st.points) + " points";
+    if (!st.created.empty()) {
+      if (!meta.empty()) meta += " · ";
+      meta += format_time_iso(st.created);
+    }
+    n.summary = std::move(meta);
   }
-  if (!st.created.empty()) {
-    if (!meta.empty()) meta += " · ";
-    meta += format_time_iso(st.created);
-  }
-  n.summary = meta;
 
-  NodeId title = doc.create(NodeKind::Paragraph, msg);
+  NodeId title = doc.create(NodeKind::Header, entry);
   if (!st.url.empty()) {
-    append_link(doc, title, st.title, st.url);
+    append_link(doc, title, st.title.empty() ? "(untitled)" : st.title, st.url);
   } else {
     InlineSpan s;
     s.kind = with_text ? InlineKind::Strong : InlineKind::Link;
@@ -241,16 +245,35 @@ NodeId append_story(Document& doc, NodeId thread, const HnItem& st,
     if (!with_text) s.href = item_url(st.id);
     doc.get(title).spans.push_back(std::move(s));
   }
-  if (with_text && !st.text.empty()) hn_append_html(doc, msg, st.text);
+  if (std::string host = url_host(st.url); !host.empty()) {
+    InlineSpan source;
+    source.role = InlineRole::Metadata;
+    source.text = " (" + host + ")";
+    doc.get(title).spans.push_back(std::move(source));
+  }
 
-  NodeId foot = doc.create(NodeKind::Paragraph, msg);
-  if (std::string host = url_host(st.url); !host.empty())
-    doc.append_text(foot, host + "  ·  ");
-  append_link(doc, foot,
-              st.comments > 0 ? std::to_string(st.comments) + " comments"
-                              : "discuss",
-              item_url(st.id));
-  return msg;
+  NodeId foot = doc.create(NodeKind::Caption, entry);
+  if (!rank.empty()) doc.append_text(foot, rank + " · ");
+  if (!with_text) {
+    doc.append_text(foot, std::to_string(st.points) +
+                         (st.points == 1 ? " point" : " points"));
+    doc.append_text(foot, " by " +
+                         (st.author.empty() ? "[deleted]" : st.author));
+    if (!st.created.empty())
+      doc.append_text(foot, " · " + format_time_iso(st.created));
+    doc.append_text(foot, " · ");
+  }
+  InlineSpan discussion;
+  discussion.role = InlineRole::Metadata;
+  discussion.kind = InlineKind::Link;
+  discussion.text = st.comments > 0
+                        ? std::to_string(st.comments) +
+                              (st.comments == 1 ? " comment" : " comments")
+                        : "discuss";
+  discussion.href = item_url(st.id);
+  doc.get(foot).spans.push_back(std::move(discussion));
+  if (with_text && !st.text.empty()) hn_append_html(doc, entry, st.text);
+  return entry;
 }
 
 // Comments depth-first; threading via alt → parent Message.label.
@@ -419,7 +442,7 @@ std::optional<Document> fetch_item(const HnUrl& u, std::string* err) {
     }
   } else {
     root_item.comments = count_comments(root_item);
-    doc.get(thread).summary = root_item.title;
+    doc.get(thread).summary = "Hacker News — discussion";
     doc.meta.title = root_item.title;
     append_story(doc, thread, root_item, {}, true);
   }

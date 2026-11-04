@@ -2119,10 +2119,15 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
   std::vector<CharInfo> chars;
   const bool small_base = is_small_role(base_role);
   for (size_t si = 0; si < node.spans.size(); ++si) {
+    const InlineSpan& span = node.spans[si];
     std::vector<uint32_t> cps;
-    decode_utf8(node.spans[si].text, cps);
-    const InlineKind kind = node.spans[si].kind;
+    decode_utf8(span.text, cps);
+    const InlineKind kind = span.kind;
     FontRole r = style_role(base_role, kind);
+    const InlineStyle& inl = (*style_)[kind];
+    if (inl.has_font) r = inl.font;
+    if (span.role == InlineRole::Metadata && style_->metadata.has_font)
+      r = style_->metadata.font;
     if (kind == InlineKind::Math) {
       // One atom set from the font's math table; without a math font (or a
       // formula that does not parse) the TeX source is shown as code.
@@ -2264,9 +2269,12 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
       pg.char_index = c.char_idx;
       pg.kind = c.kind;
       pg.font = c.role;
-      pg.color = ctx_color && !(*style_)[c.kind].has_color
+      const InlineRole semantic = node.spans[c.span_idx].role;
+      pg.color = ctx_color && !(*style_)[c.kind].has_color &&
+                             !(semantic == InlineRole::Metadata &&
+                               style_->metadata.has_color)
                      ? (*style_)[ctx_role_].color
-                     : style_->text_color(block, c.kind);
+                     : style_->text_color(block, c.kind, semantic);
       if (c.math) {
         // Formula: drawn from its box at the baseline; the glyph is its
         // caret slot.
@@ -2354,7 +2362,8 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
         pg.char_index = chars[i].char_idx;
         pg.kind = chars[i].kind;
         pg.font = chars[i].role;
-        pg.color = style_->text_color(block, chars[i].kind);
+        pg.color = style_->text_color(
+            block, chars[i].kind, node.spans[chars[i].span_idx].role);
         out.glyphs.push_back(pg);
       }
       if (cp == '\r' && i + 1 < chars.size() && chars[i + 1].cp == '\n') ++i;
