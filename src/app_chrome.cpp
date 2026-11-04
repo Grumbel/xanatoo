@@ -153,9 +153,9 @@ static std::string nav_position(App& app) {
                              split_history_position(app, pos, total))
     return "  ·  " + std::to_string(pos) + "/" + std::to_string(total);
   const NavHistory& h = focused_pane(app).nav;
-  if (h.pos < 0 || h.urls.empty()) return {};
+  if (h.pos < 0 || h.entries.empty()) return {};
   return "  ·  " + std::to_string(h.pos + 1) + "/" +
-         std::to_string(static_cast<int>(h.urls.size()));
+         std::to_string(static_cast<int>(h.entries.size()));
 }
 
 static const FetchJob* loading_job(const App& app) {

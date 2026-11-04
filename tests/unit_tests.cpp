@@ -10,6 +10,7 @@
 #include "xanatoo/html_min.hpp"
 #include "xanatoo/html_page.hpp"
 #include "xanatoo/native.hpp"
+#include "xanatoo/nav_history.hpp"
 #include "xanatoo/wikipedia.hpp"
 #include "xanatoo/hackernews.hpp"
 #include "xanatoo/time.hpp"
@@ -1124,6 +1125,75 @@ void test_layout_inline_metadata() {
     EXPECT_EQ(destination->node, parent);
     EXPECT(caret_screen_pos(ml, *destination, 0.f, 20.f).valid);
   }
+}
+
+void test_nav_history_positions_and_forward_link() {
+  using namespace xanatoo;
+  using namespace xanatoo::app;
+  NavHistory h;
+  NavHistoryEntry home;
+  home.url = "hn:";
+  EXPECT(nav_history_push(h, std::move(home), 100));
+  EXPECT_EQ(h.pos, 0);
+
+  Selection at_link;
+  at_link.focus = {12, 1, 4};
+  at_link.anchor = at_link.focus;
+  nav_history_capture(h, "hn:", at_link, 524.5f);
+  EXPECT_EQ(h.entries[0].scroll, 524.5f);
+  EXPECT(h.entries[0].sel.focus == at_link.focus);
+  // Unrelated / loading pages must not overwrite the previous stop.
+  nav_history_capture(h, "hn:item?id=2", {}, 0.f);
+  EXPECT_EQ(h.entries[0].scroll, 524.5f);
+
+  NavHistoryEntry story;
+  story.url = "hn:item?id=2";
+  story.via = {"hn:item?id=2", "hn:", 12, 1};
+  EXPECT(nav_history_push(h, std::move(story), 100));
+  EXPECT_EQ(h.pos, 1);
+  nav_history_capture(h, "hn:item?id=2", {}, 850.f);
+  h.pos = 0;  // Back
+  const NavLink* next = nav_history_forward_link(h, "hn:");
+  EXPECT(next != nullptr);
+  if (next) {
+    EXPECT_EQ(next->href, "hn:item?id=2");
+    EXPECT_EQ(next->node, 12u);
+    EXPECT_EQ(next->span, 1u);
+  }
+  EXPECT(!nav_history_forward_link(h, "different page"));
+  h.restoring = 0;
+  EXPECT(!nav_history_forward_link(h, "hn:"));
+  nav_history_capture(h, "hn:", {}, 0.f);
+  EXPECT_EQ(h.entries[0].scroll, 524.5f);
+  h.restoring = -1;
+
+  // Following a different link after Back replaces Forward history.
+  NavHistoryEntry other;
+  other.url = "hn:item?id=3";
+  other.via = {"hn:item?id=3", "hn:", 18, 0};
+  EXPECT(nav_history_push(h, std::move(other), 100));
+  EXPECT_EQ(h.entries.size(), 2u);
+  EXPECT_EQ(h.entries[1].url, "hn:item?id=3");
+  EXPECT_EQ(h.entries[0].scroll, 524.5f);
+  h.pos = 0;
+  EXPECT(nav_history_forward_link(h, "hn:") != nullptr);
+  NavHistoryEntry small;
+  small.url = "hn:item?id=4";
+  EXPECT(nav_history_push(h, std::move(small), 2));
+  EXPECT_EQ(h.entries.size(), 2u);
+  NavHistoryEntry newest;
+  newest.url = "hn:item?id=5";
+  EXPECT(nav_history_push(h, std::move(newest), 2));
+  EXPECT_EQ(h.entries.size(), 2u);
+  EXPECT_EQ(h.entries.front().url, "hn:item?id=4");
+  EXPECT_EQ(h.pos, 1);
+
+  // Replacing the point on a same-document URL preserves passage cuts,
+  // which lets anchor jumps occupy distinct Back/Forward stops.
+  Locator current = parse_locator("hn:item?id=42//id:thread#id:101");
+  const Locator destination = parse_locator("page#id:100");
+  current.point = destination.point;
+  EXPECT_EQ(format_locator(current), "hn:item?id=42//id:thread#100");
 }
 
 // Text column = min(pane * (1 - 2 * margin%), measure_chars * avg char),
@@ -3701,6 +3771,7 @@ int main() {
   test_style_sheet_parse();
   test_layout_article_gaps();
   test_layout_inline_metadata();
+  test_nav_history_positions_and_forward_link();
   test_style_sheets_shipped();
   test_footnotes();
   test_locator();

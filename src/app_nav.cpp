@@ -35,16 +35,61 @@ void push_nav_history(App& app, int pi, const std::string& url) {
       app.visited.erase(app.visited.begin());
   }
   split_history_note(app, pi, url);  // no-op unless split browsing
-  NavHistory& h = app.panes[pi].nav;
-  if (h.pos >= 0 && h.pos < static_cast<int>(h.urls.size()) &&
-      h.urls[static_cast<size_t>(h.pos)] == url)
-    return;
-  if (h.pos + 1 < static_cast<int>(h.urls.size()))
-    h.urls.resize(static_cast<size_t>(h.pos + 1));
-  h.urls.push_back(url);
-  while (static_cast<int>(h.urls.size()) > kMaxNavHistory)
-    h.urls.erase(h.urls.begin());
-  h.pos = static_cast<int>(h.urls.size()) - 1;
+  Pane& p = app.panes[pi];
+  NavHistory& h = p.nav;
+  NavHistoryEntry e;
+  e.url = url;
+  if (pane_address(app, p) == url) {
+    e.sel = p.sel;
+    e.scroll = p.scroll_y;
+  }
+  if (h.pos >= 0 && h.pos < static_cast<int>(h.entries.size()) &&
+      h.pending_link.from_url == h.entries[static_cast<size_t>(h.pos)].url)
+    e.via = h.pending_link;
+  h.pending_link = {};
+  h.restoring = -1;
+  nav_history_push(h, std::move(e), kMaxNavHistory);
+}
+
+void sync_nav_history(App& app) {
+  for (int pi : live_views(app)) {
+    if (split_browsing(app) && pi < kCentreViews) continue;
+    Pane& p = app.panes[pi];
+    NavHistory& h = p.nav;
+    const std::string visible = pane_address(app, p);
+    if (h.restoring >= 0) {
+      if (h.restoring >= static_cast<int>(h.entries.size()) ||
+          h.restoring != h.pos) {
+        h.restoring = -1;
+        continue;
+      }
+      const NavHistoryEntry& e = h.entries[static_cast<size_t>(h.restoring)];
+      if (visible != e.url || pane_fetch(app, pi)) continue;
+      if (const DocBuffer* b = find_buf(app, p.buf); b && b->placeholder)
+        continue;
+      p.sel = e.sel;
+      xanatoo::ensure_valid_caret(doc_of(app, p), p.sel.focus);
+      xanatoo::ensure_valid_caret(doc_of(app, p), p.sel.anchor);
+      p.scroll_y = e.scroll;
+      p.view_anchor.reset();
+      h.restoring = -1;
+      app.needs_layout = true;
+    } else {
+      // Session restoration may still have a saved scroll queued for a
+      // remote page. Do not overwrite it with the Loading page's top.
+      if ((pi >= kCentreViews || app.pending_scroll[pi].y < 0.f) &&
+          !(find_buf(app, p.buf) && buf(app, p.buf).placeholder))
+        nav_history_capture(h, visible, p.sel, p.scroll_y);
+    }
+  }
+}
+
+const NavLink* forward_nav_link(App& app, int pi) {
+  if (pi < 0 || pi >= kMaxViews ||
+      (split_browsing(app) && pi < kCentreViews))
+    return nullptr;
+  Pane& p = app.panes[pi];
+  return nav_history_forward_link(p.nav, pane_address(app, p));
 }
 
 bool can_nav_step(App& app, int dir) {
@@ -52,21 +97,29 @@ bool can_nav_step(App& app, int dir) {
     return split_history_can_step(app, dir);
   const NavHistory& h = focused_pane(app).nav;
   const int to = h.pos + dir;
-  return h.pos >= 0 && to >= 0 && to < static_cast<int>(h.urls.size());
+  return h.pos >= 0 && to >= 0 && to < static_cast<int>(h.entries.size());
 }
 
 bool nav_step(App& app, int dir) {
   if (split_browsing(app) && app.focus < kCentreViews)
     return split_history_step(app, dir);
   if (!can_nav_step(app, dir)) return false;
-  NavHistory& h = focused_pane(app).nav;
+  Pane& p = focused_pane(app);
+  NavHistory& h = p.nav;
+  nav_history_capture(h, pane_address(app, p), p.sel, p.scroll_y);
   const int from = h.pos;
-  h.pos += dir;
   // A copy: navigation may replace the view's buffer, never its trail,
   // but keep the string independent of the vector anyway.
-  const std::string url = h.urls[static_cast<size_t>(h.pos)];
-  if (!navigate_to_url(app, url, /*record_history=*/false))
-    focused_pane(app).nav.pos = from;
+  const int to = from + dir;
+  const std::string url = h.entries[static_cast<size_t>(to)].url;
+  h.restoring = to;
+  h.pending_link = {};
+  if (!navigate_to_url(app, url, /*record_history=*/false)) {
+    h.restoring = -1;
+    return false;
+  }
+  h.pos = to;
+  sync_nav_history(app);  // cached/local pages can be restored immediately
   return true;
 }
 
@@ -329,8 +382,21 @@ std::string page_up_url(App& app) {
   return xanatoo::up_url(page);
 }
 
-bool navigate_to_url(App& app, std::string target, bool record_history) {
-  return navigate_pane(app, app.focus, std::move(target), record_history);
+bool navigate_to_url(App& app, std::string target, bool record_history,
+                     NavLink via) {
+  return navigate_pane(app, app.focus, std::move(target), record_history,
+                       std::move(via));
+}
+
+bool navigate_anchor_link(App& app, int pi, const std::string& href,
+                          NavLink via) {
+  if (href.empty() || href[0] != '#') return false;
+  xanatoo::Locator loc = xanatoo::parse_locator(pane_address(app, app.panes[pi]));
+  const xanatoo::Locator anchor = xanatoo::parse_locator("page" + href);
+  if (!anchor.point || loc.base.empty()) return false;
+  loc.point = anchor.point;
+  return navigate_pane(app, pi, xanatoo::format_locator(loc), true,
+                       std::move(via));
 }
 
 static bool open_page(App& app, int pi, std::string target,
@@ -346,14 +412,21 @@ void refetch_page(App& app, int pi) {
 }
 
 // Pipes and fragment are view state: only the base gets opened or fetched.
-bool navigate_pane(App& app, int pi, std::string target, bool record_history) {
+bool navigate_pane(App& app, int pi, std::string target, bool record_history,
+                   NavLink via) {
   while (!target.empty() && (target.back() == ' ' || target.back() == '\t'))
     target.pop_back();
   if (target.empty()) return false;
+  Pane& p = app.panes[pi];
+  if (record_history) {
+    const std::string shown = pane_address(app, p);
+    nav_history_capture(p.nav, shown, p.sel, p.scroll_y);
+    p.nav.restoring = -1;  // a new navigation supersedes a pending Back
+    if (!via.href.empty()) via.from_url = shown;
+    p.nav.pending_link = std::move(via);
+  }
   if (xanatoo::starts_with(target, "draft:"))
     return open_page(app, pi, std::move(target), record_history);
-
-  Pane& p = app.panes[pi];
   xanatoo::Locator loc = xanatoo::parse_locator(target);
   const bool selectors = loc.has_selectors();
   std::error_code ec;
@@ -480,11 +553,14 @@ static bool open_page(App& app, int pi, std::string target,
       }
       if (bp == canon) {
         p.buf = i;
+        p.sel = {};
         if (std::find(app.tab_order.begin(), app.tab_order.end(), i) ==
             app.tab_order.end())
           app.tab_order.push_back(i);
         xanatoo::ensure_valid_caret(doc_of(app, p), p.sel.focus);
         p.sel.anchor = p.sel.focus;
+        p.scroll_y = 0.f;
+        p.view_anchor.reset();
         p.layout = {};
         app.needs_layout = true;
         update_title(app);
@@ -587,11 +663,19 @@ void activate_at_caret(App& app) {
       p.layout, p.sel.focus, p.scroll_y,
       static_cast<float>(app.fonts.regular.line_height()));
   if (!cpos.valid) return;
-  if (auto href =
-          xanatoo::hit_test_link(d, p.layout, cpos.x, cpos.y, p.scroll_y)) {
+  if (auto hit =
+          xanatoo::hit_test_link_ex(d, p.layout, cpos.x, cpos.y, p.scroll_y)) {
+    const std::optional<std::string> href = hit->href;
     if (open_link_image(app, app.focus, *href)) return;
     if (follow_link_split(app, app.focus, *href)) return;
     if (auto dest = xanatoo::jump_to_href(d, *href)) {
+      if (!split_browsing(app) &&
+          navigate_anchor_link(app, app.focus, *href,
+                               NavLink{*href, {}, hit->node, hit->span_index})) {
+        flash_status(app, "Followed " + *href);
+        reset_blink(app);
+        return;
+      }
       expand_ancestors_for_node(app, dest->node);
       p.sel.focus = *dest;
       p.sel.anchor = p.sel.focus;
@@ -606,9 +690,11 @@ void activate_at_caret(App& app) {
         if (!resolved.empty()) abs = resolved;
       }
       if (is_in_app_remote_url(abs)) {
-        navigate_to_url(app, std::move(abs));
+        navigate_to_url(app, std::move(abs), true,
+                        NavLink{*href, {}, hit->node, hit->span_index});
       } else if (is_inapp_doc_href(app, abs)) {
-        navigate_to_url(app, resolve_doc_href(app, abs));
+        navigate_to_url(app, resolve_doc_href(app, abs), true,
+                        NavLink{*href, {}, hit->node, hit->span_index});
       } else {
         xanatoo::open_external_url(*href);
         flash_status(app, "Opening " + *href);

@@ -1658,6 +1658,45 @@ static void draw_pane_overlays(App& app, int i) {
           SDL_RenderDrawLine(app.sdl, x + k, cy - (h - k), x + k, cy + (h - k));
       }
     }
+    // Ordinary Back/Forward: wash the precise link which led to the next
+    // history stop. It is navigation state, not a document style or edit.
+    NavLink split_next;
+    const NavLink* next = forward_nav_link(app, i);
+    if (!next) {
+      split_next.href = split_history_forward_href(app, i);
+      if (!split_next.href.empty()) next = &split_next;
+    }
+    if (next) {
+      const xanatoo::Document& d = doc_of(app, pane);
+      const bool exact = next->node != xanatoo::INVALID_NODE &&
+                         next->node < d.next_id &&
+                         d.get(next->node).id == next->node &&
+                         next->span < d.get(next->node).spans.size() &&
+                         d.get(next->node).spans[next->span].href == next->href;
+      const auto accent = xanatoo::theme::palette().accent;
+      for_each_link_run(
+          app, pane,
+          [&](const xanatoo::PositionedGlyph& pg) {
+            if (pg.kind != xanatoo::InlineKind::Link ||
+                pg.node == xanatoo::INVALID_NODE) return false;
+            if (exact)
+              return pg.node == next->node && pg.span_index == next->span;
+            const xanatoo::Node& n = d.get(pg.node);
+            return pg.span_index < n.spans.size() &&
+                   n.spans[pg.span_index].href == next->href;
+          },
+          [&](float x0, float x1, float top, float base) {
+            SDL_Rect r{static_cast<int>(x0 + ox) - 2,
+                       static_cast<int>(top - draw_scroll) - 2,
+                       static_cast<int>(x1 - x0) + 4,
+                       app.fonts.regular.line_height() + 4};
+            SDL_SetRenderDrawColor(app.sdl, accent.r, accent.g, accent.b, 58);
+            SDL_RenderFillRect(app.sdl, &r);
+            const int uy = static_cast<int>(base + 3.f - draw_scroll);
+            SDL_SetRenderDrawColor(app.sdl, accent.r, accent.g, accent.b, 220);
+            SDL_RenderDrawLine(app.sdl, r.x + 1, uy, r.x + r.w - 2, uy);
+          });
+    }
     // Bookmarks inside the page, under the `#` passage of this view's
     // address (a bookmark just opened is that passage, washed once).
     update_bookmark_marks(app, pane);
@@ -3157,7 +3196,9 @@ void run_frame(App& app) {
   SDL_Event ev;
   while (SDL_PollEvent(&ev)) handle_event(app, ev);
   update_touch(app);
+  sync_nav_history(app);  // capture scroll before a completed fetch swaps pages
   poll_fetches(app);
+  sync_nav_history(app);  // apply Back/Forward restore after remote loads
   autosave_drafts(app);
   autosave_session(app);
   update_split_preview(app);

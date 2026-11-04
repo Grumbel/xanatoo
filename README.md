@@ -32,8 +32,9 @@ see [docs/BRAINSTORM.md](docs/BRAINSTORM.md) and [TODO.md](TODO.md).
   columns), use section focus and the outline, toggle web reader mode, show
   footnotes in a bottom strip, and choose semantic S-expression style sheets.
 - **Arrange the workspace.** Use tabs, two-pane browsing, movable/dockable
-  document windows and panels, per-view history, bookmarks of text selections,
-  and session restoration.
+  document windows and panels, per-view Back/Forward history that restores
+  reading positions and marks the link leading forward, bookmarks of text
+  selections, and session restoration.
 - **Explore written material.** Open HTML pages, Gemini capsules, RSS/Atom
   feeds, Wikipedia, Hacker News, Reddit, Lemmy, and Nostr in native document
   views. Search with a configurable engine list and browse a curated directory.

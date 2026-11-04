@@ -382,8 +382,9 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
 
     // Follow links: internal #anchors jump in-document; http(s)/mailto open
     // externally
-    if (auto href = xanatoo::hit_test_link(doc_of(app, p), p.layout, lx, my,
-                                           p.scroll_y)) {
+    if (auto hit = xanatoo::hit_test_link_ex(doc_of(app, p), p.layout, lx,
+                                             my, p.scroll_y)) {
+      const std::optional<std::string> href = hit->href;
       const bool ctrl_click = (SDL_GetModState() & KMOD_CTRL) != 0;
       if (!ctrl_click && open_link_image(app, app.focus, *href)) return;
       // Split view: left links open on the right, right links shift left.
@@ -392,6 +393,14 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
         return;
       }
       if (auto dest = xanatoo::jump_to_href(doc_of(app, p), *href)) {
+        if (!ctrl_click && !split_browsing(app) &&
+            navigate_anchor_link(app, app.focus, *href,
+                                 NavLink{*href, {}, hit->node,
+                                         hit->span_index})) {
+          flash_status(app, "Followed " + *href);
+          reset_blink(app);
+          return;
+        }
         expand_ancestors_for_node(app, dest->node);
         // Ctrl+click: open target in the other pane (enable split)
         if (ctrl_click) {
@@ -429,11 +438,13 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
           if (!resolved.empty()) abs = resolved;
         }
         if (is_in_app_remote_url(abs)) {
-          navigate_to_url(app, std::move(abs));
+          navigate_to_url(app, std::move(abs), true,
+                          NavLink{*href, {}, hit->node, hit->span_index});
           return;
         }
         if (is_inapp_doc_href(app, abs)) {
-          navigate_to_url(app, resolve_doc_href(app, abs));
+          navigate_to_url(app, resolve_doc_href(app, abs), true,
+                          NavLink{*href, {}, hit->node, hit->span_index});
           return;
         }
         flash_status(app, "Opening " + *href);

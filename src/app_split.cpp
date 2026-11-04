@@ -599,6 +599,26 @@ const std::string& split_trail_href(const App& app, int pi) {
   return app.split_trail.href;
 }
 
+const std::string& split_history_forward_href(App& app, int pi) {
+  static const std::string none;
+  const SplitHistory& h = app.split_history;
+  if (!split_browsing(app) || app.split_preview.active || h.top < 0 ||
+      pi < 0 || pi >= kCentreViews || h.restore[pi]) return none;
+  const SplitHistoryLevel& l = h.levels[static_cast<size_t>(h.top)];
+  if (pi == 0 && l.cur + 1 < static_cast<int>(l.opened.size()) &&
+      path_of(app, app.panes[0]) == l.page.url)
+    return l.opened[static_cast<size_t>(l.cur + 1)].href;
+  // Crossing a level: the next link was clicked in the current right page,
+  // which moves left when Forward advances the split browsing trail.
+  if (pi == 1 && l.cur >= 0 &&
+      h.top + 1 < static_cast<int>(h.levels.size()) &&
+      path_of(app, app.panes[1]) == l.opened[static_cast<size_t>(l.cur)].url) {
+    const SplitHistoryLevel& next = h.levels[static_cast<size_t>(h.top + 1)];
+    if (!next.opened.empty()) return next.opened.front().href;
+  }
+  return none;
+}
+
 xanatoo::NodeId split_trail_target(App& app, int pi) {
   const SplitTrail& t = app.split_trail;
   if (pi != 1 || t.href.empty() || t.right_page.empty() ||

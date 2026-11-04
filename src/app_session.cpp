@@ -88,8 +88,20 @@ std::string session_text(App& app) {
     if (p.paged) out << "paged" << pi << "=" << (*p.paged ? 1 : 0) << "\n";
     if (p.nav.pos >= 0) {
       out << "navpos" << pi << "=" << p.nav.pos << "\n";
-      for (const std::string& u : p.nav.urls)
-        if (u.find('\n') == std::string::npos) out << "nav" << pi << "=" << u << "\n";
+      for (size_t ni = 0; ni < p.nav.entries.size(); ++ni) {
+        const NavHistoryEntry& e = p.nav.entries[ni];
+        if (e.url.find('\n') != std::string::npos) continue;
+        const std::string key = std::to_string(pi) + "." + std::to_string(ni);
+        out << "nav" << pi << "=" << e.url << "\n";
+        out << "navscroll" << key << "=" << e.scroll << "\n";
+        if (!e.via.href.empty() && e.via.href.find('\n') == std::string::npos &&
+            e.via.from_url.find('\n') == std::string::npos) {
+          out << "navvia" << key << "=" << e.via.href << "\n";
+          out << "navfrom" << key << "=" << e.via.from_url << "\n";
+          out << "navlink" << key << "=" << e.via.node << " "
+              << e.via.span << "\n";
+        }
+      }
     }
   }
   for (BufferId id : app.tab_order) {
@@ -226,7 +238,26 @@ void restore_session(App& app) {
       if (at < 0 || at >= static_cast<int>(it->second.size()) ||
           it->second[static_cast<size_t>(at)] != *get("pane" + std::to_string(pi)))
         continue;
-      h.urls = it->second;
+      h.entries.clear();
+      for (size_t ni = 0; ni < it->second.size(); ++ni) {
+        NavHistoryEntry e;
+        e.url = it->second[ni];
+        const std::string key = std::to_string(pi) + "." + std::to_string(ni);
+        if (const std::string* v = get("navscroll" + key)) {
+          const float scroll = std::stof(*v);
+          if (std::isfinite(scroll)) e.scroll = std::max(0.f, scroll);
+        }
+        if (const std::string* v = get("navvia" + key)) {
+          e.via.href = *v;
+          if (const std::string* from = get("navfrom" + key))
+            e.via.from_url = *from;
+          if (const std::string* loc = get("navlink" + key)) {
+            std::istringstream in(*loc);
+            in >> e.via.node >> e.via.span;
+          }
+        }
+        h.entries.push_back(std::move(e));
+      }
       h.pos = at;
     }
     {

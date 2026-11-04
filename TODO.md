@@ -6,7 +6,21 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **269** (this delivery is **268**)
+Next bundle number: **270** (this delivery is **269**)
+
+## Status (2026-11-04) — Reading-position history and forward link cue
+
+- Per-view Back/Forward entries now retain scroll position and caret, including
+  around asynchronous page loads and same-document `#` jumps; new navigations
+  start at the top, while history restores the saved offset. The session
+  format retains the old URL lines for compatibility and adds position and
+  source-link metadata.
+- The link leading to the Forward stop gets a subtle navigation overlay after
+  Back, matching its exact document span where possible. The split-browsing
+  trail exposes its next link for the same cue; split-view scroll restoration
+  was already present.
+- Added pure history tests for position capture, forward identity, branching,
+  and bounded trails. Native CMake build and unit tests passed.
 
 ## Status (2026-11-04) — HN comment separators and reply navigation
 

@@ -73,12 +73,19 @@ An address is `base//selector#selector` (`locator.hpp`, `docs/PASSAGES.md`):
 pipes cut the view to a passage, `#` marks one in the whole page. Only the base
 reaches buffers, caches and fetches. Use `pane_address` for what a view shows,
 never `path_of`, where the address is shown or stored.
-Back / Forward are per view (`Pane::nav`): record a shown page with
-`push_nav_history(app, pi, url)`, step with `nav_step`; `App::visited`
+Back / Forward are per view (`Pane::nav`): `NavHistoryEntry` keeps the address,
+caret, scroll offset, and source link. Record a shown page with
+`push_nav_history(app, pi, url)`, step with `nav_step`; `sync_nav_history`
+captures the current position and completes deferred restores after fetching.
+`forward_nav_link` feeds the non-document link wash in `draw_pane_overlays`;
+link clicks pass their `NavLink` through `navigate_to_url`; same-document
+anchors use `navigate_anchor_link` so Back can return to the source. `App::visited`
 is only the session log for the History panel. While split browsing, the
 centre panes share one trail instead (`App::split_history`, levels = left
 page + pages opened from it on the right): `push_nav_history` forwards to
-it and `nav_step` / `can_nav_step` walk it (`app_split.cpp`).
+it and `nav_step` / `can_nav_step` walk it (`app_split.cpp`). The split trail
+already tracks scroll/selection; `split_history_forward_href` identifies its
+next link for the same wash.
 
 Buffers are addressed by stable `BufferId` (`DocBuffer::id`, never reused,
 `kNoBuffer` = 0): use `buf(app, id)` / `find_buf` / `add_buffer` /

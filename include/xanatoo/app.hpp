@@ -24,6 +24,7 @@
 #include "xanatoo/layout.hpp"
 #include "xanatoo/locator.hpp"
 #include "xanatoo/minibuffer.hpp"
+#include "xanatoo/nav_history.hpp"
 #include "xanatoo/paginate.hpp"
 #include "xanatoo/render.hpp"
 #include "xanatoo/sidestore.hpp"
@@ -121,12 +122,6 @@ struct FootnoteOverlay {
 // view); document windows own one of the slots from kCentreViews up
 // (FloatWindow::view). x / y / w / h is the content rect in window pixels
 // (the scrollbar strip is the rightmost kSbW of it).
-// Back / Forward trail of one view: pages it showed, `pos` = current.
-struct NavHistory {
-  std::vector<std::string> urls;
-  int pos = -1;
-};
-
 // A document position and where in its view it is to stay while the page
 // changes around it (zoom, reflow, images arriving). `view_y` is the
 // position's baseline relative to the pane content.
@@ -1053,6 +1048,11 @@ void update_touch(App& app);
 // ---- nav ----
 // Records `url` as the page view `pi` now shows (its trail + session log).
 void push_nav_history(App& app, int pi, const std::string& url);
+// Keep the current history stop's view position up to date; also finish
+// restores deferred until an asynchronously fetched page arrives.
+void sync_nav_history(App& app);
+// The link to be highlighted when Back has returned to its source page.
+const NavLink* forward_nav_link(App& app, int pi);
 // Back (dir −1) / Forward (+1) in the focused view; false when there is
 // no page that way.
 bool can_nav_step(App& app, int dir);
@@ -1111,9 +1111,13 @@ std::string cut_address(const std::string& address);
 const xanatoo::Bookmark* find_bookmark(App& app, const std::string& address);
 // Open `target` (path, gemini://, Nostr, Reddit, Lemmy) in the focused pane /
 // in pane `pi`. Remote pages load in the background; true = opened or started.
-bool navigate_to_url(App& app, std::string target, bool record_history = true);
+bool navigate_to_url(App& app, std::string target, bool record_history = true,
+                     NavLink via = {});
 bool navigate_pane(App& app, int pi, std::string target,
-                   bool record_history = true);
+                   bool record_history = true, NavLink via = {});
+// Same-document #anchor as a new history stop, retaining the source link.
+bool navigate_anchor_link(App& app, int pi, const std::string& href,
+                          NavLink via = {});
 // What a link `href` in pane `pi` points at.
 enum class LinkKind : uint8_t { None, Anchor, Doc, Remote, External };
 struct LinkTarget {
@@ -1206,6 +1210,8 @@ void revert_split_preview(App& app);
 void draw_preview_badge(App& app, int pi);
 // Href of the left-pane link the right pane shows, "" = none (or preview).
 const std::string& split_trail_href(const App& app, int pi);
+// Link on the visible page which Forward would follow in the split trail.
+const std::string& split_history_forward_href(App& app, int pi);
 // The node the trail link jumped to in the right pane, or INVALID_NODE.
 xanatoo::NodeId split_trail_target(App& app, int pi);
 // push_nav_history forwards centre-pane pages here while split browsing.

@@ -242,6 +242,8 @@ void finish_navigate(App& app, const FetchJob& job) {
   FetchShared& r = *job.shared;
   const std::string service = r.service;
   if (r.input_status != 0) {
+    app.panes[job.pane].nav.pending_link = {};
+    app.panes[job.pane].nav.restoring = -1;
     // Input request — open URL bar with query for the user to complete.
     std::string q = r.final_url;
     if (!q.empty() && q.back() != '?') q.push_back('?');
@@ -253,6 +255,8 @@ void finish_navigate(App& app, const FetchJob& job) {
     return;
   }
   if (!r.doc) {
+    app.panes[job.pane].nav.pending_link = {};
+    app.panes[job.pane].nav.restoring = -1;
     flash_status(app, service + " failed: " + r.error);
     std::cerr << service << ": " << r.error << "\n";
     show_load_error(app, job);
