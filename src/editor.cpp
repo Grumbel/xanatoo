@@ -2297,7 +2297,7 @@ std::optional<LinkHit> hit_test_link_ex(const Document& doc,
     // One rect per line: a wrapped link continues as a new run on the
     // next line, tested on its own.
     float x0 = g.x;
-    float x1 = x0 + 10.f;
+    float x1 = x0 + std::max(1.f, g.advance);
     size_t j = i;
     while (j + 1 < layout.glyphs.size() &&
            layout.glyphs[j + 1].kind == g.kind &&
@@ -2305,7 +2305,7 @@ std::optional<LinkHit> hit_test_link_ex(const Document& doc,
            layout.glyphs[j + 1].span_index == g.span_index &&
            std::abs(layout.glyphs[j + 1].y - g.y) < 0.5f) {
       ++j;
-      x1 = layout.glyphs[j].x + 10.f;
+      x1 = layout.glyphs[j].x + std::max(1.f, layout.glyphs[j].advance);
     }
     float y0 = g.y - 18.f;
     float y1 = g.y + 6.f;

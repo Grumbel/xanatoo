@@ -6,7 +6,19 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **268** (this delivery is **267**)
+Next bundle number: **269** (this delivery is **268**)
+
+## Status (2026-11-04) — HN comment separators and reply navigation
+
+- Message headers now synthesize the ` · ` separators as independent,
+  non-interactive text, preserving distinct author/date/parent link spans
+  and the date's semantic timestamp annotation. Link hit regions stop at
+  the final glyph rather than extending into adjacent punctuation.
+- Fixed `#id:COMMENT` anchor resolution: typed ID fragments now find the
+  stable `Message::label`, so `reply to` navigates to its parent comment.
+- Added layout and navigation regression assertions for both separators,
+  link targets, timestamp hit areas, and the parent comment's scrollable
+  caret. Lean and full CMake builds and CTests passed.
 
 ## Status (2026-11-04) — Semantic markup design note
 

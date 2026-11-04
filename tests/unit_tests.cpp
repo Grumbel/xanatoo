@@ -1075,6 +1075,7 @@ void test_layout_inline_metadata() {
   msg.spans[2].kind = InlineKind::Link;
   msg.spans[2].href = "#id:100";
   LayoutResult ml = engine.layout(replies, 900.f);
+  float reply_header_y = 0.f;
   for (size_t span = 0; span < 3; ++span) {
     const PositionedGlyph* glyph = nullptr;
     for (const auto& g : ml.glyphs) {
@@ -1085,6 +1086,7 @@ void test_layout_inline_metadata() {
     }
     EXPECT(glyph != nullptr);
     if (!glyph) continue;
+    if (span == 0) reply_header_y = glyph->y;
     const float x = glyph->x + 2.f, y = glyph->y - 4.f;
     auto link = hit_test_link(replies, ml, x, y, 0.f);
     EXPECT(link.has_value());
@@ -1096,6 +1098,31 @@ void test_layout_inline_metadata() {
     } else {
       EXPECT(!date.has_value());
     }
+  }
+
+  // Both middle dots are punctuation between links, never part of either
+  // clickable span (or the date's semantic timestamp hover area).
+  size_t separators = 0;
+  for (const PositionedGlyph& g : ml.glyphs) {
+    if (g.codepoint != 0x00b7 || std::abs(g.y - reply_header_y) > 0.5f)
+      continue;
+    ++separators;
+    EXPECT(g.node == INVALID_NODE);
+    EXPECT(!hit_test_link(replies, ml, g.x + g.advance * 0.5f,
+                          g.y - 4.f, 0.f).has_value());
+    EXPECT(!hit_test_timestamp(replies, ml, g.x + g.advance * 0.5f,
+                               g.y - 4.f, 0.f).has_value());
+  }
+  EXPECT_EQ(separators, 2u);
+
+  // The reply link's #id: fragment must resolve to the actual parent
+  // Message, and its caret must have an onscreen position to scroll to.
+  EXPECT_EQ(find_anchor_node(replies, "#id:100"), parent);
+  const auto destination = jump_to_href(replies, msg.spans[2].href);
+  EXPECT(destination.has_value());
+  if (destination) {
+    EXPECT_EQ(destination->node, parent);
+    EXPECT(caret_screen_pos(ml, *destination, 0.f, 20.f).valid);
   }
 }
 

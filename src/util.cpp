@@ -73,9 +73,12 @@ NodeId find_anchor_node(const Document& doc, std::string_view href) {
     return body.empty() ? INVALID_NODE : body.front();
   }
 
-  // Prefer stable :label (semantic id) over heading text match.
-  // Bibliography keys are labels; cite:key and #key both resolve here.
-  if (tlow.size() > 5 && tlow.compare(0, 5, "cite:") == 0)
+  // Typed ID fragments (#id:key) address the same stable semantic label as
+  // #key.  In particular, HN reply links use #id:<parent comment id>.
+  // Bibliography keys likewise accept #cite:key and #key.
+  if (tlow.size() > 3 && tlow.compare(0, 3, "id:") == 0)
+    tlow = tlow.substr(3);
+  else if (tlow.size() > 5 && tlow.compare(0, 5, "cite:") == 0)
     tlow = tlow.substr(5);
   for (const Node& n : doc.nodes) {
     if (n.id == INVALID_NODE) continue;

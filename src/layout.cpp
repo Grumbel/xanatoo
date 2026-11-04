@@ -1077,6 +1077,20 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       Node header = node;
       header.kind = NodeKind::Paragraph;
       header.spans.clear();
+      // Header text is synthesized from Message fields. Keep separators as
+      // distinct, non-interactive spans, and map the other glyphs back to
+      // their semantic Message spans for hit-testing and timestamp hovers.
+      constexpr size_t kNoHeaderOwner = static_cast<size_t>(-1);
+      std::vector<size_t> header_owner;
+      auto add_header = [&](InlineSpan span, size_t owner) {
+        header.spans.push_back(std::move(span));
+        header_owner.push_back(owner);
+      };
+      auto add_separator = [&]() {
+        InlineSpan sep;
+        sep.text = "  ·  ";
+        add_header(std::move(sep), kNoHeaderOwner);
+      };
       {
         InlineSpan a;
         a.kind = InlineKind::Strong;
@@ -1085,13 +1099,13 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           a.kind = InlineKind::Link;
           a.href = l->href;
         }
-        header.spans.push_back(std::move(a));
+        add_header(std::move(a), 0);
       }
       if (!node.summary.empty()) {
+        add_separator();
         InlineSpan d;
         d.kind = InlineKind::Text;
-        d.text = "  ·  ";
-        d.text += node.summary;
+        d.text = node.summary;
         if (node.spans.size() > 1) {
           d.datetime = node.spans[1].datetime;
         }
@@ -1099,13 +1113,14 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           d.kind = InlineKind::Link;
           d.href = l->href;
         }
-        header.spans.push_back(std::move(d));
+        add_header(std::move(d), 1);
       }
       if (!node.alt.empty()) {
+        add_separator();
         InlineSpan r;
         r.kind = InlineKind::Emphasis;
         if (node.alt.rfind("about:", 0) == 0) {
-          r.text = "  ·  re ";
+          r.text = "re ";
           r.text += node.alt.substr(6);
         } else if (reply_to != INVALID_NODE &&
                    !doc.get(reply_to).src.empty()) {
@@ -1113,17 +1128,17 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           std::string who = doc.get(reply_to).src;
           const size_t lt = who.find(" <");
           if (lt != std::string::npos && lt > 0) who.resize(lt);
-          r.text = "  ·  reply to ";
+          r.text = "reply to ";
           r.text += who;
         } else {
-          r.text = "  ·  reply to #";
+          r.text = "reply to #";
           r.text += node.alt;
         }
         if (const InlineSpan* l = header_link(2)) {
           r.kind = InlineKind::Link;
           r.href = l->href;
         }
-        header.spans.push_back(std::move(r));
+        add_header(std::move(r), 2);
       }
       y += pad;
       const size_t header_glyphs = out.glyphs.size();
@@ -1135,8 +1150,17 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       const BlockStyle& meta_st = st[BlockRole::MessageMeta];
       for (size_t gi = header_glyphs; gi < out.glyphs.size(); ++gi) {
         PositionedGlyph& g = out.glyphs[gi];
-        g.node = id;
-        const BlockStyle& bs = g.span_index == 0 ? author_st : meta_st;
+        const size_t owner = g.span_index < header_owner.size()
+                                 ? header_owner[g.span_index]
+                                 : kNoHeaderOwner;
+        if (owner == kNoHeaderOwner) {
+          // Decorations have no underlying document span/caret or hyperlink.
+          g.node = INVALID_NODE;
+        } else {
+          g.node = id;
+          g.span_index = owner;
+        }
+        const BlockStyle& bs = owner == 0 ? author_st : meta_st;
         if (bs.has_color) g.color = bs.color;
       }
       y += 4.f;
