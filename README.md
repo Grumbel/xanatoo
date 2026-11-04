@@ -1,211 +1,196 @@
 # xanatoo
 
-Interactive document composition engine.
+**A document you can walk around in.**
 
-A lightweight, realtime, editable document system built with **C++20**, **SDL2**,
-and **FreeType**. Inspired by Markdown, classical typesetting, Ted Nelson's
-hypertext ideas, HyperCard, and the Canon Cat.
+xanatoo is a lightweight, native hypertext workspace: a live document editor,
+reader, and explorer built with **C++20, SDL2, FreeType, and Dear ImGui**. It
+draws inspiration from Ted Nelson's Xanadu and stretchtext, HyperCard, classical
+typesetting, and the Canon Cat.
 
-See [PROPOSAL.md](PROPOSAL.md) for the full vision. Design brainstorm (structure, links, transclusion, identity): [docs/BRAINSTORM.md](docs/BRAINSTORM.md). Local-only for now.
+Edit a document directly on the page, unfold a detailed explanation, follow a
+link to a particular passage, or read a web article and an ebook side by side.
+Local files, imported books, feeds, and supported online services share one
+semantic document model and layout engine. It is deliberately **not** a full
+CSS/JavaScript web browser.
 
-![xanatoo screenshot](docs/screenshot.png)
+![xanatoo showing a formatted document](docs/screenshot.png)
 
-## Quick start
+Website and downloads: **[xanatoo.github.io](https://xanatoo.github.io/)**.
+For the original vision see [PROPOSAL.md](PROPOSAL.md); for the evolving design,
+see [docs/BRAINSTORM.md](docs/BRAINSTORM.md) and [TODO.md](TODO.md).
 
-```bash
+## What it does
+
+- **Write on the page.** Edit paragraphs, headings, lists, tables, code, links,
+  figures, and notes without switching between source and preview. Reorder
+  blocks, adjust columns and image sizes, and undo edits.
+- **Follow passages, not just pages.** Expand/collapse stretchtext and sections;
+  link to a named section or selected text; show just a passage (`//`), or
+  navigate to and highlight it (`#`). Embed labelled passages with
+  `:::include`, including from another local document.
+- **Read your way.** Switch between scrolling and paged spreads (one to three
+  columns), use section focus and the outline, toggle web reader mode, show
+  footnotes in a bottom strip, and choose semantic S-expression style sheets.
+- **Arrange the workspace.** Use tabs, two-pane browsing, movable/dockable
+  document windows and panels, per-view history, bookmarks of text selections,
+  and session restoration.
+- **Explore written material.** Open HTML pages, Gemini capsules, RSS/Atom
+  feeds, Wikipedia, Hacker News, Reddit, Lemmy, and Nostr in native document
+  views. Search with a configurable engine list and browse a curated directory.
+- **Read books and images.** Open EPUB, browse Standard Ebooks and Gutenberg,
+  import many other formats through Pandoc, and view image collections in a
+  zoomable lightbox. TeX math uses an OpenType MATH font when available.
+- **Keep drafts.** Unsaved local edits are autosaved to a content-addressed
+  SQLite revision store when enabled. Revert, reopen drafts, and continue where
+  you left off without an automatic discard of unfinished work.
+
+For a guided tour of actual document elements, open
+[`examples/tour.md`](examples/tour.md) (also in **Help → Examples**).
+
+## Run it
+
+The easiest path on Linux with Nix flakes is:
+
+```sh
+nix run github:Grumbel/xanatoo
+nix run github:Grumbel/xanatoo -- notes.md
+nix run github:Grumbel/xanatoo -- wikipedia:Ted_Nelson
+```
+
+From a checkout:
+
+```sh
 nix build
-./result/bin/xanatoo                  # opens examples/welcome.md when found
-./result/bin/xanatoo notes.md         # open a file
-./result/bin/xanatoo a.md b.md        # dual-pane, two documents
-./xanatoo examples/welcome.md         # sample with images (from repo root)
-./xanatoo examples/sample.sexp        # experimental S-expression form
+./result/bin/xanatoo                       # opens the welcome document
+./result/bin/xanatoo notes.md other.md     # two panes
+./result/bin/xanatoo examples/tour.md
 ```
 
-Or with system packages (CMake ≥ 3.16, SDL2, FreeType):
+Or build with CMake and a C++20 compiler, SDL2, FreeType, and the libraries
+required by the selected optional features (see `CMakeLists.txt`):
 
-```bash
-mkdir build && cd build && cmake .. && make -j
-./xanatoo --font /path/to/font.ttf ../examples/welcome.md
+```sh
+cmake -S . -B build -DXANATOO_THUMTOO=OFF
+cmake --build build -j
+./build/xanatoo examples/welcome.md
 ```
 
-Font resolution: `--font` → `XANATOO_FONT` env → common system paths.
-`nix build` wraps the binary with DejaVu Sans.
+`--font PATH` selects a TTF/OTF face, followed by `XANATOO_FONT` and the normal
+font search. Run `xanatoo --help` or `man xanatoo` for options, including
+`--fullscreen`, `--geometry`, `--ui-scale`, and the directory overrides.
 
-The demo document lives in **`examples/welcome.md`** (with PNGs alongside).
-With no path argument, xanatoo opens it from the data directory
-(`--data-dir`, else `<exe>/../share/xanatoo`, else the install prefix; the
-build tree has the same layout). `xanatoo --show-paths` prints every
-directory it uses; see `man xanatoo` for all options.
+### Android and handhelds
 
-## Files
+The Nix flake also builds an **Android 5.0+ APK** and an **R36S/PortMaster**
+package:
 
-| What | Where |
-|------|-------|
+```sh
+nix build .#xanatoo-android
+nix build .#xanatoo-r36s-portmaster-zip
+```
+
+Android supports touch gestures and the system keyboard; on R36S, a gamepad
+drives navigation, a software pointer, and an on-screen keyboard. See
+[docs/ANDROID.md](docs/ANDROID.md) and [mk/r36s/README.md](mk/r36s/README.md).
+Prebuilt development snapshots are linked on the
+[website](https://xanatoo.github.io/#download).
+
+## Documents, formats, and addresses
+
+| Input | How xanatoo handles it |
+| --- | --- |
+| Markdown (`.md`), Org (`.org`) | Direct, editable semantic documents |
+| S-expression (`.sexp`, `.glyph`, `.ss`) | Structured document form; editable and exportable |
+| Local `.html`, HTTP(S) pages | Simplified semantic HTML, read-only; no CSS/JavaScript engine |
+| Gemtext (`.gmi`, `.gemini`), `gemini://` | Native document parser and optional network client |
+| RSS / Atom feeds | Read-only threads and entries |
+| `wikipedia:`, `hn:`, `reddit:`, `lemmy:`, `nostr:` | Service-specific read-only document views |
+| EPUB | Imported for reading; a native EPUB importer is available without Pandoc |
+| DOCX, ODT, reStructuredText, LaTeX, and more | Read-only import through optional Pandoc |
+| Images and `:::collection` | Inline/block images, cards, thumbnails, lightbox |
+
+The document language includes headings/sections/articles, nested lists and
+tasks, links and typed relations, tables, definition lists, figures, citations,
+footnotes, margin asides, columns, transclusion, stretchtext, and `$…$` /
+`$$…$$` TeX math. See [FORMAT.md](FORMAT.md),
+[examples/tour.md](examples/tour.md), and [docs/MATH.md](docs/MATH.md).
+
+Addresses can identify *part* of a document:
+
+```text
+notes.md#id:introduction       whole document, passage marked
+notes.md//id:introduction      that section as the current view
+notes.md#text:hypertext        selected text, marked in context
+```
+
+The `#text:` form accepts a richer quote/context selector as documented in
+[docs/PASSAGES.md](docs/PASSAGES.md). Some advanced selectors (such as
+image-region crops and clipped multi-block text ranges) are still planned;
+see that document for their status. Source URLs and imported formats remain
+read-only, with Save As offering an editable Markdown copy.
+
+## Everyday controls
+
+| Action | Shortcut |
+| --- | --- |
+| Open a file or address | **Ctrl+L** |
+| Search in the current document / find next | **Ctrl+F** / **F3** |
+| Search the web/services (choose engine) | **Ctrl+Alt+K** |
+| Toggle split view | **Ctrl+\\** |
+| Outline / page navigation panel | **Ctrl+Shift+O** / **Ctrl+Alt+P** |
+| Bookmark a selection or page | **Ctrl+Shift+B** |
+| Paged reading / web reader mode | **F8** / **F9** |
+| Browse/edit mode | **F2** |
+| Save / Save As / undo | **Ctrl+S** / **Ctrl+Shift+S** / **Ctrl+Z** |
+| Keyboard reference | **F1** |
+
+The menu bar and toolbar expose more commands: structure editing, dragging
+blocks and column gutters, dockable windows, styles, bookmarks, collections,
+and per-view reading options. See [examples/help.md](examples/help.md) for
+the complete keyboard reference.
+
+## Display and state
+
+Style sheets (`styles/*.xss`) control *semantic roles*, not CSS selectors.
+They can change typography, spacing, margins, side boxes, colours, and paper
+backgrounds; reader preferences like zoom and paged mode stay separate from
+the document. See [docs/STYLESHEETS.md](docs/STYLESHEETS.md).
+
+| Data | Default location |
+| --- | --- |
 | Preferences (`view.conf`) | `$XDG_CONFIG_HOME/xanatoo/` |
-| Drafts / revisions, folds, bookmarks, history | `$XDG_STATE_HOME/xanatoo/` |
-| Your style sheets (`styles/*.xss`) | `$XDG_DATA_HOME/xanatoo/styles/` |
-| Thumbnails, downloads, imports | `$XDG_CACHE_HOME/xanatoo/` |
+| Drafts/revisions, folds, bookmarks, history, sessions | `$XDG_STATE_HOME/xanatoo/` |
+| Your style sheets and search engines (`search.sexp`) | `$XDG_DATA_HOME/xanatoo/` |
+| Images, thumbnails, downloads, imports | `$XDG_CACHE_HOME/xanatoo/` |
 
-`--config-dir` / `--state-dir` / `--user-data-dir` / `--cache-dir` move one
-of them, `--portable` (or a `portable.txt` next to the executable) keeps all
-of them in `userdata/` beside it, and `--no-save` writes nothing.
+Use `--config-dir`, `--state-dir`, `--user-data-dir`, or `--cache-dir` to
+redirect these. `--portable` keeps them under `userdata/` beside the
+executable; `--no-save` disables persistent state, and `--new-session` skips
+restoring the previous workspace. `--show-paths` prints the resolved paths.
 
-## Packaging standard
+## Development status and scope
 
-xanatoo follows [gamepkgstd](https://github.com/Grumbel/gamepkgstd) where
-its rules apply to a document editor (the game-only rules — screenshots,
-pause on focus loss, gameplay rebinding, volume — do not). Deliberate
-deviations:
+xanatoo is experimental. The HTML reader prioritizes text structure over
+browser fidelity: it does not execute JavaScript, apply site CSS, or support
+interactive web forms. Several services rely on public APIs and may stop
+working when those services change.
 
-- **VER-7**: the Android `versionCode` is the commit time
-  (`self.lastModified`), not the revision count, so a build from a dirty
-  tree still installs over the last committed one.
-- **DIR / man page**: the man page is in section 1, not 6; xanatoo is not
-  a game.
+**Network security limitation:** the current OpenSSL and Mbed TLS backends
+do **not yet verify peer certificates**. Do not use the built-in network
+clients for sensitive information or authenticated browsing. Certificate
+verification is an outstanding task.
 
-## Markup
+The project follows [gamepkgstd](https://github.com/Grumbel/gamepkgstd)
+where applicable, with editor-specific exceptions documented in the
+implementation. The code and design notes live in:
 
-Supported dialect (intentionally small):
-
-| Syntax | Meaning |
-|--------|---------|
-| `#` … `######` | Headings |
-| blank-line separated | Paragraphs |
-| `- ` / `* ` / `+ ` | Unordered list items |
-| `1. ` `2. ` … | Ordered list items |
-| `> …` | Block quote |
-| `---` / `***` / `___` | Horizontal rule |
-| `*em*` `**strong**` `` `code` `` | Inline styles |
-| `[text](#anchor)` / `[text](url)` | Links |
-| `![alt](path.png){scale=1.2}` | Images (PNG/JPEG/BMP/GIF) |
-| `:::stretch summary="…"` … `:::` | Collapsed stretchtext |
-| `:::columns` / `:::column weight=1.5` | Side-by-side columns (draggable widths) |
-| `:::include #Heading` | Transclude (live embed of a local passage) |
-| `:::include other.md#H` | Cross-document transclude (path relative to host doc) |
-| `.sexp` / `.glyph` / `.ss` | Experimental S-expression form of the same model |
-| File → Export as S-expression / Markdown | Save As with the chosen extension |
-
-## UI chrome
-
-A **Dear ImGui** menu bar and toolbar sit above the document (File / Edit / Format / View). Keyboard shortcuts still work; menus mirror the same commands.
-
-## Keybindings
-
-### Files
-| Key | Action |
-|-----|--------|
-| **Ctrl+S** | Save (untitled → `untitled.md`) |
-| **Ctrl+Shift+S** | Save As (path in status bar) |
-| **Ctrl+R** | Reload from disk (refuses if dirty) |
-| **Ctrl+Shift+R** | Force reload (File → Revert to Saved drops a draft) |
-| **Ctrl+Q** | Quit (warns once if dirty) |
-| **F1** | Keyboard reference overlay |
-
-### Edit
-| Key | Action |
-|-----|--------|
-| Type / Backspace / Delete | Insert / delete |
-| **Enter** | Split paragraph / list item (empty list item exits list) |
-| **Ctrl+Enter** | Insert empty paragraph after current block |
-| **Ctrl+Shift+-** | Insert horizontal rule (then a new paragraph) |
-| **Ctrl+Shift+I** | Insert image (type path in status bar) |
-| **Drag image file** | Drop PNG/JPEG/GIF/BMP onto a pane to insert at caret |
-| Backspace at block start | Merge with previous block (drops empty lists) |
-| **Ctrl+Z** / **Ctrl+Y** | Undo / redo |
-| **Ctrl+C** / **X** / **V** | Clipboard (paste: blank lines → paragraphs) |
-| **Ctrl+B** / **I** / **\`** / **K** | Bold / italic / code / link |
-| **Ctrl+D** | Duplicate current block |
-| **Alt+↑ / Alt+↓** | Move block among siblings |
-| Drag left margin of block | Reorder / reparent block (columns & lists) |
-| Drag column gutter | Adjust relative column widths |
-| **Ctrl+E** | Wrap block in stretchtext |
-| **Ctrl+Shift+E** | Edit stretch summary |
-| **Ctrl+Shift+U** | Unwrap stretchtext |
-| **Ctrl+0** | Demote to paragraph |
-| **Ctrl+1…6** | Set heading level |
-| **Ctrl+Shift+Q** | Toggle block quote |
-| **Ctrl+Shift+8** | Toggle unordered list |
-| **Ctrl+Shift+7** | Toggle ordered list |
-| **Tab** / **Shift+Tab** | Indent / outdent list item (nested lists) |
-| **Ctrl+Shift+[** / **]** | Collapse / expand all stretchtext |
-| Double-click | Select word |
-
-### Navigate
-| Key | Action |
-|-----|--------|
-| Arrows | Move caret (scrolls into view) |
-| **Ctrl+←/→** | Word motion |
-| **Home** / **End** | Line start / end |
-| **Ctrl+Home** / **Ctrl+End** | Document start / end |
-| **Page Up** / **Page Down** | Scroll view and move caret |
-| **Ctrl+A** | Select current block |
-| **Ctrl+Shift+A** | Select all |
-| **Double-click** | Select word |
-| **Triple-click** | Select block |
-| **Ctrl+Shift+A** | Select whole document |
-| Click blue link | Follow `#anchor` or open external `http(s)` / `mailto:` |
-| **Ctrl+Click** link | Jump to `#anchor` in the other pane (enables split) |
-| Hover `#anchor` link | Preview tooltip of the target passage |
-| Click transclusion | Jump to the source passage |
-| **Ctrl+F** | Leap search |
-| **Ctrl+Shift+O** | Heading outline (jump to section) |
-| **Ctrl+H** | Leap replace (Tab switches fields) |
-| **F3** / **Ctrl+G** | Next match |
-| **Shift+F3** | Previous match |
-| **Esc** | Cancel mode / clear selection |
-
-### View
-| Key | Action |
-|-----|--------|
-| **Ctrl+\\** | Toggle dual pane |
-| **Ctrl+Shift+D** | Diff marks between two open files (orange bars) |
-| **Tab** | List indent, else focus other pane (or replace field) |
-| Drag gutter | Resize panes |
-| Drag scrollbar | Scroll |
-| Drag image corner | Resize image |
-| **Ctrl++** / **Ctrl+-** | Zoom text |
-| Click ▸/▾ | Expand / collapse stretchtext |
-
-## Architecture notes
-
-- **Document** — arena of nodes with stable `NodeId`s; layout is a pure function
-  of document state (data-oriented, Casey Muratori–style).
-- **Selection** — two carets (anchor + focus); highlights derived from glyphs.
-- **Undo** — per-document snapshot stacks.
-- **Status bar** — idle right side shows word / character / heading counts.
-- **Vendored** — `external/stb_image.h` (public domain).
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — content, layout, interaction,
+  and rendering;
+- [docs/REVISIONS.md](docs/REVISIONS.md) — draft store and future identity;
+- [docs/PASSAGES.md](docs/PASSAGES.md) — addresses, cuts, marks, and embeds;
+- [docs/BRAINSTORM.md](docs/BRAINSTORM.md) — long-term hypertext direction;
+- [TODO.md](TODO.md) — current status and open work.
 
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).
-
-## Gemini
-
-Xanatoo can open **gemtext** (`.gmi` / `.gemini`) and fetch **`gemini://`** URLs
-when built with OpenSSL (`-DXANATOO_GEMINI=ON`, the default).
-
-- **Ctrl+L** / **File → Open URL…** — enter a capsule URL or local path
-- Successful fetches open in **browse mode** (read-only navigation)
-- Relative `=>` links resolve against the current capsule
-
-Disable the network client (parser remains):
-
-```bash
-cmake -DXANATOO_GEMINI=OFF ..
-```
-
-
-## R36S / PortMaster (ArkOS)
-
-Cross-built aarch64 packages against an Ubuntu 19.10 (eoan) sysroot:
-
-```bash
-nix build .#xanatoo-r36s                 # binary only
-nix build .#xanatoo-r36s-portmaster      # folder for /roms/ports/
-nix build .#xanatoo-r36s-portmaster-zip  # zip for PortMaster autoinstall
-```
-
-The port ships `examples/`, style sheets, toolbar icons, and DejaVu Sans. The
-launcher passes the port folder as `--data-dir`, sets `XANATOO_FONT` and keeps
-config, state and cache under `conf/` via the XDG variables. See
-`mk/r36s/README.md`.

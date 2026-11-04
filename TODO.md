@@ -6,7 +6,18 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **263** (this delivery is **262**)
+Next bundle number: **264** (this delivery is **263**)
+
+## Status (2026-11-04) — README and website refresh
+
+- Rewrote `README.md` around the present document, hypertext, reader,
+  search, workspace, platform and revision features; corrected the old
+  local-only description, quick-start and dependencies, and added a clear
+  caveat about TLS peer certificate verification.
+- The separate `xanatoo.github.io` source tree now presents passage
+  addresses, current formats and workflow features in its existing
+  editorial style, with its own git bundle and no source-history fork.
+- Documentation-only change; no application behaviour changed.
 
 ## Status (2026-11-03) — TeX math
 
