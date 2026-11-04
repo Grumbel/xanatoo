@@ -27,6 +27,7 @@ namespace xanatoo::app {
 
 namespace {
 
+#ifndef __EMSCRIPTEN__
 constexpr int kMaxWorkers = 4;
 constexpr uint64_t kImageCacheBytes = 256ull * 1024 * 1024;
 constexpr uint64_t kThumbCacheBytes = 128ull * 1024 * 1024;
@@ -91,12 +92,19 @@ void image_worker(std::shared_ptr<ImageFetchShared> sh) {
     sh->done.emplace_back(std::move(url), ok);
   }
 }
+#endif
 
 }  // namespace
 
 void poll_images(App& app) {
-  ImageFetchShared& sh = *app.image_fetch;
   std::vector<std::pair<std::string, bool>> done;
+#ifdef __EMSCRIPTEN__
+  // No network or pthreads in the offline web edition. Complete queued
+  // remote requests as unavailable without scheduling any workers.
+  for (std::string& url : app.images.take_requests())
+    done.emplace_back(std::move(url), false);
+#else
+  ImageFetchShared& sh = *app.image_fetch;
   {
     std::lock_guard<std::mutex> lock(sh.mutex);
     for (std::string& url : app.images.take_requests())
@@ -108,6 +116,7 @@ void poll_images(App& app) {
     }
     done.swap(sh.done);
   }
+#endif
   const bool thumbs = app.images.poll();
   if (done.empty() && !thumbs) return;
   for (const auto& [url, ok] : done) app.images.remote_done(url, ok);
@@ -118,12 +127,14 @@ void poll_images(App& app) {
 }
 
 void prune_image_caches() {
+#ifndef __EMSCRIPTEN__
   const std::string dir = cache_dir();
   if (dir.empty()) return;
   std::thread([dir] {
     prune_cache_dir((fs::path(dir) / "images").string(), kImageCacheBytes);
     prune_cache_dir((fs::path(dir) / "thumbs").string(), kThumbCacheBytes);
   }).detach();
+#endif
 }
 
 }  // namespace xanatoo::app

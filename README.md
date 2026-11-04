@@ -96,6 +96,18 @@ drives navigation, a software pointer, and an on-screen keyboard. See
 Prebuilt development snapshots are linked on the
 [website](https://xanatoo.github.io/#download).
 
+### Windows and WebAssembly (experimental)
+
+CMake can also build **32-/64-bit Windows** packages with MinGW-w64 and an
+**offline WebAssembly** preview with Emscripten. Those builds default to
+`XANATOO_MINIMAL_PORT=ON`: they retain the document editor, local readers,
+hypertext navigation, SDL2 renderer, and bundled fonts, but omit built-in
+network services, SQLite, FontConfig, and thumtoo. The browser edition does
+not yet save changes or import files from the host.
+
+See [docs/PORTS.md](docs/PORTS.md) for commands, CI artifacts, packaged
+assets, and the currently unsupported features.
+
 ## Documents, formats, and addresses
 
 | Input | How xanatoo handles it |
@@ -189,6 +201,7 @@ implementation. The code and design notes live in:
   and rendering;
 - [docs/REVISIONS.md](docs/REVISIONS.md) — draft store and future identity;
 - [docs/PASSAGES.md](docs/PASSAGES.md) — addresses, cuts, marks, and embeds;
+- [docs/PORTS.md](docs/PORTS.md) — Windows and WebAssembly builds and limits;
 - [docs/BRAINSTORM.md](docs/BRAINSTORM.md) — long-term hypertext direction;
 - [TODO.md](TODO.md) — current status and open work.
 

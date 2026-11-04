@@ -7,6 +7,7 @@
 #include <SDL.h>
 
 #include <cmath>
+#include <filesystem>
 
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -14,7 +15,6 @@
 #include <unistd.h>
 
 #include <cstdlib>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -196,7 +196,20 @@ float platform_default_ui_scale() {
 #else
 
 void platform_pre_init() {}
-void platform_init() {}
+void platform_init() {
+#ifdef _WIN32
+  // SDL knows the per-user AppData location; HOME and XDG variables are
+  // normally absent in a native Windows process.
+  if (char* pref = SDL_GetPrefPath("Grumbel", "xanatoo")) {
+    const std::filesystem::path base(pref);
+    set_platform_dir(DirKind::Config, (base / "config").string());
+    set_platform_dir(DirKind::State, (base / "state").string());
+    set_platform_dir(DirKind::UserData, (base / "data").string());
+    set_platform_dir(DirKind::Cache, (base / "cache").string());
+    SDL_free(pref);
+  }
+#endif
+}
 void platform_request_keyboard() {}
 void platform_release_keyboard() {}
 bool platform_text_input_at_start() { return true; }

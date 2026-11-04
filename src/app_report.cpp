@@ -26,7 +26,9 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include <imgui.h>
+#if XANATOO_SQLITE
 #include <sqlite3.h>
+#endif
 
 #if XANATOO_FONTCONFIG
 #include <fontconfig/fontconfig.h>
@@ -366,8 +368,10 @@ void print_startup_report(App& app) {
                                    version3(FC_MAJOR, FC_MINOR, FC_REVISION)),
                           mapped(libs, "libfontconfig")));
 #endif
+#if XANATOO_SQLITE
   out.push_back("sqlite: " + with_path(versions(sqlite3_libversion(), SQLITE_VERSION),
                                        mapped(libs, "libsqlite3")));
+#endif
 #if XANATOO_HTTPS
   out.push_back("tls: " + with_path(xanatoo::TlsStream::version(),
                                     mapped(libs, "libssl")));

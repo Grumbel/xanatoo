@@ -107,8 +107,12 @@ static fs::path import_cache_dir(const std::string& epub_path) {
 }
 
 bool pandoc_available() {
+#if defined(_WIN32) || defined(__EMSCRIPTEN__)
+  return false;  // The POSIX shell pipeline below is not portable.
+#else
   int rc = std::system("command -v pandoc >/dev/null 2>&1");
   return rc == 0;
+#endif
 }
 
 // Lua filter for every pandoc import: drop raw HTML blocks / inlines.

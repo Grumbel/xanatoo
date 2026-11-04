@@ -19,11 +19,41 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Catch common mistakes; ImGui is vendored and not under our control.
-add_compile_options(-Wall -Wextra -Wno-unused-parameter)
+if(MSVC)
+  add_compile_options(/W4)
+else()
+  add_compile_options(-Wall -Wextra -Wno-unused-parameter)
+endif()
+
+# The first Windows / browser ports deliberately ship a useful offline reader
+# and editor. The normal Linux, Android and R36S configurations are unchanged.
+set(_minimal_port_default OFF)
+if(WIN32 OR EMSCRIPTEN)
+  set(_minimal_port_default ON)
+endif()
+option(XANATOO_MINIMAL_PORT "Offline, dependency-light cross-platform build" ${_minimal_port_default})
+if(XANATOO_MINIMAL_PORT)
+  foreach(_feature FONTCONFIG SQLITE THUMTOO GEMINI NOSTR REDDIT LEMMY HN
+                   EBOOKS FEEDS WEB WIKIPEDIA)
+    set(XANATOO_${_feature} OFF CACHE BOOL "Disabled by XANATOO_MINIMAL_PORT" FORCE)
+  endforeach()
+endif()
+
+if(EMSCRIPTEN)
+  # Emscripten's SDL2 and FreeType ports supply their headers and static libs.
+  # No host pkg-config or native FreeType library may leak into this build.
+  add_compile_options(-sUSE_SDL=2 -sUSE_FREETYPE=1)
+  add_link_options(-sUSE_SDL=2 -sUSE_FREETYPE=1)
+  add_library(Freetype::Freetype INTERFACE IMPORTED)
+  set(SDL2_LIBRARIES "-sUSE_SDL=2")
+endif()
 
 # R36S cross builds pass SDL2_INCLUDE_DIRS / SDL2_LIBRARIES explicitly.
 if(NOT SDL2_LIBRARIES)
   find_package(SDL2 REQUIRED)
+endif()
+if(TARGET SDL2::SDL2)
+  set(SDL2_LIBRARIES SDL2::SDL2)
 endif()
 if(NOT FREETYPE_LIBRARY AND NOT TARGET Freetype::Freetype)
   find_package(Freetype REQUIRED)
@@ -175,14 +205,27 @@ target_compile_definitions(xanatoo PRIVATE
   XANATOO_SQLITE=$<BOOL:${XANATOO_SQLITE}>
   XANATOO_FONTCONFIG=$<BOOL:${XANATOO_FONTCONFIG}>)
 
-find_package(Threads REQUIRED)
+if(NOT EMSCRIPTEN)
+  find_package(Threads REQUIRED)
+  set(XANATOO_THREADS Threads::Threads)
+endif()
+if(WIN32 AND TARGET SDL2::SDL2main)
+  set(XANATOO_SDL2_MAIN SDL2::SDL2main)
+endif()
 target_link_libraries(xanatoo PRIVATE
+  ${XANATOO_SDL2_MAIN}
   ${SDL2_LIBRARIES}
-  Threads::Threads
+  ${XANATOO_THREADS}
   xanatoo_sqlite3
   Freetype::Freetype
   ${FONTCONFIG_LIBRARIES}
 )
+if(WIN32)
+  set_target_properties(xanatoo PROPERTIES WIN32_EXECUTABLE TRUE)
+  if(MINGW)
+    target_link_options(xanatoo PRIVATE -static-libgcc -static-libstdc++)
+  endif()
+endif()
 
 # Images through thumtoo (vendored git subtree, shared with galapix /
 # biltoo): libvips decoding and a tile cache for thumbnails. Without it
@@ -307,7 +350,9 @@ if(UNIX AND NOT APPLE)
   target_link_libraries(xanatoo PRIVATE m)
 endif()
 
-install(TARGETS xanatoo DESTINATION bin)
+if(NOT EMSCRIPTEN)
+  install(TARGETS xanatoo DESTINATION bin)
+endif()
 
 # Data directory (gamepkgstd DIR-3, paths.hpp): --data-dir, else
 # <exe>/../share/xanatoo, else the install path compiled in here. The build
@@ -317,11 +362,21 @@ install(TARGETS xanatoo DESTINATION bin)
 set(XANATOO_BUILD_DATA_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/xanatoo)
 file(MAKE_DIRECTORY ${XANATOO_BUILD_DATA_DIR})
 foreach(_entry styles examples FORMAT.md)
-  file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/${_entry}
-       ${XANATOO_BUILD_DATA_DIR}/${_entry} SYMBOLIC)
+  if(WIN32)
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/${_entry}
+         DESTINATION ${XANATOO_BUILD_DATA_DIR})
+  else()
+    file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/${_entry}
+         ${XANATOO_BUILD_DATA_DIR}/${_entry} SYMBOLIC)
+  endif()
 endforeach()
-file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/data/icons
-     ${CMAKE_CURRENT_BINARY_DIR}/share/icons SYMBOLIC)
+if(WIN32)
+  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data/icons
+       DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/share)
+else()
+  file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/data/icons
+       ${CMAKE_CURRENT_BINARY_DIR}/share/icons SYMBOLIC)
+endif()
 target_compile_definitions(xanatoo PRIVATE
   "XANATOO_DATA_INSTALL_DIR=\"${CMAKE_INSTALL_PREFIX}/share/xanatoo\"")
 
@@ -369,10 +424,41 @@ install(DIRECTORY styles/
 # that the menu lists every page.
 install(DIRECTORY examples/ DESTINATION share/xanatoo/examples)
 
+if(XANATOO_MINIMAL_PORT)
+  install(DIRECTORY data/fonts/ DESTINATION share/xanatoo/fonts
+          FILES_MATCHING PATTERN "*.ttf" PATTERN "LICENSE-DejaVu.txt"
+                         PATTERN "README.md")
+  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data/fonts/
+       DESTINATION ${XANATOO_BUILD_DATA_DIR}/fonts)
+endif()
+
+if(EMSCRIPTEN)
+  # A standalone site: index.html + JavaScript + Wasm + preloaded /data.
+  # Remote services, persistence and subprocess imports are intentionally off.
+  set_target_properties(xanatoo PROPERTIES SUFFIX ".html")
+  target_link_options(xanatoo PRIVATE
+    "SHELL:--shell-file ${CMAKE_CURRENT_SOURCE_DIR}/mk/wasm/shell.html"
+    "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/examples/welcome.md@/data/examples/welcome.md"
+    "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/styles@/data/styles"
+    "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/data/fonts@/data/fonts"
+    "SHELL:--preload-file ${XANATOO_ICON_DIR}@/data/icons"
+    -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -sENVIRONMENT=web)
+  add_dependencies(xanatoo xanatoo_icons)
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/xanatoo.html
+                ${CMAKE_CURRENT_BINARY_DIR}/xanatoo.js
+                ${CMAKE_CURRENT_BINARY_DIR}/xanatoo.wasm
+                ${CMAKE_CURRENT_BINARY_DIR}/xanatoo.data
+          DESTINATION .)
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/xanatoo.html
+          DESTINATION . RENAME index.html)
+endif()
+
 
 # ---------------------------------------------------------------------------
 # Unit tests (no network; URL/string/JSON helpers only)
 # ---------------------------------------------------------------------------
+include(CTest)
+if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
 add_executable(xanatoo_tests
   tests/unit_tests.cpp
   src/paginate.cpp
@@ -444,5 +530,5 @@ target_compile_definitions(xanatoo_tests PRIVATE
   "XANATOO_STYLE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/styles\""
   "XANATOO_VERSION=\"${PROJECT_VERSION_FULL}\""
 )
-enable_testing()
 add_test(NAME unit_tests COMMAND xanatoo_tests)
+endif()

@@ -6,7 +6,22 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **270** (this delivery is **269**)
+Next bundle number: **271** (this delivery is **270**)
+
+## Status (2026-11-04) — Initial Win32/Win64 and WebAssembly builds
+
+- Added a dependency-light offline CMake profile, enabled by default on
+  Windows and Emscripten, with bundled DejaVu fonts and stb_image fallback.
+  Linux retains its full-featured configuration by default.
+- Added Windows SDL-pref paths, executable-relative asset lookup, native
+  external-URL handling, and a MinGW DLL-collection helper. Windows CI builds
+  32-bit and 64-bit packages.
+- Added an Emscripten-driven frame loop, preloaded assets and standalone HTML
+  shell. Web CI produces a static WASM artifact. Persistence, file import,
+  TLS/network services, and subprocess imports remain deferred.
+- Detailed build commands and current limitations: `docs/PORTS.md`.
+  Minimal native build/CTest/Xvfb smoke test passed; cross-compiler/runtime
+  validation on Windows and in a browser is still required.
 
 ## Status (2026-11-04) — Reading-position history and forward link cue
 

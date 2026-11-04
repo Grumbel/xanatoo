@@ -150,6 +150,11 @@ toolbar and shortcuts should route through `execute_command`.
   `--data-dir`, `<exe>/../share/xanatoo`, the install prefix; Android
   sets it to the unpacked assets). Never the cwd, no env variables.
   The build tree has `share/xanatoo/` with symlinks into the source.
+- Windows and Emscripten default to `XANATOO_MINIMAL_PORT=ON` (offline
+  SDL2/FreeType builds without FontConfig, SQLite, TLS clients or thumtoo).
+  The web main loop uses `emscripten_set_main_loop_arg` and preloaded `/data`;
+  Windows paths come from SDL. Maintain the feature guards and bundled font
+  fallback. Build and limitations: `docs/PORTS.md`.
 - New options go into `cli.cpp`, `print_usage` and `docs/xanatoo.1`
   (`checks.man` / `checks.help`).
 - Version strings: `version_string()`; network User-Agents via

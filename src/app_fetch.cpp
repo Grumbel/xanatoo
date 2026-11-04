@@ -392,8 +392,14 @@ uint64_t start_fetch(App& app, FetchPurpose purpose, int pane,
   job.buf = tab_buf;
   job.started = SDL_GetTicks();
   job.shared = std::make_shared<FetchShared>();
+  // There is no pthread runtime in the initial browser build. Its network
+  // services are disabled, so resolve unsupported fetches synchronously.
+#ifdef __EMSCRIPTEN__
+  fetch_page(url, job.shared);
+#else
   // Detached: a cancelled job just finishes into its (orphaned) shared state.
   std::thread(fetch_page, url, job.shared).detach();
+#endif
   app.fetches.push_back(std::move(job));
   return app.fetches.back().id;
 }

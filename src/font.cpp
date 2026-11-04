@@ -17,7 +17,9 @@
 #include <filesystem>
 #include <mutex>
 #include <vector>
+#if XANATOO_FONTCONFIG
 #include <strings.h>
+#endif
 
 namespace xanatoo {
 

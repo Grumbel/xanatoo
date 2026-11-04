@@ -1,0 +1,42 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com> -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Xanatóo — a document workspace</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #22292f; color: #e5e8e8;
+                 font-family: system-ui, sans-serif; }
+    body { display: flex; flex-direction: column; }
+    header { display: flex; align-items: baseline; justify-content: space-between;
+             gap: 1rem; padding: .5rem 1rem; }
+    header a { color: #a6cfff; }
+    #status { font-size: .85rem; opacity: .8; }
+    main { flex: 1; min-height: 0; position: relative; }
+    canvas { display: block; width: 100%; height: 100%; outline: none; }
+    footer { padding: .35rem 1rem; font-size: .78rem; opacity: .75; }
+  </style>
+</head>
+<body>
+  <header><span><strong>Xanatóo</strong> — interactive hypertext</span>
+    <span id="status">Starting…</span></header>
+  <main><canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas></main>
+  <footer>Offline preview: local documents, editing, and navigation. Changes are not saved.
+    <a href="https://github.com/Grumbel/xanatoo">Source</a></footer>
+  <script>
+    var canvas = document.getElementById('canvas');
+    var status = document.getElementById('status');
+    var Module = {
+      canvas: canvas,
+      print: function (text) { console.log(text); },
+      printErr: function (text) { console.error(text); },
+      setStatus: function (text) { status.textContent = text || 'Ready'; },
+      onRuntimeInitialized: function () { canvas.focus(); },
+      onAbort: function (reason) { status.textContent = 'Error: ' + reason; }
+    };
+  </script>
+  {{{ SCRIPT }}}
+</body>
+</html>

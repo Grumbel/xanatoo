@@ -42,7 +42,11 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#ifdef _WIN32
+#include <process.h>
+#else
 #include <unistd.h>
+#endif
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -53,6 +57,14 @@ namespace {
 
 int g_failed = 0;
 int g_passed = 0;
+
+int process_id() {
+#ifdef _WIN32
+  return _getpid();
+#else
+  return getpid();
+#endif
+}
 
 void expect(bool cond, const char* expr, const char* file, int line) {
   if (cond) {
@@ -108,7 +120,7 @@ void test_revstore() {
   using namespace xanatoo;
   namespace fs = std::filesystem;
   const fs::path db =
-      fs::temp_directory_path() / ("xanatoo-revstore-" + std::to_string(getpid()) + ".sqlite");
+      fs::temp_directory_path() / ("xanatoo-revstore-" + std::to_string(process_id()) + ".sqlite");
   fs::remove(db);
   revstore_use_path(db.string());
 
@@ -1330,7 +1342,7 @@ void test_view_settings_migration() {
   const char* old_xdg = std::getenv("XDG_CONFIG_HOME");
   std::string saved = old_xdg ? old_xdg : "";
   fs::path dir = fs::temp_directory_path() /
-                 ("xanatoo-vs-test-" + std::to_string(::getpid()));
+                 ("xanatoo-vs-test-" + std::to_string(process_id()));
   fs::create_directories(dir / "xanatoo");
   ::setenv("XDG_CONFIG_HOME", dir.c_str(), 1);
   {

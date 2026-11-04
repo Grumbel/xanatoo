@@ -3,6 +3,8 @@
 
 #include "xanatoo/paths.hpp"
 
+#include <SDL.h>
+
 #include <array>
 #include <cstdlib>
 #include <filesystem>
@@ -159,6 +161,13 @@ std::string executable_dir() {
   const fs::path exe = fs::read_symlink("/proc/self/exe", ec);
   if (!ec) return exe.parent_path().string();
 #endif
+  // On Windows, macOS and the browser SDL provides the executable location;
+  // Windows needs this for packaged share/xanatoo and portable.txt.
+  if (char* base = SDL_GetBasePath()) {
+    const std::string result(base);
+    SDL_free(base);
+    return result;
+  }
   return {};
 }
 

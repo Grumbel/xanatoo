@@ -22,7 +22,9 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include <imgui.h>
+#if XANATOO_SQLITE
 #include <sqlite3.h>
+#endif
 
 #if XANATOO_FONTCONFIG
 #include <fontconfig/fontconfig.h>
@@ -199,10 +201,15 @@ AboutSection libraries(App& app) {
   s.items.push_back({"FontConfig", false, "font families by name", {},
                      "`-DXANATOO_FONTCONFIG=ON`"});
 #endif
-  s.items.push_back({"SQLite", XANATOO_SQLITE,
+#if XANATOO_SQLITE
+  s.items.push_back({"SQLite", true,
                      std::string(sqlite3_libversion()) +
                          ", persisted folds and view state",
                      {}, "`-DXANATOO_SQLITE=ON`"});
+#else
+  s.items.push_back({"SQLite", false, "persisted folds and view state",
+                     {}, "`-DXANATOO_SQLITE=ON`"});
+#endif
   s.items.push_back({"Dear ImGui", true, IMGUI_VERSION ", menus and toolbars",
                      {}, {}});
   s.items.push_back({"Drafts", true, "unsaved edits in the revision store",

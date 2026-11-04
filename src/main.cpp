@@ -16,8 +16,13 @@
 #include <cstdio>
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <utility>
 #include <vector>
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
 
 #include "stb_image.h"
 
@@ -51,6 +56,29 @@ void set_window_icon(SDL_Window* window) {
 #endif
 }
 
+#ifdef __EMSCRIPTEN__
+// The browser owns the frame schedule. All SDL resources must outlive main(),
+// because emscripten_set_main_loop_arg(..., simulateInfiniteLoop=0) returns.
+struct BrowserRuntime {
+  SDL_Window* window = nullptr;
+  SDL_Renderer* renderer = nullptr;
+  std::unique_ptr<xanatoo::app::App> app;
+};
+
+void browser_frame(void* ctx) {
+  auto* runtime = static_cast<BrowserRuntime*>(ctx);
+  xanatoo::app::run_frame(*runtime->app);
+  if (runtime->app->running) return;
+  emscripten_cancel_main_loop();
+  xanatoo::app::app_shutdown(*runtime->app);
+  runtime->app.reset();
+  SDL_DestroyRenderer(runtime->renderer);
+  SDL_DestroyWindow(runtime->window);
+  SDL_Quit();
+  delete runtime;
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -60,6 +88,13 @@ int main(int argc, char** argv) {
   xanatoo::platform_pre_init();
   xanatoo::CliOptions opt;
   xanatoo::CliResult cli = xanatoo::parse_cli(argc, argv, opt);
+#ifdef __EMSCRIPTEN__
+  // The initial web edition reads from the preloaded virtual filesystem.
+  // It is deliberately ephemeral until IndexedDB persistence is implemented.
+  if (opt.data_dir.empty()) opt.data_dir = "/data";
+  opt.no_save = true;
+  opt.new_session = true;
+#endif
   if (cli == xanatoo::CliResult::Run) cli = xanatoo::apply_path_options(opt);
   switch (cli) {
     case xanatoo::CliResult::Run: break;
@@ -114,6 +149,22 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+#ifdef __EMSCRIPTEN__
+  auto runtime = std::make_unique<BrowserRuntime>();
+  runtime->window = window;
+  runtime->renderer = sdl;
+  runtime->app = std::make_unique<xanatoo::app::App>(window, sdl);
+  runtime->app->opt = std::move(opt);
+  if (!xanatoo::app::app_init(*runtime->app)) {
+    runtime->app.reset();
+    SDL_DestroyRenderer(sdl);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+    return 1;
+  }
+  emscripten_set_main_loop_arg(browser_frame, runtime.release(), 0, 0);
+  return 0;
+#else
   int rc = 0;
   {
     xanatoo::app::App app(window, sdl);
@@ -130,4 +181,5 @@ int main(int argc, char** argv) {
   SDL_DestroyWindow(window);
   SDL_Quit();
   return rc;
+#endif
 }

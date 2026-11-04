@@ -5,7 +5,7 @@
 #include "xanatoo/paths.hpp"
 #include "xanatoo/version.hpp"
 
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || defined(_WIN32) || defined(__EMSCRIPTEN__)
 #include <SDL.h>
 #endif
 
@@ -225,7 +225,7 @@ void open_external_url(const std::string& url_in) {
     return;
   }
 
-#if defined(__ANDROID__)
+#if defined(__ANDROID__) || defined(_WIN32) || defined(__EMSCRIPTEN__)
   if (SDL_OpenURL(url.c_str()) != 0)
     std::cerr << "SDL_OpenURL failed: " << SDL_GetError() << "\n";
 #elif defined(__linux__)
