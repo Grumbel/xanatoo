@@ -6,7 +6,15 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **277** (this delivery is **276**)
+Next bundle number: **278** (this delivery is **277**)
+
+## Status (2026-11-05) — SDL URL API compatibility on R36S
+
+- Explicitly include SDL3's `SDL_misc.h` for `SDL_OpenURL` and SDL2's
+  equivalent where available. The R36S sysroot has SDL2 2.0.10, which
+  predates `SDL_OpenURL` (added in 2.0.14); gracefully report unsupported
+  instead of failing compilation. The native build and tests pass; the
+  older SDL2 cross-compilation still needs verification on a Nix host.
 
 ## Status (2026-11-05) — Paragraph character initializer cleanup
 

@@ -9,6 +9,7 @@
 
 #if defined(XANATOO_SDL3) && XANATOO_SDL3
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_misc.h>
 // Modifiers and the grave-accent key were renamed in SDL3. Keep the
 // application's command-key vocabulary stable while both backends coexist.
 #define KMOD_CTRL SDL_KMOD_CTRL
@@ -17,6 +18,9 @@
 #define SDLK_BACKQUOTE SDLK_GRAVE
 #else
 #include <SDL.h>
+#if SDL_VERSION_ATLEAST(2, 0, 14)
+#include <SDL_misc.h>
+#endif
 #endif
 
 #include <string>
@@ -283,8 +287,12 @@ inline std::string base_path() {
 inline bool open_url(const char* url) {
 #if defined(XANATOO_SDL3) && XANATOO_SDL3
   return SDL_OpenURL(url);
-#else
+#elif SDL_VERSION_ATLEAST(2, 0, 14)
   return SDL_OpenURL(url) == 0;
+#else
+  (void)url;
+  SDL_SetError("Opening URLs requires SDL 2.0.14 or newer");
+  return false;
 #endif
 }
 
