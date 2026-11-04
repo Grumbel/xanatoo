@@ -42,6 +42,7 @@ void open_first_gamepad(App& app) {
 
 void clear_interaction_hover(App& app) {
   app.hover.href.clear();
+  app.hover.datetime.clear();
   app.hover.rel.clear();
   app.hover.preview.clear();
   app.hover.is_cite = false;

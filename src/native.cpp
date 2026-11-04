@@ -184,7 +184,8 @@ void native_rewrite_links(Document& doc, std::string_view ref) {
   if (!to_ref) return;
   for (Node& n : doc.nodes)
     for (InlineSpan& s : n.spans) {
-      if (s.kind != InlineKind::Link || s.href.empty()) continue;
+      if (s.kind != InlineKind::Link || s.href.empty() ||
+          s.rel == "external") continue;
       if (std::string r = to_ref(s.href); !r.empty()) s.href = std::move(r);
     }
 }

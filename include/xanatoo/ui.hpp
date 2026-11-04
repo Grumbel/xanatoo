@@ -224,6 +224,8 @@ struct UiState {
   bool stick_lmb = false, stick_rmb = false;
   bool help = false;
   bool selection = false;
+  std::string context_comment_native;  // passage address for a right-clicked HN comment
+  std::string context_comment_web;     // external HN per-comment permalink
   // True when caret is on a ListItem (enables indent/outdent menu items).
   bool on_list_item = false;
   // True when caret is inside a Stretch (enables edit summary).

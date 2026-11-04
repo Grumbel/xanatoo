@@ -1530,6 +1530,16 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Copy", UiCommand::Copy, cmd, state.selection, "Ctrl+C");
       menu_item_cmd("Copy Page URL", UiCommand::CopyPageUrl, cmd, true,
                     "Ctrl+Shift+U");
+      if (!state.context_comment_native.empty()) {
+        if (ImGui::MenuItem("Copy Link to Comment")) {
+          cmd = UiCommand::CopyText;
+          result.arg = state.context_comment_native;
+        }
+        if (ImGui::MenuItem("Copy Web Permalink")) {
+          cmd = UiCommand::CopyText;
+          result.arg = state.context_comment_web;
+        }
+      }
       menu_item_cmd("Select Block", UiCommand::SelectBlock, cmd, true, "Ctrl+A");
       ImGui::Separator();
     } else {

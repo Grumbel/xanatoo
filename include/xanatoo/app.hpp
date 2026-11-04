@@ -290,6 +290,7 @@ struct Lightbox {
 
 struct Hover {
   std::string href;
+  std::string datetime;  // semantic instant under pointer, even without href
   std::string rel;
   bool is_cite = false;
   std::string preview;
@@ -724,6 +725,9 @@ struct App {
   FloatWindow pg = make_float_panel(WindowRole::Page, 60, 110, 260, 420);
   PagePanel page;
   Hover hover;
+  // Right-clicked HN Message, not necessarily the current text selection.
+  std::string context_comment_native;
+  std::string context_comment_web;
   Touch touch;
   std::vector<FetchJob> fetches;
   uint64_t next_fetch_id = 1;

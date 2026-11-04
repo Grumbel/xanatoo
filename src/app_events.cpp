@@ -616,6 +616,26 @@ static void mouse_right_down(App& app, SDL_Event& ev, bool imgui_mouse) {
       float my = content_y(app, static_cast<float>(ev.button.y), app.focus);
       Pane& p = focused_pane(app);
       float lx = local_x(app, mx, app.focus);
+      app.context_comment_native.clear();
+      app.context_comment_web.clear();
+      const std::string page = path_of(app, p);
+      if (xanatoo::starts_with(page, "hn:item?id=")) {
+        // Target the actual message card, not the nearest text caret (which
+        // might belong to a different comment when clicking empty space).
+        const float doc_y = my + p.scroll_y;
+        for (const auto& card : p.layout.message_cards) {
+          const auto& box = card.box;
+          if (lx < box.x || lx > box.x + box.width || doc_y < box.y ||
+              doc_y > box.y + box.height) continue;
+          const auto& n = doc_of(app, p).get(box.node);
+          if (n.kind != xanatoo::NodeKind::Message || n.label.empty()) continue;
+          app.context_comment_native = page.substr(0, page.find('#')) +
+                                       "#id:" + n.label;
+          app.context_comment_web =
+              "https://news.ycombinator.com/item?id=" + n.label;
+          break;
+        }
+      }
       // A bookmark's margin icon has a menu of its own.
       if (const BookmarkMark* bm = bookmark_icon_at(app, p, lx, my)) {
         app.bookmark_menu = bm->address;
@@ -860,6 +880,7 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
       auto& hd = doc_of(app, hp);
 
       app.hover.href.clear();
+      app.hover.datetime.clear();
       app.hover.rel.clear();
       app.hover.is_cite = false;
       app.hover.preview.clear();
@@ -953,6 +974,9 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
             }
           }
         }
+        if (auto dt = xanatoo::hit_test_timestamp(
+                hd, hp.layout, lx, my, hp.scroll_y))
+          app.hover.datetime = std::move(*dt);
       }
 
       // Task checkbox column (left ~26px of a ListItem)

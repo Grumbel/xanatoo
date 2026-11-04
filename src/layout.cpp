@@ -1067,8 +1067,8 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
       // Header: author · date · reply/about, coloured by the message-author /
       // message-op / message-meta roles so posts separate at a glance.
-      // Optional Link spans on the Message (0 = author, 1 = date) turn those
-      // header parts into links; header span i hit-tests as node.spans[i].
+      // Optional semantic spans on Message (0 = author, 1 = date, 2 = reply)
+      // annotate the reconstructed header without making layout HN-specific.
       auto header_link = [&](size_t i) -> const InlineSpan* {
         return i < node.spans.size() && node.spans[i].kind == InlineKind::Link
                    ? &node.spans[i]
@@ -1092,6 +1092,9 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         d.kind = InlineKind::Text;
         d.text = "  ·  ";
         d.text += node.summary;
+        if (node.spans.size() > 1) {
+          d.datetime = node.spans[1].datetime;
+        }
         if (const InlineSpan* l = header_link(1)) {
           d.kind = InlineKind::Link;
           d.href = l->href;
@@ -1115,6 +1118,10 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         } else {
           r.text = "  ·  reply to #";
           r.text += node.alt;
+        }
+        if (const InlineSpan* l = header_link(2)) {
+          r.kind = InlineKind::Link;
+          r.href = l->href;
         }
         header.spans.push_back(std::move(r));
       }

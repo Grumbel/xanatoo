@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -24,6 +25,7 @@
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/theme.hpp"
+#include "xanatoo/time.hpp"
 #include "xanatoo/util.hpp"
 #include "xanatoo/native.hpp"
 #include "xanatoo/wikipedia.hpp"
@@ -121,6 +123,8 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.virtual_keyboard = app.virtual_keyboard;
   ui_state.help = app.help_mode;
   ui_state.selection = !focused_pane(app).sel.empty();
+  ui_state.context_comment_native = app.context_comment_native;
+  ui_state.context_comment_web = app.context_comment_web;
   {
     auto& fd = doc_of(app, focused_pane(app));
     auto nid = focused_pane(app).sel.focus.node;
@@ -3040,6 +3044,10 @@ void draw_hover_tooltip(App& app) {
     if (!prompt) {
       if (app.hover.stretch != xanatoo::INVALID_NODE) {
         tip = "Click to expand / collapse";
+      } else if (!app.hover.datetime.empty()) {
+        tip = xanatoo::timestamp_hover_text(
+            app.hover.datetime, static_cast<int64_t>(std::time(nullptr)));
+        if (!app.hover.href.empty()) tip += "\nClick: " + app.hover.href;
       } else if (!app.hover.href.empty()) {
         tip = app.hover.href;
         if (!app.hover.preview.empty() && app.hover.href[0] == '#') {
@@ -3070,11 +3078,24 @@ void draw_hover_tooltip(App& app) {
       }
     }
     if (!tip.empty()) {
-      if (tip.size() > 96) tip = tip.substr(0, 93) + "…";
-      int tw = app.ui_font.measure(tip);
+      std::vector<std::string> lines;
+      size_t pos = 0;
+      do {
+        const size_t end = tip.find('\n', pos);
+        std::string line = tip.substr(pos, end == std::string::npos
+                                              ? std::string::npos : end - pos);
+        if (line.size() > 96) line = line.substr(0, 93) + "…";
+        lines.push_back(std::move(line));
+        if (end == std::string::npos) break;
+        pos = end + 1;
+      } while (pos < tip.size());
+      int tw = 0;
+      for (const auto& line : lines)
+        tw = std::max(tw, app.ui_font.measure(line));
       const int pad_x = 10, pad_y = 6;
       int box_w = tw + pad_x * 2;
-      int box_h = app.ui_font.line_height() + pad_y * 2;
+      int box_h = app.ui_font.line_height() * static_cast<int>(lines.size()) +
+                  pad_y * 2;
       int bx = static_cast<int>(app.mouse_x) + 14;
       int by = static_cast<int>(app.mouse_y) - box_h - 10;
       if (bx + box_w > app.win_w - 4) bx = app.win_w - box_w - 4;
@@ -3098,8 +3119,11 @@ void draw_hover_tooltip(App& app) {
       SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
       float tip_baseline =
           static_cast<float>(by + pad_y + app.ui_font.ascender());
-      app.renderer.draw_text(app.ui_font, static_cast<float>(bx + pad_x),
-                             tip_baseline, tip, 235, 240, 250);
+      for (const auto& line : lines) {
+        app.renderer.draw_text(app.ui_font, static_cast<float>(bx + pad_x),
+                               tip_baseline, line, 235, 240, 250);
+        tip_baseline += app.ui_font.line_height();
+      }
     }
   }
 }

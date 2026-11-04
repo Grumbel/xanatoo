@@ -2344,6 +2344,23 @@ std::optional<std::string> hit_test_link(const Document& doc,
   return hit->href;
 }
 
+std::optional<std::string> hit_test_timestamp(const Document& doc,
+                                              const LayoutResult& layout,
+                                              float mx, float my,
+                                              float scroll_y) {
+  const float y = my + scroll_y;
+  for (const auto& g : layout.glyphs) {
+    if (g.node == INVALID_NODE || y < g.y - 18.f || y > g.y + 6.f ||
+        mx < g.x || mx > g.x + std::max(8.f, g.advance))
+      continue;
+    const Node& n = doc.get(g.node);
+    if (g.span_index >= n.spans.size()) continue;
+    if (!n.spans[g.span_index].datetime.empty())
+      return n.spans[g.span_index].datetime;
+  }
+  return std::nullopt;
+}
+
 bool move_up(const LayoutResult& layout, Caret& caret, float preferred_x) {
   // Find current baseline
   float cur_y = -1.f;

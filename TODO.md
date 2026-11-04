@@ -6,7 +6,24 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **266** (this delivery is **265**)
+Next bundle number: **267** (this delivery is **266**)
+
+## Status (2026-11-04) — Hacker News comment links and semantic time
+
+- Usernames in lists and comment headers now link to a native
+  `hn:user?id=NAME` view backed by the official HN user API (karma, join
+  instant, profile description, optional web profile link).
+- Comment dates link to their own `hn:item?id=N` views. `reply to NAME`
+  links point to the parent message's `#id:PARENT` anchor. Right-click on
+  an item-page comment exposes **Copy Link to Comment** (a native passage
+  address retaining surrounding discussion) and **Copy Web Permalink**.
+- Added `InlineSpan.datetime` annotations, HTML `<time datetime="…">`
+  retention, and three-line hover text showing UTC time, local time, and
+  two-unit relative age/future distance. These are generic document
+  semantics and independent of clickable link/style roles.
+- Offline tests cover HN user URL handling, linkable message-header slots,
+  timestamp hit testing, HTML `<time>`, ISO offsets, leap days, and relative
+  age. Lean and full thumtoo-enabled CMake builds and CTests passed.
 
 ## Status (2026-11-04) — Hacker News semantic story hierarchy
 

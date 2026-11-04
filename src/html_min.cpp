@@ -211,6 +211,7 @@ class Builder {
   NodeId para_ = INVALID_NODE;
   int em_ = 0, strong_ = 0, code_ = 0, strike_ = 0;
   std::vector<std::string> links_;  // "" = <a> without href
+  std::vector<std::string> times_;  // <time datetime="…">, independent of links
   bool pre_start_ = false;          // drop the newline right after <pre>
 };
 
@@ -316,7 +317,10 @@ void Builder::close_para() {
 void Builder::push_text(NodeId t, InlineKind kind, std::string s,
                         const std::string& href) {
   auto& spans = doc_.get(t).spans;
-  if (!spans.empty() && spans.back().kind == kind && spans.back().href == href) {
+  const std::string_view dt = times_.empty() ? std::string_view{}
+                                              : std::string_view(times_.back());
+  if (!spans.empty() && spans.back().kind == kind && spans.back().href == href &&
+      spans.back().datetime == dt) {
     spans.back().text += s;
     return;
   }
@@ -324,6 +328,7 @@ void Builder::push_text(NodeId t, InlineKind kind, std::string s,
   span.kind = kind;
   span.text = std::move(s);
   span.href = href;
+  span.datetime = dt;
   spans.push_back(std::move(span));
 }
 
@@ -463,6 +468,10 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
         href.erase(0, page.size());
     }
     links_.push_back(std::move(href));
+    return;
+  }
+  if (tag == "time") {
+    times_.push_back(html_attr(attrs, "datetime"));
     return;
   }
   if (tag == "em" || tag == "i" || tag == "cite" || tag == "dfn" ||
@@ -702,6 +711,10 @@ void Builder::close(const std::string& tag) {
   }
   if (tag == "a") {
     if (!links_.empty()) links_.pop_back();
+    return;
+  }
+  if (tag == "time") {
+    if (!times_.empty()) times_.pop_back();
     return;
   }
   if (tag == "em" || tag == "i" || tag == "cite" || tag == "dfn" ||

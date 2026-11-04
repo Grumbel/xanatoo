@@ -44,6 +44,7 @@ Decision: both, with different meanings and the same selectors.
 ```text
 book.md//id:intro                section as a document
 book.md#id:intro                 whole book, at the section, marked
+hn:item?id=42#id:101             discussion item, pointing to comment 101
 book.md#intro                    same; a bare fragment is a label (as today)
 book.md//id:ch3//text:the%20best,of%20times    range inside a section, cut
 book.md//id:ch3#text:the%20best,of%20times     section cut, range marked

@@ -146,6 +146,22 @@ metadata role's `font` and `color` override the inline-kind and block
 styles; otherwise those existing styles apply. The built-in style gives
 metadata small, muted text.
 
+**Time is semantic, not a visual role.** An inline span can carry a separate
+ISO 8601 `datetime` value, regardless of its visible text, link target or
+style. HTML `<time datetime="2026-11-04T10:30:00Z">Wednesday</time>` is
+preserved by the importer. Hovering the span shows three live values: the
+instant in UTC, the instant in the reader's system-local timezone, and its
+relative age (or how far in the future it lies). A `<time>` inside `<a>`
+remains clickable; neither its text nor its destination is inferred from the
+timestamp. A timezone (`Z` or an explicit offset) is required for unambiguous
+hover conversion; unqualified dates still render as ordinary text.
+
+Native services can annotate their own date spans the same way. Hacker News
+uses this on stories and comments; its comment header also gives author,
+timestamp and reply reference separate link targets. These distinctions do
+not depend on the active `.xss` sheet, and custom sheets continue to control
+their appearance via the existing `link` and `message-meta` roles.
+
 Unknown roles, properties or bad values become warnings on stderr, and the
 status line reports how many there were. The rest of the sheet still applies.
 

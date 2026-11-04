@@ -16,6 +16,7 @@
 #include "xanatoo/version.hpp"
 
 #include <algorithm>
+#include <ctime>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -32,6 +33,7 @@ constexpr int kStoriesPerPage = 30;
 struct HnUrl {
   std::string list;  // "top" / "new" / "best" / "ask" / "show"; empty = item
   int64_t item = 0;
+  std::string user;
   int page = 1;
 };
 
@@ -78,6 +80,15 @@ std::optional<HnUrl> parse_hn_url(std::string_view s) {
     out.item = std::strtoll(query_param(query, "id").c_str(), nullptr, 10);
     if (out.item <= 0) return std::nullopt;
     return out;
+  } else if (path == "/user") {
+    out.user = query_param(query, "id");
+    if (out.user.empty() ||
+        !std::all_of(out.user.begin(), out.user.end(), [](unsigned char c) {
+          return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                 (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.';
+        }))
+      return std::nullopt;
+    return out;
   } else {
     return std::nullopt;
   }
@@ -109,6 +120,31 @@ std::string format_time_iso(std::string_view iso) {
 
 std::string item_url(int64_t id) {
   return "https://news.ycombinator.com/item?id=" + std::to_string(id);
+}
+
+std::string user_url(std::string_view id) {
+  return "https://news.ycombinator.com/user?id=" + std::string(id);
+}
+
+// Message header slots 0=author, 1=date, 2=reply. The layout reconstructs
+// their visible text, but retains the link targets and timestamp annotation.
+void link_message_header(Node& msg, std::string_view author,
+                         std::string_view created, int64_t id,
+                         int64_t parent = 0) {
+  msg.spans.resize(parent > 0 ? 3 : 2);
+  if (!author.empty()) {
+    msg.spans[0].kind = InlineKind::Link;
+    msg.spans[0].href = user_url(author);
+  }
+  if (!created.empty()) {
+    msg.spans[1].kind = InlineKind::Link;
+    msg.spans[1].href = item_url(id);
+    msg.spans[1].datetime = created;
+  }
+  if (parent > 0) {
+    msg.spans[2].kind = InlineKind::Link;
+    msg.spans[2].href = "#id:" + std::to_string(parent);
+  }
 }
 
 const std::string kUserAgent = user_agent("read-only Hacker News client");
@@ -226,13 +262,8 @@ NodeId append_story(Document& doc, NodeId thread, const HnItem& st,
   n.label = std::to_string(st.id);
   if (with_text) {
     n.src = st.author.empty() ? "[deleted]" : st.author;
-    std::string meta;
-    if (st.points != 0) meta = std::to_string(st.points) + " points";
-    if (!st.created.empty()) {
-      if (!meta.empty()) meta += " · ";
-      meta += format_time_iso(st.created);
-    }
-    n.summary = std::move(meta);
+    n.summary = format_time_iso(st.created);
+    link_message_header(n, st.author, st.created, st.id);
   }
 
   NodeId title = doc.create(NodeKind::Header, entry);
@@ -257,11 +288,31 @@ NodeId append_story(Document& doc, NodeId thread, const HnItem& st,
   if (!with_text) {
     doc.append_text(foot, std::to_string(st.points) +
                          (st.points == 1 ? " point" : " points"));
-    doc.append_text(foot, " by " +
-                         (st.author.empty() ? "[deleted]" : st.author));
-    if (!st.created.empty())
-      doc.append_text(foot, " · " + format_time_iso(st.created));
+    doc.append_text(foot, " by ");
+    if (st.author.empty()) {
+      doc.append_text(foot, "[deleted]");
+    } else {
+      InlineSpan user;
+      user.kind = InlineKind::Link;
+      user.role = InlineRole::Metadata;
+      user.text = st.author;
+      user.href = user_url(st.author);
+      doc.get(foot).spans.push_back(std::move(user));
+    }
+    if (!st.created.empty()) {
+      doc.append_text(foot, " · ");
+      InlineSpan date;
+      date.kind = InlineKind::Link;
+      date.role = InlineRole::Metadata;
+      date.text = format_time_iso(st.created);
+      date.href = item_url(st.id);
+      date.datetime = st.created;
+      doc.get(foot).spans.push_back(std::move(date));
+    }
     doc.append_text(foot, " · ");
+  } else {
+    doc.append_text(foot, std::to_string(st.points) +
+                         (st.points == 1 ? " point" : " points") + " · ");
   }
   InlineSpan discussion;
   discussion.role = InlineRole::Metadata;
@@ -287,6 +338,7 @@ void append_comments(Document& doc, NodeId thread, const HnItem& parent) {
     n.alt = std::to_string(parent.id);
     n.src = c.author.empty() ? "[deleted]" : c.author;
     n.summary = format_time_iso(c.created);
+    link_message_header(n, c.author, c.created, c.id, parent.id);
     if (gone) {
       NodeId p = doc.create(NodeKind::Paragraph, msg);
       doc.append_text(p, "[deleted]", InlineKind::Emphasis);
@@ -435,6 +487,8 @@ std::optional<Document> fetch_item(const HnUrl& u, std::string* err) {
     n.label = std::to_string(root_item.id);
     n.src = root_item.author.empty() ? "[deleted]" : root_item.author;
     n.summary = format_time_iso(root_item.created);
+    // Parent is outside this view: link directly to its item page below.
+    link_message_header(n, root_item.author, root_item.created, root_item.id);
     hn_append_html(doc, msg, root_item.text);
     if (root_item.parent > 0) {
       NodeId up = doc.create(NodeKind::Paragraph, msg);
@@ -452,14 +506,68 @@ std::optional<Document> fetch_item(const HnUrl& u, std::string* err) {
   return doc;
 }
 
+std::optional<Document> fetch_user(const HnUrl& u, std::string* err) {
+  auto json = get_json("https://hacker-news.firebaseio.com/v0/user/" +
+                           u.user + ".json", err);
+  if (!json) return std::nullopt;
+  const std::string data = json_top_level(*json);
+  const std::string name = json_str_field(data, "id");
+  if (name.empty()) {
+    if (err) *err = "HN user " + u.user + " not found";
+    return std::nullopt;
+  }
+  Document doc;
+  NodeId root = doc.create(NodeKind::Document);
+  doc.meta.title = "HN user: " + name;
+  append_nav(doc, root, {});
+  NodeId title = doc.create(NodeKind::Header, root);
+  doc.append_text(title, name, InlineKind::Strong);
+  NodeId details = doc.create(NodeKind::Paragraph, root);
+  doc.append_text(details, "Karma: " +
+                            std::to_string(json_int_field(data, "karma")));
+  int64_t created = json_int_field(data, "created");
+  if (created > 0) {
+    doc.append_text(details, " · Joined: ");
+    // Firebase supplies Unix seconds. Convert without assuming the machine's
+    // timezone; the resulting <time>-like span is interpreted by the engine.
+    std::time_t raw = static_cast<std::time_t>(created);
+    std::tm utc{};
+#if defined(_WIN32)
+    bool valid = gmtime_s(&utc, &raw) == 0;
+#else
+    bool valid = gmtime_r(&raw, &utc) != nullptr;
+#endif
+    if (valid) {
+      char iso[32];
+      if (std::strftime(iso, sizeof(iso), "%Y-%m-%dT%H:%M:%SZ", &utc)) {
+        InlineSpan date;
+        date.text = format_time_iso(iso);
+        date.datetime = iso;
+        doc.get(details).spans.push_back(std::move(date));
+      }
+    }
+  }
+  const std::string about = json_str_field(data, "about");
+  if (!about.empty()) hn_append_html(doc, root, about);
+  NodeId footer = doc.create(NodeKind::Paragraph, root);
+  InlineSpan web;
+  web.kind = InlineKind::Link;
+  web.text = "View profile on Hacker News (web)";
+  web.href = user_url(name);
+  web.rel = "external";
+  doc.get(footer).spans.push_back(std::move(web));
+  return doc;
+}
+
 }  // namespace
 
 std::optional<Document> hn_fetch(std::string_view url, std::string* err) {
   auto u = parse_hn_url(url);
   if (!u) {
-    if (err) *err = "not a Hacker News list or item URL";
+    if (err) *err = "not a Hacker News list, item or user URL";
     return std::nullopt;
   }
+  if (!u->user.empty()) return fetch_user(*u, err);
   return u->list.empty() ? fetch_item(*u, err) : fetch_list(*u, err);
 }
 

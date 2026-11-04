@@ -121,6 +121,7 @@ add_executable(xanatoo
   src/reddit.cpp
   src/lemmy.cpp
   src/hackernews.cpp
+  src/time.cpp
   src/ebooks.cpp
   src/feed.cpp
   src/sitemap.cpp
@@ -388,6 +389,7 @@ add_executable(xanatoo_tests
   src/reddit.cpp
   src/lemmy.cpp
   src/hackernews.cpp
+  src/time.cpp
   src/ebooks.cpp
   src/feed.cpp
   src/sitemap.cpp

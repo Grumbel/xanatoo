@@ -82,6 +82,7 @@ struct InlineSpan {
   std::string text;
   std::string href;   // Link target, or Cite key
   std::string rel;    // typed relation: glossary, source, contra, …
+  std::string datetime;  // ISO 8601 instant for semantic <time> / dated links
   NodeId target = INVALID_NODE;
   // InlineKind::Image only.
   std::string src;      // image path / URL

@@ -12,6 +12,7 @@
 #include "xanatoo/native.hpp"
 #include "xanatoo/wikipedia.hpp"
 #include "xanatoo/hackernews.hpp"
+#include "xanatoo/time.hpp"
 #include "xanatoo/json_min.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/locator.hpp"
@@ -1050,6 +1051,52 @@ void test_layout_inline_metadata() {
   EXPECT_EQ(doc.get(title).spans[0].href, "https://example.org/story");
   EXPECT_EQ(doc.get(caption).spans[0].href,
             "https://news.ycombinator.com/item?id=42");
+
+  // Generic Message headers carry semantic links and timestamp metadata.
+  Document replies;
+  NodeId rr = replies.create(NodeKind::Document);
+  NodeId thread = replies.create(NodeKind::Thread, rr);
+  NodeId parent = replies.create(NodeKind::Message, thread);
+  replies.get(parent).label = "100";
+  replies.get(parent).src = "alice";
+  replies.get(parent).summary = "2026-11-03 10:00 UTC";
+  NodeId reply = replies.create(NodeKind::Message, thread);
+  auto& msg = replies.get(reply);
+  msg.label = "101";
+  msg.alt = "100";
+  msg.src = "bob";
+  msg.summary = "2026-11-04 09:00 UTC";
+  msg.spans.resize(3);
+  msg.spans[0].kind = InlineKind::Link;
+  msg.spans[0].href = "hn:user?id=bob";
+  msg.spans[1].kind = InlineKind::Link;
+  msg.spans[1].href = "hn:item?id=101";
+  msg.spans[1].datetime = "2026-11-04T09:00:00Z";
+  msg.spans[2].kind = InlineKind::Link;
+  msg.spans[2].href = "#id:100";
+  LayoutResult ml = engine.layout(replies, 900.f);
+  for (size_t span = 0; span < 3; ++span) {
+    const PositionedGlyph* glyph = nullptr;
+    for (const auto& g : ml.glyphs) {
+      if (g.node == reply && g.span_index == span && g.codepoint > ' ') {
+        glyph = &g;
+        break;
+      }
+    }
+    EXPECT(glyph != nullptr);
+    if (!glyph) continue;
+    const float x = glyph->x + 2.f, y = glyph->y - 4.f;
+    auto link = hit_test_link(replies, ml, x, y, 0.f);
+    EXPECT(link.has_value());
+    if (link) EXPECT_EQ(*link, msg.spans[span].href);
+    auto date = hit_test_timestamp(replies, ml, x, y, 0.f);
+    if (span == 1) {
+      EXPECT(date.has_value());
+      if (date) EXPECT_EQ(*date, msg.spans[1].datetime);
+    } else {
+      EXPECT(!date.has_value());
+    }
+  }
 }
 
 // Text column = min(pane * (1 - 2 * margin%), measure_chars * avg char),
@@ -1548,6 +1595,10 @@ void test_locator() {
   l = parse_locator("hn:item?id=1//id:x");
   EXPECT_EQ(l.base, "hn:item?id=1");
   EXPECT_EQ(l.pipes.size(), 1u);
+  l = parse_locator("hn:item?id=42#id:101");
+  EXPECT_EQ(l.base, "hn:item?id=42");
+  EXPECT(l.point.has_value());
+  if (l.point) EXPECT_EQ(l.point->value, "101");
   l = parse_locator("https://a.org//b//path:0.1#c");
   EXPECT_EQ(l.base, "https://a.org//b");
   EXPECT_EQ(l.pipes[0].value, "0.1");
@@ -1821,7 +1872,8 @@ void test_hn_urls_and_html() {
   EXPECT(is_hn_url("https://news.ycombinator.com/newest"));
   EXPECT(is_hn_url("http://news.ycombinator.com/item?id=8863"));
   EXPECT(!is_hn_url("https://news.ycombinator.com/item"));
-  EXPECT(!is_hn_url("https://news.ycombinator.com/user?id=pg"));
+  EXPECT(is_hn_url("https://news.ycombinator.com/user?id=pg"));
+  EXPECT(!is_hn_url("https://news.ycombinator.com/user?id="));
   EXPECT(!is_hn_url("https://example.com/item?id=1"));
 
   Document doc;
@@ -1846,6 +1898,46 @@ void test_hn_urls_and_html() {
     EXPECT_EQ(plain_text(doc, kids[3]), "  a < b");
     EXPECT_EQ(plain_text(doc, kids[4]), "tail");
   }
+
+  Document dated;
+  NodeId dated_root = dated.create(NodeKind::Document);
+  hn_append_html(dated, dated_root,
+                 "<p><time datetime=\"2026-11-04T09:00:00Z\">today</time>"
+                 " then <a href=\"/item?id=10\"><time "
+                 "datetime=\"2026-11-03T09:00:00Z\">yesterday</time>"
+                 "</a> afterwards");
+  const auto& spans = dated.get(dated.get(dated_root).children.at(0)).spans;
+  EXPECT(spans.size() >= 4);
+  if (spans.size() >= 4) {
+    EXPECT_EQ(spans[0].datetime, "2026-11-04T09:00:00Z");
+    EXPECT(spans[1].datetime.empty());
+    EXPECT_EQ(spans[2].datetime, "2026-11-03T09:00:00Z");
+    EXPECT(spans[2].kind == InlineKind::Link);
+    EXPECT(spans[3].datetime.empty());
+  }
+}
+
+void test_timestamps() {
+  using namespace xanatoo;
+  EXPECT_EQ(parse_timestamp("1970-01-01T00:00:00Z"),
+            std::optional<int64_t>{0});
+  EXPECT_EQ(parse_timestamp("1970-01-01T01:00:00+01:00"),
+            std::optional<int64_t>{0});
+  EXPECT_EQ(parse_timestamp("1970-01-01T00:30:00-01:00"),
+            std::optional<int64_t>{5400});
+  EXPECT_EQ(parse_timestamp("2024-02-29T12:34:56.000Z"),
+            std::optional<int64_t>{1709210096});
+  EXPECT(!parse_timestamp("2025-02-29T12:00Z"));
+  EXPECT(!parse_timestamp("2026-11-04T12:00"));  // no timezone
+  EXPECT(!parse_timestamp("2026-11-04T24:00Z"));
+  const int64_t now = *parse_timestamp("2026-11-04T12:00:00Z");
+  auto past = timestamp_hover_text("2026-10-30T08:00:00Z", now);
+  EXPECT(past.find("5 days, 4 hours ago") != std::string::npos);
+  EXPECT(past.find("UTC") != std::string::npos);
+  EXPECT(past.find("Local") != std::string::npos);
+  auto future = timestamp_hover_text("2026-11-04T15:02:00Z", now);
+  EXPECT(future.find("in 3 hours, 2 minutes") != std::string::npos);
+  EXPECT(timestamp_hover_text("not a date", now).empty());
 }
 
 void test_json_utf8_and_top_level() {
@@ -2816,7 +2908,10 @@ void test_wikipedia() {
   EXPECT_EQ(native_url_for("https://news.ycombinator.com/news?p=2"), "hn:?p=2");
   EXPECT_EQ(native_url_for("https://news.ycombinator.com/item?id=42"),
             "hn:item?id=42");
-  EXPECT_EQ(native_url_for("https://news.ycombinator.com/user?id=pg"), "");
+  EXPECT_EQ(native_url_for("https://news.ycombinator.com/user?id=pg"),
+            "hn:user?id=pg");
+  EXPECT_EQ(web_url_for("hn:user?id=pg"),
+            "https://news.ycombinator.com/user?id=pg");
   EXPECT_EQ(web_url_for("hn:newest"), "https://news.ycombinator.com/newest");
   EXPECT(is_hn_ref("hn:"));
   EXPECT(!is_hn_ref("https://news.ycombinator.com/"));
@@ -2870,11 +2965,17 @@ void test_wikipedia() {
     item.href = "https://news.ycombinator.com/item?id=5";
     InlineSpan ext = item;
     ext.href = "https://example.org/c/post/1";
+    InlineSpan web_profile = item;
+    web_profile.href = "https://news.ycombinator.com/user?id=pg";
+    web_profile.rel = "external";
     hn.get(para).spans.push_back(item);
     hn.get(para).spans.push_back(ext);
+    hn.get(para).spans.push_back(web_profile);
     native_rewrite_links(hn, "hn:");
     EXPECT_EQ(hn.get(para).spans[0].href, "hn:item?id=5");
     EXPECT_EQ(hn.get(para).spans[1].href, "https://example.org/c/post/1");
+    EXPECT_EQ(hn.get(para).spans[2].href,
+              "https://news.ycombinator.com/user?id=pg");
   }
 
   Document doc = parse_html_page(
@@ -3524,6 +3625,7 @@ int main() {
   test_feed_urls();
   test_parse_feeds();
   test_hn_urls_and_html();
+  test_timestamps();
   test_json_utf8_and_top_level();
   test_ebook_urls();
   test_string_helpers();

@@ -323,6 +323,13 @@ std::optional<std::string> hit_test_link(const Document& doc,
                                          const LayoutResult& layout,
                                          float mx, float my, float scroll_y);
 
+// A <time datetime="…"> (or service-provided dated span) is hoverable even
+// when it has no hyperlink. Return its ISO 8601 instant at the pointer.
+std::optional<std::string> hit_test_timestamp(const Document& doc,
+                                              const LayoutResult& layout,
+                                              float mx, float my,
+                                              float scroll_y);
+
 // Structural block diff for side-by-side version viewing.
 // Aligns text-bearing nodes via LCS of plain-text fingerprints, then
 // marks nodes that are not part of the common subsequence (insertions,

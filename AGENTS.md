@@ -280,6 +280,19 @@ parallel history or distribute patch files. Keep the next number in TODO.md.
   do not add site-specific geometry to the layout engine.
 - `hn_append_html` maps comment HTML → Paragraph / BlockQuote (`> …`) /
   CodeBlock with Link / Emphasis spans.
+- `hn:user?id=NAME` fetches the official Firebase user record (case-sensitive)
+  and presents karma, join time and profile text. Links from author names
+  resolve here; `rel=external` marks a deliberately web-only link.
+- Message header link slots are semantic annotations on `Message.spans`:
+  `0` author, `1` date (plus `datetime`), `2` reply-to `#id:PARENT`.
+  Layout reconstructs the visible header and preserves those annotations;
+  do not hard-code HN URLs into layout. In item pages, the date opens that
+  comment's own `hn:item?id=N` view. Right-clicking a comment offers both
+  `hn:item?id=STORY#id:COMMENT` and the web permalink for sharing.
+- `InlineSpan::datetime` is a generic ISO 8601 instant also populated from
+  HTML `<time datetime>`. `hit_test_timestamp` works independently of links;
+  `time.cpp` formats UTC, local and relative hover lines. Keep this semantic
+  annotation separate from style-sheet roles.
 
 ## Feeds (RSS / Atom)
 
