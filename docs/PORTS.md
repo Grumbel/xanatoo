@@ -55,12 +55,14 @@ in `nix/windows.nix` as a fallback if the compatibility package cannot be
 cross-compiled on a given nixpkgs revision.
 
 The SDL3 source transition now has a shared `xanatoo/sdl.hpp` boundary for
-window startup, text input, timer/mouse differences, surfaces, and common
-2D drawing operations. The native SDL3 application backend is **not** yet
-selectable: input events, gamepad handling, renderer diagnostics and ImGui
-backends still require migration. `nix flake check -L` includes `sdl3-api`,
-a compile-only check of that boundary against `pkgs.sdl3`, in addition to
-the regular SDL2 application builds.
+window startup, text input, timer/mouse differences, surfaces, common 2D
+drawing, gamepads, keyboard/events, touch, system cursors, path ownership,
+and report helpers. The native SDL3 application backend is **not** yet
+selectable: vendored ImGui backends still use the SDL2 platform and 2D
+renderer interfaces, and an end-to-end SDL3 build has not been verified.
+`nix flake check -L` includes `sdl3-api`, a compile-only check of that
+boundary against `pkgs.sdl3`, in addition to the regular SDL2 application
+builds.
 
 For an alternative local MINGW64 (or MINGW32) shell, install the corresponding
 `mingw-w64-...-gcc`, `cmake`, `ninja`, `SDL2`, and `freetype` packages and run:

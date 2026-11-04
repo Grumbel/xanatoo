@@ -37,6 +37,33 @@ void compile_sdl_render_api(SDL_Window* window, SDL_Renderer* renderer, SDL_Text
   sdl::set_fullscreen(window, false);
   sdl::start_text_input(window);
   sdl::stop_text_input(window);
+  sdl::Gamepad* pad = sdl::open_first_gamepad();
+  (void)sdl::gamepad_name(pad);
+  (void)sdl::gamepad_id(pad);
+  (void)sdl::gamepad_axis(pad, sdl::AxisRightX);
+  (void)sdl::gamepad_button(pad, sdl::button::A);
+  sdl::close_gamepad(pad);
+  SDL_Event event{};
+  (void)sdl::keycode(event);
+  sdl::set_keycode(event, SDLK_ESCAPE);
+  (void)sdl::keymod(event);
+  (void)sdl::scancode(event);
+  sdl::push_mouse_button(window, SDL_BUTTON_LEFT, true, 1, 2);
+  sdl::push_mouse_motion(window, 1, 2, true, false);
+  (void)sdl::event_kind(event);
+  (void)sdl::gamepad_event_button(event);
+  (void)sdl::gamepad_event_id(event);
+  (void)sdl::take_drop_filename(event);
+  SDL_TouchFingerEvent finger{};
+  (void)sdl::touch_id(finger);
+  (void)sdl::finger_id(finger);
+  SDL_Cursor* cursor = sdl::create_system_cursor(sdl::SystemCursor::Hand);
+  sdl::destroy_cursor(cursor);
+  (void)sdl::base_path();
+  (void)sdl::open_url("https://example.org");
+  (void)sdl::runtime_version();
+  (void)sdl::renderer_name(renderer);
+  (void)sdl::touch_device_count();
 }
 
 }  // namespace xanatoo::tests

@@ -96,11 +96,12 @@ bool app_init(App& app) {
     app.ui_font_bold.load(ui, kUiFontPx, app.sdl);
   std::cerr << "chrome font: " << app.ui_font.path() << " @ " << kUiFontPx
             << " px\n";
-  app.cursor_arrow = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
-  app.cursor_hand = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
-  app.cursor_sizewe = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE);
-  app.cursor_sizenwse = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENWSE);
-  app.cursor_sizeall = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEALL);
+  using xanatoo::sdl::SystemCursor;
+  app.cursor_arrow = xanatoo::sdl::create_system_cursor(SystemCursor::Arrow);
+  app.cursor_hand = xanatoo::sdl::create_system_cursor(SystemCursor::Hand);
+  app.cursor_sizewe = xanatoo::sdl::create_system_cursor(SystemCursor::ResizeEW);
+  app.cursor_sizenwse = xanatoo::sdl::create_system_cursor(SystemCursor::ResizeNWSE);
+  app.cursor_sizeall = xanatoo::sdl::create_system_cursor(SystemCursor::Move);
   app.cursor_current = app.cursor_arrow;
   app.caret_blink_start = xanatoo::sdl::ticks();
   app.minibuf_hist_path = load_minibuffer_history("path");
@@ -217,14 +218,14 @@ void app_shutdown(App& app) {
   release_pane_rasters(app);
   app.ui.shutdown();
   if (app.gamepad) {
-    SDL_GameControllerClose(app.gamepad);
+    xanatoo::sdl::close_gamepad(app.gamepad);
     app.gamepad = nullptr;
   }
   SDL_Cursor** cursors[] = {&app.cursor_arrow, &app.cursor_hand,
                             &app.cursor_sizewe, &app.cursor_sizenwse,
                             &app.cursor_sizeall};
   for (SDL_Cursor** c : cursors) {
-    if (*c) SDL_FreeCursor(*c);
+    if (*c) xanatoo::sdl::destroy_cursor(*c);
     *c = nullptr;
   }
 }

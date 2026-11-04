@@ -6,7 +6,25 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **274** (this delivery is **273**)
+Next bundle number: **275** (this delivery is **274**)
+
+## Status (2026-11-05) — SDL3 input and diagnostics bridge
+
+- Moved gamepad enumeration/open/close, axes, button mappings, joystick instance
+  IDs, synthetic mouse clicks and motion, keyboard fields, touch IDs and
+  cursor names behind the SDL2/SDL3 adapter. The common event dispatcher now
+  maps SDL2 and SDL3 event constants to one set of document handlers.
+- SDL3 drop-file data is borrowed from the event; SDL2's allocated filename
+  is copied and freed exactly once. Executable base-path ownership and
+  external URL results also use version-aware wrappers.
+- The About page and startup report now use version-appropriate SDL library,
+  renderer, display, controller and touch-device APIs. The SDL3 compile-only
+  check in `flake.nix` exercises the expanded public adapter.
+- Native SDL2 app build and CTest were run locally. **Native SDL3 application
+  builds are not yet enabled:** the vendored Dear ImGui backends still target
+  SDL2, and a Nix host with SDL3 headers and target toolchains is required for
+  platform verification. Win32/Win64 continue to use SDL3 through sdl2-compat,
+  while WASM/Android/R36S still use SDL2.
 
 ## Status (2026-11-05) — Shared SDL2/SDL3 API bridge
 
@@ -22,9 +40,9 @@ Next bundle number: **274** (this delivery is **273**)
   headers through `flake.nix`. Native SDL2 minimal app build and CTest pass;
   this environment does not have Nix/SDL3 available to run the new flake check.
 - **Still pending before `XANATOO_SDL3=1` can build the full application:**
-  SDL3 event/key/gamepad APIs, remaining renderer/report/display APIs, and
-  vendored ImGui SDL3 platform and renderer backends. Win32/Win64 remain on
-  SDL2 compatibility backed by SDL3 until that work is verified.
+  vendored ImGui SDL3 platform and renderer backends, a whole-app SDL3 compile
+  and runtime smoke test, and target-by-target validation. Win32/Win64 remain
+  on SDL2 compatibility backed by SDL3 until that work is verified.
 
 ## Status (2026-11-04) — Start staged SDL3 migration; cross-build fix
 

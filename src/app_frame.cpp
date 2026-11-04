@@ -253,8 +253,8 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   // Right-stick software cursor (extra pointer; never touches OS mouse).
   bool stick_active = false;
   if (app.gamepad) {
-    auto axis_e = [&](SDL_GameControllerAxis a) -> float {
-      Sint16 v = SDL_GameControllerGetAxis(app.gamepad, a);
+    auto axis_e = [&](xanatoo::sdl::GamepadAxis a) -> float {
+      Sint16 v = xanatoo::sdl::gamepad_axis(app.gamepad, a);
       const float dead = 8000.f;
       if (v > -dead && v < dead) return 0.f;
       return static_cast<float>(v) / 32767.f;
@@ -265,8 +265,8 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
       app.stick_cursor_init = true;
     }
     app.stick_cursor_on = true;
-    float rx = axis_e(SDL_CONTROLLER_AXIS_RIGHTX);
-    float ry = axis_e(SDL_CONTROLLER_AXIS_RIGHTY);
+    float rx = axis_e(xanatoo::sdl::AxisRightX);
+    float ry = axis_e(xanatoo::sdl::AxisRightY);
     if (rx != 0.f || ry != 0.f) {
       // Non-linear response: fine aim near centre, faster at full tilt.
       auto curve = [](float v) {
@@ -296,17 +296,8 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
         last_ix = ix;
         last_iy = iy;
         // Synthetic events at stick position — OS cursor stays put.
-        SDL_Event me{};
-        me.type = SDL_MOUSEMOTION;
-        me.motion.x = ix;
-        me.motion.y = iy;
-        me.motion.xrel = 0;
-        me.motion.yrel = 0;
-        me.motion.windowID = SDL_GetWindowID(app.window);
-        me.motion.state = 0;
-        if (app.stick_lmb) me.motion.state |= SDL_BUTTON(SDL_BUTTON_LEFT);
-        if (app.stick_rmb) me.motion.state |= SDL_BUTTON(SDL_BUTTON_RIGHT);
-        SDL_PushEvent(&me);
+        xanatoo::sdl::push_mouse_motion(app.window, ix, iy, app.stick_lmb,
+                                        app.stick_rmb);
       }
     }
   }
@@ -1535,14 +1526,14 @@ void run_chrome(App& app) {
 
 void poll_gamepad_axes(App& app) {
   if (app.gamepad) {
-    auto axis = [&](SDL_GameControllerAxis a) -> float {
-      Sint16 v = SDL_GameControllerGetAxis(app.gamepad, a);
+    auto axis = [&](xanatoo::sdl::GamepadAxis a) -> float {
+      Sint16 v = xanatoo::sdl::gamepad_axis(app.gamepad, a);
       const float dead = 8000.f;
       if (v > -dead && v < dead) return 0.f;
       return static_cast<float>(v) / 32767.f;
     };
     // Left stick Y: scroll focused pane (unchanged).
-    float ly = axis(SDL_CONTROLLER_AXIS_LEFTY);
+    float ly = axis(xanatoo::sdl::AxisLeftY);
     if (ly != 0.f) {
       Pane& p = focused_pane(app);
       const float max_s = pane_max_scroll(app, p);
@@ -1551,8 +1542,8 @@ void poll_gamepad_axes(App& app) {
     }
     // Triggers as page up/down
     static bool lt_held = false, rt_held = false;
-    float lt = axis(SDL_CONTROLLER_AXIS_TRIGGERLEFT);
-    float rt = axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+    float lt = axis(xanatoo::sdl::AxisLeftTrigger);
+    float rt = axis(xanatoo::sdl::AxisRightTrigger);
     if (lt > 0.5f) {
       if (!lt_held) {
         nav_page(app, true);

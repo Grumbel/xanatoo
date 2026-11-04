@@ -226,7 +226,7 @@ void open_external_url(const std::string& url_in) {
   }
 
 #if defined(__ANDROID__) || defined(_WIN32) || defined(__EMSCRIPTEN__)
-  if (SDL_OpenURL(url.c_str()) != 0)
+  if (!xanatoo::sdl::open_url(url.c_str()))
     std::cerr << "SDL_OpenURL failed: " << SDL_GetError() << "\n";
 #elif defined(__linux__)
   pid_t pid = fork();

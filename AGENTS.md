@@ -163,9 +163,11 @@ toolbar and shortcuts should route through `execute_command`.
   The app and vendored ImGui still compile against SDL2 headers; WASM,
   Android, and R36S currently retain SDL2. Do not change their ABI until
   the SDL3 API/backend migration and platform tests are complete. First-party
-  render, window, surface, time and mouse operations now use
+  render, window, surface, time, mouse, input events, gamepads, cursor and
+  SDL diagnostic operations now use
   `xanatoo/sdl.hpp` (switch `XANATOO_SDL3`); `checks.sdl3-api` compiles this
-  bridge with real SDL3 headers. This is not a full SDL3 application target.
+  bridge with real SDL3 headers. The vendored ImGui SDL2 backends still block
+  full SDL3 compilation. This is not a full SDL3 application target.
 - New options go into `cli.cpp`, `print_usage` and `docs/xanatoo.1`
   (`checks.man` / `checks.help`).
 - Version strings: `version_string()`; network User-Agents via

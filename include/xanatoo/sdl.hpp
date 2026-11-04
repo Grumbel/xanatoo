@@ -13,7 +13,409 @@
 #include <SDL.h>
 #endif
 
+#include <string>
+
 namespace xanatoo::sdl {
+
+// The SDL3 gamepad API addresses devices by instance ID, while SDL2 opens
+// controllers by their enumeration index. Neither difference belongs in the
+// reader's navigation code.
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+using Gamepad = SDL_Gamepad;
+using GamepadAxis = SDL_GamepadAxis;
+inline constexpr GamepadAxis AxisLeftY = SDL_GAMEPAD_AXIS_LEFTY;
+inline constexpr GamepadAxis AxisRightX = SDL_GAMEPAD_AXIS_RIGHTX;
+inline constexpr GamepadAxis AxisRightY = SDL_GAMEPAD_AXIS_RIGHTY;
+inline constexpr GamepadAxis AxisLeftTrigger = SDL_GAMEPAD_AXIS_LEFT_TRIGGER;
+inline constexpr GamepadAxis AxisRightTrigger = SDL_GAMEPAD_AXIS_RIGHT_TRIGGER;
+namespace button {
+inline constexpr Uint8 A = SDL_GAMEPAD_BUTTON_SOUTH;
+inline constexpr Uint8 B = SDL_GAMEPAD_BUTTON_EAST;
+inline constexpr Uint8 X = SDL_GAMEPAD_BUTTON_WEST;
+inline constexpr Uint8 Y = SDL_GAMEPAD_BUTTON_NORTH;
+inline constexpr Uint8 Back = SDL_GAMEPAD_BUTTON_BACK;
+inline constexpr Uint8 Guide = SDL_GAMEPAD_BUTTON_GUIDE;
+inline constexpr Uint8 Start = SDL_GAMEPAD_BUTTON_START;
+inline constexpr Uint8 LeftStick = SDL_GAMEPAD_BUTTON_LEFT_STICK;
+inline constexpr Uint8 RightStick = SDL_GAMEPAD_BUTTON_RIGHT_STICK;
+inline constexpr Uint8 LeftShoulder = SDL_GAMEPAD_BUTTON_LEFT_SHOULDER;
+inline constexpr Uint8 RightShoulder = SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER;
+inline constexpr Uint8 DpadUp = SDL_GAMEPAD_BUTTON_DPAD_UP;
+inline constexpr Uint8 DpadDown = SDL_GAMEPAD_BUTTON_DPAD_DOWN;
+inline constexpr Uint8 DpadLeft = SDL_GAMEPAD_BUTTON_DPAD_LEFT;
+inline constexpr Uint8 DpadRight = SDL_GAMEPAD_BUTTON_DPAD_RIGHT;
+}
+#else
+using Gamepad = SDL_GameController;
+using GamepadAxis = SDL_GameControllerAxis;
+inline constexpr GamepadAxis AxisLeftY = SDL_CONTROLLER_AXIS_LEFTY;
+inline constexpr GamepadAxis AxisRightX = SDL_CONTROLLER_AXIS_RIGHTX;
+inline constexpr GamepadAxis AxisRightY = SDL_CONTROLLER_AXIS_RIGHTY;
+inline constexpr GamepadAxis AxisLeftTrigger = SDL_CONTROLLER_AXIS_TRIGGERLEFT;
+inline constexpr GamepadAxis AxisRightTrigger = SDL_CONTROLLER_AXIS_TRIGGERRIGHT;
+namespace button {
+inline constexpr Uint8 A = SDL_CONTROLLER_BUTTON_A;
+inline constexpr Uint8 B = SDL_CONTROLLER_BUTTON_B;
+inline constexpr Uint8 X = SDL_CONTROLLER_BUTTON_X;
+inline constexpr Uint8 Y = SDL_CONTROLLER_BUTTON_Y;
+inline constexpr Uint8 Back = SDL_CONTROLLER_BUTTON_BACK;
+inline constexpr Uint8 Guide = SDL_CONTROLLER_BUTTON_GUIDE;
+inline constexpr Uint8 Start = SDL_CONTROLLER_BUTTON_START;
+inline constexpr Uint8 LeftStick = SDL_CONTROLLER_BUTTON_LEFTSTICK;
+inline constexpr Uint8 RightStick = SDL_CONTROLLER_BUTTON_RIGHTSTICK;
+inline constexpr Uint8 LeftShoulder = SDL_CONTROLLER_BUTTON_LEFTSHOULDER;
+inline constexpr Uint8 RightShoulder = SDL_CONTROLLER_BUTTON_RIGHTSHOULDER;
+inline constexpr Uint8 DpadUp = SDL_CONTROLLER_BUTTON_DPAD_UP;
+inline constexpr Uint8 DpadDown = SDL_CONTROLLER_BUTTON_DPAD_DOWN;
+inline constexpr Uint8 DpadLeft = SDL_CONTROLLER_BUTTON_DPAD_LEFT;
+inline constexpr Uint8 DpadRight = SDL_CONTROLLER_BUTTON_DPAD_RIGHT;
+}
+#endif
+
+inline Gamepad* open_first_gamepad() {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  int count = 0;
+  SDL_JoystickID* ids = SDL_GetGamepads(&count);
+  if (!ids) return nullptr;
+  Gamepad* gamepad = nullptr;
+  for (int i = 0; i < count && !gamepad; ++i)
+    gamepad = SDL_OpenGamepad(ids[i]);
+  SDL_free(ids);
+  return gamepad;
+#else
+  for (int i = 0; i < SDL_NumJoysticks(); ++i)
+    if (SDL_IsGameController(i))
+      if (Gamepad* gamepad = SDL_GameControllerOpen(i)) return gamepad;
+  return nullptr;
+#endif
+}
+
+inline const char* gamepad_name(Gamepad* gamepad) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  return SDL_GetGamepadName(gamepad);
+#else
+  return SDL_GameControllerName(gamepad);
+#endif
+}
+
+inline void close_gamepad(Gamepad* gamepad) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  SDL_CloseGamepad(gamepad);
+#else
+  SDL_GameControllerClose(gamepad);
+#endif
+}
+
+inline SDL_JoystickID gamepad_id(Gamepad* gamepad) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  return SDL_GetGamepadID(gamepad);
+#else
+  return SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(gamepad));
+#endif
+}
+
+inline Sint16 gamepad_axis(Gamepad* gamepad, GamepadAxis axis) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  return SDL_GetGamepadAxis(gamepad, axis);
+#else
+  return SDL_GameControllerGetAxis(gamepad, axis);
+#endif
+}
+
+inline bool gamepad_button(Gamepad* gamepad, Uint8 button_id) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  return SDL_GetGamepadButton(gamepad, static_cast<SDL_GamepadButton>(button_id));
+#else
+  return SDL_GameControllerGetButton(
+             gamepad, static_cast<SDL_GameControllerButton>(button_id)) != 0;
+#endif
+}
+
+// SDL3 flattened SDL_KeyboardEvent.keysym. Keep the reader's key logic
+// independent of the SDL event ABI.
+inline SDL_Keycode keycode(const SDL_Event& event) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  return event.key.key;
+#else
+  return event.key.keysym.sym;
+#endif
+}
+
+inline void set_keycode(SDL_Event& event, SDL_Keycode code) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  event.key.key = code;
+#else
+  event.key.keysym.sym = code;
+#endif
+}
+
+inline SDL_Keymod keymod(const SDL_Event& event) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  return static_cast<SDL_Keymod>(event.key.mod);
+#else
+  return static_cast<SDL_Keymod>(event.key.keysym.mod);
+#endif
+}
+
+inline SDL_Scancode scancode(const SDL_Event& event) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  return event.key.scancode;
+#else
+  return event.key.keysym.scancode;
+#endif
+}
+
+// Gamepad A/B emit real SDL mouse events so the document and ImGui receive
+// identical clicks. SDL3 uses floating-point positions and a `down` flag.
+inline void push_mouse_button(SDL_Window* window, Uint8 button_id, bool down,
+                              int x, int y) {
+  SDL_Event event{};
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  event.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
+  event.button.down = down;
+  event.button.x = static_cast<float>(x);
+  event.button.y = static_cast<float>(y);
+#else
+  event.type = down ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+  event.button.state = down ? SDL_PRESSED : SDL_RELEASED;
+  event.button.x = x;
+  event.button.y = y;
+#endif
+  event.button.button = button_id;
+  event.button.clicks = 1;
+  event.button.windowID = SDL_GetWindowID(window);
+  SDL_PushEvent(&event);
+}
+
+inline void push_mouse_motion(SDL_Window* window, int x, int y,
+                              bool left_down, bool right_down) {
+  SDL_Event event{};
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  event.type = SDL_EVENT_MOUSE_MOTION;
+  event.motion.x = static_cast<float>(x);
+  event.motion.y = static_cast<float>(y);
+#else
+  event.type = SDL_MOUSEMOTION;
+  event.motion.x = x;
+  event.motion.y = y;
+#endif
+  event.motion.xrel = 0;
+  event.motion.yrel = 0;
+  event.motion.windowID = SDL_GetWindowID(window);
+  event.motion.state = 0;
+  if (left_down) event.motion.state |= SDL_BUTTON_LMASK;
+  if (right_down) event.motion.state |= SDL_BUTTON_RMASK;
+  SDL_PushEvent(&event);
+}
+
+enum class EventKind {
+  Other,
+  Quit,
+  WindowResized,
+  DropFile,
+  MouseWheel,
+  MouseButtonDown,
+  MouseButtonUp,
+  MouseMotion,
+  TextInput,
+  FingerDown,
+  FingerMotion,
+  FingerUp,
+  GamepadAdded,
+  GamepadRemoved,
+  GamepadButtonDown,
+  GamepadButtonUp,
+  KeyDown,
+  KeyUp,
+  RenderReset,
+};
+
+enum class SystemCursor { Arrow, Hand, ResizeEW, ResizeNWSE, Move };
+
+inline SDL_Cursor* create_system_cursor(SystemCursor kind) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  switch (kind) {
+    case SystemCursor::Arrow: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
+    case SystemCursor::Hand: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_POINTER);
+    case SystemCursor::ResizeEW: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_EW_RESIZE);
+    case SystemCursor::ResizeNWSE: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NWSE_RESIZE);
+    case SystemCursor::Move: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_MOVE);
+  }
+#else
+  switch (kind) {
+    case SystemCursor::Arrow: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
+    case SystemCursor::Hand: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
+    case SystemCursor::ResizeEW: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE);
+    case SystemCursor::ResizeNWSE: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENWSE);
+    case SystemCursor::Move: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEALL);
+  }
+#endif
+  return nullptr;
+}
+
+inline void destroy_cursor(SDL_Cursor* cursor) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  SDL_DestroyCursor(cursor);
+#else
+  SDL_FreeCursor(cursor);
+#endif
+}
+
+inline std::string base_path() {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  // SDL3 caches the path internally and retains ownership.
+  const char* path = SDL_GetBasePath();
+  return path ? path : "";
+#else
+  char* path = SDL_GetBasePath();
+  std::string result = path ? path : "";
+  SDL_free(path);
+  return result;
+#endif
+}
+
+inline bool open_url(const char* url) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  return SDL_OpenURL(url);
+#else
+  return SDL_OpenURL(url) == 0;
+#endif
+}
+
+inline std::string runtime_version() {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  const int version = SDL_GetVersion();
+  return std::to_string(SDL_VERSIONNUM_MAJOR(version)) + "." +
+         std::to_string(SDL_VERSIONNUM_MINOR(version)) + "." +
+         std::to_string(SDL_VERSIONNUM_MICRO(version));
+#else
+  SDL_version version{};
+  SDL_GetVersion(&version);
+  return std::to_string(version.major) + "." +
+         std::to_string(version.minor) + "." +
+         std::to_string(version.patch);
+#endif
+}
+
+inline const char* renderer_name(SDL_Renderer* renderer) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  return SDL_GetRendererName(renderer);
+#else
+  SDL_RendererInfo info{};
+  return SDL_GetRendererInfo(renderer, &info) == 0 ? info.name : nullptr;
+#endif
+}
+
+inline int touch_device_count() {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  int count = 0;
+  SDL_TouchID* devices = SDL_GetTouchDevices(&count);
+  SDL_free(devices);
+  return count;
+#else
+  return SDL_GetNumTouchDevices();
+#endif
+}
+
+inline EventKind event_kind(const SDL_Event& event) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  switch (event.type) {
+    case SDL_EVENT_QUIT:
+    case SDL_EVENT_WINDOW_CLOSE_REQUESTED: return EventKind::Quit;
+    case SDL_EVENT_WINDOW_RESIZED: return EventKind::WindowResized;
+    case SDL_EVENT_DROP_FILE: return EventKind::DropFile;
+    case SDL_EVENT_MOUSE_WHEEL: return EventKind::MouseWheel;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN: return EventKind::MouseButtonDown;
+    case SDL_EVENT_MOUSE_BUTTON_UP: return EventKind::MouseButtonUp;
+    case SDL_EVENT_MOUSE_MOTION: return EventKind::MouseMotion;
+    case SDL_EVENT_TEXT_INPUT: return EventKind::TextInput;
+    case SDL_EVENT_FINGER_DOWN: return EventKind::FingerDown;
+    case SDL_EVENT_FINGER_MOTION: return EventKind::FingerMotion;
+    case SDL_EVENT_FINGER_UP: return EventKind::FingerUp;
+    case SDL_EVENT_GAMEPAD_ADDED: return EventKind::GamepadAdded;
+    case SDL_EVENT_GAMEPAD_REMOVED: return EventKind::GamepadRemoved;
+    case SDL_EVENT_GAMEPAD_BUTTON_DOWN: return EventKind::GamepadButtonDown;
+    case SDL_EVENT_GAMEPAD_BUTTON_UP: return EventKind::GamepadButtonUp;
+    case SDL_EVENT_KEY_DOWN: return EventKind::KeyDown;
+    case SDL_EVENT_KEY_UP: return EventKind::KeyUp;
+    case SDL_EVENT_RENDER_TARGETS_RESET:
+    case SDL_EVENT_RENDER_DEVICE_RESET: return EventKind::RenderReset;
+    default: return EventKind::Other;
+  }
+#else
+  switch (event.type) {
+    case SDL_QUIT: return EventKind::Quit;
+    case SDL_WINDOWEVENT:
+      return event.window.event == SDL_WINDOWEVENT_RESIZED ||
+                     event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED
+                 ? EventKind::WindowResized
+                 : EventKind::Other;
+    case SDL_DROPFILE: return EventKind::DropFile;
+    case SDL_MOUSEWHEEL: return EventKind::MouseWheel;
+    case SDL_MOUSEBUTTONDOWN: return EventKind::MouseButtonDown;
+    case SDL_MOUSEBUTTONUP: return EventKind::MouseButtonUp;
+    case SDL_MOUSEMOTION: return EventKind::MouseMotion;
+    case SDL_TEXTINPUT: return EventKind::TextInput;
+    case SDL_FINGERDOWN: return EventKind::FingerDown;
+    case SDL_FINGERMOTION: return EventKind::FingerMotion;
+    case SDL_FINGERUP: return EventKind::FingerUp;
+    case SDL_CONTROLLERDEVICEADDED: return EventKind::GamepadAdded;
+    case SDL_CONTROLLERDEVICEREMOVED: return EventKind::GamepadRemoved;
+    case SDL_CONTROLLERBUTTONDOWN: return EventKind::GamepadButtonDown;
+    case SDL_CONTROLLERBUTTONUP: return EventKind::GamepadButtonUp;
+    case SDL_KEYDOWN: return EventKind::KeyDown;
+    case SDL_KEYUP: return EventKind::KeyUp;
+    case SDL_RENDER_TARGETS_RESET:
+    case SDL_RENDER_DEVICE_RESET: return EventKind::RenderReset;
+    default: return EventKind::Other;
+  }
+#endif
+}
+
+inline Uint8 gamepad_event_button(const SDL_Event& event) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  return event.gbutton.button;
+#else
+  return event.cbutton.button;
+#endif
+}
+
+inline SDL_JoystickID gamepad_event_id(const SDL_Event& event) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  return event.gdevice.which;
+#else
+  return event.cdevice.which;
+#endif
+}
+
+inline std::string take_drop_filename(SDL_Event& event) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  // SDL3 owns the event's drop data and releases it at the appropriate time.
+  return event.drop.data ? event.drop.data : "";
+#else
+  char* filename = event.drop.file;
+  std::string result = filename ? filename : "";
+  SDL_free(filename);
+  event.drop.file = nullptr;
+  return result;
+#endif
+}
+
+inline SDL_TouchID touch_id(const SDL_TouchFingerEvent& finger) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  return finger.touchID;
+#else
+  return finger.touchId;
+#endif
+}
+
+inline SDL_FingerID finger_id(const SDL_TouchFingerEvent& finger) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  return finger.fingerID;
+#else
+  return finger.fingerId;
+#endif
+}
 
 inline bool init_video_and_gamepads() {
 #if defined(XANATOO_SDL3) && XANATOO_SDL3

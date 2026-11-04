@@ -179,14 +179,11 @@ AboutSection images() {
 
 AboutSection libraries(App& app) {
   AboutSection s{"Platform", {}, {}};
-  SDL_version sv;
-  SDL_GetVersion(&sv);
-  std::string sdl = version3(sv.major, sv.minor, sv.patch) + " on " +
-                    SDL_GetPlatform();
+  std::string sdl = xanatoo::sdl::runtime_version() + " on " + SDL_GetPlatform();
   if (const char* v = SDL_GetCurrentVideoDriver()) sdl += ", video " + std::string(v);
-  SDL_RendererInfo ri;
-  if (app.sdl && SDL_GetRendererInfo(app.sdl, &ri) == 0)
-    sdl += ", renderer " + std::string(ri.name);
+  if (app.sdl)
+    if (const char* name = xanatoo::sdl::renderer_name(app.sdl))
+      sdl += ", renderer " + std::string(name);
   s.items.push_back({"SDL", true, sdl, {}, {}});
   s.items.push_back({"FreeType", true,
                      version3(FREETYPE_MAJOR, FREETYPE_MINOR, FREETYPE_PATCH),

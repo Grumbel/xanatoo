@@ -140,13 +140,14 @@ void begin_pinch(App& app) {
 }  // namespace
 
 bool is_touch_mouse_event(const SDL_Event& ev) {
-  switch (ev.type) {
-    case SDL_MOUSEMOTION:
+  using xanatoo::sdl::EventKind;
+  switch (xanatoo::sdl::event_kind(ev)) {
+    case EventKind::MouseMotion:
       return ev.motion.which == SDL_TOUCH_MOUSEID;
-    case SDL_MOUSEBUTTONDOWN:
-    case SDL_MOUSEBUTTONUP:
+    case EventKind::MouseButtonDown:
+    case EventKind::MouseButtonUp:
       return ev.button.which == SDL_TOUCH_MOUSEID;
-    case SDL_MOUSEWHEEL:
+    case EventKind::MouseWheel:
       return ev.wheel.which == SDL_TOUCH_MOUSEID;
     default:
       return false;
@@ -156,17 +157,18 @@ bool is_touch_mouse_event(const SDL_Event& ev) {
 // Only touchscreens: touchpad coordinates are not window positions, and
 // mouse-synthesised touches would duplicate the mouse handlers.
 static bool is_screen_touch(const SDL_TouchFingerEvent& tf) {
-  return tf.touchId != SDL_MOUSE_TOUCHID &&
-         SDL_GetTouchDeviceType(tf.touchId) == SDL_TOUCH_DEVICE_DIRECT;
+  return xanatoo::sdl::touch_id(tf) != SDL_MOUSE_TOUCHID &&
+         SDL_GetTouchDeviceType(xanatoo::sdl::touch_id(tf)) ==
+             SDL_TOUCH_DEVICE_DIRECT;
 }
 
 void touch_finger_down(App& app, const SDL_TouchFingerEvent& tf) {
   if (!is_screen_touch(tf)) return;
   Touch& t = app.touch;
-  if (t.count >= 2 || find_finger(t, tf.fingerId)) return;
+  if (t.count >= 2 || find_finger(t, xanatoo::sdl::finger_id(tf))) return;
   const float x = tf.x * static_cast<float>(app.win_w);
   const float y = tf.y * static_cast<float>(app.win_h);
-  t.fingers[t.count++] = TouchPoint{tf.fingerId, x, y};
+  t.fingers[t.count++] = TouchPoint{xanatoo::sdl::finger_id(tf), x, y};
   if (t.count == 1) {
     begin_gesture(app, x, y);
   } else if (t.mode == TouchMode::Pending || t.mode == TouchMode::Pan) {
@@ -177,7 +179,7 @@ void touch_finger_down(App& app, const SDL_TouchFingerEvent& tf) {
 void touch_finger_motion(App& app, const SDL_TouchFingerEvent& tf) {
   if (!is_screen_touch(tf)) return;
   Touch& t = app.touch;
-  TouchPoint* f = find_finger(t, tf.fingerId);
+  TouchPoint* f = find_finger(t, xanatoo::sdl::finger_id(tf));
   if (!f) return;
   const float x = tf.x * static_cast<float>(app.win_w);
   const float y = tf.y * static_cast<float>(app.win_h);
@@ -229,7 +231,7 @@ void touch_finger_motion(App& app, const SDL_TouchFingerEvent& tf) {
 void touch_finger_up(App& app, const SDL_TouchFingerEvent& tf) {
   if (!is_screen_touch(tf)) return;
   Touch& t = app.touch;
-  TouchPoint* f = find_finger(t, tf.fingerId);
+  TouchPoint* f = find_finger(t, xanatoo::sdl::finger_id(tf));
   if (!f) return;
   const bool primary = f == &t.fingers[0];
   const int xi = static_cast<int>(f->x), yi = static_cast<int>(f->y);

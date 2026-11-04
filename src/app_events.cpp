@@ -44,20 +44,15 @@ static void on_quit(App& app, SDL_Event& ev, bool imgui_mouse,
 
 static void on_windowevent(App& app, SDL_Event& ev, bool imgui_mouse,
                            bool imgui_keys) {
-  if (ev.window.event == SDL_WINDOWEVENT_SIZE_CHANGED ||
-      ev.window.event == SDL_WINDOWEVENT_RESIZED) {
-    apply_window_size(app, ev.window.data1, ev.window.data2);
-  }
+  apply_window_size(app, ev.window.data1, ev.window.data2);
   return;
 }
 
 static void on_dropfile(App& app, SDL_Event& ev, bool imgui_mouse,
                         bool imgui_keys) {
   // Drag-and-drop: documents open in a soft window; images insert at caret.
-  char* dropped = ev.drop.file;
-  if (!dropped) return;
-  std::string fpath(dropped);
-  SDL_free(dropped);
+  std::string fpath = xanatoo::sdl::take_drop_filename(ev);
+  if (fpath.empty()) return;
 
   auto lower_ext = [](std::string p) {
     for (char& c : p)
@@ -1130,28 +1125,23 @@ static void on_controllerdeviceadded(App& app, SDL_Event& ev, bool imgui_mouse,
 static void on_controllerdeviceremoved(App& app, SDL_Event& ev,
                                        bool imgui_mouse, bool imgui_keys) {
   if (app.gamepad &&
-      ev.cdevice.which ==
-          SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(app.gamepad))) {
+      xanatoo::sdl::gamepad_event_id(ev) ==
+          xanatoo::sdl::gamepad_id(app.gamepad)) {
     if (app.stick_lmb || app.stick_rmb) {
-      SDL_Event me{};
-      me.type = SDL_MOUSEBUTTONUP;
-      me.button.state = SDL_RELEASED;
-      me.button.clicks = 1;
-      me.button.x = static_cast<Sint32>(app.stick_cx);
-      me.button.y = static_cast<Sint32>(app.stick_cy);
-      me.button.windowID = SDL_GetWindowID(app.window);
       if (app.stick_lmb) {
-        me.button.button = SDL_BUTTON_LEFT;
-        SDL_PushEvent(&me);
+        xanatoo::sdl::push_mouse_button(app.window, SDL_BUTTON_LEFT, false,
+                                        static_cast<int>(app.stick_cx),
+                                        static_cast<int>(app.stick_cy));
         app.stick_lmb = false;
       }
       if (app.stick_rmb) {
-        me.button.button = SDL_BUTTON_RIGHT;
-        SDL_PushEvent(&me);
+        xanatoo::sdl::push_mouse_button(app.window, SDL_BUTTON_RIGHT, false,
+                                        static_cast<int>(app.stick_cx),
+                                        static_cast<int>(app.stick_cy));
         app.stick_rmb = false;
       }
     }
-    SDL_GameControllerClose(app.gamepad);
+    xanatoo::sdl::close_gamepad(app.gamepad);
     app.gamepad = nullptr;
     app.stick_cursor_on = false;
     app.stick_cursor_init = false;
@@ -1162,68 +1152,56 @@ static void on_controllerdeviceremoved(App& app, SDL_Event& ev,
 static void on_controllerbuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
                                     bool imgui_keys) {
   // Gamepad is always for navigation (never text entry).
-  switch (ev.cbutton.button) {
-    case SDL_CONTROLLER_BUTTON_DPAD_UP:
+  switch (xanatoo::sdl::gamepad_event_button(ev)) {
+    case xanatoo::sdl::button::DpadUp:
       nav_move_line(app, true);
       break;
-    case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
+    case xanatoo::sdl::button::DpadDown:
       nav_move_line(app, false);
       break;
-    case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
+    case xanatoo::sdl::button::DpadLeft:
       // Collapse stretch under caret, else previous block
       if (!toggle_stretch_at_caret(app)) nav_move_block(app, true);
       break;
-    case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
+    case xanatoo::sdl::button::DpadRight:
       if (!toggle_stretch_at_caret(app)) nav_move_block(app, false);
       break;
-    case SDL_CONTROLLER_BUTTON_A: {
+    case xanatoo::sdl::button::A: {
       // With a pad, A is left-click at the stick pointer (menus + hits).
       // Hold LB to fall back to caret activate (stretch / link under caret).
-      const bool lb = SDL_GameControllerGetButton(
-                          app.gamepad, SDL_CONTROLLER_BUTTON_LEFTSHOULDER) != 0;
+      const bool lb = xanatoo::sdl::gamepad_button(
+          app.gamepad, xanatoo::sdl::button::LeftShoulder);
       if (!lb) {
         app.stick_cursor_on = true;
         app.stick_lmb = true;
-        SDL_Event me{};
-        me.type = SDL_MOUSEBUTTONDOWN;
-        me.button.button = SDL_BUTTON_LEFT;
-        me.button.state = SDL_PRESSED;
-        me.button.clicks = 1;
-        me.button.x = static_cast<Sint32>(app.stick_cx);
-        me.button.y = static_cast<Sint32>(app.stick_cy);
-        me.button.windowID = SDL_GetWindowID(app.window);
-        SDL_PushEvent(&me);
+        xanatoo::sdl::push_mouse_button(app.window, SDL_BUTTON_LEFT, true,
+                                        static_cast<int>(app.stick_cx),
+                                        static_cast<int>(app.stick_cy));
       } else {
         activate_at_caret(app);
       }
       break;
     }
-    case SDL_CONTROLLER_BUTTON_B: {
+    case xanatoo::sdl::button::B: {
       // Right-click at pointer; LB+B = collapse stretch under caret.
-      const bool lb = SDL_GameControllerGetButton(
-                          app.gamepad, SDL_CONTROLLER_BUTTON_LEFTSHOULDER) != 0;
+      const bool lb = xanatoo::sdl::gamepad_button(
+          app.gamepad, xanatoo::sdl::button::LeftShoulder);
       if (!lb) {
         app.stick_cursor_on = true;
         app.stick_rmb = true;
-        SDL_Event me{};
-        me.type = SDL_MOUSEBUTTONDOWN;
-        me.button.button = SDL_BUTTON_RIGHT;
-        me.button.state = SDL_PRESSED;
-        me.button.clicks = 1;
-        me.button.x = static_cast<Sint32>(app.stick_cx);
-        me.button.y = static_cast<Sint32>(app.stick_cy);
-        me.button.windowID = SDL_GetWindowID(app.window);
-        SDL_PushEvent(&me);
+        xanatoo::sdl::push_mouse_button(app.window, SDL_BUTTON_RIGHT, true,
+                                        static_cast<int>(app.stick_cx),
+                                        static_cast<int>(app.stick_cy));
       } else {
         if (!toggle_stretch_at_caret(app)) collapse_or_expand_all(app, false);
       }
       break;
     }
-    case SDL_CONTROLLER_BUTTON_X:
+    case xanatoo::sdl::button::X:
       // Content only (the outline is in the toolbar / View menu).
       toggle_chrome(app);
       break;
-    case SDL_CONTROLLER_BUTTON_Y:
+    case xanatoo::sdl::button::Y:
       // Forward in history when possible; else structure overlay.
       if (!nav_step(app, 1)) {
         app.structure_mode = !app.structure_mode;
@@ -1231,19 +1209,19 @@ static void on_controllerbuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
                      app.structure_mode ? "Structure on" : "Structure off");
       }
       break;
-    case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
+    case xanatoo::sdl::button::LeftShoulder:
       nav_header(app, true);
       break;
-    case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:
+    case xanatoo::sdl::button::RightShoulder:
       nav_header(app, false);
       break;
-    case SDL_CONTROLLER_BUTTON_LEFTSTICK:
+    case xanatoo::sdl::button::LeftStick:
       collapse_or_expand_all(app, false);
       break;
-    case SDL_CONTROLLER_BUTTON_RIGHTSTICK:
+    case xanatoo::sdl::button::RightStick:
       collapse_or_expand_all(app, true);
       break;
-    case SDL_CONTROLLER_BUTTON_BACK:
+    case xanatoo::sdl::button::Back:
       // Prefer capsule history when available; else toggle browse.
       if (nav_step(app, -1)) {
       } else if (focused_read_only(app)) {
@@ -1254,14 +1232,14 @@ static void on_controllerbuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
                      browsing(app) ? "Browse mode (read-only)" : "Edit mode");
       }
       break;
-    case SDL_CONTROLLER_BUTTON_START:
+    case xanatoo::sdl::button::Start:
       app.help_mode = !app.help_mode;
       if (app.help_mode) {
         ensure_help_doc(app);
         app.help_needs_layout = true;
       }
       break;
-    case SDL_CONTROLLER_BUTTON_GUIDE:
+    case xanatoo::sdl::button::Guide:
       app.virtual_keyboard = !app.virtual_keyboard;
       if (app.virtual_keyboard && browsing(app)) {
         app.browse_mode = false;
@@ -1279,28 +1257,18 @@ static void on_controllerbuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
 
 static void on_controllerbuttonup(App& app, SDL_Event& ev, bool imgui_mouse,
                                   bool imgui_keys) {
-  if (ev.cbutton.button == SDL_CONTROLLER_BUTTON_A && app.stick_lmb) {
+  if (xanatoo::sdl::gamepad_event_button(ev) == xanatoo::sdl::button::A &&
+      app.stick_lmb) {
     app.stick_lmb = false;
-    SDL_Event me{};
-    me.type = SDL_MOUSEBUTTONUP;
-    me.button.button = SDL_BUTTON_LEFT;
-    me.button.state = SDL_RELEASED;
-    me.button.clicks = 1;
-    me.button.x = static_cast<Sint32>(app.stick_cx);
-    me.button.y = static_cast<Sint32>(app.stick_cy);
-    me.button.windowID = SDL_GetWindowID(app.window);
-    SDL_PushEvent(&me);
-  } else if (ev.cbutton.button == SDL_CONTROLLER_BUTTON_B && app.stick_rmb) {
+    xanatoo::sdl::push_mouse_button(app.window, SDL_BUTTON_LEFT, false,
+                                    static_cast<int>(app.stick_cx),
+                                    static_cast<int>(app.stick_cy));
+  } else if (xanatoo::sdl::gamepad_event_button(ev) ==
+                 xanatoo::sdl::button::B && app.stick_rmb) {
     app.stick_rmb = false;
-    SDL_Event me{};
-    me.type = SDL_MOUSEBUTTONUP;
-    me.button.button = SDL_BUTTON_RIGHT;
-    me.button.state = SDL_RELEASED;
-    me.button.clicks = 1;
-    me.button.x = static_cast<Sint32>(app.stick_cx);
-    me.button.y = static_cast<Sint32>(app.stick_cy);
-    me.button.windowID = SDL_GetWindowID(app.window);
-    SDL_PushEvent(&me);
+    xanatoo::sdl::push_mouse_button(app.window, SDL_BUTTON_RIGHT, false,
+                                    static_cast<int>(app.stick_cx),
+                                    static_cast<int>(app.stick_cy));
   }
   return;
 }
@@ -1309,7 +1277,7 @@ static void on_controllerbuttonup(App& app, SDL_Event& ev, bool imgui_mouse,
 // to the document (type-through); shortcuts and bare modifiers keep focus.
 static void panel_key_unused(App& app, const SDL_Event& ev, bool ctrl,
                              bool alt) {
-  switch (ev.key.keysym.sym) {
+  switch (xanatoo::sdl::keycode(ev)) {
     case SDLK_LSHIFT: case SDLK_RSHIFT: case SDLK_LCTRL: case SDLK_RCTRL:
     case SDLK_LALT: case SDLK_RALT: case SDLK_LGUI: case SDLK_RGUI:
     case SDLK_CAPSLOCK: case SDLK_MODE:
@@ -1324,26 +1292,26 @@ static void panel_key_unused(App& app, const SDL_Event& ev, bool ctrl,
 // Up/Down/Enter navigate. True = consumed.
 static bool handle_backlinks_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
                        bool alt) {
-  if (app.backlinks_mode && ev.key.keysym.sym == SDLK_b && ctrl && alt) {
+  if (app.backlinks_mode && xanatoo::sdl::keycode(ev) == SDLK_b && ctrl && alt) {
     app.backlinks_mode = false;
     return true;
   }
   if (panel_has_keys(app, KeyFocus::Backlinks)) {
-    if (ev.key.keysym.sym == SDLK_ESCAPE) {
+    if (xanatoo::sdl::keycode(ev) == SDLK_ESCAPE) {
       app.backlinks_mode = false;
       return true;
     }
-    if (ev.key.keysym.sym == SDLK_UP) {
+    if (xanatoo::sdl::keycode(ev) == SDLK_UP) {
       if (app.backlinks_sel > 0) --app.backlinks_sel;
       return true;
     }
-    if (ev.key.keysym.sym == SDLK_DOWN) {
+    if (xanatoo::sdl::keycode(ev) == SDLK_DOWN) {
       if (app.backlinks_sel + 1 < static_cast<int>(app.backlinks.size()))
         ++app.backlinks_sel;
       return true;
     }
-    if (ev.key.keysym.sym == SDLK_RETURN ||
-        ev.key.keysym.sym == SDLK_KP_ENTER) {
+    if (xanatoo::sdl::keycode(ev) == SDLK_RETURN ||
+        xanatoo::sdl::keycode(ev) == SDLK_KP_ENTER) {
       if (app.backlinks_sel >= 0 &&
           app.backlinks_sel < static_cast<int>(app.backlinks.size())) {
         auto& p = focused_pane(app);
@@ -1366,7 +1334,7 @@ static bool handle_backlinks_key(App& app, const SDL_Event& ev, bool ctrl, bool 
 // Home / End move, ←/→ fold, Enter opens. True = consumed.
 static bool handle_sitemap_key(App& app, const SDL_Event& ev, bool ctrl,
                                bool alt) {
-  const SDL_Keycode k = ev.key.keysym.sym;
+  const SDL_Keycode k = xanatoo::sdl::keycode(ev);
   if (k == SDLK_m && ctrl && alt) {
     toggle_sitemap(app);
     return true;
@@ -1391,7 +1359,7 @@ static bool handle_sitemap_key(App& app, const SDL_Event& ev, bool ctrl,
 // Home / End move, Enter follows the link. True = consumed.
 static bool handle_page_key(App& app, const SDL_Event& ev, bool ctrl,
                             bool alt) {
-  const SDL_Keycode k = ev.key.keysym.sym;
+  const SDL_Keycode k = xanatoo::sdl::keycode(ev);
   if (k == SDLK_p && ctrl && alt) {
     toggle_page_panel(app);
     return true;
@@ -1412,15 +1380,15 @@ static bool handle_page_key(App& app, const SDL_Event& ev, bool ctrl,
 static bool handle_outline_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
                        bool alt) {
   if (panel_has_keys(app, KeyFocus::Outline)) {
-    if (ev.key.keysym.sym == SDLK_ESCAPE ||
-        (ev.key.keysym.sym == SDLK_o && ctrl && shift)) {
+    if (xanatoo::sdl::keycode(ev) == SDLK_ESCAPE ||
+        (xanatoo::sdl::keycode(ev) == SDLK_o && ctrl && shift)) {
       app.outline_mode = false;
       app.ol.dragging = false;
       app.ol.resize = 0;
       return true;
     }
     bool outline_consumed = false;
-    switch (ev.key.keysym.sym) {
+    switch (xanatoo::sdl::keycode(ev)) {
       case SDLK_UP:
         if (app.outline_sel > 0) --app.outline_sel;
         outline_consumed = true;
@@ -1466,9 +1434,9 @@ static bool handle_outline_key(App& app, const SDL_Event& ev, bool ctrl, bool sh
         outline_consumed = true;
         break;
       default:
-        if (!ctrl && !alt && ev.key.keysym.sym >= SDLK_1 &&
-            ev.key.keysym.sym <= SDLK_9) {
-          int idx = static_cast<int>(ev.key.keysym.sym - SDLK_1);
+        if (!ctrl && !alt && xanatoo::sdl::keycode(ev) >= SDLK_1 &&
+            xanatoo::sdl::keycode(ev) <= SDLK_9) {
+          int idx = static_cast<int>(xanatoo::sdl::keycode(ev) - SDLK_1);
           if (idx < static_cast<int>(app.outline.size())) {
             app.outline_sel = idx;
             jump_outline_sel(app);
@@ -1496,7 +1464,7 @@ static bool handle_nav_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
     mover();
     if (!shift) p.sel.anchor = p.sel.focus;
   };
-  switch (ev.key.keysym.sym) {
+  switch (xanatoo::sdl::keycode(ev)) {
     case SDLK_LEFT:
       if (alt && !ctrl) {
         // This view's history back
@@ -1532,18 +1500,18 @@ static bool handle_nav_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
       return true;
 
     case SDLK_UP:
-      if ((ev.key.keysym.mod & KMOD_ALT) != 0 &&
-          (ev.key.keysym.mod & KMOD_SHIFT) != 0) {
+      if ((xanatoo::sdl::keymod(ev) & KMOD_ALT) != 0 &&
+          (xanatoo::sdl::keymod(ev) & KMOD_SHIFT) != 0) {
         edit(app);
         if (xanatoo::move_section_up(d, p.sel.focus)) {
           app.needs_layout = true;
           reset_blink(app);
           flash_status(app, "Section moved up");
         }
-      } else if ((ev.key.keysym.mod & KMOD_ALT) != 0 && browsing(app)) {
+      } else if ((xanatoo::sdl::keymod(ev) & KMOD_ALT) != 0 && browsing(app)) {
         // Read-only pages have no blocks to move: Alt+Up goes up instead.
         execute_command(app, xanatoo::UiCommand::GoUp, {});
-      } else if ((ev.key.keysym.mod & KMOD_ALT) != 0) {
+      } else if ((xanatoo::sdl::keymod(ev) & KMOD_ALT) != 0) {
         edit(app);
         if (xanatoo::move_block_up(d, p.sel.focus.node)) {
           app.needs_layout = true;
@@ -1560,7 +1528,7 @@ static bool handle_nav_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
       return true;
 
     case SDLK_DOWN:
-      if ((ev.key.keysym.mod & KMOD_ALT) != 0) {
+      if ((xanatoo::sdl::keymod(ev) & KMOD_ALT) != 0) {
         edit(app);
         if (xanatoo::move_block_down(d, p.sel.focus.node)) {
           app.needs_layout = true;
@@ -1578,7 +1546,7 @@ static bool handle_nav_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
 
     case SDLK_PAGEUP:
     case SDLK_PAGEDOWN: {
-      const bool up = (ev.key.keysym.sym == SDLK_PAGEUP);
+      const bool up = (xanatoo::sdl::keycode(ev) == SDLK_PAGEUP);
       // When the pointer is over soft chrome, page that surface instead
       // of the document (matches wheel routing).
       int mxk = 0, myk = 0;
@@ -1683,9 +1651,9 @@ static bool handle_nav_key(App& app, const SDL_Event& ev, bool ctrl, bool shift,
 
 static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
                        bool imgui_keys) {
-  bool shift = (ev.key.keysym.mod & KMOD_SHIFT) != 0;
-  bool ctrl = (ev.key.keysym.mod & KMOD_CTRL) != 0;
-  bool alt = (ev.key.keysym.mod & KMOD_ALT) != 0;
+  bool shift = (xanatoo::sdl::keymod(ev) & KMOD_SHIFT) != 0;
+  bool ctrl = (xanatoo::sdl::keymod(ev) & KMOD_CTRL) != 0;
+  bool alt = (xanatoo::sdl::keymod(ev) & KMOD_ALT) != 0;
   Pane& p = focused_pane(app);
   xanatoo::Document& d = doc_of(app, p);
   app.eat_text_input = false;
@@ -1693,7 +1661,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   // Alt+letter opens the matching top-level menu (Windows/GNOME style).
   // Handled before status-prompt isolation so chrome stays reachable.
   if (alt && !ctrl && !shift) {
-    const SDL_Keycode k = ev.key.keysym.sym;
+    const SDL_Keycode k = xanatoo::sdl::keycode(ev);
     const char* menu = nullptr;
     switch (k) {
       case SDLK_f:
@@ -1735,7 +1703,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   // history), Home/End, Delete, and C-a/e/k/u/w.
   const bool status_prompt = prompt_active(app);
   if (status_prompt) {
-    const SDL_Keycode k = ev.key.keysym.sym;
+    const SDL_Keycode k = xanatoo::sdl::keycode(ev);
     const bool minibuf_path = minibuf_active(app);
     const bool prompt_key =
         k == SDLK_ESCAPE || k == SDLK_BACKSPACE || k == SDLK_RETURN ||
@@ -1753,10 +1721,10 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
           (ctrl && (k == SDLK_a || k == SDLK_e || k == SDLK_k || k == SDLK_u ||
                     k == SDLK_w))));
     if (!prompt_key) return;
-  } else if (imgui_keys && ev.key.keysym.sym != SDLK_ESCAPE &&
-             ev.key.keysym.sym != SDLK_F1 && ev.key.keysym.sym != SDLK_F2 &&
-             ev.key.keysym.sym != SDLK_F8 && ev.key.keysym.sym != SDLK_F9 &&
-             ev.key.keysym.sym != SDLK_F11) {
+  } else if (imgui_keys && xanatoo::sdl::keycode(ev) != SDLK_ESCAPE &&
+             xanatoo::sdl::keycode(ev) != SDLK_F1 && xanatoo::sdl::keycode(ev) != SDLK_F2 &&
+             xanatoo::sdl::keycode(ev) != SDLK_F8 && xanatoo::sdl::keycode(ev) != SDLK_F9 &&
+             xanatoo::sdl::keycode(ev) != SDLK_F11) {
     return;
   }
 
@@ -1764,7 +1732,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   // before the browse-mode filter below.
   if (!status_prompt && handle_sitemap_key(app, ev, ctrl, alt)) return;
   if (!status_prompt && handle_page_key(app, ev, ctrl, alt)) return;
-  if (!status_prompt && ev.key.keysym.sym == SDLK_k && ctrl && alt) {
+  if (!status_prompt && xanatoo::sdl::keycode(ev) == SDLK_k && ctrl && alt) {
     show_search_bar(app);
     return;
   }
@@ -1772,14 +1740,15 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   // Paged reading, read-only: ← → turn the page like PgUp / PgDn.
   if (!status_prompt && browsing(app) && focused_pane(app).pages.on && !ctrl &&
       !alt && !shift &&
-      (ev.key.keysym.sym == SDLK_LEFT || ev.key.keysym.sym == SDLK_RIGHT))
-    ev.key.keysym.sym =
-        ev.key.keysym.sym == SDLK_LEFT ? SDLK_PAGEUP : SDLK_PAGEDOWN;
+      (xanatoo::sdl::keycode(ev) == SDLK_LEFT ||
+       xanatoo::sdl::keycode(ev) == SDLK_RIGHT))
+    xanatoo::sdl::set_keycode(
+        ev, xanatoo::sdl::keycode(ev) == SDLK_LEFT ? SDLK_PAGEUP : SDLK_PAGEDOWN);
 
   // Browse mode: navigation and view toggles only (no document edits).
   // An open prompt (URL bar, Save as) keeps its own keys.
   if (browsing(app) && !status_prompt) {
-    const SDL_Keycode k = ev.key.keysym.sym;
+    const SDL_Keycode k = xanatoo::sdl::keycode(ev);
     const bool browse_ok =
         k == SDLK_ESCAPE || k == SDLK_F1 || k == SDLK_F2 || k == SDLK_F8 ||
         k == SDLK_F9 || k == SDLK_F11 || k == SDLK_LEFT ||
@@ -1807,7 +1776,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
 
   // Help window is non-modal: Esc/F1 close it; other keys edit the document.
   if (app.help_mode &&
-      (ev.key.keysym.sym == SDLK_ESCAPE || ev.key.keysym.sym == SDLK_F1)) {
+      (xanatoo::sdl::keycode(ev) == SDLK_ESCAPE || xanatoo::sdl::keycode(ev) == SDLK_F1)) {
     app.help_mode = false;
     app.help.dragging = false;
     return;
@@ -1815,7 +1784,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
 
   // ---- Minibuffer (path/URL prompts): Tab, history, cursor ----
   if (minibuf_active(app)) {
-    const SDL_Keycode k = ev.key.keysym.sym;
+    const SDL_Keycode k = xanatoo::sdl::keycode(ev);
     bool used = true;
     if (k == SDLK_ESCAPE) {
       close_prompt(app);
@@ -1879,12 +1848,12 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   if (handle_outline_key(app, ev, ctrl, shift, alt)) return;
 
   // Table-driven shortcuts share the menu/toolbar command implementations.
-  if (auto bound = keymap_lookup(ev.key.keysym.sym, ctrl, shift)) {
+  if (auto bound = keymap_lookup(xanatoo::sdl::keycode(ev), ctrl, shift)) {
     execute_command(app, *bound);
     return;
   }
 
-  switch (ev.key.keysym.sym) {
+  switch (xanatoo::sdl::keycode(ev)) {
     case SDLK_ESCAPE:
       if (app.outline_mode) {
         app.outline_mode = false;
@@ -1901,7 +1870,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       } else if (!p.sel.empty()) {
         p.sel.anchor = p.sel.focus;
         reset_blink(app);
-      } else if (ev.key.keysym.scancode == SDL_SCANCODE_AC_BACK &&
+      } else if (xanatoo::sdl::scancode(ev) == SDL_SCANCODE_AC_BACK &&
                  !imgui_keys) {
         execute_command(app, UiCommand::NavBack);
       }
@@ -2054,14 +2023,14 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
 
     case SDLK_F3:
     case SDLK_g:
-      if (ev.key.keysym.sym == SDLK_F3 || ctrl) {
+      if (xanatoo::sdl::keycode(ev) == SDLK_F3 || ctrl) {
         if (!prompt_is_search(app)) {
           if (app.last_search.empty()) break;
           open_search(app, false);
         }
         Pane& pp = focused_pane(app);
         size_t mlen = 0;
-        const bool backward = shift || (ev.key.keysym.mod & KMOD_SHIFT) != 0;
+        const bool backward = shift || (xanatoo::sdl::keymod(ev) & KMOD_SHIFT) != 0;
         auto hit = backward
                        ? xanatoo::find_prev(doc_of(app, pp), app.prompt.text,
                                             pp.sel.focus, mlen)
@@ -2553,7 +2522,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
     case SDLK_6:
       if (ctrl && shift) {
         // Ctrl+Shift+1/2 — wrap in Section / Article
-        int n = static_cast<int>(ev.key.keysym.sym - SDLK_0);
+        int n = static_cast<int>(xanatoo::sdl::keycode(ev) - SDLK_0);
         if (n == 1) {
           edit(app);
           if (xanatoo::wrap_in_section(d, p.sel.focus)) {
@@ -2568,7 +2537,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
           }
         }
       } else if (ctrl && !shift) {
-        int level = static_cast<int>(ev.key.keysym.sym - SDLK_0);
+        int level = static_cast<int>(xanatoo::sdl::keycode(ev) - SDLK_0);
         edit(app);
         bool ok = false;
         if (level == 1)
@@ -2644,9 +2613,10 @@ void handle_event(App& app, SDL_Event& ev) {
   // Android Back (trapped, see platform_pre_init) acts like Escape
   // everywhere: lightbox, ImGui popups, prompts, panels. The scancode stays
   // AC_BACK, so where Escape has nothing to close Back steps history back.
-  if ((ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP) &&
-      ev.key.keysym.sym == SDLK_AC_BACK) {
-    ev.key.keysym.sym = SDLK_ESCAPE;
+  if ((xanatoo::sdl::event_kind(ev) == xanatoo::sdl::EventKind::KeyDown ||
+       xanatoo::sdl::event_kind(ev) == xanatoo::sdl::EventKind::KeyUp) &&
+      xanatoo::sdl::keycode(ev) == SDLK_AC_BACK) {
+    xanatoo::sdl::set_keycode(ev, SDLK_ESCAPE);
   }
   if (lightbox_event(app, ev)) return;  // fullscreen viewer owns the input
   app.ui.process_event(ev);
@@ -2656,57 +2626,57 @@ void handle_event(App& app, SDL_Event& ev) {
   // Let ImGui consume mouse/keyboard when interacting with menus
   const bool imgui_mouse = app.ui.want_capture_mouse();
   const bool imgui_keys = app.ui.want_capture_keyboard();
-  switch (ev.type) {
-    case SDL_QUIT:
+  using xanatoo::sdl::EventKind;
+  switch (xanatoo::sdl::event_kind(ev)) {
+    case EventKind::Quit:
       on_quit(app, ev, imgui_mouse, imgui_keys);
       break;
-    case SDL_WINDOWEVENT:
+    case EventKind::WindowResized:
       on_windowevent(app, ev, imgui_mouse, imgui_keys);
       break;
-    case SDL_DROPFILE:
+    case EventKind::DropFile:
       on_dropfile(app, ev, imgui_mouse, imgui_keys);
       break;
-    case SDL_MOUSEWHEEL:
+    case EventKind::MouseWheel:
       on_mousewheel(app, ev, imgui_mouse, imgui_keys);
       break;
-    case SDL_MOUSEBUTTONDOWN:
+    case EventKind::MouseButtonDown:
       on_mousebuttondown(app, ev, imgui_mouse, imgui_keys);
       break;
-    case SDL_MOUSEBUTTONUP:
+    case EventKind::MouseButtonUp:
       on_mousebuttonup(app, ev, imgui_mouse, imgui_keys);
       break;
-    case SDL_MOUSEMOTION:
+    case EventKind::MouseMotion:
       on_mousemotion(app, ev, imgui_mouse, imgui_keys);
       break;
-    case SDL_TEXTINPUT:
+    case EventKind::TextInput:
       on_textinput(app, ev, imgui_mouse, imgui_keys);
       break;
-    case SDL_FINGERDOWN:
+    case EventKind::FingerDown:
       touch_finger_down(app, ev.tfinger);
       break;
-    case SDL_FINGERMOTION:
+    case EventKind::FingerMotion:
       touch_finger_motion(app, ev.tfinger);
       break;
-    case SDL_FINGERUP:
+    case EventKind::FingerUp:
       touch_finger_up(app, ev.tfinger);
       break;
-    case SDL_CONTROLLERDEVICEADDED:
+    case EventKind::GamepadAdded:
       on_controllerdeviceadded(app, ev, imgui_mouse, imgui_keys);
       break;
-    case SDL_CONTROLLERDEVICEREMOVED:
+    case EventKind::GamepadRemoved:
       on_controllerdeviceremoved(app, ev, imgui_mouse, imgui_keys);
       break;
-    case SDL_CONTROLLERBUTTONDOWN:
+    case EventKind::GamepadButtonDown:
       on_controllerbuttondown(app, ev, imgui_mouse, imgui_keys);
       break;
-    case SDL_CONTROLLERBUTTONUP:
+    case EventKind::GamepadButtonUp:
       on_controllerbuttonup(app, ev, imgui_mouse, imgui_keys);
       break;
-    case SDL_KEYDOWN:
+    case EventKind::KeyDown:
       on_keydown(app, ev, imgui_mouse, imgui_keys);
       break;
-    case SDL_RENDER_TARGETS_RESET:
-    case SDL_RENDER_DEVICE_RESET:
+    case EventKind::RenderReset:
       release_pane_rasters(app);
       break;
     default:

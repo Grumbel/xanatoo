@@ -472,8 +472,11 @@ void Ui::process_event(const SDL_Event& ev) {
   if (!ready_) return;
   // Ctrl+Tab / Ctrl+Shift+Tab belong to the document tab strip; keep ImGui's
   // built-in window switcher overlay from popping up over the page.
-  if ((ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP) &&
-      ev.key.keysym.sym == SDLK_TAB && (ev.key.keysym.mod & KMOD_CTRL)) {
+  const auto kind = xanatoo::sdl::event_kind(ev);
+  if ((kind == xanatoo::sdl::EventKind::KeyDown ||
+       kind == xanatoo::sdl::EventKind::KeyUp) &&
+      xanatoo::sdl::keycode(ev) == SDLK_TAB &&
+      (xanatoo::sdl::keymod(ev) & KMOD_CTRL)) {
     return;
   }
   ImGui_ImplSDL2_ProcessEvent(&ev);

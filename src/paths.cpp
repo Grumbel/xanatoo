@@ -163,12 +163,7 @@ std::string executable_dir() {
 #endif
   // On Windows, macOS and the browser SDL provides the executable location;
   // Windows needs this for packaged share/xanatoo and portable.txt.
-  if (char* base = SDL_GetBasePath()) {
-    const std::string result(base);
-    SDL_free(base);
-    return result;
-  }
-  return {};
+  return xanatoo::sdl::base_path();
 }
 
 void print_paths(std::ostream& out) {

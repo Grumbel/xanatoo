@@ -217,6 +217,23 @@ std::string freetype_runtime() {
 
 std::string video_line(App& app) {
   std::string s = SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "?";
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  const SDL_DisplayID di = SDL_GetDisplayForWindow(app.window);
+  if (di != 0) {
+    int count = 0;
+    SDL_DisplayID* displays = SDL_GetDisplays(&count);
+    SDL_free(displays);
+    s += ", display " + std::to_string(di) + "/" + std::to_string(count);
+    if (const char* name = SDL_GetDisplayName(di)) s += std::string(" \"") + name + "\"";
+    if (const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(di)) {
+      s += " " + std::to_string(mode->w) + "x" + std::to_string(mode->h) +
+           " @ " + std::to_string(mode->refresh_rate) + " Hz " +
+           SDL_GetPixelFormatName(mode->format);
+    }
+    const float scale = SDL_GetDisplayContentScale(di);
+    if (scale > 0.f) s += ", content scale " + std::to_string(scale);
+  }
+#else
   const int di = SDL_GetWindowDisplayIndex(app.window);
   SDL_DisplayMode mode{};
   if (di >= 0 && SDL_GetCurrentDisplayMode(di, &mode) == 0) {
@@ -230,6 +247,7 @@ std::string video_line(App& app) {
     if (SDL_GetDisplayDPI(di, &ddpi, nullptr, nullptr) == 0)
       s += ", " + std::to_string(static_cast<int>(ddpi + 0.5f)) + " dpi";
   }
+#endif
   int ww = 0, wh = 0, dw = 0, dh = 0;
   SDL_GetWindowSize(app.window, &ww, &wh);
   xanatoo::sdl::renderer_output_size(app.sdl, &dw, &dh);
@@ -249,6 +267,23 @@ std::string video_line(App& app) {
 }
 
 std::string renderer_line(App& app) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  const char* name = SDL_GetRendererName(app.sdl);
+  if (!name) return std::string("? ") + SDL_GetError();
+  std::string s = name;
+  const SDL_PropertiesID props = SDL_GetRendererProperties(app.sdl);
+  if (props) {
+    const int64_t max_texture = SDL_GetNumberProperty(
+        props, SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER, 0);
+    if (max_texture > 0)
+      s += ", max texture " + std::to_string(max_texture) + "x" +
+           std::to_string(max_texture);
+  }
+  std::vector<std::string> drivers;
+  for (int i = 0; i < SDL_GetNumRenderDrivers(); ++i)
+    if (const char* driver = SDL_GetRenderDriver(i)) drivers.push_back(driver);
+  return s + "; available " + join(drivers, " ");
+#else
   SDL_RendererInfo ri{};
   if (SDL_GetRendererInfo(app.sdl, &ri) != 0) return std::string("? ") + SDL_GetError();
   std::string s = ri.name ? ri.name : "?";
@@ -274,6 +309,7 @@ std::string renderer_line(App& app) {
   }
   s += "; available " + join(drivers, " ");
   return s;
+#endif
 }
 
 // GL strings of the renderer's context (opengl / opengles2 renderers),
@@ -298,12 +334,26 @@ std::string opengl_line() {
 // sources they read, so the mapping is printed rather than guessed.
 std::vector<std::string> controller_lines() {
   std::vector<std::string> out;
+  // The GAMECONTROLLERCONFIG hints retain their names in SDL3.
   const char* env = SDL_getenv("SDL_GAMECONTROLLERCONFIG");
+  const char* env_file = SDL_getenv("SDL_GAMECONTROLLERCONFIG_FILE");
   std::string file_db;
-  if (const char* file = SDL_getenv("SDL_GAMECONTROLLERCONFIG_FILE")) {
-    std::ifstream in(file);
+  if (env_file) {
+    std::ifstream in(env_file);
     file_db.assign(std::istreambuf_iterator<char>(in), {});
   }
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  int count = 0;
+  SDL_JoystickID* joysticks = SDL_GetJoysticks(&count);
+  for (int i = 0; i < count; ++i) {
+    const SDL_JoystickID id = joysticks[i];
+    char guid[33] = {};
+    SDL_GUIDToString(SDL_GetJoystickGUIDForID(id), guid, sizeof(guid));
+    const char* name = SDL_GetJoystickNameForID(id);
+    const std::string head = "controller " + std::to_string(i);
+    out.push_back(head + ": " + (name ? name : "(unnamed)") + ", GUID " + guid);
+    char* m = SDL_IsGamepad(id) ? SDL_GetGamepadMappingForID(id) : nullptr;
+#else
   for (int i = 0; i < SDL_NumJoysticks(); ++i) {
     char guid[33] = {};
     SDL_JoystickGetGUIDString(SDL_JoystickGetDeviceGUID(i), guid, sizeof(guid));
@@ -312,6 +362,7 @@ std::vector<std::string> controller_lines() {
     out.push_back(head + ": " + (name ? name : "(unnamed)") + ", GUID " + guid);
     char* m = SDL_IsGameController(i) ? SDL_GameControllerMappingForDeviceIndex(i)
                                       : nullptr;
+#endif
     if (!m) {
       out.push_back(head + " mapping: none (plain joystick)");
       continue;
@@ -331,6 +382,9 @@ std::vector<std::string> controller_lines() {
     out.push_back(head + " mapping: " + source + ", " +
                   (bindings.size() > 120 ? bindings.substr(0, 120) + "…" : bindings));
   }
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  SDL_free(joysticks);
+#endif
   if (out.empty()) out.push_back("controllers: none");
   return out;
 }
@@ -351,15 +405,22 @@ void print_startup_report(App& app) {
   out.push_back("system: " + system_line());
   for (const std::string& e : env_lines()) out.push_back("env: " + e);
 
-  SDL_version sv;
-  SDL_GetVersion(&sv);
   out.push_back(
       "sdl: " +
-      with_path(versions(version3(sv.major, sv.minor, sv.patch),
+      with_path(versions(xanatoo::sdl::runtime_version(),
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+                         version3(SDL_MAJOR_VERSION, SDL_MINOR_VERSION,
+                                  SDL_MICRO_VERSION)) +
+#else
                          version3(SDL_MAJOR_VERSION, SDL_MINOR_VERSION,
                                   SDL_PATCHLEVEL)) +
+#endif
                     " " + SDL_GetRevision(),
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+                mapped(libs, "libSDL3")));
+#else
                 mapped(libs, "libSDL2")));
+#endif
   out.push_back("freetype: " +
                 with_path(versions(freetype_runtime(),
                                    version3(FREETYPE_MAJOR, FREETYPE_MINOR,
@@ -399,7 +460,7 @@ void print_startup_report(App& app) {
     if (!drivers.empty()) out.push_back("opengl libraries: " + join(drivers, ", "));
   }
   for (const std::string& c : controller_lines()) out.push_back(c);
-  out.push_back("touch devices: " + std::to_string(SDL_GetNumTouchDevices()));
+  out.push_back("touch devices: " + std::to_string(xanatoo::sdl::touch_device_count()));
 
   out.push_back("dir config: " + dir_line(dir_info(DirKind::Config)));
   out.push_back("dir state: " + dir_line(dir_info(DirKind::State)));

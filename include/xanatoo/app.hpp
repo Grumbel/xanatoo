@@ -695,7 +695,7 @@ struct App {
   // status line only while a prompt or notice needs it.
   bool chrome_hidden = false;
   bool virtual_keyboard = false;
-  SDL_GameController* gamepad = nullptr;
+  xanatoo::sdl::Gamepad* gamepad = nullptr;
   bool stick_cursor_on = false;
   float stick_cx = 0.f;
   float stick_cy = 0.f;

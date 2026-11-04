@@ -81,11 +81,33 @@ void expect(bool cond, const char* expr, const char* file, int line) {
 
 void test_sdl_time_bridge() {
   using xanatoo::sdl::ticks_passed;
+  EXPECT(!xanatoo::sdl::runtime_version().empty());
   EXPECT(ticks_passed(100, 100));
   EXPECT(ticks_passed(101, 100));
   EXPECT(!ticks_passed(99, 100));
   EXPECT(!ticks_passed(0xfffffff0u, 0x00000010u));
   EXPECT(ticks_passed(0x00000010u, 0xfffffff0u));
+
+  SDL_Event event{};
+  using xanatoo::sdl::EventKind;
+  EXPECT_EQ(xanatoo::sdl::event_kind(event), EventKind::Other);
+  event.type = SDL_WINDOWEVENT;
+  event.window.event = SDL_WINDOWEVENT_MOVED;
+  EXPECT_EQ(xanatoo::sdl::event_kind(event), EventKind::Other);
+  event.window.event = SDL_WINDOWEVENT_RESIZED;
+  EXPECT_EQ(xanatoo::sdl::event_kind(event), EventKind::WindowResized);
+  event.type = SDL_CONTROLLERBUTTONDOWN;
+  event.cbutton.button = SDL_CONTROLLER_BUTTON_A;
+  EXPECT_EQ(xanatoo::sdl::event_kind(event), EventKind::GamepadButtonDown);
+  EXPECT_EQ(xanatoo::sdl::gamepad_event_button(event),
+            xanatoo::sdl::button::A);
+  event.type = SDL_KEYDOWN;
+  event.key.keysym.sym = SDLK_RETURN;
+  event.key.keysym.mod = KMOD_CTRL;
+  EXPECT_EQ(xanatoo::sdl::keycode(event), SDLK_RETURN);
+  EXPECT((xanatoo::sdl::keymod(event) & KMOD_CTRL) != 0);
+  xanatoo::sdl::set_keycode(event, SDLK_ESCAPE);
+  EXPECT_EQ(event.key.keysym.sym, SDLK_ESCAPE);
 }
 
 void test_string_helpers() {

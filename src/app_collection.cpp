@@ -302,22 +302,24 @@ static bool in_rect(const SDL_Rect& r, int x, int y) {
 bool lightbox_event(App& app, const SDL_Event& ev) {
   Lightbox& lb = app.lightbox;
   if (!lb.open) return false;
+  using xanatoo::sdl::EventKind;
+  const EventKind kind = xanatoo::sdl::event_kind(ev);
   // Pointer events outside the viewer belong to the menus and toolbars.
   {
     const SDL_Rect r = lightbox_rect(app);
     int px = 0, py = 0;
     bool pointer = true;
-    switch (ev.type) {
-      case SDL_MOUSEBUTTONDOWN:
-      case SDL_MOUSEBUTTONUP:
+    switch (kind) {
+      case EventKind::MouseButtonDown:
+      case EventKind::MouseButtonUp:
         px = ev.button.x;
         py = ev.button.y;
         break;
-      case SDL_MOUSEMOTION:
+      case EventKind::MouseMotion:
         px = ev.motion.x;
         py = ev.motion.y;
         break;
-      case SDL_MOUSEWHEEL:
+      case EventKind::MouseWheel:
         xanatoo::sdl::mouse_position(&px, &py);
         break;
       default:
@@ -325,9 +327,9 @@ bool lightbox_event(App& app, const SDL_Event& ev) {
     }
     if (pointer && !in_rect(r, px, py)) return false;
   }
-  switch (ev.type) {
-    case SDL_KEYDOWN:
-      switch (ev.key.keysym.sym) {
+  switch (kind) {
+    case EventKind::KeyDown:
+      switch (xanatoo::sdl::keycode(ev)) {
         case SDLK_ESCAPE:
         case SDLK_q:
           lb.open = false;
@@ -387,7 +389,7 @@ bool lightbox_event(App& app, const SDL_Event& ev) {
           break;
       }
       return true;
-    case SDL_MOUSEBUTTONDOWN:
+    case EventKind::MouseButtonDown:
       if (ev.button.button == SDL_BUTTON_LEFT) {
         switch (lightbox_zone(app, ev.button.x, ev.button.y)) {
           case LbZone::Close: lb.open = false; break;
@@ -399,7 +401,7 @@ bool lightbox_event(App& app, const SDL_Event& ev) {
       else
         lb.open = false;
       return true;
-    case SDL_MOUSEWHEEL: {
+    case EventKind::MouseWheel: {
       int px = 0, py = 0;
       xanatoo::sdl::mouse_position(&px, &py);
       if (ev.wheel.y != 0)
@@ -407,39 +409,39 @@ bool lightbox_event(App& app, const SDL_Event& ev) {
                       static_cast<float>(px), static_cast<float>(py));
       return true;
     }
-    case SDL_MOUSEMOTION:
+    case EventKind::MouseMotion:
       if (lb.drag && lb.scale > 0.f) {
         lb.pan_x += static_cast<float>(ev.motion.xrel);
         lb.pan_y += static_cast<float>(ev.motion.yrel);
       }
       return true;
-    case SDL_MOUSEBUTTONUP:
+    case EventKind::MouseButtonUp:
       lb.drag = false;
       return true;
-    case SDL_CONTROLLERBUTTONDOWN:
-      switch (ev.cbutton.button) {
-        case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
-        case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
+    case EventKind::GamepadButtonDown:
+      switch (xanatoo::sdl::gamepad_event_button(ev)) {
+        case xanatoo::sdl::button::DpadLeft:
+        case xanatoo::sdl::button::LeftShoulder:
           step(lb, -1);
           break;
-        case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
-        case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:
-        case SDL_CONTROLLER_BUTTON_A:
+        case xanatoo::sdl::button::DpadRight:
+        case xanatoo::sdl::button::RightShoulder:
+        case xanatoo::sdl::button::A:
           step(lb, 1);
           break;
-        case SDL_CONTROLLER_BUTTON_B:
-        case SDL_CONTROLLER_BUTTON_BACK:
+        case xanatoo::sdl::button::B:
+        case xanatoo::sdl::button::Back:
           lb.open = false;
           break;
         default:
           break;
       }
       return true;
-    case SDL_TEXTINPUT:
-    case SDL_KEYUP:
-    case SDL_FINGERDOWN:
-    case SDL_FINGERUP:
-    case SDL_FINGERMOTION:
+    case EventKind::TextInput:
+    case EventKind::KeyUp:
+    case EventKind::FingerDown:
+    case EventKind::FingerUp:
+    case EventKind::FingerMotion:
       return true;
     default:
       return false;  // quit, window, render resets keep their handlers

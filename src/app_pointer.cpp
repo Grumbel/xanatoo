@@ -28,15 +28,10 @@ namespace xanatoo::app {
 
 void open_first_gamepad(App& app) {
   if (app.gamepad) return;
-  for (int i = 0; i < SDL_NumJoysticks(); ++i) {
-    if (SDL_IsGameController(i)) {
-      app.gamepad = SDL_GameControllerOpen(i);
-      if (app.gamepad) {
-        const char* name = SDL_GameControllerName(app.gamepad);
-        std::cerr << "gamepad: opened " << (name ? name : "(unknown)") << "\n";
-        break;
-      }
-    }
+  app.gamepad = xanatoo::sdl::open_first_gamepad();
+  if (app.gamepad) {
+    const char* name = xanatoo::sdl::gamepad_name(app.gamepad);
+    std::cerr << "gamepad: opened " << (name ? name : "(unknown)") << "\n";
   }
 }
 

@@ -198,8 +198,8 @@
                 touch $out
               '')) self.apps.${system};
         in self.packages.${system} // appChecks // {
-          # Compile the SDL-facing geometry/surface bridge directly against
-          # SDL3 headers before migrating the remaining event/ImGui paths.
+          # Compile the SDL-facing drawing, window, event, gamepad and input
+          # bridge against SDL3 headers before migrating vendored ImGui.
           sdl3-api = pkgs.runCommand "xanatoo-check-sdl3-api" {
             nativeBuildInputs = [ pkgs.pkg-config ];
             buildInputs = [ pkgs.sdl3 ];
