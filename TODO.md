@@ -6,7 +6,13 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **276** (this delivery is **275**)
+Next bundle number: **277** (this delivery is **276**)
+
+## Status (2026-11-05) — Paragraph character initializer cleanup
+
+- Explicitly default-initialize `CharInfo::math` in the paragraph layout
+  aggregate. This preserves the null pointer for ordinary text and image
+  spans and eliminates three `-Wmissing-field-initializers` warnings.
 
 ## Status (2026-11-05) — Experimental native SDL3 application target
 

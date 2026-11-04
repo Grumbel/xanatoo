@@ -2145,7 +2145,7 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     float img_d = 0.f;
     float math_px = 0.f;
     bool display = false;
-    std::shared_ptr<const MathBox> math;
+    std::shared_ptr<const MathBox> math = nullptr;
   };
   std::vector<CharInfo> chars;
   const bool small_base = is_small_role(base_role);
