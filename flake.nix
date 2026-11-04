@@ -118,6 +118,24 @@
             };
           };
 
+          # Separate native SDL3 package: keep the released SDL2 path as the
+          # default until the lean SDL3 UI is verified on all target systems.
+          xanatooSDL3 = pkgs.stdenv.mkDerivation {
+            pname = "xanatoo-sdl3";
+            inherit version;
+            src = ./.;
+            nativeBuildInputs = with pkgs; [ cmake pkg-config python3 ];
+            buildInputs = with pkgs; [ sdl3 freetype ];
+            cmakeFlags = [
+              "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+              "-DPROJECT_VERSION_FULL=${version}"
+              "-DXANATOO_SDL3=ON"
+              "-DXANATOO_MINIMAL_PORT=ON"
+              "-DBUILD_TESTING=OFF"
+            ];
+            meta = xanatoo.meta;
+          };
+
           # The binary wrapped with a font and pandoc; data is found next
           # to the binary (<exe>/../share/xanatoo).
           wrapped = pkgs.symlinkJoin {
@@ -140,6 +158,7 @@
 
           # Unwrapped binary for packaging / debugging
           xanatoo-unwrapped = xanatoo;
+          xanatoo-sdl3-native = xanatooSDL3;
         } // (
           # R36S / ArkOS PortMaster packages (Linux hosts only: cross to aarch64).
           if pkgs.stdenv.hostPlatform.isLinux then

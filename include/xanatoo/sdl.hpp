@@ -9,6 +9,12 @@
 
 #if defined(XANATOO_SDL3) && XANATOO_SDL3
 #include <SDL3/SDL.h>
+// Modifiers and the grave-accent key were renamed in SDL3. Keep the
+// application's command-key vocabulary stable while both backends coexist.
+#define KMOD_CTRL SDL_KMOD_CTRL
+#define KMOD_SHIFT SDL_KMOD_SHIFT
+#define KMOD_ALT SDL_KMOD_ALT
+#define SDLK_BACKQUOTE SDLK_GRAVE
 #else
 #include <SDL.h>
 #endif

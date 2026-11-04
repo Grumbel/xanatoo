@@ -18,6 +18,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(XANATOO_SDL3 "Use the native SDL3 window, input and renderer backend" OFF)
+if(XANATOO_SDL3 AND EMSCRIPTEN)
+  message(FATAL_ERROR "The current Emscripten package uses SDL2")
+endif()
+
 # Catch common mistakes; ImGui is vendored and not under our control.
 if(MSVC)
   add_compile_options(/W4)
@@ -62,11 +67,17 @@ if(EMSCRIPTEN)
 endif()
 
 # R36S cross builds pass SDL2_INCLUDE_DIRS / SDL2_LIBRARIES explicitly.
-if(NOT SDL2_LIBRARIES)
-  find_package(SDL2 REQUIRED)
-endif()
-if(TARGET SDL2::SDL2)
-  set(SDL2_LIBRARIES SDL2::SDL2)
+if(XANATOO_SDL3)
+  find_package(SDL3 REQUIRED CONFIG)
+  set(SDL2_LIBRARIES SDL3::SDL3)
+  set(SDL2_INCLUDE_DIRS "")
+else()
+  if(NOT SDL2_LIBRARIES)
+    find_package(SDL2 REQUIRED)
+  endif()
+  if(TARGET SDL2::SDL2)
+    set(SDL2_LIBRARIES SDL2::SDL2)
+  endif()
 endif()
 if(NOT FREETYPE_LIBRARY AND NOT TARGET Freetype::Freetype)
   find_package(Freetype REQUIRED)
@@ -181,9 +192,15 @@ add_executable(xanatoo
   external/imgui/imgui_draw.cpp
   external/imgui/imgui_tables.cpp
   external/imgui/imgui_widgets.cpp
-  external/imgui/backends/imgui_impl_sdl2.cpp
-  external/imgui/backends/imgui_impl_sdlrenderer2.cpp
 )
+
+if(XANATOO_SDL3)
+  target_sources(xanatoo PRIVATE src/imgui_sdl3.cpp)
+else()
+  target_sources(xanatoo PRIVATE
+    external/imgui/backends/imgui_impl_sdl2.cpp
+    external/imgui/backends/imgui_impl_sdlrenderer2.cpp)
+endif()
 
 target_include_directories(xanatoo PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -215,6 +232,7 @@ endif()
 target_compile_definitions(xanatoo PRIVATE
   "XANATOO_VERSION=\"${PROJECT_VERSION_FULL}\""
   "XANATOO_BUILD_TYPE=\"${CMAKE_BUILD_TYPE}\""
+  XANATOO_SDL3=$<BOOL:${XANATOO_SDL3}>
   XANATOO_SQLITE=$<BOOL:${XANATOO_SQLITE}>
   XANATOO_FONTCONFIG=$<BOOL:${XANATOO_FONTCONFIG}>)
 
@@ -529,6 +547,7 @@ target_link_libraries(xanatoo_tests PRIVATE
 )
 # Detection/parse APIs compile without OpenSSL clients.
 target_compile_definitions(xanatoo_tests PRIVATE
+  XANATOO_SDL3=$<BOOL:${XANATOO_SDL3}>
   XANATOO_GEMINI=0
   XANATOO_NOSTR=0
   XANATOO_REDDIT=0

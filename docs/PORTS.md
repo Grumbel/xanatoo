@@ -54,15 +54,27 @@ source migration is planned separately. A classic SDL2 source builder remains
 in `nix/windows.nix` as a fallback if the compatibility package cannot be
 cross-compiled on a given nixpkgs revision.
 
-The SDL3 source transition now has a shared `xanatoo/sdl.hpp` boundary for
+The SDL3 source transition has a shared `xanatoo/sdl.hpp` boundary for
 window startup, text input, timer/mouse differences, surfaces, common 2D
 drawing, gamepads, keyboard/events, touch, system cursors, path ownership,
-and report helpers. The native SDL3 application backend is **not** yet
-selectable: vendored ImGui backends still use the SDL2 platform and 2D
-renderer interfaces, and an end-to-end SDL3 build has not been verified.
-`nix flake check -L` includes `sdl3-api`, a compile-only check of that
-boundary against `pkgs.sdl3`, in addition to the regular SDL2 application
-builds.
+and report helpers. The experimental native SDL3 application backend uses a
+small single-window ImGui adapter (`src/imgui_sdl3.cpp`), independent from the
+vendored SDL2 backends:
+
+```sh
+nix build -L .#xanatoo-sdl3-native
+# Or, without Nix, with SDL3 and FreeType development packages installed:
+cmake -S . -B build/sdl3 -G Ninja -DXANATOO_SDL3=ON \
+  -DXANATOO_MINIMAL_PORT=ON
+cmake --build build/sdl3
+```
+
+`nix flake check -L` includes the native SDL3 package and the `sdl3-api`
+compile-only bridge check. **SDL3 compilation and runtime behavior have not
+yet been verified** in this environment; treat this target as experimental.
+ImGui gamepad navigation and secondary viewports are not supported by the
+minimal backend. The current Win32/Win64 and WASM production artifacts remain
+on the SDL2 API while this new backend is validated.
 
 For an alternative local MINGW64 (or MINGW32) shell, install the corresponding
 `mingw-w64-...-gcc`, `cmake`, `ninja`, `SDL2`, and `freetype` packages and run:

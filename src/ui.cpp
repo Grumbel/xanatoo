@@ -12,8 +12,12 @@
 
 #include "imgui.h"
 #include "imgui_internal.h"
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+#include "xanatoo/imgui_sdl3.hpp"
+#else
 #include "backends/imgui_impl_sdl2.h"
 #include "backends/imgui_impl_sdlrenderer2.h"
+#endif
 
 #include <cstdlib>
 #include <algorithm>
@@ -424,7 +428,9 @@ bool Ui::init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale) {
   ImGuiIO& io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   // Gamepad navigates ImGui menus when a controller is present.
+#if !defined(XANATOO_SDL3) || !XANATOO_SDL3
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+#endif
   io.IniFilename = nullptr;
   scale_ = ui_scale > 0.f ? ui_scale : 1.f;
   window_ = window;
@@ -441,6 +447,9 @@ bool Ui::init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale) {
   }
   load_icons(renderer);
 
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  if (!xanatoo::imgui_sdl3::init(window, renderer)) return false;
+#else
   if (!ImGui_ImplSDL2_InitForSDLRenderer(window, renderer)) return false;
   if (!ImGui_ImplSDLRenderer2_Init(renderer)) return false;
   if (ImGui_ImplSDLRenderer2_UsesTriangleFallback()) {
@@ -452,6 +461,7 @@ bool Ui::init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale) {
     s.PopupRounding = s.ScrollbarRounding = s.GrabRounding = 0.f;
     s.TabRounding = 0.f;
   }
+#endif
   ready_ = true;
   return true;
 }
@@ -462,8 +472,12 @@ void Ui::shutdown() {
     if (ic.texture) SDL_DestroyTexture(ic.texture);
   }
   icons_.clear();
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  xanatoo::imgui_sdl3::shutdown();
+#else
   ImGui_ImplSDLRenderer2_Shutdown();
   ImGui_ImplSDL2_Shutdown();
+#endif
   ImGui::DestroyContext();
   ready_ = false;
 }
@@ -479,7 +493,11 @@ void Ui::process_event(const SDL_Event& ev) {
       (xanatoo::sdl::keymod(ev) & KMOD_CTRL)) {
     return;
   }
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  xanatoo::imgui_sdl3::process_event(ev);
+#else
   ImGui_ImplSDL2_ProcessEvent(&ev);
+#endif
 }
 
 bool Ui::want_capture_keyboard() const {
@@ -1207,8 +1225,12 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   UiFrameResult result;
   if (!ready_) return result;
 
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  xanatoo::imgui_sdl3::new_frame();
+#else
   ImGui_ImplSDLRenderer2_NewFrame();
   ImGui_ImplSDL2_NewFrame();
+#endif
   ImGui::NewFrame();
   // Stick is an *extra* pointer. Only drive ImGui from it while the stick is
   // actively used (axis motion or A/B held); otherwise leave the real mouse.
@@ -1840,7 +1862,11 @@ void Ui::end_frame(SDL_Renderer* renderer) {
   if (wants_text && !wanted_text_input_) platform_request_keyboard(window_);
   wanted_text_input_ = wants_text;
   ImGui::Render();
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  xanatoo::imgui_sdl3::render(ImGui::GetDrawData(), renderer);
+#else
   ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
+#endif
 }
 
 }  // namespace xanatoo

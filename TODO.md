@@ -6,7 +6,23 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **275** (this delivery is **274**)
+Next bundle number: **276** (this delivery is **275**)
+
+## Status (2026-11-05) — Experimental native SDL3 application target
+
+- Added a small first-party Dear ImGui SDL3 backend for Xanatoo's single
+  window: SDL3 mouse/keyboard/text/focus events and clipboard, cursor updates,
+  font atlas texture, and ImGui draw lists through SDL3 geometry rendering.
+  SDL2 continues to use the existing vendored backends. The experimental
+  SDL3 backend has no secondary viewport or ImGui gamepad navigation support.
+- `-DXANATOO_SDL3=ON` now selects SDL3::SDL3, the native backend and the
+  first-party SDL3 adapter. `.#xanatoo-sdl3-native` is a separate minimal
+  package in `flake.nix`, included in `nix flake check`/GitHub's normal checks;
+  it does **not** replace the released SDL2/sdl2-compat packages.
+- Native SDL2 CMake build and CTest were rerun. SDL3 headers, the Nix toolchain
+  and a cross-platform SDL3 runtime are unavailable in this container, so
+  SDL3 compilation, startup, fonts, input, clipping and DPI still need
+  verification on a Nix host. Treat the package as experimental until then.
 
 ## Status (2026-11-05) — SDL3 input and diagnostics bridge
 
@@ -20,11 +36,10 @@ Next bundle number: **275** (this delivery is **274**)
 - The About page and startup report now use version-appropriate SDL library,
   renderer, display, controller and touch-device APIs. The SDL3 compile-only
   check in `flake.nix` exercises the expanded public adapter.
-- Native SDL2 app build and CTest were run locally. **Native SDL3 application
-  builds are not yet enabled:** the vendored Dear ImGui backends still target
-  SDL2, and a Nix host with SDL3 headers and target toolchains is required for
-  platform verification. Win32/Win64 continue to use SDL3 through sdl2-compat,
-  while WASM/Android/R36S still use SDL2.
+- Native SDL2 app build and CTest were run locally. Native SDL3 application
+  builds are now available as a separate experimental target (above), with
+  a Nix host and SDL3 headers still required for validation. Win32/Win64
+  continue through sdl2-compat; WASM/Android/R36S still use SDL2.
 
 ## Status (2026-11-05) — Shared SDL2/SDL3 API bridge
 

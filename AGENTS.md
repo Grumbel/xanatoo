@@ -166,8 +166,10 @@ toolbar and shortcuts should route through `execute_command`.
   render, window, surface, time, mouse, input events, gamepads, cursor and
   SDL diagnostic operations now use
   `xanatoo/sdl.hpp` (switch `XANATOO_SDL3`); `checks.sdl3-api` compiles this
-  bridge with real SDL3 headers. The vendored ImGui SDL2 backends still block
-  full SDL3 compilation. This is not a full SDL3 application target.
+  bridge with real SDL3 headers. `-DXANATOO_SDL3=ON` selects an experimental
+  first-party ImGui platform/renderer backend (`src/imgui_sdl3.cpp`) and the
+  flake's separate `xanatoo-sdl3-native` package. Do not switch production
+  packages until native SDL3 builds and runtime tests pass.
 - New options go into `cli.cpp`, `print_usage` and `docs/xanatoo.1`
   (`checks.man` / `checks.help`).
 - Version strings: `version_string()`; network User-Agents via
