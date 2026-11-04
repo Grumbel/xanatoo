@@ -1,14 +1,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 #
-# gamepkgstd FLAKE-14: CI runs `nix flake check` and nothing else; every
-# build and test is defined in flake.nix.
+# gamepkgstd FLAKE-14: all builds/tests are defined in flake.nix. CI runs
+# flake check, then uploads the flake's Windows and WebAssembly outputs.
 
 name: check
 
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   check:
@@ -19,3 +20,24 @@ jobs:
           fetch-depth: 0  # self.revCount for the version string (VER-5)
       - uses: cachix/install-nix-action@v31
       - run: nix flake check --print-build-logs
+      - name: Collect portable flake artifacts
+        run: |
+          nix build -L .#xanatoo-wasm --out-link result-wasm
+          nix build -L .#xanatoo-win32-zip --out-link result-win32
+          nix build -L .#xanatoo-win64-zip --out-link result-win64
+          mkdir -p dist/wasm dist/win32 dist/win64
+          cp -rL result-wasm/. dist/wasm/
+          cp result-win32/*.zip dist/win32/
+          cp result-win64/*.zip dist/win64/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xanatoo-wasm
+          path: dist/wasm/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xanatoo-win32
+          path: dist/win32/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xanatoo-win64
+          path: dist/win64/
