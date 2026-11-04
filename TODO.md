@@ -6,7 +6,18 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **271** (this delivery is **270**)
+Next bundle number: **272** (this delivery is **271**)
+
+## Status (2026-11-04) — Canonical Nix cross-platform packages
+
+- Added `nix/windows.nix` and `nix/wasm.nix` to the flake: Win32/Win64
+  folders and ZIPs, WASM static site and serving app, and intermediate
+  SDL2/FreeType wasm libraries. WASM sources build offline under Nix.
+- GitHub Actions now uses `nix flake check` and uploads those exact flake
+  outputs; removed the independently configured portable CI workflow.
+- `docs/PORTS.md` and the README now put Nix first. Local Linux CMake builds
+  still work. No Nix executable is available in this ChatGPT container, so
+  real cross-target evaluation/builds must be confirmed on a Nix host or CI.
 
 ## Status (2026-11-04) — Initial Win32/Win64 and WebAssembly builds
 

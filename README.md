@@ -98,15 +98,25 @@ Prebuilt development snapshots are linked on the
 
 ### Windows and WebAssembly (experimental)
 
-CMake can also build **32-/64-bit Windows** packages with MinGW-w64 and an
-**offline WebAssembly** preview with Emscripten. Those builds default to
+The flake now builds **32-/64-bit Windows** packages with MinGW-w64 and an
+**offline WebAssembly** preview with Emscripten:
+
+```sh
+nix build .#xanatoo-win32-zip
+nix build .#xanatoo-win64-zip
+nix build .#xanatoo-wasm
+nix run .#xanatoo-wasm   # serve the browser version locally
+```
+
+Those builds default to
 `XANATOO_MINIMAL_PORT=ON`: they retain the document editor, local readers,
 hypertext navigation, SDL2 renderer, and bundled fonts, but omit built-in
 network services, SQLite, FontConfig, and thumtoo. The browser edition does
 not yet save changes or import files from the host.
 
-See [docs/PORTS.md](docs/PORTS.md) for commands, CI artifacts, packaged
-assets, and the currently unsupported features.
+GitHub Actions builds these same flake outputs and uploads the resulting
+artifacts. See [docs/PORTS.md](docs/PORTS.md) for the optional standalone
+CMake commands, packaged assets, and the currently unsupported features.
 
 ## Documents, formats, and addresses
 

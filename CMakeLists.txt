@@ -40,12 +40,25 @@ if(XANATOO_MINIMAL_PORT)
 endif()
 
 if(EMSCRIPTEN)
-  # Emscripten's SDL2 and FreeType ports supply their headers and static libs.
-  # No host pkg-config or native FreeType library may leak into this build.
-  add_compile_options(-sUSE_SDL=2 -sUSE_FREETYPE=1)
-  add_link_options(-sUSE_SDL=2 -sUSE_FREETYPE=1)
+  # Nix supplies offline-built wasm libraries (no downloads in the sandbox).
+  # Standalone emcmake builds may still use Emscripten's built-in ports.
+  if(XANATOO_WASM_SDL2_ROOT)
+    set(SDL2_LIBRARIES "${XANATOO_WASM_SDL2_ROOT}/lib/libSDL2.a")
+    set(SDL2_INCLUDE_DIRS "${XANATOO_WASM_SDL2_ROOT}/include/SDL2")
+  else()
+    add_compile_options(-sUSE_SDL=2)
+    add_link_options(-sUSE_SDL=2)
+    set(SDL2_LIBRARIES "-sUSE_SDL=2")
+  endif()
   add_library(Freetype::Freetype INTERFACE IMPORTED)
-  set(SDL2_LIBRARIES "-sUSE_SDL=2")
+  if(XANATOO_WASM_FREETYPE_ROOT)
+    set_target_properties(Freetype::Freetype PROPERTIES
+      INTERFACE_INCLUDE_DIRECTORIES "${XANATOO_WASM_FREETYPE_ROOT}/include/freetype2"
+      INTERFACE_LINK_LIBRARIES "${XANATOO_WASM_FREETYPE_ROOT}/lib/libfreetype.a")
+  else()
+    add_compile_options(-sUSE_FREETYPE=1)
+    add_link_options(-sUSE_FREETYPE=1)
+  endif()
 endif()
 
 # R36S cross builds pass SDL2_INCLUDE_DIRS / SDL2_LIBRARIES explicitly.

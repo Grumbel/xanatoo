@@ -20,10 +20,34 @@ document UI remain available. An external `http(s)` link can still open in
 the system browser via SDL2; it cannot open through xanatoo's native network
 reader in these builds. Pandoc subprocess imports are unavailable.
 
+## Canonical Nix builds and CI
+
+The **flake is authoritative**. On an x86_64 Linux build host:
+
+```sh
+nix build -L .#xanatoo-win32-zip
+nix build -L .#xanatoo-win64-zip
+nix build -L .#xanatoo-wasm
+nix run .#xanatoo-wasm  # serve the site at localhost:8765
+nix flake check -L      # includes the platform packages and native tests
+```
+
+The Windows folder outputs are `.#xanatoo-win32` and `.#xanatoo-win64`;
+the `-zip` outputs contain those folders. `.#sdl2-wasm` and
+`.#freetype-wasm` expose the individual WebAssembly libraries for debugging.
+`nix/wasm.nix` compiles SDL2 from the pinned `sdl2-src` flake input and
+FreeType from the nixpkgs source, offline. The `XANATOO_WASM_*_ROOT` CMake
+options select these libraries without triggering Emscripten port downloads.
+
+`.github/workflows/check.yml` executes `nix flake check` and uploads the
+actual Windows and web flake outputs. There is no separate, drifting CI build
+recipe. The standalone commands below remain useful for development outside
+Nix, but are not the source of truth for releases.
+
 ## Windows (MinGW-w64)
 
-The Windows CI matrix builds both `x86_64` and `i686` with MSYS2/MinGW-w64.
-For an equivalent local MINGW64 (or MINGW32) shell, install the corresponding
+The flake cross-compiles both `x86_64` and `i686` with MinGW-w64. For an
+alternative local MINGW64 (or MINGW32) shell, install the corresponding
 `mingw-w64-...-gcc`, `cmake`, `ninja`, `SDL2`, and `freetype` packages and run:
 
 ```sh
@@ -81,9 +105,7 @@ ctest --test-dir build/minimal --output-on-failure
 ./build/minimal/xanatoo --new-session --no-save
 ```
 
-CI workflow `.github/workflows/ports.yml` builds and publishes downloadable
-artifacts for both Windows architectures and the browser edition. Cross-build
-verification still requires those toolchains; native Linux checks do not prove
+Cross-build verification still requires those toolchains; native Linux checks do not prove
 the Windows or WebAssembly binaries will run.
 
 Next steps: run each artifact on its actual platform, fix any platform-specific

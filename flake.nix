@@ -7,7 +7,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    # SDL2 sources for the Android build (nix/android.nix).
+    # Pinned SDL2 sources shared by Android, Windows and offline WASM builds.
     sdl2-src = {
       url = "https://github.com/libsdl-org/SDL/releases/download/release-2.30.3/SDL2-2.30.3.tar.gz";
       flake = false;
@@ -156,6 +156,29 @@
               xanatoo-r36s-portmaster-zip = r36s.portmasterZip;
             }
           else { }
+        ) // (
+          # Portable packages are built by the flake on a Linux build host.
+          # The CI workflow uses these same outputs, not separate CMake rules.
+          if system == "x86_64-linux" then
+            let
+              windows = import ./nix/windows.nix {
+                inherit pkgs version;
+                sdlSrc = sdl2-src;
+              };
+              wasm = import ./nix/wasm.nix {
+                inherit pkgs version;
+                sdlSrc = sdl2-src;
+              };
+            in {
+              xanatoo-win32 = windows.win32;
+              xanatoo-win32-zip = windows.win32Zip;
+              xanatoo-win64 = windows.win64;
+              xanatoo-win64-zip = windows.win64Zip;
+              xanatoo-wasm = wasm.xanatooWasm;
+              sdl2-wasm = wasm.sdl2Wasm;
+              freetype-wasm = wasm.freetypeWasm;
+            }
+          else { }
         ));
 
       # gamepkgstd FLAKE-9..11: `nix flake check` builds every package, checks
@@ -241,6 +264,12 @@
           xanatoo = run;
         } // nixpkgs.lib.optionalAttrs (nixpkgs.lib.hasSuffix "-linux" system) {
           install-android-xanatoo = (androidFor system).installApp;
+        } // nixpkgs.lib.optionalAttrs (system == "x86_64-linux") {
+          xanatoo-wasm = (import ./nix/wasm.nix {
+            pkgs = import nixpkgs { inherit system; };
+            sdlSrc = sdl2-src;
+            inherit version;
+          }).serveApp;
         });
 
       # Develop shell: deps + env + PATH scripts for out-of-tree CMake.

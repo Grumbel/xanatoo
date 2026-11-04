@@ -154,7 +154,10 @@ toolbar and shortcuts should route through `execute_command`.
   SDL2/FreeType builds without FontConfig, SQLite, TLS clients or thumtoo).
   The web main loop uses `emscripten_set_main_loop_arg` and preloaded `/data`;
   Windows paths come from SDL. Maintain the feature guards and bundled font
-  fallback. Build and limitations: `docs/PORTS.md`.
+  fallback. The authoritative cross-target packages are in `flake.nix` with
+  `nix/windows.nix` and `nix/wasm.nix`. GitHub must build these exact flake
+  outputs, never an independent CMake recipe. Build and limitations:
+  `docs/PORTS.md`.
 - New options go into `cli.cpp`, `print_usage` and `docs/xanatoo.1`
   (`checks.man` / `checks.help`).
 - Version strings: `version_string()`; network User-Agents via
