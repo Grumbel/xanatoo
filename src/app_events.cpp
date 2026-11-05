@@ -119,8 +119,9 @@ static void on_dropfile(App& app, SDL_Event& ev, bool imgui_mouse,
   if (!base.empty()) {
     try {
       std::filesystem::path rel = std::filesystem::relative(fpath, base);
-      if (!rel.empty() && rel.native().find("..") == std::string::npos)
-        store = rel.generic_string();
+      const std::string rel_s = rel.generic_string();
+      if (!rel_s.empty() && rel_s.find("..") == std::string::npos)
+        store = rel_s;
     } catch (...) {
     }
   }

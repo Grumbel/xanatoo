@@ -59,6 +59,10 @@ def collect(exe: Path, search_dirs: list[Path]) -> None:
             if source is None:
                 raise SystemExit(f"Missing DLL {name} imported by {binary}")
             destination = exe.parent / source.name
+            # The app package may already link this DLL into bin/; replace
+            # such symlinks with real files.
+            if destination.is_symlink() or destination.exists():
+                destination.unlink()
             shutil.copy2(source, destination)
             print(f"Bundled {source.name}")
             todo.append(destination)

@@ -84,7 +84,11 @@ bool write_draft(App& app, DocBuffer& b) {
 std::string format_time(int64_t t) {
   const std::time_t tt = static_cast<std::time_t>(t);
   std::tm tm{};
+#if defined(_WIN32)
+  localtime_s(&tm, &tt);
+#else
   localtime_r(&tt, &tm);
+#endif
   char s[32];
   std::strftime(s, sizeof s, "%Y-%m-%d %H:%M", &tm);
   return s;

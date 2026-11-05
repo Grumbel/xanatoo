@@ -69,7 +69,9 @@ let
       # libraries and MinGW runtime. The helper checks for missing DLLs.
       dll_search_dirs=(
         ${sdl2}
-        ${lib.optionalString sdl3Compat "${crossPkgs.sdl3}"}
+        ${lib.getDev sdl2}
+        ${lib.getBin sdl2}
+        ${lib.optionalString sdl3Compat "${crossPkgs.sdl3} ${lib.getDev crossPkgs.sdl3} ${lib.getBin crossPkgs.sdl3}"}
         ${crossPkgs.freetype}
         ${crossPkgs.libpng}
         ${crossPkgs.zlib}
@@ -84,7 +86,7 @@ let
       ${lib.optionalString sdl3Compat ''
         # sdl2-compat loads SDL3 at runtime rather than necessarily listing
         # it as a PE import. Bundle it explicitly and inspect its imports too.
-        sdl3_dll=$(find ${crossPkgs.sdl3} -type f -iname SDL3.dll -print -quit)
+        sdl3_dll=$(find ${crossPkgs.sdl3} ${lib.getDev crossPkgs.sdl3} ${lib.getBin crossPkgs.sdl3} -type f -iname SDL3.dll -print -quit)
         if [ -z "$sdl3_dll" ]; then
           echo "Missing SDL3.dll in ${crossPkgs.sdl3}" >&2
           exit 1
