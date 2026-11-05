@@ -6,7 +6,13 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **283** (this delivery is **282**)
+Next bundle number: **284** (this delivery is **283**)
+
+## Status (2026-11-05) — Rebased cumulative bundle 283
+
+- Rebasing the aside layout fix onto the current upstream `master` also
+  incorporates the newer floating-window changes. Bundle 283 supersedes
+  the pre-rebase bundle 282 and remains cumulative from `568a91b`.
 
 ## Status (2026-11-05) — Asides use only existing margins
 
