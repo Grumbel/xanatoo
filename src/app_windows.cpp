@@ -48,9 +48,9 @@ bool contains(const FloatWindow& w, int mx, int my) {
 
 // Backlinks rows live in a padded client area just below the title.
 std::tuple<int, int, int, int> backlinks_client_rect(const FloatWindow& w) {
-  constexpr int pad = 8;
-  return {w.x + pad, w.y + help_title_h + 4, w.w - pad * 2,
-          w.h - help_title_h - pad - 4};
+  // Same inset as every other window (outline / help / page / sitemap).
+  return {w.x + help_pad, w.y + help_title_h + 4, w.w - help_pad * 2,
+          w.h - help_title_h - help_pad - 4};
 }
 
 float scroll_wheel_step(const FloatWindow& w) {

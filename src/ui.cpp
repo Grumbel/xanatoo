@@ -115,19 +115,20 @@ void Ui::apply_classic_theme() {
   ImGui::StyleColorsLight();
   ImGuiStyle& s = ImGui::GetStyle();
 
-  s.WindowPadding = ImVec2(6.f, 4.f);
+  s.WindowPadding = ImVec2(8.f, 8.f);  // canvas windows: help_pad well inset
   s.FramePadding = ImVec2(6.f, 3.f);
   s.ItemSpacing = ImVec2(6.f, 4.f);
   s.ItemInnerSpacing = ImVec2(4.f, 3.f);
-  s.ScrollbarSize = 12.f;
+  s.ScrollbarSize = 12.f;  // same as draw_client_scrollbar
   s.GrabMinSize = 10.f;
 
   // Soft corners like Clearlooks; not fully flat, not fully modern.
-  s.WindowRounding = 3.f;
+  // Windows and scrollbars are square like the canvas windows (theme.cpp).
+  s.WindowRounding = 0.f;
   s.ChildRounding = 2.f;
   s.FrameRounding = 3.f;
   s.PopupRounding = 3.f;
-  s.ScrollbarRounding = 3.f;
+  s.ScrollbarRounding = 0.f;
   s.GrabRounding = 2.f;
   s.TabRounding = 2.f;
 
@@ -169,10 +170,10 @@ void Ui::apply_classic_theme() {
   c[ImGuiCol_TitleBgActive] = P(pal.tab_top);
   c[ImGuiCol_TitleBgCollapsed] = header;
   c[ImGuiCol_MenuBarBg] = bg2;
-  c[ImGuiCol_ScrollbarBg] = C(0x5C, 0x5A, 0x55);
-  c[ImGuiCol_ScrollbarGrab] = C(0xB8, 0xB6, 0xB0);
-  c[ImGuiCol_ScrollbarGrabHovered] = C(0xA0, 0x9E, 0x98);
-  c[ImGuiCol_ScrollbarGrabActive] = C(0x88, 0x86, 0x80);
+  c[ImGuiCol_ScrollbarBg] = P(pal.scroll_trough);  // = theme::draw_vscrollbar
+  c[ImGuiCol_ScrollbarGrab] = P(pal.face);
+  c[ImGuiCol_ScrollbarGrabHovered] = P(pal.accent_soft);
+  c[ImGuiCol_ScrollbarGrabActive] = P(pal.face_dark);
   c[ImGuiCol_CheckMark] = sel;
   c[ImGuiCol_SliderGrab] = sel;
   c[ImGuiCol_SliderGrabActive] = sel_hi;
@@ -185,7 +186,7 @@ void Ui::apply_classic_theme() {
   c[ImGuiCol_Separator] = border;
   c[ImGuiCol_SeparatorHovered] = sel;
   c[ImGuiCol_SeparatorActive] = sel_hi;
-  c[ImGuiCol_ResizeGrip] = C(0xB8, 0xB6, 0xB0, 180);
+  c[ImGuiCol_ResizeGrip] = P(pal.shadow);
   c[ImGuiCol_ResizeGripHovered] = sel_hi;
   c[ImGuiCol_ResizeGripActive] = sel;
   c[ImGuiCol_Tab] = bg3;

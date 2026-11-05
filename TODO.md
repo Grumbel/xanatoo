@@ -2128,3 +2128,18 @@ LCS structural diff marks; cross-document `:::include`.
 - `xanatoo-260.*-fix-scrollbar-clip-wrap-…` — prior
 - `xanatoo-261.*-rewrite-paragraph-wrap-…` — prior
 - `xanatoo-262.*-context-menu-keep-sel-…` — this delivery
+
+## Window chrome unification (partial)
+
+Done: ImGui windows (Preferences / History / Bookmarks) now share the canvas
+windows' look — square corners, 12px scrollbar with the `scroll_trough`
+palette colours, 8px padding; Backlinks uses `help_pad` like all other
+canvas windows.
+
+Still different (decide later): ImGui windows use ImGui's title bar and a
+triangular resize grip, canvas windows use `theme::draw_window_chrome`
+(gradient title, ridged SE grip, maximize box). Real unification means moving
+Preferences/History/Bookmarks to `FloatWindow` roles (dialogs vs tool windows
+should then differ explicitly, e.g. title colour). Close box is on the right
+everywhere (Gnome2 HIG). Check the grip is actually visible on narrow docked
+windows (`resizable` is false when docked, by design).
