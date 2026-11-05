@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "created": "2026-11-05",
+  "purpose": "Candidate PDFs/page images for testing semantic PDF-to-Xanatoo conversion",
+  "notes": [
+    "URLs identify source catalog items, not pre-downloaded or redistributable PDF files.",
+    "Rights flags are preliminary. Verify the exact edition, item licence, territory, and AI-service terms before use.",
+    "No ground-truth pages or conversion scores have been measured yet."
+  ],
+  "items": [
+    {
+      "id": "byrne-euclid",
+      "title": "The First Six Books of the Elements of Euclid",
+      "creator": "Oliver Byrne (editor)",
+      "year": 1847,
+      "url": "https://archive.org/details/firstsixbooksofe00eucl",
+      "source_format": "historical_scan",
+      "rights_review": "US public-domain candidate; verify scan and local terms",
+      "features": ["formal_propositions", "coloured_semantic_diagrams", "inline_symbols", "figure_references"]
+    },
+    {
+      "id": "maxwell-electricity-v1",
+      "title": "A Treatise on Electricity and Magnetism, volume 1",
+      "creator": "James Clerk Maxwell",
+      "year": 1873,
+      "url": "https://archive.org/details/electricandmagne01maxwrich",
+      "source_format": "historical_scan",
+      "rights_review": "US public-domain candidate; verify scan and local terms",
+      "features": ["equation_blocks", "numbered_sections", "mathematical_symbols", "diagrams"]
+    },
+    {
+      "id": "gray-anatomy",
+      "title": "Anatomy of the Human Body",
+      "creator": "Henry Gray",
+      "year": 1918,
+      "url": "https://archive.org/details/anatomyofhumanbo00grayrich",
+      "source_format": "historical_scan",
+      "rights_review": "US public-domain candidate; verify edition and local terms",
+      "features": ["figure_callouts", "figure_caption_links", "anatomical_labels", "index", "cross_references"]
+    },
+    {
+      "id": "century-dictionary",
+      "title": "The Century Dictionary, part 1",
+      "creator": "William Dwight Whitney (editor)",
+      "year": 1889,
+      "url": "https://archive.org/details/centurydictipt100whituoft",
+      "source_format": "historical_scan",
+      "rights_review": "Wikimedia Commons marks source work US public domain; verify any reused scan terms",
+      "features": ["dictionary_entries", "headwords", "etymology", "pronunciation", "numbered_senses", "continuous_columns"]
+    },
+    {
+      "id": "chicago-manual",
+      "title": "A Manual of Style",
+      "creator": "University of Chicago Press",
+      "year": 1906,
+      "url": "https://archive.org/details/manualofstylebei00univrich",
+      "source_format": "historical_scan",
+      "rights_review": "US public-domain candidate; verify scan and local terms",
+      "features": ["type_specimens", "nested_lists", "tables", "editorial_examples", "index"]
+    },
+    {
+      "id": "scientific-american-1906",
+      "title": "Scientific American, 14 July 1906",
+      "creator": "Scientific American",
+      "year": 1906,
+      "url": "https://archive.org/details/scientific-american-1906-07-14",
+      "source_format": "historical_periodical_scan",
+      "rights_review": "US public-domain candidate by publication date; verify individual matter and local terms",
+      "features": ["multiple_articles", "article_reading_order", "newspaper_columns", "advertisements", "illustrations"]
+    },
+    {
+      "id": "whitman-leaves",
+      "title": "Leaves of Grass",
+      "creator": "Walt Whitman",
+      "year": 1891,
+      "url": "https://archive.org/details/leavesofgrassinc00whitrich",
+      "source_format": "historical_scan",
+      "rights_review": "US public-domain candidate; verify scan and local terms",
+      "features": ["verse_lines", "stanzas", "poem_titles", "poem_sequence", "deliberate_whitespace"]
+    },
+    {
+      "id": "shakespeare-folio",
+      "title": "The First Folio of Shakespeare",
+      "creator": "William Shakespeare",
+      "year": 1623,
+      "url": "https://www.loc.gov/item/2021666879/",
+      "source_format": "historical_scan",
+      "rights_review": "Historical public-domain text; verify scan provider terms",
+      "features": ["drama", "speech", "speaker_labels", "stage_directions", "act_scene_hierarchy"]
+    },
+    {
+      "id": "aucassin-nicolette",
+      "title": "Aucassin & Nicolette: A Love Story",
+      "creator": "Historical edition",
+      "year": 1887,
+      "url": "https://archive.org/details/aucassinnicolett00bouruoft",
+      "source_format": "historical_scan",
+      "rights_review": "US public-domain candidate; use original Archive.org scan, not an independently licensed modern transcription",
+      "features": ["prose_verse_mix", "annotations", "glossary", "bibliography"]
+    },
+    {
+      "id": "berghaus-atlas",
+      "title": "The Physical Atlas",
+      "creator": "Heinrich Berghaus",
+      "year": 1845,
+      "url": "https://wellcomecollection.org/works/qukcpt3s",
+      "source_format": "historical_plate_scan",
+      "rights_review": "Wellcome Collection marks this item Public Domain",
+      "features": ["maps", "image_region_labels", "legends", "plates", "nonlinear_media"]
+    },
+    {
+      "id": "jats-bmj",
+      "title": "JATS 1.2 full article sample: BMJ",
+      "creator": "NLM JATS Tag Library / BMJ",
+      "year": null,
+      "url": "https://jats.nlm.nih.gov/publishing/tag-library/1.2/chapter/samples.html",
+      "source_format": "pdf_plus_xml",
+      "rights_review": "Licence and redistribution/AI permission not established; benchmark for schema exploration only until cleared",
+      "features": ["title_metadata", "abstract", "authors", "affiliations", "references", "jats_gold_xml"]
+    },
+    {
+      "id": "jats-pnas",
+      "title": "JATS 1.2 full article sample: PNAS",
+      "creator": "NLM JATS Tag Library / PNAS",
+      "year": null,
+      "url": "https://jats.nlm.nih.gov/publishing/tag-library/1.2/chapter/samples.html",
+      "source_format": "pdf_plus_xml",
+      "rights_review": "Licence and redistribution/AI permission not established; benchmark for schema exploration only until cleared",
+      "features": ["math", "figures", "tables", "citations", "jats_gold_xml"]
+    }
+  ]
+}

@@ -6,7 +6,22 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **279** (this delivery is **278**)
+Next bundle number: **280** (this delivery is **279**)
+
+## Status (2026-11-05) — PDF layout feature research and import corpus
+
+- Curated candidate historical books, magazines, maps, poetry and two paired
+  scientific PDF/JATS XML article samples in `docs/PDF_LAYOUT_RESEARCH.md` and
+  `research/pdf-layout-corpus.json` (catalog links only; no PDFs redistributed).
+- Distinguished semantic structure from reflow/layout hints and facsimile
+  provenance, and inventoried existing Xanatoo markup versus proposed roles
+  (equation numbering, theorem/proof, tables with spans, lexical entries,
+  verse, marginal notes and article reading order).
+- Outlined an offline PDF-to-structured-tree pipeline with OCR/layout-model
+  baselines, uncertainty and page-region traceability, plus a validation
+  benchmark using JATS XML as structural reference where licensed.
+- **Research only:** no new importer or markup syntax implemented. Before
+  bulk processing, verify exact editions and their AI/redistribution rights.
 
 ## Status (2026-11-05) — Android SDL2 build and R36S experimental SDL3
 
