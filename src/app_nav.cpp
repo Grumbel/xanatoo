@@ -526,7 +526,15 @@ static bool open_page(App& app, int pi, std::string target,
   }
   if (!fs::exists(path)) {
     flash_status(app, "Not found: " + target);
-    return false;
+    if (!stash_or_confirm(app, p.buf)) return false;
+    show_doc_in_pane(app, pi,
+                     xanatoo::parse_document(
+                         "# Could not open page\n\n`" + target +
+                             "`\n\nNo such file or directory.\n",
+                         "error.md"),
+                     target);
+    if (record_history) push_nav_history(app, pi, target);
+    return true;
   }
   app.gemini_current_url.clear();
   // Directories open as a listing; one canonical spelling with a trailing

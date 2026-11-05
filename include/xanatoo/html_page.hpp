@@ -41,12 +41,18 @@ Document parse_html_page(std::string_view html, std::string_view page_url = {},
 // text/plain body: blank-line separated chunks as code blocks.
 Document plain_text_document(std::string_view text);
 
+// "HTTP 404 Not Found" (reason phrase only for the common codes).
+std::string http_status_line(int status);
+
 #if defined(XANATOO_WEB) && XANATOO_WEB
 // GET (redirects followed) and convert by Content-Type: HTML pages, feeds,
 // text/plain, text/markdown, text/gemini. `final_url` receives the URL
-// after redirects (fragment dropped).
+// after redirects (fragment dropped). A 4xx / 5xx answer with a readable
+// body returns that body as the document *and* sets `err` and
+// `http_status`, so the caller can show it under an error banner.
 std::optional<Document> web_fetch(std::string_view url, std::string* err,
-                                  std::string* final_url = nullptr);
+                                  std::string* final_url = nullptr,
+                                  int* http_status = nullptr);
 #endif
 
 }  // namespace xanatoo

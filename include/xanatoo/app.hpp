@@ -364,7 +364,8 @@ enum class FetchPurpose : uint8_t {
 struct FetchShared {
   std::atomic<bool> done{false};
   std::optional<xanatoo::Document> doc;
-  std::string error;
+  std::string error;      // with `doc` set: the page is an HTTP error body
+  int http_status = 0;    // non-200 answer whose body is in `doc`
   std::string final_url;  // page URL after redirects (buffer path)
   const char* service = "";
   // Gemini 10/11: the server asks for input (meta = prompt text).

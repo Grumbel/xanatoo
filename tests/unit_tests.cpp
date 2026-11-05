@@ -3007,6 +3007,9 @@ void test_html_page() {
   EXPECT_EQ(d4.get(p4).spans[0].href, "https://w.org/wiki/X");
   EXPECT_EQ(d4.get(p4).spans[1].href, "#n1");
 
+  EXPECT_EQ(http_status_line(404), "HTTP 404 Not Found");
+  EXPECT_EQ(http_status_line(599), "HTTP 599");
+
   Document txt = plain_text_document("a\r\n  b\n\n\n c\n");
   auto tk2 = kids_of(txt, txt.root);
   EXPECT_EQ(tk2.size(), 2u);

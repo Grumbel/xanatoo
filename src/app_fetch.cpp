@@ -153,7 +153,8 @@ void fetch_page(std::string url, std::shared_ptr<FetchShared> out) {
   } else if (xanatoo::is_web_url(url)) {
 #if defined(XANATOO_WEB) && XANATOO_WEB
     out->service = "Web";
-    out->doc = xanatoo::web_fetch(url, &out->error, &out->final_url);
+    out->doc = xanatoo::web_fetch(url, &out->error, &out->final_url,
+                                  &out->http_status);
 #endif
   }
   if (!out->doc && out->error.empty()) out->error = "no client for " + url;
@@ -202,12 +203,26 @@ xanatoo::Document load_error_doc(const FetchJob& job) {
   return xanatoo::parse_document(md, "error.md");
 }
 
-// Error page for a pane that only showed the "Loading …" stand-in.
+// Error page in the pane, like a browser's: the address stays the one that
+// failed. Back returns to the page before.
 void show_load_error(App& app, const FetchJob& job) {
-  Pane& p = app.panes[job.pane];
-  const DocBuffer* b = find_buf(app, p.buf);
-  if (!b || !b->placeholder) return;
+  if (!stash_or_confirm(app, app.panes[job.pane].buf)) return;
   show_doc_in_pane(app, job.pane, load_error_doc(job), job.url);
+  if (job.record_history)
+    push_nav_history(app, job.pane, pane_address(app, app.panes[job.pane]));
+}
+
+// A site's own 4xx / 5xx page, under the official reason.
+void add_http_banner(xanatoo::Document& doc, const FetchJob& job) {
+  if (doc.root == xanatoo::INVALID_NODE) return;
+  const xanatoo::NodeId n =
+      doc.create(xanatoo::NodeKind::BlockQuote, doc.root);
+  doc.append_text(n, job.shared->error, xanatoo::InlineKind::Strong);
+  doc.append_text(n, " \u2014 " + job.url +
+                         " could not be loaded; this is the page the server "
+                         "sent instead.");
+  auto& kids = doc.get(doc.root).children;
+  std::rotate(kids.begin(), kids.end() - 1, kids.end());
 }
 
 // A background tab's page arrived: fill its stand-in buffer, unless the tab
@@ -262,7 +277,13 @@ void finish_navigate(App& app, const FetchJob& job) {
     show_load_error(app, job);
     return;
   }
-  cache_page(app, job);
+  const bool http_error = r.http_status != 0;
+  if (http_error) {
+    add_http_banner(*r.doc, job);
+    r.final_url = job.url;  // the address stays the one that failed
+  } else {
+    cache_page(app, job);
+  }
   show_doc_in_pane(app, job.pane, std::move(*r.doc), r.final_url);
   // Redirected: the sitemap lists the requested URL.
   if (job.url != r.final_url)
@@ -280,7 +301,8 @@ void finish_navigate(App& app, const FetchJob& job) {
   char secs[32];
   std::snprintf(secs, sizeof(secs), "  (%.1f s)",
                 static_cast<double>(xanatoo::sdl::ticks() - job.started) / 1000.0);
-  flash_status(app, "Opened " + r.final_url + secs);
+  flash_status(app, http_error ? service + ": " + r.error
+                               : "Opened " + r.final_url + secs);
 }
 
 }  // namespace

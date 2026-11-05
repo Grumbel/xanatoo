@@ -268,10 +268,36 @@ Document plain_text_document(std::string_view text) {
   return doc;
 }
 
+std::string http_status_line(int status) {
+  const char* reason = "";
+  switch (status) {
+    case 400: reason = "Bad Request"; break;
+    case 401: reason = "Unauthorized"; break;
+    case 403: reason = "Forbidden"; break;
+    case 404: reason = "Not Found"; break;
+    case 405: reason = "Method Not Allowed"; break;
+    case 406: reason = "Not Acceptable"; break;
+    case 408: reason = "Request Timeout"; break;
+    case 410: reason = "Gone"; break;
+    case 418: reason = "I'm a teapot"; break;
+    case 429: reason = "Too Many Requests"; break;
+    case 451: reason = "Unavailable For Legal Reasons"; break;
+    case 500: reason = "Internal Server Error"; break;
+    case 501: reason = "Not Implemented"; break;
+    case 502: reason = "Bad Gateway"; break;
+    case 503: reason = "Service Unavailable"; break;
+    case 504: reason = "Gateway Timeout"; break;
+    default: break;
+  }
+  std::string s = "HTTP " + std::to_string(status);
+  if (*reason) s += std::string(" ") + reason;
+  return s;
+}
+
 #if defined(XANATOO_WEB) && XANATOO_WEB
 
 std::optional<Document> web_fetch(std::string_view url_in, std::string* err,
-                                  std::string* final_url) {
+                                  std::string* final_url, int* http_status) {
   static const std::string kUserAgent =
       std::string("Mozilla/5.0 (compatible; xanatoo/") + version_string() +
       "; +https://github.com/Grumbel/xanatoo)";
@@ -281,9 +307,13 @@ std::optional<Document> web_fetch(std::string_view url_in, std::string* err,
   auto resp = https_get_follow(url, kUserAgent, err, &fin);
   if (!resp) return std::nullopt;
   if (final_url) *final_url = fin;
-  if (resp->status != 200) {
-    if (err) *err = "HTTP " + std::to_string(resp->status);
-    return std::nullopt;
+  const bool failed = resp->status != 200;
+  if (http_status) *http_status = resp->status;
+  if (failed) {
+    if (err) *err = http_status_line(resp->status);
+    // 4xx / 5xx pages are content too (a site's own 404 page); anything
+    // else without a usable body is just an error.
+    if (resp->status < 400 || resp->status > 599) return std::nullopt;
   }
   std::string type = ascii_lower(resp->content_type);
   type = type.substr(0, type.find(';'));
@@ -293,7 +323,7 @@ std::optional<Document> web_fetch(std::string_view url_in, std::string* err,
   const std::string charset = detect_charset(resp->content_type, resp->body);
   std::string body = to_utf8(std::move(resp->body), charset);
 
-  if (looks_like_feed(body)) return parse_feed(body, fin, err);
+  if (!failed && looks_like_feed(body)) return parse_feed(body, fin, err);
   if (type.empty() || type == "text/html" || type == "application/xhtml+xml")
     return parse_html_page(body, fin);
   if (type == "text/markdown" || type == "text/x-markdown")
@@ -301,6 +331,7 @@ std::optional<Document> web_fetch(std::string_view url_in, std::string* err,
   if (type == "text/gemini") return parse_gemtext(body);
   if (starts_with(type, "text/") || type == "application/json")
     return plain_text_document(body);
+  if (failed) return std::nullopt;  // keep the HTTP error text
   if (err) *err = "cannot show " + type + " (" + std::to_string(body.size()) + " bytes)";
   return std::nullopt;
 }

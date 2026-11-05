@@ -8,6 +8,15 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **282** (this delivery is **281**)
 
+## Status (2026-11-05) — Load failures are pages, not status messages
+
+- A failed navigation (network error, unsupported, missing local file) now
+  shows an error page in the pane at the failed address (history entry,
+  URL bar keeps the typed URL); before only a placeholder pane did.
+- HTTP 4xx/5xx with a readable body: the site's own page is shown under a
+  banner with the official status line (`http_status_line`); not cached.
+  `web_fetch` returns the doc and sets `err` / `http_status`.
+
 ## Status (2026-11-05) — Screenplays, shooting scripts and stage-play layout research
 
 - Extended the PDF layout inventory with **12** primary-source script/play
