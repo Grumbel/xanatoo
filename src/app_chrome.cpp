@@ -38,6 +38,7 @@ void set_chrome_scale(float scale) {
   kUiFontPx = px(14);
   help_pad = px(12);
   help_edge = px(6);
+  help_grip_h = px(14);
 }
 
 void toggle_chrome(App& app) {
@@ -120,7 +121,7 @@ void draw_floating_frame(App& app, const SDL_Rect& outer,
   const th::Palette& p = th::palette();
   // Document well: paper surface in a sunken frame under the title strip.
   const SDL_Rect well{outer.x + 4, outer.y + help_title_h + 4, outer.w - 8,
-                      outer.h - help_title_h - 8};
+                      outer.h - help_title_h - 4 - help_grip_h};
   th::fill(app.sdl, well, p.paper);
   th::bevel(app.sdl, well, th::Bevel::Sunken);
   const th::Rgb ink = active ? p.tab_text : p.text_dim;

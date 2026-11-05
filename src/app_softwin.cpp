@@ -28,8 +28,7 @@ namespace xanatoo::app {
 
 std::tuple<int, int, int, int> soft_client_rect(App& app,
                                                 const FloatWindow& sw) {
-  return std::tuple{sw.x + help_pad, sw.y + help_title_h + 4,
-                    sw.w - help_pad * 2, sw.h - help_title_h - help_pad - 4};
+  return window_client_rect(sw.x, sw.y, sw.w, sw.h);
 }
 
 void snap_soft_geom(App& app, int& x, int& y, int w, int h) {

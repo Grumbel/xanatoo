@@ -232,8 +232,7 @@ void update_sitemap(App& app) {
 }
 
 std::tuple<int, int, int, int> sitemap_client_rect(App& app) {
-  return {app.sm.x + help_pad, app.sm.y + help_title_h + 4,
-          app.sm.w - help_pad * 2, app.sm.h - help_title_h - help_pad - 4};
+  return window_client_rect(app.sm.x, app.sm.y, app.sm.w, app.sm.h);
 }
 
 float sitemap_max_scroll(App& app) {

@@ -631,15 +631,13 @@ void ensure_help_doc(App& app) {
 
 void layout_help(App& app) {
   if (!app.help_loaded) return;
-  float mw = static_cast<float>(std::max(120, app.help.w - help_pad * 2));
+  float mw = static_cast<float>(std::max(120, std::get<2>(help_client_rect(app))));
   app.help_layout = app.layout_engine.layout(app.help_doc, mw);
   app.help_needs_layout = false;
 }
 
 std::tuple<int, int, int, int> help_client_rect(App& app) {
-  return std::tuple{app.help.x + help_pad, app.help.y + help_title_h + 4,
-                    app.help.w - help_pad * 2,
-                    app.help.h - help_title_h - help_pad - 4};
+  return window_client_rect(app.help.x, app.help.y, app.help.w, app.help.h);
 }
 
 }  // namespace xanatoo::app

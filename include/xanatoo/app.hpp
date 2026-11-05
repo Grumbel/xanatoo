@@ -60,6 +60,17 @@ inline int float_close_w = 28;  // close box hit zone at the title's right
 inline int kUiFontPx = 14;
 inline int help_pad = 12;
 inline int help_edge = 6;
+inline int help_grip_h = 14;  // strip under the client well: resize grip / h-scroll
+
+// Client rect of a floating window (x, y, w, h = outer frame): the sunken
+// well under the title minus its bevel. Left inset only; the right edge is
+// flush so the scrollbar sits on the frame; the bottom strip is the grip row.
+inline std::tuple<int, int, int, int> window_client_rect(int x, int y, int w,
+                                                        int h) {
+  const int lp = help_pad - 4;
+  return {x + 4 + lp, y + help_title_h + 5, w - 8 - lp - 1,
+          h - help_title_h - 4 - help_grip_h - 2};
+}
 
 // Scale the chrome metrics above (call once, before the first layout).
 void set_chrome_scale(float scale);

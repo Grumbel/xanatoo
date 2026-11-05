@@ -2143,3 +2143,10 @@ Preferences/History/Bookmarks to `FloatWindow` roles (dialogs vs tool windows
 should then differ explicitly, e.g. title colour). Close box is on the right
 everywhere (Gnome2 HIG). Check the grip is actually visible on narrow docked
 windows (`resizable` is false when docked, by design).
+
+Update: canvas windows share `window_client_rect` (app.hpp): the sunken well
+under the title, left inset only, scrollbar flush at the right edge, and a
+`help_grip_h` strip at the bottom for the resize grip (room for a future
+horizontal scrollbar). Not yet done: History / Bookmarks (ImGui) vs Outline
+should become the same `FloatWindow` kind of list panel; ImGui windows have
+no bottom grip strip. Not checked visually — look at it in the running app.

@@ -798,9 +798,7 @@ float content_y(App& app, float window_y, int pi) {
 }
 
 std::tuple<int, int, int, int> outline_client_rect(App& app) {
-  return std::tuple{app.ol.x + help_pad, app.ol.y + help_title_h + 4,
-                    app.ol.w - help_pad * 2,
-                    app.ol.h - help_title_h - help_pad - 4};
+  return window_client_rect(app.ol.x, app.ol.y, app.ol.w, app.ol.h);
 }
 
 float outline_row_step(App& app) {
