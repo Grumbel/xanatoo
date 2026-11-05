@@ -302,7 +302,7 @@ private:
                          BlockRole role, FloatSide side,
                          const std::string& label, float y,
                          LayoutResult& out);
-  void setup_margins(const Document& doc, float& mx, float& content_w,
+  void setup_margins(const Document& doc, float mx, float content_w,
                      float max_width);
   // Display size of an inline image span (CSS px × px_scale, fitted to
   // max_w); remote ones from their thumbnail, a 1 em box while pending.

@@ -57,9 +57,9 @@
   (role transclusion (indent 12) (space-after 10) (border "#8c9bb4"))
   ;; Side boxes: indent = padding, width = preferred width, side left /
   ;; right. placement margin: in the page margin beside the text column
-  ;; (the column gives up width when the margin is too narrow); float:
-  ;; inside the column with text running past; flow: full width. Margin and
-  ;; float drop into the flow when there is no room.
+  ;; (never narrows the text column); if no margin fits, float inside the
+  ;; column with text running past. Float uses the same inside-column path;
+  ;; flow is full width. Margin and float use full width if no float fits.
   (role aside       (indent 8) (space-after 10) (width 15em) (side right)
                     (placement margin) (font small) (color "#4a4232")
                     (background (rgba 238 232 216 200)) (border "#c8bea5"))

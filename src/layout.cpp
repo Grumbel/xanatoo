@@ -1828,8 +1828,11 @@ void LayoutEngine::layout_aside(const Document& doc, const Node& node,
   float want = bs.width.px(em, dp);
   if (want < 1.f) want = 16.f * em;
   const float aw = std::min(want, max_width * 0.45f);
-  // Float only while it stays a box and the text beside it stays readable.
-  const bool floating = bs.placement == Placement::Float &&
+  // Margin placement falls back to a float inside the existing text column
+  // when the page margin has no space. Neither mode may shrink the column to
+  // manufacture a wider margin for the aside.
+  const bool floating = (bs.placement == Placement::Float ||
+                         bs.placement == Placement::Margin) &&
                         side != FloatSide::None && !in_margin_ &&
                         aw >= 6.f * em && max_width - aw - gap >= 10.f * em;
 
@@ -1891,11 +1894,10 @@ void LayoutEngine::layout_aside(const Document& doc, const Node& node,
   // y stays: the following blocks run beside the box.
 }
 
-// Margin room for the side boxes of `doc`: the margin as the view settings
-// leave it, widened at the cost of the text column (down to kMinText) when
-// a side has boxes and is too narrow for them.
-void LayoutEngine::setup_margins(const Document& doc, float& mx,
-                                 float& content_w, float max_width) {
+// Margin room for side boxes of `doc`: use only the margin left by the view
+// settings / text measure. Never take width from the text column for asides.
+void LayoutEngine::setup_margins(const Document& doc, float mx,
+                                 float content_w, float max_width) {
   margins_[0] = margins_[1] = MarginArea{};
   in_margin_ = 0;
   small_ = false;
@@ -1924,22 +1926,13 @@ void LayoutEngine::setup_margins(const Document& doc, float& mx,
   if (want[0] <= 0.f && want[1] <= 0.f) return;
   const float gap = 1.25f * em;  // margin box ↔ text column
   const float edge = std::max(options_.margin_x, 0.5f * em);
-  const float min_text = 28.f * em;  // the column never gets narrower
-  const float min_box = 8.f * em;    // a margin box never gets narrower
+  const float min_box = 8.f * em;    // below this, fall back inside the column
   for (int s = 0; s < 2; ++s) {
     if (want[s] <= 0.f) continue;
     const float free = s == 0 ? mx - edge - gap
                               : max_width - (mx + content_w) - edge - gap;
-    float w = free;
-    if (free < want[s]) {
-      const float take =
-          std::min(want[s] - free, std::max(0.f, content_w - min_text));
-      w = free + take;
-      if (w < min_box) continue;  // no room: these boxes go into the flow
-      content_w -= take;
-      if (s == 0) mx += take;
-    }
-    w = std::min(w, want[s]);
+    if (free < min_box) continue;
+    const float w = std::min(free, want[s]);
     MarginArea& m = margins_[s];
     m.w = w;
     m.x = s == 0 ? mx - gap - w : mx + content_w + gap;

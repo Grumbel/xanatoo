@@ -2392,8 +2392,8 @@ void test_inline_images_and_asides() {
     EXPECT(im.y >= 0.f);
   }
 
-  // Margin: the aside sits right of the text column, in small type; the
-  // column gives up width for it and no text line runs under it.
+  // A margin aside uses existing space only. It may not narrow the text
+  // column just to make room for itself.
   std::string words;
   for (int k = 0; k < 120; ++k) words += "word ";
   Document fl = parse_markup(":::aside\nSide box\n:::\n\n" + words + "\n");
@@ -2409,18 +2409,32 @@ void test_inline_images_and_asides() {
                                fl.get(g.node).parent == aside);
   };
   {
-    LayoutResult mr = engine.layout(fl, 1000.f);
+    lo.margin_pct = 0.22f;
+    engine.set_options(lo);
+    LayoutResult mr = engine.layout(fl, 1200.f);
     const LayoutBox abox = box_of(mr, aside);
-    EXPECT(abox.width > 0.f && abox.x > 600.f && abox.x + abox.width <= 1000.f);
+    EXPECT(abox.width >= 8.f * fonts.regular.pixel_size() &&
+           abox.width <= 264.f);
+    EXPECT(abox.x > 950.f && abox.x + abox.width <= 1200.f);
+    Document body_only = parse_markup(words + "\n");
+    LayoutResult plain = engine.layout(body_only, 1200.f);
     float text_right = 0.f;
     bool small = false;
+    size_t body_at = 0;
     for (const auto& g : mr.glyphs) {
       if (in_aside(g)) {
         small = small || g.font == FontRole::Small;
         continue;
       }
       if (g.codepoint != ' ') text_right = std::max(text_right, g.x + g.advance);
+      if (body_at < plain.glyphs.size()) {
+        // The text must lay out identically with or without the aside.
+        EXPECT(std::abs(g.x - plain.glyphs[body_at].x) < 0.5f);
+        EXPECT(std::abs(g.y - plain.glyphs[body_at].y) < 0.5f);
+      }
+      ++body_at;
     }
+    EXPECT_EQ(body_at, plain.glyphs.size());
     EXPECT(small);
     EXPECT(text_right > 0.f && text_right <= abox.x);
     // The flow does not move for it: the paragraph starts at the top.
@@ -2429,9 +2443,63 @@ void test_inline_images_and_asides() {
       if (!in_aside(g)) first_y = std::min(first_y, g.y);
     EXPECT(first_y < abox.y + abox.height);
   }
-  // No room for a margin: in the flow at full width.
+  // Without an existing margin, the aside floats inside the text column
+  // rather than manufacturing a new margin by shrinking the column.
+  lo.margin_pct = 0.f;
+  engine.set_options(lo);
+  {
+    LayoutResult fr = engine.layout(fl, 1000.f);
+    const LayoutBox abox = box_of(fr, aside);
+    EXPECT(abox.width > 0.f && abox.width <= 450.f);
+    EXPECT(abox.x > 500.f && abox.x + abox.width <= 1000.f);
+    float beside_right = 0.f, below_right = 0.f, text_left = 1e9f;
+    for (const auto& g : fr.glyphs) {
+      if (in_aside(g) || g.codepoint == ' ') continue;
+      text_left = std::min(text_left, g.x);
+      const float r = g.x + g.advance;
+      if (g.y < abox.y + abox.height) beside_right = std::max(beside_right, r);
+      else below_right = std::max(below_right, r);
+    }
+    EXPECT(text_left < 1.f);  // no text-column inset was introduced
+    EXPECT(beside_right > 0.f && beside_right <= abox.x);
+    EXPECT(below_right > abox.x);
+  }
+  // When even a readable float cannot fit, use a full-width block.
   LayoutResult narrow = engine.layout(fl, 300.f);
   EXPECT_EQ(box_of(narrow, aside).width, 300.f);
+
+  // The same fallback works on the left, retaining the normal right edge
+  // of the document once lines pass below the aside.
+  Document left = parse_markup(
+      ":::aside side=left\nSide box\n:::\n\n" + words + "\n");
+  NodeId left_id = kids_of(left, left.root)[0];
+  auto in_left_aside = [&](const PositionedGlyph& g) {
+    return g.node == left_id || (g.node != INVALID_NODE &&
+                                 left.get(g.node).parent == left_id);
+  };
+  {
+    LayoutResult lr = engine.layout(left, 1000.f);
+    const LayoutBox abox = box_of(lr, left_id);
+    EXPECT(abox.x < 1.f && abox.width > 0.f && abox.width <= 450.f);
+    float beside_left = 1e9f, below_left = 1e9f;
+    for (const auto& g : lr.glyphs) {
+      if (in_left_aside(g) || g.codepoint == ' ')
+        continue;
+      if (g.y < abox.y + abox.height)
+        beside_left = std::min(beside_left, g.x);
+      else
+        below_left = std::min(below_left, g.x);
+    }
+    EXPECT(beside_left >= abox.x + abox.width);
+    EXPECT(below_left < 1.f);
+  }
+
+  // Explicit flow placement still occupies the entire text column.
+  DocStyle flow_style = builtin_style();
+  flow_style.block[static_cast<size_t>(BlockRole::Aside)].placement =
+      Placement::Flow;
+  engine.set_style(&flow_style);
+  EXPECT_EQ(box_of(engine.layout(fl, 1000.f), aside).width, 1000.f);
 
   // placement float: lines beside the box stop at its left edge, lines
   // below it use the whole column again.

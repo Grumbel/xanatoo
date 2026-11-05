@@ -104,17 +104,18 @@ Their properties:
 Side boxes are `aside` (text boxes of the document: `:::aside`, HTML
 `<aside>` inside the article). Navigation and side bars of web pages are not
 part of the text: they go into the Page panel (View → Page Navigation).
-With `placement margin` (the default) a box goes into the page
+With `placement margin` (the default) a box uses **only existing** page
 margin beside the place where it stands; the text column keeps its lines,
-the box does not push the text down, and boxes on one side stack. When the
-margin is narrower than `width`, the text column gives up the difference as
-long as 28 em of text remain; a margin under 8 em takes no boxes, and they
-go into the flow at full width. `placement float` is the HTML way: the box
-sits inside the column and the text runs past it (only while the box is at
-most 45 % of the column and 10 em of text stay beside it). `placement flow`
-always puts it in the text. Text inside a side box takes its `font` (small
-faces) and `color` unless its own role sets one. `indent` is the padding
-inside the box; with a `background` the box is filled and framed with
+the box does not push the text down, and boxes on one side stack. It may be
+narrower than its preferred `width`, but an available margin under 8 em is
+not used: the aside falls back to a **float inside the text column**, or a
+full-width block if even a readable float cannot fit. Margin asides never
+shrink the text column to manufacture more margin. `placement float` always
+puts the box inside the column with text running past it (only while the box
+is at most 45 % of the column and 10 em of text stay beside it).
+`placement flow` always puts it in the text. Text inside a side box takes
+its `font` (small faces) and `color` unless its own role sets one. `indent`
+is the padding inside the box; with a `background` it is filled and framed with
 `border`, without one `border` is a bar on the side facing the text. A
 document may pick the side (`:::aside side=left`).
 

@@ -388,10 +388,11 @@ parallel history or distribute patch files. Keep the next number in TODO.md.
   opens the viewer). Markdown `![a](s){width=… height=…}` inside text.
 - `NodeKind::Aside`: a container of blocks, a side box (style role
   `aside`: `width`, `side`, `placement`, `indent` = padding, small `font`,
-  muted `color`). `placement margin` (default) puts it into the page margin
+  muted `color`). `placement margin` (default) uses existing page margin
   beside its flow position (`LayoutEngine::margins_`, set up per layout()
-  by `setup_margins`, which narrows the column when a side is too narrow;
-  `layout_margin_box`); without room it goes into the flow.
+  by `setup_margins`, which never narrows the text column;
+  `layout_margin_box`); without margin room it floats inside the column
+  if readable, otherwise it uses a full-width flow block.
   `placement float` is the HTML-compatible float: floats live in
   `LayoutEngine::floats_` for one layout() call, text lines take the band
   `float_band` leaves free, boxed blocks (`clears_floats`) start below.

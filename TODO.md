@@ -6,7 +6,24 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **282** (this delivery is **281**)
+Next bundle number: **283** (this delivery is **282**)
+
+## Status (2026-11-05) — Asides use only existing margins
+
+- `LayoutEngine::setup_margins` no longer steals text-column width to
+  manufacture extra side margin for `placement margin` asides. It uses an
+  existing >= 8 em margin (possibly narrower than the preferred aside
+  width), or leaves the margin empty.
+- If the existing margin cannot fit the aside, `placement margin` now uses
+  the same in-column floating path as `placement float` while the aside can
+  fit beside at least 10 em of text. On a narrow pane the aside remains a
+  full-width flow block. Explicit `placement float` / `placement flow`
+  behaviours remain unchanged.
+- Updated stylesheet documentation/comments and regression tests for:
+  unchanged body geometry with a partially fitting existing margin,
+  no-margin float fallback (left and right), narrow full-width fallback,
+  and explicit flow placement. C++ runtime tests still need to be run in
+  a Nix/native build environment (this workspace has no CMake or SDL2).
 
 ## Status (2026-11-05) — Load failures are pages, not status messages
 
