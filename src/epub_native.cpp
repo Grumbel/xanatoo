@@ -366,7 +366,9 @@ std::optional<EpubBook> epub_to_markdown(std::string_view zip, std::string* err)
   for (size_t i = 0; i < spine.size(); ++i) {
     auto xhtml = zip_read(zip, *dir, spine[i]);
     if (!xhtml) continue;
-    html += "<a id=\"ch-" + std::to_string(i) + "\"></a>";
+    html += "<a id=\"ch-";
+    html += std::to_string(i);
+    html += "\"></a>";
     html += chapter_body(*xhtml, spine[i], book);
     html += '\n';
   }
@@ -379,8 +381,16 @@ std::optional<EpubBook> epub_to_markdown(std::string_view zip, std::string* err)
   const std::string author = dc_text(*opf, "creator");
   if (!title.empty() || !author.empty()) {
     out.markdown = "---\n";
-    if (!title.empty()) out.markdown += "title: " + yaml_quoted(title) + "\n";
-    if (!author.empty()) out.markdown += "author: " + yaml_quoted(author) + "\n";
+    if (!title.empty()) {
+      out.markdown += "title: ";
+      out.markdown += yaml_quoted(title);
+      out.markdown += '\n';
+    }
+    if (!author.empty()) {
+      out.markdown += "author: ";
+      out.markdown += yaml_quoted(author);
+      out.markdown += '\n';
+    }
     out.markdown += "---\n\n";
   }
   out.markdown += serialize_markup(doc);

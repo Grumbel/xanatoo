@@ -6,7 +6,22 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **278** (this delivery is **277**)
+Next bundle number: **279** (this delivery is **278**)
+
+## Status (2026-11-05) — Android SDL2 build and R36S experimental SDL3
+
+- Excluded `src/imgui_sdl3.cpp` from Android's wildcard SDL2 source list;
+  the module continues using the vendored SDL2 ImGui backends. This resolves
+  the reported `SDL3/SDL.h` missing-header failure.
+- Split EPUB HTML/YAML string appends to avoid false-positive GCC 9
+  `-Warray-bounds` warnings from string-literal + rvalue-string chains.
+- Added a separate native SDL3 R36S cross target using the KMS/DRM build
+  recipe in `Grumbel/sdl-jstest` and packaging `libSDL3.so.0` in its own
+  PortMaster ZIP; legacy SDL2 packages are unchanged. Exposed the variants
+  in `flake.nix`, with the same checks as other platform outputs.
+- Local native build and CTest verify the shared source changes, but Nix,
+  Android NDK and R36S device testing are unavailable here. SDL3 cross
+  build/runtime compatibility remains experimental.
 
 ## Status (2026-11-05) — SDL URL API compatibility on R36S
 

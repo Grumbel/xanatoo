@@ -76,6 +76,20 @@ ImGui gamepad navigation and secondary viewports are not supported by the
 minimal backend. The current Win32/Win64 and WASM production artifacts remain
 on the SDL2 API while this new backend is validated.
 
+R36S/ArkOS also has a separate experimental SDL3 cross build, using the
+same eoan glibc/libstdc++ sysroot as the established SDL2 port and the SDL3
+KMS/DRM recipe from `Grumbel/sdl-jstest`:
+
+```sh
+nix build -L .#sdl3-r36s                    # SDL3 library for ArkOS
+nix build -L .#xanatoo-r36s-sdl3           # application
+nix build -L .#xanatoo-r36s-sdl3-portmaster-zip
+```
+
+The SDL3 PortMaster bundle ships `libSDL3.so.0` and uses the regular launcher
+without SDL2 preloading. It is an alternative to (not a replacement for)
+`xanatoo-r36s-portmaster-zip`, and still needs an on-device smoke test.
+
 For an alternative local MINGW64 (or MINGW32) shell, install the corresponding
 `mingw-w64-...-gcc`, `cmake`, `ninja`, `SDL2`, and `freetype` packages and run:
 

@@ -161,15 +161,17 @@ toolbar and shortcuts should route through `execute_command`.
 - SDL3 transition (in progress): Win32/Win64 flake packages use nixpkgs'
   SDL2-compatible API over an SDL3 runtime, explicitly packaging SDL3.dll.
   The app and vendored ImGui still compile against SDL2 headers; WASM,
-  Android, and R36S currently retain SDL2. Do not change their ABI until
-  the SDL3 API/backend migration and platform tests are complete. First-party
-  render, window, surface, time, mouse, input events, gamepads, cursor and
-  SDL diagnostic operations now use
-  `xanatoo/sdl.hpp` (switch `XANATOO_SDL3`); `checks.sdl3-api` compiles this
+  Android, and the default R36S port currently retain SDL2. Do not change
+  their ABI until the SDL3 API/backend migration and platform tests are
+  complete. First-party render, window, surface, time, mouse, input events,
+  gamepads, cursor and SDL diagnostic operations now use `xanatoo/sdl.hpp`
+  (switch `XANATOO_SDL3`); `checks.sdl3-api` compiles this
   bridge with real SDL3 headers. `-DXANATOO_SDL3=ON` selects an experimental
   first-party ImGui platform/renderer backend (`src/imgui_sdl3.cpp`) and the
-  flake's separate `xanatoo-sdl3-native` package. Do not switch production
-  packages until native SDL3 builds and runtime tests pass.
+  flake's separate `xanatoo-sdl3-native` package. `nix/r36s.nix` also has an
+  experimental SDL3 KMS/DRM build and alternative PortMaster package that
+  ships `libSDL3.so.0`; keep the SDL2 package as the default. Do not switch
+  production packages until native SDL3 builds and runtime tests pass.
 - New options go into `cli.cpp`, `print_usage` and `docs/xanatoo.1`
   (`checks.man` / `checks.help`).
 - Version strings: `version_string()`; network User-Agents via

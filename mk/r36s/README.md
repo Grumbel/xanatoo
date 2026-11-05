@@ -16,6 +16,12 @@ per-triangle fallback. Example documents, toolbar icons, and a
 UI/body font ship inside the port folder. The gamepad pointer is a drawn
 sprite (not the system cursor — KMS/DRM has none).
 
+An **experimental SDL3 variant** builds SDL3 against the same eoan sysroot,
+with its KMS/DRM backend enabled (following `Grumbel/sdl-jstest`). It bundles
+`libSDL3.so.0` in `libs/`, and the launcher avoids preloading ArkOS's SDL2.
+It uses xanatoo's new single-window ImGui SDL3 adapter; on-device rendering,
+input and startup still require testing before this replaces the SDL2 port.
+
 ## Install
 
 Copy `Xanatoo.sh` and the `xanatoo/` folder to `/roms/ports/`, or put the
@@ -31,6 +37,7 @@ zip into `ports/PortMaster/autoinstall/` and start PortMaster once.
 /roms/ports/xanatoo/icons/           # toolbar PNGs
 /roms/ports/xanatoo/fonts/           # DejaVuSans.ttf
 /roms/ports/xanatoo/libs/            # libsqlite3.so.0 (drafts, folds)
+                                     # SDL3 variant also: libSDL3.so.0
 /roms/ports/xanatoo/conf/            # created at runtime: config/, state/
                                      # (drafts, bookmarks), data/, cache/
 ```
@@ -64,7 +71,13 @@ lists the bundled documents.
 nix build .#xanatoo-r36s
 nix build .#xanatoo-r36s-portmaster
 nix build .#xanatoo-r36s-portmaster-zip
+# Experimental native SDL3:
+nix build .#xanatoo-r36s-sdl3
+nix build .#xanatoo-r36s-sdl3-portmaster-zip
 ```
+
+The two PortMaster ZIPs install to the same path; use only one variant at
+a time. The SDL3 package does not need an SDL2 runtime on the device.
 
 ## Later polish
 

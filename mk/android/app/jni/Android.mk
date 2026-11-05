@@ -18,6 +18,9 @@ LOCAL_SRC_FILES := \
 	external/imgui/imgui_widgets.cpp \
 	external/imgui/backends/imgui_impl_sdl2.cpp \
 	external/imgui/backends/imgui_impl_sdlrenderer2.cpp
+# The native SDL3 ImGui backend is selected by CMake only. This Android
+# target still uses SDL2 and its vendored ImGui backends.
+LOCAL_SRC_FILES := $(filter-out src/imgui_sdl3.cpp,$(LOCAL_SRC_FILES))
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/include \
 	$(LOCAL_PATH)/external \

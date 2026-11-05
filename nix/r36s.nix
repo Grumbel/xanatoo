@@ -13,7 +13,10 @@
 # build), the stable SDL2 ABI.
 #
 # Same approach as kurvenrausch's nix/r36s.nix; FreeType/Fontconfig debs
-# added for xanatoo's text stack. ImGui's SDL_Renderer backend is patched
+# added for xanatoo's text stack. An experimental SDL3 build follows the
+# KMS/DRM setup of Grumbel/sdl-jstest (nix/r36s.nix): SDL3 is built for the
+# eoan sysroot and shipped alongside the PortMaster executable.
+# ImGui's SDL2 renderer backend is patched
 # for SDL 2.0.10 headers (no RenderGeometry): it looks up
 # SDL_RenderGeometryRaw in the device SDL at runtime, else draws per triangle
 # (ArkOS has 2.0.10) into a texture that is only redrawn when the UI changes.
@@ -21,6 +24,7 @@
 #   nix build .#xanatoo-r36s
 #   nix build .#xanatoo-r36s-portmaster
 #   nix build .#xanatoo-r36s-portmaster-zip
+#   nix build .#xanatoo-r36s-sdl3-portmaster-zip
 
 { pkgs
 , version
@@ -62,6 +66,13 @@ let
     # OpenSSL 1.1 for gemini:// (ArkOS/device typically already has libssl1.1).
     { file = "pool/main/o/openssl/libssl1.1_1.1.1c-1ubuntu4_arm64.deb"; sha256 = "ec2aca230fa845c96c90afc5a4bb9b41ea10e0135a70eb5898d3d2597a3d0c3d"; }
     { file = "pool/main/o/openssl/libssl-dev_1.1.1c-1ubuntu4_arm64.deb"; sha256 = "275f730b1867066b841f3d66289bfd87d10d98c1358d611d687b1311c974fbab"; }
+    # SDL3 KMS/DRM runtime loader needs the corresponding platform headers.
+    { file = "pool/main/libd/libdrm/libdrm2_2.4.99-1ubuntu1_arm64.deb"; sha256 = "570407f42d8fac13c20be388fa45a1739ae0e900b30d9a924bd6599cd5e64d45"; }
+    { file = "pool/main/libd/libdrm/libdrm-dev_2.4.99-1ubuntu1_arm64.deb"; sha256 = "69071f9360391bdf3ec9a3842aef851b05aac363e9c35b89a8c31f8227d31af5"; }
+    { file = "pool/main/m/mesa/libgbm1_19.2.1-1ubuntu1_arm64.deb"; sha256 = "c982ba0bc2e00522e82bdde0b510fee50185b89670ff77853074d7b591c1f054"; }
+    { file = "pool/main/m/mesa/libgbm-dev_19.2.1-1ubuntu1_arm64.deb"; sha256 = "7732f9ebe793b7ea5dd45b7c7c531446ea6d9a4f366229630e70a1bd9a58252a"; }
+    { file = "pool/main/s/systemd/libudev1_242-7ubuntu3_arm64.deb"; sha256 = "af9cb069b6900a330d6ccf82f9e346ab1d74d5d8df76f4a50b76f63602904610"; }
+    { file = "pool/main/s/systemd/libudev-dev_242-7ubuntu3_arm64.deb"; sha256 = "2785dd52d59b7a590f5471b474fd8f09fd2ef5c79d889510b740e5ce95fc69fa"; }
   ];
   fetchDeb = d: pkgs.fetchurl {
     url = "http://old-releases.ubuntu.com/ubuntu/${d.file}";
@@ -147,8 +158,62 @@ let
     ${cc} -shared -fPIC -o $out/lib/libSDL2.so -Wl,-soname,libSDL2-2.0.so.0 stub.c
   '';
 
-  r36s = pkgs.stdenv.mkDerivation {
-    pname = "xanatoo-r36s";
+  # Based on the tested R36S SDL3 build in Grumbel/sdl-jstest. SDL3 loads
+  # the device's KMS/DRM, GBM, EGL and udev drivers at runtime; our build
+  # uses the eoan headers and ships just libSDL3.so.0 in the port folder.
+  sdl3 = pkgs.stdenv.mkDerivation {
+    pname = "xanatoo-sdl3-r36s";
+    inherit (pkgs.sdl3) version src;
+    nativeBuildInputs = [ pkgs.cmake pkgs.pkg-config ];
+    PKG_CONFIG_PATH = "${sysroot}/usr/lib/${multiarch}/pkgconfig";
+    PKG_CONFIG_LIBDIR = "${sysroot}/usr/lib/${multiarch}/pkgconfig";
+    PKG_CONFIG_SYSROOT_DIR = "${sysroot}";
+    cmakeFlags = [
+      "-DCMAKE_SYSTEM_NAME=Linux"
+      "-DCMAKE_SYSTEM_PROCESSOR=aarch64"
+      "-DCMAKE_SYSROOT=${sysroot}"
+      "-DCMAKE_C_COMPILER=${cc}"
+      "-DCMAKE_AR=${binutils}/bin/${tp}-ar"
+      "-DCMAKE_RANLIB=${binutils}/bin/${tp}-ranlib"
+      "-DCMAKE_STRIP=${binutils}/bin/${tp}-strip"
+      "-DCMAKE_BUILD_TYPE=Release"
+      "-DCMAKE_SKIP_RPATH=ON"
+      "-DCMAKE_INSTALL_LIBDIR=lib"
+      "-DCMAKE_INSTALL_INCLUDEDIR=include"
+      "-DSDL_SHARED=ON"
+      "-DSDL_STATIC=OFF"
+      "-DSDL_TESTS=OFF"
+      "-DSDL_EXAMPLES=OFF"
+      "-DSDL_REVISION=SDL-${pkgs.sdl3.version}"
+      "-DSDL_VENDOR_INFO=xanatoo R36S"
+      "-DSDL_UNIX_CONSOLE_BUILD=ON"
+      "-DSDL_KMSDRM=ON"
+      "-DSDL_OPENGLES=ON"
+      "-DSDL_OPENGL=OFF"
+      "-DSDL_VULKAN=OFF"
+      "-DSDL_RENDER_VULKAN=OFF"
+      "-DSDL_RENDER_GPU=OFF"
+      "-DSDL_X11=OFF"
+      "-DSDL_WAYLAND=OFF"
+      "-DSDL_ALSA=OFF"
+      "-DSDL_PULSEAUDIO=OFF"
+      "-DSDL_PIPEWIRE=OFF"
+      "-DSDL_JACK=OFF"
+      "-DSDL_SNDIO=OFF"
+      "-DSDL_DBUS=OFF"
+      "-DSDL_IBUS=OFF"
+      "-DSDL_LIBURING=OFF"
+      "-DSDL_HIDAPI_LIBUSB=OFF"
+      "-DSDL_LIBUDEV=ON"
+      "-DCMAKE_LIBRARY_PATH=/lib/${multiarch}"
+    ];
+    dontPatchELF = true;
+    dontPatchShebangs = true;
+    dontStrip = true;
+  };
+
+  mkApp = withSDL3: pkgs.stdenv.mkDerivation {
+    pname = if withSDL3 then "xanatoo-r36s-sdl3" else "xanatoo-r36s";
     inherit version;
     src = lib.cleanSource ../.;
     nativeBuildInputs = [ pkgs.cmake pkgs.pkg-config pkgs.python3 ];
@@ -170,8 +235,6 @@ let
       "-DXANATOO_GEMINI=ON"
       # No libvips in the ArkOS sysroot: stb_image decodes, BMP thumbnails.
       "-DXANATOO_THUMTOO=OFF"
-      "-DSDL2_INCLUDE_DIRS=${sysroot}/usr/include/SDL2"
-      "-DSDL2_LIBRARIES=${sdlStub}/lib/libSDL2.so"
       "-DFREETYPE_INCLUDE_DIRS=${sysroot}/usr/include/freetype2"
       "-DFREETYPE_INCLUDE_DIR_ft2build=${sysroot}/usr/include/freetype2"
       "-DFREETYPE_INCLUDE_DIR_freetype2=${sysroot}/usr/include/freetype2"
@@ -184,7 +247,13 @@ let
       "-DOPENSSL_CRYPTO_LIBRARY=${sysroot}/usr/lib/${multiarch}/libcrypto.so"
       "-DSQLite3_INCLUDE_DIR=${sysroot}/usr/include"
       "-DSQLite3_LIBRARY=${sysroot}/usr/lib/${multiarch}/libsqlite3.so"
-    ];
+    ] ++ (if withSDL3 then [
+      "-DXANATOO_SDL3=ON"
+      "-DSDL3_DIR=${sdl3}/lib/cmake/SDL3"
+    ] else [
+      "-DSDL2_INCLUDE_DIRS=${sysroot}/usr/include/SDL2"
+      "-DSDL2_LIBRARIES=${sdlStub}/lib/libSDL2.so"
+    ]);
     dontPatchELF = true;
     dontPatchShebangs = true;
     postInstall = ''
@@ -193,20 +262,24 @@ let
     dontStrip = true;
   };
 
-  portmaster = pkgs.stdenvNoCC.mkDerivation {
-    pname = "xanatoo-r36s-portmaster";
+  r36s = mkApp false;
+  r36sSDL3 = mkApp true;
+
+  mkPortmaster = { app, withSDL3 }: pkgs.stdenvNoCC.mkDerivation {
+    pname = if withSDL3 then "xanatoo-r36s-sdl3-portmaster"
+            else "xanatoo-r36s-portmaster";
     inherit version;
     dontUnpack = true;
     dontPatchShebangs = true;
     dontFixup = true;
     installPhase = ''
       mkdir -p $out/xanatoo/examples $out/xanatoo/styles $out/xanatoo/icons $out/xanatoo/fonts
-      install -m755 ${r36s}/bin/xanatoo $out/xanatoo/xanatoo
+      install -m755 ${app}/bin/xanatoo $out/xanatoo/xanatoo
       cp -r ${../examples}/. $out/xanatoo/examples/
       cp ${../styles}/*.xss $out/xanatoo/styles/
       cp ${../FORMAT.md} $out/xanatoo/FORMAT.md
-      if [ -d ${r36s}/share/xanatoo/icons ]; then
-        cp -r ${r36s}/share/xanatoo/icons/. $out/xanatoo/icons/
+      if [ -d ${app}/share/xanatoo/icons ]; then
+        cp -r ${app}/share/xanatoo/icons/. $out/xanatoo/icons/
       fi
       # Not every ArkOS image has SQLite; ship the sysroot's (eoan 3.29).
       mkdir -p $out/xanatoo/libs
@@ -220,17 +293,27 @@ let
       chmod +x $out/Xanatoo.sh
       substitute ${../mk/r36s/port.json} $out/port.json --subst-var-by version ${version}
       cp ${../mk/r36s/README.md} $out/README.md
+    '' + lib.optionalString withSDL3 ''
+      cp -L ${sdl3}/lib/libSDL3.so.0 $out/xanatoo/libs/
     '';
   };
 
-  portmasterZip = pkgs.runCommand "xanatoo-${version}-r36s-portmaster.zip" {
+  portmaster = mkPortmaster { app = r36s; withSDL3 = false; };
+  portmasterSDL3 = mkPortmaster { app = r36sSDL3; withSDL3 = true; };
+
+  mkPortmasterZip = { port, withSDL3 }: pkgs.runCommand
+    "xanatoo-${version}-r36s${lib.optionalString withSDL3 "-sdl3"}-portmaster.zip" {
     nativeBuildInputs = [ pkgs.zip ];
   } ''
     mkdir -p $out
-    cd ${portmaster}
+    cd ${port}
     zip -r -9 $out/xanatoo.zip .
   '';
 
+  portmasterZip = mkPortmasterZip { port = portmaster; withSDL3 = false; };
+  portmasterSDL3Zip = mkPortmasterZip { port = portmasterSDL3; withSDL3 = true; };
+
 in {
-  inherit sysroot r36s portmaster portmasterZip;
+  inherit sysroot sdl3 r36s r36sSDL3 portmaster portmasterZip
+    portmasterSDL3 portmasterSDL3Zip;
 }

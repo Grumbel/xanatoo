@@ -174,6 +174,12 @@
               xanatoo-r36s = r36s.r36s;
               xanatoo-r36s-portmaster = r36s.portmaster;
               xanatoo-r36s-portmaster-zip = r36s.portmasterZip;
+              # Experimental native SDL3 path: build SDL3 for the ArkOS
+              # sysroot and bundle libSDL3.so.0 with the PortMaster package.
+              sdl3-r36s = r36s.sdl3;
+              xanatoo-r36s-sdl3 = r36s.r36sSDL3;
+              xanatoo-r36s-sdl3-portmaster = r36s.portmasterSDL3;
+              xanatoo-r36s-sdl3-portmaster-zip = r36s.portmasterSDL3Zip;
             }
           else { }
         ) // (
