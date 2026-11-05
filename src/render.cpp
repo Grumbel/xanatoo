@@ -117,22 +117,22 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
   {
     SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
     for (const RoleBox& rb : layout.role_fills) {
-      set_color(sdl_, st[rb.role].background);
+      set_color(sdl_, layout.style_for(rb.box.node, st)[rb.role].background);
       SDL_Rect r{static_cast<int>(rb.box.x + origin_x), px(rb.box.y - scroll_y),
                  static_cast<int>(rb.box.width),
                  static_cast<int>(rb.box.height)};
       if (visible(r.x, r.y, r.w, r.h)) xanatoo::sdl::fill_rect(sdl_, &r);
     }
     for (const RoleBox& rb : layout.role_frames) {
-      set_color(sdl_, st[rb.role].border);
+      set_color(sdl_, layout.style_for(rb.box.node, st)[rb.role].border);
       SDL_Rect r{static_cast<int>(rb.box.x + origin_x), px(rb.box.y - scroll_y),
                  static_cast<int>(rb.box.width),
                  static_cast<int>(rb.box.height)};
       if (visible(r.x, r.y, r.w, r.h)) xanatoo::sdl::draw_rect(sdl_, &r);
     }
     for (const auto& mc : layout.message_cards) {
-      const Rgba& fill =
-          st[mc.alt ? BlockRole::MessageAlt : BlockRole::Message].background;
+      const BlockRole role = mc.alt ? BlockRole::MessageAlt : BlockRole::Message;
+      const Rgba& fill = layout.style_for(mc.box.node, st)[role].background;
       if (!fill.visible()) continue;
       set_color(sdl_, fill);
       SDL_Rect r{
@@ -179,7 +179,8 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
   {
     SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
     for (const auto& fill : layout.table_header_fills) {
-      set_color(sdl_, st[BlockRole::Table].background);
+      set_color(sdl_,
+                layout.style_for(fill.node, st)[BlockRole::Table].background);
       SDL_Rect r{
           static_cast<int>(fill.x + origin_x),
           px(fill.y - scroll_y),
@@ -193,8 +194,9 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
   // Fenced code-block soft background
   {
     SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
-    const BlockStyle& code = st[BlockRole::CodeBlock];
     for (const auto& cb : layout.code_blocks) {
+      const BlockStyle& code =
+          layout.style_for(cb.node, st)[BlockRole::CodeBlock];
       set_color(sdl_, code.background);
       SDL_Rect r{
           static_cast<int>(cb.x + origin_x),
@@ -211,7 +213,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
   SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
   // Block-quote (and transclusion) left bars
   for (const auto& qb : layout.quote_bars) {
-    set_color(sdl_, st[BlockRole::BlockQuote].border);
+    set_color(sdl_, layout.style_for(qb.node, st)[BlockRole::BlockQuote].border);
     int bw = static_cast<int>(qb.width);
     if (bw < 2) bw = 2;
     SDL_Rect bar{
@@ -224,7 +226,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
 
   // Note left bars (amber, distinct from quotes)
   for (const auto& nb : layout.note_bars) {
-    set_color(sdl_, st[BlockRole::Note].border);
+    set_color(sdl_, layout.style_for(nb.node, st)[BlockRole::Note].border);
     int bw = static_cast<int>(nb.width);
     if (bw < 2) bw = 2;
     SDL_Rect bar{
@@ -237,7 +239,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
 
   // Message / comment bars (teal — discussion thread)
   for (const auto& mb : layout.message_bars) {
-    set_color(sdl_, st[BlockRole::Message].border);
+    set_color(sdl_, layout.style_for(mb.node, st)[BlockRole::Message].border);
     int bw = static_cast<int>(mb.width);
     if (bw < 2) bw = 2;
     SDL_Rect bar{
@@ -250,7 +252,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
 
   // Table grid lines
   for (const auto& tl : layout.table_lines) {
-    set_color(sdl_, st[BlockRole::Table].border);
+    set_color(sdl_, layout.style_for(tl.node, st)[BlockRole::Table].border);
     int w = static_cast<int>(tl.width);
     int h = static_cast<int>(tl.height);
     if (w < 1) w = 1;
@@ -264,7 +266,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
 
   // Rules under headers
   for (const RoleBox& rb : layout.role_rules) {
-    set_color(sdl_, st[rb.role].border);
+    set_color(sdl_, layout.style_for(rb.box.node, st)[rb.role].border);
     SDL_Rect line{static_cast<int>(rb.box.x + origin_x), px(rb.box.y - scroll_y),
                   static_cast<int>(rb.box.width),
                   std::max(1, static_cast<int>(rb.box.height))};
@@ -273,7 +275,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
 
   // Horizontal rules
   for (const auto& hr : layout.hr_lines) {
-    set_color(sdl_, st[BlockRole::Rule].border);
+    set_color(sdl_, layout.style_for(hr.node, st)[BlockRole::Rule].border);
     int th = static_cast<int>(hr.height);
     if (th < 1) th = 1;
     SDL_Rect line{
@@ -286,23 +288,29 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
   SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
 
   // Soft background runs under inline code
-  if (st[InlineKind::Code].background.visible()) {
+  {
     SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
     float run_x0 = 0.f, run_y = 0.f, run_x1 = 0.f;
     bool in_run = false;
+    Rgba run_color{};
     auto flush_run = [&]() {
       if (!in_run) return;
       int x = static_cast<int>(run_x0 + origin_x) - 2;
       int y = px(run_y - scroll_y) - 2;
       int w = static_cast<int>(run_x1 - run_x0) + 4;
       int h = fonts_.pick(FontRole::Code).line_height() + 2;
-      set_color(sdl_, st[InlineKind::Code].background);
+      set_color(sdl_, run_color);
       SDL_Rect r{x, y, w, h};
       xanatoo::sdl::fill_rect(sdl_, &r);
       in_run = false;
     };
     for (const auto& pg : layout.glyphs) {
       if (pg.kind != InlineKind::Code) {
+        flush_run();
+        continue;
+      }
+      const Rgba bg = layout.style_for(pg.node, st)[InlineKind::Code].background;
+      if (!bg.visible()) {
         flush_run();
         continue;
       }
@@ -315,14 +323,17 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
         run_x0 = pg.x;
         run_x1 = pg.x + adv;
         run_y = top;
+        run_color = bg;
         in_run = true;
-      } else if (std::abs(top - run_y) < 0.5f && pg.x <= run_x1 + 2.f) {
+      } else if (bg == run_color && std::abs(top - run_y) < 0.5f &&
+                 pg.x <= run_x1 + 2.f) {
         run_x1 = pg.x + adv;
       } else {
         flush_run();
         run_x0 = pg.x;
         run_x1 = pg.x + adv;
         run_y = top;
+        run_color = bg;
         in_run = true;
       }
     }
@@ -352,7 +363,7 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
       }
     }
 
-    const bool underline = st[pg.kind].underline;
+    const bool underline = layout.style_for(pg.node, st)[pg.kind].underline;
     const bool strike = pg.kind == InlineKind::Strike;
     if (underline || strike) {
       // Decorations bridge to the next glyph when it continues the same

@@ -93,6 +93,14 @@ struct RoleBox {
 };
 
 struct LayoutResult {
+  // Resolved lexical style scopes, indexed by node rather than inherited
+  // through renderer state. Index 0 means use the renderer's base sheet.
+  std::vector<DocStyle> scoped_styles;
+  std::unordered_map<NodeId, size_t> node_style_index;
+  const DocStyle& style_for(NodeId id, const DocStyle& base) const {
+    auto it = node_style_index.find(id);
+    return it == node_style_index.end() ? base : scoped_styles[it->second - 1];
+  }
   std::vector<PositionedGlyph> glyphs;
   std::vector<LayoutBox> boxes;
   std::vector<PositionedImage> images;
@@ -260,6 +268,7 @@ private:
   ImageCache* images_;
   LayoutOptions options_{};
   const DocStyle* style_;
+  size_t active_style_index_ = 0;
   const std::unordered_map<NodeId, CollectionView>* collection_views_ = nullptr;
 
   std::string image_base_;

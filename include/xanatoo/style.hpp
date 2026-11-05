@@ -11,9 +11,11 @@
 // --font) > style sheet > built-in default.
 
 #include "xanatoo/font.hpp"
+#include "xanatoo/sexpr.hpp"
 #include "xanatoo/types.hpp"
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -101,6 +103,14 @@ struct InlineStyle {
   FontRole font = FontRole::Body;
 };
 
+// A named, explicitly applied group of role overrides. The parsed forms
+// and late-bound tokens are reused when composing nested scopes, so only
+// properties mentioned by the variant change in the child scope.
+struct StyleVariant {
+  std::vector<SExpr> forms;
+  std::map<std::string, SExpr> defines;
+};
+
 struct DocStyle {
   std::string name = "default";  // file stem; key for view.conf
   std::string title = "Default";
@@ -123,6 +133,7 @@ struct DocStyle {
   BlockStyle block[kBlockRoleCount];
   InlineStyle inl[kInlineKindCount];
   InlineStyle metadata;  // semantic inline role, can also apply to links
+  std::map<std::string, StyleVariant> variants;
   // Unknown roles / properties / values met while loading (with sheet name).
   std::vector<std::string> warnings;
 
@@ -155,6 +166,10 @@ DocStyle builtin_style();
 // Exposed for tests; load_style() is the normal entry point.
 void apply_style_source(DocStyle& style, std::string_view source,
                         const std::string& sheet_name = {});
+
+// Apply one named role-only variant over an already resolved style. Unspecified
+// roles and properties remain unchanged. Returns false for an unknown name.
+bool apply_style_variant(DocStyle& style, std::string_view name);
 
 struct StyleEntry {
   std::string name;   // file stem

@@ -566,6 +566,7 @@ LayoutResult LayoutEngine::layout(
   static uint64_t next_generation = 0;
   LayoutResult result;
   result.generation = ++next_generation;
+  active_style_index_ = 0;
   image_base_ = image_base;
   viewport_ = viewport;
   height_hints_ = height_hints;
@@ -639,6 +640,32 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
   if (id == INVALID_NODE) return;
   const Node& node = doc.get(id);
   if (node.id != id) return;  // stale child id → invalid-node sentinel
+
+  // A named block variant overlays only its declared role properties. The
+  // scope is lexical: the resolved style applies to this block and its
+  // descendants, then the parent's style is restored for the next sibling.
+  std::optional<DocStyle> scoped_style;
+  const DocStyle* parent_style = style_;
+  const size_t parent_index = active_style_index_;
+  if (!node.style.empty()) {
+    scoped_style.emplace(*style_);
+    if (apply_style_variant(*scoped_style, node.style)) {
+      style_ = &*scoped_style;
+      out.scoped_styles.push_back(*scoped_style);
+      active_style_index_ = out.scoped_styles.size();
+    }
+  }
+  if (active_style_index_ != 0) out.node_style_index[id] = active_style_index_;
+  struct RestoreStyle {
+    LayoutEngine& engine;
+    const DocStyle* parent;
+    size_t& active;
+    size_t parent_index;
+    ~RestoreStyle() {
+      engine.set_style(parent);
+      active = parent_index;
+    }
+  } restore{*this, parent_style, active_style_index_, parent_index};
 
   // Role spacing from the style sheet; em follows the body size (zoom).
   const DocStyle& st = *style_;
@@ -1906,8 +1933,7 @@ void LayoutEngine::setup_margins(const Document& doc, float mx,
   const float em = static_cast<float>(fonts_.regular.pixel_size());
   const float dp = options_.px_scale;
   float want[2] = {0.f, 0.f};
-  auto need = [&](BlockRole role, FloatSide side) {
-    const BlockStyle& bs = st[role];
+  auto need = [&](const BlockStyle& bs, FloatSide side) {
     if (bs.placement != Placement::Margin || side == FloatSide::None) return;
     float w = bs.width.px(em, dp);
     if (w < 1.f) w = 14.f * em;
@@ -1917,10 +1943,21 @@ void LayoutEngine::setup_margins(const Document& doc, float mx,
   for (const Node& n : doc.nodes) {
     if (n.parent == INVALID_NODE) continue;  // unhooked arena entries
     if (n.kind == NodeKind::Aside) {
-      FloatSide side = st[BlockRole::Aside].side;
+      DocStyle scoped = st;
+      // The margin prepass must agree with the actual, possibly nested,
+      // variant scope used when laying out this aside.
+      std::vector<NodeId> ancestors;
+      for (NodeId id = n.id; id != INVALID_NODE; id = doc.get(id).parent)
+        ancestors.push_back(id);
+      for (auto it = ancestors.rbegin(); it != ancestors.rend(); ++it) {
+        const std::string& name = doc.get(*it).style;
+        if (!name.empty()) apply_style_variant(scoped, name);
+      }
+      const BlockStyle& bs = scoped[BlockRole::Aside];
+      FloatSide side = bs.side;
       if (n.src == "left") side = FloatSide::Left;
       else if (n.src == "right") side = FloatSide::Right;
-      need(BlockRole::Aside, side);
+      need(bs, side);
     }
   }
   if (want[0] <= 0.f && want[1] <= 0.f) return;

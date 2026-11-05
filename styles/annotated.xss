@@ -1,0 +1,21 @@
+; SPDX-License-Identifier: GPL-3.0-or-later
+; Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
+; A neutral reading style with optional, explicitly selected block variants.
+(stylesheet
+  (name "Annotated")
+  (description "Named warning, technical and compact-side-note variants")
+  (define warning "#aa4a22")
+
+  ; :::note style=warning
+  (variant warning
+    (role note (border warning) (color warning)))
+
+  ; :::section style=technical — also applies to its descendants
+  (variant technical
+    (role code-block (background "#f1f3f5") (border "#b6c0ca"))
+    (role code (background "#edf0f3")))
+
+  ; :::aside style=compact — floats in the text column, never makes a margin
+  (variant compact
+    (role aside (placement float) (width 13em)
+          (background "#f4f5f6") (border "#b6c0ca"))))

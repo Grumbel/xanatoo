@@ -125,6 +125,24 @@ class SheetReader {
     }
   }
 
+  void set_defines(const std::map<std::string, SExpr>& defines) {
+    defines_ = defines;
+  }
+
+  void finish_variants() {
+    for (auto& [name, variant] : style_.variants) {
+      variant.defines = defines_;
+      // Validate once on load, not on every layout pass.
+      DocStyle check = style_;
+      check.warnings.clear();
+      SheetReader reader(check, sheet_ + ": variant " + name);
+      reader.set_defines(defines_);
+      for (const SExpr& form : variant.forms) reader.apply(form);
+      style_.warnings.insert(style_.warnings.end(), check.warnings.begin(),
+                             check.warnings.end());
+    }
+  }
+
   void apply(const SExpr& f) {
     if (f.kind != SExpr::Kind::List || f.kids.empty() ||
         f.kids[0].kind != SExpr::Kind::Atom) {
@@ -153,6 +171,16 @@ class SheetReader {
       fonts(f);
     } else if (head == "role") {
       role(f);
+    } else if (head == "variant") {
+      if (f.kids.size() < 3 || f.kids[1].kind != SExpr::Kind::Atom) {
+        warn("expected (variant name (role …) …)");
+      } else {
+        auto& variant = style_.variants[f.kids[1].text];
+        for (size_t i = 2; i < f.kids.size(); ++i) {
+          if (is_form(f.kids[i], "role")) variant.forms.push_back(f.kids[i]);
+          else warn("variant " + f.kids[1].text + " accepts only role forms");
+        }
+      }
     } else {
       warn("unknown form (" + head + " …)");
     }
@@ -374,6 +402,7 @@ void apply_forms(DocStyle& style, const std::vector<SExpr>& forms,
   SheetReader reader(style, sheet_name);
   reader.collect_defines(forms);
   for (const SExpr& f : forms) reader.apply(f);
+  reader.finish_variants();
 }
 
 bool read_file(const std::string& path, std::string& out) {
@@ -574,6 +603,15 @@ DocStyle builtin_style() {
 void apply_style_source(DocStyle& style, std::string_view source,
                         const std::string& sheet_name) {
   apply_forms(style, sheet_forms(source), sheet_name);
+}
+
+bool apply_style_variant(DocStyle& style, std::string_view name) {
+  const auto it = style.variants.find(std::string(name));
+  if (it == style.variants.end()) return false;
+  SheetReader reader(style, "variant " + std::string(name));
+  reader.set_defines(it->second.defines);
+  for (const SExpr& f : it->second.forms) reader.apply(f);
+  return true;
 }
 
 std::vector<std::string> style_dirs() {

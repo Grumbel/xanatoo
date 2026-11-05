@@ -6,7 +6,24 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **284** (this delivery is **283**)
+Next bundle number: **285** (this delivery is **284**)
+
+## Status (2026-11-05) — Explicit block style variants (bundle 284)
+
+- Added named `(variant name (role …) …)` groups to `.xss` sheets. Role
+  property overrides apply to explicitly named `style=name` fenced blocks,
+  including descendants, without selectors or CSS specificity. Nested named
+  variants compose; siblings return to their enclosing style.
+- The Markdown parser and serializer preserve style names on article,
+  section, header, aside, note and figure fences. Layout resolves scoped
+  role properties; rendering looks up the corresponding node's style for
+  borders, fills, inline-code backgrounds and underlining; pagination keeps
+  those scopes. Margin prepass respects variant width/placement.
+- New example `styles/annotated.xss` and tests for overrides, roundtrips,
+  inherited/nested scopes and scoped rendering. Per-document base sheets are
+  deferred: split panes currently share a single font set and renderer style.
+- `src/parse.cpp` passes standalone C++ syntax checking; CMake cannot
+  configure runtime tests in this workspace without SDL2 development headers.
 
 ## Status (2026-11-05) — Rebased cumulative bundle 283
 

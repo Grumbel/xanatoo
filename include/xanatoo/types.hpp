@@ -114,6 +114,7 @@ struct Node {
   float display_scale = 1.f;      // image interactive scale (1 = natural fit)
   std::string label;              // stable semantic anchor (links: #label)
   std::string tags;               // org-style tags without outer colons ("work:urgent")
+  std::string style;              // optional named .xss variant for this subtree
   // CodeBlock: language id in `src` (e.g. "cpp"); Note: optional kind in `src`
   // Transclude: summary holds optional :excerpt phrase (range within target)
   // TableCell: level 1 = header cell, 0 = body cell

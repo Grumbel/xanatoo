@@ -246,6 +246,15 @@ Structural selectors should remain available for advanced cases, but authors sho
 
 ### 8.2 Make precedence predictable
 
+**Implementation note (November 2026):** Xanatoo now experiments with an
+explicit `(variant name (role …) …)` in `.xss` sheets and a `style=name`
+attribute on selected block fences. The role overrides apply to the block's
+subtree and return to the parent scope after it. This is lexical composition,
+not selector-based cascading or specificity. It permits a document to request
+a special warning or technical section treatment while retaining the reader's
+base stylesheet. Document-local *base* sheets and a reader/author precedence
+model are still design work; split panes currently share fonts and a sheet.
+
 Keep the useful idea of layered styling, but define precedence explicitly. A possible order is:
 
 1. Reader accessibility requirements and explicit overrides.

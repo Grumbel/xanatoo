@@ -948,6 +948,10 @@ void test_style_sheet_parse() {
       (role header (color accent) (font code))
       (role link (color accent) (underline #f))
       (role code (background none))
+      (variant warning
+        (role note (color accent) (border "#aabbcc"))
+        (role paragraph (font code)))
+      (variant quiet (role note (color "#eeeeee")))
       (role bogus (color "#000"))
       (role note (wobble 3) (border "nonsense")))
   )",
@@ -981,8 +985,94 @@ void test_style_sheet_parse() {
   EXPECT(!st[InlineKind::Code].background.visible());
   // Untouched roles keep the built-in values.
   EXPECT(st[BlockRole::ListItem].indent.px(10.f) == 28.f);
+  EXPECT_EQ(st.variants.size(), 2u);
+  DocStyle scoped = st;
+  EXPECT(apply_style_variant(scoped, "warning"));
+  EXPECT(scoped[BlockRole::Note].border == (Rgba{0xaa, 0xbb, 0xcc, 255}));
+  EXPECT(scoped.text_color(BlockRole::Note, InlineKind::Text) ==
+         (Rgba{0x10, 0x20, 0x30, 255}));
+  EXPECT(scoped[BlockRole::Paragraph].font == FontRole::Code);
+  EXPECT(scoped[BlockRole::Header].font == st[BlockRole::Header].font);
+  EXPECT(apply_style_variant(scoped, "quiet"));
+  EXPECT(scoped.text_color(BlockRole::Note, InlineKind::Text) ==
+         (Rgba{0xee, 0xee, 0xee, 255}));
+  EXPECT(scoped[BlockRole::Note].border == (Rgba{0xaa, 0xbb, 0xcc, 255}));
+  EXPECT(!apply_style_variant(scoped, "not-defined"));
   // bogus role, unknown property, bad colour
   EXPECT_EQ(st.warnings.size(), 3u);
+}
+
+void test_named_style_scopes() {
+  using namespace xanatoo;
+  const std::string source =
+      ":::section style=technical\n"
+      ":::header\nTechnical\n:::\n"
+      ":::note style=warning kind=tip\nWarning text\n:::\n"
+      ":::note\nNormal text\n:::\n"
+      ":::\n"
+      ":::aside style=compact side=left\nMargin text\n:::\n";
+  Document doc = parse_markup(source);
+  const auto roots = kids_of(doc, doc.root);
+  EXPECT_EQ(roots.size(), 2u);
+  if (roots.size() != 2) return;
+  NodeId sec = roots[0], aside = roots[1];
+  EXPECT(doc.get(sec).kind == NodeKind::Section);
+  EXPECT_EQ(doc.get(sec).style, "technical");
+  EXPECT(doc.get(aside).kind == NodeKind::Aside);
+  EXPECT_EQ(doc.get(aside).style, "compact");
+  auto kids = kids_of(doc, sec);
+  EXPECT_EQ(kids.size(), 3u);
+  if (kids.size() != 3) return;
+  NodeId warning = kids[1], normal = kids[2];
+  EXPECT_EQ(doc.get(warning).style, "warning");
+  EXPECT(doc.get(normal).style.empty());
+  const std::string saved = serialize_markup(doc);
+  EXPECT(saved.find(":::section style=technical") != std::string::npos);
+  EXPECT(saved.find(":::note style=warning kind=tip") != std::string::npos);
+  EXPECT_EQ(serialize_markup(parse_markup(saved)), saved);
+
+  FontSet fonts;
+  std::string path = fontconfig_find("DejaVu Sans", 0, 0);
+  if (path.empty() || !fonts.load(nullptr, path, 18, 24)) {
+    std::fprintf(stderr, "SKIP test_named_style_scopes layout (no font)\n");
+    return;
+  }
+  DocStyle style = builtin_style();
+  apply_style_source(style, R"(
+    (stylesheet
+      (variant technical (role note (border "#112233")))
+      (variant warning (role note (border "#aa3300") (color "#ff0000"))
+      (variant compact (role aside (placement flow) (width 12em))))
+  )");
+  EXPECT(style.warnings.empty());
+  LayoutEngine engine(fonts);
+  engine.set_style(&style);
+  LayoutOptions opt;
+  opt.margin_x = 0.f;
+  opt.margin_y = 0.f;
+  engine.set_options(opt);
+  LayoutResult result = engine.layout(doc, 800.f);
+  EXPECT_EQ(result.scoped_styles.size(), 3u);
+  EXPECT_EQ(result.note_bars.size(), 2u);
+  EXPECT(result.style_for(warning, style)[BlockRole::Note].border ==
+         (Rgba{0xaa, 0x33, 0, 255}));
+  EXPECT(result.style_for(normal, style)[BlockRole::Note].border ==
+         (Rgba{0x11, 0x22, 0x33, 255}));
+  EXPECT(result.style_for(aside, style)[BlockRole::Aside].placement ==
+         Placement::Flow);
+  EXPECT(result.style_for(sec, style)[BlockRole::Note].border ==
+         (Rgba{0x11, 0x22, 0x33, 255}));
+  bool red_warning = false;
+  for (const PositionedGlyph& g : result.glyphs) {
+    if (g.node == warning) {
+      EXPECT(g.color == (Rgba{255, 0, 0, 255}));
+      red_warning = true;
+    }
+  }
+  EXPECT(red_warning);
+  // The paged result must retain the rendering style of its source nodes.
+  // This mapping is also used for note bars and code/inline backgrounds.
+  EXPECT(!result.node_style_index.empty());
 }
 
 void test_style_sheets_shipped() {
@@ -3405,6 +3495,12 @@ void test_paginate() {
   // 100 lines of 20 px from y = 24, a heading at line 20, a code box over
   // lines 40..60 and a 1000 px image-free tail.
   LayoutResult l;
+  DocStyle base = builtin_style();
+  DocStyle scoped = base;
+  scoped.block[static_cast<size_t>(BlockRole::Note)].border =
+      {0x12, 0x34, 0x56, 255};
+  l.scoped_styles.push_back(scoped);
+  l.node_style_index[1] = 1;
   for (int i = 0; i < 100; ++i) {
     PositionedGlyph g;
     g.node = 1;
@@ -3427,6 +3523,10 @@ void test_paginate() {
   spec.extents.assign(11, GlyphExtent{14.f, 4.f});
   PageMap map;
   LayoutResult out = paginate(l, spec, map);
+  EXPECT(out.style_for(1, base)[BlockRole::Note].border ==
+         (Rgba{0x12, 0x34, 0x56, 255}));
+  EXPECT(out.style_for(2, base)[BlockRole::Note].border ==
+         base[BlockRole::Note].border);
   // 252 px per page → 12 lines per page, 9 pages (the last short).
   EXPECT(map.pages.size() == 9);
   EXPECT(map.spread_count() == 5);
@@ -3903,6 +4003,7 @@ int main() {
   test_tour_example();
   test_view_settings_migration();
   test_style_sheet_parse();
+  test_named_style_scopes();
   test_layout_article_gaps();
   test_layout_inline_metadata();
   test_nav_history_positions_and_forward_link();

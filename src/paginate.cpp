@@ -235,6 +235,8 @@ private:
 
   LayoutResult stack() {
     LayoutResult out;
+    out.scoped_styles = in_.scoped_styles;
+    out.node_style_index = in_.node_style_index;
     out.generation = in_.generation;
     out.materialised_top = in_.materialised_top;
     out.materialised_bottom = in_.materialised_bottom;

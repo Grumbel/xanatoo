@@ -159,6 +159,16 @@ std::string fence_attr(std::string_view line, std::string_view key) {
   return std::string(line.substr(pos, end - pos));
 }
 
+// Named style variants are identifiers, not arbitrary CSS or file paths.
+void read_fence_style(Document& doc, NodeId id, std::string_view fence) {
+  std::string name = fence_attr(fence, "style");
+  if (!name.empty() &&
+      std::all_of(name.begin(), name.end(), [](unsigned char c) {
+        return std::isalnum(c) || c == '_' || c == '-' || c == '.';
+      }))
+    doc.get(id).style = std::move(name);
+}
+
 // "![alt](src)" at text[i], with an optional pandoc-style
 // "{width=16 height=16}" after it: an inline image span. Returns the index
 // after it, or npos when text[i] starts no image.
@@ -591,6 +601,7 @@ Document parse_markup(std::string_view source) {
     // Opening fences
     if (starts_with(trimmed, ":::article")) {
       NodeId n = doc.create(NodeKind::Article, current_parent());
+      read_fence_style(doc, n, trimmed);
       std::string id = fence_attr(trimmed, "id");
       if (id.empty()) id = fence_attr(trimmed, "label");
       if (!id.empty()) doc.get(n).label = id;
@@ -600,6 +611,7 @@ Document parse_markup(std::string_view source) {
     }
     if (starts_with(trimmed, ":::section")) {
       NodeId n = doc.create(NodeKind::Section, current_parent());
+      read_fence_style(doc, n, trimmed);
       std::string id = fence_attr(trimmed, "id");
       if (id.empty()) id = fence_attr(trimmed, "label");
       if (!id.empty()) doc.get(n).label = id;
@@ -610,6 +622,7 @@ Document parse_markup(std::string_view source) {
     if (starts_with(trimmed, ":::header")) {
       // Header is a leaf title line (body until :::).
       NodeId n = doc.create(NodeKind::Header, current_parent());
+      read_fence_style(doc, n, trimmed);
       std::string id = fence_attr(trimmed, "id");
       if (id.empty()) id = fence_attr(trimmed, "label");
       if (!id.empty()) doc.get(n).label = id;
@@ -651,6 +664,7 @@ Document parse_markup(std::string_view source) {
     // :::aside [side=left|right] — a text box beside the flow
     if (starts_with(trimmed, ":::aside")) {
       NodeId n = doc.create(NodeKind::Aside, current_parent());
+      read_fence_style(doc, n, trimmed);
       std::string id = fence_attr(trimmed, "id");
       if (!id.empty()) doc.get(n).label = id;
       std::string side = fence_attr(trimmed, "side");
@@ -687,6 +701,7 @@ Document parse_markup(std::string_view source) {
     }
     if (starts_with(trimmed, ":::note")) {
       NodeId n = doc.create(NodeKind::Note, current_parent());
+      read_fence_style(doc, n, trimmed);
       // Optional subtype: :::note kind=tip  (stored in src)
       auto kpos = trimmed.find("kind=");
       if (kpos != std::string_view::npos) {
@@ -901,6 +916,7 @@ Document parse_markup(std::string_view source) {
     }
     if (starts_with(trimmed, ":::figure")) {
       NodeId n = doc.create(NodeKind::Figure, current_parent());
+      read_fence_style(doc, n, trimmed);
       push_fence(n);
       ++i;
       continue;
@@ -1545,10 +1561,11 @@ void serialize_inlines(const Node& node, std::string& out) {
 // re-parses to the same tree; 0 when it needs ::: fences.
 int atx_section_depth(const Document& doc, const Node& sec) {
   auto plain = [&](const Node& n) {
-    if (n.kind != NodeKind::Section || !n.label.empty() || n.children.empty())
+    if (n.kind != NodeKind::Section || !n.label.empty() ||
+        !n.style.empty() || n.children.empty())
       return false;
     const Node& h = doc.get(n.children.front());
-    return h.kind == NodeKind::Header && h.label.empty() && h.src.empty() &&
+    return h.kind == NodeKind::Header && h.label.empty() && h.style.empty() && h.src.empty() &&
            h.tags.empty() && !h.spans.empty();
   };
   if (!plain(sec)) return 0;
@@ -1569,6 +1586,7 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
   const Node& node = doc.get(id);
   if (node.id != id) return;
   std::string pad(static_cast<size_t>(indent), ' ');
+  const std::string style_attr = node.style.empty() ? "" : " style=" + node.style;
 
   switch (node.kind) {
     case NodeKind::Document:
@@ -1590,6 +1608,7 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
     case NodeKind::Header: {
       out += pad;
       out += ":::header";
+      out += style_attr;
       if (!node.label.empty()) {
         out += " id=\"";
         out += node.label;
@@ -1607,6 +1626,7 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
     case NodeKind::Article: {
       out += pad;
       out += ":::article";
+      out += style_attr;
       if (!node.label.empty()) {
         out += " id=\"";
         out += node.label;
@@ -1636,6 +1656,7 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
       }
       out += pad;
       out += ":::section";
+      out += style_attr;
       if (!node.label.empty()) {
         out += " id=\"";
         out += node.label;
@@ -1698,6 +1719,7 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
     case NodeKind::Aside: {
       out += pad;
       out += ":::aside";
+      out += style_attr;
       if (!node.label.empty()) out += " id=\"" + node.label + "\"";
       if (!node.src.empty()) out += " side=" + node.src;
       out += "\n";
@@ -1710,6 +1732,7 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
     case NodeKind::Note: {
       out += pad;
       out += ":::note";
+      out += style_attr;
       if (!node.src.empty()) {
         out += " kind=";
         out += node.src;
@@ -1776,7 +1799,7 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
 
     case NodeKind::Figure: {
       out += pad;
-      out += ":::figure\n";
+      out += ":::figure" + style_attr + "\n";
       for (NodeId c : node.children)
         serialize_node(doc, c, out, indent);
       out += pad;

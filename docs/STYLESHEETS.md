@@ -64,6 +64,48 @@ Lowest priority first; a later directory replaces a sheet of the same name:
 
 The `(stylesheet …)` wrapper is optional. `;` starts a comment.
 
+### Named block variants
+
+A sheet may define a named variant of semantic roles. A document opts into
+it explicitly on a fenced block, independently of its semantic type:
+
+```scheme
+; In styles/annotated.xss, for example:
+(variant warning
+  (role note (border "#aa4a22") (color "#aa4a22")))
+(variant compact
+  (role aside (placement float) (width 13em)))
+```
+
+```markdown
+:::note style=warning kind=tip
+Check this before continuing.
+:::
+
+:::aside style=compact side=right
+A short digression that floats inside the column.
+:::
+
+:::section style=technical
+The variant also applies to all the section's descendants.
+:::
+```
+
+Variants contain only `(role …)` declarations, including inline roles.
+Each one overrides **only the properties it names**. The enclosing block
+and its descendants use the resolved variant; later siblings return to
+their enclosing style. Nested variants compose in the document's explicit
+nesting order. There are **no selectors, specificity scores, automatic
+class matching or `!important`**. `style=warning` is an explicit document
+choice, not a change to the meaning of `:::note` or `kind=tip`.
+
+The syntax works on `:::article`, `:::section`, `:::header`, `:::aside`,
+`:::note` and `:::figure`. An unknown name leaves the block unmodified.
+For now, `page` and `fonts` cannot occur inside variants: they affect an
+entire rendered view rather than a single block. The selected base sheet
+is still a **reader-wide preference**; per-document base sheets remain a
+separate future feature.
+
 **Tokens are late-bound.** All `define`s across the inherit chain are
 collected first and the child's win, so a child that redefines `accent`
 recolours every parent rule that uses `accent` (see `night-amber.xss`).
@@ -182,7 +224,8 @@ rules. They are ordinary sheets — the selection is still global, not per site.
 - `include/xanatoo/sexpr.hpp` — reader shared with the `.sexp` document
   format.
 - Layout resolves spacing, fonts and glyph colours (`PositionedGlyph::color`).
-  The renderer reads decoration colours from the same `DocStyle`.
+  Named block variants create per-node resolved style scopes that the renderer
+  also uses for decorations; pagination preserves those scopes.
 - `apply_style` (`app_view.cpp`) reloads fonts when the families change,
   drops height hints and relayouts panes, help and floating windows.
 
