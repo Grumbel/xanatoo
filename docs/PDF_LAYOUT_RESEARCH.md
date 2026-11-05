@@ -1,4 +1,4 @@
-# Layout features from books and scholarly PDFs
+# Layout features from books, papers, magazines, and scripts
 
 > Research inventory, 2026-11-05. **Not an implemented PDF importer or new
 > markup specification.** Candidate sources are linked rather than copied;
@@ -42,8 +42,8 @@ Open the linked catalog item first, then use its downloadable PDF or page
 images. A catalog link is intentional: Archive.org may offer a different
 scanned edition, a searchable OCR file, or no unrestricted PDF download.
 The last two article entries supply structured XML unavailable for most
-historical scans. Later magazine additions are exploratory references, not
-necessarily cleared for automated ingestion.
+historical scans. Later magazine and modern-script additions are exploratory
+references, not necessarily cleared for automated ingestion.
 
 | ID / source | What to inspect | Why it is difficult |
 |---|---|---|
@@ -59,8 +59,20 @@ necessarily cleared for automated ingestion.
 | **mondo-2000-01** — [*Mondo 2000* no. 1 (1989)](https://archive.org/details/Mondo.2000.Issue.01.1989) | Early magazine structure, interviews, reviews and artwork | Earlier baseline for comparison with later issues; **copyrighted, reference only unless cleared** |
 | **mondo-2000-04** — [*Mondo 2000* no. 4 (1991)](https://archive.org/details/Mondo.2000.Issue.04.1991) | Digital collage, experimental feature design, pull quotes, article opening spreads | A severe reading-order and text/graphic-boundary stress test; **copyrighted, reference only unless cleared** |
 | **emigre-11** — [*Emigre* no. 11 (1989), Letterform Archive](https://letterformarchive.org/news/emigre-issue-11/) | Typography as subject, digital display types, unusual placement | Can the extraction retain information where type design itself is content? **Reference only; viewing access is not an AI licence** |
+| **academy-screenplay-format** — [Academy Nicholl screenplay-format PDF](https://www.oscars.org/nicholl/screenwriting-resources) | Scene headings, character cues, action, dialogue, parentheticals, transitions, page splits | Annotated 13-page guide; distinguishes an utterance from its printed indentation and `(MORE)`/`(CONT'D)` pagination. **Reference only** |
+| **short-term-12-screenplay** — [*Short Term 12* screenplay, Destin Cretton, Academy](https://www.oscars.org/nicholl/screenwriting-resources) | Complete produced-film screenplay, Academy Nicholl entry | 96-page script with extractable text; realistic baseline beyond an instructional example. **Copyrighted, reference only** |
+| **arlington-road-screenplay** — [*Arlington Road* screenplay, Ehren Kruger, Academy](https://www.oscars.org/nicholl/screenwriting-resources) | Historical professional script PDF | 119-page PDF with little extractable text in the web viewer: potential OCR-versus-native-text comparison; verify PDF text layer before benchmarking. **Copyrighted, reference only** |
+| **broken-shooting-script** — [BBC *Broken* shooting script (2011)](https://downloads.bbc.co.uk/writersroom/scripts/Broken-Shooting-Script.pdf) | Numbered scenes, `OMITTED` scene placeholders, production title page, camera/shot cues | **Preserve scene identity and revision gaps** rather than renumbering scenes or treating the numbers as body text. **Copyrighted, reference only** |
+| **bbc-screenplay-template** — [BBC screenplay format PDF](https://downloads.bbc.co.uk/writersroom/scripts/screenplay.pdf) | Side-by-side dialogue, parentheticals, character continuations | **Simultaneous speech** is a grouping relation, not two independent columns of prose. **Reference only** |
+| **loc-one-thousand-shot** — [*One Thousand to One Shot* (1914), Library of Congress](https://www.loc.gov/item/s1229l02104/) | Early American motion-picture copyright-deposit document | Compare early scenario/photoplay conventions against modern screenplays; confirm this specific document's contents and permissions. **Historical candidate** |
 | **whitman-leaves** — [Whitman, *Leaves of Grass* (1891–92)](https://archive.org/details/leavesofgrassinc00whitrich) | Long verse lines, stanzas, indentation, poems and sequence | Line boundaries are meaningful; poem versus prose and deliberate whitespace |
 | **shakespeare-folio** — [Shakespeare, *First Folio* (1623), Library of Congress](https://www.loc.gov/item/2021666879/) | Act/scene divisions, speech labels, stage directions | Speaker/speech/aside structure; historical orthography and challenging OCR |
+| **wilde-earnest-1899** — [Oscar Wilde, *The Importance of Being Earnest* (1899 scan)](https://commons.wikimedia.org/wiki/File:The_importance_of_being_earnest_-_a_trivial_comedy_for_serious_people_(IA_importanceofbein00wildrich).pdf) | Cast, acts, speaker cues, parenthesized stage action | A comedy with a 176-page historical PDF marked US public domain by Wikimedia Commons |
+| **shaw-pygmalion-1914** — [Bernard Shaw, *Pygmalion* (1914 scan)](https://commons.wikimedia.org/wiki/File:Pygmalion_-_a_play_in_five_acts,_(IA_pygmalionplayinf00shawrich).pdf) | Substantial dramatic stage directions and character speech | Directions interleaved with dialogue and preface/paratext versus staged action; **historical rights candidate** |
+| **capek-rur-1923** — [Karel Čapek, *R.U.R.* (1923 English translation)](https://en.wikisource.org/wiki/File:R_U_R_Rossum_s_Universal_Robots.pdf) | Cast list, three acts and epilogue, dialogue and stage directions | A 220-page scanned translation with matching Wikisource transcription; **check translation-specific rights before reuse** |
+| **guild-modern-play** — [Dramatists Guild modern-play format sample](https://www.dramatistsguild.com/script-formats) | Character labels, stage action, print binding, page numbers | One-page annotated modern-play example, *not* a source of public-domain dialogue. **Reference only** |
+| **guild-musical-format** — [Dramatists Guild musical format sample](https://www.dramatistsguild.com/script-formats) | Musical numbers, lyric lines, sung vs spoken text, cues | Speech, music and lyrics may appear together; distinguish their roles. **Reference only** |
+| **bbc-stage-template** — [BBC stage-script format sample](https://downloads.bbc.co.uk/writersroom/scripts/stage.pdf) | Title page, scene headings, directions and dialogue layout | A producer formatting convention, not a universal syntax. **Reference only** |
 | **aucassin-nicolette** — [*Aucassin & Nicolette* (1887)](https://archive.org/details/aucassinnicolett00bouruoft) | Verse/prose transitions, notes, glossary, bibliography | Mixed literary forms and extensive scholarly back matter; confirm the particular edition's layout |
 | **berghaus-atlas** — [Berghaus, *The Physical Atlas* (1845), Wellcome](https://wellcomecollection.org/works/qukcpt3s) | Maps, legend and associated notes | Labeled map regions, figure legends, plates that should be zoomable, not forced into text |
 | **jats-bmj** — [JATS sample BMJ article (PDF + XML)](https://jats.nlm.nih.gov/publishing/tag-library/1.2/chapter/samples.html) | Title block, affiliations, structured sections and references | Paired source structure to score PDF extraction against; **licence/redistribution review required** |
@@ -88,6 +100,12 @@ contain PDFs, OCR, scraped full text or claimed ground-truth annotations.
   a suitable use and permission are established. Start automated benchmark
   fixtures with vetted public-domain magazines (Scientific American, Dada,
   391, The Popular Magazine).
+- The Academy and BBC publish example/professional scripts to **read**, not
+  as a general licence to redistribute them or send them to an AI service.
+  Likewise the Dramatists Guild templates are references; their excerpts
+  can themselves be copyrighted. Keep these `reference_only`. Historical
+  theatre works need **edition- and translation-specific** checks: a 1923
+  English *R.U.R.* is not every translation of Čapek's play.
 - Explicit counterexample: **OpenStax Astronomy 2e** is freely readable,
   but its current site terms explicitly restrict ingestion by generative AI
   without permission. Do **not** add it to an automated AI-ingestion set.
@@ -147,6 +165,118 @@ collage with text, a pull quote, a separate advertisement, and a feature
 continued on another spread. First establish these against public-domain
 magazines; compare *Mondo* and *Emigre* visually under their access terms.
 
+## Screenplays and stage plays: the page is a performance score
+
+A screenplay is unusually easy to *read* as PDF text and unusually easy to
+misparse if its meaning is inferred from typography. Character cues, action,
+dialogue, parentheticals, scene headings, transitions and revision markers
+are visually differentiated mainly by **indentation, capitals and blank
+lines**. Those are conventions for *rendering* structured events, not
+separate kinds of paragraphs determined by font size. The
+[Academy Nicholl guide](https://www.oscars.org/nicholl/screenwriting-resources)
+notes that professional formats vary; its illustrated `scriptsample.pdf`
+includes parentheticals and a speech continued across a page break.
+The [BBC screenplay example](https://downloads.bbc.co.uk/writersroom/scripts/screenplay.pdf)
+also shows two characters speaking simultaneously, side by side.
+
+Do not equate a **screenplay** with a **shooting script**. The BBC's
+[*Broken* shooting-script PDF](https://downloads.bbc.co.uk/writersroom/scripts/Broken-Shooting-Script.pdf)
+has scene numbers and explicit `OMITTED` slots. A conversion that drops
+omitted scenes and renumbers the remaining ones can break every production
+reference. A writer's draft, by contrast, may intentionally have no scene
+numbers. Distinguish **scene identity**, **source/production scene number**,
+**display page/production revision number**, and **scene heading text**.
+
+Stage plays usually add acts, a cast/character list, setting and time,
+speaker-labelled speeches, directions for movement or delivery, entrances,
+exits, props, lights and sound, and sometimes music/lyrics. A parenthetical
+in a play is not automatically a screenplay-style dialogue parenthetical;
+its semantic role depends on context. Play pages are also *not* formatted
+identically across the industry: the
+[Dramatists Guild](https://www.dramatistsguild.com/script-formats)
+supplies several alternative play and musical layouts. A production script
+may have separate cue numbers or stage-manager annotations, and should not
+silently collapse them into the author's dialogue.
+
+| Distinct structure | Source/layout symptom | Desired Xanatoo model |
+|---|---|---|
+| Screenplay scene | `INT.`/`EXT.` slug, location/time, optional shot or sequence heading | `scene` with stable ID; parse slug fields opportunistically, retain verbatim heading |
+| Action vs speech | Full-width prose versus indented, speaker-labelled passage | Separate `action` and `speech` nodes; speech refers to a cast/person identity |
+| Speaker qualifiers | `(O.S.)`, `(V.O.)`, `(CONT'D)`, offstage/sung/spoken | Typed delivery/source/continuation annotations, preserving the printed form |
+| Parenthetical vs stage direction | Inline cues, stand-alone directions, parenthesized prose | Typed subordinate cue or independent stage action; ordering retained |
+| Two simultaneous speakers | Parallel dialogue columns or braces | `simultaneous` group referencing speech units; **not** two parallel articles or a table |
+| Voice and song | Lyric lines, numbered songs, spoken interruptions | Verse/lyric line and musical-number grouping with speaker/voice references |
+| Production identifiers | Scene `12A`, `OMITTED` slots, draft date, revision marks | Non-renumbered external identifiers plus production-layer provenance; omitted scene as explicit tombstone |
+| Script pagination | `(MORE)`, `(CONT'D)` at page turn; script folios | Generate those for screenplay *output*; retain originals as source markers, not extra dialogue |
+| Cast and dramatis personae | Role names, performers, doubles, descriptions | Cast list with canonical role IDs and printed names/aliases |
+| Act/scene/epilogue | Titles, roman numerals, part breaks | Semantic hierarchy and explicit navigation destinations; don't infer acts from page count |
+| Stage directions and design | Lighting, sound, projection, prop, entrance/exit | Typed stage/design events, anchored to passage or timeline when meaningful |
+| Verse drama | Meaningful line endings crossing speech boundaries | Preserve each verse line even when rendered lines wrap; maintain speaker and verse hierarchy independently |
+
+Two existing interchange formats are useful starting points:
+
+- [**Fountain**](https://fountain.io/syntax/) is already a screenplay-focused,
+  human-readable plain-text markup language (scene headings, character/
+  dialogue, parentheticals, transitions, simultaneous dialogue via `^`,
+  sections, and explicit page breaks). **Evaluate direct import/export**
+  before inventing incompatible Markdown shortcuts. Fountain is inspired by
+  Markdown but is not Markdown; ambiguities are context-sensitive.
+- [**TEI P5 Performance Texts**](https://www.tei-c.org/release/doc/tei-p5-doc/en/html/DR.html)
+  describes cast lists, `sp`/`speaker`, `stage`, act/scene divisions,
+  grouped speech, verse lines, and simultaneous actions. It explicitly
+  discusses overlapping speech and verse hierarchies. TEI provides a
+  **semantic reference model** and potential known-structure import path;
+  Xanatoo need not implement its entire vocabulary.
+
+These point to a good default: preserve the content and *sequence or
+simultaneity* of dramatic events, then format it with a screenplay or
+play-specific style. Fixed Courier sizes, 1.5-inch binding margins,
+right-aligned transitions and page breaks belong to an optional print
+profile. They should not become structural requirements for a reflowable
+reading mode or literal spaces in Xanatoo Markdown.
+
+### Possible Markdown roles (proposal, **not parsed**)
+
+````markdown
+:::cast
+- id=engineer name="ENGINEER" description="Maintains the station"
+- id=pilot name="PILOT" description="Arrives from outside"
+:::
+
+:::scene id=scene-12 slug="INT. CONTROL ROOM - NIGHT" number="12A"
+:::action
+The warning lamp comes on.
+:::
+
+:::simultaneous
+:::speech who=engineer
+The circuit is open!
+:::
+:::speech who=pilot delivery=offstage
+I can see it from here!
+:::
+:::
+
+:::direction kind=lighting
+The room goes dark.
+:::
+:::
+````
+
+This intentionally chooses **typed speech**, not `**ENGINEER**` on one
+paragraph and the text on the next, because authorial structure should not
+disappear on reformatting. Page numbers and character-name column positions
+can be generated later. The example is synthetic, not taken from a script.
+
+**Minimum drama test set:** scene-heading detection, cast-to-speech links,
+parenthetical inside a speech, direction between speeches, a speech split
+across source pages, simultaneous dialogue, an omitted numbered scene,
+stage act/scene/epilogue structure, musical lyric/cue grouping, and verse
+lines crossing speaker turns. Evaluate against hand-annotated *regions and
+relations*, not just extracted text equality. Use historical verified
+public-domain editions for automated AI tests; use modern Academy, BBC,
+and Guild PDFs only as reference until cleared.
+
 ## Feature inventory and the mapping to Xanatoo
 
 Legend: **Now** = implemented representation according to `FORMAT.md` and
@@ -165,7 +295,9 @@ limitation; no claim here that existing nodes reproduce print typesetting.
 | Tables | Headers, row/column grouping, spanned cells, footers, units | **Partial:** semantic table with headers; cell spans, nested headers, tables split across pages **New** | PNAS, Chicago |
 | Mathematics | Inline/display separation, symbol order, alignment, equation label | **Partial:** TeX math atom; aligned equation groups, equation numbering and reference targets **New** | Maxwell, PNAS |
 | Formal science objects | Theorem, proof, lemma, definition, experiment, algorithm, numbered example | **Partial:** generic section/note; typed block role, numbering, mutual links **New** | Byrne, PNAS |
-| Verse, drama, letters | Verse line and stanza boundaries, speaker, stage direction, attribution | **Partial:** paragraphs and code can preserve lines but not meaning; `verse`/`stanza`/`speech` **New** | Whitman, Shakespeare |
+| Verse and letters | Verse line and stanza boundaries, correspondence/attribution | **Partial:** paragraphs and code preserve lines but not all meaning; `verse`/`stanza` and letter structure **New** | Whitman, Aucassin |
+| Film screenplays and shooting scripts | Scene/shot headings, speaker, speech, parentheticals, simultaneous dialogue, scene numbers and omitted slots | **Partial:** headings/paragraphs/columns imitate appearance but erase semantics; `scene`/`action`/`speech`/`simultaneous` and production IDs **New** | Academy samples, *Broken*, LOC |
+| Stage plays and musicals | Acts/scenes/cast, speeches, stage/lighting/sound cues, songs, verse and directions | **Partial:** sections, notes and lists preserve text only; cast/cue/speech/music roles and TEI/Fountain bridges **New** | Shakespeare, *R.U.R.*, Dramatists Guild |
 | Dictionary and glossary | Headword, language, pronunciation, senses, etymology, crossrefs | **Partial:** `deflist`/linked labels; rich lexical entry/inline phonetics **New** | Century Dictionary |
 | Parallel text and annotation | Distinguish aligned translations, commentary, side notes from page columns | **Partial:** `columns` expresses parallel blocks; synchronized alignment and marginal note anchor **New** | Annotated editions |
 | Magazine/newspaper | Article boundaries, continuation links, pull-quote identity, optional sidebars, ads and artwork distinct from text flow | **Now:** explicit `article`, `section`, `note`; independent reading flows, sidebar-to-anchor links, and visual/semantic cross-maps **New** | Scientific American, Mondo 2000 |

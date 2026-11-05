@@ -6,7 +6,28 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **281** (this delivery is **280**)
+Next bundle number: **282** (this delivery is **281**)
+
+## Status (2026-11-05) — Screenplays, shooting scripts and stage-play layout research
+
+- Extended the PDF layout inventory with **12** primary-source script/play
+  references (now 30 corpus items): Academy screenplay sample and produced
+  scripts, BBC screenplay/shooting and stage examples, a 1914 Library of
+  Congress photoplay deposit, Wilde/Shaw/Capek historical stage-play scans,
+  and Dramatists Guild play/musical templates.
+- Catalogued scenes and production scene numbers (including `OMITTED`),
+  character-linked speeches, dialogue continuations, interleaved actions,
+  simultaneous speech, stage/lighting/sound directions, cast lists, lyrics,
+  acts, and verse lines. Added a synthetic, **not yet parsed** Markdown-role
+  sketch and benchmark criteria in `docs/PDF_LAYOUT_RESEARCH.md`.
+- Identified [Fountain](https://fountain.io/syntax/) (screenplay plaintext)
+  and [TEI P5 Performance Texts](https://www.tei-c.org/release/doc/tei-p5-doc/en/html/DR.html)
+  (semantic drama) as interoperability/reference targets. Distinguish writer
+  drafts from numbered production scripts; printed indentation and Courier
+  pagination are style/output conventions, not semantic nodes.
+- **Research only:** no runtime parser, layout engine, PDF importer or source
+  downloads. Modern samples are reference-only; historical translations
+  need individual local copyright review before automated AI processing.
 
 ## Status (2026-11-05) — Magazine layout research: Mondo 2000 and avant-garde periodicals
 

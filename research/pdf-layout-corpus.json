@@ -5,7 +5,7 @@
   "notes": [
     "URLs identify source catalog items, not pre-downloaded or redistributable PDF files.",
     "Rights flags are preliminary. Verify the exact edition, item licence, territory, and AI-service terms before use.",
-    "Modern magazines marked reference_only should not be bulk-ingested into an AI workflow without permission.",
+    "Modern magazines and copyrighted scripts marked reference_only should not be bulk-ingested into an AI workflow without permission.",
     "No ground-truth pages or conversion scores have been measured yet."
   ],
   "items": [
@@ -133,6 +133,71 @@
       "features": ["experimental_typography", "type_specimens", "text_as_graphic", "magazine_spreads"]
     },
     {
+      "id": "academy-screenplay-format",
+      "title": "Nicholl Screenplay Format Guide: For a Few Days More (13-page sample)",
+      "creator": "Academy of Motion Picture Arts and Sciences",
+      "year": 2014,
+      "url": "https://www.oscars.org/sites/oscars/files/scriptsample.pdf",
+      "source_format": "born_digital_screenplay_pdf",
+      "evaluation_use": "reference_only",
+      "rights_review": "Academy-produced instructional example; downloading to read does not establish redistribution or AI-ingestion rights",
+      "features": ["scene_sluglines", "action", "character_cues", "parentheticals", "dialogue", "transitions", "page_break_continuations"]
+    },
+    {
+      "id": "short-term-12-screenplay",
+      "title": "Short Term 12 (Academy Nicholl entry screenplay)",
+      "creator": "Destin Cretton",
+      "year": 2013,
+      "url": "https://www.oscars.org/sites/oscars/files/scripts/cretton_short-term-12.pdf",
+      "source_format": "professional_screenplay_pdf",
+      "evaluation_use": "reference_only",
+      "rights_review": "Copyrighted contemporary script, hosted by the Academy to read; AI processing/redistribution not cleared",
+      "features": ["scene_sluglines", "screenplay_dialogue", "parentheticals", "action_blocks", "character_introduction"]
+    },
+    {
+      "id": "arlington-road-screenplay",
+      "title": "Arlington Road (Academy Nicholl entry screenplay)",
+      "creator": "Ehren Kruger",
+      "year": 1999,
+      "url": "https://www.oscars.org/sites/oscars/files/scripts/kruger_arlingtonroad2.pdf",
+      "source_format": "professional_screenplay_pdf_low_text_extraction",
+      "evaluation_use": "reference_only",
+      "rights_review": "Copyrighted screenplay; text layer appears sparse in web viewer, confirm with PDF inspection before treating as scanned/OCR input",
+      "features": ["historic_professional_script", "screenplay_dialogue", "pdf_text_layer_quality", "ocr_candidate"]
+    },
+    {
+      "id": "broken-shooting-script",
+      "title": "Broken: Shooting Script (12 October 2011)",
+      "creator": "Mark O'Rowe / BBC and BFI",
+      "year": 2011,
+      "url": "https://downloads.bbc.co.uk/writersroom/scripts/Broken-Shooting-Script.pdf",
+      "source_format": "production_shooting_script_pdf",
+      "evaluation_use": "reference_only",
+      "rights_review": "BBC/BFI/Cuba Pictures copyrighted production script; reference only without rights clearance",
+      "features": ["numbered_scenes", "omitted_scene_placeholders", "production_metadata", "camera_cues", "character_continuations", "scene_identity"]
+    },
+    {
+      "id": "bbc-screenplay-template",
+      "title": "BBC Screenplay Format",
+      "creator": "BBC Writersroom",
+      "year": null,
+      "url": "https://downloads.bbc.co.uk/writersroom/scripts/screenplay.pdf",
+      "source_format": "annotated_screenplay_format_pdf",
+      "evaluation_use": "reference_only",
+      "rights_review": "Formatting example from BBC, not a licence for redistribution or third-party AI ingestion",
+      "features": ["simultaneous_dialogue", "dialogue_continuation", "parentheticals", "screenplay_layout"]
+    },
+    {
+      "id": "loc-one-thousand-shot",
+      "title": "One Thousand to One Shot (motion-picture copyright-deposit item)",
+      "creator": "Biograph Company",
+      "year": 1914,
+      "url": "https://www.loc.gov/item/s1229l02104/",
+      "source_format": "historical_motion_picture_manuscript_pdf",
+      "rights_review": "Historical US public-domain candidate; verify specific item contents, rights and scan provider conditions",
+      "features": ["early_film_scenario", "historical_script_conventions", "manuscript_layout"]
+    },
+    {
       "id": "whitman-leaves",
       "title": "Leaves of Grass",
       "creator": "Walt Whitman",
@@ -151,6 +216,69 @@
       "source_format": "historical_scan",
       "rights_review": "Historical public-domain text; verify scan provider terms",
       "features": ["drama", "speech", "speaker_labels", "stage_directions", "act_scene_hierarchy"]
+    },
+    {
+      "id": "wilde-earnest-1899",
+      "title": "The Importance of Being Earnest (1899 printed edition)",
+      "creator": "Oscar Wilde",
+      "year": 1899,
+      "url": "https://commons.wikimedia.org/wiki/File:The_importance_of_being_earnest_-_a_trivial_comedy_for_serious_people_(IA_importanceofbein00wildrich).pdf",
+      "source_format": "historical_play_scan_pdf",
+      "rights_review": "Wikimedia Commons identifies the work as US public domain; verify edition and local rights before processing",
+      "features": ["dramatis_personae", "acts", "speech", "stage_directions", "dramatic_dialogue"]
+    },
+    {
+      "id": "shaw-pygmalion-1914",
+      "title": "Pygmalion: A Play in Five Acts (1914 edition)",
+      "creator": "George Bernard Shaw",
+      "year": 1914,
+      "url": "https://commons.wikimedia.org/wiki/File:Pygmalion_-_a_play_in_five_acts,_(IA_pygmalionplayinf00shawrich).pdf",
+      "source_format": "historical_play_scan_pdf",
+      "rights_review": "US public-domain candidate; verify exact edition, local rights and scan terms",
+      "features": ["dramatis_personae", "five_acts", "speech", "extended_stage_directions", "preface"]
+    },
+    {
+      "id": "capek-rur-1923",
+      "title": "R.U.R. (Rossum's Universal Robots), 1923 English translation",
+      "creator": "Karel Capek; translated by Paul Selver",
+      "year": 1923,
+      "url": "https://en.wikisource.org/wiki/File:R_U_R_Rossum_s_Universal_Robots.pdf",
+      "source_format": "historical_play_scan_with_transcription",
+      "rights_review": "Wikisource describes this scan as 1923 public domain; independently verify translation and territory-specific rights",
+      "features": ["dramatis_personae", "act_scene_hierarchy", "epilogue", "stage_directions", "dramatic_dialogue", "scan_transcription_pair"]
+    },
+    {
+      "id": "guild-modern-play",
+      "title": "Dramatists Guild Modern Play Format sample",
+      "creator": "Dramatists Guild",
+      "year": null,
+      "url": "https://www.dramatistsguild.com/sites/default/files/2019-12/modernformat-New.pdf",
+      "source_format": "annotated_stage_play_format_pdf",
+      "evaluation_use": "reference_only",
+      "rights_review": "Professional formatting guide quotes a copyrighted play; reference only without permission",
+      "features": ["play_format", "speaker_cues", "stage_action", "pagination", "print_margins"]
+    },
+    {
+      "id": "guild-musical-format",
+      "title": "Dramatists Guild Modern Musical Format sample",
+      "creator": "Dramatists Guild",
+      "year": null,
+      "url": "https://www.dramatistsguild.com/sites/default/files/2019-12/musicalformat-New.pdf",
+      "source_format": "annotated_musical_format_pdf",
+      "evaluation_use": "reference_only",
+      "rights_review": "Professional template with excerpts; viewing access does not authorize AI ingestion",
+      "features": ["song_numbers", "lyrics", "sung_spoken_distinction", "stage_cues"]
+    },
+    {
+      "id": "bbc-stage-template",
+      "title": "BBC Stage Format example",
+      "creator": "BBC Writersroom / Matt Carless",
+      "year": 2004,
+      "url": "https://downloads.bbc.co.uk/writersroom/scripts/stage.pdf",
+      "source_format": "annotated_stage_play_format_pdf",
+      "evaluation_use": "reference_only",
+      "rights_review": "BBC-hosted example; copyright and AI-ingestion permission not assessed",
+      "features": ["title_page", "acts", "speaker_cues", "stage_directions", "page_conventions"]
     },
     {
       "id": "aucassin-nicolette",
