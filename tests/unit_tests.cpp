@@ -1012,7 +1012,7 @@ void test_named_style_scopes() {
       ":::\n"
       ":::aside style=compact side=left\nMargin text\n:::\n";
   Document doc = parse_markup(source);
-  const auto roots = kids_of(doc, doc.root);
+  const auto& roots = doc.get(doc.root).children;
   EXPECT_EQ(roots.size(), 2u);
   if (roots.size() != 2) return;
   NodeId sec = roots[0], aside = roots[1];
@@ -1020,7 +1020,7 @@ void test_named_style_scopes() {
   EXPECT_EQ(doc.get(sec).style, "technical");
   EXPECT(doc.get(aside).kind == NodeKind::Aside);
   EXPECT_EQ(doc.get(aside).style, "compact");
-  auto kids = kids_of(doc, sec);
+  const auto& kids = doc.get(sec).children;
   EXPECT_EQ(kids.size(), 3u);
   if (kids.size() != 3) return;
   NodeId warning = kids[1], normal = kids[2];
@@ -1041,7 +1041,7 @@ void test_named_style_scopes() {
   apply_style_source(style, R"(
     (stylesheet
       (variant technical (role note (border "#112233")))
-      (variant warning (role note (border "#aa3300") (color "#ff0000"))
+      (variant warning (role note (border "#aa3300") (color "#ff0000")))
       (variant compact (role aside (placement flow) (width 12em))))
   )");
   EXPECT(style.warnings.empty());

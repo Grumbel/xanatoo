@@ -6,7 +6,16 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **285** (this delivery is **284**)
+Next bundle number: **286** (this delivery is **285**)
+
+## Status (2026-11-05) — Fix named variant test compilation (bundle 285)
+
+- `test_named_style_scopes` now inspects `Document::children` directly instead
+  of calling `kids_of` before its definition. The other identifier errors
+  (`aside`, `normal`) were consequences of that failed declaration.
+- Corrected a missing closing parenthesis in the test's `warning` variant,
+  which would otherwise nest `compact` under `warning` instead of testing
+  two separate scopes.
 
 ## Status (2026-11-05) — Explicit block style variants (bundle 284)
 
