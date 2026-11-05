@@ -41,8 +41,9 @@ Three distinct things must survive conversion:
 Open the linked catalog item first, then use its downloadable PDF or page
 images. A catalog link is intentional: Archive.org may offer a different
 scanned edition, a searchable OCR file, or no unrestricted PDF download.
-The final three entries supply ground-truth material unavailable for most
-historical scans.
+The last two article entries supply structured XML unavailable for most
+historical scans. Later magazine additions are exploratory references, not
+necessarily cleared for automated ingestion.
 
 | ID / source | What to inspect | Why it is difficult |
 |---|---|---|
@@ -52,6 +53,12 @@ historical scans.
 | **century-dictionary** — [*The Century Dictionary* (1889–91), part 1](https://archive.org/details/centurydictipt100whituoft) | Headwords, pronunciation, etymology, numbered senses, usage examples | Dictionary *entries* rather than paragraphs; crossrefs and multi-column continuous flow |
 | **chicago-manual** — [*A Manual of Style* (1906)](https://archive.org/details/manualofstylebei00univrich) | Editorial examples, typographic samples, lists, tables, index | Examples whose typography is itself the subject, nested lists and back matter |
 | **scientific-american-1906** — [*Scientific American*, 14 July 1906](https://archive.org/details/scientific-american-1906-07-14) | Multiple articles, columns, illustrations, advertisements | **Multiple separate reading orders on one page**; page composition is not one article and not parallel-text columns |
+| **popular-magazine-1920** — [*The Popular Magazine*, 7 June 1920](https://archive.org/details/the-popular-magazine-v-056-n-04-1920-06-07) | Pulp fiction, covers, display headlines, serials, advertising | Feature openings, illustration/text alternation, editorial versus commercial content; historical public-domain candidate |
+| **dada-1917** — [*Dada* no. 1 (1917), University of Iowa](https://sdrc.lib.uiowa.edu/dada/dada/1/index.htm) | Avant-garde magazine pages, typography and image relationships | Design can be part of the work; page-image source, not necessarily a downloadable PDF |
+| **391-1920** — [*391*, no. 13 (1920), Wikimedia Commons](https://commons.wikimedia.org/wiki/File:391_magazine_Volume_13.pdf) | Experimental typographic composition and juxtaposition | Historically avant-garde page design with an identified PDF and public-domain declaration |
+| **mondo-2000-01** — [*Mondo 2000* no. 1 (1989)](https://archive.org/details/Mondo.2000.Issue.01.1989) | Early magazine structure, interviews, reviews and artwork | Earlier baseline for comparison with later issues; **copyrighted, reference only unless cleared** |
+| **mondo-2000-04** — [*Mondo 2000* no. 4 (1991)](https://archive.org/details/Mondo.2000.Issue.04.1991) | Digital collage, experimental feature design, pull quotes, article opening spreads | A severe reading-order and text/graphic-boundary stress test; **copyrighted, reference only unless cleared** |
+| **emigre-11** — [*Emigre* no. 11 (1989), Letterform Archive](https://letterformarchive.org/news/emigre-issue-11/) | Typography as subject, digital display types, unusual placement | Can the extraction retain information where type design itself is content? **Reference only; viewing access is not an AI licence** |
 | **whitman-leaves** — [Whitman, *Leaves of Grass* (1891–92)](https://archive.org/details/leavesofgrassinc00whitrich) | Long verse lines, stanzas, indentation, poems and sequence | Line boundaries are meaningful; poem versus prose and deliberate whitespace |
 | **shakespeare-folio** — [Shakespeare, *First Folio* (1623), Library of Congress](https://www.loc.gov/item/2021666879/) | Act/scene divisions, speech labels, stage directions | Speaker/speech/aside structure; historical orthography and challenging OCR |
 | **aucassin-nicolette** — [*Aucassin & Nicolette* (1887)](https://archive.org/details/aucassinnicolett00bouruoft) | Verse/prose transitions, notes, glossary, bibliography | Mixed literary forms and extensive scholarly back matter; confirm the particular edition's layout |
@@ -74,6 +81,13 @@ contain PDFs, OCR, scraped full text or claimed ground-truth annotations.
   access on PMC or arXiv **does not mean** permission for every kind of
   redistribution or AI use. PMC's Open Access Subset records individual
   licences; JATS sample files are for format study pending review.
+- **Mondo 2000 and Emigre are modern copyrighted magazines.** Their scans
+  and online reading archives are valuable *visual design references*, not
+  an assumed licence to bulk download, train a model, publish derived OCR,
+  or upload entire issues to an AI service. Keep them reference-only until
+  a suitable use and permission are established. Start automated benchmark
+  fixtures with vetted public-domain magazines (Scientific American, Dada,
+  391, The Popular Magazine).
 - Explicit counterexample: **OpenStax Astronomy 2e** is freely readable,
   but its current site terms explicitly restrict ingestion by generative AI
   without permission. Do **not** add it to an automated AI-ingestion set.
@@ -81,6 +95,57 @@ contain PDFs, OCR, scraped full text or claimed ground-truth annotations.
   evidence alongside every future manually annotated fixture. Scan page
   index (zero-based), original printed page label and logical page sequence
   are three different coordinates.
+
+## Magazines as a separate problem: *Mondo 2000*
+
+Magazine composition deserves its own benchmark rather than treating it as
+another book layout. For example, [*Mondo 2000* issue 4 (1991)](https://archive.org/details/Mondo.2000.Issue.04.1991)
+is a particularly interesting case: the magazine's digital collages,
+unconventional typography and experimental layouts are documented in a
+[retrospective on its design](https://www.wired.com/2015/07/tech-time-warp-week-wired-eccentric-mondo-2000/).
+The Archive.org item identifies 164 scanned pages and offers PDF,
+PDF-with-text, OCR and hOCR exports; these are potential *inputs* to a
+reading-order investigation, not evidence that the resulting text is good.
+Issue [1 (1989)](https://archive.org/details/Mondo.2000.Issue.01.1989)
+provides a useful earlier comparison. The [Anarchivism issue list](https://anarchivism.org/w/Mondo_2000)
+links scans across the run.
+
+| Magazine composition | Recovery question | Desired semantic result |
+|---|---|---|
+| Feature opening spread | Is large lettering a title, caption, decorative art, or all three? | One article with a proper title; preserve stylized title art separately when significant |
+| Several irregular text blocks | Which fragments form a continuous story, and in what order? | Explicit ordered article flow, not global left-to-right/top-to-bottom reading |
+| Interleaved sidebar or fact box | Does it interrupt the main argument or offer optional context? | Distinct sidebar passage with an `about`/`related` link to its anchor |
+| Pull quote | Is this new text, or a styled repeat of a sentence elsewhere? | A reference to/excerpt of the original passage; avoid duplicating narrative content |
+| Photographic collage and overlays | Are words part of a diagram, illustration, or readable article prose? | Figure/plate with text annotations and source regions where warranted |
+| Ads, product blurbs, and reviews | Do these belong to the adjacent feature? | Independent labelled items with explicit commercial/editorial role |
+| Split article across spreads | Which story continues on a later page? | Continuous semantic article with source page segments retained as provenance |
+| Rotated/angled text | Does orientation signal emphasis, a separate content path, or a purely graphical motif? | Typed text if meaningful; retain a facsimile crop if flattening erases meaning |
+| Contents, folios and running headers | Which strings navigate, and which are page furniture? | Article/issue links; print pagination only as source location |
+
+This exposes a limitation of the phrase **"same document in Markdown"**:
+an aggressively art-directed spread is sometimes itself an image/composition.
+No semantic text tree can reproduce *every* intentional interaction of ink,
+font, and collage. There should be two complementary outputs:
+
+1. **Semantic reader edition:** articles, headings, sidebars, interviews,
+   figures and linked excerpts; excellent search, accessibility and reflow.
+2. **Facsimile/graphic edition:** an original or rights-cleared page/spread
+   image with text/region links into the semantic edition. This preserves
+   artwork and graphic relationships that should not be faked with CSS or
+   discarded by OCR.
+
+A later hybrid reader could show the source spread with selectable semantic
+overlays, or switch a passage from designed-facsimile to reflow. The markup
+should identify *what belongs together*; the facsimile/source map can retain
+where the designer placed it. In particular, avoid treating every PDF text
+box as a new authored paragraph or assuming the magazine has one universal
+reading sequence.
+
+**Minimum magazine test cases** after selecting exact pages: one ordinary
+multi-column article, an unusual article opener, an interleaved sidebar, a
+collage with text, a pull quote, a separate advertisement, and a feature
+continued on another spread. First establish these against public-domain
+magazines; compare *Mondo* and *Emigre* visually under their access terms.
 
 ## Feature inventory and the mapping to Xanatoo
 
@@ -103,7 +168,7 @@ limitation; no claim here that existing nodes reproduce print typesetting.
 | Verse, drama, letters | Verse line and stanza boundaries, speaker, stage direction, attribution | **Partial:** paragraphs and code can preserve lines but not meaning; `verse`/`stanza`/`speech` **New** | Whitman, Shakespeare |
 | Dictionary and glossary | Headword, language, pronunciation, senses, etymology, crossrefs | **Partial:** `deflist`/linked labels; rich lexical entry/inline phonetics **New** | Century Dictionary |
 | Parallel text and annotation | Distinguish aligned translations, commentary, side notes from page columns | **Partial:** `columns` expresses parallel blocks; synchronized alignment and marginal note anchor **New** | Annotated editions |
-| Magazine/newspaper | Article boundaries and correct reading order, figures, ads, sidebars | **Now:** explicit `article`, `section`, `note`; independent flows and region relationships **New** | Scientific American |
+| Magazine/newspaper | Article boundaries, continuation links, pull-quote identity, optional sidebars, ads and artwork distinct from text flow | **Now:** explicit `article`, `section`, `note`; independent reading flows, sidebar-to-anchor links, and visual/semantic cross-maps **New** | Scientific American, Mondo 2000 |
 | Back matter and navigation | TOC, index with page/passage refs, glossary, appendix, errata | **Partial:** sections and links; semantic index terms and generated index/TOC **New** | Chicago, Gray |
 | Nonlinear media and maps | Plate/region references, legends, legends linked to geometry | **Partial:** figure/image/collection; image-region anchors and diagram text/colour **New** | Berghaus, Byrne |
 | Print-only mechanics | Running head, folio/page label, ornaments, crop marks, hyphenation | **Source provenance / view metadata**, *not* semantic body text | All scanned books |
@@ -251,7 +316,10 @@ such PDF/XML pairs (BMJ and PNAS). See also the 2024 [JATS 1.4 standard](https:/
    coverage of meaningful blocks; ordering/edge accuracy; math symbol
    agreement; table header associations; figure-caption links; citation
    target resolution; footnote/backlink consistency; number of manual fixes.
-   Also measure *unsupported-role* count.
+   Also measure *unsupported-role* count. For magazines additionally score
+   article-continuation edges, separation of ads/sidebars from editorial
+   prose, detection of duplicated pull quotes, and retention of artwork
+   that cannot be semantically reflowed.
 4. **Implement high-return roles** after inspecting errors: front matter,
    theorem/definition/proof, numbered math, table footnotes/spans, verse and
    marginal notes. Extend the canonical AST first, then Markdown fences,
@@ -282,3 +350,9 @@ reader inspect any uncertain region in the original**.
   [Century Dictionary scan and licence note](https://commons.wikimedia.org/wiki/File:The_Century_dictionary_-_an_encyclopedic_lexicon_of_the_English_language-_prepared_under_the_superintendence_of_William_Dwight_Whitney_(IA_centurydictipt100whituoft).pdf),
   [Whitman Archive](https://whitmanarchive.org/item/ppp.00707),
   [Library of Congress First Folio](https://www.loc.gov/item/2021666879/).
+- Magazine references: [*Mondo 2000* scan index](https://anarchivism.org/w/Mondo_2000),
+  [issue 4](https://archive.org/details/Mondo.2000.Issue.04.1991),
+  [Emigre / Letterform Archive](https://letterformarchive.org/news/new-in-the-online-archive-complete-emigre-magazine/),
+  [University of Iowa Digital Dada Library](https://sdrc.lib.uiowa.edu/dada/digitaldadalib/index.html),
+  [UPenn public-domain *Dada* catalogue](https://onlinebooks.library.upenn.edu/webbin/serial?id=dada1917),
+  [Wikimedia Commons *391* PDF](https://commons.wikimedia.org/wiki/File:391_magazine_Volume_13.pdf).

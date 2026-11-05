@@ -5,6 +5,7 @@
   "notes": [
     "URLs identify source catalog items, not pre-downloaded or redistributable PDF files.",
     "Rights flags are preliminary. Verify the exact edition, item licence, territory, and AI-service terms before use.",
+    "Modern magazines marked reference_only should not be bulk-ingested into an AI workflow without permission.",
     "No ground-truth pages or conversion scores have been measured yet."
   ],
   "items": [
@@ -67,6 +68,69 @@
       "source_format": "historical_periodical_scan",
       "rights_review": "US public-domain candidate by publication date; verify individual matter and local terms",
       "features": ["multiple_articles", "article_reading_order", "newspaper_columns", "advertisements", "illustrations"]
+    },
+    {
+      "id": "popular-magazine-1920",
+      "title": "The Popular Magazine, volume 56 no. 4",
+      "creator": "The Popular Magazine",
+      "year": 1920,
+      "url": "https://archive.org/details/the-popular-magazine-v-056-n-04-1920-06-07",
+      "source_format": "historical_periodical_scan",
+      "rights_review": "Wikimedia Commons lists the source scan as public domain; verify local rights and item terms",
+      "features": ["feature_openings", "serial_fiction", "headlines", "illustrations", "advertisements"]
+    },
+    {
+      "id": "dada-1917",
+      "title": "Dada, number 1",
+      "creator": "Dada (Zurich)",
+      "year": 1917,
+      "url": "https://sdrc.lib.uiowa.edu/dada/dada/1/index.htm",
+      "source_format": "historical_periodical_page_images",
+      "rights_review": "University of Pennsylvania Online Books Page lists this serial as public domain in the US; review source page-image terms",
+      "features": ["experimental_typography", "visual_poetry", "graphic_composition", "nonlinear_reading"]
+    },
+    {
+      "id": "391-1920",
+      "title": "391, issue 13",
+      "creator": "391 (avant-garde magazine)",
+      "year": 1920,
+      "url": "https://commons.wikimedia.org/wiki/File:391_magazine_Volume_13.pdf",
+      "source_format": "historical_periodical_pdf",
+      "rights_review": "Wikimedia Commons file description marks it public domain; review local rights",
+      "features": ["experimental_typography", "collage", "juxtaposition", "nonlinear_reading"]
+    },
+    {
+      "id": "mondo-2000-01",
+      "title": "Mondo 2000, issue 1",
+      "creator": "Mondo 2000",
+      "year": 1989,
+      "url": "https://archive.org/details/Mondo.2000.Issue.01.1989",
+      "source_format": "modern_magazine_scan",
+      "evaluation_use": "reference_only",
+      "rights_review": "Copyrighted modern magazine; Archive.org read access is not reuse or AI-ingestion permission",
+      "features": ["article_openings", "interviews", "reviews", "editorial_art", "issue_structure"]
+    },
+    {
+      "id": "mondo-2000-04",
+      "title": "Mondo 2000, issue 4",
+      "creator": "Mondo 2000",
+      "year": 1991,
+      "url": "https://archive.org/details/Mondo.2000.Issue.04.1991",
+      "source_format": "modern_magazine_scan_with_archive_ocr",
+      "evaluation_use": "reference_only",
+      "rights_review": "Copyrighted modern magazine; Archive.org read access is not reuse or AI-ingestion permission",
+      "features": ["art_directed_spreads", "photomontage", "display_typography", "sidebars", "pullquotes", "multiple_reading_flows", "text_over_images"]
+    },
+    {
+      "id": "emigre-11",
+      "title": "Emigre, issue 11: Ambition/Fear",
+      "creator": "Emigre",
+      "year": 1989,
+      "url": "https://letterformarchive.org/news/emigre-issue-11/",
+      "source_format": "online_magazine_page_images",
+      "evaluation_use": "reference_only",
+      "rights_review": "Copyrighted modern magazine; free online viewing does not authorize AI ingestion",
+      "features": ["experimental_typography", "type_specimens", "text_as_graphic", "magazine_spreads"]
     },
     {
       "id": "whitman-leaves",

@@ -6,7 +6,20 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **280** (this delivery is **279**)
+Next bundle number: **281** (this delivery is **280**)
+
+## Status (2026-11-05) — Magazine layout research: Mondo 2000 and avant-garde periodicals
+
+- Expanded `docs/PDF_LAYOUT_RESEARCH.md` with a magazine-specific semantic
+  reading-order problem and a two-output approach: a reflowable article
+  edition plus facsimile/graphic edition with region links.
+- Added Mondo 2000 issues 1 and 4, Emigre 11, and historical Dada, 391 and
+  The Popular Magazine to the machine-readable corpus (18 items in total).
+  Modern magazine scans remain reference-only pending explicit reuse/AI
+  permission; the historical titles are preliminary public-domain candidates.
+- Extended evaluation ideas for sidebars, separate advertisements, article
+  continuation, pull-quote duplication, image/text overlays and composed
+  art. No content downloaded or importer code changed.
 
 ## Status (2026-11-05) — PDF layout feature research and import corpus
 
