@@ -344,6 +344,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::ViewMeasure ||
         c == C::ToggleSectionFocus || c == C::ToggleJustify ||
         c == C::ToggleHoverPreview || c == C::TogglePreferences ||
+        c == C::SetUiScale ||
         c == C::SelectStyle || c == C::ReloadStyles;
     if (!allowed) {
       flash_status(app, "Browse mode — F2 to edit");
