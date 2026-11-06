@@ -12,10 +12,67 @@
 #include <SDL3/SDL_misc.h>
 // Modifiers and the grave-accent key were renamed in SDL3. Keep the
 // application's command-key vocabulary stable while both backends coexist.
+#undef KMOD_CTRL
+#undef KMOD_SHIFT
+#undef KMOD_ALT
 #define KMOD_CTRL SDL_KMOD_CTRL
 #define KMOD_SHIFT SDL_KMOD_SHIFT
 #define KMOD_ALT SDL_KMOD_ALT
+#undef SDLK_BACKQUOTE
 #define SDLK_BACKQUOTE SDLK_GRAVE
+// SDL2 used lowercase key names; SDL3 spells the same keycodes in uppercase.
+#undef SDLK_a
+#undef SDLK_b
+#undef SDLK_c
+#undef SDLK_d
+#undef SDLK_e
+#undef SDLK_f
+#undef SDLK_g
+#undef SDLK_h
+#undef SDLK_i
+#undef SDLK_j
+#undef SDLK_k
+#undef SDLK_l
+#undef SDLK_m
+#undef SDLK_n
+#undef SDLK_o
+#undef SDLK_p
+#undef SDLK_q
+#undef SDLK_r
+#undef SDLK_s
+#undef SDLK_t
+#undef SDLK_u
+#undef SDLK_v
+#undef SDLK_w
+#undef SDLK_x
+#undef SDLK_y
+#undef SDLK_z
+#define SDLK_a SDLK_A
+#define SDLK_b SDLK_B
+#define SDLK_c SDLK_C
+#define SDLK_d SDLK_D
+#define SDLK_e SDLK_E
+#define SDLK_f SDLK_F
+#define SDLK_g SDLK_G
+#define SDLK_h SDLK_H
+#define SDLK_i SDLK_I
+#define SDLK_j SDLK_J
+#define SDLK_k SDLK_K
+#define SDLK_l SDLK_L
+#define SDLK_m SDLK_M
+#define SDLK_n SDLK_N
+#define SDLK_o SDLK_O
+#define SDLK_p SDLK_P
+#define SDLK_q SDLK_Q
+#define SDLK_r SDLK_R
+#define SDLK_s SDLK_S
+#define SDLK_t SDLK_T
+#define SDLK_u SDLK_U
+#define SDLK_v SDLK_V
+#define SDLK_w SDLK_W
+#define SDLK_x SDLK_X
+#define SDLK_y SDLK_Y
+#define SDLK_z SDLK_Z
 #else
 #include <SDL.h>
 #if SDL_VERSION_ATLEAST(2, 0, 14)
@@ -613,6 +670,14 @@ inline void mouse_position(int* x, int* y) {
 // Keep existing 32-bit timing fields, and SDL2's wrap-safe deadline test.
 // SDL3's SDL_GetTicks() returns 64 bits; narrowing preserves the same modulo.
 inline Uint32 ticks() { return static_cast<Uint32>(SDL_GetTicks()); }
+
+inline int cpu_count() {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  return SDL_GetNumLogicalCPUCores();
+#else
+  return SDL_GetCPUCount();
+#endif
+}
 
 inline bool ticks_passed(Uint32 now, Uint32 deadline) {
   return static_cast<Sint32>(deadline - now) <= 0;

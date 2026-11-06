@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Builds the APK: xanatoo's sources as libmain.so with ndk-build against the
-# prebuilt SDL2 and a static FreeType, packaged with SDL's Java side,
+# prebuilt SDL3 and a static FreeType, packaged with SDL's Java side,
 # aligned and signed (after Kurvenrausch / Pingus). Data files (examples,
 # FORMAT.md, style sheets, toolbar icons) go to assets/xanatoo/ with a
 # MANIFEST that platform.cpp unpacks into internal storage.
@@ -79,9 +79,9 @@ sed -e "s/@THUMTOO_VERSION_MAJOR@/$tv_major/" -e "s/@THUMTOO_VERSION_MINOR@/$tv_
   -e "s/@THUMTOO_HAVE_[A-Z]*@/0/" \
   "$APP_SRC_DIR"/external/thumtoo/include/thumtoo/version.hpp.in > "$T/gen/thumtoo/version.hpp"
 
-# SDL2, prebuilt; xanatoo includes <SDL.h> from include/SDL2.
+# SDL3, prebuilt; xanatoo includes <SDL3/SDL.h> from include/.
 cp "$SDL_PREBUILT_MK" src/jni/SDL/Android.mk
-cp -r "$SDL_ANDROID_LIBS/include" src/jni/SDL/include/SDL2
+cp -r "$SDL_ANDROID_LIBS/include/." src/jni/SDL/include/
 chmod -R u+rwX src
 
 # Data files → assets/xanatoo/ + MANIFEST (stamp line, then one path per

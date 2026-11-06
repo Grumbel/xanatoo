@@ -60,13 +60,23 @@ class LogcatBuf : public std::streambuf {
 
 // Whole asset (or any SDL_RWops path) as a string; empty when missing.
 std::string read_asset(const std::string& path) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  SDL_IOStream* rw = SDL_IOFromFile(path.c_str(), "rb");
+#else
   SDL_RWops* rw = SDL_RWFromFile(path.c_str(), "rb");
+#endif
   if (!rw) return {};
   std::string data;
   char buf[16384];
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  size_t n;
+  while ((n = SDL_ReadIO(rw, buf, sizeof(buf))) > 0) data.append(buf, n);
+  SDL_CloseIO(rw);
+#else
   size_t n;
   while ((n = SDL_RWread(rw, buf, 1, sizeof(buf))) > 0) data.append(buf, n);
   SDL_RWclose(rw);
+#endif
   return data;
 }
 
@@ -109,8 +119,13 @@ void unpack_assets(const fs::path& dest) {
 
 // Context.getCacheDir() (gamepkgstd DIR-5); SDL2 has no wrapper for it.
 std::string android_cache_dir() {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
+  auto activity = static_cast<jobject>(SDL_GetAndroidActivity());
+#else
   auto* env = static_cast<JNIEnv*>(SDL_AndroidGetJNIEnv());
   auto activity = static_cast<jobject>(SDL_AndroidGetActivity());
+#endif
   if (!env || !activity) return {};
   std::string out;
   jclass cls = env->GetObjectClass(activity);
@@ -154,7 +169,11 @@ void platform_init() {
 
   // User directories in the app's private storage (gamepkgstd DIR-5):
   // <internal>/{config,state,data}, the cache in Context.getCacheDir().
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  const char* internal = SDL_GetAndroidInternalStoragePath();
+#else
   const char* internal = SDL_AndroidGetInternalStoragePath();
+#endif
   if (!internal) return;
   const fs::path home = internal;
   set_platform_dir(DirKind::Config, (home / "config").string());
@@ -190,11 +209,16 @@ void platform_release_keyboard(SDL_Window* window) {
 bool platform_text_input_at_start() { return false; }
 
 float platform_default_ui_scale() {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  const float scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+  return scale > 0.f ? scale : 1.f;
+#else
   float ddpi = 0.f;
   if (SDL_GetDisplayDPI(0, &ddpi, nullptr, nullptr) != 0 || ddpi <= 0.f)
     return 1.f;
   const float s = std::round(ddpi / 160.f * 4.f) / 4.f;
   return s < 1.f ? 1.f : s;
+#endif
 }
 
 #else

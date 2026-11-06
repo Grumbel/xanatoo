@@ -6,7 +6,21 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **286** (this delivery is **285**)
+Next bundle number: **287** (this delivery is **286**)
+
+## Status (2026-11-06) — Android SDL3 migration (bundle 286)
+
+- Switched the Android APK pipeline from SDL 2.30.3 to nixpkgs SDL3, matching
+  Kurvenrausch's NDK/SDLActivity build and APK packaging. The app now compiles
+  through its SDL3 API bridge and first-party ImGui SDL3 backend, and links
+  against `libSDL3.so`.
+- Raised Android's minimum API from 21 to 22, matching the SDL3 Android port.
+  SDL3's Android orientation policy respects the system rotation lock.
+- Updated the shared SDL bridge for SDL3 keycodes and CPU reporting, and the
+  Android platform code for SDL3 I/O streams, JNI access, storage paths and
+  display scaling.
+- `nix build .#xanatoo-android` passes for armeabi-v7a, arm64-v8a and x86_64.
+  Device orientation behavior still needs runtime verification.
 
 ## Status (2026-11-05) — Fix named variant test compilation (bundle 285)
 

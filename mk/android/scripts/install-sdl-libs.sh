@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Collects build-sdl-libs.sh's results into $out: lib/<abi>/libSDL2.so,
+# Collects build-sdl-libs.sh's results into $out: lib/<abi>/libSDL3.so,
 # include/ (SDL's headers) and dex/classes.dex.
 # Env: TARGET_ABIS (e.g. "armeabi-v7a arm64-v8a"), out
 set -euo pipefail

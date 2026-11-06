@@ -7,7 +7,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    # Pinned SDL2 sources used by Android and offline WASM; retained as a
+    # Pinned SDL2 sources used by offline WASM; retained as a
     # fallback for Windows while its default Nix package uses SDL3 compat.
     sdl2-src = {
       url = "https://github.com/libsdl-org/SDL/releases/download/release-2.30.3/SDL2-2.30.3.tar.gz";
@@ -39,8 +39,8 @@
       thumtooBuildInputs = pkgs:
         thumtooLib.mkBuildInputs (pkgs // { mupdf = thumtooLib.pinMupdf pkgs; });
 
-      # Android (Linux hosts): the SDK and NDK are unfree. Android 5.0
-      # (API 21) is the minimum; the Java side compiles against API 33.
+      # Android (Linux hosts): the SDK and NDK are unfree. API 22 is the
+      # minimum supported by the SDL3 Android port; Java compiles against 33.
       androidFor = system:
         let
           androidPkgs = import nixpkgs {
@@ -51,14 +51,14 @@
         in import ./nix/android.nix {
           pkgs = androidPkgs;
           inherit nixpkgs;
-          sdlSrc = sdl2-src;
-          sdlVersion = "2.30.3";
+          sdlSrc = androidPkgs.sdl3.src;
+          sdlVersion = androidPkgs.sdl3.version;
           buildToolsVersion = "30.0.3";
-          packagePlatform = "21";
+          packagePlatform = "22";
           compilePlatform = "33";
           targetAbis = [ "armeabi-v7a" "arm64-v8a" "x86_64" ];
           androidSdk = (androidPkgs.androidenv.composeAndroidPackages {
-            platformVersions = [ "21" "33" ];
+            platformVersions = [ "22" "33" ];
             buildToolsVersions = [ "30.0.3" ];
             includeNDK = true;
             ndkVersion = "29.0.14206865";
@@ -168,7 +168,7 @@
               android = androidFor system;
             in {
               xanatoo-android = android.apk;
-              sdl2-android = android.sdlAndroidLibs;
+              sdl3-android = android.sdlAndroidLibs;
               imagedeps-android = android.imageLibs;
               arkos-sysroot = r36s.sysroot;
               xanatoo-r36s = r36s.r36s;

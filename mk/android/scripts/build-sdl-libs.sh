@@ -2,11 +2,11 @@
 # SPDX-FileCopyrightText: 2026 Ingo Ruhnke <grumbel@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Builds SDL2's native library with ndk-build for every ABI, and its Java
-# side (SDLActivity) into classes.dex, as Pingus does.
+# Builds SDL3's native library with ndk-build for every ABI, and its Java
+# side (SDLActivity) into classes.dex, following the Kurvenrausch pipeline.
 #
 # Env: ANDROID_HOME, BUILD_TOOLS_VERSION, COMPILE_PLATFORM, PACKAGE_PLATFORM,
-#      SDL_SRC (SDL2 source tree), APPLICATION_MK, TOP_ANDROID_MK
+#      SDL_SRC (SDL3 source tree), APPLICATION_MK, TOP_ANDROID_MK
 set -euo pipefail
 
 # shellcheck source=ndk.sh
@@ -19,11 +19,6 @@ COMPILE_JAR="$ANDROID_HOME/platforms/android-$COMPILE_PLATFORM/android.jar"
 mkdir -p sdl-jni
 cp -r "$SDL_SRC" sdl-jni/SDL
 chmod -R u+rwX sdl-jni/SDL
-# NDK r26+ makes ALooper_pollAll a hard error; SDL 2.30.3 still calls it in
-# the sensor code. ALooper_pollOnce is the supported replacement.
-grep -Rl 'ALooper_pollAll' sdl-jni/SDL 2>/dev/null | while read -r f; do
-  sed -i 's/ALooper_pollAll/ALooper_pollOnce/g' "$f"
-done
 cp "$APPLICATION_MK" sdl-jni/Application.mk
 cp "$TOP_ANDROID_MK" sdl-jni/Android.mk
 

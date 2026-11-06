@@ -144,7 +144,7 @@ std::string system_line() {
   if (__system_property_get("ro.product.model", model) > 0)
     s += std::string(", ") + model;
 #endif
-  s += ", " + std::to_string(SDL_GetCPUCount()) + " CPUs";
+  s += ", " + std::to_string(xanatoo::sdl::cpu_count()) + " CPUs";
   std::vector<std::string> simd;
   if (SDL_HasSSE2()) simd.push_back("sse2");
   if (SDL_HasAVX2()) simd.push_back("avx2");

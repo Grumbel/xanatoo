@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # The Android build, after Kurvenrausch / Pingus's ndk-build pipeline
-# (mk/android/): SDL2's native library and Java side are built once from its
-# release tarball; xanatoo (plus a static FreeType built from nixpkgs'
+# (mk/android/): SDL3's native library and Java side are built once from its
+# nixpkgs source; xanatoo (plus a static FreeType built from nixpkgs'
 # source) into libmain.so against it; both packaged into a signed APK.
 #
 # Network clients (Gemini / Nostr / Reddit / Lemmy) use Mbed TLS; SQLite is
@@ -42,7 +42,7 @@ let
   '';
 
   sdlAndroidLibs = pkgs.stdenvNoCC.mkDerivation {
-    pname = "sdl2-android-libs";
+    pname = "sdl3-android-libs";
     version = sdlVersion;
     dontUnpack = true;
     nativeBuildInputs = [ androidSdk pkgs.jdk17 pkgs.gnumake ];
@@ -89,11 +89,11 @@ let
     path = import ./android-imagelibs.nix { inherit nixpkgs abi; system = pkgs.stdenv.buildPlatform.system; };
   }) targetAbis);
 
-  sdlPrebuiltMk = pkgs.writeText "SDL2-prebuilt-Android.mk" ''
+  sdlPrebuiltMk = pkgs.writeText "SDL3-prebuilt-Android.mk" ''
     LOCAL_PATH := $(call my-dir)
     include $(CLEAR_VARS)
-    LOCAL_MODULE := SDL2
-    LOCAL_SRC_FILES := ${sdlAndroidLibs}/lib/$(TARGET_ARCH_ABI)/libSDL2.so
+    LOCAL_MODULE := SDL3
+    LOCAL_SRC_FILES := ${sdlAndroidLibs}/lib/$(TARGET_ARCH_ABI)/libSDL3.so
     include $(PREBUILT_SHARED_LIBRARY)
   '';
 

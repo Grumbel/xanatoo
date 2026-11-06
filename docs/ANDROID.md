@@ -7,15 +7,14 @@ nix run .#install-android-xanatoo    # adb install -r
 
 Same pipeline as Kurvenrausch / Pingus (`nix/android.nix`, `mk/android/`):
 
-1. `sdl2-android`: SDL 2.30.3 from its release tarball (flake input
-   `sdl2-src`) built with `ndk-build` for every ABI, plus SDL's Java side
-   (`SDLActivity`) compiled to `classes.dex`.
+1. `sdl3-android`: SDL3 from nixpkgs built with `ndk-build` for every ABI,
+   plus SDL's Java side (`SDLActivity`) compiled to `classes.dex`.
 2. `xanatoo-android`: `src/*.cpp` (minus `https.cpp`), vendored ImGui and a
    static FreeType module (nixpkgs' `freetype.src`, `mk/android/freetype/
    Android.mk`) into `libmain.so`; `aapt` + `zipalign` + `apksigner` with
    the debug keystore in `mk/android/keystore/`.
 
-Targets Android 5.0+ (`minSdkVersion` 21), ABIs `armeabi-v7a arm64-v8a
+Targets Android 5.1+ (`minSdkVersion` 22), ABIs `armeabi-v7a arm64-v8a
 x86_64`, NDK 29. The launcher icon is rasterized into `res/mipmap-*/`
 from the app icon `data/icons/xanatoo.svg` by `tools/make_icons.py`.
 
