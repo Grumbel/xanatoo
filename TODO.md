@@ -6,7 +6,14 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **289** (this delivery is **288**)
+Next bundle number: **290** (this delivery is **289**)
+
+## Status (2026-11-06) — Refresh toolbar icon set (bundle 289)
+
+- Redrew all 53 toolbar SVGs with a consistent GNOME 2-inspired style:
+  compact beveled forms, muted colors, paper and metal surfaces, and small
+  highlight details while keeping each icon's existing action and filename.
+- Rendered the complete icon set at 20 px and reviewed the contact sheet.
 
 ## Status (2026-11-06) — Complete WebAssembly data preload (bundle 288)
 
