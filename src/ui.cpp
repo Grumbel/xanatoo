@@ -102,6 +102,19 @@ void draw_toolbar_button_bevel() {
                 ImVec2(max.x - 1.f, max.y - 1.f), dark);
 }
 
+void draw_toolbar_menu_marker(float scale) {
+  const ImVec2 max = ImGui::GetItemRectMax();
+  const float inset = 3.f * scale;
+  const float width = 6.f * scale;
+  const float height = 4.f * scale;
+  const ImVec2 a(max.x - inset - width, max.y - inset - height);
+  const ImVec2 b(max.x - inset, max.y - inset - height);
+  const ImVec2 c(max.x - inset - width * 0.5f, max.y - inset);
+  const theme::Palette& p = theme::palette();
+  ImGui::GetWindowDrawList()->AddTriangleFilled(
+      a, b, c, IM_COL32(p.shadow.r, p.shadow.g, p.shadow.b, 255));
+}
+
 void pop_toolbar_button_style(int colors) {
   ImGui::PopStyleVar(2);
   ImGui::PopStyleColor(colors);
@@ -508,6 +521,7 @@ bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip)
             ImVec4(1, 1, 1, 1.f)))
       pressed = true;
     draw_toolbar_button_bevel();
+    draw_toolbar_menu_marker(scale_);
     ImGui::PopStyleVar();
   } else {
     static const std::unordered_map<std::string, const char*> kShort = {

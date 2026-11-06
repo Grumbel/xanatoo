@@ -8,6 +8,13 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Mark toolbar menu buttons
+
+- Added a small muted dropdown triangle at the lower-right of icon-backed
+  toolbar buttons that open menus. SDL3 syntax-only compilation and
+  `git diff --check` passed. This CLI change has no bundle; number 290 remains
+  for the next Web chat handover.
+
 ## Status (2026-11-06) — Match toolbar height and separators
 
 - Sized the URL toolbar for its 32 px icons and padding, and replaced text
