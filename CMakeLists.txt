@@ -19,6 +19,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(XANATOO_SDL3 "Use the native SDL3 window, input and renderer backend" ON)
+option(XANATOO_R36S "Use compact default UI scale for 640x480 R36S" OFF)
 
 # Catch common mistakes; ImGui is vendored and not under our control.
 if(MSVC)
@@ -225,6 +226,7 @@ target_compile_definitions(xanatoo PRIVATE
   "XANATOO_VERSION=\"${PROJECT_VERSION_FULL}\""
   "XANATOO_BUILD_TYPE=\"${CMAKE_BUILD_TYPE}\""
   XANATOO_SDL3=$<BOOL:${XANATOO_SDL3}>
+  XANATOO_R36S=$<BOOL:${XANATOO_R36S}>
   XANATOO_SQLITE=$<BOOL:${XANATOO_SQLITE}>
   XANATOO_FONTCONFIG=$<BOOL:${XANATOO_FONTCONFIG}>)
 
@@ -412,7 +414,7 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -E make_directory ${XANATOO_ICON_DIR}
   COMMAND ${CMAKE_COMMAND} -E env python3
           ${CMAKE_CURRENT_SOURCE_DIR}/scripts/rasterize_icons.py
-          ${XANATOO_SVG_DIR} ${XANATOO_ICON_DIR} 20
+          ${XANATOO_SVG_DIR} ${XANATOO_ICON_DIR} 64
   COMMAND ${CMAKE_COMMAND} -E touch ${XANATOO_ICON_DIR}/.stamp
   DEPENDS ${XANATOO_SVGS} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/rasterize_icons.py
   COMMENT "Rasterizing toolbar icons (SVG → PNG)"

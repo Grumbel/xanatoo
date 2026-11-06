@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <string>
 
 #include <cstdio>
@@ -39,6 +40,53 @@ void set_chrome_scale(float scale) {
   help_pad = px(12);
   help_edge = px(6);
   help_grip_h = px(14);
+}
+
+void apply_ui_scale(App& app) {
+  if (!app.ui_scale_pending) return;
+  app.ui_scale_pending = false;
+  app.view_settings.clamp();
+  const float next = app.ui_scale_base * app.view_settings.ui_scale;
+  const float ratio = next / app.ui_scale;
+  if (std::abs(ratio - 1.f) < 0.001f) {
+    xanatoo::save_view_settings(app.view_settings);
+    return;
+  }
+
+  keep_views(app);
+  app.ui_scale = next;
+  app.body_px = static_cast<int>(std::lround(app.body_px * ratio));
+  app.heading_px = static_cast<int>(std::lround(app.heading_px * ratio));
+  for (FloatWindow* w : {&app.help, &app.bl, &app.ol, &app.sm, &app.pg}) {
+    w->x = static_cast<int>(std::lround(w->x * ratio));
+    w->y = static_cast<int>(std::lround(w->y * ratio));
+    w->w = static_cast<int>(std::lround(w->w * ratio));
+    w->h = static_cast<int>(std::lround(w->h * ratio));
+    w->restore_x = static_cast<int>(std::lround(w->restore_x * ratio));
+    w->restore_y = static_cast<int>(std::lround(w->restore_y * ratio));
+    w->restore_w = static_cast<int>(std::lround(w->restore_w * ratio));
+    w->restore_h = static_cast<int>(std::lround(w->restore_h * ratio));
+  }
+  for (int& width : app.dock_w)
+    width = static_cast<int>(std::lround(width * ratio));
+
+  set_chrome_scale(app.ui_scale);
+  if (app.ui_font.loaded()) app.ui_font.set_size(kUiFontPx);
+  if (app.ui_font_bold.loaded()) app.ui_font_bold.set_size(kUiFontPx);
+  apply_font_sizes(app);
+  app.layout_engine.set_options(
+      xanatoo::LayoutOptions::from_view(app.view_settings, app.ui_scale));
+  for (Pane& pane : app.panes) pane.height_cache.clear();
+  app.needs_layout = true;
+  app.help_needs_layout = true;
+
+  app.ui.shutdown();
+  if (!app.ui.init(app.window, app.sdl, app.ui_scale))
+    std::cerr << "Warning: ImGui UI failed to reinitialize after scale change\n";
+  if (!xanatoo::save_view_settings(app.view_settings))
+    std::cerr << "Could not persist UI scale to "
+              << xanatoo::view_settings_path() << "\n";
+  flash_status(app, "UI scale updated");
 }
 
 void toggle_chrome(App& app) {

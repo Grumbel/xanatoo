@@ -159,6 +159,7 @@ enum class UiCommand {
   ToggleHoverPreview,       // split view: preview hovered links on the right
   ToggleReaderDefault,      // Preferences: reader mode for new views
   TogglePreferences,        // Edit → Preferences window
+  SetUiScale,               // Preferences: scale chrome and default text
   SelectStyle,              // arg = style sheet name (styles/<name>.xss)
   ReloadStyles,             // rescan styles/ and re-read the active sheet
 };
@@ -211,6 +212,7 @@ struct UiState {
   float view_line_spacing = 1.30f;
   float view_margin_pct = 5.f;
   int view_measure_chars = 0;
+  float ui_scale = 1.f;  // preference multiplier on the platform default
   // Style sheets: (name, title) pairs and the active name.
   std::vector<std::pair<std::string, std::string>> styles;
   std::string style;
@@ -289,7 +291,7 @@ public:
   Ui& operator=(const Ui&) = delete;
 
   // ui_scale: chrome factor (font, padding, icons, toolbar rows); 1 = 14 px
-  // menu font. The app passes --ui-scale or the display density.
+  // menu font and 32 px toolbar icons before effective display/user scaling.
   bool init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale = 1.f);
   void shutdown();
 

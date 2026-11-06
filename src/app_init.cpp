@@ -26,10 +26,13 @@ namespace fs = std::filesystem;
 namespace xanatoo::app {
 
 bool app_init(App& app) {
+  // Load the user's chrome scale before deriving any pixel geometry.
+  xanatoo::load_view_settings(app.view_settings);
   // Chrome metrics, UI font and the default document size follow the
   // display scale (--ui-scale, else density on Android).
-  app.ui_scale = app.opt.ui_scale > 0.f ? app.opt.ui_scale
-                                        : xanatoo::platform_default_ui_scale();
+  app.ui_scale_base = app.opt.ui_scale > 0.f ? app.opt.ui_scale
+                                              : xanatoo::platform_default_ui_scale();
+  app.ui_scale = app.ui_scale_base * app.view_settings.ui_scale;
   set_chrome_scale(app.ui_scale);
   print_startup_report(app);
   app.body_px = static_cast<int>(std::lround(app.body_px * app.ui_scale));
@@ -64,8 +67,7 @@ bool app_init(App& app) {
   app.font_path = existing_font(app.opt.font_path);
   if (const char* env = std::getenv("XANATOO_FONT"); env && env[0] != '\0')
     app.env_font_path = existing_font(env);
-  // View prefs first: they name the style sheet, which picks the fonts.
-  xanatoo::load_view_settings(app.view_settings);
+  // View prefs name the style sheet, which picks the fonts.
   app.styles = xanatoo::list_styles();
   init_search(app);
   {
@@ -164,10 +166,10 @@ bool app_init(App& app) {
       app.win_h = nh;
     }
   }
-  if (app.ui_scale == 1.f && app.win_w > 0 && app.win_w <= 720 &&
-      app.body_px < 20) {
-    app.body_px = 20;
-    app.heading_px = 28;
+  const int compact_body_px = static_cast<int>(std::lround(20.f * app.ui_scale));
+  if (app.win_w > 0 && app.win_w <= 720 && app.body_px < compact_body_px) {
+    app.body_px = compact_body_px;
+    app.heading_px = static_cast<int>(std::lround(28.f * app.ui_scale));
   }
   apply_font_sizes(app);
   open_first_gamepad(app);

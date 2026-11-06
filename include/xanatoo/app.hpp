@@ -38,9 +38,10 @@
 // "systems" that read/transform it. No behaviour lives on the data types.
 namespace xanatoo::app {
 
-// Chrome metrics in px at ui scale 1. Variables, not constants: app_init
-// multiplies them once by the display's ui scale (set_chrome_scale; --ui-scale
-// or dpi/160 on Android) before anything is laid out.
+struct App;
+
+// Chrome metrics in px at ui scale 1. Variables, not constants: app_init and
+// apply_ui_scale multiply them by the effective display/user scale.
 inline int kSbW = 14;
 inline int kSbArrow = 14;
 inline int kSbLayoutGutter = kSbW + 4;
@@ -72,8 +73,9 @@ inline std::tuple<int, int, int, int> window_client_rect(int x, int y, int w,
           h - help_title_h - 4 - help_grip_h - 2};
 }
 
-// Scale the chrome metrics above (call once, before the first layout).
+// Scale the chrome metrics above (call before layout and when the UI scale changes).
 void set_chrome_scale(float scale);
+void apply_ui_scale(App& app);
 
 // Stable identity of a document buffer; never reused, 0 = none.
 using BufferId = uint32_t;
@@ -585,6 +587,8 @@ struct App {
   int heading_px = 26;
   xanatoo::FontSet fonts;
   float ui_scale = 1.f;        // chrome / default zoom factor (set_chrome_scale)
+  float ui_scale_base = 1.f;   // display density or --ui-scale, before preference
+  bool ui_scale_pending = false;  // applied after the current ImGui frame renders
   xanatoo::Font ui_font;       // chrome text (see kUiFontPx)
   xanatoo::Font ui_font_bold;  // outline top level, emphasis in chrome
   std::vector<DocBuffer> buffers;  // dense storage; address by BufferId

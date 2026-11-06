@@ -115,6 +115,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.view_line_spacing = app.view_settings.line_spacing;
   ui_state.view_margin_pct = app.view_settings.margin_pct;
   ui_state.view_measure_chars = app.view_settings.measure_chars;
+  ui_state.ui_scale = app.view_settings.ui_scale;
   ui_state.styles.clear();
   for (const auto& e : app.styles) ui_state.styles.emplace_back(e.name, e.title);
   ui_state.style = app.style.name;
@@ -1476,6 +1477,13 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     }
     case C::TogglePreferences:
       app.preferences_open = !app.preferences_open;
+      break;
+    case C::SetUiScale:
+      try {
+        app.view_settings.ui_scale = std::stof(arg);
+        app.ui_scale_pending = true;
+      } catch (...) {
+      }
       break;
     case C::ToggleJustify:
       app.view_settings.justify = !app.view_settings.justify;
@@ -3181,6 +3189,7 @@ void present_frame(App& app) {
                       app.stick_lmb || app.stick_rmb);
   }
   app.renderer.present();
+  apply_ui_scale(app);
 }
 
 void run_frame(App& app) {

@@ -241,7 +241,13 @@ void platform_init() {
 void platform_request_keyboard(SDL_Window*) {}
 void platform_release_keyboard(SDL_Window*) {}
 bool platform_text_input_at_start() { return true; }
-float platform_default_ui_scale() { return 1.f; }
+float platform_default_ui_scale() {
+#if defined(XANATOO_R36S) && XANATOO_R36S
+  return 0.75f;  // 24 px toolbar icons on the 640×480 screen
+#else
+  return 1.f;
+#endif
+}
 
 #endif
 

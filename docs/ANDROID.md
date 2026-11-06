@@ -98,17 +98,19 @@ source set still compiles.
 
 ## Display density
 
-`app.ui_scale` = `--ui-scale`, else `platform_default_ui_scale()`: on
-Android dpi / 160 in quarter steps (at least 1), on desktop 1. It scales the
-ImGui font / style / toolbar rows / icons, the canvas chrome metrics
-(`set_chrome_scale`: status bar, title bars, close box, panel padding,
-scrollbars, UI font), panel default sizes, the default document text size,
-and px lengths in layout (style sheet px, the view margin floor:
+`app.ui_scale` = (`--ui-scale`, else `platform_default_ui_scale()`) times the
+saved UI scale preference: Android dpi / 160 in quarter steps (at least 1),
+R36S 0.75, desktop 1. It scales toolbar icons, menu/chrome text, the canvas
+chrome metrics (`set_chrome_scale`: status bar, title bars, close box, panel
+padding, scrollbars, UI font), panel default sizes, the default document text
+size, and px lengths in layout (style sheet px, the view margin floor:
 `LayoutOptions::px_scale`; em lengths already follow the font). Test on
 desktop with `--ui-scale 2`. The Fire 7 is 160 dpi, so it runs at 1.
 
-Toolbar icons are 20 px PNGs scaled up; rasterize them larger if they look
-soft on high-density screens.
+Toolbar icons are rendered at 32 px at the platform default from 64 px PNGs.
+The Edit → Preferences UI scale setting multiplies toolbar, menu, chrome and
+default document text sizes; Android's display-density scale still applies
+underneath it. The 640×480 R36S package starts at 75% of the desktop default.
 
 ## Next
 

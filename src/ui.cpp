@@ -435,7 +435,7 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
   const int style_colors = push_toolbar_button_style();
   if (ic) {
     ImGui::PushID(id);
-    ImVec2 size(ic->w * scale_, ic->h * scale_);
+    ImVec2 size(32.f * scale_, 32.f * scale_);
     // Pad hit target a little for classic toolbar feel
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.f, 3.f));
     if (ImGui::ImageButton(
@@ -500,7 +500,7 @@ bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip)
   bool pressed = false;
   const int style_colors = push_toolbar_button_style();
   if (ic) {
-    ImVec2 size(ic->w * scale_, ic->h * scale_);
+    ImVec2 size(32.f * scale_, 32.f * scale_);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.f, 3.f));
     if (ImGui::ImageButton(
             "##btn", reinterpret_cast<ImTextureID>(ic->texture), size,
@@ -1805,6 +1805,27 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
              "Wash over bookmarked passages, a ribbon at reading positions");
       toggle("Justify text", state.justify, UiCommand::ToggleJustify,
              "Wrapped body lines fill the column");
+      ImGui::SeparatorText("Interface");
+      static constexpr float scales[] = {
+          0.75f, 0.9f, 1.f, 1.1f, 1.25f, 1.4f, 1.6f, 1.8f, 2.f};
+      static constexpr const char* labels[] = {
+          "75%", "90%", "100%", "110%", "125%", "140%", "160%",
+          "180%", "200%"};
+      int selected_scale = 0;
+      for (int i = 1; i < IM_ARRAYSIZE(scales); ++i)
+        if (std::abs(state.ui_scale - scales[i]) <
+            std::abs(state.ui_scale - scales[selected_scale]))
+          selected_scale = i;
+      if (ImGui::BeginCombo("UI scale", labels[selected_scale])) {
+        for (int i = 0; i < IM_ARRAYSIZE(scales); ++i) {
+          if (ImGui::Selectable(labels[i], i == selected_scale)) {
+            cmd = UiCommand::SetUiScale;
+            result.arg = std::to_string(scales[i]);
+          }
+        }
+        ImGui::EndCombo();
+      }
+      ImGui::TextDisabled("32 px icons at the platform default; text scales too.");
       ImGui::Spacing();
       ImGui::TextDisabled("Saved to view.conf; layout options are in View.");
       if (ImGui::Button("Close")) open = false;

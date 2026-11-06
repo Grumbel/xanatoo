@@ -97,7 +97,7 @@ done
 cp -r "$APP_SRC_DIR"/examples/. "$A/examples/"
 cp "$APP_SRC_DIR"/styles/*.xss "$A/styles/"
 cp "$APP_SRC_DIR"/FORMAT.md "$A/"
-python3 "$APP_SRC_DIR"/scripts/rasterize_icons.py "$APP_SRC_DIR"/icons/svg "$A/icons" 20
+python3 "$APP_SRC_DIR"/scripts/rasterize_icons.py "$APP_SRC_DIR"/icons/svg "$A/icons" 64
 chmod -R u+rwX assets
 files="$(cd "$A" && find . -type f ! -name MANIFEST | sed 's|^\./||' | LC_ALL=C sort)"
 hash="$(cd "$A" && printf '%s\n' "$files" | xargs sha256sum | sha256sum | cut -c1-16)"

@@ -42,6 +42,8 @@ struct ViewSettings {
   std::string style = "default";
   // Engine of the search bar (search.hpp id).
   std::string search_engine = "wikipedia";
+  // Multiplier on the platform's normal chrome scale; 1 = platform default.
+  float ui_scale = 1.f;
 
   static constexpr float kLineTight = 1.10f;
   static constexpr float kLineNormal = 1.30f;

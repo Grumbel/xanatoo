@@ -22,6 +22,9 @@ void ViewSettings::clamp() {
   margin_pct = std::clamp(margin_pct, 0.f, 40.f);
   margin_y = std::clamp(margin_y, 0.f, 120.f);
   page_columns = std::clamp(page_columns, 0, 3);
+  ui_scale = std::isfinite(ui_scale)
+                 ? std::clamp(ui_scale, 0.65f, 2.0f)
+                 : 1.f;
   if (measure_chars < 0) measure_chars = 0;
   if (measure_chars > 0 && measure_chars < 20) measure_chars = 20;
   if (measure_chars > 400) measure_chars = 400;
@@ -112,6 +115,8 @@ bool load_view_settings(ViewSettings& out) {
         out.style = val;
       else if (key == "search_engine" && !val.empty())
         out.search_engine = val;
+      else if (key == "ui_scale")
+        out.ui_scale = std::stof(val);
     } catch (...) {
     }
   }
@@ -140,6 +145,7 @@ bool save_view_settings(const ViewSettings& in) {
   out << "page_columns=" << v.page_columns << "\n";
   out << "style=" << v.style << "\n";
   out << "search_engine=" << v.search_engine << "\n";
+  out << "ui_scale=" << v.ui_scale << "\n";
   return write_file_atomic(path, out.str());
 }
 

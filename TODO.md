@@ -8,6 +8,17 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Add configurable UI scale
+
+- Added a saved Edit → Preferences UI scale with presets from 75% to 200%.
+  Changing it updates toolbar icons, ImGui menus, canvas chrome and default
+  document text immediately; `view.conf` preserves the choice.
+- Toolbar glyphs now rasterize at 64 px and display at 32 px at the platform
+  default scale. The R36S package defaults to 75% for its 640×480 screen.
+- SDL3 syntax-only compile passed for the changed UI, app, platform and
+  settings translation units. This CLI change has no bundle; number 290
+  remains for the next Web chat handover.
+
 ## Status (2026-11-06) — Add icons to command menus
 
 - Added the matching toolbar icons to common File, Edit, Format, Insert and

@@ -233,6 +233,7 @@ let
       "-DCMAKE_SKIP_RPATH=ON"
       "-DCMAKE_CXX_STANDARD=20"
       "-DXANATOO_GEMINI=ON"
+      "-DXANATOO_R36S=ON"
       # No libvips in the ArkOS sysroot: stb_image decodes, BMP thumbnails.
       "-DXANATOO_THUMTOO=OFF"
       "-DFREETYPE_INCLUDE_DIRS=${sysroot}/usr/include/freetype2"

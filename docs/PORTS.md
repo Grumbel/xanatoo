@@ -78,7 +78,9 @@ nix build -L .#xanatoo-r36s-portmaster-zip
 
 The PortMaster bundle ships `libSDL3.so.0` and uses the regular launcher
 without SDL2 preloading. The old SDL2 ABI package remains available under
-the `xanatoo-r36s-sdl2*` names as a rollback option.
+the `xanatoo-r36s-sdl2*` names as a rollback option. R36S starts at 75% of
+the regular toolbar/chrome scale to fit its 640×480 screen; Edit → Preferences
+can change the saved UI scale.
 
 For an alternative local MINGW64 (or MINGW32) shell, install the corresponding
 `mingw-w64-...-gcc`, `cmake`, `ninja`, `SDL3`, and `freetype` packages and run:
