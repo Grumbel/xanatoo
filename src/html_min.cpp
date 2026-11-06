@@ -506,7 +506,7 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
     std::string src = html_img_src(attrs);
     if (src.empty()) return;
     // alt="" marks a decorative image.
-    if (opt_.drop_chrome && html_has_attr(attrs, "alt") &&
+    if (opt_.drop_chrome && top_index("figure") < 0 && html_has_attr(attrs, "alt") &&
         html_attr(attrs, "alt").empty())
       return;
     // Declared size; 0 when absent or not a number ("auto").
@@ -528,7 +528,8 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
     // image inside an <a>: as a block it would lose the link and a click
     // would show the thumbnail instead of the linked target.
     const bool icon = (w > 0 && w <= kIconEdge) || (h > 0 && h <= kIconEdge);
-    if (opt_.images && !in_leaf && !icon && links_.empty() &&
+    if (opt_.images && !in_leaf && !icon &&
+        (links_.empty() || top_index("figure") >= 0) &&
         !starts_with(src, "data:")) {
       const NodeKind ck = doc_.get(container()).kind;
       if (ck != NodeKind::List && ck != NodeKind::Table &&
@@ -729,8 +730,13 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
     block_boundary();
     Frame f;
     f.tag = tag;
-    f.em_add = 1;
-    ++em_;
+    if (!in_leaf && doc_.get(container()).kind == NodeKind::Figure) {
+      f.kind = FrameKind::Leaf;
+      f.node = doc_.create(NodeKind::Caption, container());
+    } else {
+      f.em_add = 1;
+      ++em_;
+    }
     push(std::move(f));
     return;
   }
@@ -738,7 +744,7 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
 }
 
 void Builder::close(const std::string& tag) {
-  if (tag == "aside" && top_index("aside") >= 0) {
+  if ((tag == "aside" || tag == "figure") && top_index(tag) >= 0) {
     pop_to(tag);
     return;
   }

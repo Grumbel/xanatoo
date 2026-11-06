@@ -240,7 +240,7 @@ void LayoutEngine::layout_children_sequential(
   for (NodeId child : children) {
     if (child == INVALID_NODE) continue;
     const NodeKind kind = doc.get(child).kind;
-    const bool image_float = kind == NodeKind::Image &&
+    const bool image_float = (kind == NodeKind::Image || kind == NodeKind::Figure) &&
                              !doc.get(child).image_float.empty();
     if (!floats_.empty() && clears_floats(kind) && !image_float)
       y = clear_floats(x, max_width, y);
@@ -1262,10 +1262,49 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       break;
 
     case NodeKind::Figure: {
+      if (!in_figure_float_ && !in_margin_ &&
+          (node.image_float == "left" || node.image_float == "right")) {
+        const float em = static_cast<float>(fonts_.regular.pixel_size());
+        const float gap = em;
+        const float fw = std::min(max_width * 0.45f, 20.f * em);
+        if (fw >= 6.f * em && max_width - fw - gap >= 10.f * em) {
+          const bool right = node.image_float == "right";
+          const float bx = right ? x + max_width - fw : x;
+          float top = y;
+          for (bool moved = true; moved;) {
+            moved = false;
+            for (const FloatBox& f : floats_) {
+              if (f.top <= top && f.bottom > top && f.right > bx && f.left < bx + fw) {
+                top = f.bottom;
+                moved = true;
+              }
+            }
+          }
+          float bottom = top;
+          in_figure_float_ = true;
+          in_image_float_ = true;
+          layout_node(doc, id, bx, bottom, fw, out);
+          in_image_float_ = false;
+          in_figure_float_ = false;
+          if (bottom > top) {
+            FloatBox fb;
+            fb.top = top; fb.bottom = bottom;
+            fb.side = right ? FloatSide::Right : FloatSide::Left;
+            fb.left = right ? bx - gap : bx;
+            fb.right = right ? bx + fw : bx + fw + gap;
+            floats_.push_back(fb);
+          }
+          break;
+        }
+        y = clear_floats(x, max_width, y);
+      }
       y += before(BlockRole::Figure);
       float start_y = y;
+      const bool was_in_image_float = in_image_float_;
+      in_image_float_ = true;
       for (NodeId c : node.children)
         layout_node(doc, c, x, y, max_width, out);
+      in_image_float_ = was_in_image_float;
       y += after(BlockRole::Figure);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;

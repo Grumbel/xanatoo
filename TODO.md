@@ -8,6 +8,14 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Figure floats
+
+- Float figures as a unit with their captions, with a narrow-column flow
+  fallback. HTML figure frames now close correctly and retain linked images
+  and semantic captions.
+- Changed source files compiled; linking in this shell lacks the Fontconfig,
+  FreeType and SQLite linker aliases. No CLI bundle.
+
 ## Status (2026-11-06) — Image floats
 
 - Added `float=left|right` to Markdown block images and `:float` to
