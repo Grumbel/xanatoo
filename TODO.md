@@ -8,6 +8,13 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Keep ImGui above the image gallery
+
+- Moved Lightbox drawing into the scene pass before ImGui rendering. The
+  gallery remains above document panels while menus and ImGui windows now
+  render over it. SDL3 syntax-only compilation and `git diff --check` passed.
+  This CLI change has no bundle; number 290 remains for the next Web chat.
+
 ## Status (2026-11-06) — Add a Panels menu
 
 - Added a dedicated Panels menu for all six dockable panels: Keyboard

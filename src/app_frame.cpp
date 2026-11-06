@@ -3224,7 +3224,6 @@ void present_frame(App& app) {
   else
     set_cursor(app, app.cursor_arrow);
   app.ui.end_frame(app.sdl);
-  draw_lightbox(app);
   if (app.stick_cursor_on) {
     draw_stick_cursor(app, app.sdl, static_cast<int>(app.stick_cx),
                       static_cast<int>(app.stick_cy),
@@ -3264,6 +3263,9 @@ void run_frame(App& app) {
   draw_floats(app);
   draw_dock_preview(app);
   draw_hover_tooltip(app);
+  // The gallery covers document chrome, but ImGui menus/windows must remain
+  // on top so they can be seen and interacted with while the lightbox is open.
+  draw_lightbox(app);
   present_frame(app);
 }
 
