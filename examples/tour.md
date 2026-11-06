@@ -193,6 +193,26 @@ Plasma fractal in **ember** colours, portrait format.
 :::
 :::
 
+## Image floats
+
+A block image can sit at the left or right of the text column. The following
+paragraphs wrap around each image; when the column is too narrow to leave a
+readable text measure, the image takes its own line instead.
+
+![A warm sunset gradient](collection/sunset-gradient.jpg){width=150 float=left}
+
+This image floats to the **left**. The text uses the remaining space beside
+it, then returns to the full column below. A float belongs to the flow around
+it, so keep the surrounding paragraphs long enough to show the wrap. Resize
+the window or switch panes to see the layout adapt.
+
+![A violet plasma study](collection/violet-plasma.jpg){width=150 float=right}
+
+This one floats to the **right**. The same block image syntax works on either
+side: add `float=left` or `float=right` to its attributes. The image remains a
+block in the document; its float changes only how nearby lines flow around
+it.
+
 ## Transclusion
 
 The box below is not a copy. It shows the passage named `#quotable` from

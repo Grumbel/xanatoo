@@ -45,6 +45,7 @@ Open any of these from this page (links load in the same pane and join session h
 - [Keyboard reference](help.md) — complete keybinding list (**F1**)
 - [Feature tour](tour.md) — every kind of block in one page: sections,
   inline images, margin notes, tables, stretchtext, columns, collections,
+  image floats,
   includes, threads, footnotes and citations
 
 ### Demos
