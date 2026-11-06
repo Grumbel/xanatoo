@@ -8,6 +8,13 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Figure size and image links
+
+- Size floating figures to their loaded image, and preserve block image links;
+  Wikipedia thumbnail links open the original Wikimedia upload in the viewer.
+- Built the application and unit tests with the configured library paths;
+  3768 checks passed. No CLI bundle.
+
 ## Status (2026-11-06) — Figure floats
 
 - Float figures as a unit with their captions, with a narrow-column flow

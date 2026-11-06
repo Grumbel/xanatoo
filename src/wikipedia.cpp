@@ -178,6 +178,21 @@ std::optional<WikipediaRef> wikipedia_ref_from_url(std::string_view url) {
 
 void wikipedia_rewrite_links(Document& doc, const WikipediaRef& self) {
   for (Node& n : doc.nodes) {
+    // Parsoid links a thumbnail to its File page. Wikimedia's thumbnail
+    // path also identifies the original file, which the image viewer can
+    // open at full resolution.
+    if (n.kind == NodeKind::Image &&
+        starts_with(n.src, "https://upload.wikimedia.org/") &&
+        !n.spans.empty() && n.spans[0].kind == InlineKind::Link &&
+        n.spans[0].href.find("/wiki/File:") != std::string::npos) {
+      const size_t thumb = n.src.find("/thumb/");
+      const size_t last = n.src.rfind('/');
+      if (thumb != std::string::npos && last != std::string::npos &&
+          last > thumb + 7) {
+        n.spans[0].href = n.src.substr(0, thumb) +
+                          n.src.substr(thumb + 6, last - thumb - 6);
+      }
+    }
     for (InlineSpan& s : n.spans) {
       if (s.kind != InlineKind::Link || s.href.empty() || s.href[0] == '#')
         continue;

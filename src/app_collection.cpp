@@ -73,7 +73,13 @@ void open_image_lightbox(App& app, Pane& pane, NodeId image) {
     const xanatoo::Node& n = doc.get(id);
     if (n.kind == xanatoo::NodeKind::Image && !n.src.empty()) {
       if (id == image) lb.index = static_cast<int>(lb.items.size());
-      lb.items.push_back({n.src, n.alt});
+      std::string src = n.src;
+      for (const auto& span : n.spans)
+        if (span.kind == xanatoo::InlineKind::Link && xanatoo::is_image_url(span.href)) {
+          src = span.href;
+          break;
+        }
+      lb.items.push_back({src, n.alt});
     }
     stack.insert(stack.end(), n.children.rbegin(), n.children.rend());
   }
@@ -146,14 +152,30 @@ void collection_command(App& app, const std::string& arg) {
 bool click_collection_card(App& app, int pi, float lx, float my) {
   Pane& p = app.panes[pi];
   for (const auto& im : p.layout.images) {
-    if (im.thumb <= 0 || im.in_text) continue;  // inline: a link (editor.cpp)
+    if (im.in_text) continue;  // inline: a link (editor.cpp)
+    if (im.thumb <= 0) {
+      const auto& node = doc_of(app, p).get(im.node);
+      bool linked = false;
+      for (const auto& span : node.spans)
+        linked |= span.kind == xanatoo::InlineKind::Link && !span.href.empty();
+      if (!linked) continue;
+    }
     const float y0 = im.y - p.scroll_y;
     if (lx >= im.x && lx <= im.x + im.width && my >= y0 &&
         my <= y0 + im.height) {
       if (im.group != xanatoo::INVALID_NODE)
         open_lightbox(app, p, im.group, im.node);
-      else
+      else {
+        const auto& node = doc_of(app, p).get(im.node);
+        for (const auto& span : node.spans) {
+          if (span.kind == xanatoo::InlineKind::Link && !span.href.empty() &&
+              !xanatoo::is_image_url(span.href)) {
+            navigate_to_url(app, span.href);
+            return true;
+          }
+        }
         open_image_lightbox(app, p, im.node);
+      }
       return app.lightbox.open;
     }
   }

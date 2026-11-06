@@ -2333,8 +2333,8 @@ void test_html_min() {
       "<ul><li>x <img src=\"li.png\"></ul>",
       opt);
   auto ik = kids_of(idoc, iroot);
-  EXPECT_EQ(ik.size(), 7u);
-  if (ik.size() == 7) {
+  EXPECT_EQ(ik.size(), 6u);
+  if (ik.size() == 6) {
     EXPECT_EQ(plain_text(idoc, ik[0]), "Before");
     EXPECT(idoc.get(ik[1]).kind == NodeKind::Image);
     EXPECT_EQ(idoc.get(ik[1]).src, "https://blog.example/posts/i.png");
@@ -2351,13 +2351,19 @@ void test_html_min() {
         EXPECT(sp[1].width == 16 && sp[1].height == 11);
       }
     }
-    EXPECT(idoc.get(ik[3]).kind == NodeKind::Image);
-    EXPECT_EQ(idoc.get(ik[3]).src, "https://blog.example/lazy.jpg");
-    EXPECT_EQ(plain_text(idoc, ik[4]), "Cap");
-    EXPECT(idoc.get(ik[5]).kind == NodeKind::Image);
-    EXPECT_EQ(idoc.get(ik[5]).src, "https://cdn.example/s.webp");
-    EXPECT(idoc.get(ik[6]).kind == NodeKind::List);
-    const auto li = kids_of(idoc, ik[6]);
+    EXPECT(idoc.get(ik[3]).kind == NodeKind::Figure);
+    const auto fk = kids_of(idoc, ik[3]);
+    EXPECT_EQ(fk.size(), 2u);
+    if (fk.size() == 2) {
+      EXPECT(idoc.get(fk[0]).kind == NodeKind::Image);
+      EXPECT_EQ(idoc.get(fk[0]).src, "https://blog.example/lazy.jpg");
+      EXPECT(idoc.get(fk[1]).kind == NodeKind::Caption);
+      EXPECT_EQ(plain_text(idoc, fk[1]), "Cap");
+    }
+    EXPECT(idoc.get(ik[4]).kind == NodeKind::Image);
+    EXPECT_EQ(idoc.get(ik[4]).src, "https://cdn.example/s.webp");
+    EXPECT(idoc.get(ik[5]).kind == NodeKind::List);
+    const auto li = kids_of(idoc, ik[5]);
     EXPECT(li.size() == 1 && idoc.get(li[0]).spans.size() == 2 &&
            idoc.get(li[0]).spans[1].kind == InlineKind::Image);
   }
@@ -3354,6 +3360,31 @@ void test_wikipedia() {
     EXPECT_EQ(hrefs[3], "https://en.wikipedia.org/wiki/Category:Web");
     EXPECT_EQ(hrefs[4], "wikipedia:de:Hypertext");
   }
+  Document figure = parse_html_page(
+      "<base href=\"//en.wikipedia.org/wiki/\"><main>"
+      "<figure class=\"mw-halign-left\"><a href=\"./File:Example.jpg\">"
+      "<img alt=\"\" width=\"170\" height=\"170\" "
+      "src=\"//upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Example.jpg/170px-Example.jpg\">"
+      "</a><figcaption>Example caption</figcaption></figure><p>After</p></main>",
+      "https://en.wikipedia.org/wiki/Hypertext");
+  wikipedia_rewrite_links(figure, self);
+  bool found_image = false, found_figure = false, found_caption = false;
+  for (const Node& n : figure.nodes) {
+    if (n.kind == NodeKind::Figure) {
+      found_figure = true;
+      EXPECT_EQ(n.image_float, "left");
+    } else if (n.kind == NodeKind::Image) {
+      found_image = true;
+      EXPECT_EQ(n.spans.size(), size_t(1));
+      if (!n.spans.empty())
+        EXPECT_EQ(n.spans[0].href,
+                  "https://upload.wikimedia.org/wikipedia/commons/a/ab/Example.jpg");
+    } else if (n.kind == NodeKind::Caption) {
+      found_caption = true;
+      EXPECT_EQ(plain_text(figure, n.id), "Example caption");
+    }
+  }
+  EXPECT(found_image && found_figure && found_caption);
 }
 
 void test_pandoc_formats() {

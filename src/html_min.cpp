@@ -538,6 +538,12 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
         NodeId im = doc_.create(NodeKind::Image, container());
         doc_.get(im).src = std::move(src);
         doc_.get(im).alt = std::move(alt);
+        if (!links_.empty() && !links_.back().empty()) {
+          InlineSpan link;
+          link.kind = InlineKind::Link;
+          link.href = links_.back();
+          doc_.get(im).spans.push_back(std::move(link));
+        }
         // MediaWiki/Parsoid encodes thumbnail alignment on its wrapper:
         // figure[typeof~="mw:File/Thumb"] with class="mw-halign-left/right".
         // The image is emitted while that wrapper is on the builder stack.

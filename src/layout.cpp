@@ -1266,8 +1266,35 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           (node.image_float == "left" || node.image_float == "right")) {
         const float em = static_cast<float>(fonts_.regular.pixel_size());
         const float gap = em;
-        const float fw = std::min(max_width * 0.45f, 20.f * em);
-        if (fw >= 6.f * em && max_width - fw - gap >= 10.f * em) {
+        float fw = std::min(max_width * 0.45f, 20.f * em);
+        // Size the figure to its image, so the caption and the exclusion
+        // band do not reserve empty space beside a small thumbnail.
+        if (images_) {
+          for (NodeId child : node.children) {
+            const Node& image = doc.get(child);
+            if (image.kind != NodeKind::Image || image.src.empty()) continue;
+            const bool remote = is_remote_image(image.src);
+            const Image& img = remote
+                ? images_->thumb(image.src, image_base_, kRemoteThumbEdge)
+                : images_->get(image.src, image_base_);
+            if (img.ok && img.width > 0 && img.height > 0) {
+              float scale = remote
+                  ? std::min({options_.px_scale, fw / img.width,
+                              360.f * options_.px_scale / img.height})
+                  : std::min({1.f, fw / img.width, 480.f / img.height});
+              if (!remote) {
+                scale *= image.display_scale > 0.05f ? image.display_scale : 1.f;
+                scale = std::min(scale, fw / img.width);
+              }
+              // A local image's interactive scale is applied after fitting
+              // to its column; shrinking that column would apply it twice.
+              if (remote || image.display_scale >= 0.99f)
+                fw = std::min(fw, img.width * scale);
+            }
+            break;
+          }
+        }
+        if (fw > 0.f && max_width - fw - gap >= 10.f * em) {
           const bool right = node.image_float == "right";
           const float bx = right ? x + max_width - fw : x;
           float top = y;
