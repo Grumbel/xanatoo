@@ -8,6 +8,13 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Narrow URL bar
+
+- Move the location field to a full-width second row when toolbar controls
+  leave less than 200 scaled pixels for it. The changed source compiled and
+  the existing unit suite passed (3895 checks); application linking in this
+  shell lacks Fontconfig, FreeType and SQLite linker aliases. No CLI bundle.
+
 ## Status (2026-11-06) — Table cell spans
 
 - Added column and row spans to table cells, HTML import (including

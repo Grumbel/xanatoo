@@ -926,7 +926,14 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
   };
 
   // -- Browse / navigation row (browser chrome) --
-  const float browse_h = 32.f * scale_ + 16.f;
+  const float button_row_h = 32.f * scale_ + 16.f;
+  // Keep a useful location field when the navigation controls crowd it.
+  const float min_url_w = 200.f * scale_;
+  const float button_w = 32.f * scale_ + 8.f + ImGui::GetStyle().ItemSpacing.x;
+  const int right_buttons = state.browse ? 7 : 6;
+  const bool url_own_row = vp->Size.x <
+      12.f + (7 + right_buttons) * button_w + 15.f + min_url_w;
+  const float browse_h = button_row_h + (url_own_row ? button_row_h : 0.f);
   ImGui::SetNextWindowPos(ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
   ImGui::SetNextWindowSize(ImVec2(vp->Size.x, browse_h));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.f, 4.f));
@@ -985,10 +992,10 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       if (state.reader) ImGui::PopStyleColor(2);
     }
 
-    toolbar_separator();
+    if (!url_own_row) toolbar_separator();
 
     // Location / URL field (path or gemini://)
-    {
+    auto location_field = [&] {
       const float row_y = ImGui::GetCursorPosY();
       const float button_h = 32.f * scale_ + 6.f;
       const float field_h = 32.f * scale_;
@@ -1001,7 +1008,8 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       }
       // Leave room for the buttons right of the field (measured last frame).
       float field_w =
-          ImGui::GetContentRegionAvail().x - url_right_w_ - 6.f;
+          ImGui::GetContentRegionAvail().x -
+          (url_own_row ? 0.f : url_right_w_ + 6.f);
       if (field_w < 100.f) field_w = 100.f;
       ImGui::SetNextItemWidth(field_w);
       ImGui::SetCursorPosY(row_y + (button_h - field_h) * 0.5f);
@@ -1041,9 +1049,12 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         url_bar_editing_ = false;
         ImGui::ClearActiveID();
       }
-      ImGui::SameLine(0.f, 6.f);
-      ImGui::SetCursorPosY(row_y);
-    }
+      if (!url_own_row) {
+        ImGui::SameLine(0.f, 6.f);
+        ImGui::SetCursorPosY(row_y);
+      }
+    };
+    if (!url_own_row) location_field();
     const float right_x0 = ImGui::GetCursorPosX();
 
     {
@@ -1125,6 +1136,10 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
     }
     // tool_button ends with SameLine, so the cursor sits after the group.
     url_right_w_ = ImGui::GetCursorPosX() - right_x0;
+    if (url_own_row) {
+      ImGui::SetCursorPos(ImVec2(6.f, 4.f + button_row_h));
+      location_field();
+    }
   }
   ImGui::End();
   ImGui::PopStyleVar(2);
