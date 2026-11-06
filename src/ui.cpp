@@ -890,9 +890,20 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse |
       ImGuiWindowFlags_NoScrollWithMouse;
+  auto toolbar_separator = [&] {
+    ImGui::SameLine(0.f, 4.f);
+    const ImVec2 p = ImGui::GetCursorScreenPos();
+    const float row_h = 32.f * scale_;
+    ImGui::GetWindowDrawList()->AddLine(
+        ImVec2(p.x + 3.f, p.y + 4.f),
+        ImVec2(p.x + 3.f, p.y + row_h - 4.f),
+        ImGui::GetColorU32(ImGuiCol_Separator));
+    ImGui::Dummy(ImVec2(7.f, row_h));
+    ImGui::SameLine(0.f, 4.f);
+  };
 
   // -- Browse / navigation row (browser chrome) --
-  const float browse_h = 34.f * scale_;
+  const float browse_h = 32.f * scale_ + 16.f;
   ImGui::SetNextWindowPos(ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
   ImGui::SetNextWindowSize(ImVec2(vp->Size.x, browse_h));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.f, 4.f));
@@ -951,8 +962,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       if (state.reader) ImGui::PopStyleColor(2);
     }
 
-    ImGui::TextDisabled("|");
-    ImGui::SameLine(0.f, 4.f);
+    toolbar_separator();
 
     // Location / URL field (path or gemini://)
     {
@@ -1151,7 +1161,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
   if (!state.browse) {
     constexpr int kEditGroups[] = {5, 3, 4, 1, 1, 1, 4};
     const float button_step = 32.f * scale_ + 10.f;
-    const float separator_step = 14.f * scale_ * 0.35f + 4.f;
+    const float separator_step = 15.f;
     const float edit_width = std::max(1.f, vp->Size.x - 14.f);
     int edit_rows = 1;
     float row_used = 0.f;
@@ -1196,8 +1206,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
           line_has_group = false;
         }
         if (line_has_group) {
-          ImGui::TextDisabled("|");
-          ImGui::SameLine(0.f, 4.f);
+          toolbar_separator();
         }
         wrap_inside_group = group_width > edit_width;
         line_has_item = false;

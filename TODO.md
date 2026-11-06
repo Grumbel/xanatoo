@@ -8,6 +8,14 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Match toolbar height and separators
+
+- Sized the URL toolbar for its 32 px icons and padding, and replaced text
+  pipes with vertical dividers that scale to the icon row. Updated edit-row
+  wrap estimates for the divider width. SDL3 syntax-only compilation and
+  `git diff --check` passed. This CLI change has no bundle; number 290 remains
+  for the next Web chat handover.
+
 ## Status (2026-11-06) — Wrap the edit toolbar
 
 - Removed the horizontal scrolling toolbar row. Edit actions now wrap into
