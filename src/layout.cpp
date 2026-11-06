@@ -2405,6 +2405,27 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     word_w = 0.f;
   };
 
+  // Draw a muted continuation mark at synthetic breaks. It has no document
+  // node, so it remains visual only and cannot become a caret/selection slot.
+  auto add_forced_break_mark = [&](FontRole role) {
+    constexpr uint32_t kReturnMark = 0x21A9; // ↩
+    constexpr uint32_t kFallbackMark = 0x21B5; // ↵
+    Font& font = fonts_.pick(role);
+    const uint32_t cp = font.has_glyph(kReturnMark) ? kReturnMark : kFallbackMark;
+    const Glyph& glyph = font.glyph(cp);
+    PositionedGlyph mark;
+    mark.codepoint = cp;
+    if (out.glyphs.empty()) return;
+    const PositionedGlyph& previous = out.glyphs.back();
+    mark.x = previous.x + std::max(previous.advance, 1.f);
+    mark.y = previous.y;
+    mark.advance = static_cast<float>(glyph.advance >> 6);
+    mark.kind = InlineKind::Text;
+    mark.font = role;
+    mark.color = {128, 128, 128, 190};
+    out.glyphs.push_back(mark);
+  };
+
   for (size_t i = 0; i < chars.size(); ++i) {
     const uint32_t cp = chars[i].cp;
 
@@ -2484,10 +2505,27 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
       continue;
     }
 
-    // Non-space: accumulate into the current word.
+    // Non-space: accumulate into the current word. If an unbreakable run
+    // exceeds the measure, split at this codepoint boundary and mark the
+    // synthetic break with a return arrow.
     if (!in_word) {
       in_word = true;
       word_lo = i;
+      word_w = 0.f;
+    }
+    if (line_w > 0.f && line_w + word_w + adv > lw) {
+      flush_line(word_lo, false);
+      word_lo = i;
+      line_lo = i;
+    }
+    if (word_w > 0.f && word_w + adv > lw) {
+      const FontRole role = chars[i - 1].role;
+      emit_line(line_lo, i, false);
+      add_forced_break_mark(role);
+      place_line();
+      line_lo = i;
+      word_lo = i;
+      line_w = 0.f;
       word_w = 0.f;
     }
     word_w += adv;

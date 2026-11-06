@@ -8,6 +8,14 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Break long unspaced text runs
+
+- Long words now wrap at character boundaries to stay within the text measure.
+  A muted ↩ marker identifies each forced break without adding content to the
+  document or changing caret/selection positions.
+- SDL2 syntax-only compilation and `git diff --check` passed. This CLI change
+  has no bundle; number 290 remains for the next Web chat.
+
 ## Status (2026-11-06) — Pinch zoom in the image viewer
 
 - Added a Lightbox two-finger gesture that zooms around the fingers' midpoint
