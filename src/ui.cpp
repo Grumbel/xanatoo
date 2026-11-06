@@ -50,6 +50,59 @@ std::string elide_middle(const std::string& s, size_t keep) {
 
 bool near_eq(float a, float b, float eps) { return std::fabs(a - b) < eps; }
 
+// Toolbar controls are flat until hovered. On hover, a one-pixel raised
+// Clearlooks-style edge appears; holding a button reverses the bevel and uses
+// the darker face. Keep this local so menu and dialog buttons retain the
+// regular ImGui frame style.
+int push_toolbar_button_style() {
+  const theme::Palette& p = theme::palette();
+  ImGuiStyle& s = ImGui::GetStyle();
+  const ImVec4 idle = s.Colors[ImGuiCol_Button];
+  const bool default_idle =
+      near_eq(idle.x, p.face_dark.r / 255.f, 0.01f) &&
+      near_eq(idle.y, p.face_dark.g / 255.f, 0.01f) &&
+      near_eq(idle.z, p.face_dark.b / 255.f, 0.01f);
+  int colors = 0;
+  if (default_idle) {
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+    ++colors;
+  }
+  auto color = [](theme::Rgb c) {
+    return ImVec4(c.r / 255.f, c.g / 255.f, c.b / 255.f, 1.f);
+  };
+  ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color(p.accent_soft));
+  ImGui::PushStyleColor(ImGuiCol_ButtonActive, color(p.face_dark));
+  colors += 2;
+  ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
+  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.f);
+  return colors;
+}
+
+void draw_toolbar_button_bevel() {
+  if (!ImGui::IsItemHovered()) return;
+  const bool pressed = ImGui::IsItemActive();
+  const theme::Palette& p = theme::palette();
+  const ImVec2 min = ImGui::GetItemRectMin();
+  const ImVec2 max = ImGui::GetItemRectMax();
+  ImDrawList* draw = ImGui::GetWindowDrawList();
+  auto rgba = [](theme::Rgb c) {
+    return IM_COL32(c.r, c.g, c.b, 255);
+  };
+  const ImU32 light = rgba(pressed ? p.shadow : p.highlight);
+  const ImU32 dark = rgba(pressed ? p.highlight : p.shadow);
+  draw->AddLine(ImVec2(min.x + 1.f, min.y), ImVec2(max.x - 2.f, min.y), light);
+  draw->AddLine(ImVec2(min.x, min.y + 1.f), ImVec2(min.x, max.y - 2.f), light);
+  draw->AddLine(ImVec2(min.x + 1.f, max.y - 1.f),
+                ImVec2(max.x - 1.f, max.y - 1.f), dark);
+  draw->AddLine(ImVec2(max.x - 1.f, min.y + 1.f),
+                ImVec2(max.x - 1.f, max.y - 1.f), dark);
+}
+
+void pop_toolbar_button_style(int colors) {
+  ImGui::PopStyleVar(2);
+  ImGui::PopStyleColor(colors);
+}
+
 // Shared View / toolbar items for display prefs (not document format).
 void fill_line_spacing_items(const UiState& state, UiCommand& cmd) {
   using VS = xanatoo::ViewSettings;
@@ -284,6 +337,7 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
   const Icon* ic = icon(icon_name);
   bool pressed = false;
   ImGui::BeginDisabled(!enabled);
+  const int style_colors = push_toolbar_button_style();
   if (ic) {
     ImGui::PushID(id);
     ImVec2 size(ic->w * scale_, ic->h * scale_);
@@ -296,6 +350,7 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
       pressed = true;
       out = c;
     }
+    draw_toolbar_button_bevel();
     ImGui::PopStyleVar();
     ImGui::PopID();
   } else {
@@ -330,7 +385,9 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
       pressed = true;
       out = c;
     }
+    draw_toolbar_button_bevel();
   }
+  pop_toolbar_button_style(style_colors);
   ImGui::EndDisabled();
   if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && tip && tip[0]) {
     ImGui::SetTooltip("%s", tip);
@@ -346,6 +403,7 @@ bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip)
   const Icon* ic = icon(icon_name);
   ImGui::PushID(id);
   bool pressed = false;
+  const int style_colors = push_toolbar_button_style();
   if (ic) {
     ImVec2 size(ic->w * scale_, ic->h * scale_);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.f, 3.f));
@@ -354,6 +412,7 @@ bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip)
             ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0),
             ImVec4(1, 1, 1, 1.f)))
       pressed = true;
+    draw_toolbar_button_bevel();
     ImGui::PopStyleVar();
   } else {
     static const std::unordered_map<std::string, const char*> kShort = {
@@ -376,7 +435,9 @@ bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip)
     }
     label += " ▾";
     if (ImGui::SmallButton(label.c_str())) pressed = true;
+    draw_toolbar_button_bevel();
   }
+  pop_toolbar_button_style(style_colors);
   if (pressed) ImGui::OpenPopup("##menu");
   if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && tip && tip[0])
     ImGui::SetTooltip("%s", tip);

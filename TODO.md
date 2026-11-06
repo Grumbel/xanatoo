@@ -8,6 +8,15 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Toolbar button interaction states
+
+- Removed the idle toolbar frame and added a raised bevel on hover with a
+  darker sunken face while pressed. The styling is scoped to toolbar buttons.
+- Build verification is pending: the existing build cache points to a removed
+  Nix compiler, the Nix shell cannot update its read-only fetcher cache, and a
+  direct configure cannot find SDL3 development files. This CLI change has no
+  bundle; number 290 remains for the next Web chat handover.
+
 ## Status (2026-11-06) — Restrict bundle creation to Web chat
 
 - Clarified in `AGENTS.md` that cumulative Git bundles are only for Web chat
