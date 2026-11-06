@@ -1676,6 +1676,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::TogglePage;
       if (ImGui::MenuItem("History", "Ctrl+Shift+H", state.history_open))
         cmd = UiCommand::ToggleHistory;
+      if (ImGui::MenuItem("Style Sheets", nullptr, state.styles_open))
+        cmd = UiCommand::ToggleStylesPanel;
       ImGui::EndMenu();
     }
     // Go: moving through and between pages, plus the panels that do so.

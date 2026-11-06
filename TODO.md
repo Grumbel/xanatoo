@@ -8,6 +8,14 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Add a Style Sheets panel
+
+- Added a dockable Style Sheets panel listing discovered sheets, highlighting
+  the active one, and applying a selection immediately. Added it to the Panels
+  menu and session geometry/open-state persistence. SDL3 syntax-only
+  compilation passed for all six changed C++ units; `git diff --check` passed.
+  This CLI change has no bundle; number 290 remains for the next Web chat.
+
 ## Status (2026-11-06) — Anchor toolbar menus to their buttons
 
 - Toolbar popups now open below the lower-left corner of their triggering
@@ -33,9 +41,9 @@ Next bundle number: **290** (this delivery is **289**)
 
 ## Status (2026-11-06) — Add a Panels menu
 
-- Added a dedicated Panels menu for all six dockable panels: Keyboard
-  Reference, Heading Outline, Backlinks, Site Map, Page Navigation and
-  History. Menu checkmarks reflect the panels' open states, and existing
+- Added a dedicated Panels menu for the dockable panels: Keyboard Reference,
+  Heading Outline, Backlinks, Site Map, Page Navigation, History and Style
+  Sheets. Menu checkmarks reflect the panels' open states, and existing
   shortcuts remain. SDL3 syntax-only compilation and `git diff --check`
   passed. This CLI change has no bundle; number 290 remains for the next Web
   chat handover.

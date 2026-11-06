@@ -230,7 +230,7 @@ struct Pane {
 enum class Dock : uint8_t { None = 0, Left, Right, Top, Bottom, Max };
 
 enum class WindowRole : uint8_t {
-  Help, Outline, Backlinks, Sitemap, Page, History, Document
+  Help, Outline, Backlinks, Sitemap, Page, History, Styles, Document
 };
 
 // One floating window: help / outline / backlinks panels and document
@@ -677,6 +677,7 @@ struct App {
   uint64_t bookmarks_gen = 1;  // bumped by every change of `bookmarks`
   std::string bookmark_menu;   // bookmark of the open margin-icon menu
   bool history_panel_open = false;
+  bool styles_panel_open = false;
   bool preferences_open = false;  // Edit → Preferences (ImGui window)
   bool bookmarks_panel_open = false;
   std::string status_notice;
@@ -732,6 +733,7 @@ struct App {
   FloatWindow ol = make_float_panel(WindowRole::Outline, 40, 100, 320, 420);
   FloatWindow sm = make_float_panel(WindowRole::Sitemap, 140, 110, 340, 460);
   FloatWindow history_win = make_float_panel(WindowRole::History, 100, 130, 440, 360);
+  FloatWindow styles_win = make_float_panel(WindowRole::Styles, 160, 150, 320, 420);
   SitemapPanel sitemap;
   SearchBar search;
   FloatWindow pg = make_float_panel(WindowRole::Page, 60, 110, 260, 420);
@@ -1366,6 +1368,7 @@ void draw_status_bar(App& app);
 void draw_outline_panel(App& app);
 void draw_backlinks_panel(App& app);
 void draw_history_panel(App& app);
+void draw_styles_panel(App& app);
 void draw_help_window(App& app);
 void draw_floats(App& app);  // all floating windows, back→front
 void draw_dock_preview(App& app);

@@ -26,6 +26,7 @@ enum class UiCommand {
   GoUp,        // one level up the page hierarchy (UiState::up_url)
   StopLoading, // cancel running page fetches (toolbar Stop, Esc)
   ToggleHistory,   // View → History panel
+  ToggleStylesPanel, // Panels → Style sheets
   AddBookmark,     // bookmark the selection, else the current page
   BookmarkPosition,  // bookmark the caret position in the page
   RemoveBookmark,  // remove current (or arg) from bookmarks
@@ -249,6 +250,7 @@ struct UiState {
   float collection_thumb = 160.f;
   bool loading = false;  // a page fetch is running (Reload becomes Stop)
   bool history_open = false;
+  bool styles_open = false;
   bool bookmarks_open = false;
   bool current_bookmarked = false;
   int page_bookmarks = 0;  // bookmarks of passages inside the focused page

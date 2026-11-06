@@ -29,6 +29,8 @@ std::pair<int, int> min_size(const FloatWindow& w) {
     case WindowRole::History:
     case WindowRole::Backlinks:
       return {200, 120};
+    case WindowRole::Styles:
+      return {200, 140};
     case WindowRole::Help:
     case WindowRole::Document:
       break;
@@ -83,6 +85,9 @@ void close_window(App& app, FloatWindow& w) {
       break;
     case WindowRole::History:
       app.history_panel_open = false;
+      break;
+    case WindowRole::Styles:
+      app.styles_panel_open = false;
       break;
     case WindowRole::Document:
       close_doc_window(app, static_cast<size_t>(&w - app.soft_wins.data()));
@@ -262,6 +267,16 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
       }
       break;
     }
+    case WindowRole::Styles: {
+      auto [cx, cy, cw, ch] = float_client_rect(app, w);
+      const float step = static_cast<float>(
+          std::max(18, app.ui_font.line_height() + 7));
+      const int row = static_cast<int>(
+          (static_cast<float>(my - cy) + w.scroll) / step);
+      if (row >= 0 && row < static_cast<int>(app.styles.size()))
+        apply_style(app, app.styles[static_cast<size_t>(row)].name);
+      break;
+    }
     case WindowRole::Outline:
       click_outline(app, w, mx, my);
       break;
@@ -288,6 +303,7 @@ std::vector<FloatWindow*> float_stack(App& app) {
   if (app.sitemap.shown) st.push_back(&app.sm);
   if (app.page.shown) st.push_back(&app.pg);
   if (app.history_panel_open) st.push_back(&app.history_win);
+  if (app.styles_panel_open) st.push_back(&app.styles_win);
   if (app.help_mode) st.push_back(&app.help);
   for (auto& sw : app.soft_wins) st.push_back(&sw);
   // Docked columns under floating windows, maximized ones on top.
@@ -323,6 +339,8 @@ std::tuple<int, int, int, int> float_client_rect(App& app,
       return page_client_rect(app);
     case WindowRole::History:
       return window_client_rect(w.x, w.y, w.w, w.h);
+    case WindowRole::Styles:
+      return window_client_rect(w.x, w.y, w.w, w.h);
     case WindowRole::Document:
       return soft_client_rect(app, w);
   }
@@ -348,6 +366,10 @@ float float_max_scroll(App& app, const FloatWindow& w) {
                                8.f - view_h);
     case WindowRole::History:
       return std::max(0.f, static_cast<float>(app.visited.size()) *
+                                   std::max(18, app.ui_font.line_height() + 7) +
+                               8.f - view_h);
+    case WindowRole::Styles:
+      return std::max(0.f, static_cast<float>(app.styles.size()) *
                                    std::max(18, app.ui_font.line_height() + 7) +
                                8.f - view_h);
     case WindowRole::Sitemap:
@@ -591,6 +613,9 @@ void draw_floats(App& app) {
         break;
       case WindowRole::History:
         draw_history_panel(app);
+        break;
+      case WindowRole::Styles:
+        draw_styles_panel(app);
         break;
       case WindowRole::Help:
         draw_help_window(app);

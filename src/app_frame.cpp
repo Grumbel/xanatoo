@@ -215,6 +215,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   }
   ui_state.can_nav_forward = can_nav_step(app, 1);
   ui_state.history_open = app.history_panel_open;
+  ui_state.styles_open = app.styles_panel_open;
   ui_state.bookmarks_open = app.bookmarks_panel_open;
   ui_state.bookmarks = app.bookmarks;
   {
@@ -314,6 +315,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::NavigateUrl || c == C::NavBack || c == C::NavForward ||
         c == C::GoHome || c == C::GoUp ||
         c == C::ToggleHistory || c == C::ToggleBookmarks ||
+        c == C::ToggleStylesPanel ||
         c == C::AddBookmark || c == C::RemoveBookmark ||
         c == C::BookmarkPosition || c == C::NewTab ||
         c == C::CloseTab || c == C::NextTab || c == C::PrevTab ||
@@ -597,6 +599,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     case C::ToggleHistory:
       app.history_panel_open = !app.history_panel_open;
+      break;
+    case C::ToggleStylesPanel:
+      app.styles_panel_open = !app.styles_panel_open;
       break;
     case C::ToggleBookmarks:
       app.bookmarks_panel_open = !app.bookmarks_panel_open;
@@ -3019,6 +3024,58 @@ void draw_history_panel(App& app) {
     app.renderer.draw_text(app.ui_font, static_cast<float>(cx + 8),
                            static_cast<float>(cy + 8 + app.ui_font.ascender()),
                            "No pages visited this session", pal.text_dim.r,
+                           pal.text_dim.g, pal.text_dim.b);
+  xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
+  draw_client_scrollbar(app, cx, cy, cw, ch, w.scroll, max_s);
+}
+
+void draw_styles_panel(App& app) {
+  if (!app.styles_panel_open) return;
+  FloatWindow& w = app.styles_win;
+  if (w.dock == Dock::None) {
+    w.w = std::max(w.w, 200);
+    w.h = std::max(w.h, 140);
+  }
+  auto [cx, cy, cw, ch] = float_client_rect(app, w);
+  const float step = static_cast<float>(
+      std::max(18, app.ui_font.line_height() + 7));
+  const float content_h = static_cast<float>(app.styles.size()) * step + 8.f;
+  const float max_s = std::max(0.f, content_h - static_cast<float>(ch));
+  w.scroll = std::clamp(w.scroll, 0.f, max_s);
+
+  const SDL_Rect outer{w.x, w.y, w.w, w.h};
+  draw_floating_frame(app, outer, "Style Sheets", false,
+                      w.dock == Dock::None, 0, w.dock == Dock::Max);
+  SDL_Rect clip{cx, cy, cw, ch};
+  xanatoo::sdl::set_clip_rect(app.sdl, &clip);
+  const auto& pal = xanatoo::theme::palette();
+  float row_y = static_cast<float>(cy) - w.scroll;
+  for (int row = 0; row < static_cast<int>(app.styles.size()); ++row) {
+    if (row_y > static_cast<float>(cy + ch)) break;
+    if (row_y + step >= static_cast<float>(cy)) {
+      const xanatoo::StyleEntry& style =
+          app.styles[static_cast<size_t>(row)];
+      const bool active = style.name == app.style.name;
+      const int ry = static_cast<int>(row_y);
+      if (active)
+        xanatoo::theme::fill(app.sdl, SDL_Rect{cx + 1, ry, cw - 2,
+                                               static_cast<int>(step)},
+                             pal.face_dark);
+      const int baseline = ry + (static_cast<int>(step) -
+                                 app.ui_font.line_height()) / 2 +
+                           app.ui_font.ascender();
+      const std::string& label = style.title.empty() ? style.name : style.title;
+      app.renderer.draw_text(
+          app.ui_font, static_cast<float>(cx + 8), static_cast<float>(baseline),
+          fit_text(app.ui_font, label, cw - 28), pal.text.r, pal.text.g,
+          pal.text.b);
+    }
+    row_y += step;
+  }
+  if (app.styles.empty())
+    app.renderer.draw_text(app.ui_font, static_cast<float>(cx + 8),
+                           static_cast<float>(cy + 8 + app.ui_font.ascender()),
+                           "No style sheets found", pal.text_dim.r,
                            pal.text_dim.g, pal.text_dim.b);
   xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
   draw_client_scrollbar(app, cx, cy, cw, ch, w.scroll, max_s);
