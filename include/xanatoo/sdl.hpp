@@ -3,7 +3,7 @@
 //
 // SDL's 2D rendering switched to floating-point rectangles in SDL3. Keep
 // document/layout geometry in integer pixels, and convert at the boundary.
-// This header is shared by the legacy SDL2 and future native SDL3 backends.
+// This header keeps SDL3 and the explicit SDL2 rollback build on one API.
 
 #pragma once
 

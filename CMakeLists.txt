@@ -18,10 +18,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(XANATOO_SDL3 "Use the native SDL3 window, input and renderer backend" OFF)
-if(XANATOO_SDL3 AND EMSCRIPTEN)
-  message(FATAL_ERROR "The current Emscripten package uses SDL2")
-endif()
+option(XANATOO_SDL3 "Use the native SDL3 window, input and renderer backend" ON)
 
 # Catch common mistakes; ImGui is vendored and not under our control.
 if(MSVC)
@@ -30,8 +27,8 @@ else()
   add_compile_options(-Wall -Wextra -Wno-unused-parameter)
 endif()
 
-# The first Windows / browser ports deliberately ship a useful offline reader
-# and editor. The normal Linux, Android and R36S configurations are unchanged.
+# The Windows / browser ports deliberately ship a useful offline reader and
+# editor. SDL3 is the common backend on desktop, Android and handheld builds.
 set(_minimal_port_default OFF)
 if(WIN32 OR EMSCRIPTEN)
   set(_minimal_port_default ON)
@@ -45,15 +42,10 @@ if(XANATOO_MINIMAL_PORT)
 endif()
 
 if(EMSCRIPTEN)
-  # Nix supplies offline-built wasm libraries (no downloads in the sandbox).
-  # Standalone emcmake builds may still use Emscripten's built-in ports.
-  if(XANATOO_WASM_SDL2_ROOT)
-    set(SDL2_LIBRARIES "${XANATOO_WASM_SDL2_ROOT}/lib/libSDL2.a")
-    set(SDL2_INCLUDE_DIRS "${XANATOO_WASM_SDL2_ROOT}/include/SDL2")
-  else()
-    add_compile_options(-sUSE_SDL=2)
-    add_link_options(-sUSE_SDL=2)
-    set(SDL2_LIBRARIES "-sUSE_SDL=2")
+  # Nix supplies offline-built SDL3 and FreeType libraries. SDL3_DIR may also
+  # be set explicitly by standalone Emscripten builds.
+  if(XANATOO_WASM_SDL3_ROOT)
+    set(SDL3_DIR "${XANATOO_WASM_SDL3_ROOT}/lib/cmake/SDL3")
   endif()
   add_library(Freetype::Freetype INTERFACE IMPORTED)
   if(XANATOO_WASM_FREETYPE_ROOT)
@@ -66,7 +58,7 @@ if(EMSCRIPTEN)
   endif()
 endif()
 
-# R36S cross builds pass SDL2_INCLUDE_DIRS / SDL2_LIBRARIES explicitly.
+# Legacy SDL2 builds can still pass SDL2_INCLUDE_DIRS / SDL2_LIBRARIES.
 if(XANATOO_SDL3)
   find_package(SDL3 REQUIRED CONFIG)
   set(SDL2_LIBRARIES SDL3::SDL3)

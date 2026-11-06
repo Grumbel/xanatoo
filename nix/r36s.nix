@@ -2,21 +2,21 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # The R36S handheld (RK3326, 640x480) running ArkOS, whose userland is
-# Ubuntu 19.10 (eoan): glibc 2.30, libstdc++ from GCC 9, SDL2 2.0.x. A
+# Ubuntu 19.10 (eoan): glibc 2.30, libstdc++ from GCC 9. A
 # binary built against nixpkgs' glibc does not run there, so this builds
 # against a sysroot made of eoan's arm64 packages, from the Ubuntu archive
 # with their published hashes (Pingus fetches a prebuilt sysroot instead).
 # The compiler is nixpkgs' aarch64 cross GCC, but every header and library
 # comes from the sysroot: libstdc++ 9's headers with its shared library (so
 # no ABI shims are needed), the shared libgcc_s; GCC's own libgcc.a supplies
-# only compiler builtins. On the device, SDL2 is ArkOS's (KMS/DRM, its own
-# build), the stable SDL2 ABI.
+# only compiler builtins. SDL3 is built for the same sysroot and shipped with
+# the PortMaster package.
 #
 # Same approach as kurvenrausch's nix/r36s.nix; FreeType/Fontconfig debs
-# added for xanatoo's text stack. An experimental SDL3 build follows the
+# added for xanatoo's text stack. The SDL3 build follows the
 # KMS/DRM setup of Grumbel/sdl-jstest (nix/r36s.nix): SDL3 is built for the
 # eoan sysroot and shipped alongside the PortMaster executable.
-# ImGui's SDL2 renderer backend is patched
+# Historical SDL2 fallback: ImGui's SDL2 renderer backend is patched
 # for SDL 2.0.10 headers (no RenderGeometry): it looks up
 # SDL_RenderGeometryRaw in the device SDL at runtime, else draws per triangle
 # (ArkOS has 2.0.10) into a texture that is only redrawn when the UI changes.
@@ -262,8 +262,9 @@ let
     dontStrip = true;
   };
 
-  r36s = mkApp false;
-  r36sSDL3 = mkApp true;
+  r36s = mkApp true;
+  r36sSDL3 = r36s;
+  r36sSDL2 = mkApp false;
 
   mkPortmaster = { app, withSDL3 }: pkgs.stdenvNoCC.mkDerivation {
     pname = if withSDL3 then "xanatoo-r36s-sdl3-portmaster"
@@ -298,8 +299,9 @@ let
     '';
   };
 
-  portmaster = mkPortmaster { app = r36s; withSDL3 = false; };
-  portmasterSDL3 = mkPortmaster { app = r36sSDL3; withSDL3 = true; };
+  portmaster = mkPortmaster { app = r36s; withSDL3 = true; };
+  portmasterSDL3 = portmaster;
+  portmasterSDL2 = mkPortmaster { app = r36sSDL2; withSDL3 = false; };
 
   mkPortmasterZip = { port, withSDL3 }: pkgs.runCommand
     "xanatoo-${version}-r36s${lib.optionalString withSDL3 "-sdl3"}-portmaster.zip" {
@@ -310,10 +312,11 @@ let
     zip -r -9 $out/xanatoo.zip .
   '';
 
-  portmasterZip = mkPortmasterZip { port = portmaster; withSDL3 = false; };
-  portmasterSDL3Zip = mkPortmasterZip { port = portmasterSDL3; withSDL3 = true; };
+  portmasterZip = mkPortmasterZip { port = portmaster; withSDL3 = true; };
+  portmasterSDL3Zip = portmasterZip;
+  portmasterSDL2Zip = mkPortmasterZip { port = portmasterSDL2; withSDL3 = false; };
 
 in {
-  inherit sysroot sdl3 r36s r36sSDL3 portmaster portmasterZip
-    portmasterSDL3 portmasterSDL3Zip;
+  inherit sysroot sdl3 r36s r36sSDL3 r36sSDL2 portmaster portmasterZip
+    portmasterSDL3 portmasterSDL3Zip portmasterSDL2 portmasterSDL2Zip;
 }

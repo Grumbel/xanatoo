@@ -3,7 +3,7 @@
 **A document you can walk around in.**
 
 xanatoo is a lightweight, native hypertext workspace: a live document editor,
-reader, and explorer built with **C++20, SDL2, FreeType, and Dear ImGui**. It
+reader, and explorer built with **C++20, SDL3, FreeType, and Dear ImGui**. It
 draws inspiration from Ted Nelson's Xanadu and stretchtext, HyperCard, classical
 typesetting, and the Canon Cat.
 
@@ -67,7 +67,7 @@ nix build
 ./result/bin/xanatoo examples/tour.md
 ```
 
-Or build with CMake and a C++20 compiler, SDL2, FreeType, and the libraries
+Or build with CMake and a C++20 compiler, SDL3, FreeType, and the libraries
 required by the selected optional features (see `CMakeLists.txt`):
 
 ```sh
@@ -82,7 +82,7 @@ font search. Run `xanatoo --help` or `man xanatoo` for options, including
 
 ### Android and handhelds
 
-The Nix flake also builds an **Android 5.0+ APK** and an **R36S/PortMaster**
+The Nix flake also builds an **Android 5.1+ APK** and an **R36S/PortMaster**
 package:
 
 ```sh
@@ -110,7 +110,7 @@ nix run .#xanatoo-wasm   # serve the browser version locally
 
 Those builds default to
 `XANATOO_MINIMAL_PORT=ON`: they retain the document editor, local readers,
-hypertext navigation, SDL2 renderer, and bundled fonts, but omit built-in
+hypertext navigation, SDL3 renderer, and bundled fonts, but omit built-in
 network services, SQLite, FontConfig, and thumtoo. The browser edition does
 not yet save changes or import files from the host.
 

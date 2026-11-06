@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
-# Self-contained, offline WebAssembly build. Building SDL2 and FreeType from
-# pinned Nix sources avoids Emscripten ports fetching code inside a sandbox.
+# Self-contained, offline WebAssembly build. Build SDL3 and FreeType from
+# nixpkgs sources so no Emscripten ports download code in the sandbox.
 #
 # nix build .#xanatoo-wasm   site at result/index.html
 # nix run .#xanatoo-wasm     serve the site locally
 
-{ pkgs, sdlSrc, version }:
+{ pkgs, version }:
 
 let
   emscripten = pkgs.emscripten;
@@ -18,32 +18,27 @@ let
     chmod -R u+w "$EM_CACHE"
   '';
 
-  commonTools = [ emscripten pkgs.cmake pkgs.ninja pkgs.python3 ];
+  commonTools = [ emscripten pkgs.cmake pkgs.ninja pkgs.python3 pkgs.gnumake ];
 
-  sdl2Wasm = pkgs.stdenv.mkDerivation {
-    pname = "xanatoo-sdl2-wasm";
-    version = "2.30.3";
+  sdl3Wasm = pkgs.stdenv.mkDerivation {
+    pname = "xanatoo-sdl3-wasm";
+    inherit (pkgs.sdl3) version src;
     dontUnpack = true;
     dontConfigure = true;
     dontUseCmakeConfigure = true;
     nativeBuildInputs = commonTools;
     buildPhase = ''
       runHook preBuild
-      ${setupEmCache "sdl2"}
-      cp -r ${sdlSrc} SDL2-src
-      chmod -R u+w SDL2-src
-      emcmake cmake -S SDL2-src -B build -G Ninja \
-        -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$out \
-        -DCMAKE_INSTALL_BINDIR=bin \
-        -DCMAKE_INSTALL_INCLUDEDIR=include -DCMAKE_INSTALL_LIBDIR=lib \
-        -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TEST=OFF
-      cmake --build build --parallel ''${NIX_BUILD_CORES:-1}
+      ${setupEmCache "sdl3"}
+      PREFIX=$PWD/prefix SDL_SRC=${pkgs.sdl3.src} \
+        bash ${../mk/wasm/scripts/build-sdl3.sh}
       runHook postBuild
     '';
     installPhase = ''
       runHook preInstall
-      cmake --install build
-      test -f $out/lib/libSDL2.a
+      mkdir -p $out
+      cp -a prefix/. $out/
+      test -f $out/lib/libSDL3.a
       runHook postInstall
     '';
     dontStrip = true;
@@ -91,8 +86,8 @@ let
       emcmake cmake -S . -B build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$out \
         -DPROJECT_VERSION_FULL=${version} \
-        -DXANATOO_MINIMAL_PORT=ON -DBUILD_TESTING=OFF \
-        -DXANATOO_WASM_SDL2_ROOT=${sdl2Wasm} \
+        -DXANATOO_SDL3=ON -DXANATOO_MINIMAL_PORT=ON -DBUILD_TESTING=OFF \
+        -DXANATOO_WASM_SDL3_ROOT=${sdl3Wasm} \
         -DXANATOO_WASM_FREETYPE_ROOT=${freetypeWasm}
       cmake --build build --parallel ''${NIX_BUILD_CORES:-1}
       runHook postBuild
@@ -130,5 +125,5 @@ let
     meta.description = "Serve the WASM build on localhost";
   };
 in {
-  inherit sdl2Wasm freetypeWasm xanatooWasm serveApp;
+  inherit sdl3Wasm freetypeWasm xanatooWasm serveApp;
 }

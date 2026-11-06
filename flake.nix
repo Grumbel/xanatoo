@@ -7,15 +7,9 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    # Pinned SDL2 sources used by offline WASM; retained as a
-    # fallback for Windows while its default Nix package uses SDL3 compat.
-    sdl2-src = {
-      url = "https://github.com/libsdl-org/SDL/releases/download/release-2.30.3/SDL2-2.30.3.tar.gz";
-      flake = false;
-    };
   };
 
-  outputs = { self, nixpkgs, sdl2-src }:
+  outputs = { self, nixpkgs }:
     let
       systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
@@ -88,9 +82,6 @@
             ];
 
             buildInputs = with pkgs; [
-              SDL2
-              # nixpkgs SDL2 is sdl2-compat: runtime needs matching SDL3 on the
-              # loader path (see develop shell LD_LIBRARY_PATH).
               sdl3
               freetype
               fontconfig
@@ -106,6 +97,7 @@
             cmakeFlags = [
               "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
               "-DPROJECT_VERSION_FULL=${version}"
+              "-DXANATOO_SDL3=ON"
             ];
             # CTest unit tests (FLAKE-7); skipped automatically when cross.
             doCheck = true;
@@ -118,8 +110,7 @@
             };
           };
 
-          # Separate native SDL3 package: keep the released SDL2 path as the
-          # default until the lean SDL3 UI is verified on all target systems.
+          # Minimal native SDL3 package for backend checks.
           xanatooSDL3 = pkgs.stdenv.mkDerivation {
             pname = "xanatoo-sdl3";
             inherit version;
@@ -174,12 +165,16 @@
               xanatoo-r36s = r36s.r36s;
               xanatoo-r36s-portmaster = r36s.portmaster;
               xanatoo-r36s-portmaster-zip = r36s.portmasterZip;
-              # Experimental native SDL3 path: build SDL3 for the ArkOS
-              # sysroot and bundle libSDL3.so.0 with the PortMaster package.
+              # SDL3 backend; the unqualified package names above now select
+              # this production path.
               sdl3-r36s = r36s.sdl3;
               xanatoo-r36s-sdl3 = r36s.r36sSDL3;
               xanatoo-r36s-sdl3-portmaster = r36s.portmasterSDL3;
               xanatoo-r36s-sdl3-portmaster-zip = r36s.portmasterSDL3Zip;
+              # Retain the old device SDL2 ABI packages for rollback only.
+              xanatoo-r36s-sdl2 = r36s.r36sSDL2;
+              xanatoo-r36s-sdl2-portmaster = r36s.portmasterSDL2;
+              xanatoo-r36s-sdl2-portmaster-zip = r36s.portmasterSDL2Zip;
             }
           else { }
         ) // (
@@ -187,13 +182,9 @@
           # The CI workflow uses these same outputs, not separate CMake rules.
           if system == "x86_64-linux" then
             let
-              windows = import ./nix/windows.nix {
-                inherit pkgs version;
-                sdlSrc = sdl2-src;
-              };
+              windows = import ./nix/windows.nix { inherit pkgs version; };
               wasm = import ./nix/wasm.nix {
                 inherit pkgs version;
-                sdlSrc = sdl2-src;
               };
             in {
               xanatoo-win32 = windows.win32;
@@ -201,7 +192,7 @@
               xanatoo-win64 = windows.win64;
               xanatoo-win64-zip = windows.win64Zip;
               xanatoo-wasm = wasm.xanatooWasm;
-              sdl2-wasm = wasm.sdl2Wasm;
+              sdl3-wasm = wasm.sdl3Wasm;
               freetype-wasm = wasm.freetypeWasm;
             }
           else { }
@@ -224,7 +215,7 @@
               '')) self.apps.${system};
         in self.packages.${system} // appChecks // {
           # Compile the SDL-facing drawing, window, event, gamepad and input
-          # bridge against SDL3 headers before migrating vendored ImGui.
+          # bridge against SDL3 headers independently of the application build.
           sdl3-api = pkgs.runCommand "xanatoo-check-sdl3-api" {
             nativeBuildInputs = [ pkgs.pkg-config ];
             buildInputs = [ pkgs.sdl3 ];
@@ -304,7 +295,6 @@
         } // nixpkgs.lib.optionalAttrs (system == "x86_64-linux") {
           xanatoo-wasm = (import ./nix/wasm.nix {
             pkgs = import nixpkgs { inherit system; };
-            sdlSrc = sdl2-src;
             inherit version;
           }).serveApp;
         });
@@ -345,11 +335,8 @@
             # the live sources (styles/, examples/, FORMAT.md); DEV-6.
             XANATOO_DATA_ARGS=(--data-dir "$XANATOO_BUILD_DIR/share/xanatoo")
 
-            # Host LD_LIBRARY_PATH often breaks sdl2-compat: wrong libSDL2 or
-            # missing SDL3 → SIGABRT in dllinit() before main(). Prefer the
-            # nixpkgs set that matches the linked SDL2.
             export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath (with pkgs; [
-              SDL2 sdl3 libx11 libGL freetype fontconfig openssl sqlite
+              sdl3 libx11 libGL freetype fontconfig openssl sqlite
             ])}''${XANATOO_EXTRA_LD_LIBRARY_PATH:+:$XANATOO_EXTRA_LD_LIBRARY_PATH}"
           '';
 
@@ -480,7 +467,7 @@ except Exception:
               export XANATOO_BUILD_DIR="''${XANATOO_BUILD_DIR:-/tmp/xanatoo-build}"
               export XANATOO_FONT="''${XANATOO_FONT:-${dejavuFont}}"
               export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath (with pkgs; [
-                SDL2 sdl3 libx11 libGL freetype fontconfig openssl sqlite
+                sdl3 libx11 libGL freetype fontconfig openssl sqlite
               ])}''${XANATOO_EXTRA_LD_LIBRARY_PATH:+:$XANATOO_EXTRA_LD_LIBRARY_PATH}"
               # Prefer ccache when available (ccacheStdenv or explicit launcher).
               if command -v ccache >/dev/null 2>&1; then
@@ -528,11 +515,6 @@ xanatoo — nix develop (out-of-tree CMake)
     xanatoo-configure && xanatoo-build
     xanatoo-run
     # or: xanatoo-run-gdb
-
-  If the binary aborts before main in sdl2-compat dllinit:
-    · this shell sets LD_LIBRARY_PATH to nixpkgs SDL2+SDL3 (host path is toxic)
-    · re-enter the shell, or: export SDL2COMPAT_DEBUG_LOGGING=1
-    · then: xanatoo-run-gdb   (should stop with a better message on stderr)
 
   Debug symbols: CMAKE_BUILD_TYPE=Debug with -g3 -Og -fno-omit-frame-pointer
   (set at configure time). After changing flags: rm -rf $XANATOO_BUILD_DIR &&

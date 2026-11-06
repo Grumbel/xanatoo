@@ -1,6 +1,6 @@
 # Portable desktop and web builds
 
-The first Windows and WebAssembly ports deliberately use a reduced, **offline**
+The Windows and WebAssembly packages deliberately use a reduced, **offline**
 feature set. Their goal is to exercise the same document model, SDL rendering,
 FreeType typography, editor, and hypertext navigation as the Linux application
 before bringing additional network and storage backends across platforms.
@@ -17,7 +17,7 @@ are loaded from `share/xanatoo/fonts/` (bundled DejaVu faces); images fall
 back to the built-in stb_image decoders. Local Markdown, Org, structured
 documents, simplified HTML, direct EPUB import, editing, links, and the
 document UI remain available. An external `http(s)` link can still open in
-the system browser via SDL2; it cannot open through xanatoo's native network
+the system browser via SDL3; it cannot open through xanatoo's native network
 reader in these builds. Pandoc subprocess imports are unavailable.
 
 ## Canonical Nix builds and CI
@@ -33,11 +33,11 @@ nix flake check -L      # includes the platform packages and native tests
 ```
 
 The Windows folder outputs are `.#xanatoo-win32` and `.#xanatoo-win64`;
-the `-zip` outputs contain those folders. `.#sdl2-wasm` and
+the `-zip` outputs contain those folders. `.#sdl3-wasm` and
 `.#freetype-wasm` expose the individual WebAssembly libraries for debugging.
-`nix/wasm.nix` compiles SDL2 from the pinned `sdl2-src` flake input and
-FreeType from the nixpkgs source, offline. The `XANATOO_WASM_*_ROOT` CMake
-options select these libraries without triggering Emscripten port downloads.
+`nix/wasm.nix` compiles SDL3 and FreeType from nixpkgs sources, offline. The
+`XANATOO_WASM_*_ROOT` CMake options select these libraries without triggering
+Emscripten port downloads.
 
 `.github/workflows/check.yml` executes `nix flake check` and uploads the
 actual Windows and web flake outputs. There is no separate, drifting CI build
@@ -46,20 +46,13 @@ Nix, but are not the source of truth for releases.
 
 ## Windows (MinGW-w64)
 
-The flake cross-compiles both `x86_64` and `i686` with MinGW-w64. The Windows
-packages now use nixpkgs' `SDL2` (sdl2-compat), backed by SDL3. They ship
-`SDL3.dll` as well as the SDL2-compatible DLL. This moves their runtime onto
-SDL3 without changing the application or vendored ImGui SDL2 APIs yet; full
-source migration is planned separately. A classic SDL2 source builder remains
-in `nix/windows.nix` as a fallback if the compatibility package cannot be
-cross-compiled on a given nixpkgs revision.
-
-The SDL3 source transition has a shared `xanatoo/sdl.hpp` boundary for
-window startup, text input, timer/mouse differences, surfaces, common 2D
-drawing, gamepads, keyboard/events, touch, system cursors, path ownership,
-and report helpers. The experimental native SDL3 application backend uses a
-small single-window ImGui adapter (`src/imgui_sdl3.cpp`), independent from the
-vendored SDL2 backends:
+The flake cross-compiles both `x86_64` and `i686` with MinGW-w64 and links
+directly to SDL3. All regular builds use the SDL3 application backend and the
+small single-window ImGui adapter (`src/imgui_sdl3.cpp`). The shared
+`xanatoo/sdl.hpp` boundary handles window startup, text input, timer/mouse
+differences, surfaces, drawing, gamepads, keyboard/events, touch, cursors,
+path ownership, and platform reporting. The SDL2 backend remains available
+only by explicitly configuring `-DXANATOO_SDL3=OFF`.
 
 ```sh
 nix build -L .#xanatoo-sdl3-native
@@ -70,28 +63,25 @@ cmake --build build/sdl3
 ```
 
 `nix flake check -L` includes the native SDL3 package and the `sdl3-api`
-compile-only bridge check. **SDL3 compilation and runtime behavior have not
-yet been verified** in this environment; treat this target as experimental.
-ImGui gamepad navigation and secondary viewports are not supported by the
-minimal backend. The current Win32/Win64 and WASM production artifacts remain
-on the SDL2 API while this new backend is validated.
+compile-only bridge check. ImGui gamepad navigation and secondary viewports
+are not supported by the minimal backend.
 
-R36S/ArkOS also has a separate experimental SDL3 cross build, using the
-same eoan glibc/libstdc++ sysroot as the established SDL2 port and the SDL3
-KMS/DRM recipe from `Grumbel/sdl-jstest`:
+R36S/ArkOS uses SDL3 built for the eoan glibc/libstdc++ sysroot and bundled
+with the PortMaster package, using the KMS/DRM recipe from
+`Grumbel/sdl-jstest`:
 
 ```sh
 nix build -L .#sdl3-r36s                    # SDL3 library for ArkOS
-nix build -L .#xanatoo-r36s-sdl3           # application
-nix build -L .#xanatoo-r36s-sdl3-portmaster-zip
+nix build -L .#xanatoo-r36s                 # application
+nix build -L .#xanatoo-r36s-portmaster-zip
 ```
 
-The SDL3 PortMaster bundle ships `libSDL3.so.0` and uses the regular launcher
-without SDL2 preloading. It is an alternative to (not a replacement for)
-`xanatoo-r36s-portmaster-zip`, and still needs an on-device smoke test.
+The PortMaster bundle ships `libSDL3.so.0` and uses the regular launcher
+without SDL2 preloading. The old SDL2 ABI package remains available under
+the `xanatoo-r36s-sdl2*` names as a rollback option.
 
 For an alternative local MINGW64 (or MINGW32) shell, install the corresponding
-`mingw-w64-...-gcc`, `cmake`, `ninja`, `SDL2`, and `freetype` packages and run:
+`mingw-w64-...-gcc`, `cmake`, `ninja`, `SDL3`, and `freetype` packages and run:
 
 ```sh
 cmake -S . -B build/windows -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -111,11 +101,14 @@ To run directly from the build tree, use `build/windows/xanatoo.exe`.
 
 ## WebAssembly (Emscripten)
 
-Install the Emscripten SDK and Ninja; use Emscripten's built-in SDL2 and
-FreeType ports (there is no native SDL/FreeType installation to link):
+Install the Emscripten SDK and Ninja, then build a static SDL3 library for
+Emscripten using `mk/wasm/scripts/build-sdl3.sh`. Point CMake at that install:
 
 ```sh
-emcmake cmake -S . -B build/wasm -G Ninja -DCMAKE_BUILD_TYPE=Release
+SDL_SRC=/path/to/SDL PREFIX=/tmp/sdl3-wasm \
+  bash mk/wasm/scripts/build-sdl3.sh
+emcmake cmake -S . -B build/wasm -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DXANATOO_SDL3=ON -DXANATOO_WASM_SDL3_ROOT=/tmp/sdl3-wasm
 cmake --build build/wasm --parallel
 cmake --install build/wasm --prefix dist/web
 python3 -m http.server --directory dist/web 8000

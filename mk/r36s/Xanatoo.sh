@@ -43,11 +43,8 @@ export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
 $GPTOKEYB "xanatoo" &
 pm_platform_helper "$GAMEDIR/xanatoo"
 
-# ArkOS installs several SDL2 builds side by side but points
-# libSDL2-2.0.so.0 at eoan's 2.0.10, which lacks SDL_RenderGeometry (the
-# UI then takes a slow fallback path). Preload the newest one for the SDL2
-# port. The experimental SDL3 port bundles its own SDL3 in libs/ and must
-# not preload any SDL2 library into its process.
+# The SDL3 port bundles its own runtime and must not preload a device SDL2
+# library. The named SDL2 rollback package selects the compatibility branch.
 sdl_preload=""
 if [ ! -f "$GAMEDIR/libs/libSDL3.so.0" ]; then
   sdl_default=$(readlink -f /usr/lib/aarch64-linux-gnu/libSDL2-2.0.so.0 2>/dev/null)

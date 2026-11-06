@@ -60,10 +60,9 @@ desktop and glyphs Roboto lacks (▸ ▾ ☐ ☑) render.
 
 Tested on a Fire 7 (KFAUWI, Fire OS 5 / Android 5.1.1, 600×1024 @160 dpi).
 
-Known: one SIGSEGV inside `SDL_RenderPresent` (SDL 2.30.3 GLES2) while the
-surface was resizing for the keyboard under fast input; not reproducible in
-a dozen further runs. If it returns, try SDL 2.32.x (Android surface
-lifecycle fixes).
+Historical SDL2 issue: one SIGSEGV inside `SDL_RenderPresent` (SDL 2.30.3
+GLES2) while the surface resized for the keyboard under fast input. It did
+not recur in a dozen runs. The SDL3 build needs a fresh device smoke test.
 
 ## Network (Mbed TLS)
 

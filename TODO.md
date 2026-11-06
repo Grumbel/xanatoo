@@ -6,7 +6,26 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **287** (this delivery is **286**)
+Next bundle number: **288** (this delivery is **287**)
+
+## Status (2026-11-06) — SDL3 on all default targets (bundle 287)
+
+- Made SDL3 the CMake default and switched the native Linux package, Win32/
+  Win64 cross builds, WebAssembly build, Android APK and default R36S /
+  PortMaster output to SDL3. The SDL2 backend remains as an explicit CMake
+  fallback and a separately named R36S rollback package.
+- Replaced Windows sdl2-compat packaging with direct SDL3 linking. The
+  WebAssembly build now builds static SDL3 offline from nixpkgs and links the
+  first-party ImGui SDL3 backend. The default R36S package ships SDL3.
+- Kept the SDL2 R36S package available under explicit rollback names and
+  updated its launcher and handheld documentation to describe SDL3 as the
+  standard package.
+- Removed the SDL2 flake input and updated platform documentation. SDL3 key
+  name and platform API differences are covered by the shared SDL boundary.
+- Verified `nix build .#xanatoo-unwrapped`, both Windows ZIPs,
+  `nix build .#xanatoo-wasm .#sdl3-wasm`, and
+  `nix build .#xanatoo-r36s-portmaster-zip`. Device/browser runtime checks
+  remain outstanding.
 
 ## Status (2026-11-06) — Android SDL3 migration (bundle 286)
 
