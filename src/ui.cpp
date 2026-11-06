@@ -567,8 +567,9 @@ void Ui::tool_menu_end() {
 }
 
 static void load_ui_fonts(ImGuiIO& io, float scale) {
-  // ~10–11 pt at 96 dpi — close to GNOME 2 menu/toolbar size
-  const float size_px = std::round(14.0f * scale);
+  // GNOME 2 commonly used Sans 10. Keep its Sans-family look, with a little
+  // more pixel size to balance xanatoo's intentionally large 32 px icons.
+  const float size_px = std::round(16.0f * scale);
   std::string path = ui_font_path();
   ImFontConfig cfg;
   cfg.OversampleH = 2;
