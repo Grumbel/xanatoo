@@ -6,7 +6,16 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **288** (this delivery is **287**)
+Next bundle number: **289** (this delivery is **288**)
+
+## Status (2026-11-06) — Complete WebAssembly data preload (bundle 288)
+
+- Expanded the WASM virtual filesystem preload from only `welcome.md` to all
+  of `examples/`, including relative images and collection assets. Also preload
+  `FORMAT.md`, which the format-reference menu opens from the data root.
+- Rebuilt `.#xanatoo-wasm` successfully and verified the generated loader
+  contains paths for `examples/tour.md`, example images, `FORMAT.md`, styles
+  and bundled fonts.
 
 ## Status (2026-11-06) — SDL3 on all default targets (bundle 287)
 

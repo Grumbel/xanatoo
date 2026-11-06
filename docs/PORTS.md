@@ -117,8 +117,9 @@ python3 -m http.server --directory dist/web 8000
 Open `http://localhost:8000/`. The deployment includes `index.html`,
 `xanatoo.js`, `xanatoo.wasm`, and `xanatoo.data`; serve all four from the
 same directory. The last file preloads the welcome document, styles,
-icons, and fallback fonts into the Emscripten virtual filesystem under
-`/data`. The browser drives `run_frame()` via Emscripten's main loop, not
+icons, and fallback fonts into `/data` in Emscripten's virtual filesystem.
+It also includes every example document and its relative images, plus
+`FORMAT.md`. The browser drives `run_frame()` via Emscripten's main loop, not
 a blocking native SDL loop.
 
 This **preview is ephemeral**: file-system persistence, native file dialogs,

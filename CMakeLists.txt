@@ -461,10 +461,11 @@ if(EMSCRIPTEN)
   set_target_properties(xanatoo PROPERTIES SUFFIX ".html")
   target_link_options(xanatoo PRIVATE
     "SHELL:--shell-file ${CMAKE_CURRENT_SOURCE_DIR}/mk/wasm/shell.html"
-    "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/examples/welcome.md@/data/examples/welcome.md"
+    "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/examples@/data/examples"
     "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/styles@/data/styles"
     "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/data/fonts@/data/fonts"
     "SHELL:--preload-file ${XANATOO_ICON_DIR}@/data/icons"
+    "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/FORMAT.md@/data/FORMAT.md"
     -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -sENVIRONMENT=web)
   add_dependencies(xanatoo xanatoo_icons)
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/xanatoo.html
