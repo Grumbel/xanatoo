@@ -8,6 +8,15 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Pinch zoom in the image viewer
+
+- Added a Lightbox two-finger gesture that zooms around the fingers' midpoint
+  and bypasses SDL's synthesized primary-finger drag while pinching.
+- Completed Style Sheets keyboard focus: Up/Down/Home/End select, Enter applies,
+  and Escape closes. SDL3 syntax-only compilation passed across the touch,
+  gallery, event, frame and panel integration paths; `git diff --check` passed.
+  This CLI change has no bundle; number 290 remains for the next Web chat.
+
 ## Status (2026-11-06) — Focus the Style Sheets panel
 
 - Added Style Sheets to the shared `KeyFocus` state. Clicking the panel or

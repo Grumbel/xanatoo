@@ -602,10 +602,16 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     case C::ToggleStylesPanel:
       app.styles_panel_open = !app.styles_panel_open;
-      if (app.styles_panel_open)
+      if (app.styles_panel_open) {
         app.key_focus = KeyFocus::Styles;
-      else if (app.key_focus == KeyFocus::Styles)
+        for (int i = 0; i < static_cast<int>(app.styles.size()); ++i)
+          if (app.styles[static_cast<size_t>(i)].name == app.style.name) {
+            app.styles_sel = i;
+            break;
+          }
+      } else if (app.key_focus == KeyFocus::Styles) {
         app.key_focus = KeyFocus::Document;
+      }
       break;
     case C::ToggleBookmarks:
       app.bookmarks_panel_open = !app.bookmarks_panel_open;
@@ -3043,6 +3049,11 @@ void draw_styles_panel(App& app) {
   auto [cx, cy, cw, ch] = float_client_rect(app, w);
   const float step = static_cast<float>(
       std::max(18, app.ui_font.line_height() + 7));
+  if (app.styles.empty())
+    app.styles_sel = 0;
+  else
+    app.styles_sel = std::clamp(app.styles_sel, 0,
+                                static_cast<int>(app.styles.size()) - 1);
   const float content_h = static_cast<float>(app.styles.size()) * step + 8.f;
   const float max_s = std::max(0.f, content_h - static_cast<float>(ch));
   w.scroll = std::clamp(w.scroll, 0.f, max_s);
@@ -3061,17 +3072,18 @@ void draw_styles_panel(App& app) {
       const xanatoo::StyleEntry& style =
           app.styles[static_cast<size_t>(row)];
       const bool active = style.name == app.style.name;
+      const bool selected = row == app.styles_sel;
       const int ry = static_cast<int>(row_y);
-      if (active)
+      if (selected || active)
         xanatoo::theme::fill(app.sdl, SDL_Rect{cx + 1, ry, cw - 2,
                                                static_cast<int>(step)},
-                             focused ? pal.accent : pal.face_dark);
+                             selected && focused ? pal.accent : pal.face_dark);
       const int baseline = ry + (static_cast<int>(step) -
                                  app.ui_font.line_height()) / 2 +
                            app.ui_font.ascender();
       const std::string& label = style.title.empty() ? style.name : style.title;
       const xanatoo::theme::Rgb ink =
-          active && focused ? pal.highlight : pal.text;
+          selected && focused ? pal.highlight : pal.text;
       app.renderer.draw_text(
           app.ui_font, static_cast<float>(cx + 8), static_cast<float>(baseline),
           fit_text(app.ui_font, label, cw - 28), ink.r, ink.g, ink.b);

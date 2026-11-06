@@ -335,6 +335,8 @@ enum class TouchMode : uint8_t {
   Select,   // after a long press: dragging extends the selection
   Direct,   // scrollbar / float frame / split gutter: plain pointer drag
   Pinch,    // two fingers: zoom
+  Lightbox, // one finger in the image viewer, awaiting a tap or second finger
+  LightboxPinch, // two fingers in the image viewer: image zoom
   Ignored,  // ImGui's touch or a finished pinch; wait for all fingers up
 };
 
@@ -351,6 +353,7 @@ struct Touch {
   float start_x = 0.f, start_y = 0.f;
   Uint32 start_ticks = 0;
   bool on_float = false;
+  bool on_lightbox = false;
   int pane = 0;
   // Pan velocity (scroll px/s) and the fling that continues it.
   float velocity = 0.f;
@@ -680,6 +683,7 @@ struct App {
   std::string bookmark_menu;   // bookmark of the open margin-icon menu
   bool history_panel_open = false;
   bool styles_panel_open = false;
+  int styles_sel = 0;
   bool preferences_open = false;  // Edit → Preferences (ImGui window)
   bool bookmarks_panel_open = false;
   std::string status_notice;
@@ -1208,6 +1212,8 @@ bool open_link_image(App& app, int pi, const std::string& href);
 void note_collection_target(App& app, int pi, float lx, float my);
 // While the lightbox is open it takes every event. True = consumed.
 bool lightbox_event(App& app, const SDL_Event& ev);
+bool lightbox_touch_target(const App& app, float x, float y);
+void lightbox_touch_zoom(App& app, float factor, float x, float y);
 void draw_lightbox(App& app);
 
 // ---- remote images (app_images.cpp) ----

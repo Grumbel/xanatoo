@@ -67,9 +67,18 @@ void begin_gesture(App& app, float x, float y) {
   t.start_ticks = xanatoo::sdl::ticks();
   t.last_move_ticks = t.start_ticks;
   t.on_float = false;
+  t.on_lightbox = false;
   const int xi = static_cast<int>(x), yi = static_cast<int>(y);
-  if (app.ui.captures_point(x, y) || y < app.ui_top ||
-      yi >= app.win_h - status_bar_h) {
+  if (app.ui.captures_point(x, y)) {
+    t.mode = TouchMode::Ignored;
+    return;
+  }
+  if (lightbox_touch_target(app, x, y)) {
+    t.on_lightbox = true;
+    t.mode = TouchMode::Lightbox;
+    return;
+  }
+  if (y < app.ui_top || yi >= app.win_h - status_bar_h) {
     t.mode = TouchMode::Ignored;
     return;
   }
@@ -127,6 +136,10 @@ void begin_pinch(App& app) {
   t.pinch_dist = finger_distance(t);
   t.pinch_body_px = app.body_px;
   t.pinch_anchor.reset();
+  if (t.on_lightbox) {
+    t.mode = TouchMode::LightboxPinch;
+    return;
+  }
   if (!t.on_float) {
     const float mx = (t.fingers[0].x + t.fingers[1].x) * 0.5f;
     const float my = (t.fingers[0].y + t.fingers[1].y) * 0.5f;
@@ -171,7 +184,8 @@ void touch_finger_down(App& app, const SDL_TouchFingerEvent& tf) {
   t.fingers[t.count++] = TouchPoint{xanatoo::sdl::finger_id(tf), x, y};
   if (t.count == 1) {
     begin_gesture(app, x, y);
-  } else if (t.mode == TouchMode::Pending || t.mode == TouchMode::Pan) {
+  } else if (t.mode == TouchMode::Pending || t.mode == TouchMode::Pan ||
+             t.mode == TouchMode::Lightbox) {
     begin_pinch(app);
   }
 }
@@ -222,7 +236,18 @@ void touch_finger_motion(App& app, const SDL_TouchFingerEvent& tf) {
         zoom_by(app, target - app.body_px);
       }
       break;
+    case TouchMode::LightboxPinch:
+      if (t.pinch_dist > 0.f) {
+        const float distance = finger_distance(t);
+        const float factor = distance / t.pinch_dist;
+        t.pinch_dist = distance;
+        const float mx = (t.fingers[0].x + t.fingers[1].x) * 0.5f;
+        const float my = (t.fingers[0].y + t.fingers[1].y) * 0.5f;
+        lightbox_touch_zoom(app, factor, mx, my);
+      }
+      break;
     case TouchMode::Idle:
+    case TouchMode::Lightbox:
     case TouchMode::Ignored:
       break;
   }
@@ -264,9 +289,11 @@ void touch_finger_up(App& app, const SDL_TouchFingerEvent& tf) {
       if (primary) pointer_left_up(app, xi, yi);
       break;
     case TouchMode::Pinch:  // the remaining finger does nothing
+    case TouchMode::LightboxPinch:
       t.mode = TouchMode::Ignored;
       break;
     case TouchMode::Idle:
+    case TouchMode::Lightbox:
     case TouchMode::Ignored:
       break;
   }

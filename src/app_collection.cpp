@@ -305,11 +305,27 @@ static bool in_rect(const SDL_Rect& r, int x, int y) {
   return x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h;
 }
 
+bool lightbox_touch_target(const App& app, float x, float y) {
+  if (!app.lightbox.open) return false;
+  const SDL_Rect r = lightbox_rect(app);
+  return x >= static_cast<float>(r.x) && y >= static_cast<float>(r.y) &&
+         x < static_cast<float>(r.x + r.w) &&
+         y < static_cast<float>(r.y + r.h);
+}
+
+void lightbox_touch_zoom(App& app, float factor, float x, float y) {
+  lightbox_zoom(app, factor, x, y);
+}
+
 bool lightbox_event(App& app, const SDL_Event& ev) {
   Lightbox& lb = app.lightbox;
   if (!lb.open) return false;
   using xanatoo::sdl::EventKind;
   const EventKind kind = xanatoo::sdl::event_kind(ev);
+  // SDL mirrors the primary touch as mouse input; during a two-finger pinch
+  // it must not also drag the image while the raw finger events zoom it.
+  if (app.touch.mode == TouchMode::LightboxPinch && is_touch_mouse_event(ev))
+    return true;
   // Pointer events outside the viewer belong to the menus and toolbars.
   {
     const SDL_Rect r = lightbox_rect(app);

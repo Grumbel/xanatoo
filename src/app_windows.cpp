@@ -275,8 +275,10 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
           std::max(18, app.ui_font.line_height() + 7));
       const int row = static_cast<int>(
           (static_cast<float>(my - cy) + w.scroll) / step);
-      if (row >= 0 && row < static_cast<int>(app.styles.size()))
+      if (row >= 0 && row < static_cast<int>(app.styles.size())) {
+        app.styles_sel = row;
         apply_style(app, app.styles[static_cast<size_t>(row)].name);
+      }
       break;
     }
     case WindowRole::Outline:
@@ -430,6 +432,13 @@ bool float_press(App& app, int mx, int my) {
                     : w->role == WindowRole::Page      ? KeyFocus::Page
                     : w->role == WindowRole::Styles    ? KeyFocus::Styles
                                                        : KeyFocus::Document;
+    if (w->role == WindowRole::Styles) {
+      for (int i = 0; i < static_cast<int>(app.styles.size()); ++i)
+        if (app.styles[static_cast<size_t>(i)].name == app.style.name) {
+          app.styles_sel = i;
+          break;
+        }
+    }
     if (w->role == WindowRole::Document) {
       // Raise to top of the document stack; `w` is stale afterwards.
       const size_t idx = static_cast<size_t>(w - app.soft_wins.data());

@@ -36,7 +36,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `search_results.cpp` | JSON search engines → Markdown result documents (`search_results_markdown`, pure; `search_fetch` needs HTTPS): wikipedia / hn / archive / gutendex / lemmy / bluesky mappers; link text is literal in our parser, only brackets are changed |
 | `app_search.cpp` | search bar state (`App::search`, engine = `ViewSettings::search_engine`): show / toggle / select engine / `run_search`; the ImGui row is in `ui.cpp` |
 | `app_softwin.cpp` | window placement: `Dock` (None / Left / Right / Max) for every role — `dock_window` / `undock_window` / `toggle_maximize`, `place_windows` derives docked geometry, `dock_column_w` is what `layout_panes` leaves out |
-| `app_touch.cpp` | touchscreen gestures: tap → click, drag/fling scroll, long-press select, pinch zoom |
+| `app_touch.cpp` | touchscreen gestures: tap → click, drag/fling scroll, long-press select, pane text zoom and Lightbox image zoom |
 | `app_buffers.cpp` / `app_view.cpp` / `app_nav.cpp` / `app_softwin.cpp` / `app_prompts.cpp` / `app_pointer.cpp` | document buffers, scroll/fold/outline, URL history + bookmarks, floating windows, minibuffer, cursor/gamepad |
 | `app_fetch.cpp` | background page fetches (`FetchJob` on a worker thread → `poll_fetches`), page cache, loading indicator |
 | `app_images.cpp` | remote (http/https) images: worker downloads of what `ImageCache` queued → `cache_dir()/images/`, relayout on completion and on finished thumbnails (`poll_images`); cache pruning at startup |
