@@ -552,10 +552,12 @@ bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip)
   popup_pos = ImVec2(button_min.x, button_max.y);
   pop_toolbar_button_style(style_colors);
   if (pressed) ImGui::OpenPopup("##menu");
-  if (ImGui::IsPopupOpen("##menu"))
-    ImGui::SetNextWindowPos(popup_pos, ImGuiCond_Appearing);
   if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && tip && tip[0])
     ImGui::SetTooltip("%s", tip);
+  // Set this after the tooltip: SetTooltip() begins another ImGui window and
+  // consumes SetNextWindowPos before the popup gets a chance to use it.
+  if (ImGui::IsPopupOpen("##menu"))
+    ImGui::SetNextWindowPos(popup_pos, ImGuiCond_Appearing);
   // Advance toolbar cursor before opening the popup window.
   ImGui::SameLine(0.f, 2.f);
   bool open = ImGui::BeginPopup("##menu");
