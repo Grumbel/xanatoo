@@ -36,10 +36,16 @@ void clipboard_set(void*, const char* text) {
 }
 
 ImGuiKey key_for(SDL_Scancode scancode) {
+  auto key_in_range = [](ImGuiKey first, SDL_Scancode key,
+                        SDL_Scancode first_scancode) {
+    return static_cast<ImGuiKey>(
+        static_cast<int>(first) + static_cast<int>(key) -
+        static_cast<int>(first_scancode));
+  };
   if (scancode >= SDL_SCANCODE_A && scancode <= SDL_SCANCODE_Z)
-    return static_cast<ImGuiKey>(ImGuiKey_A + scancode - SDL_SCANCODE_A);
+    return key_in_range(ImGuiKey_A, scancode, SDL_SCANCODE_A);
   if (scancode >= SDL_SCANCODE_1 && scancode <= SDL_SCANCODE_9)
-    return static_cast<ImGuiKey>(ImGuiKey_1 + scancode - SDL_SCANCODE_1);
+    return key_in_range(ImGuiKey_1, scancode, SDL_SCANCODE_1);
   switch (scancode) {
     case SDL_SCANCODE_0: return ImGuiKey_0;
     case SDL_SCANCODE_TAB: return ImGuiKey_Tab;
@@ -100,7 +106,7 @@ ImGuiKey key_for(SDL_Scancode scancode) {
     default: break;
   }
   if (scancode >= SDL_SCANCODE_F1 && scancode <= SDL_SCANCODE_F12)
-    return static_cast<ImGuiKey>(ImGuiKey_F1 + scancode - SDL_SCANCODE_F1);
+    return key_in_range(ImGuiKey_F1, scancode, SDL_SCANCODE_F1);
   return ImGuiKey_None;
 }
 

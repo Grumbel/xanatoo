@@ -8,6 +8,14 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — SDL3 ImGui enum arithmetic warning
+
+- Converted ImGui key and SDL scancode enums to integers before calculating
+  alphabetic, numeric and function-key offsets, removing Clang's deprecated
+  cross-enum arithmetic warnings without changing the key mapping.
+- This CLI change has no bundle; number 290 remains for the next Web chat
+  handover.
+
 ## Status (2026-11-06) — Export SDL3 Android entry point
 
 - Included SDL3's `SDL_main.h` in the translation unit that defines `main`,
