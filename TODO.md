@@ -8,6 +8,12 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Restrict bundle creation to Web chat
+
+- Clarified in `AGENTS.md` that cumulative Git bundles are only for Web chat
+  handovers. CLI sessions commit changes directly and leave the next bundle
+  number reserved for the next Web chat handover.
+
 ## Status (2026-11-06) — Refresh toolbar icon set (bundle 289)
 
 - Redrew all 53 toolbar SVGs with a consistent GNOME 2-inspired style:

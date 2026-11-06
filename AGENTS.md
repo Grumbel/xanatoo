@@ -289,11 +289,12 @@ toolbar and shortcuts should route through `execute_command`.
 
 Read `TODO.md` first. Record plans and outcomes there.
 Longer design notes: `docs/BRAINSTORM.md`.
-Work is committed directly to git (bundles were only a Grok Web handover
-mechanism originally; historical bundle numbers in TODO.md are archival).
-For the current ChatGPT handover, deliver **git bundles only**, cumulative
-from the original `568a91b` base through the current `HEAD`; never create a
-parallel history or distribute patch files. Keep the next number in TODO.md.
+Work is committed directly to git. Git bundles are only for Web chat
+handovers: when running in Web chat, deliver cumulative bundles from the
+original `568a91b` base through the current `HEAD`, and keep the next bundle
+number in `TODO.md`. When running as CLI, do not create bundles; the bundle
+number is reserved for the next Web chat handover. Never create a parallel
+history or distribute patch files.
 
 ## Hacker News
 
