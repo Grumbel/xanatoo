@@ -37,6 +37,10 @@ namespace xanatoo {
 
 namespace {
 
+// The immediate-mode menu helpers below are free functions shared by several
+// menus. Keep their current renderer's icon textures available for the frame.
+std::unordered_map<std::string, SDL_Texture*> menu_icon_textures;
+
 // First and last `keep` bytes (on character boundaries) around an ellipsis.
 std::string elide_middle(const std::string& s, size_t keep) {
   auto cont = [&](size_t i) {
@@ -156,6 +160,95 @@ void fill_style_items(const UiState& state, UiCommand& cmd, std::string& arg) {
     cmd = UiCommand::ReloadStyles;
 }
 
+const char* menu_icon_for(UiCommand command) {
+  switch (command) {
+    case UiCommand::NewDocument:
+    case UiCommand::NewTab: return "new";
+    case UiCommand::OpenDocument:
+    case UiCommand::OpenInWindow: return "open";
+    case UiCommand::OpenUrlBar:
+    case UiCommand::Find: return "find";
+    case UiCommand::CloseTab:
+    case UiCommand::Quit: return "stop";
+    case UiCommand::PopOut:
+    case UiCommand::PopIn:
+    case UiCommand::ToggleSplit: return "split";
+    case UiCommand::Save:
+    case UiCommand::SaveAs: return "save";
+    case UiCommand::Undo: return "undo";
+    case UiCommand::Redo: return "redo";
+    case UiCommand::Cut: return "cut";
+    case UiCommand::Copy: return "copy";
+    case UiCommand::CopyPageUrl:
+    case UiCommand::Link: return "link";
+    case UiCommand::Paste: return "paste";
+    case UiCommand::Replace:
+    case UiCommand::ReplaceAll: return "replace";
+    case UiCommand::Bold: return "bold";
+    case UiCommand::Italic: return "italic";
+    case UiCommand::Strike: return "strike";
+    case UiCommand::Code:
+    case UiCommand::InsertCodeBlock: return "code";
+    case UiCommand::Cite:
+    case UiCommand::InsertBiblioEntry: return "cite";
+    case UiCommand::InsertParagraph:
+    case UiCommand::ParagraphLevel:
+    case UiCommand::InsertHr: return "para";
+    case UiCommand::InsertImage: return "image";
+    case UiCommand::InsertFigure: return "figure";
+    case UiCommand::InsertNote: return "note";
+    case UiCommand::InsertTable: return "table";
+    case UiCommand::InsertDefList: return "lists";
+    case UiCommand::ToggleUnorderedList: return "list";
+    case UiCommand::ToggleOrderedList: return "olist";
+    case UiCommand::ToggleTask: return "task";
+    case UiCommand::ToggleBlockQuote: return "quote";
+    case UiCommand::MakeHeader:
+    case UiCommand::Heading1: return "h1";
+    case UiCommand::Heading2: return "h2";
+    case UiCommand::Heading3: return "h3";
+    case UiCommand::NavBack: return "back";
+    case UiCommand::NavForward: return "forward";
+    case UiCommand::GoUp: return "up";
+    case UiCommand::GoHome: return "home";
+    case UiCommand::ToggleHistory: return "history";
+    case UiCommand::ToggleOutline: return "outline";
+    case UiCommand::ToggleStructure: return "structure";
+    case UiCommand::ToggleDiff: return "diff";
+    case UiCommand::ToggleBrowse: return "browse";
+    case UiCommand::ToggleNative: return "native";
+    case UiCommand::ToggleReader: return "reader";
+    case UiCommand::ToggleHelp: return "help";
+    case UiCommand::ZoomIn: return "zoomin";
+    case UiCommand::ZoomOut: return "zoomout";
+    case UiCommand::OpenFormatDoc: return "format";
+    default: return nullptr;
+  }
+}
+
+bool menu_item_with_icon(const char* label, const char* icon_name,
+                         const char* shortcut, bool selected, bool enabled) {
+  auto it = menu_icon_textures.find(icon_name ? icon_name : "");
+  if (it == menu_icon_textures.end() || !it->second)
+    return ImGui::MenuItem(label, shortcut, selected, enabled);
+
+  // Reserve ImGui's icon column with spaces, then replace it visually with
+  // the matching toolbar texture after MenuItemEx creates the hit area.
+  const bool clicked = ImGui::MenuItemEx(label, "    ", shortcut, selected,
+                                         enabled);
+  const ImVec2 min = ImGui::GetItemRectMin();
+  const ImVec2 max = ImGui::GetItemRectMax();
+  const float side = ImGui::GetFontSize() * 1.05f;
+  const float x = min.x + 1.f;
+  const float y = min.y + (max.y - min.y - side) * 0.5f;
+  const ImU32 tint = enabled ? IM_COL32(255, 255, 255, 255)
+                             : IM_COL32(160, 160, 160, 150);
+  ImGui::GetWindowDrawList()->AddImage(
+      reinterpret_cast<ImTextureID>(it->second), ImVec2(x, y),
+      ImVec2(x + side, y + side), ImVec2(0, 0), ImVec2(1, 1), tint);
+  return clicked;
+}
+
 }  // namespace
 
 
@@ -257,6 +350,7 @@ void Ui::apply_classic_theme() {
 void Ui::load_icons(SDL_Renderer* renderer) {
   if (!renderer) return;
   renderer_ = renderer;
+  menu_icon_textures.clear();
 
   // Toolbar icons are installed data: <data dir>/icons (paths.hpp).
   std::vector<fs::path> roots;
@@ -319,6 +413,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
     ic.w = w;
     ic.h = h;
     icons_[name] = ic;
+    menu_icon_textures[name] = ic.texture;
   }
   std::cerr << "icons: " << icons_.size() << "/" << (sizeof(names) / sizeof(names[0]))
             << " from";
@@ -530,6 +625,7 @@ bool Ui::init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale) {
 
 void Ui::shutdown() {
   if (!ready_) return;
+  menu_icon_textures.clear();
   for (auto& [k, ic] : icons_) {
     if (ic.texture) SDL_DestroyTexture(ic.texture);
   }
@@ -622,7 +718,7 @@ void Ui::open_bookmark_menu(float x, float y) {
 
 static bool menu_item_cmd(const char* label, UiCommand c, UiCommand& out,
                           bool enabled = true, const char* shortcut = nullptr) {
-  if (ImGui::MenuItem(label, shortcut, false, enabled)) {
+  if (menu_item_with_icon(label, menu_icon_for(c), shortcut, false, enabled)) {
     out = c;
     return true;
   }

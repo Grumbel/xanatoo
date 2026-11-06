@@ -8,6 +8,15 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Add icons to command menus
+
+- Added the matching toolbar icons to common File, Edit, Format, Insert and
+  navigation commands in ImGui menus. ImGui retains the full menu hit target,
+  keyboard navigation, shortcut and checkmark columns.
+- The SDL3 `ui.cpp` translation unit passes a syntax-only compile.
+- This CLI change has no bundle; number 290 remains for the next Web chat
+  handover.
+
 ## Status (2026-11-06) — SDL3 ImGui enum arithmetic warning
 
 - Converted ImGui key and SDL scancode enums to integers before calculating
