@@ -8,6 +8,14 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Follow-up (2026-11-06) — Focus the History panel
+
+- Added History to shared panel keyboard-focus state. Opening it by menu or
+  shortcut, or clicking its frame, now highlights its title; closing it returns
+  focus to the document.
+- SDL2 syntax-only compilation and `git diff --check` passed. No bundle;
+  number 290 remains unchanged.
+
 ## Follow-up (2026-11-06) — Preserve long-word prefixes
 
 - Fixed the forced-wrap state so a word is moved as a whole only before its

@@ -537,7 +537,7 @@ struct StatusLine {
 // Who receives plain keys (arrows, Enter, digits). Panels only while open;
 // see panel_has_keys(). Status prompts / minibuffer take precedence anyway.
 enum class KeyFocus : uint8_t {
-  Document, Outline, Backlinks, Sitemap, Page, Styles
+  Document, Outline, Backlinks, Sitemap, Page, History, Styles
 };
 
 // The single active status-bar prompt (at most one at a time).
@@ -1014,6 +1014,8 @@ inline bool panel_has_keys(const App& app, KeyFocus panel) {
       return app.sitemap.shown;
     case KeyFocus::Page:
       return app.page.shown;
+    case KeyFocus::History:
+      return app.history_panel_open;
     case KeyFocus::Styles:
       return app.styles_panel_open;
     default:

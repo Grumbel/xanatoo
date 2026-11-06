@@ -2059,6 +2059,11 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
     case SDLK_h:
       if (ctrl && shift) {
         app.history_panel_open = !app.history_panel_open;
+        if (app.history_panel_open) {
+          app.key_focus = KeyFocus::History;
+        } else if (app.key_focus == KeyFocus::History) {
+          app.key_focus = KeyFocus::Document;
+        }
         break;
       }
       if (ctrl) {

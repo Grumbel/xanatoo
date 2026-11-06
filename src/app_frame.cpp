@@ -599,6 +599,11 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     case C::ToggleHistory:
       app.history_panel_open = !app.history_panel_open;
+      if (app.history_panel_open) {
+        app.key_focus = KeyFocus::History;
+      } else if (app.key_focus == KeyFocus::History) {
+        app.key_focus = KeyFocus::Document;
+      }
       break;
     case C::ToggleStylesPanel:
       app.styles_panel_open = !app.styles_panel_open;
@@ -3002,7 +3007,9 @@ void draw_history_panel(App& app) {
   w.scroll = std::clamp(w.scroll, 0.f, max_s);
 
   const SDL_Rect outer{w.x, w.y, w.w, w.h};
-  draw_floating_frame(app, outer, "History", false, w.dock == Dock::None, 0,
+  draw_floating_frame(app, outer, "History",
+                      panel_has_keys(app, KeyFocus::History),
+                      w.dock == Dock::None, 0,
                       w.dock == Dock::Max);
   SDL_Rect clip{cx, cy, cw, ch};
   xanatoo::sdl::set_clip_rect(app.sdl, &clip);

@@ -85,6 +85,8 @@ void close_window(App& app, FloatWindow& w) {
       break;
     case WindowRole::History:
       app.history_panel_open = false;
+      if (app.key_focus == KeyFocus::History)
+        app.key_focus = KeyFocus::Document;
       break;
     case WindowRole::Styles:
       app.styles_panel_open = false;
@@ -430,6 +432,7 @@ bool float_press(App& app, int mx, int my) {
                     : w->role == WindowRole::Backlinks ? KeyFocus::Backlinks
                     : w->role == WindowRole::Sitemap   ? KeyFocus::Sitemap
                     : w->role == WindowRole::Page      ? KeyFocus::Page
+                    : w->role == WindowRole::History   ? KeyFocus::History
                     : w->role == WindowRole::Styles    ? KeyFocus::Styles
                                                        : KeyFocus::Document;
     if (w->role == WindowRole::Styles) {
