@@ -8,6 +8,15 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Add a Panels menu
+
+- Added a dedicated Panels menu for all six dockable panels: Keyboard
+  Reference, Heading Outline, Backlinks, Site Map, Page Navigation and
+  History. Menu checkmarks reflect the panels' open states, and existing
+  shortcuts remain. SDL3 syntax-only compilation and `git diff --check`
+  passed. This CLI change has no bundle; number 290 remains for the next Web
+  chat handover.
+
 ## Status (2026-11-06) — Enlarge the ImGui menu font
 
 - Kept the GNOME 2-era Sans family and raised the default ImGui UI font from

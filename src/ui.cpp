@@ -1653,6 +1653,23 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       }
       ImGui::EndMenu();
     }
+    force_menu("Panels");
+    if (ImGui::BeginMenu("Panels")) {
+      if (ImGui::MenuItem("Keyboard Reference", "F1", state.help))
+        cmd = UiCommand::ToggleHelp;
+      ImGui::Separator();
+      if (ImGui::MenuItem("Heading Outline", "Ctrl+Shift+O", state.outline))
+        cmd = UiCommand::ToggleOutline;
+      if (ImGui::MenuItem("Backlinks", "Ctrl+Alt+B", state.backlinks))
+        cmd = UiCommand::ToggleBacklinks;
+      if (ImGui::MenuItem("Site Map", "Ctrl+Alt+M", state.sitemap))
+        cmd = UiCommand::ToggleSitemap;
+      if (ImGui::MenuItem("Page Navigation", "Ctrl+Alt+P", state.page_panel))
+        cmd = UiCommand::TogglePage;
+      if (ImGui::MenuItem("History", "Ctrl+Shift+H", state.history_open))
+        cmd = UiCommand::ToggleHistory;
+      ImGui::EndMenu();
+    }
     // Go: moving through and between pages, plus the panels that do so.
     force_menu("Go");
     if (ImGui::BeginMenu("Go")) {
