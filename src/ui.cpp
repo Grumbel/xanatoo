@@ -907,7 +907,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
   auto toolbar_separator = [&] {
     ImGui::SameLine(0.f, 4.f);
     const ImVec2 p = ImGui::GetCursorScreenPos();
-    const float row_h = 32.f * scale_;
+    const float row_h = 32.f * scale_ + 6.f;
     ImGui::GetWindowDrawList()->AddLine(
         ImVec2(p.x + 3.f, p.y + 4.f),
         ImVec2(p.x + 3.f, p.y + row_h - 4.f),
@@ -980,8 +980,13 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
 
     // Location / URL field (path or gemini://)
     {
+      const float row_y = ImGui::GetCursorPosY();
+      const float button_h = 32.f * scale_ + 6.f;
+      const float field_h = 32.f * scale_;
       std::string want = state.doc_label.empty() ? "untitled" : state.doc_label;
       if (state.dirty) {
+        ImGui::SetCursorPosY(row_y +
+                             (button_h - ImGui::GetTextLineHeight()) * 0.5f);
         ImGui::TextDisabled("*");
         ImGui::SameLine(0.f, 2.f);
       }
@@ -990,6 +995,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
           ImGui::GetContentRegionAvail().x - url_right_w_ - 6.f;
       if (field_w < 100.f) field_w = 100.f;
       ImGui::SetNextItemWidth(field_w);
+      ImGui::SetCursorPosY(row_y + (button_h - field_h) * 0.5f);
 
       if (focus_url_bar_) {
         ImGui::SetKeyboardFocusHere();
@@ -1005,10 +1011,15 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,
                             ImVec4(0.98f, 0.98f, 1.f, 1.f));
       ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1.f, 1.f, 1.f, 1.f));
+      ImGui::PushStyleVar(
+          ImGuiStyleVar_FramePadding,
+          ImVec2(6.f * scale_,
+                 std::max(0.f, (field_h - ImGui::GetFontSize()) * 0.5f)));
       bool enter = ImGui::InputText(
           "##urlbar", url_input_, sizeof(url_input_),
           ImGuiInputTextFlags_EnterReturnsTrue |
               ImGuiInputTextFlags_AutoSelectAll);
+      ImGui::PopStyleVar();
       ImGui::PopStyleColor(3);
       url_bar_editing_ = ImGui::IsItemActive();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
@@ -1022,6 +1033,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         ImGui::ClearActiveID();
       }
       ImGui::SameLine(0.f, 6.f);
+      ImGui::SetCursorPosY(row_y);
     }
     const float right_x0 = ImGui::GetCursorPosX();
 
