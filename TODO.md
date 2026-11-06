@@ -8,6 +8,18 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Refresh app and Android launcher icon
+
+- Added a warmer gradient, subtle symbol shadow and small highlights to the
+  existing X mark. Regenerated Linux and legacy Android PNG icons.
+- Added Android adaptive foreground/background layers for Android 8+, sized
+  the mark to Android's safe zone, and supplied a monochrome layer for themed
+  launchers on Android 13+.
+- Kept density-specific legacy icons for Android 5–7. Reviewed the square
+  logo and an adaptive circular-mask preview; validated all icon XML files.
+- This CLI change has no bundle; number 290 remains for the next Web chat
+  handover.
+
 ## Status (2026-11-06) — Toolbar button interaction states
 
 - Removed the idle toolbar frame and added a raised bevel on hover with a

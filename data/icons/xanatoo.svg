@@ -3,12 +3,50 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- App icon source; tools/make_icons.py rasterizes the hicolor and Android launcher icons from it. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7CB3A"/><stop offset="1" stop-color="#E3AA10"/></linearGradient></defs>
-  <rect x="12" y="12" width="232" height="232" rx="48" fill="url(#bg)"/>
-  <!-- two link curves crossing: an X of connections -->
-  <path d="M66 66 C 132 66, 124 190, 190 190" fill="none" stroke="#2E3436" stroke-width="34" stroke-linecap="round"/>
-  <path d="M66 190 C 132 190, 124 66, 190 66" fill="none" stroke="#EDBB22" stroke-width="58" stroke-linecap="round"/>
-  <path d="M66 190 C 132 190, 124 66, 190 66" fill="none" stroke="#2A62A8" stroke-width="34" stroke-linecap="round"/>
-  <circle cx="66" cy="66" r="24" fill="#2E3436"/><circle cx="190" cy="190" r="24" fill="#2E3436"/>
-  <circle cx="66" cy="190" r="24" fill="#2A62A8"/><circle cx="190" cy="66" r="24" fill="#2A62A8"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2=".15" y2="1">
+      <stop offset="0" stop-color="#F9D34D"/>
+      <stop offset=".52" stop-color="#F0BC24"/>
+      <stop offset="1" stop-color="#D99408"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2=".8" y2="1">
+      <stop offset="0" stop-color="#4E86C5"/>
+      <stop offset=".55" stop-color="#2E68AD"/>
+      <stop offset="1" stop-color="#174B86"/>
+    </linearGradient>
+    <linearGradient id="slate" x1="0" y1="0" x2=".8" y2="1">
+      <stop offset="0" stop-color="#50585A"/>
+      <stop offset="1" stop-color="#252C2E"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFE68A"/>
+      <stop offset="1" stop-color="#E3A018"/>
+    </linearGradient>
+    <filter id="markShadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dy="3"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".38"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="12" y="12" width="232" height="232" rx="48" fill="url(#bg)"
+        stroke="#C58C12" stroke-width="2"/>
+  <g filter="url(#markShadow)">
+    <!-- Two interwoven paths form the X of connections. -->
+    <path d="M66 66 C 132 66, 124 190, 190 190" fill="none"
+          stroke="url(#slate)" stroke-width="34" stroke-linecap="round"/>
+    <path d="M66 190 C 132 190, 124 66, 190 66" fill="none"
+          stroke="url(#rim)" stroke-width="58" stroke-linecap="round"/>
+    <path d="M66 190 C 132 190, 124 66, 190 66" fill="none"
+          stroke="url(#blue)" stroke-width="34" stroke-linecap="round"/>
+    <circle cx="66" cy="66" r="24" fill="url(#slate)"/>
+    <circle cx="190" cy="190" r="24" fill="url(#slate)"/>
+    <circle cx="66" cy="190" r="24" fill="url(#blue)"/>
+    <circle cx="190" cy="66" r="24" fill="url(#blue)"/>
+    <!-- Restrained top glints give the links a little dimensionality. -->
+    <path d="M66 61 C 126 61, 124 178, 181 185" fill="none"
+          stroke="#FFFFFF" stroke-opacity=".24" stroke-width="4" stroke-linecap="round"/>
+    <path d="M70 184 C 128 181, 128 72, 183 68" fill="none"
+          stroke="#FFFFFF" stroke-opacity=".28" stroke-width="4" stroke-linecap="round"/>
+  </g>
 </svg>

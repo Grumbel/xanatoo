@@ -18,6 +18,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "data" / "icons" / "xanatoo.svg"
+ANDROID_FOREGROUND = ROOT / "data" / "icons" / "xanatoo-foreground.svg"
+ANDROID_MONOCHROME = ROOT / "data" / "icons" / "xanatoo-monochrome.svg"
 
 HICOLOR_SIZES = (16, 32, 48, 64, 128, 256)
 ANDROID_SIZES = {
@@ -49,6 +51,10 @@ def main() -> None:
     for density, size in ANDROID_SIZES.items():
         rasterize(SOURCE, ROOT / "mk" / "android" / "app" / "res" /
                   f"mipmap-{density}" / "ic_launcher.png", size)
+    for name, source in (("ic_launcher_foreground", ANDROID_FOREGROUND),
+                         ("ic_launcher_monochrome", ANDROID_MONOCHROME)):
+        rasterize(source, ROOT / "mk" / "android" / "app" / "res" /
+                  "drawable-nodpi" / f"{name}.png", 432)
 
 
 if __name__ == "__main__":

@@ -15,8 +15,12 @@ Same pipeline as Kurvenrausch / Pingus (`nix/android.nix`, `mk/android/`):
    the debug keystore in `mk/android/keystore/`.
 
 Targets Android 5.1+ (`minSdkVersion` 22), ABIs `armeabi-v7a arm64-v8a
-x86_64`, NDK 29. The launcher icon is rasterized into `res/mipmap-*/`
-from the app icon `data/icons/xanatoo.svg` by `tools/make_icons.py`.
+x86_64`, NDK 29. The app icon `data/icons/xanatoo.svg` is rasterized into
+legacy `res/mipmap-*/` icons by `tools/make_icons.py` (Android 5 through 7).
+Android 8+ uses an adaptive icon with separate gradient background and
+foreground layers; the foreground stays within Android's 66 dp safe zone so
+launcher masks do not shrink the mark into a padded square. The adaptive icon
+also includes a monochrome layer for themed icons on Android 13+ launchers.
 
 SQLite (side store: persisted folds) is the amalgamation generated from
 nixpkgs' `sqlite.src` (`sqliteAmalgamation` in `nix/android.nix`) and built
