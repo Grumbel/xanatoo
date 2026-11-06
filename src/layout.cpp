@@ -219,9 +219,8 @@ void LayoutEngine::float_band(float top, float bottom, float& x,
     if (f.side == FloatSide::Right) r = std::min(r, f.left);
     else l = std::max(l, f.right);
   }
-  if (r - l < 1.f) return;  // no room at all: overlap rather than vanish
   x = l;
-  w = r - l;
+  w = std::max(0.f, r - l);
 }
 
 float LayoutEngine::clear_floats(float x, float w, float y) const {
@@ -902,7 +901,10 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       } else {
         layout_role_text(doc, node, BlockRole::Header, x, y, max_width, out);
       }
-      add_role_band(BlockRole::Header, id, x, text_y, max_width, y, out);
+      float band_x = x, band_w = max_width;
+      float_band(text_y, y, band_x, band_w);
+      if (band_w > 0.f)
+        add_role_band(BlockRole::Header, id, band_x, text_y, band_w, y, out);
       y += after(BlockRole::Header);
       out.boxes.push_back({id, x, start_y, max_width, y - start_y});
       break;
@@ -2385,11 +2387,27 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
   float lx0 = x;
   float lw = max_width;
   auto place_line = [&]() {
-    lx0 = x;
-    lw = max_width;
-    if (floats_.empty()) return;
-    const float top = baseline - metrics.ascender();
-    float_band(top, top + metrics.line_height(), lx0, lw);
+    for (;;) {
+      lx0 = x;
+      lw = max_width;
+      if (floats_.empty()) return;
+      const float top = baseline - metrics.ascender();
+      const float bottom = top + metrics.line_height();
+      float_band(top, bottom, lx0, lw);
+      const float min_width = std::min(max_width,
+          static_cast<float>(metrics.pixel_size()));
+      if (lw >= min_width) return;
+      // No usable line remains between the floats. Resume at the earliest
+      // bottom that can open space in this column.
+      float next = 0.f;
+      for (const FloatBox& f : floats_) {
+        if (f.bottom <= top || f.top >= bottom || f.right <= x ||
+            f.left >= x + max_width) continue;
+        if (next == 0.f || f.bottom < next) next = f.bottom;
+      }
+      if (next <= top) return;
+      baseline = next + metrics.ascender();
+    }
   };
   place_line();
 

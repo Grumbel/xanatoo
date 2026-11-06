@@ -2561,6 +2561,102 @@ void test_inline_images_and_asides() {
     EXPECT_EQ(aligned.get(ak[1]).float_side, "left");
   }
 
+  // A right infobox and a left thumbnail can overlap vertically across a
+  // section boundary. The heading rule and text must stay between them.
+  Document paired;
+  NodeId paired_root = paired.create(NodeKind::Document);
+  HtmlOptions page_html = html;
+  page_html.sections = true;
+  html_append_blocks(paired, paired_root,
+      "<table class='infobox'><tr><th>Name</th><td>Alice</td></tr>"
+      "<tr><th>One</th><td>Details</td></tr><tr><th>Two</th><td>Details</td></tr>"
+      "<tr><th>Three</th><td>Details</td></tr><tr><th>Four</th><td>Details</td></tr>"
+      "<tr><th>Five</th><td>Details</td></tr><tr><th>Six</th><td>Details</td></tr>"
+      "<tr><th>Seven</th><td>Details</td></tr></table>"
+      "<h2>Section</h2><figure typeof='mw:File/Thumb' class='mw-halign-left'>"
+      "<img src='portrait.jpg' width='170' height='170'><figcaption>Portrait</figcaption>"
+      "</figure><p>Text continues between the figure and the infobox.</p>", page_html);
+  NodeId table_id = INVALID_NODE, figure_id = INVALID_NODE;
+  NodeId header_id = INVALID_NODE, text_id = INVALID_NODE;
+  for (const Node& n : paired.nodes) {
+    if (n.kind == NodeKind::Table) table_id = n.id;
+    if (n.kind == NodeKind::Figure) figure_id = n.id;
+    if (n.kind == NodeKind::Header) header_id = n.id;
+    if (n.kind == NodeKind::Paragraph && plain_text(paired, n.id).find("Text continues") == 0)
+      text_id = n.id;
+  }
+  EXPECT(table_id != INVALID_NODE && figure_id != INVALID_NODE &&
+         header_id != INVALID_NODE && text_id != INVALID_NODE);
+  if (table_id != INVALID_NODE && figure_id != INVALID_NODE &&
+      header_id != INVALID_NODE && text_id != INVALID_NODE) {
+    EXPECT_EQ(paired.get(figure_id).float_side, "left");
+    DocStyle float_style = builtin_style();
+    float_style.block[static_cast<size_t>(BlockRole::Header)].border = {100, 100, 100, 255};
+    engine.set_style(&float_style);
+    auto box_for = [](const LayoutResult& l, NodeId id) -> const LayoutBox* {
+      for (const auto& b : l.boxes) if (b.node == id) return &b;
+      return nullptr;
+    };
+    LayoutResult wide = engine.layout(paired, 900.f);
+    const LayoutBox* table = box_for(wide, table_id);
+    const LayoutBox* figure = box_for(wide, figure_id);
+    EXPECT(table && figure);
+    if (table && figure) {
+      EXPECT(figure->y < table->y + table->height);
+      EXPECT(figure->x + figure->width < table->x);
+      bool saw_rule = false;
+      for (const auto& rule : wide.role_rules)
+        if (rule.box.node == header_id) {
+          saw_rule = true;
+          EXPECT(rule.box.x + rule.box.width <= table->x);
+        }
+      EXPECT(saw_rule);
+      bool text_between = false;
+      for (const auto& g : wide.glyphs)
+        if (g.node == text_id && g.y < table->y + table->height &&
+            g.x >= figure->x + figure->width && g.x < table->x)
+          text_between = true;
+      EXPECT(text_between);
+    }
+    LayoutResult tight = engine.layout(paired, 400.f);
+    table = box_for(tight, table_id);
+    figure = box_for(tight, figure_id);
+    EXPECT(table && figure);
+    if (table && figure) {
+      for (const auto& g : tight.glyphs)
+        if (g.node == text_id && g.y < table->y + table->height)
+          EXPECT(g.y >= figure->y + figure->height);
+    }
+    engine.set_style(nullptr);
+  }
+
+  Document default_thumb;
+  NodeId default_root = default_thumb.create(NodeKind::Document);
+  html_append_blocks(default_thumb, default_root,
+      "<table class='infobox'><tr><td>One</td></tr><tr><td>Two</td></tr>"
+      "<tr><td>Three</td></tr><tr><td>Four</td></tr></table>"
+      "<figure typeof='mw:File/Thumb'><img src='portrait.jpg' width='170'>"
+      "<figcaption>Portrait</figcaption></figure><p>Text alongside the infobox.</p>"
+      "<figure typeof='mw:File/Thumb' class='mw-halign-none'><img src='plain.jpg'></figure>", html);
+  auto defaults = kids_of(default_thumb, default_root);
+  EXPECT_EQ(defaults.size(), 4u);
+  if (defaults.size() == 4) {
+    EXPECT_EQ(default_thumb.get(defaults[1]).float_side, "right");
+    EXPECT(default_thumb.get(defaults[3]).float_side.empty());
+    LayoutResult layout = engine.layout(default_thumb, 900.f);
+    const LayoutBox *tb = nullptr, *fig = nullptr, *text = nullptr;
+    for (const auto& box : layout.boxes) {
+      if (box.node == defaults[0]) tb = &box;
+      if (box.node == defaults[1]) fig = &box;
+      if (box.node == defaults[2]) text = &box;
+    }
+    EXPECT(tb && fig && text);
+    if (tb && fig && text) {
+      EXPECT(fig->y >= tb->y + tb->height);
+      EXPECT(text->y < tb->y + tb->height);
+    }
+  }
+
   // Inline image: an atom on the baseline, raising its line.
   Document il = parse_markup("a ![i](i.png){width=40 height=60} b\n");
   LayoutResult lr = engine.layout(il, 600.f);

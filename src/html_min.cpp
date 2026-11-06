@@ -116,7 +116,6 @@ enum class FrameKind : uint8_t {
 
 struct Frame {
   std::string tag;
-  std::string attrs;
   FrameKind kind = FrameKind::Pseudo;
   NodeId node = INVALID_NODE;
   int items = 0;  // ordered list: last ordinal
@@ -132,6 +131,7 @@ constexpr int kIconEdge = 48;
 template <class F>
 void for_each_class(std::string_view attrs, F&& fn);
 std::string table_float_side(std::string_view attrs);
+std::string figure_float_side(std::string_view attrs);
 
 class Builder {
  public:
@@ -545,18 +545,6 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
           link.href = links_.back();
           doc_.get(im).spans.push_back(std::move(link));
         }
-        // MediaWiki/Parsoid encodes thumbnail alignment on its wrapper:
-        // figure[typeof~="mw:File/Thumb"] with class="mw-halign-left/right".
-        // The image is emitted while that wrapper is on the builder stack.
-        for (auto it = frames_.rbegin(); it != frames_.rend(); ++it) {
-          if (it->tag != "figure") continue;
-          for_each_class(it->attrs, [&](std::string_view token) {
-            if (token == "mw-halign-left") doc_.get(im).float_side = "left";
-            else if (token == "mw-halign-right") doc_.get(im).float_side = "right";
-            return token == "mw-halign-left" || token == "mw-halign-right";
-          });
-          break;
-        }
         take_pending_id(im);
         return;
       }
@@ -592,14 +580,9 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
     close_para();
     Frame f;
     f.tag = tag;
-    f.attrs = std::string(attrs);
     f.kind = FrameKind::Container;
     f.node = doc_.create(NodeKind::Figure, container());
-    for_each_class(attrs, [&](std::string_view token) {
-      if (token == "mw-halign-left") doc_.get(f.node).float_side = "left";
-      else if (token == "mw-halign-right") doc_.get(f.node).float_side = "right";
-      return token == "mw-halign-left" || token == "mw-halign-right";
-    });
+    doc_.get(f.node).float_side = figure_float_side(attrs);
     take_pending_id(f.node);
     push(std::move(f));
     return;
@@ -845,6 +828,26 @@ void for_each_class(std::string_view attrs, F&& fn) {
     if (!tok.empty() && fn(tok)) return;
     p = e + 1;
   }
+}
+
+std::string figure_float_side(std::string_view attrs) {
+  std::string side;
+  bool explicit_alignment = false;
+  for_each_class(attrs, [&](std::string_view tok) {
+    if (tok == "mw-halign-left") side = "left";
+    else if (tok == "mw-halign-right") side = "right";
+    else if (tok != "mw-halign-none" && tok != "mw-halign-center") return false;
+    explicit_alignment = true;
+    return true;
+  });
+  if (explicit_alignment) return side;
+  // MediaWiki floats thumbnails and framed files right by default. Parsoid
+  // omits an alignment class when the default applies.
+  const std::string type = ascii_lower(html_attr(attrs, "typeof"));
+  if (type.find("mw:file/thumb") != std::string::npos ||
+      type.find("mw:file/frame") != std::string::npos)
+    return "right";
+  return {};
 }
 
 // HTML float hints and MediaWiki's semantic infobox class. Explicit CSS or

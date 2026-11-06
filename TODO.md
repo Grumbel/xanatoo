@@ -8,6 +8,15 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Floats on both sides
+
+- Recognize Parsoid thumbnails and framed files as right floats by default,
+  retaining explicit left, right and no-float alignment. Header rules stop at
+  active floats; text waits for room when floats leave an unusable gap.
+- Built the app and unit suite; 3850 checks passed, including opposite-side
+  floats, same-side stacking and narrow gaps. Live Wikipedia fetch could not
+  be checked from this sandbox (DNS unavailable). No CLI bundle.
+
 ## Status (2026-11-06) — Floating infobox tables
 
 - Preserve HTML infobox tables, including captions and nested table content;
