@@ -355,6 +355,17 @@ history or distribute patch files.
   and web pages (page-mode options below); also `html_to_plain`,
   `html_attr`, `resolve_url`, `html_element_end`.
 
+## Tables
+
+- `TableCell::col_span` / `row_span` are occupied column and row counts;
+  `build_table_grid` (`table_grid.hpp`) derives slots and placements without
+  duplicating cells. Spanning tables are laid out table-wide; borders stop at
+  merged cells and a complete unspanned row supplies column weights.
+- HTML `rowspan=0` resolves at its row-group boundary. Markdown uses
+  `:::cell` / `:::th` with `colspan=` / `rowspan=`; S-expressions use
+  `:colspan` / `:rowspan`. Enter inside a cell extends spans crossing the
+  inserted row. Details: `docs/TABLES.md`.
+
 ## Web pages (`html_page.hpp`)
 
 - `src/html_page.cpp`, gated by `XANATOO_WEB` (default ON). Any http(s)

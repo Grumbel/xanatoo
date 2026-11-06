@@ -5,6 +5,7 @@
 #include "xanatoo/math_font.hpp"
 #include "xanatoo/images.hpp"
 #include "xanatoo/parse.hpp"
+#include "xanatoo/table_grid.hpp"
 #include "xanatoo/util.hpp"
 
 #include <algorithm>
@@ -634,6 +635,143 @@ LayoutResult LayoutEngine::layout(
   folded_sections_ = nullptr;
   focus_section_ = INVALID_NODE;
   return result;
+}
+
+void LayoutEngine::layout_spanned_table(const Document& doc, NodeId table,
+                                       const std::vector<NodeId>& rows, float x,
+                                       float& y, float width, LayoutResult& out) {
+  struct Cell {
+    NodeId id;
+    size_t row, col, rows, cols;
+    float height = 0.f;
+  };
+  const TableGrid table_grid = build_table_grid(doc, table);
+  std::vector<Cell> cells;
+  for (const TablePlacement& cell : table_grid.cells)
+    cells.push_back({cell.id, cell.row, cell.col, cell.rows, cell.cols});
+  const auto& grid = table_grid.slots;
+  const size_t columns = table_grid.columns;
+  if (columns == 0) return;
+
+  // A complete row of unspanned cells supplies the existing column weights
+  // and resize handles. A spanning heading is not a column definition.
+  std::vector<NodeId> weight_cells;
+  size_t weight_row = 0;
+  for (size_t r = 0; r < rows.size(); ++r) {
+    std::vector<NodeId> candidate;
+    for (NodeId id : grid[r]) {
+      if (id == INVALID_NODE || doc.get(id).parent != rows[r] ||
+          doc.get(id).col_span != 1 || doc.get(id).row_span != 1) {
+        candidate.clear();
+        break;
+      }
+      candidate.push_back(id);
+    }
+    if (candidate.size() == columns) {
+      weight_cells = std::move(candidate);
+      weight_row = r;
+      break;
+    }
+  }
+  std::vector<float> col_x(columns + 1, x);
+  std::vector<float> weights(columns, 1.f);
+  float total_weight = 0.f;
+  for (size_t c = 0; c < columns; ++c) {
+    if (!weight_cells.empty())
+      weights[c] = std::clamp(doc.get(weight_cells[c]).display_scale, 0.15f, 20.f);
+    total_weight += weights[c];
+  }
+  for (size_t c = 0; c < columns; ++c)
+    col_x[c + 1] = col_x[c] + width * weights[c] / total_weight;
+  col_x.back() = x + width;
+
+  constexpr float pad = 4.f;
+  std::vector<float> heights(rows.size(), pad * 2.f + 2.f);
+  // Measure each cell once at its combined column width, without allowing
+  // nested floats from the measurement to affect the surrounding page.
+  const auto saved_floats = floats_;
+  const LayoutViewport saved_viewport = viewport_;
+  viewport_ = {};
+  for (Cell& cell : cells) {
+    LayoutResult measure;
+    float bottom = 0.f;
+    floats_.clear();
+    layout_node(doc, cell.id, col_x[cell.col] + pad, bottom,
+                std::max(1.f, col_x[cell.col + cell.cols] - col_x[cell.col] - 2.f * pad),
+                measure);
+    for (const FloatBox& f : floats_) bottom = std::max(bottom, f.bottom);
+    floats_ = saved_floats;
+    cell.height = bottom + pad * 2.f + 2.f;
+    if (cell.rows == 1) heights[cell.row] = std::max(heights[cell.row], cell.height);
+  }
+  viewport_ = saved_viewport;
+  // Satisfy shorter spans first; distributing a deficit can only help longer
+  // spans and never shrinks a row that another cell needs.
+  std::vector<size_t> order;
+  for (size_t i = 0; i < cells.size(); ++i)
+    if (cells[i].rows > 1) order.push_back(i);
+  std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+    return cells[a].rows < cells[b].rows;
+  });
+  for (size_t index : order) {
+    const Cell& cell = cells[index];
+    float have = 0.f;
+    for (size_t r = cell.row; r < cell.row + cell.rows; ++r) have += heights[r];
+    const float extra = std::max(0.f, cell.height - have) / cell.rows;
+    for (size_t r = cell.row; r < cell.row + cell.rows; ++r) heights[r] += extra;
+  }
+  std::vector<float> row_y(rows.size() + 1, y);
+  for (size_t r = 0; r < rows.size(); ++r) row_y[r + 1] = row_y[r] + heights[r];
+
+  for (const Cell& cell : cells) {
+    const float left = col_x[cell.col], right = col_x[cell.col + cell.cols];
+    const float top = row_y[cell.row], bottom = row_y[cell.row + cell.rows];
+    float content_y = top + pad;
+    const size_t box_at = out.boxes.size();
+    const size_t fill_at = out.table_header_fills.size();
+    floats_.clear();
+    layout_node(doc, cell.id, left + pad, content_y,
+                std::max(1.f, right - left - 2.f * pad), out);
+    floats_ = saved_floats;
+    for (size_t i = box_at; i < out.boxes.size(); ++i)
+      if (out.boxes[i].node == cell.id)
+        out.boxes[i].height = std::max(0.f, bottom - top - 2.f * pad);
+    for (size_t i = fill_at; i < out.table_header_fills.size(); ++i)
+      if (out.table_header_fills[i].node == cell.id)
+        out.table_header_fills[i] = {cell.id, left + 2.f, top + 2.f,
+                                     std::max(0.f, right - left - 4.f),
+                                     std::max(0.f, bottom - top - 4.f)};
+  }
+  for (size_t r = 0; r < rows.size(); ++r)
+    out.boxes.push_back({rows[r], x, row_y[r], width, heights[r]});
+
+  constexpr float stroke = 1.f;
+  const float top = row_y.front(), bottom = row_y.back();
+  out.table_lines.push_back({table, x, top, width, stroke});
+  out.table_lines.push_back({table, x, bottom - stroke, width, stroke});
+  out.table_lines.push_back({table, x, top, stroke, bottom - top});
+  out.table_lines.push_back({table, x + width - stroke, top, stroke, bottom - top});
+  for (size_t r = 1; r < rows.size(); ++r)
+    for (size_t c = 0; c < columns; ++c)
+      if (grid[r - 1][c] == INVALID_NODE || grid[r - 1][c] != grid[r][c])
+        out.table_lines.push_back({table, col_x[c], row_y[r] - stroke * 0.5f,
+                                   col_x[c + 1] - col_x[c], stroke});
+  for (size_t c = 1; c < columns; ++c) {
+    for (size_t r = 0; r < rows.size(); ++r)
+      if (grid[r][c - 1] == INVALID_NODE || grid[r][c - 1] != grid[r][c])
+        out.table_lines.push_back({table, col_x[c] - stroke * 0.5f, row_y[r],
+                                   stroke, heights[r]});
+    if (!weight_cells.empty()) {
+      ColumnGap gap;
+      gap.columns = table;
+      gap.left = weight_cells[c - 1]; gap.right = weight_cells[c];
+      gap.x = col_x[c]; gap.y = row_y[weight_row]; gap.height = heights[weight_row];
+      gap.left_w = col_x[c] - col_x[c - 1];
+      gap.right_w = col_x[c + 1] - col_x[c];
+      out.column_gaps.push_back(gap);
+    }
+  }
+  y = bottom;
 }
 
 void LayoutEngine::layout_node(const Document& doc, NodeId id,
@@ -1478,6 +1616,18 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           if (doc.get(c).kind == NodeKind::Caption)
             layout_node(doc, c, x, y, max_width, out);
         const float grid_y = y;
+        bool has_spans = false;
+        for (NodeId row : rows)
+          for (NodeId cell : doc.get(row).children)
+            if (doc.get(cell).kind == NodeKind::TableCell &&
+                (doc.get(cell).col_span > 1 || doc.get(cell).row_span > 1))
+              has_spans = true;
+        if (has_spans) {
+          layout_spanned_table(doc, id, rows, x, y, max_width, out);
+          y += after(BlockRole::Table);
+          out.boxes.push_back({id, x, start_y, max_width, y - start_y});
+          break;
+        }
         // Column weights from the first row's cells (display_scale).
         // All rows share the same relative widths; dragging a separator
         // updates the first-row cell weights (and is mirrored on drag).

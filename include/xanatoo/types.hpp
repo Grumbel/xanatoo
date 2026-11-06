@@ -107,6 +107,8 @@ struct Node {
   std::vector<NodeId> children;
   std::vector<InlineSpan> spans;  // leaf text content
   int level = 0;                  // legacy Heading 1-6; List ordered flag; TableCell header
+  int col_span = 1;              // TableCell: occupied columns
+  int row_span = 1;              // TableCell: occupied rows
   std::string alt;                // image alt text
   std::string src;                // image path
   bool expanded = true;           // for Stretch

@@ -9,6 +9,7 @@
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/html_min.hpp"
 #include "xanatoo/html_page.hpp"
+#include "xanatoo/table_grid.hpp"
 #include "xanatoo/native.hpp"
 #include "xanatoo/nav_history.hpp"
 #include "xanatoo/wikipedia.hpp"
@@ -2560,6 +2561,182 @@ void test_inline_images_and_asides() {
     EXPECT(aligned.get(ak[0]).float_side.empty());
     EXPECT_EQ(aligned.get(ak[1]).float_side, "left");
   }
+
+  // HTML spans are table-wide: a cell covers slots in subsequent rows,
+  // and rowspan=0 ends at the current row group, not the next tbody.
+  Document spans;
+  NodeId spans_root = spans.create(NodeKind::Document);
+  html_append_blocks(spans, spans_root,
+      "<table class='infobox'><thead><tr><th colspan='2'>Title</th></tr></thead>"
+      "<tbody><tr><th rowspan='0'>Long<br>spanning<br>heading<br>with<br>many<br>lines</th>"
+      "<td>One</td></tr><tr><td>Two</td></tr><tr><td>Three</td></tr></tbody>"
+      "<tbody><tr><td colspan='2'>End</td></tr></tbody></table><p>Beside.</p>", html);
+  auto span_top = kids_of(spans, spans_root);
+  EXPECT_EQ(span_top.size(), 2u);
+  if (span_top.size() == 2) {
+    auto rows = kids_of(spans, span_top[0]);
+    EXPECT_EQ(rows.size(), 5u);
+    if (rows.size() == 5) {
+      auto title = kids_of(spans, rows[0]);
+      auto first = kids_of(spans, rows[1]);
+      auto second = kids_of(spans, rows[2]);
+      auto last = kids_of(spans, rows[4]);
+      EXPECT(title.size() == 1 && first.size() == 2 && second.size() == 1 && last.size() == 1);
+      if (title.size() == 1 && first.size() == 2 && second.size() == 1 && last.size() == 1) {
+        EXPECT_EQ(spans.get(title[0]).col_span, 2);
+        EXPECT_EQ(spans.get(first[0]).row_span, 3);
+        EXPECT_EQ(spans.get(last[0]).col_span, 2);
+        Document edited = spans;
+        Caret insertion{first[1], 0, 0};
+        EXPECT(split_block(edited, insertion));
+        const TableGrid edited_grid = build_table_grid(edited, span_top[0]);
+        EXPECT_EQ(edited_grid.rows.size(), 6u);
+        EXPECT_EQ(edited.get(first[0]).row_span, 4);
+        if (edited_grid.rows.size() == 6 && edited_grid.columns == 2) {
+          EXPECT_EQ(edited_grid.slots[2][0], first[0]);
+          EXPECT_EQ(edited_grid.slots[2][1], insertion.node);
+          EXPECT_EQ(edited_grid.slots[3][0], first[0]);
+          EXPECT_EQ(edited_grid.slots[3][1], second[0]);
+        } else EXPECT(false);
+        LayoutResult laid = engine.layout(spans, 900.f);
+        auto box_for = [&](NodeId id) -> const LayoutBox* {
+          for (const auto& b : laid.boxes) if (b.node == id) return &b;
+          return nullptr;
+        };
+        const auto* table = box_for(span_top[0]);
+        const auto* head = box_for(title[0]);
+        const auto* tall = box_for(first[0]);
+        const auto* right = box_for(second[0]);
+        const auto* row0 = box_for(rows[0]);
+        const auto* row2 = box_for(rows[2]);
+        const auto* row4 = box_for(rows[4]);
+        EXPECT(table && head && tall && right && row0 && row2 && row4);
+        if (table && head && tall && right && row0 && row2 && row4) {
+          EXPECT(head->width > tall->width * 1.8f);
+          EXPECT(right->x > tall->x + tall->width - 1.f);
+          EXPECT(tall->y + tall->height <= row4->y + 0.1f);
+          EXPECT(tall->y + tall->height >= row4->y - 9.f);
+          bool covered_fill = false;
+          for (const auto& fill : laid.table_header_fills)
+            if (fill.node == first[0])
+              covered_fill = fill.y + fill.height >= row4->y - 5.f;
+          EXPECT(covered_fill);
+          for (const auto& line : laid.table_lines) {
+            if (line.node != span_top[0]) continue;
+            if (line.width <= 1.01f && line.x > table->x + 2.f &&
+                line.x < table->x + table->width - 2.f)
+              EXPECT(line.y >= row0->y + row0->height - 1.f);
+            if (line.height <= 1.01f && std::abs(line.y - row2->y) < 1.f)
+              EXPECT(line.x > tall->x + tall->width - 1.f);
+          }
+        }
+        for (const std::string& serialized : {serialize_markup(spans), serialize_sexpr(spans)}) {
+          Document restored = serialized[0] == '(' ? parse_sexpr(serialized) : parse_markup(serialized);
+          bool col = false, row = false;
+          for (const Node& n : restored.nodes) {
+            col |= n.kind == NodeKind::TableCell && n.col_span == 2;
+            row |= n.kind == NodeKind::TableCell && n.row_span == 3;
+          }
+          EXPECT(col && row);
+        }
+      }
+    }
+  }
+  Document invalid_spans;
+  NodeId invalid_root = invalid_spans.create(NodeKind::Document);
+  html_append_blocks(invalid_spans, invalid_root,
+      "<table class='infobox'><tr><td colspan='0' rowspan='oops'>Bad</td>"
+      "<td colspan='9999999'>Large</td></tr></table>", html);
+  auto invalid_table = kids_of(invalid_spans, invalid_root);
+  if (!invalid_table.empty()) {
+    auto rows = kids_of(invalid_spans, invalid_table[0]);
+    if (!rows.empty()) {
+      auto cells = kids_of(invalid_spans, rows[0]);
+      EXPECT_EQ(cells.size(), 2u);
+      if (cells.size() == 2) {
+        EXPECT(invalid_spans.get(cells[0]).col_span == 1 && invalid_spans.get(cells[0]).row_span == 1);
+        EXPECT_EQ(invalid_spans.get(cells[1]).col_span, 1000);
+      }
+    }
+  }
+  Document single_span;
+  NodeId single_root = single_span.create(NodeKind::Document);
+  html_append_blocks(single_span, single_root,
+      "<table><tr><td colspan=' 2 '>Single row</td></tr></table>", html);
+  auto single_children = kids_of(single_span, single_root);
+  EXPECT(single_children.size() == 1 && single_span.get(single_children[0]).kind == NodeKind::Table);
+  if (single_children.size() == 1 && single_span.get(single_children[0]).kind == NodeKind::Table) {
+    auto rows = kids_of(single_span, single_children[0]);
+    if (rows.size() == 1) {
+      auto cells = kids_of(single_span, rows[0]);
+      EXPECT(cells.size() == 1 && single_span.get(cells[0]).col_span == 2);
+    } else EXPECT(false);
+  }
+  Document implicit_group;
+  NodeId implicit_root = implicit_group.create(NodeKind::Document);
+  html_append_blocks(implicit_group, implicit_root,
+      "<table class='infobox'><tr><td rowspan='0'>Before</td></tr>"
+      "<tbody><tr><td>After</td></tr></tbody></table>", html);
+  auto implicit_table = kids_of(implicit_group, implicit_root);
+  if (!implicit_table.empty()) {
+    auto rows = kids_of(implicit_group, implicit_table[0]);
+    if (rows.size() == 2) {
+      auto cells = kids_of(implicit_group, rows[0]);
+      EXPECT(cells.size() == 1 && implicit_group.get(cells[0]).row_span == 1);
+    } else EXPECT(false);
+  } else EXPECT(false);
+  Document combined;
+  NodeId combined_root = combined.create(NodeKind::Document);
+  html_append_blocks(combined, combined_root,
+      "<table class='infobox'><tr><th rowspan='2'>A</th><th colspan='2'>B</th></tr>"
+      "<tr><td colspan='2'>C</td></tr></table>", html);
+  auto combined_children = kids_of(combined, combined_root);
+  EXPECT_EQ(combined_children.size(), 1u);
+  if (combined_children.size() == 1) {
+    const TableGrid grid = build_table_grid(combined, combined_children[0]);
+    EXPECT(grid.rows.size() == 2 && grid.columns == 3 && grid.cells.size() == 3);
+    if (grid.rows.size() == 2 && grid.columns == 3 && grid.cells.size() == 3) {
+      EXPECT(grid.slots[0][0] == grid.slots[1][0]);
+      EXPECT(grid.slots[0][1] == grid.slots[0][2]);
+      EXPECT(grid.slots[1][1] == grid.slots[1][2]);
+      EXPECT(grid.slots[0][1] != grid.slots[1][1]);
+      EXPECT(grid.slots[1][0] != grid.slots[1][1]);
+    }
+  }
+  Document rectangle;
+  NodeId rectangle_root = rectangle.create(NodeKind::Document);
+  html_append_blocks(rectangle, rectangle_root,
+      "<table class='infobox'><tr><th colspan='2' rowspan='2'>A</th><td>B</td></tr>"
+      "<tr><td>C</td></tr></table>", html);
+  auto rectangle_children = kids_of(rectangle, rectangle_root);
+  if (rectangle_children.size() == 1) {
+    const TableGrid grid = build_table_grid(rectangle, rectangle_children[0]);
+    EXPECT(grid.rows.size() == 2 && grid.columns == 3);
+    if (grid.rows.size() == 2 && grid.columns == 3) {
+      EXPECT(grid.slots[0][0] == grid.slots[0][1]);
+      EXPECT(grid.slots[0][0] == grid.slots[1][0]);
+      EXPECT(grid.slots[0][0] == grid.slots[1][1]);
+      EXPECT(grid.slots[0][2] != grid.slots[1][2]);
+    }
+  } else EXPECT(false);
+  Document weighted;
+  NodeId weighted_root = weighted.create(NodeKind::Document);
+  html_append_blocks(weighted, weighted_root,
+      "<table class='infobox'><tr><th colspan='2'>Title</th></tr>"
+      "<tr><td>Left</td><td>Right</td></tr></table>", html);
+  auto weighted_table = kids_of(weighted, weighted_root);
+  if (weighted_table.size() == 1) {
+    auto rows = kids_of(weighted, weighted_table[0]);
+    LayoutResult laid = engine.layout(weighted, 900.f);
+    if (rows.size() == 2) {
+      const LayoutBox* title_row = nullptr;
+      for (const auto& box : laid.boxes) if (box.node == rows[0]) title_row = &box;
+      EXPECT(title_row != nullptr && !laid.column_gaps.empty());
+      if (title_row)
+        for (const auto& gap : laid.column_gaps)
+          EXPECT(gap.y >= title_row->y + title_row->height);
+    } else EXPECT(false);
+  } else EXPECT(false);
 
   // A right infobox and a left thumbnail can overlap vertically across a
   // section boundary. The heading rule and text must stay between them.

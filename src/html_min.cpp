@@ -17,6 +17,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace xanatoo {
@@ -175,6 +176,11 @@ class Builder {
     NodeId node;
     int level;
   };
+  struct RowGroup {
+    std::string tag;
+    NodeId table;
+    size_t first_row;
+  };
 
   void open_tag(const std::string& tag, std::string_view attrs);
   bool open_section(const std::string& tag);
@@ -194,6 +200,8 @@ class Builder {
                  const std::string& href = {});
   void emit(std::string s);
   void pop();
+  void finish_row_group(NodeId table);
+  size_t resolve_rowspans(NodeId table, size_t first_row);
   bool pop_to(std::string_view tag);
   void push(Frame f) {
     close_para();
@@ -211,6 +219,8 @@ class Builder {
   const HtmlOptions& opt_;
   NodeId root_;
   std::vector<Frame> frames_;
+  std::vector<RowGroup> row_groups_;
+  std::unordered_map<NodeId, size_t> resolved_table_rows_;
   std::vector<Sec> secs_;   // open Sections (sections mode)
   std::string pending_id_;  // id= waiting for the next block (anchors mode)
   NodeId para_ = INVALID_NODE;
@@ -407,6 +417,11 @@ void Builder::pop() {
   close_para();
   Frame f = std::move(frames_.back());
   frames_.pop_back();
+  if (f.tag == "table" && f.kind == FrameKind::Container) {
+    finish_row_group(f.node);
+    resolve_rowspans(f.node, resolved_table_rows_[f.node]);
+    resolved_table_rows_.erase(f.node);
+  }
   if (f.kind == FrameKind::Leaf) finalize(f.node);
   strong_ -= f.strong_add;
   em_ -= f.em_add;
@@ -415,6 +430,27 @@ void Builder::pop() {
     if (f.kind == FrameKind::Pseudo) add_break();
   }
   if (f.kind == FrameKind::Pseudo && f.tag[0] == 'h') add_break();
+}
+
+size_t Builder::resolve_rowspans(NodeId table, size_t first_row) {
+  std::vector<NodeId> rows;
+  for (NodeId child : doc_.get(table).children)
+    if (doc_.get(child).kind == NodeKind::TableRow) rows.push_back(child);
+  for (size_t r = first_row; r < rows.size(); ++r)
+    for (NodeId child : doc_.get(rows[r]).children) {
+      Node& cell = doc_.get(child);
+      if (cell.kind != NodeKind::TableCell) continue;
+      const int remaining = static_cast<int>(rows.size() - r);
+      if (cell.row_span == 0) cell.row_span = remaining;
+      else cell.row_span = std::min(cell.row_span, remaining);
+    }
+  return rows.size();
+}
+
+void Builder::finish_row_group(NodeId table) {
+  if (row_groups_.empty() || row_groups_.back().table != table) return;
+  resolved_table_rows_[table] = resolve_rowspans(table, row_groups_.back().first_row);
+  row_groups_.pop_back();
 }
 
 bool Builder::pop_to(std::string_view tag) {
@@ -458,6 +494,20 @@ bool Builder::open_section(const std::string& tag) {
 
 void Builder::open_tag(const std::string& tag, std::string_view attrs) {
   const bool in_leaf = owner() != INVALID_NODE;
+
+  if ((tag == "thead" || tag == "tbody" || tag == "tfoot") && !in_leaf) {
+    int ti = top_index("table");
+    if (ti >= 0 && frames_[static_cast<size_t>(ti)].kind == FrameKind::Container) {
+      NodeId table = frames_[static_cast<size_t>(ti)].node;
+      finish_row_group(table);
+      // Rows outside an explicit group form an implicit group, which ends
+      // before the next thead/tbody/tfoot starts.
+      const size_t count = resolve_rowspans(table, resolved_table_rows_[table]);
+      resolved_table_rows_[table] = count;
+      row_groups_.push_back({tag, table, count});
+    }
+    return;
+  }
 
   // Inline markup.
   if (tag == "a") {
@@ -703,6 +753,20 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
       f.kind = FrameKind::Leaf;
       f.node = doc_.create(NodeKind::TableCell, frames_.back().node);
       doc_.get(f.node).level = tag == "th" ? 1 : 0;
+      auto span = [&](const char* name, int limit, bool zero_allowed) {
+        const std::string raw = html_attr(attrs, name);
+        std::string_view trimmed = raw;
+        trim_ascii(trimmed);
+        const std::string value(trimmed);
+        if (value.empty()) return 1;
+        char* end = nullptr;
+        long n = std::strtol(value.c_str(), &end, 10);
+        if (end == value.c_str() || *end != '\0' || n < 0 || (!zero_allowed && n == 0))
+          return 1;
+        return static_cast<int>(std::min<long>(n, limit));
+      };
+      doc_.get(f.node).col_span = span("colspan", 1000, false);
+      doc_.get(f.node).row_span = span("rowspan", 65534, true);
     }
     push(std::move(f));
     return;
@@ -736,6 +800,16 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
 }
 
 void Builder::close(const std::string& tag) {
+  if ((tag == "thead" || tag == "tbody" || tag == "tfoot") &&
+      !row_groups_.empty() && row_groups_.back().tag == tag) {
+    int ti = top_index("table");
+    if (ti < 0 || frames_[static_cast<size_t>(ti)].node != row_groups_.back().table)
+      return;
+    int ri = top_index("tr");
+    if (ri > ti && ti >= 0) pop_to("tr");
+    finish_row_group(row_groups_.back().table);
+    return;
+  }
   if ((tag == "aside" || tag == "figure") && top_index(tag) >= 0) {
     pop_to(tag);
     return;
@@ -973,6 +1047,25 @@ bool is_layout_table(std::string_view html, size_t after_open,
   if (ascii_lower(html_attr(attrs, "role")) == "presentation") return true;
   size_t end = html_element_end(html, after_open, "table");
   std::string_view inner = html.substr(after_open, end - after_open);
+  // A spanning cell is explicit table structure, including in a single-row
+  // table. Ignore cells of nested tables when classifying the outer table.
+  int depth = 0;
+  for (size_t p = 0; (p = inner.find('<', p)) != std::string_view::npos;) {
+    const size_t e = tag_end(inner, p);
+    if (e == std::string_view::npos) break;
+    const bool closing = p + 1 < inner.size() && inner[p + 1] == '/';
+    const size_t at = p + (closing ? 2 : 1);
+    const std::string tag = tag_name(inner.substr(at, e - at));
+    if (tag == "table") {
+      if (closing) { if (depth > 0) --depth; }
+      else ++depth;
+    } else if (depth == 0 && !closing && (tag == "td" || tag == "th")) {
+      std::string_view cell_attrs = inner.substr(at + tag.size(), e - at - tag.size());
+      if (html_has_attr(cell_attrs, "colspan") || html_has_attr(cell_attrs, "rowspan"))
+        return false;
+    }
+    p = e + 1;
+  }
   if (find_ci(inner, "<table", 0) != std::string_view::npos) return true;
   // A single row: a frame around content, not data.
   size_t rows = 0;

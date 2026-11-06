@@ -959,6 +959,16 @@ Document parse_markup(std::string_view source) {
       }
       NodeId n = doc.create(NodeKind::TableCell, parent);
       if (starts_with(trimmed, ":::th")) doc.get(n).level = 1;
+      auto cell_span = [&](const char* key, int limit) {
+        const std::string value = fence_attr(trimmed, key);
+        try {
+          size_t used = 0;
+          int v = std::stoi(value, &used);
+          return used == value.size() && v > 0 ? std::min(v, limit) : 1;
+        } catch (...) { return 1; }
+      };
+      doc.get(n).col_span = cell_span("colspan", 1000);
+      doc.get(n).row_span = cell_span("rowspan", 65534);
       // Optional weight=N on the fence line
       auto wpos = trimmed.find("weight=");
       if (wpos != std::string_view::npos) {
@@ -1944,7 +1954,8 @@ case NodeKind::Table: {
         if (row.kind != NodeKind::TableRow) continue;
         for (NodeId cell_id : row.children) {
           const Node& cell = doc.get(cell_id);
-          if (cell.kind == NodeKind::TableCell && !cell.children.empty()) {
+          if (cell.kind == NodeKind::TableCell &&
+              (!cell.children.empty() || cell.col_span > 1 || cell.row_span > 1)) {
             needs_blocks = true;
             break;
           }
@@ -1969,6 +1980,8 @@ case NodeKind::Table: {
             if (cell.kind != NodeKind::TableCell) continue;
             out += pad;
             out += (cell.level > 0) ? ":::th" : ":::cell";
+            if (cell.col_span > 1) out += " colspan=" + std::to_string(cell.col_span);
+            if (cell.row_span > 1) out += " rowspan=" + std::to_string(cell.row_span);
             if (cell.display_scale > 0.15f &&
                 (cell.display_scale < 0.99f || cell.display_scale > 1.01f)) {
               out += " weight=";
@@ -2814,6 +2827,12 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
     float weight = 1.f;
     size_t i =
         read_kwargs(e.kids, 1, nullptr, nullptr, &weight, nullptr, nullptr);
+    for (size_t k = 1; k + 1 < i; k += 2) {
+      if (is_atom(e.kids[k], ":colspan"))
+        doc.get(n).col_span = std::clamp(sexpr_int(e.kids[k + 1], 1), 1, 1000);
+      else if (is_atom(e.kids[k], ":rowspan"))
+        doc.get(n).row_span = std::clamp(sexpr_int(e.kids[k + 1], 1), 1, 65534);
+    }
     if (weight > 0.15f && weight < 20.f) doc.get(n).display_scale = weight;
     while (i + 1 < e.kids.size() && e.kids[i].kind == SExpr::Kind::Atom &&
            !e.kids[i].text.empty() && e.kids[i].text[0] == ':')
@@ -3381,6 +3400,8 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
       out += pad;
       out += (node.level > 0) ? "(th" : "(td";
       emit_node_id(node, out);
+      if (node.col_span > 1) out += " :colspan " + std::to_string(node.col_span);
+      if (node.row_span > 1) out += " :rowspan " + std::to_string(node.row_span);
       if (node.display_scale > 0.15f &&
           (node.display_scale < 0.99f || node.display_scale > 1.01f)) {
         out += " :weight ";

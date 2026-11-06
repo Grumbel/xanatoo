@@ -8,6 +8,15 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Table cell spans
+
+- Added column and row spans to table cells, HTML import (including
+  `rowspan=0` and row groups), Markdown/S-expression round trips, and row
+  insertion through spans. A derived occupancy grid drives spanning table
+  layout, cell sizing, header fills and segmented borders.
+- Added an example and `docs/TABLES.md`. Application and unit suite built;
+  3895 checks passed. No CLI bundle.
+
 ## Status (2026-11-06) — Floats on both sides
 
 - Recognize Parsoid thumbnails and framed files as right floats by default,

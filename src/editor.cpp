@@ -3,6 +3,7 @@
 
 #include "xanatoo/editor.hpp"
 #include "xanatoo/layout.hpp"
+#include "xanatoo/table_grid.hpp"
 #include "xanatoo/util.hpp"
 #include <cctype>
 #include <cmath>
@@ -760,6 +761,8 @@ std::optional<NodeId> duplicate_block(Document& doc, NodeId block) {
   Node& dst = doc.get(nid);
   dst.kind = src.kind;
   dst.level = src.level;
+  dst.col_span = src.col_span;
+  dst.row_span = src.row_span;
   dst.alt = src.alt;
   dst.src = src.src;
   dst.label = src.label;
@@ -1629,6 +1632,8 @@ static void copy_node_deep(Document& doc, NodeId src_id, NodeId new_parent,
   out_id = doc.create(src.kind, new_parent);
   Node& dst = doc.get(out_id);
   dst.level = src.level;
+  dst.col_span = src.col_span;
+  dst.row_span = src.row_span;
   dst.alt = src.alt;
   dst.src = src.src;
   dst.label = src.label;
@@ -1832,6 +1837,51 @@ bool split_block(Document& doc, Caret& caret) {
     NodeId table_id = row.parent;
     if (table_id == INVALID_NODE || doc.get(table_id).kind != NodeKind::Table)
       return false;
+
+    bool has_spans = false;
+    for (NodeId rid : doc.get(table_id).children)
+      if (doc.get(rid).kind == NodeKind::TableRow)
+        for (NodeId cid : doc.get(rid).children) {
+          const Node& cell = doc.get(cid);
+          has_spans |= cell.kind == NodeKind::TableCell &&
+                       (cell.col_span > 1 || cell.row_span > 1);
+        }
+    if (has_spans) {
+      const TableGrid grid = build_table_grid(doc, table_id);
+      size_t row_index = grid.rows.size(), target_col = 0;
+      for (size_t r = 0; r < grid.rows.size(); ++r)
+        if (grid.rows[r] == row_id) { row_index = r; break; }
+      for (const TablePlacement& placement : grid.cells)
+        if (placement.id == cell_id) { target_col = placement.col; break; }
+      if (row_index == grid.rows.size() || grid.columns == 0) return false;
+      const size_t insert_row = row_index + 1;
+      std::vector<bool> occupied(grid.columns, false);
+      for (const TablePlacement& placement : grid.cells) {
+        if (placement.row > row_index || placement.row + placement.rows <= insert_row)
+          continue;
+        Node& spanning = doc.get(placement.id);
+        spanning.row_span = std::min(65534, spanning.row_span + 1);
+        for (size_t c = placement.col; c < placement.col + placement.cols; ++c)
+          occupied[c] = true;
+      }
+      NodeId new_row = doc.create(NodeKind::TableRow, INVALID_NODE);
+      if (!doc.insert_after(row_id, new_row)) doc.add_child(table_id, new_row);
+      NodeId focus_cell = INVALID_NODE;
+      size_t best_distance = grid.columns + 1;
+      for (size_t c = 0; c < grid.columns; ++c) {
+        if (occupied[c]) continue;
+        NodeId nc = doc.create(NodeKind::TableCell, new_row);
+        doc.append_text(nc, "");
+        const size_t distance = c > target_col ? c - target_col : target_col - c;
+        if (distance < best_distance) { focus_cell = nc; best_distance = distance; }
+      }
+      if (focus_cell != INVALID_NODE) {
+        caret.node = focus_cell;
+        caret.span_index = 0;
+        caret.char_index = 0;
+      }
+      return true;
+    }
 
     // Column index of the current cell among TableCell siblings
     size_t col = 0;

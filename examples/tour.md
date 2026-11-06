@@ -113,6 +113,31 @@ int main() { return run_frame(app); }
 | Network | ![network](network.png){width=48} | feeds, Gemini, Nostr |
 
 Table cells hold inline markup and inline images, like the pictures above.
+For a cell that spans columns or rows, use a fenced table:
+
+:::table
+:::row
+:::th colspan=2
+Reading modes
+:::
+:::
+:::row
+:::th rowspan=2
+Page
+:::
+:::cell
+One column
+:::
+:::
+:::row
+:::cell
+Facing columns
+:::
+:::
+:::
+
+The first heading covers two columns; the second covers both rows. In an
+S-expression table, write the same attributes as `:colspan 2` and `:rowspan 2`.
 
 ## Side boxes
 

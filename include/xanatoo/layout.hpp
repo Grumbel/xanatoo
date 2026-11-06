@@ -343,6 +343,9 @@ private:
   void layout_node(const Document& doc, NodeId id,
                    float x, float& y, float max_width,
                    LayoutResult& out);
+  void layout_spanned_table(const Document& doc, NodeId table,
+                            const std::vector<NodeId>& rows, float x, float& y,
+                            float width, LayoutResult& out);
   void layout_paragraph(const Document& doc, const Node& node,
                         float x, float& y, float max_width,
                         LayoutResult& out, FontRole base_role,
