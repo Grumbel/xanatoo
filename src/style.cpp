@@ -555,6 +555,7 @@ DocStyle builtin_style() {
   {
     BlockStyle& b = blk(BlockRole::Table);
     b.space_after = px(10);
+    b.width = Length{20.f, true};
     b.border = {160, 165, 175, 255};
     b.background = {230, 235, 245, 220};
   }

@@ -918,6 +918,8 @@ Document parse_markup(std::string_view source) {
     if (starts_with(trimmed, ":::figure")) {
       NodeId n = doc.create(NodeKind::Figure, current_parent());
       read_fence_style(doc, n, trimmed);
+      std::string side = fence_attr(trimmed, "float");
+      if (side == "left" || side == "right") doc.get(n).float_side = side;
       push_fence(n);
       ++i;
       continue;
@@ -931,6 +933,8 @@ Document parse_markup(std::string_view source) {
     }
     if (starts_with(trimmed, ":::table")) {
       NodeId n = doc.create(NodeKind::Table, current_parent());
+      std::string side = fence_attr(trimmed, "float");
+      if (side == "left" || side == "right") doc.get(n).float_side = side;
       push_fence(n);
       ++i;
       continue;
@@ -1075,8 +1079,8 @@ Document parse_markup(std::string_view source) {
             std::istringstream attrs(std::string(trimmed.substr(end + 2, bend - end - 2)));
             std::string attr;
             while (attrs >> attr) {
-              if (attr == "float=left") doc.get(n).image_float = "left";
-              else if (attr == "float=right") doc.get(n).image_float = "right";
+              if (attr == "float=left") doc.get(n).float_side = "left";
+              else if (attr == "float=right") doc.get(n).float_side = "right";
               else if (starts_with(attr, "scale=")) {
                 try {
                   float scale = std::stof(attr.substr(6));
@@ -1416,8 +1420,9 @@ Document parse_markup(std::string_view source) {
       continue;
     }
 
-    // Caption under a figure: non-image text line becomes Caption
-    if (doc.get(current_parent()).kind == NodeKind::Figure &&
+    // Plain text directly in a figure or table is its caption.
+    if ((doc.get(current_parent()).kind == NodeKind::Figure ||
+         doc.get(current_parent()).kind == NodeKind::Table) &&
         !starts_with(trimmed, "![") && !starts_with(trimmed, ":::")) {
       NodeId cap = doc.create(NodeKind::Caption, current_parent());
       parse_inlines(doc.get(cap), trimmed);
@@ -1806,7 +1811,9 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
 
     case NodeKind::Figure: {
       out += pad;
-      out += ":::figure" + style_attr + "\n";
+      out += ":::figure" + style_attr;
+      if (!node.float_side.empty()) out += " float=" + node.float_side;
+      out += "\n";
       for (NodeId c : node.children)
         serialize_node(doc, c, out, indent);
       out += pad;
@@ -1945,7 +1952,9 @@ case NodeKind::Table: {
         if (needs_blocks) break;
       }
       out += pad;
-      out += ":::table\n";
+      out += ":::table";
+      if (!node.float_side.empty()) out += " float=" + node.float_side;
+      out += "\n";
       if (needs_blocks) {
         for (NodeId row_id : node.children) {
           const Node& row = doc.get(row_id);
@@ -2054,11 +2063,11 @@ case NodeKind::Table: {
       out += ")";
       const bool scaled = node.display_scale > 0.05f &&
           (node.display_scale < 0.99f || node.display_scale > 1.01f);
-      if (scaled || !node.image_float.empty()) {
+      if (scaled || !node.float_side.empty()) {
         out += "{";
-        if (!node.image_float.empty()) out += "float=" + node.image_float;
+        if (!node.float_side.empty()) out += "float=" + node.float_side;
         if (scaled) {
-          if (!node.image_float.empty()) out += " ";
+          if (!node.float_side.empty()) out += " ";
           out += "scale=" + std::to_string(node.display_scale);
         }
         out += "}";
@@ -2682,6 +2691,11 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
     size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
                            &label);
     if (!label.empty()) doc.get(n).label = label;
+    for (size_t k = 1; k + 1 < i; k += 2)
+      if (is_atom(e.kids[k], ":float")) {
+        std::string side = sexpr_text(e.kids[k + 1]);
+        if (side == "left" || side == "right") doc.get(n).float_side = side;
+      }
     parse_sexpr_children(doc, n, e.kids, i);
     return;
   }
@@ -2779,6 +2793,11 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
     size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
                            &label);
     if (!label.empty()) doc.get(n).label = label;
+    for (size_t k = 1; k + 1 < i; k += 2)
+      if (is_atom(e.kids[k], ":float")) {
+        std::string side = sexpr_text(e.kids[k + 1]);
+        if (side == "left" || side == "right") doc.get(n).float_side = side;
+      }
     parse_sexpr_children(doc, n, e.kids, i);
     return;
   }
@@ -2839,7 +2858,7 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
     for (size_t k = 1; k + 1 < e.kids.size(); ++k) {
       if (is_atom(e.kids[k], ":float")) {
         std::string side = sexpr_text(e.kids[k + 1]);
-        if (side == "left" || side == "right") doc.get(n).image_float = side;
+        if (side == "left" || side == "right") doc.get(n).float_side = side;
       }
     }
     if (scale > 0.05f && scale < 10.f) doc.get(n).display_scale = scale;
@@ -3252,6 +3271,7 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
       out += "(figure";
       emit_node_id(node, out);
       emit_label(node, out);
+      if (!node.float_side.empty()) out += " :float " + node.float_side;
       serialize_sexpr_children(doc, node, out, indent + 2);
       out.push_back('\n');
       out += pad;
@@ -3340,6 +3360,7 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
       out += "(table";
       emit_node_id(node, out);
       emit_label(node, out);
+      if (!node.float_side.empty()) out += " :float " + node.float_side;
       serialize_sexpr_children(doc, node, out, indent + 2);
       out.push_back('\n');
       out += pad;
@@ -3386,7 +3407,7 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
         out += " :alt ";
         escape_sexpr_string(node.alt, out);
       }
-      if (!node.image_float.empty()) out += " :float " + node.image_float;
+      if (!node.float_side.empty()) out += " :float " + node.float_side;
       if (node.display_scale > 0.05f &&
           (node.display_scale < 0.99f || node.display_scale > 1.01f)) {
         out += " :scale ";

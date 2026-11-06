@@ -2376,16 +2376,16 @@ void test_inline_images_and_asides() {
     using namespace xanatoo;
     Document d = parse_markup("![caption](a.png){scale=0.7 float=right}\n");
     NodeId id = kids_of(d, d.root)[0];
-    EXPECT_EQ(d.get(id).image_float, "right");
+    EXPECT_EQ(d.get(id).float_side, "right");
     EXPECT(d.get(id).display_scale > 0.69f && d.get(id).display_scale < 0.71f);
     const std::string md = serialize_markup(d);
     Document again = parse_markup(md);
-    EXPECT_EQ(again.get(kids_of(again, again.root)[0]).image_float, "right");
+    EXPECT_EQ(again.get(kids_of(again, again.root)[0]).float_side, "right");
     const std::string sx = serialize_sexpr(d);
     Document sex = parse_sexpr(sx);
-    EXPECT_EQ(sex.get(kids_of(sex, sex.root)[0]).image_float, "right");
+    EXPECT_EQ(sex.get(kids_of(sex, sex.root)[0]).float_side, "right");
     Document invalid = parse_markup("![x](a.png){float=center}\n");
-    EXPECT(invalid.get(kids_of(invalid, invalid.root)[0]).image_float.empty());
+    EXPECT(invalid.get(kids_of(invalid, invalid.root)[0]).float_side.empty());
   }
 
   using namespace xanatoo;
@@ -2489,6 +2489,77 @@ void test_inline_images_and_asides() {
   lo.margin_x = 0.f;
   lo.margin_y = 0.f;
   engine.set_options(lo);
+
+  // Wikipedia infoboxes remain tables even with nested layout tables. The
+  // complete table floats beside text, and falls back to flow when narrow.
+  Document infobox;
+  NodeId root = infobox.create(NodeKind::Document);
+  HtmlOptions html;
+  html.drop_chrome = true;
+  html.images = true;
+  html_append_blocks(infobox, root,
+      "<table class='infobox biography'><caption>Profile</caption>"
+      "<tr><th>Name</th><td>Alice</td></tr>"
+      "<tr><td>Born</td><td><table><tr><td>Berlin</td></tr></table></td></tr>"
+      "</table><p>Following text runs beside the infobox when there is room.</p>", html);
+  auto ib = kids_of(infobox, root);
+  EXPECT_EQ(ib.size(), 2u);
+  if (ib.size() == 2) {
+    EXPECT(infobox.get(ib[0]).kind == NodeKind::Table);
+    EXPECT_EQ(infobox.get(ib[0]).float_side, "right");
+    auto table_kids = kids_of(infobox, ib[0]);
+    EXPECT_EQ(table_kids.size(), 3u);
+    if (!table_kids.empty()) {
+      EXPECT(infobox.get(table_kids[0]).kind == NodeKind::Caption);
+      EXPECT_EQ(plain_text(infobox, table_kids[0]), "Profile");
+    }
+    bool nested_text = false;
+    for (const Node& n : infobox.nodes)
+      if (n.kind == NodeKind::TableCell && plain_text(infobox, n.id).find("Berlin") != std::string::npos)
+        nested_text = true;
+    EXPECT(nested_text);
+    auto find_box = [](const LayoutResult& l, NodeId id) -> const LayoutBox* {
+      for (const auto& b : l.boxes) if (b.node == id) return &b;
+      return nullptr;
+    };
+    LayoutResult wide = engine.layout(infobox, 900.f);
+    const LayoutBox* table = find_box(wide, ib[0]);
+    const LayoutBox* text = find_box(wide, ib[1]);
+    EXPECT(table && text);
+    if (table && text) {
+      EXPECT(table->x > text->x);
+      EXPECT(text->y < table->y + table->height);
+    }
+    LayoutResult narrow = engine.layout(infobox, 250.f);
+    table = find_box(narrow, ib[0]);
+    text = find_box(narrow, ib[1]);
+    EXPECT(table && text);
+    if (table && text) EXPECT(text->y >= table->y + table->height);
+    Document roundtrip = parse_sexpr(serialize_sexpr(infobox));
+    bool retained = false;
+    for (const Node& n : roundtrip.nodes)
+      retained |= n.kind == NodeKind::Table && n.float_side == "right";
+    EXPECT(retained);
+    Document markdown = parse_markup(serialize_markup(infobox));
+    retained = false;
+    bool caption_retained = false;
+    for (const Node& n : markdown.nodes) {
+      retained |= n.kind == NodeKind::Table && n.float_side == "right";
+      caption_retained |= n.kind == NodeKind::Caption && plain_text(markdown, n.id) == "Profile";
+    }
+    EXPECT(retained && caption_retained);
+  }
+  Document aligned;
+  NodeId aligned_root = aligned.create(NodeKind::Document);
+  html_append_blocks(aligned, aligned_root,
+      "<table class='infobox' style='float: none'><tr><td>A</td></tr></table>"
+      "<table style='FLOAT: left'><tr><td>B</td></tr></table>", html);
+  auto ak = kids_of(aligned, aligned_root);
+  EXPECT_EQ(ak.size(), 2u);
+  if (ak.size() == 2) {
+    EXPECT(aligned.get(ak[0]).float_side.empty());
+    EXPECT_EQ(aligned.get(ak[1]).float_side, "left");
+  }
 
   // Inline image: an atom on the baseline, raising its line.
   Document il = parse_markup("a ![i](i.png){width=40 height=60} b\n");
@@ -3372,7 +3443,7 @@ void test_wikipedia() {
   for (const Node& n : figure.nodes) {
     if (n.kind == NodeKind::Figure) {
       found_figure = true;
-      EXPECT_EQ(n.image_float, "left");
+      EXPECT_EQ(n.float_side, "left");
     } else if (n.kind == NodeKind::Image) {
       found_image = true;
       EXPECT_EQ(n.spans.size(), size_t(1));

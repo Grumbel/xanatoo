@@ -8,6 +8,14 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Floating infobox tables
+
+- Preserve HTML infobox tables, including captions and nested table content;
+  recognize infobox and explicit HTML float/alignment hints. Floated tables
+  share the existing exclusion bands and fall back to flow in narrow panes.
+- Added table-role width and round-trip support for figure and table floats.
+  Application and unit suite built; 3785 checks passed. No CLI bundle.
+
 ## Status (2026-11-06) — Figure size and image links
 
 - Size floating figures to their loaded image, and preserve block image links;

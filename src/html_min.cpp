@@ -131,6 +131,7 @@ constexpr int kIconEdge = 48;
 
 template <class F>
 void for_each_class(std::string_view attrs, F&& fn);
+std::string table_float_side(std::string_view attrs);
 
 class Builder {
  public:
@@ -550,8 +551,8 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
         for (auto it = frames_.rbegin(); it != frames_.rend(); ++it) {
           if (it->tag != "figure") continue;
           for_each_class(it->attrs, [&](std::string_view token) {
-            if (token == "mw-halign-left") doc_.get(im).image_float = "left";
-            else if (token == "mw-halign-right") doc_.get(im).image_float = "right";
+            if (token == "mw-halign-left") doc_.get(im).float_side = "left";
+            else if (token == "mw-halign-right") doc_.get(im).float_side = "right";
             return token == "mw-halign-left" || token == "mw-halign-right";
           });
           break;
@@ -595,8 +596,8 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
     f.kind = FrameKind::Container;
     f.node = doc_.create(NodeKind::Figure, container());
     for_each_class(attrs, [&](std::string_view token) {
-      if (token == "mw-halign-left") doc_.get(f.node).image_float = "left";
-      else if (token == "mw-halign-right") doc_.get(f.node).image_float = "right";
+      if (token == "mw-halign-left") doc_.get(f.node).float_side = "left";
+      else if (token == "mw-halign-right") doc_.get(f.node).float_side = "right";
       return token == "mw-halign-left" || token == "mw-halign-right";
     });
     take_pending_id(f.node);
@@ -683,6 +684,7 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
       close_para();
       f.kind = FrameKind::Container;
       f.node = doc_.create(NodeKind::Table, container());
+      doc_.get(f.node).float_side = table_float_side(attrs);
     }
     push(std::move(f));
     return;
@@ -732,11 +734,12 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
     }
     return;
   }
-  if (tag == "figcaption") {
+  if (tag == "figcaption" || tag == "caption") {
     block_boundary();
     Frame f;
     f.tag = tag;
-    if (!in_leaf && doc_.get(container()).kind == NodeKind::Figure) {
+    if (!in_leaf && ((tag == "figcaption" && doc_.get(container()).kind == NodeKind::Figure) ||
+                     (tag == "caption" && doc_.get(container()).kind == NodeKind::Table))) {
       f.kind = FrameKind::Leaf;
       f.node = doc_.create(NodeKind::Caption, container());
     } else {
@@ -785,7 +788,7 @@ void Builder::close(const std::string& tag) {
   }
   if (tag == "ul" || tag == "ol" || tag == "li" || tag == "blockquote" ||
       tag == "pre" || tag == "table" || tag == "tr" || tag == "td" ||
-      tag == "th" || tag == "figcaption" ||
+      tag == "th" || tag == "figcaption" || tag == "caption" ||
       (tag.size() == 2 && tag[0] == 'h' && tag[1] >= '1' && tag[1] <= '6')) {
     // A list / table close also ends its unclosed items / cells.
     if (pop_to(tag)) {
@@ -842,6 +845,36 @@ void for_each_class(std::string_view attrs, F&& fn) {
     if (!tok.empty() && fn(tok)) return;
     p = e + 1;
   }
+}
+
+// HTML float hints and MediaWiki's semantic infobox class. Explicit CSS or
+// align overrides the class, including float:none.
+std::string table_float_side(std::string_view attrs) {
+  const std::string style = ascii_lower(html_attr(attrs, "style"));
+  size_t pos = 0;
+  while (pos < style.size()) {
+    size_t end = style.find(';', pos);
+    if (end == std::string::npos) end = style.size();
+    std::string_view decl(style.data() + pos, end - pos);
+    size_t colon = decl.find(':');
+    if (colon != std::string_view::npos) {
+      std::string_view key = decl.substr(0, colon), value = decl.substr(colon + 1);
+      trim_ascii(key);
+      trim_ascii(value);
+      if (key == "float" && (value == "left" || value == "right" || value == "none"))
+        return value == "none" ? std::string{} : std::string(value);
+    }
+    pos = end + 1;
+  }
+  const std::string align = ascii_lower(html_attr(attrs, "align"));
+  if (align == "left" || align == "right") return align;
+  std::string side;
+  for_each_class(attrs, [&](std::string_view tok) {
+    if (tok == "floatleft") side = "left";
+    else if (tok == "infobox" || tok == "floatright") side = "right";
+    return !side.empty();
+  });
+  return side;
 }
 
 size_t find_ci(std::string_view hay, std::string_view needle, size_t from);
@@ -927,6 +960,13 @@ size_t find_ci(std::string_view hay, std::string_view needle, size_t from);
 // grids), or a lone big cell.
 bool is_layout_table(std::string_view html, size_t after_open,
                      std::string_view attrs) {
+  if (!table_float_side(attrs).empty()) return false;
+  bool infobox = false;
+  for_each_class(attrs, [&](std::string_view tok) {
+    infobox = tok == "infobox";
+    return infobox;
+  });
+  if (infobox) return false;
   if (ascii_lower(html_attr(attrs, "role")) == "presentation") return true;
   size_t end = html_element_end(html, after_open, "table");
   std::string_view inner = html.substr(after_open, end - after_open);

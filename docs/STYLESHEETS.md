@@ -139,7 +139,7 @@ Their properties:
 | `color` | text colour (else the page colour) |
 | `background` | code-block fill, table header fill, message card fill, band behind a `header` / `thread` title |
 | `border` | side bar, rule, table grid, code-block frame, footnote overlay rule, rule under a `header` / `thread` title, aside frame |
-| `width` | preferred width of a side box (`aside`) |
+| `width` | preferred width of a side box (`aside`) or floating `table` |
 | `side` | `left`, `right` or `none`: which side of the page a side box goes to |
 | `placement` | `margin`, `float` or `flow`: where a side box goes (below) |
 
@@ -252,3 +252,11 @@ in either order. Following text wraps around the image and its caption; on a
 narrow column the image returns to normal block flow. Inline images and
 collection cards do not float. In S-expressions the equivalent is
 `(img "harbour.jpg" :alt "A view of the harbour" :float right :scale 0.8)`.
+
+Figures and tables can float as a whole, including their captions. For
+example, use `:::figure float=left` or `:::table float=right` in Markdown,
+or `:float left` / `:float right` on a `figure` or `table` in S-expressions.
+The `table` role's `width` sets a floating table's preferred width; narrow
+columns put it back in the normal flow. HTML tables with the `infobox` class
+float right by default, and explicit HTML float or alignment hints are also
+recognized.

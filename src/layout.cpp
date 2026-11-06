@@ -240,12 +240,13 @@ void LayoutEngine::layout_children_sequential(
   for (NodeId child : children) {
     if (child == INVALID_NODE) continue;
     const NodeKind kind = doc.get(child).kind;
-    const bool image_float = (kind == NodeKind::Image || kind == NodeKind::Figure) &&
-                             !doc.get(child).image_float.empty();
-    if (!floats_.empty() && clears_floats(kind) && !image_float)
+    const bool floating = (kind == NodeKind::Image || kind == NodeKind::Figure ||
+                           kind == NodeKind::Table) &&
+                          !doc.get(child).float_side.empty();
+    if (!floats_.empty() && clears_floats(kind) && !floating)
       y = clear_floats(x, max_width, y);
     // Side boxes may not advance y: their box height is no hint.
-    if (kind != NodeKind::Aside && !image_float &&
+    if (kind != NodeKind::Aside && !floating &&
         try_skip_block(child, x, y, max_width, out))
       continue;
     layout_node(doc, child, x, y, max_width, out);
@@ -1263,7 +1264,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
 
     case NodeKind::Figure: {
       if (!in_figure_float_ && !in_margin_ &&
-          (node.image_float == "left" || node.image_float == "right")) {
+          (node.float_side == "left" || node.float_side == "right")) {
         const float em = static_cast<float>(fonts_.regular.pixel_size());
         const float gap = em;
         float fw = std::min(max_width * 0.45f, 20.f * em);
@@ -1295,7 +1296,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           }
         }
         if (fw > 0.f && max_width - fw - gap >= 10.f * em) {
-          const bool right = node.image_float == "right";
+          const bool right = node.float_side == "right";
           const float bx = right ? x + max_width - fw : x;
           float top = y;
           for (bool moved = true; moved;) {
@@ -1426,6 +1427,41 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
     }
 
     case NodeKind::Table: {
+      if (!in_table_float_ && !in_margin_ &&
+          (node.float_side == "left" || node.float_side == "right")) {
+        const float em = static_cast<float>(fonts_.regular.pixel_size());
+        const float gap = em;
+        const float want = (*style_)[BlockRole::Table].width.px(em, options_.px_scale);
+        const float fw = std::min(want, max_width * 0.45f);
+        if (fw >= 6.f * em && max_width - fw - gap >= 10.f * em) {
+          const bool right = node.float_side == "right";
+          const float bx = right ? x + max_width - fw : x;
+          float top = y;
+          for (bool moved = true; moved;) {
+            moved = false;
+            for (const FloatBox& f : floats_) {
+              if (f.top <= top && f.bottom > top && f.right > bx && f.left < bx + fw) {
+                top = f.bottom;
+                moved = true;
+              }
+            }
+          }
+          float bottom = top;
+          in_table_float_ = true;
+          layout_node(doc, id, bx, bottom, fw, out);
+          in_table_float_ = false;
+          if (bottom > top) {
+            FloatBox fb;
+            fb.top = top; fb.bottom = bottom;
+            fb.side = right ? FloatSide::Right : FloatSide::Left;
+            fb.left = right ? bx - gap : bx;
+            fb.right = right ? bx + fw : bx + fw + gap;
+            floats_.push_back(fb);
+          }
+          break;
+        }
+        y = clear_floats(x, max_width, y);
+      }
       y += before(BlockRole::Table);
       float start_y = y;
       std::vector<NodeId> rows;
@@ -1436,6 +1472,10 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         for (NodeId c : node.children)
           layout_node(doc, c, x, y, max_width, out);
       } else {
+        for (NodeId c : node.children)
+          if (doc.get(c).kind == NodeKind::Caption)
+            layout_node(doc, c, x, y, max_width, out);
+        const float grid_y = y;
         // Column weights from the first row's cells (display_scale).
         // All rows share the same relative widths; dragging a separator
         // updates the first-row cell weights (and is mirrored on drag).
@@ -1477,13 +1517,13 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         }
 
         const float stroke = 1.f;
-        float table_h = y - start_y;
+        float table_h = y - grid_y;
         if (table_h < 1.f) table_h = 1.f;
-        out.table_lines.push_back({id, x, start_y, max_width, stroke});
+        out.table_lines.push_back({id, x, grid_y, max_width, stroke});
         out.table_lines.push_back({id, x, y - stroke, max_width, stroke});
-        out.table_lines.push_back({id, x, start_y, stroke, table_h});
+        out.table_lines.push_back({id, x, grid_y, stroke, table_h});
         out.table_lines.push_back(
-            {id, x + max_width - stroke, start_y, stroke, table_h});
+            {id, x + max_width - stroke, grid_y, stroke, table_h});
         for (size_t r = 0; r + 1 < row_bottoms.size(); ++r) {
           float ly = row_bottoms[r] - stroke * 0.5f;
           out.table_lines.push_back({id, x, ly, max_width, stroke});
@@ -1494,14 +1534,14 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           for (size_t c = 0; c + 1 < n_cols; ++c) {
             cx += col_widths[c];
             float lx = cx - stroke * 0.5f;
-            out.table_lines.push_back({id, lx, start_y, stroke, table_h});
+            out.table_lines.push_back({id, lx, grid_y, stroke, table_h});
             if (c < weight_cells.size() && c + 1 < weight_cells.size()) {
               ColumnGap gap;
               gap.columns = id;  // table id (hit-test uses left/right cells)
               gap.left = weight_cells[c];
               gap.right = weight_cells[c + 1];
               gap.x = cx;
-              gap.y = start_y;
+              gap.y = grid_y;
               gap.height = table_h;
               gap.left_w = col_widths[c];
               gap.right_w = col_widths[c + 1];
@@ -1675,9 +1715,9 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       const float gap = em;
       const float fw = std::min(max_width * 0.45f, 20.f * em);
       if (!in_image_float_ && !in_margin_ &&
-          (node.image_float == "left" || node.image_float == "right") &&
+          (node.float_side == "left" || node.float_side == "right") &&
           fw >= 6.f * em && max_width - fw - gap >= 10.f * em) {
-        const bool right = node.image_float == "right";
+        const bool right = node.float_side == "right";
         const float bx = right ? x + max_width - fw : x;
         float top = y;
         for (bool moved = true; moved;) {
@@ -1703,7 +1743,7 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
         }
         break;
       }
-      if (!in_image_float_ && !node.image_float.empty())
+      if (!in_image_float_ && !node.float_side.empty())
         y = clear_floats(x, max_width, y);
       if (is_remote_image(node.src)) {
         layout_remote_image(doc, node, x, y, max_width, out);
