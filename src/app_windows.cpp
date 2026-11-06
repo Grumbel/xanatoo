@@ -88,6 +88,8 @@ void close_window(App& app, FloatWindow& w) {
       break;
     case WindowRole::Styles:
       app.styles_panel_open = false;
+      if (app.key_focus == KeyFocus::Styles)
+        app.key_focus = KeyFocus::Document;
       break;
     case WindowRole::Document:
       close_doc_window(app, static_cast<size_t>(&w - app.soft_wins.data()));
@@ -426,6 +428,7 @@ bool float_press(App& app, int mx, int my) {
                     : w->role == WindowRole::Backlinks ? KeyFocus::Backlinks
                     : w->role == WindowRole::Sitemap   ? KeyFocus::Sitemap
                     : w->role == WindowRole::Page      ? KeyFocus::Page
+                    : w->role == WindowRole::Styles    ? KeyFocus::Styles
                                                        : KeyFocus::Document;
     if (w->role == WindowRole::Document) {
       // Raise to top of the document stack; `w` is stale afterwards.

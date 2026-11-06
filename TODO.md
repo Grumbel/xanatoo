@@ -8,6 +8,14 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Focus the Style Sheets panel
+
+- Added Style Sheets to the shared `KeyFocus` state. Clicking the panel or
+  opening it from Panels now activates its title and active-sheet highlight;
+  closing it returns focus to the document. SDL3 syntax-only compilation and
+  `git diff --check` passed. This CLI change has no bundle; number 290 remains
+  for the next Web chat.
+
 ## Status (2026-11-06) — Add a Style Sheets panel
 
 - Added a dockable Style Sheets panel listing discovered sheets, highlighting

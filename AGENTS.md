@@ -106,7 +106,7 @@ buffer call `attach_draft` (`add_buffer` / `show_doc_in_pane` do); after
 writing it, `note_saved`. Mark edits with `mark_dirty` / `note_edit`, not
 `dirty = true`. Design and roadmap: `docs/REVISIONS.md`.
 
-Keyboard focus: `App::key_focus` (`KeyFocus::Document/Outline/Backlinks`).
+Keyboard focus: `App::key_focus` (`KeyFocus::Document/Outline/Backlinks/Sitemap/Page/Styles`).
 Panels handle plain keys only while `panel_has_keys(app, …)`; opening or
 clicking a panel focuses it, a pane click / jump / unused plain key returns
 focus to the document. Never let a panel consume keys just because it is open.

@@ -602,6 +602,10 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     case C::ToggleStylesPanel:
       app.styles_panel_open = !app.styles_panel_open;
+      if (app.styles_panel_open)
+        app.key_focus = KeyFocus::Styles;
+      else if (app.key_focus == KeyFocus::Styles)
+        app.key_focus = KeyFocus::Document;
       break;
     case C::ToggleBookmarks:
       app.bookmarks_panel_open = !app.bookmarks_panel_open;
@@ -3044,7 +3048,8 @@ void draw_styles_panel(App& app) {
   w.scroll = std::clamp(w.scroll, 0.f, max_s);
 
   const SDL_Rect outer{w.x, w.y, w.w, w.h};
-  draw_floating_frame(app, outer, "Style Sheets", false,
+  const bool focused = panel_has_keys(app, KeyFocus::Styles);
+  draw_floating_frame(app, outer, "Style Sheets", focused,
                       w.dock == Dock::None, 0, w.dock == Dock::Max);
   SDL_Rect clip{cx, cy, cw, ch};
   xanatoo::sdl::set_clip_rect(app.sdl, &clip);
@@ -3060,15 +3065,16 @@ void draw_styles_panel(App& app) {
       if (active)
         xanatoo::theme::fill(app.sdl, SDL_Rect{cx + 1, ry, cw - 2,
                                                static_cast<int>(step)},
-                             pal.face_dark);
+                             focused ? pal.accent : pal.face_dark);
       const int baseline = ry + (static_cast<int>(step) -
                                  app.ui_font.line_height()) / 2 +
                            app.ui_font.ascender();
       const std::string& label = style.title.empty() ? style.name : style.title;
+      const xanatoo::theme::Rgb ink =
+          active && focused ? pal.highlight : pal.text;
       app.renderer.draw_text(
           app.ui_font, static_cast<float>(cx + 8), static_cast<float>(baseline),
-          fit_text(app.ui_font, label, cw - 28), pal.text.r, pal.text.g,
-          pal.text.b);
+          fit_text(app.ui_font, label, cw - 28), ink.r, ink.g, ink.b);
     }
     row_y += step;
   }
