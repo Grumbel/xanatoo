@@ -38,7 +38,8 @@ bool app_init(App& app) {
   app.body_px = static_cast<int>(std::lround(app.body_px * app.ui_scale));
   app.heading_px = static_cast<int>(std::lround(app.heading_px * app.ui_scale));
   // Panel geometry defaults (px at scale 1).
-  for (FloatWindow* w : {&app.help, &app.bl, &app.ol, &app.sm, &app.pg}) {
+  for (FloatWindow* w : {&app.help, &app.bl, &app.ol, &app.sm, &app.pg,
+                         &app.history_win}) {
     w->x = static_cast<int>(std::lround(w->x * app.ui_scale));
     w->y = static_cast<int>(std::lround(w->y * app.ui_scale));
     w->w = static_cast<int>(std::lround(w->w * app.ui_scale));
@@ -46,7 +47,8 @@ bool app_init(App& app) {
   }
   for (int& w : app.dock_w)
     w = static_cast<int>(std::lround(w * app.ui_scale));
-  for (FloatWindow* w : {&app.help, &app.bl, &app.ol, &app.sm, &app.pg}) {
+  for (FloatWindow* w : {&app.help, &app.bl, &app.ol, &app.sm, &app.pg,
+                         &app.history_win}) {
     w->restore_x = w->x;
     w->restore_y = w->y;
     w->restore_w = w->w;

@@ -216,17 +216,6 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.can_nav_forward = can_nav_step(app, 1);
   ui_state.history_open = app.history_panel_open;
   ui_state.bookmarks_open = app.bookmarks_panel_open;
-  ui_state.history_entries = app.visited;
-  {
-    // The latest visit of the focused page is the "current" entry.
-    const std::string& here = path_of(app, focused_pane(app));
-    ui_state.history_pos = -1;
-    for (int i = static_cast<int>(app.visited.size()) - 1; i >= 0; --i)
-      if (app.visited[static_cast<size_t>(i)] == here) {
-        ui_state.history_pos = i;
-        break;
-      }
-  }
   ui_state.bookmarks = app.bookmarks;
   {
     // With a selection the star bookmarks the selection.
@@ -2980,6 +2969,58 @@ void draw_backlinks_panel(App& app) {
       draw_client_scrollbar(app, cx, cy, cw, ch, app.bl.scroll, max_s);
     }
   }
+}
+
+void draw_history_panel(App& app) {
+  if (!app.history_panel_open) return;
+  FloatWindow& w = app.history_win;
+  if (w.dock == Dock::None) {
+    w.w = std::max(w.w, 200);
+    w.h = std::max(w.h, 140);
+  }
+  auto [cx, cy, cw, ch] = float_client_rect(app, w);
+  const float step = static_cast<float>(
+      std::max(18, app.ui_font.line_height() + 7));
+  const float content_h = static_cast<float>(app.visited.size()) * step + 8.f;
+  const float max_s = std::max(0.f, content_h - static_cast<float>(ch));
+  w.scroll = std::clamp(w.scroll, 0.f, max_s);
+
+  const SDL_Rect outer{w.x, w.y, w.w, w.h};
+  draw_floating_frame(app, outer, "History", false, w.dock == Dock::None, 0,
+                      w.dock == Dock::Max);
+  SDL_Rect clip{cx, cy, cw, ch};
+  xanatoo::sdl::set_clip_rect(app.sdl, &clip);
+  const auto& pal = xanatoo::theme::palette();
+  const std::string here = path_of(app, focused_pane(app));
+  float row_y = static_cast<float>(cy) - w.scroll;
+  for (int row = 0; row < static_cast<int>(app.visited.size()); ++row) {
+    if (row_y > static_cast<float>(cy + ch)) break;
+    if (row_y + step >= static_cast<float>(cy)) {
+      const std::string& url =
+          app.visited[app.visited.size() - 1 - static_cast<size_t>(row)];
+      const bool current = url == here;
+      const int ry = static_cast<int>(row_y);
+      if (current)
+        xanatoo::theme::fill(app.sdl, SDL_Rect{cx + 1, ry, cw - 2,
+                                               static_cast<int>(step)},
+                             pal.face_dark);
+      const int baseline = ry + (static_cast<int>(step) -
+                                 app.ui_font.line_height()) / 2 +
+                           app.ui_font.ascender();
+      app.renderer.draw_text(
+          app.ui_font, static_cast<float>(cx + 8), static_cast<float>(baseline),
+          fit_text(app.ui_font, url, cw - 28), pal.text.r, pal.text.g,
+          pal.text.b);
+    }
+    row_y += step;
+  }
+  if (app.visited.empty())
+    app.renderer.draw_text(app.ui_font, static_cast<float>(cx + 8),
+                           static_cast<float>(cy + 8 + app.ui_font.ascender()),
+                           "No pages visited this session", pal.text_dim.r,
+                           pal.text_dim.g, pal.text_dim.b);
+  xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
+  draw_client_scrollbar(app, cx, cy, cw, ch, w.scroll, max_s);
 }
 
 void draw_help_window(App& app) {

@@ -1918,36 +1918,6 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     if (!open) cmd = UiCommand::TogglePreferences;
   }
 
-  // ---- Session History panel ----
-  if (state.history_open) {
-    bool open = true;
-    ImGui::SetNextWindowSize(ImVec2(480.f, 360.f), ImGuiCond_FirstUseEver);
-    if (ImGui::Begin("History", &open)) {
-      ImGui::TextDisabled("Session navigation history · click to open");
-      ImGui::Separator();
-      if (state.history_entries.empty()) {
-        ImGui::TextWrapped("No pages yet. Open a file or gemini:// URL to start.");
-      } else {
-        // Show newest first.
-        for (int i = static_cast<int>(state.history_entries.size()) - 1; i >= 0;
-             --i) {
-          const std::string& e = state.history_entries[static_cast<size_t>(i)];
-          bool current = (i == state.history_pos);
-          if (current) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.1f, 0.35f, 0.7f, 1.f));
-          std::string label = e;
-          if (current) label = "▸ " + label;
-          if (ImGui::Selectable(label.c_str(), current)) {
-            cmd = UiCommand::NavigateUrl;
-            result.arg = e;
-          }
-          if (current) ImGui::PopStyleColor();
-        }
-      }
-    }
-    ImGui::End();
-    if (!open) cmd = UiCommand::ToggleHistory;
-  }
-
   // ---- Bookmarks manager panel ----
   if (state.bookmarks_open) {
     bool open = true;

@@ -256,9 +256,6 @@ struct UiState {
   struct BookmarkMenu {
     std::string address, label, cut;  // cut: the passage as a cut address
   } bookmark_menu;
-  // Session history (oldest → newest) for the History panel.
-  std::vector<std::string> history_entries;
-  int history_pos = -1;  // current index, or -1
   // Persistent bookmarks for the Bookmarks menu / panel.
   std::vector<Bookmark> bookmarks;
   // Tab strip (labels left→right); active_tab is index into tab_labels.

@@ -8,6 +8,16 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Make History a regular panel
+
+- Replaced the separate ImGui History window with a shared `FloatWindow`
+  panel. It now uses the common frame, docking, move/resize, maximize,
+  scrollbar and session geometry paths while preserving newest-first entries,
+  current-page highlighting and click-to-open navigation.
+- SDL3 syntax-only compilation passed for all six changed translation units;
+  `git diff --check` passed. This CLI change has no bundle; number 290 remains
+  for the next Web chat handover.
+
 ## Status (2026-11-06) — Mark toolbar menu buttons
 
 - Added a small muted dropdown triangle at the lower-right of icon-backed

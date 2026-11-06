@@ -31,7 +31,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_frame.cpp` | frame stages: sync size, relayout, `run_chrome` (UiState + `execute_command`), draw panes, overlays |
 | `app_passage.cpp` | the passage a view shows (`docs/PASSAGES.md`): selectors of the address are view state on `Pane`, `pane_address` / `pane_cut` / `apply_locator`; pure address parsing in `locator.hpp` |
 | `app_chrome.cpp` | status line (`compute_status` is pure data → `draw_status_bar`), floating window frame, client scrollbar |
-| `app_windows.cpp` | floating windows (`FloatWindow`, role = Help/Outline/Backlinks/Document): one z-stack, shared hit-test / drag / resize / scroll / draw |
+| `app_windows.cpp` | floating windows (`FloatWindow`, role = Help/Outline/Backlinks/Sitemap/Page/History/Document): one z-stack, shared hit-test / drag / resize / scroll / draw |
 | `search.cpp` | search engines (built-in table + user `search.sexp`), the `search:<engine>:<query>` address, query encoding, Ctrl+L keywords — pure, `search.hpp`, `docs/SEARCH.md` |
 | `search_results.cpp` | JSON search engines → Markdown result documents (`search_results_markdown`, pure; `search_fetch` needs HTTPS): wikipedia / hn / archive / gutendex / lemmy / bluesky mappers; link text is literal in our parser, only brackets are changed |
 | `app_search.cpp` | search bar state (`App::search`, engine = `ViewSettings::search_engine`): show / toggle / select engine / `run_search`; the ImGui row is in `ui.cpp` |

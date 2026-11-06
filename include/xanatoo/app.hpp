@@ -230,7 +230,7 @@ struct Pane {
 enum class Dock : uint8_t { None = 0, Left, Right, Top, Bottom, Max };
 
 enum class WindowRole : uint8_t {
-  Help, Outline, Backlinks, Sitemap, Page, Document
+  Help, Outline, Backlinks, Sitemap, Page, History, Document
 };
 
 // One floating window: help / outline / backlinks panels and document
@@ -731,6 +731,7 @@ struct App {
   FloatWindow bl = make_float_panel(WindowRole::Backlinks, 80, 120, 360, 320);
   FloatWindow ol = make_float_panel(WindowRole::Outline, 40, 100, 320, 420);
   FloatWindow sm = make_float_panel(WindowRole::Sitemap, 140, 110, 340, 460);
+  FloatWindow history_win = make_float_panel(WindowRole::History, 100, 130, 440, 360);
   SitemapPanel sitemap;
   SearchBar search;
   FloatWindow pg = make_float_panel(WindowRole::Page, 60, 110, 260, 420);
@@ -1364,6 +1365,7 @@ void draw_split_chrome(App& app);
 void draw_status_bar(App& app);
 void draw_outline_panel(App& app);
 void draw_backlinks_panel(App& app);
+void draw_history_panel(App& app);
 void draw_help_window(App& app);
 void draw_floats(App& app);  // all floating windows, back→front
 void draw_dock_preview(App& app);
