@@ -116,6 +116,7 @@ enum class FrameKind : uint8_t {
 
 struct Frame {
   std::string tag;
+  std::string attrs;
   FrameKind kind = FrameKind::Pseudo;
   NodeId node = INVALID_NODE;
   int items = 0;  // ordered list: last ordinal
@@ -127,6 +128,9 @@ struct Frame {
 
 // <img> with a declared edge up to this is an icon in the text.
 constexpr int kIconEdge = 48;
+
+template <class F>
+void for_each_class(std::string_view attrs, F&& fn);
 
 class Builder {
  public:
@@ -533,6 +537,18 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
         NodeId im = doc_.create(NodeKind::Image, container());
         doc_.get(im).src = std::move(src);
         doc_.get(im).alt = std::move(alt);
+        // MediaWiki/Parsoid encodes thumbnail alignment on its wrapper:
+        // figure[typeof~="mw:File/Thumb"] with class="mw-halign-left/right".
+        // The image is emitted while that wrapper is on the builder stack.
+        for (auto it = frames_.rbegin(); it != frames_.rend(); ++it) {
+          if (it->tag != "figure") continue;
+          for_each_class(it->attrs, [&](std::string_view token) {
+            if (token == "mw-halign-left") doc_.get(im).image_float = "left";
+            else if (token == "mw-halign-right") doc_.get(im).image_float = "right";
+            return token == "mw-halign-left" || token == "mw-halign-right";
+          });
+          break;
+        }
         take_pending_id(im);
         return;
       }
@@ -559,6 +575,23 @@ void Builder::open_tag(const std::string& tag, std::string_view attrs) {
     f.tag = tag;
     f.kind = FrameKind::Container;
     f.node = doc_.create(NodeKind::Aside, container());
+    take_pending_id(f.node);
+    push(std::move(f));
+    return;
+  }
+
+  if (tag == "figure" && !in_leaf && !in_container()) {
+    close_para();
+    Frame f;
+    f.tag = tag;
+    f.attrs = std::string(attrs);
+    f.kind = FrameKind::Container;
+    f.node = doc_.create(NodeKind::Figure, container());
+    for_each_class(attrs, [&](std::string_view token) {
+      if (token == "mw-halign-left") doc_.get(f.node).image_float = "left";
+      else if (token == "mw-halign-right") doc_.get(f.node).image_float = "right";
+      return token == "mw-halign-left" || token == "mw-halign-right";
+    });
     take_pending_id(f.node);
     push(std::move(f));
     return;
