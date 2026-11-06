@@ -13,6 +13,9 @@
 #include "xanatoo/platform.hpp"
 
 #include "xanatoo/sdl.hpp"
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+#include <SDL3/SDL_main.h>
+#endif
 #include <cstdio>
 #include <filesystem>
 #include <iostream>

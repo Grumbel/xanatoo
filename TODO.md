@@ -8,6 +8,16 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Export SDL3 Android entry point
+
+- Included SDL3's `SDL_main.h` in the translation unit that defines `main`,
+  allowing SDL's platform mapping to export the `SDL_main` symbol required by
+  Android's `SDLActivity::nativeRunMain`.
+- Confirmed the Android header mapping exports an unmangled `SDL_main`
+  symbol with a local compile check; device/APK verification remains pending.
+- This CLI change has no bundle; number 290 remains for the next Web chat
+  handover.
+
 ## Status (2026-11-06) — Refresh app and Android launcher icon
 
 - Added a warmer gradient, subtle symbol shadow and small highlights to the
