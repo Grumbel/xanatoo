@@ -111,6 +111,7 @@ struct Node {
   std::string src;                // image path
   bool expanded = true;           // for Stretch
   std::string summary;            // stretchtext collapsed label
+  std::string image_float;        // block image: "left", "right", or flow
   float display_scale = 1.f;      // image interactive scale (1 = natural fit)
   std::string label;              // stable semantic anchor (links: #label)
   std::string tags;               // org-style tags without outer colons ("work:urgent")

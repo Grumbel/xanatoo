@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <vector>
 #include <cstdio>
+#include <sstream>
 
 namespace xanatoo {
 
@@ -1067,16 +1068,22 @@ Document parse_markup(std::string_view source) {
         NodeId n = doc.create(NodeKind::Image, current_parent());
         doc.get(n).alt = std::string(trimmed.substr(2, mid - 2));
         doc.get(n).src = std::string(trimmed.substr(mid + 2, end - (mid + 2)));
-        // Optional {scale=…} after the closing paren
-        size_t brace = trimmed.find("{scale=", end);
-        if (brace != std::string_view::npos) {
-          size_t bend = trimmed.find('}', brace);
+        // Block image attributes are whitespace-separated, in either order.
+        if (end + 1 < trimmed.size() && trimmed[end + 1] == '{') {
+          size_t bend = trimmed.find('}', end + 2);
           if (bend != std::string_view::npos) {
-            std::string num(trimmed.substr(brace + 7, bend - (brace + 7)));
-            try {
-              float s = std::stof(num);
-              if (s > 0.05f && s < 10.f) doc.get(n).display_scale = s;
-            } catch (...) {}
+            std::istringstream attrs(std::string(trimmed.substr(end + 2, bend - end - 2)));
+            std::string attr;
+            while (attrs >> attr) {
+              if (attr == "float=left") doc.get(n).image_float = "left";
+              else if (attr == "float=right") doc.get(n).image_float = "right";
+              else if (starts_with(attr, "scale=")) {
+                try {
+                  float scale = std::stof(attr.substr(6));
+                  if (scale > 0.05f && scale < 10.f) doc.get(n).display_scale = scale;
+                } catch (...) {}
+              }
+            }
           }
         }
         ++i;
@@ -2045,12 +2052,15 @@ case NodeKind::Table: {
       out += "](";
       out += node.src;
       out += ")";
-      if (node.display_scale > 0.05f &&
-          (node.display_scale < 0.99f || node.display_scale > 1.01f)) {
-        out += "{scale=";
-        out += std::to_string(node.display_scale);
-        // trim excess float digits: keep ~2
-        // (to_string is fine for round-trip)
+      const bool scaled = node.display_scale > 0.05f &&
+          (node.display_scale < 0.99f || node.display_scale > 1.01f);
+      if (scaled || !node.image_float.empty()) {
+        out += "{";
+        if (!node.image_float.empty()) out += "float=" + node.image_float;
+        if (scaled) {
+          if (!node.image_float.empty()) out += " ";
+          out += "scale=" + std::to_string(node.display_scale);
+        }
         out += "}";
       }
       out += "\n\n";
@@ -2826,6 +2836,12 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
     float scale = 1.f;
     i = read_kwargs(e.kids, i, nullptr, nullptr, nullptr, &scale, &alt);
     doc.get(n).alt = alt;
+    for (size_t k = 1; k + 1 < e.kids.size(); ++k) {
+      if (is_atom(e.kids[k], ":float")) {
+        std::string side = sexpr_text(e.kids[k + 1]);
+        if (side == "left" || side == "right") doc.get(n).image_float = side;
+      }
+    }
     if (scale > 0.05f && scale < 10.f) doc.get(n).display_scale = scale;
     if (alt.empty() && i < e.kids.size() &&
         e.kids[i].kind == SExpr::Kind::String)
@@ -3370,6 +3386,7 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
         out += " :alt ";
         escape_sexpr_string(node.alt, out);
       }
+      if (!node.image_float.empty()) out += " :float " + node.image_float;
       if (node.display_scale > 0.05f &&
           (node.display_scale < 0.99f || node.display_scale > 1.01f)) {
         out += " :scale ";

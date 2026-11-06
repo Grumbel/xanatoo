@@ -300,6 +300,7 @@ private:
     float bottom = 0.f;
   };
   MarginArea margins_[2];  // [0] left, [1] right
+  bool in_image_float_ = false;
   int in_margin_ = 0;      // > 0 while laying out a margin box
   // Side box text: small faces and the box role's text colour
   // (BlockRole::Count = none) for the blocks inside.

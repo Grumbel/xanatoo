@@ -2366,6 +2366,22 @@ void test_html_min() {
 // Inline images (InlineKind::Image) and asides (NodeKind::Aside) through
 // Markdown, sexp and HTML; layout of floats and image atoms.
 void test_inline_images_and_asides() {
+  {
+    using namespace xanatoo;
+    Document d = parse_markup("![caption](a.png){scale=0.7 float=right}\n");
+    NodeId id = kids_of(d, d.root)[0];
+    EXPECT_EQ(d.get(id).image_float, "right");
+    EXPECT(d.get(id).display_scale > 0.69f && d.get(id).display_scale < 0.71f);
+    const std::string md = serialize_markup(d);
+    Document again = parse_markup(md);
+    EXPECT_EQ(again.get(kids_of(again, again.root)[0]).image_float, "right");
+    const std::string sx = serialize_sexpr(d);
+    Document sex = parse_sexpr(sx);
+    EXPECT_EQ(sex.get(kids_of(sex, sex.root)[0]).image_float, "right");
+    Document invalid = parse_markup("![x](a.png){float=center}\n");
+    EXPECT(invalid.get(kids_of(invalid, invalid.root)[0]).image_float.empty());
+  }
+
   using namespace xanatoo;
   // Markdown inline images: plain, sized, linked; a lone one is a block.
   Document md = parse_markup(
@@ -2582,6 +2598,26 @@ void test_inline_images_and_asides() {
     }
     EXPECT(beside_left >= abox.x + abox.width);
     EXPECT(below_left < 1.f);
+  }
+
+  // Image floats reserve a band for the caption and restore the text width.
+  for (const char* side : {"left", "right"}) {
+    Document image = parse_markup(std::string("![caption](missing.png){float=") +
+                                  side + "}\n\n" + words + "\n");
+    NodeId image_id = kids_of(image, image.root)[0];
+    LayoutResult ir = engine.layout(image, 800.f);
+    LayoutBox ib = box_of(ir, image_id);
+    EXPECT(ib.width > 0.f && ib.width <= 360.f);
+    bool beside = false;
+    for (const auto& g : ir.glyphs) {
+      if (g.node == image_id || g.codepoint == ' ' || g.y >= ib.y + ib.height)
+        continue;
+      beside = true;
+      if (std::string(side) == "left") EXPECT(g.x >= ib.x + ib.width);
+      else EXPECT(g.x + g.advance <= ib.x);
+    }
+    EXPECT(beside);
+    EXPECT(box_of(engine.layout(image, 200.f), image_id).width >= 199.f);
   }
 
   // Explicit flow placement still occupies the entire text column.

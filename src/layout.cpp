@@ -240,10 +240,12 @@ void LayoutEngine::layout_children_sequential(
   for (NodeId child : children) {
     if (child == INVALID_NODE) continue;
     const NodeKind kind = doc.get(child).kind;
-    if (!floats_.empty() && clears_floats(kind))
+    const bool image_float = kind == NodeKind::Image &&
+                             !doc.get(child).image_float.empty();
+    if (!floats_.empty() && clears_floats(kind) && !image_float)
       y = clear_floats(x, max_width, y);
     // Side boxes may not advance y: their box height is no hint.
-    if (kind != NodeKind::Aside &&
+    if (kind != NodeKind::Aside && !image_float &&
         try_skip_block(child, x, y, max_width, out))
       continue;
     layout_node(doc, child, x, y, max_width, out);
@@ -1603,6 +1605,40 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
     }
 
     case NodeKind::Image: {
+      const float em = static_cast<float>(fonts_.regular.pixel_size());
+      const float gap = em;
+      const float fw = std::min(max_width * 0.45f, 20.f * em);
+      if (!in_image_float_ && !in_margin_ &&
+          (node.image_float == "left" || node.image_float == "right") &&
+          fw >= 6.f * em && max_width - fw - gap >= 10.f * em) {
+        const bool right = node.image_float == "right";
+        const float bx = right ? x + max_width - fw : x;
+        float top = y;
+        for (bool moved = true; moved;) {
+          moved = false;
+          for (const FloatBox& f : floats_) {
+            if (f.top <= top && f.bottom > top && f.right > bx && f.left < bx + fw) {
+              top = f.bottom;
+              moved = true;
+            }
+          }
+        }
+        float bottom = top;
+        in_image_float_ = true;
+        layout_node(doc, id, bx, bottom, fw, out);
+        in_image_float_ = false;
+        if (bottom > top) {
+          FloatBox fb;
+          fb.top = top; fb.bottom = bottom;
+          fb.side = right ? FloatSide::Right : FloatSide::Left;
+          fb.left = right ? bx - gap : bx;
+          fb.right = right ? bx + fw : bx + fw + gap;
+          floats_.push_back(fb);
+        }
+        break;
+      }
+      if (!in_image_float_ && !node.image_float.empty())
+        y = clear_floats(x, max_width, y);
       if (is_remote_image(node.src)) {
         layout_remote_image(doc, node, x, y, max_width, out);
         break;

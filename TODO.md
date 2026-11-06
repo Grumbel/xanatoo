@@ -8,6 +8,13 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Image floats
+
+- Added `float=left|right` to Markdown block images and `:float` to
+  S-expression images, with text wrapping and a narrow-column flow fallback.
+- Added serialization and layout coverage; the unit suite passed (3760 checks).
+  No CLI bundle; number 290 remains unchanged.
+
 ## Follow-up (2026-11-06) — Focus the History panel
 
 - Added History to shared panel keyboard-focus state. Opening it by menu or

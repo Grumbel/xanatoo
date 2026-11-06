@@ -238,3 +238,17 @@ rules. They are ordinary sheets — the selection is still global, not per site.
 - Per-glyph font fallback: a body face without ☐ / ☑ shows tofu for task
   boxes.
 - UI chrome (status line, floating window titles) shares the body font.
+
+### Floating images
+
+A block image can float to either side of the text column:
+
+```markdown
+![A view of the harbour](harbour.jpg){float=right scale=0.8}
+```
+
+Use `float=left` or `float=right`. The optional `scale` attribute can appear
+in either order. Following text wraps around the image and its caption; on a
+narrow column the image returns to normal block flow. Inline images and
+collection cards do not float. In S-expressions the equivalent is
+`(img "harbour.jpg" :alt "A view of the harbour" :float right :scale 0.8)`.
