@@ -1149,46 +1149,108 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
   // -- Edit row (compact: primary icons + dropdown groups) --
   // Not while browsing: its reading tools are on the browse row then.
   if (!state.browse) {
-    const float edit_h = 36.f * scale_;
+    constexpr int kEditGroups[] = {5, 3, 4, 1, 1, 1, 4};
+    const float button_step = 32.f * scale_ + 10.f;
+    const float separator_step = 14.f * scale_ * 0.35f + 4.f;
+    const float edit_width = std::max(1.f, vp->Size.x - 14.f);
+    int edit_rows = 1;
+    float row_used = 0.f;
+    for (int count : kEditGroups) {
+      const float group_width = count * button_step;
+      if (row_used > 0.f &&
+          (group_width > edit_width ||
+           row_used + separator_step + group_width > edit_width)) {
+        ++edit_rows;
+        row_used = 0.f;
+      } else if (row_used > 0.f) {
+        row_used += separator_step;
+      }
+      if (group_width <= edit_width) {
+        row_used += group_width;
+      } else {
+        for (int i = 0; i < count; ++i) {
+          if (row_used > 0.f && row_used + button_step > edit_width) {
+            ++edit_rows;
+            row_used = 0.f;
+          }
+          row_used += button_step;
+        }
+      }
+    }
+    const float row_h = 32.f * scale_ + 6.f;
+    const float edit_h = edit_rows * row_h + 10.f;
     ImGui::SetNextWindowPos(ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
     ImGui::SetNextWindowSize(ImVec2(vp->Size.x, edit_h));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.f, 4.f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.f);
     if (ImGui::Begin("##toolbar_edit", nullptr, tb_flags)) {
-      ImGui::BeginChild("##toolbar_edit_scroll", ImVec2(0.f, 0.f), false,
-                        ImGuiWindowFlags_HorizontalScrollbar);
+      bool line_has_group = false;
+      bool wrap_inside_group = false;
+      bool line_has_item = false;
+      auto start_group = [&](int count) {
+        const float group_width = count * button_step;
+        if (line_has_group &&
+            ImGui::GetContentRegionAvail().x <
+                separator_step + group_width) {
+          ImGui::NewLine();
+          line_has_group = false;
+        }
+        if (line_has_group) {
+          ImGui::TextDisabled("|");
+          ImGui::SameLine(0.f, 4.f);
+        }
+        wrap_inside_group = group_width > edit_width;
+        line_has_item = false;
+        line_has_group = true;
+      };
+      auto before_group_item = [&] {
+        if (wrap_inside_group && line_has_item &&
+            ImGui::GetContentRegionAvail().x < button_step) {
+          ImGui::NewLine();
+          line_has_item = false;
+        }
+        line_has_item = true;
+      };
+      auto edit_button = [&](const char* id, const char* icon, const char* tip,
+                             UiCommand action, bool enabled = true) {
+        before_group_item();
+        tool_button(id, icon, tip, action, cmd, enabled);
+      };
+      auto edit_menu_begin = [&](const char* id, const char* icon,
+                                 const char* tip) {
+        before_group_item();
+        return tool_menu_begin(id, icon, tip);
+      };
 
       // File
-      tool_button("tb_new", "new", "New document (Ctrl+N)", UiCommand::NewDocument,
-                  cmd);
-      tool_button("tb_open", "open", "Open… (Ctrl+O)", UiCommand::OpenDocument, cmd);
-      tool_button("tb_save", "save", "Save (Ctrl+S)", UiCommand::Save, cmd);
-      tool_button("tb_undo", "undo", "Undo (Ctrl+Z)", UiCommand::Undo, cmd);
-      tool_button("tb_redo", "redo", "Redo (Ctrl+Y)", UiCommand::Redo, cmd);
-
-      ImGui::TextDisabled("|");
-      ImGui::SameLine(0.f, 4.f);
+      start_group(5);
+      edit_button("tb_new", "new", "New document (Ctrl+N)",
+                  UiCommand::NewDocument);
+      edit_button("tb_open", "open", "Open… (Ctrl+O)",
+                  UiCommand::OpenDocument);
+      edit_button("tb_save", "save", "Save (Ctrl+S)", UiCommand::Save);
+      edit_button("tb_undo", "undo", "Undo (Ctrl+Z)", UiCommand::Undo);
+      edit_button("tb_redo", "redo", "Redo (Ctrl+Y)", UiCommand::Redo);
 
       // Clipboard
-      tool_button("tb_cut", "cut", "Cut (Ctrl+X)", UiCommand::Cut, cmd,
+      start_group(3);
+      edit_button("tb_cut", "cut", "Cut (Ctrl+X)", UiCommand::Cut,
                   state.selection);
-      tool_button("tb_copy", "copy", "Copy (Ctrl+C)", UiCommand::Copy, cmd,
+      edit_button("tb_copy", "copy", "Copy (Ctrl+C)", UiCommand::Copy,
                   state.selection);
-      tool_button("tb_paste", "paste", "Paste (Ctrl+V)", UiCommand::Paste, cmd);
-
-      ImGui::TextDisabled("|");
-      ImGui::SameLine(0.f, 4.f);
+      edit_button("tb_paste", "paste", "Paste (Ctrl+V)", UiCommand::Paste);
 
       // Common inline styles
-      tool_button("tb_bold", "bold", "Bold (Ctrl+B)", UiCommand::Bold, cmd,
+      start_group(4);
+      edit_button("tb_bold", "bold", "Bold (Ctrl+B)", UiCommand::Bold,
                   state.selection);
-      tool_button("tb_italic", "italic", "Italic (Ctrl+I)", UiCommand::Italic,
-                  cmd, state.selection);
-      tool_button("tb_link", "link", "Link (Ctrl+K)", UiCommand::Link, cmd,
+      edit_button("tb_italic", "italic", "Italic (Ctrl+I)", UiCommand::Italic,
+                  state.selection);
+      edit_button("tb_link", "link", "Link (Ctrl+K)", UiCommand::Link,
                   state.selection);
 
       // More format styles
-      if (tool_menu_begin("tb_format", "format", "More formatting")) {
+      if (edit_menu_begin("tb_format", "format", "More formatting")) {
         menu_item_cmd("Code", UiCommand::Code, cmd, state.selection, "Ctrl+`");
         menu_item_cmd("Strikethrough", UiCommand::Strike, cmd, state.selection,
                       "Ctrl+Shift+X");
@@ -1197,11 +1259,9 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         tool_menu_end();
       }
 
-      ImGui::TextDisabled("|");
-      ImGui::SameLine(0.f, 4.f);
-
       // Structure group
-      if (tool_menu_begin("tb_structmenu", "structure", "Structure")) {
+      start_group(1);
+      if (edit_menu_begin("tb_structmenu", "structure", "Structure")) {
         menu_item_cmd("Header", UiCommand::MakeHeader, cmd, true, "Ctrl+1");
         menu_item_cmd("Wrap Section", UiCommand::WrapSection, cmd, true,
                       "Ctrl+Shift+1");
@@ -1220,7 +1280,8 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       }
 
       // Lists / blocks group
-      if (tool_menu_begin("tb_lists", "lists", "Lists & blocks")) {
+      start_group(1);
+      if (edit_menu_begin("tb_lists", "lists", "Lists & blocks")) {
         menu_item_cmd("Unordered list", UiCommand::ToggleUnorderedList, cmd);
         menu_item_cmd("Ordered list", UiCommand::ToggleOrderedList, cmd);
         menu_item_cmd("Task item", UiCommand::ToggleTask, cmd, true, "Ctrl+Shift+T");
@@ -1232,7 +1293,8 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       }
 
       // Insert group
-      if (tool_menu_begin("tb_insert", "insert", "Insert")) {
+      start_group(1);
+      if (edit_menu_begin("tb_insert", "insert", "Insert")) {
         menu_item_cmd("Table", UiCommand::InsertTable, cmd);
         menu_item_cmd("Image…", UiCommand::InsertImage, cmd, true, "Ctrl+Shift+I");
         menu_item_cmd("Figure…", UiCommand::InsertFigure, cmd);
@@ -1245,21 +1307,20 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         tool_menu_end();
       }
 
-      ImGui::TextDisabled("|");
-      ImGui::SameLine(0.f, 4.f);
-
-      tool_button("tb_find", "find", "Find (Ctrl+F)", UiCommand::Find, cmd);
+      start_group(4);
+      edit_button("tb_find", "find", "Find (Ctrl+F)", UiCommand::Find);
+      before_group_item();
       toggle_button("tb_split", "split", "Split pane (Ctrl+\\)",
                     UiCommand::ToggleSplit, state.split);
+      before_group_item();
       toggle_button("tb_outline", "outline",
                     "Heading outline (Ctrl+Shift+O; Ctrl+Alt+O docks it)",
                     UiCommand::ToggleOutline, state.outline);
-      if (tool_menu_begin("tb_viewmenu", "view", "View tools")) {
+      if (edit_menu_begin("tb_viewmenu", "view", "View tools")) {
         view_tools_items(state, cmd, result.arg);
         tool_menu_end();
       }
 
-      ImGui::EndChild();
     }
     ImGui::End();
     ImGui::PopStyleVar(2);

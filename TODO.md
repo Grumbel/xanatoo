@@ -8,6 +8,15 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Wrap the edit toolbar
+
+- Removed the horizontal scrolling toolbar row. Edit actions now wrap into
+  additional rows, preferring separator-delimited groups; oversized groups
+  can split across rows on very narrow windows.
+- Toolbar height is calculated from the wrapped row count. SDL3 syntax-only
+  compilation and `git diff --check` passed. This CLI change has no bundle;
+  number 290 remains for the next Web chat handover.
+
 ## Status (2026-11-06) — Add configurable UI scale
 
 - Added a saved Edit → Preferences UI scale with presets from 75% to 200%.
