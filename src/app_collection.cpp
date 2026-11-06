@@ -232,15 +232,21 @@ static SDL_Rect lightbox_rect(const App& app) {
   return {0, top, app.win_w, std::max(0, app.win_h - status_bar_h - top)};
 }
 
-// Edge zones of the viewer: top leaves, left / right step.
+// Edge zones of the viewer: narrow full-height sides step; the middle of the
+// top strip closes the viewer.
 enum class LbZone { None, Close, Prev, Next };
+static int lightbox_side_width(const SDL_Rect& r) {
+  return std::min(std::max(40, r.w / 8), std::max(1, r.w / 3));
+}
+
 static LbZone lightbox_zone(const App& app, int x, int y) {
   const SDL_Rect r = lightbox_rect(app);
   if (x < r.x || y < r.y || x >= r.x + r.w || y >= r.y + r.h)
     return LbZone::None;
+  const int side_w = lightbox_side_width(r);
+  if (x - r.x < side_w) return LbZone::Prev;
+  if (x - r.x >= r.w - side_w) return LbZone::Next;
   if (y - r.y < std::max(48, r.h / 7)) return LbZone::Close;
-  if (x - r.x < r.w / 4) return LbZone::Prev;
-  if (x - r.x >= r.w - r.w / 4) return LbZone::Next;
   return LbZone::None;
 }
 
@@ -521,11 +527,13 @@ void draw_lightbox(App& app) {
     SDL_Rect zr;
     const char* glyph;
     if (z == LbZone::Close) {
-      zr = {all.x, all.y, all.w, zh};
+      const int side_w = lightbox_side_width(all);
+      zr = {all.x + side_w, all.y, all.w - 2 * side_w, zh};
       glyph = "✕";
     } else {
-      zr = {z == LbZone::Prev ? all.x : all.x + all.w - all.w / 4,
-            all.y + zh, all.w / 4, all.h - zh};
+      const int side_w = lightbox_side_width(all);
+      zr = {z == LbZone::Prev ? all.x : all.x + all.w - side_w,
+            all.y, side_w, all.h};
       glyph = z == LbZone::Prev ? "◀" : "▶";
     }
     SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);

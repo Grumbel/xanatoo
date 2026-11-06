@@ -8,6 +8,13 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Refine gallery edge zones
+
+- Narrowed the previous/next hit and hover strips to the outer eighths of the
+  viewer, aligned them to the edges, and extended them through the full height.
+  The top close strip now occupies the center between those side zones. SDL3
+  syntax-only compilation and `git diff --check` passed. No CLI bundle created.
+
 ## Status (2026-11-06) — Keep ImGui above the image gallery
 
 - Moved Lightbox drawing into the scene pass before ImGui rendering. The
