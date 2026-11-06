@@ -511,6 +511,7 @@ bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip)
   const Icon* ic = icon(icon_name);
   ImGui::PushID(id);
   bool pressed = false;
+  ImVec2 popup_pos;
   const int style_colors = push_toolbar_button_style();
   if (ic) {
     ImVec2 size(32.f * scale_, 32.f * scale_);
@@ -546,8 +547,13 @@ bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip)
     if (ImGui::SmallButton(label.c_str())) pressed = true;
     draw_toolbar_button_bevel();
   }
+  const ImVec2 button_min = ImGui::GetItemRectMin();
+  const ImVec2 button_max = ImGui::GetItemRectMax();
+  popup_pos = ImVec2(button_min.x, button_max.y);
   pop_toolbar_button_style(style_colors);
   if (pressed) ImGui::OpenPopup("##menu");
+  if (ImGui::IsPopupOpen("##menu"))
+    ImGui::SetNextWindowPos(popup_pos, ImGuiCond_Appearing);
   if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && tip && tip[0])
     ImGui::SetTooltip("%s", tip);
   // Advance toolbar cursor before opening the popup window.

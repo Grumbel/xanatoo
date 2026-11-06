@@ -8,6 +8,13 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-06) — Anchor toolbar menus to their buttons
+
+- Toolbar popups now open below the lower-left corner of their triggering
+  button instead of at the pointer click location. SDL3 syntax-only
+  compilation and `git diff --check` passed. This CLI change has no bundle;
+  number 290 remains for the next Web chat handover.
+
 ## Status (2026-11-06) — Refine gallery edge zones
 
 - Narrowed the previous/next hit and hover strips to the outer eighths of the
