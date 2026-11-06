@@ -8,6 +8,15 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Follow-up (2026-11-06) — Preserve long-word prefixes
+
+- Fixed the forced-wrap state so a word is moved as a whole only before its
+  first character; prefixes already accumulated are now emitted intact. The
+  line also reserves room for the ↩ mark to avoid clipping its final text.
+- SDL2 syntax-only compilation and `git diff --check` passed. The unit-test
+  target compiled but could not link because this shell lacks Fontconfig and
+  FreeType linker aliases. No bundle; number 290 remains unchanged.
+
 ## Status (2026-11-06) — Break long unspaced text runs
 
 - Long words now wrap at character boundaries to stay within the text measure.

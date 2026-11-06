@@ -2426,6 +2426,14 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     out.glyphs.push_back(mark);
   };
 
+  auto forced_break_mark_width = [&](FontRole role) {
+    constexpr uint32_t kReturnMark = 0x21A9;
+    constexpr uint32_t kFallbackMark = 0x21B5;
+    Font& font = fonts_.pick(role);
+    const uint32_t cp = font.has_glyph(kReturnMark) ? kReturnMark : kFallbackMark;
+    return static_cast<float>(font.glyph(cp).advance >> 6);
+  };
+
   for (size_t i = 0; i < chars.size(); ++i) {
     const uint32_t cp = chars[i].cp;
 
@@ -2513,12 +2521,14 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
       word_lo = i;
       word_w = 0.f;
     }
-    if (line_w > 0.f && line_w + word_w + adv > lw) {
+    // Move a whole word to the next line only before its first character.
+    // Once a word is in progress, preserve its accumulated prefix and split
+    // that prefix only when the word itself exceeds the measure.
+    if (word_w == 0.f && line_w > 0.f && line_w + adv > lw) {
       flush_line(word_lo, false);
-      word_lo = i;
-      line_lo = i;
     }
-    if (word_w > 0.f && word_w + adv > lw) {
+    if (word_w > 0.f &&
+        word_w + adv + forced_break_mark_width(chars[i].role) > lw) {
       const FontRole role = chars[i - 1].role;
       emit_line(line_lo, i, false);
       add_forced_break_mark(role);
