@@ -12,6 +12,7 @@
 #include <functional>
 #include <iostream>
 #include <optional>
+#include <stdexcept>
 
 #include "xanatoo/app.hpp"
 #include "xanatoo/ebooks.hpp"
@@ -121,6 +122,20 @@ xanatoo::Document load_doc(App& app, std::string path) {
   std::string source((std::istreambuf_iterator<char>(in)),
                      std::istreambuf_iterator<char>());
   std::cout << "Opened: " << path << "\n";
+  if (xanatoo::path_uses_xml(path)) {
+    try {
+      auto doc = xanatoo::parse_xml(source);
+      app.invalid_xml_paths.erase(path);
+      return doc;
+    } catch (const std::invalid_argument& e) {
+      app.invalid_xml_paths.insert(path);
+      std::cerr << "Cannot import " << path << ": " << e.what() << "\n";
+      return xanatoo::parse_markup(
+          "# XML import failed\n\nThe source file was not modified. "
+          "This view is read-only; fix the input and reload it.\n\n`" +
+          std::string(e.what()) + "`\n");
+    }
+  }
   return xanatoo::parse_document(source, path);
 }
 
@@ -169,7 +184,8 @@ bool is_foreign_path(std::string_view path) {
 
 bool focused_read_only(App& app) {
   const DocBuffer* b = find_buf(app, focused_pane(app).buf);
-  return b && is_foreign_path(b->path);
+  return b && (is_foreign_path(b->path) ||
+               app.invalid_xml_paths.contains(b->path));
 }
 
 bool browsing(App& app) { return app.browse_mode || focused_read_only(app); }

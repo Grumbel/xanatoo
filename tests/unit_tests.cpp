@@ -599,6 +599,9 @@ void test_path_format_dispatch() {
   EXPECT(path_uses_sexpr("x.glyph"));
   EXPECT(path_uses_sexpr("y.ss"));
   EXPECT(!path_uses_sexpr("doc.md"));
+  EXPECT(path_uses_xml("document.xml"));
+  EXPECT(path_uses_xml("document.XML"));
+  EXPECT(!path_uses_xml("document.xhtml"));
   EXPECT(path_uses_gemtext("page.gmi"));
   EXPECT(path_uses_gemtext("page.gemini"));
   EXPECT(!path_uses_gemtext("page.md"));
@@ -661,6 +664,22 @@ void test_parse_document_sexpr_path() {
     for (auto c : n.children) stack.push_back(c);
   }
   EXPECT(headings >= 1);
+}
+
+void test_parse_document_xml_path() {
+  using namespace xanatoo;
+  const std::string source =
+      "<doc title=\"Hello &amp; goodbye\"><section label=\"intro\">"
+      "<p>Before <em>after</em> &lt;end&gt;</p></section></doc>";
+  Document doc = parse_document(source, "note.XML");
+  EXPECT_EQ(doc.meta.title, "Hello & goodbye");
+  EXPECT_EQ(doc.get(doc.root).children.size(), 1u);
+  EXPECT_EQ(doc.get(doc.get(doc.root).children[0]).kind, NodeKind::Section);
+  std::string output = serialize_document(doc, "note.xml");
+  EXPECT(output.find("<section") != std::string::npos);
+  EXPECT(output.find("<em>after</em>") != std::string::npos);
+  EXPECT_EQ(serialize_document(parse_document(output, "note.xml"), "note.xml"),
+            output);
 }
 
 void test_markup_stretch_and_link() {
@@ -4396,6 +4415,7 @@ int main() {
   test_path_format_dispatch();
   test_parse_sexpr();
   test_parse_document_sexpr_path();
+  test_parse_document_xml_path();
   test_markup_stretch_and_link();
   test_markup_blockquote_code_table();
   test_markup_columns();

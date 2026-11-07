@@ -63,6 +63,18 @@ bool looks_like_sexpr(std::string_view source);
 Document parse_sexpr(std::string_view source);
 std::string serialize_sexpr(const Document& doc);
 
+// --- Experimental minimal XML document format ----------------------------
+//
+// .xml is a native semantic-tree format, not an HTML/XML general-purpose
+// importer. Only elements, quoted attributes, and the five predefined XML
+// entities plus numeric character references are supported. In particular,
+// declarations, DTDs, namespaces, comments, CDATA and processing instructions
+// are rejected. Invalid input throws std::invalid_argument (with byte offset).
+// See docs/XML.md for the exact vocabulary and round-trip rules.
+bool path_uses_xml(std::string_view path);
+Document parse_xml(std::string_view source);
+std::string serialize_xml(const Document& doc);
+
 // --- Gemini gemtext -------------------------------------------------------
 //
 // Line-oriented text/gemini format (projectgemini.io):
@@ -83,7 +95,8 @@ Document parse_gemtext(std::string_view source);
 // Best-effort export (lossy vs full Markdown model).
 std::string serialize_gemtext(const Document& doc);
 
-// Dispatch: sexpr / gemtext / org by path (or look), else Markdown-ish markup.
+// Dispatch: native XML by .xml path; sexpr (path/content), gemtext, org,
+// HTML by path; otherwise Markdown-ish markup.
 Document parse_document(std::string_view source, std::string_view path = {});
 std::string serialize_document(const Document& doc, std::string_view path = {});
 

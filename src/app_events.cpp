@@ -63,7 +63,8 @@ static void on_dropfile(App& app, SDL_Event& ev, bool imgui_mouse,
   const bool is_doc =
       low.size() >= 3 &&
       (xanatoo::ends_with(low, ".md") || xanatoo::ends_with(low, ".markdown") ||
-       xanatoo::ends_with(low, ".sexp") || xanatoo::ends_with(low, ".txt") ||
+       xanatoo::ends_with(low, ".sexp") || xanatoo::ends_with(low, ".xml") ||
+       xanatoo::ends_with(low, ".txt") ||
        xanatoo::ends_with(low, ".org") || xanatoo::ends_with(low, ".gmi") ||
        xanatoo::ends_with(low, ".gemini") || xanatoo::path_uses_html(low) ||
        xanatoo::is_pandoc_path(low));

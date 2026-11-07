@@ -147,6 +147,7 @@ add_executable(xanatoo
   src/layout.cpp
   src/render.cpp
   src/parse.cpp
+  src/xml.cpp
   src/org.cpp
   src/editor.cpp
   src/images.cpp
@@ -496,6 +497,7 @@ add_executable(xanatoo_tests
   src/minibuffer.cpp
   src/document.cpp
   src/parse.cpp
+  src/xml.cpp
   src/org.cpp
   src/editor.cpp
   src/reddit.cpp
@@ -559,4 +561,14 @@ target_compile_definitions(xanatoo_tests PRIVATE
   "XANATOO_VERSION=\"${PROJECT_VERSION_FULL}\""
 )
 add_test(NAME unit_tests COMMAND xanatoo_tests)
+
+# Parser-only regression tests (no SDL/network/font dependencies). Also useful
+# for the experimental formats while the full application is cross-compiled.
+add_executable(xanatoo_xml_tests
+  tests/xml_tests.cpp
+  src/xml.cpp
+  src/document.cpp
+)
+target_include_directories(xanatoo_xml_tests PRIVATE include)
+add_test(NAME xml_tests COMMAND xanatoo_xml_tests)
 endif()

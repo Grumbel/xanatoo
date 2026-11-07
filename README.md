@@ -124,6 +124,7 @@ CMake commands, packaged assets, and the currently unsupported features.
 | --- | --- |
 | Markdown (`.md`), Org (`.org`) | Direct, editable semantic documents |
 | S-expression (`.sexp`, `.glyph`, `.ss`) | Structured document form; editable and exportable |
+| Experimental minimal XML (`.xml`) | Same semantic tree with fixed tags, quoted attributes, and builtin escapes; editable and exportable ([subset definition](docs/XML.md)) |
 | Local `.html`, HTTP(S) pages | Simplified semantic HTML, read-only; no CSS/JavaScript engine |
 | Gemtext (`.gmi`, `.gemini`), `gemini://` | Native document parser and optional network client |
 | RSS / Atom feeds | Read-only threads and entries |

@@ -3909,6 +3909,7 @@ std::string serialize_sexpr(const Document& doc) {
 }
 
 Document parse_document(std::string_view source, std::string_view path) {
+  if (path_uses_xml(path)) return parse_xml(source);
   if (path_uses_sexpr(path) || looks_like_sexpr(source))
     return parse_sexpr(source);
   if (path_uses_gemtext(path))
@@ -3921,6 +3922,7 @@ Document parse_document(std::string_view source, std::string_view path) {
 }
 
 std::string serialize_document(const Document& doc, std::string_view path) {
+  if (path_uses_xml(path)) return serialize_xml(doc);
   if (path_uses_sexpr(path)) return serialize_sexpr(doc);
   if (path_uses_gemtext(path)) return serialize_gemtext(doc);
   if (path_uses_org(path)) return serialize_org(doc);

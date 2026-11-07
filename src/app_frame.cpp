@@ -13,6 +13,7 @@
 #include <functional>
 #include <iostream>
 #include <optional>
+#include <stdexcept>
 
 #include "xanatoo/app.hpp"
 #include "xanatoo/platform.hpp"
@@ -373,7 +374,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::BookmarkPosition || c == C::NewTab ||
         c == C::CloseTab || c == C::NextTab || c == C::PrevTab ||
         c == C::SelectTab || c == C::PopOut || c == C::PopIn || c == C::Save ||
-        c == C::SaveAs || c == C::ExportSexpr || c == C::ExportMarkdown ||
+        c == C::SaveAs || c == C::ExportSexpr || c == C::ExportXml ||
+        c == C::ExportMarkdown ||
         c == C::Reload || c == C::ForceReload || c == C::OpenDrafts ||
         c == C::OpenAbout ||
         c == C::Copy ||
@@ -690,6 +692,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       std::string& spath = path_of(app, p);
       if (spath.empty()) {
         open_prompt(app, PromptKind::SaveAs, "untitled.md");
+      } else if (app.invalid_xml_paths.contains(spath)) {
+        flash_status(app, "Invalid XML is read-only — fix the file and reload");
       } else if (xanatoo::path_uses_html(spath) || is_in_app_remote_url(spath)) {
         // HTML is imported one way: writing Markdown over it would destroy
         // the original, and a URL is not a file.
@@ -703,7 +707,14 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
                       fs::path(spath).replace_extension(".md").string());
         flash_status(app, "Read-only page — save an editable Markdown copy");
       } else {
-        std::string text = xanatoo::serialize_document(d, spath);
+        std::string text;
+        try {
+          text = xanatoo::serialize_document(d, spath);
+        } catch (const std::invalid_argument& e) {
+          std::cerr << "Cannot save " << spath << ": " << e.what() << "\n";
+          flash_status(app, e.what());
+          break;
+        }
         std::ofstream out(spath);
         if (out) {
           out << text;
@@ -722,13 +733,15 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
                   path_of(app, p).empty() ? "untitled.md" : path_of(app, p));
       break;
     case C::ExportSexpr:
+    case C::ExportXml:
     case C::ExportMarkdown: {
       const bool as_sexp = (cmd == C::ExportSexpr);
-      const char* ext = as_sexp ? ".sexp" : ".md";
+      const bool as_xml = (cmd == C::ExportXml);
+      const char* ext = as_sexp ? ".sexp" : as_xml ? ".xml" : ".md";
       std::string cur = path_of(app, p);
       std::string target;
       if (cur.empty()) {
-        target = as_sexp ? "untitled.sexp" : "untitled.md";
+        target = std::string("untitled") + ext;
       } else {
         std::filesystem::path fp(cur);
         target = fp.stem().string() + ext;

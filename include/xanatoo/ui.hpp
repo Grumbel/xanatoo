@@ -47,6 +47,7 @@ enum class UiCommand {
 
   SaveAs,
   ExportSexpr,
+  ExportXml,
   ExportMarkdown,
   Reload,
   ForceReload,

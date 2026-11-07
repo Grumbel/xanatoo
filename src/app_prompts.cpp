@@ -11,6 +11,7 @@
 #include <functional>
 #include <iostream>
 #include <optional>
+#include <stdexcept>
 
 #include "xanatoo/app.hpp"
 #include "xanatoo/html_page.hpp"
@@ -321,11 +322,22 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
       minibuf_sync_out(app);
       if (!pr.text.empty()) {
         const std::string target = xanatoo::expand_user_path(pr.text);
-        if (xanatoo::path_uses_html(target)) {
-          flash_status(app, "Cannot write HTML — use .md, .org or .sexp");
+        if (app.invalid_xml_paths.contains(target)) {
+          flash_status(app, "Cannot overwrite an XML file that failed to import");
           return true;
         }
-        std::string text = xanatoo::serialize_document(d, target);
+        if (xanatoo::path_uses_html(target)) {
+          flash_status(app, "Cannot write HTML — use .md, .org, .sexp or .xml");
+          return true;
+        }
+        std::string text;
+        try {
+          text = xanatoo::serialize_document(d, target);
+        } catch (const std::invalid_argument& e) {
+          std::cerr << "Cannot save " << target << ": " << e.what() << "\n";
+          flash_status(app, e.what());
+          return true;
+        }
         std::ofstream out(target);
         if (!out) {
           std::cerr << "Failed to save: " << target << "\n";

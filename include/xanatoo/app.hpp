@@ -597,6 +597,9 @@ struct App {
   xanatoo::Font ui_font;       // chrome text (see kUiFontPx)
   xanatoo::Font ui_font_bold;  // outline top level, emphasis in chrome
   std::vector<DocBuffer> buffers;  // dense storage; address by BufferId
+  // Documents whose strict XML import failed stay read-only until reloaded
+  // successfully. An error preview must never overwrite the original file.
+  std::unordered_set<std::string> invalid_xml_paths;
   BufferId next_buffer_id = 1;
   std::vector<BufferId> tab_order;
   ImageCache images;
