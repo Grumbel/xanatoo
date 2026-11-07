@@ -216,6 +216,20 @@ def draw_icon(name: str, size: int = 20) -> bytes:
         line(buf, size, size, S(15), S(13), S(7), S(13), ACCENT, 1)
         line(buf, size, size, S(7), S(13), S(9), S(11), ACCENT, 1)
         line(buf, size, size, S(7), S(13), S(9), S(15), ACCENT, 1)
+    elif name == "reader":
+        rect(buf, size, size, S(2), S(4), S(16), S(12), INK, PAPER)
+        line(buf, size, size, S(10), S(4), S(10), S(16), INK)
+        for y in (7, 10, 13):
+            line(buf, size, size, S(4), S(y), S(8), S(y), ACCENT)
+            line(buf, size, size, S(12), S(y), S(16), S(y), ACCENT)
+    elif name == "sitemap":
+        line(buf, size, size, S(10), S(6), S(10), S(9), INK)
+        line(buf, size, size, S(4), S(9), S(16), S(9), INK)
+        line(buf, size, size, S(4), S(9), S(4), S(12), INK)
+        line(buf, size, size, S(16), S(9), S(16), S(12), INK)
+        rect(buf, size, size, S(7), S(2), S(6), S(4), INK, ACCENT)
+        rect(buf, size, size, S(1), S(12), S(6), S(5), INK, SOFT)
+        rect(buf, size, size, S(13), S(12), S(6), S(5), INK, SOFT)
     elif name == "outline":
         line(buf, size, size, S(4), S(5), S(16), S(5), INK, 2)
         line(buf, size, size, S(6), S(10), S(16), S(10), INK, 1)

@@ -386,7 +386,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
       "strike", "cite", "h1", "h2", "h3", "para", "task", "table",
       "figure", "note", "replace", "outline", "paste", "copy", "new", "open",
       "zoomin", "zoomout", "structure", "diff",
-      "back", "forward", "up", "home", "reload", "stop", "bookmark", "history", "browse", "native", "reader",
+      "back", "forward", "up", "home", "reload", "stop", "bookmark", "history", "browse", "native", "reader", "sitemap",
       "linespacing", "measure", "style",
       "format", "insert", "view", "lists",
   };
@@ -1003,14 +1003,21 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         ImGui::SameLine(0.f, 2.f);
       }
       // Context controls stay with the address on either toolbar row.
-      const float extra_w = url_extras * (30.f * scale_ + 2.f);
+      const float extra_w = url_extras * 28.f * scale_;
       // Leave room for the buttons right of the field (measured last frame).
       float field_w =
           ImGui::GetContentRegionAvail().x -
-          (url_own_row ? 0.f : url_right_w_ + 6.f) - extra_w;
-      if (field_w < 100.f) field_w = 100.f;
-      ImGui::SetNextItemWidth(field_w);
+          (url_own_row ? 0.f : url_right_w_ + 6.f);
+      if (field_w < 40.f + extra_w) field_w = 40.f + extra_w;
+      ImGui::SetNextItemWidth(std::max(40.f, field_w - extra_w));
       ImGui::SetCursorPosY(row_y + (button_h - field_h) * 0.5f);
+      const ImVec2 field_pos = ImGui::GetCursorScreenPos();
+      const ImVec2 field_end(field_pos.x + field_w, field_pos.y + field_h);
+      ImDrawList* draw = ImGui::GetWindowDrawList();
+      draw->AddRectFilled(field_pos, field_end, IM_COL32(242, 242, 247, 255),
+                          ImGui::GetStyle().FrameRounding);
+      draw->AddRect(field_pos, field_end, ImGui::GetColorU32(ImGuiCol_Border),
+                    ImGui::GetStyle().FrameRounding);
 
       if (focus_url_bar_) {
         ImGui::SetKeyboardFocusHere();
@@ -1022,10 +1029,10 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         url_synced_from_ = want;
       }
 
-      ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.95f, 0.95f, 0.97f, 1.f));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,
-                            ImVec4(0.98f, 0.98f, 1.f, 1.f));
-      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1.f, 1.f, 1.f, 1.f));
+      ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.f, 0.f, 0.f, 0.f));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.f, 0.f, 0.f, 0.f));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.f, 0.f, 0.f, 0.f));
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
       ImGui::PushStyleVar(
           ImGuiStyleVar_FramePadding,
           ImVec2((state.location_icon ? 30.f : 6.f) * scale_,
@@ -1044,7 +1051,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
             ImVec2(p.x + 5.f * scale_ + (side - size.x) * 0.5f, y),
             ImVec2(p.x + 5.f * scale_ + (side + size.x) * 0.5f, y + size.y));
       }
-      ImGui::PopStyleVar();
+      ImGui::PopStyleVar(2);
       ImGui::PopStyleColor(3);
       url_bar_editing_ = ImGui::IsItemActive();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
@@ -1057,24 +1064,37 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         url_bar_editing_ = false;
         ImGui::ClearActiveID();
       }
-      auto extra = [&](const char* label, const char* tip, UiCommand action, bool on) {
-        ImGui::SameLine(0.f, 2.f);
-        if (on) {
-          ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
-          ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.5f, 0.75f, 1.f));
+      auto extra = [&](const char* id, const char* icon_name, const char* fallback,
+                       const char* tip, UiCommand action, bool on) {
+        ImGui::SameLine(0.f, 0.f);
+        ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x,
+                                       field_pos.y + 3.f * scale_));
+        ImGui::PushStyleColor(ImGuiCol_Button, on ? ImVec4(0.55f, 0.68f, 0.85f, 1.f)
+                                                  : ImVec4(0.f, 0.f, 0.f, 0.f));
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.f * scale_, 3.f * scale_));
+        const Icon* ic = icon(icon_name);
+        bool pressed;
+        if (ic) {
+          pressed = ImGui::ImageButton(id, reinterpret_cast<ImTextureID>(ic->texture),
+                                       ImVec2(20.f * scale_, 20.f * scale_));
+        } else {
+          ImGui::PushID(id);
+          pressed = ImGui::Button(fallback, ImVec2(28.f * scale_, 26.f * scale_));
+          ImGui::PopID();
         }
-        if (ImGui::Button(label, ImVec2(30.f * scale_, field_h))) cmd = action;
-        if (on) ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor();
+        if (pressed) cmd = action;
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", tip);
       };
       if (state.has_chrome)
-        extra("R##url_reader", state.reader ? "Show the whole page (F9)" : "Reader mode (F9)",
+        extra("url_reader", "reader", "R", state.reader ? "Show the whole page (F9)" : "Reader mode (F9)",
               UiCommand::ToggleReader, state.reader);
       if (state.has_nav)
-        extra("N##url_nav", state.page_panel ? "Close page navigation" : "Open page navigation",
+        extra("url_nav", "outline", "N", state.page_panel ? "Close page navigation" : "Open page navigation",
               UiCommand::TogglePage, state.page_panel);
       if (state.has_site)
-        extra("S##url_sitemap", state.sitemap ? "Close site map" : "Find and open site map",
+        extra("url_sitemap", "sitemap", "S", state.sitemap ? "Close site map" : "Find and open site map",
               UiCommand::ToggleSitemap, state.sitemap);
       if (!url_own_row) {
         ImGui::SameLine(0.f, 6.f);

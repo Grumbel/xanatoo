@@ -8,6 +8,12 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Follow-up (2026-11-07) — Icons inside the location field
+
+- Embedded the contextual controls in the location field, reserving text space,
+  and added icon artwork and rasterizer fallbacks for reader and site map.
+- Compiled the changed UI unit and rasterized the icon set. No CLI bundle.
+
 ## Status (2026-11-07) — Context controls in the location bar
 
 - Added reader, page navigation and site-map controls beside the address when
