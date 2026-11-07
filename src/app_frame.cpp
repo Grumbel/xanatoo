@@ -113,6 +113,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.footnote_overlay = app.view_settings.footnote_overlay;
   ui_state.bookmark_marks = app.view_settings.bookmark_marks;
   ui_state.hover_preview = app.view_settings.hover_preview;
+  ui_state.auto_updates = app.view_settings.auto_updates;
   ui_state.reader_default = app.view_settings.reader_mode;
   ui_state.reader = pane_reader(app, focused_pane(app));
   ui_state.paged = pane_paged(app, focused_pane(app));
@@ -397,7 +398,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::ViewLineSpacingLoose || c == C::ViewMargins ||
         c == C::ViewMeasure ||
         c == C::ToggleSectionFocus || c == C::ToggleJustify ||
-        c == C::ToggleHoverPreview || c == C::TogglePreferences ||
+        c == C::ToggleHoverPreview || c == C::ToggleAutoUpdates || c == C::TogglePreferences ||
         c == C::SetUiScale ||
         c == C::SelectStyle || c == C::ReloadStyles;
     if (!allowed) {
@@ -1515,6 +1516,14 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       flash_status(app, app.view_settings.bookmark_marks
                             ? "Bookmarks marked in the page"
                             : "Bookmarks not marked in the page");
+      break;
+    case C::ToggleAutoUpdates:
+      app.view_settings.auto_updates = !app.view_settings.auto_updates;
+      xanatoo::save_view_settings(app.view_settings);
+      xanatoo::platform_auto_updates(app.view_settings.auto_updates);
+      flash_status(app, app.view_settings.auto_updates
+                            ? "Automatic update checks on"
+                            : "Automatic update checks off");
       break;
     case C::ToggleHoverPreview:
       app.view_settings.hover_preview = !app.view_settings.hover_preview;

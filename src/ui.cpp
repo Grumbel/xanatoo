@@ -2035,6 +2035,12 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
              "Wash over bookmarked passages, a ribbon at reading positions");
       toggle("Justify text", state.justify, UiCommand::ToggleJustify,
              "Wrapped body lines fill the column");
+#ifdef __ANDROID__
+      ImGui::SeparatorText("Updates");
+      toggle("Automatic update checks", state.auto_updates,
+             UiCommand::ToggleAutoUpdates,
+             "Notify when a new Android version is available");
+#endif
       ImGui::SeparatorText("Interface");
       static constexpr float scales[] = {
           0.75f, 0.9f, 1.f, 1.1f, 1.25f, 1.4f, 1.6f, 1.8f, 2.f};

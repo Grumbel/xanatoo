@@ -1494,6 +1494,8 @@ void test_view_settings_migration() {
   EXPECT(load_view_settings(v));
   EXPECT(v.margin_pct == 10.f);
   EXPECT(v.measure_chars == 72);
+  EXPECT(!v.auto_updates);
+  v.auto_updates = true;
   v.margin_pct = 25.f;
   v.measure_chars = 0;
   EXPECT(save_view_settings(v));
@@ -1501,6 +1503,7 @@ void test_view_settings_migration() {
   EXPECT(load_view_settings(w));
   EXPECT(w.margin_pct == 25.f);
   EXPECT(w.measure_chars == 0);
+  EXPECT(w.auto_updates);
   if (old_xdg)
     ::setenv("XDG_CONFIG_HOME", saved.c_str(), 1);
   else

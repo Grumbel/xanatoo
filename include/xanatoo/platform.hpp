@@ -17,6 +17,9 @@ namespace xanatoo {
 void platform_pre_init();
 void platform_init();
 
+// Enable or disable Android update checks; a no-op on other platforms.
+void platform_auto_updates(bool enabled);
+
 // The document took a tap / an ImGui text field gained focus: bring up the
 // on-screen keyboard (Android); desktop keeps text input on permanently.
 void platform_request_keyboard(SDL_Window* window);

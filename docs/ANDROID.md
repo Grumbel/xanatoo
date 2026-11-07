@@ -119,7 +119,8 @@ underneath it. The 640×480 R36S package starts at 75% of the desktop default.
 
 ## Updates
 
-When the app starts, it checks the website for a newer Android package at most
+Automatic update checks are off by default; enable them in Edit → Preferences.
+When enabled, the app checks the website for a newer Android package at most
 once a day after a successful check. An Android notification links to the
 download page; the user downloads the APK and confirms installation through
 Android. Android 13 and later ask for notification permission when an update

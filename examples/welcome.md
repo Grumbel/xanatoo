@@ -34,6 +34,9 @@ Inspired by *Xanadu*, **HyperCard**, and the *Canon Cat*.
 Menus: **Alt+F** File · **E** Edit · **V** View · **G** Go · **B** Bookmarks · **H** Help.
 :::
 
+On Android, you can enable **automatic update checks** in **Edit → Preferences**
+to receive a notification when a new version is available.
+
 ## Example documents
 
 The **Services** menu opens the front page of every built-in client:

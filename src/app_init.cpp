@@ -28,6 +28,7 @@ namespace xanatoo::app {
 bool app_init(App& app) {
   // Load the user's chrome scale before deriving any pixel geometry.
   xanatoo::load_view_settings(app.view_settings);
+  xanatoo::platform_auto_updates(app.view_settings.auto_updates);
   // Chrome metrics, UI font and the default document size follow the
   // display scale (--ui-scale, else density on Android).
   app.ui_scale_base = app.opt.ui_scale > 0.f ? app.opt.ui_scale

@@ -157,6 +157,7 @@ enum class UiCommand {
   ToggleJustify,            // view: justify wrapped lines
   ToggleFootnoteOverlay,    // view: notes of on-screen footnote marks
   ToggleBookmarkMarks,      // view: wash over bookmarks inside the page
+  ToggleAutoUpdates,         // Android update checks
   ToggleHoverPreview,       // split view: preview hovered links on the right
   ToggleReaderDefault,      // Preferences: reader mode for new views
   TogglePreferences,        // Edit → Preferences window
@@ -192,6 +193,7 @@ struct UiState {
   bool footnote_overlay = true;
   bool bookmark_marks = true;
   bool hover_preview = false;
+  bool auto_updates = false;
   bool reader_default = false;  // ViewSettings::reader_mode
   bool reader = false;          // focused view hides the page chrome
   bool paged = false;           // focused view shows pages

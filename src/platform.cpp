@@ -199,6 +199,26 @@ void platform_init() {
     SDL_Log("xanatoo: chdir %s failed", user.c_str());
 }
 
+void platform_auto_updates(bool enabled) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
+  auto activity = static_cast<jobject>(SDL_GetAndroidActivity());
+#else
+  auto* env = static_cast<JNIEnv*>(SDL_AndroidGetJNIEnv());
+  auto activity = static_cast<jobject>(SDL_AndroidGetActivity());
+#endif
+  if (!env || !activity) return;
+  jclass cls = env->GetObjectClass(activity);
+  jmethodID method = env->GetMethodID(cls, "setAutoUpdates", "(Z)V");
+  if (method) env->CallVoidMethod(activity, method, enabled ? JNI_TRUE : JNI_FALSE);
+  if (env->ExceptionCheck()) {
+    SDL_Log("xanatoo: could not set Android update preference");
+    env->ExceptionClear();
+  }
+  env->DeleteLocalRef(cls);
+  env->DeleteLocalRef(activity);
+}
+
 void platform_request_keyboard(SDL_Window* window) {
   sdl::start_text_input(window);
 }
@@ -238,6 +258,7 @@ void platform_init() {
   }
 #endif
 }
+void platform_auto_updates(bool) {}
 void platform_request_keyboard(SDL_Window*) {}
 void platform_release_keyboard(SDL_Window*) {}
 bool platform_text_input_at_start() { return true; }

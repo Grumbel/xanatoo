@@ -8,6 +8,15 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-07) — Opt-in Android updates
+
+- Added an Android Preferences switch for automatic update checks, off by
+  default, and linked to it from the welcome page. Disabling it suppresses
+  pending results and removes the update notification.
+- Java and changed desktop units compiled; 3897 offline checks passed. The
+  full desktop build still lacks SQLite headers in this shell. Device testing
+  remains outstanding. No CLI bundle.
+
 ## Status (2026-11-07) — Android update notice
 
 - Android checks the website for a newer APK at startup and offers a system

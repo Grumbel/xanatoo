@@ -11,7 +11,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
-import android.os.Bundle;
 import android.util.Log;
 import org.libsdl.app.SDLActivity;
 import org.json.JSONObject;
@@ -26,16 +25,28 @@ public class XanatooActivity extends SDLActivity {
     private static final long INTERVAL = 24L * 60 * 60 * 1000;
     private static final int PERMISSION_REQUEST = 702;
     private String pendingVersion;
+    private volatile boolean autoUpdates;
+    private volatile int updateGeneration;
 
-    @Override public void onCreate(Bundle state) {
-        super.onCreate(state);
+    // Called by the native preference system, including once after loading
+    // view.conf. No network request is made until the user enables it.
+    public void setAutoUpdates(boolean enabled) {
+        autoUpdates = enabled;
+        int generation = ++updateGeneration;
+        if (!enabled) {
+            runOnUiThread(() -> {
+                pendingVersion = null;
+                ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).cancel(1);
+            });
+            return;
+        }
         long last = getPreferences(MODE_PRIVATE).getLong("update_check", 0);
         long now = System.currentTimeMillis();
         if (now >= last && now - last < INTERVAL) return;
-        new Thread(() -> checkUpdate()).start();
+        new Thread(() -> checkUpdate(generation)).start();
     }
 
-    private void checkUpdate() {
+    private void checkUpdate(int generation) {
         HttpURLConnection connection = null;
         try {
             connection = (HttpURLConnection) new URL(MANIFEST).openConnection();
@@ -57,9 +68,12 @@ public class XanatooActivity extends SDLActivity {
             long code = manifest.getLong("versionCode");
             String version = manifest.getString("versionName");
             int installed = getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
+            if (!autoUpdates || generation != updateGeneration) return;
             getPreferences(MODE_PRIVATE).edit().putLong("update_check", System.currentTimeMillis()).apply();
             if (code > installed && version.length() > 0 && version.length() <= 100) {
-                runOnUiThread(() -> offerUpdate(version));
+                runOnUiThread(() -> {
+                    if (autoUpdates && generation == updateGeneration) offerUpdate(version);
+                });
             }
         } catch (Exception e) {
             Log.w("xanatoo", "Update check failed", e);
@@ -69,7 +83,7 @@ public class XanatooActivity extends SDLActivity {
     }
 
     private void offerUpdate(String version) {
-        if (isFinishing()) return;
+        if (!autoUpdates || isFinishing()) return;
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
             pendingVersion = version;
@@ -82,7 +96,7 @@ public class XanatooActivity extends SDLActivity {
     @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
         if (requestCode == PERMISSION_REQUEST && pendingVersion != null) {
-            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) showUpdate(pendingVersion);
+            if (autoUpdates && results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) showUpdate(pendingVersion);
             pendingVersion = null;
         }
     }
