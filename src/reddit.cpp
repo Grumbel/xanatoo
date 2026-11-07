@@ -53,8 +53,8 @@ bool is_reddit_url(std::string_view s) {
   if (starts_with_ci(rest, "https://")) rest.remove_prefix(8);
   else if (starts_with_ci(rest, "http://")) rest.remove_prefix(7);
 
-  // host[/path…]
-  size_t slash = rest.find('/');
+  // host[/path…][?query][#fragment] — the homepage may have no slash.
+  size_t slash = rest.find_first_of("/?#");
   std::string_view host =
       (slash == std::string_view::npos) ? rest : rest.substr(0, slash);
   // drop userinfo / port
@@ -86,12 +86,13 @@ std::string reddit_json_url(std::string_view s) {
     size_t scheme = url.find("://");
     if (scheme != std::string::npos) {
       size_t host_begin = scheme + 3;
-      size_t host_end = url.find('/', host_begin);
+      size_t host_end = url.find_first_of("/?#", host_begin);
       std::string host = (host_end == std::string::npos)
                              ? url.substr(host_begin)
                              : url.substr(host_begin, host_end - host_begin);
       std::string path = (host_end == std::string::npos) ? "/"
                                                          : url.substr(host_end);
+      if (!path.empty() && path.front() != '/') path.insert(path.begin(), '/');
       // drop port from host for rebuild
       size_t colon = host.rfind(':');
       if (colon != std::string::npos) host = host.substr(0, colon);

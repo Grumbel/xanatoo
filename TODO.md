@@ -6,7 +6,19 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **294** (this delivery is **293**)
+Next bundle number: **295** (this delivery is **294**)
+
+## Status (2026-11-07) — Reddit RSS fallback review
+
+- Audited the 403 error document, native Reddit URL conversion, and RSS/Atom
+  dispatch: the fallback link is a normal inline link, is only offered for
+  HTTP 403 from the Reddit client, and feeds route to the existing reader.
+- Fixed an edge case shared by `is_reddit_url` and `reddit_json_url`: a Reddit
+  homepage address with `?query` or `#fragment` but no slash previously
+  treated the suffix as part of the host. Added regression checks for both
+  JSON and RSS conversion and a lookalike-domain rejection.
+- Offline standalone URL/dispatch checks and Reddit-client syntax checks pass.
+  A live Reddit request and the full SDL/FreeType GUI build remain untested.
 
 ## Status (2026-11-07) — Reddit HTTP 403 RSS fallback
 
