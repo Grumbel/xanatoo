@@ -1003,7 +1003,8 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         ImGui::SameLine(0.f, 2.f);
       }
       // Context controls stay with the address on either toolbar row.
-      const float extra_w = url_extras * 28.f * scale_;
+      const float right_pad = url_extras ? 2.f * scale_ : 0.f;
+      const float extra_w = url_extras * 28.f * scale_ + right_pad;
       // Leave room for the buttons right of the field (measured last frame).
       float field_w =
           ImGui::GetContentRegionAvail().x -
@@ -1072,6 +1073,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         ImGui::PushStyleColor(ImGuiCol_Button, on ? ImVec4(0.55f, 0.68f, 0.85f, 1.f)
                                                   : ImVec4(0.f, 0.f, 0.f, 0.f));
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.f * scale_, 3.f * scale_));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, on ? 1.f : 0.f);
         const Icon* ic = icon(icon_name);
         bool pressed;
         if (ic) {
@@ -1082,7 +1084,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
           pressed = ImGui::Button(fallback, ImVec2(28.f * scale_, 26.f * scale_));
           ImGui::PopID();
         }
-        ImGui::PopStyleVar();
+        ImGui::PopStyleVar(2);
         ImGui::PopStyleColor();
         if (pressed) cmd = action;
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", tip);
@@ -1097,7 +1099,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         extra("url_sitemap", "sitemap", "S", state.sitemap ? "Close site map" : "Find and open site map",
               UiCommand::ToggleSitemap, state.sitemap);
       if (!url_own_row) {
-        ImGui::SameLine(0.f, 6.f);
+        ImGui::SameLine(0.f, 6.f + right_pad);
         ImGui::SetCursorPosY(row_y);
       }
     };

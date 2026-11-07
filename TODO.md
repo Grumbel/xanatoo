@@ -8,6 +8,11 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Follow-up (2026-11-07) — Location icon borders
+
+- Hide contextual button borders until toggled and inset the icon group from
+  the right edge of the location field. No CLI bundle.
+
 ## Follow-up (2026-11-07) — Icons inside the location field
 
 - Embedded the contextual controls in the location field, reserving text space,
