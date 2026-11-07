@@ -124,6 +124,7 @@ add_executable(xanatoo
   src/app_chrome.cpp
   src/app_keymap.cpp
   src/app_fetch.cpp
+  src/app_downloads.cpp
   src/app_split.cpp
   src/app_footnotes.cpp
   src/app_sitemap.cpp
@@ -179,6 +180,7 @@ add_executable(xanatoo
   src/inflate.cpp
   src/html_min.cpp
   src/html_page.cpp
+  src/download.cpp
   src/wikipedia.cpp
   src/locator.cpp
   src/native.cpp
@@ -514,6 +516,7 @@ add_executable(xanatoo_tests
   src/inflate.cpp
   src/html_min.cpp
   src/html_page.cpp
+  src/download.cpp
   src/wikipedia.cpp
   src/locator.cpp
   src/native.cpp

@@ -37,7 +37,9 @@ see [docs/BRAINSTORM.md](docs/BRAINSTORM.md) and [TODO.md](TODO.md).
   selections, and session restoration.
 - **Explore written material.** Open HTML pages, Gemini capsules, RSS/Atom
   feeds, Wikipedia, Hacker News, Reddit, Lemmy, and Nostr in native document
-  views. Search with a configurable engine list and browse a curated directory.
+  views. Unsupported web response types download to disk, with a live Downloads
+  panel (Panels → Downloads). Search with a configurable engine list and browse
+  a curated directory.
 - **Read books and images.** Open EPUB, browse Standard Ebooks and Gutenberg,
   import many other formats through Pandoc, and view image collections in a
   zoomable lightbox. TeX math uses an OpenType MATH font when available.
@@ -188,7 +190,8 @@ the document. See [docs/STYLESHEETS.md](docs/STYLESHEETS.md).
 | Preferences (`view.conf`) | `$XDG_CONFIG_HOME/xanatoo/` |
 | Drafts/revisions, folds, bookmarks, history, sessions | `$XDG_STATE_HOME/xanatoo/` |
 | Your style sheets and search engines (`search.sexp`) | `$XDG_DATA_HOME/xanatoo/` |
-| Images, thumbnails, downloads, imports | `$XDG_CACHE_HOME/xanatoo/` |
+| Images, thumbnails, EPUB import cache | `$XDG_CACHE_HOME/xanatoo/` |
+| Files downloaded from web links | `XDG_DOWNLOAD_DIR` / user Downloads folder ([details](docs/DOWNLOADS.md)) |
 
 Use `--config-dir`, `--state-dir`, `--user-data-dir`, or `--cache-dir` to
 redirect these. `--portable` keeps them under `userdata/` beside the
@@ -215,6 +218,7 @@ implementation. The code and design notes live in:
   and rendering;
 - [docs/REVISIONS.md](docs/REVISIONS.md) — draft store and future identity;
 - [docs/PASSAGES.md](docs/PASSAGES.md) — addresses, cuts, marks, and embeds;
+- [docs/DOWNLOADS.md](docs/DOWNLOADS.md) — MIME routing, progress and saved files;
 - [docs/PORTS.md](docs/PORTS.md) — Windows and WebAssembly builds and limits;
 - [docs/BRAINSTORM.md](docs/BRAINSTORM.md) — long-term hypertext direction;
 - [TODO.md](TODO.md) — current status and open work.

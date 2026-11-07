@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "xanatoo/cli.hpp"
+#include "xanatoo/download.hpp"
 #include "xanatoo/editor.hpp"
 #include "xanatoo/font.hpp"
 #include "xanatoo/images.hpp"
@@ -235,7 +236,7 @@ struct Pane {
 enum class Dock : uint8_t { None = 0, Left, Right, Top, Bottom, Max };
 
 enum class WindowRole : uint8_t {
-  Help, Outline, Backlinks, Sitemap, Page, History, Styles, Document
+  Help, Outline, Backlinks, Sitemap, Page, History, Styles, Downloads, Document
 };
 
 // One floating window: help / outline / backlinks panels and document
@@ -386,6 +387,7 @@ struct FetchShared {
   std::atomic<bool> done{false};
   std::optional<xanatoo::Document> doc;
   std::optional<std::string> raw_source;
+  std::shared_ptr<xanatoo::DownloadProgress> download;
   std::string error;      // with `doc` set: the page is an HTTP error body
   int http_status = 0;    // non-200 answer whose body is in `doc`
   std::string final_url;  // page URL after redirects (buffer path)
@@ -693,6 +695,7 @@ struct App {
   std::string bookmark_menu;   // bookmark of the open margin-icon menu
   bool history_panel_open = false;
   bool styles_panel_open = false;
+  bool downloads_panel_open = false;
   int styles_sel = 0;
   bool preferences_open = false;  // Edit → Preferences (ImGui window)
   bool bookmarks_panel_open = false;
@@ -750,6 +753,7 @@ struct App {
   FloatWindow sm = make_float_panel(WindowRole::Sitemap, 140, 110, 340, 460);
   FloatWindow history_win = make_float_panel(WindowRole::History, 100, 130, 440, 360);
   FloatWindow styles_win = make_float_panel(WindowRole::Styles, 160, 150, 320, 420);
+  FloatWindow downloads_win = make_float_panel(WindowRole::Downloads, 120, 160, 520, 380);
   SitemapPanel sitemap;
   SearchBar search;
   FloatWindow pg = make_float_panel(WindowRole::Page, 60, 110, 260, 420);
@@ -760,6 +764,7 @@ struct App {
   std::string context_comment_web;
   Touch touch;
   std::vector<FetchJob> fetches;
+  std::vector<std::shared_ptr<xanatoo::DownloadProgress>> downloads;
   uint64_t next_fetch_id = 1;
   std::shared_ptr<ImageFetchShared> image_fetch =
       std::make_shared<ImageFetchShared>();
@@ -1198,6 +1203,11 @@ const CachedPage* find_cached_page(App& app, const std::string& url);
 void forget_cached_page(App& app, const std::string& url);  // Reload
 // Progress bar + "Loading host…" label on panes with a running fetch.
 void draw_load_indicator(App& app, int pi);
+// Browser-style downloads panel: active transfers and completed files.
+void draw_downloads_panel(App& app);
+void click_downloads_panel(App& app, int mx, int my);
+void load_download_history(App& app);
+void save_download_history(const App& app);
 
 // ---- footnotes (app_footnotes.cpp) ----
 // Notes of the footnote marks on screen, as a strip at the bottom of pane

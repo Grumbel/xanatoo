@@ -76,7 +76,8 @@ void fetch_gemini(const std::string& url, FetchShared& out) {
 #endif
 
 // Worker thread body: everything here must stay off App.
-void fetch_page(std::string url, std::shared_ptr<FetchShared> out) {
+void fetch_page(std::string url, std::shared_ptr<FetchShared> out,
+                bool allow_download) {
   out->final_url = url;
   // A search is its expanded URL, fetched like any page; the address stays.
   if (xanatoo::is_search_ref(url)) {
@@ -96,7 +97,8 @@ void fetch_page(std::string url, std::shared_ptr<FetchShared> out) {
       out->done.store(true, std::memory_order_release);
       return;
     }
-    fetch_page(xanatoo::search_target(url, xanatoo::load_engines()), out);
+    fetch_page(xanatoo::search_target(url, xanatoo::load_engines()), out,
+               allow_download);
     out->final_url = shown;
     return;
   }
@@ -156,11 +158,18 @@ void fetch_page(std::string url, std::shared_ptr<FetchShared> out) {
     out->service = "Web";
     std::string body;
     out->doc = xanatoo::web_fetch(url, &out->error, &out->final_url,
-                                  &out->http_status, &body);
+                                  &out->http_status, &body,
+                                  allow_download ? out->download.get() : nullptr);
     if (out->doc) out->raw_source = std::move(body);
 #endif
   }
-  if (!out->doc && out->error.empty()) out->error = "no client for " + url;
+  if (!out->doc && out->error.empty() &&
+      (!out->download || out->download->phase.load() !=
+                             xanatoo::DownloadPhase::Complete))
+    out->error = "no client for " + url;
+  if (out->download && out->download->phase.load() ==
+                            xanatoo::DownloadPhase::Pending)
+    out->download->phase.store(xanatoo::DownloadPhase::Skipped);
   out->done.store(true, std::memory_order_release);
 }
 
@@ -235,6 +244,12 @@ void finish_tab(App& app, const FetchJob& job) {
   FetchShared& r = *job.shared;
   DocBuffer* b = find_buf(app, job.buf);
   if (!b || !b->placeholder) return;
+  if (r.download && r.download->phase.load() != xanatoo::DownloadPhase::Skipped) {
+    remove_buffer(app, job.buf);
+    app.downloads_panel_open = true;
+    flash_status(app, "Download: " + r.download->name);
+    return;
+  }
   if (r.doc) cache_page(app, job);
   if (!r.doc && r.input_status != 0 && r.error.empty())
     r.error = "The page asks for input: " + r.input_meta;
@@ -261,6 +276,13 @@ void finish_tab(App& app, const FetchJob& job) {
 void finish_navigate(App& app, const FetchJob& job) {
   FetchShared& r = *job.shared;
   const std::string service = r.service;
+  if (r.download && r.download->phase.load() != xanatoo::DownloadPhase::Skipped) {
+    app.panes[job.pane].nav.pending_link = {};
+    app.panes[job.pane].nav.restoring = -1;
+    app.downloads_panel_open = true;
+    flash_status(app, "Download: " + r.download->name);
+    return;  // keep the page visible; no navigation to a binary file
+  }
   if (r.input_status != 0) {
     app.panes[job.pane].nav.pending_link = {};
     app.panes[job.pane].nav.restoring = -1;
@@ -420,19 +442,32 @@ uint64_t start_fetch(App& app, FetchPurpose purpose, int pane,
   job.buf = tab_buf;
   job.started = xanatoo::sdl::ticks();
   job.shared = std::make_shared<FetchShared>();
+  if (purpose != FetchPurpose::Preview) {
+    job.shared->download = std::make_shared<xanatoo::DownloadProgress>();
+    job.shared->download->url = url;
+    app.downloads.push_back(job.shared->download);
+  }
   // There is no pthread runtime in the initial browser build. Its network
   // services are disabled, so resolve unsupported fetches synchronously.
 #ifdef __EMSCRIPTEN__
-  fetch_page(url, job.shared);
+  fetch_page(url, job.shared, purpose != FetchPurpose::Preview);
 #else
   // Detached: a cancelled job just finishes into its (orphaned) shared state.
-  std::thread(fetch_page, url, job.shared).detach();
+  std::thread(fetch_page, url, job.shared,
+              purpose != FetchPurpose::Preview).detach();
 #endif
   app.fetches.push_back(std::move(job));
   return app.fetches.back().id;
 }
 
 void poll_fetches(App& app) {
+  for (const auto& d : app.downloads)
+    if (d->phase.load(std::memory_order_acquire) !=
+            xanatoo::DownloadPhase::Pending &&
+        d->phase.load(std::memory_order_acquire) !=
+            xanatoo::DownloadPhase::Skipped &&
+        !d->announced.exchange(true))
+      app.downloads_panel_open = true;
   // Collect first: finishing a job can start or cancel others.
   std::vector<FetchJob> done;
   for (auto it = app.fetches.begin(); it != app.fetches.end();) {
@@ -444,6 +479,9 @@ void poll_fetches(App& app) {
     }
   }
   for (FetchJob& job : done) {
+    if (job.shared->download && job.shared->download->phase.load() ==
+                                    xanatoo::DownloadPhase::Pending)
+      job.shared->download->phase.store(xanatoo::DownloadPhase::Skipped);
     if (job.purpose == FetchPurpose::Navigate) {
       finish_navigate(app, job);
     } else if (job.purpose == FetchPurpose::Tab) {
@@ -458,6 +496,28 @@ void poll_fetches(App& app) {
                                 job.shared->error);
       }
     }
+  }
+  app.downloads.erase(std::remove_if(app.downloads.begin(), app.downloads.end(),
+      [](const auto& d) {
+        return d->phase.load(std::memory_order_acquire) ==
+               xanatoo::DownloadPhase::Skipped;
+      }), app.downloads.end());
+  bool save_history = false;
+  for (const auto& d : app.downloads)
+    if (d->phase.load(std::memory_order_acquire) ==
+            xanatoo::DownloadPhase::Complete && !d->recorded.exchange(true))
+      save_history = true;
+  if (save_history) save_download_history(app);
+  // Keep a bounded in-session list without losing active transfers.
+  for (auto it = app.downloads.begin();
+       app.downloads.size() > 200 && it != app.downloads.end();) {
+    const auto phase = (*it)->phase.load(std::memory_order_acquire);
+    if (phase == xanatoo::DownloadPhase::Complete ||
+        phase == xanatoo::DownloadPhase::Failed ||
+        phase == xanatoo::DownloadPhase::Cancelled)
+      it = app.downloads.erase(it);
+    else
+      ++it;
   }
 }
 

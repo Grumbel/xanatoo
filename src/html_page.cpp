@@ -131,19 +131,18 @@ bool path_uses_html(std::string_view path) {
 
 bool is_web_url(std::string_view s) {
   if (!is_remote(s)) return false;
-  // Path without query / fragment, for the extension test.
+  // Raster images still go to the image viewer. Other URLs must reach the
+  // web fetcher so the *response* MIME (or Content-Disposition) can decide
+  // between rendering and downloading, even for .pdf/.zip/... links.
   size_t host = s.find("://") + 3;
   size_t slash = s.find('/', host);
   if (slash == std::string_view::npos) return true;
   std::string_view path = s.substr(slash);
   path = path.substr(0, path.find_first_of("?#"));
-  static constexpr std::array<std::string_view, 40> kDownloads = {
-      ".pdf",  ".zip",  ".gz",   ".tgz",  ".xz",   ".bz2",  ".7z",   ".rar",
-      ".tar",  ".exe",  ".dmg",  ".iso",  ".apk",  ".deb",  ".rpm",  ".msi",
-      ".mp3",  ".mp4",  ".m4a",  ".ogg",  ".opus", ".flac", ".wav",  ".webm",
-      ".mkv",  ".avi",  ".mov",  ".png",  ".jpg",  ".jpeg", ".gif",  ".webp",
-      ".svg",  ".ico",  ".bmp",  ".tiff", ".docx", ".xlsx", ".pptx", ".odt"};
-  for (std::string_view ext : kDownloads)
+  static constexpr std::array<std::string_view, 9> kImages = {
+      ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg",
+      ".ico", ".bmp", ".tiff"};
+  for (std::string_view ext : kImages)
     if (path_ends_with_ci(path, ext)) return false;
   return true;
 }
@@ -298,31 +297,95 @@ std::string http_status_line(int status) {
 
 std::optional<Document> web_fetch(std::string_view url_in, std::string* err,
                                   std::string* final_url, int* http_status,
-                                  std::string* raw_source) {
+                                  std::string* raw_source,
+                                  DownloadProgress* download) {
   static const std::string kUserAgent =
       std::string("Mozilla/5.0 (compatible; xanatoo/") + version_string() +
       "; +https://github.com/Grumbel/xanatoo)";
   std::string url(url_in.substr(0, url_in.find('#')));
   std::cerr << "Web: GET " << url << "\n";
   std::string fin;
-  auto resp = https_get_follow(url, kUserAgent, err, &fin);
-  if (!resp) return std::nullopt;
+  HttpStreamHeaders headers;
+  std::string body_bytes;
+  DownloadFile file;
+  bool downloading = false;
+  const bool ok = https_get_follow_stream(url, kUserAgent,
+      [&](const HttpStreamHeaders& h) {
+        headers = h;
+        if (h.status == 200 && !download &&
+            download_response(url, h.content_type, h.content_disposition)) {
+          if (err) *err = "preview unavailable for " + h.content_type;
+          return false;
+        }
+        downloading = h.status == 200 && download &&
+            download_response(url, h.content_type, h.content_disposition);
+        if (!downloading) return true;
+        const std::string name = download_filename(url, h.content_disposition);
+        download->name = name;
+        download->mime = h.content_type;
+        if (!file.begin(name, err)) return false;
+        download->total.store(h.content_length, std::memory_order_relaxed);
+        download->phase.store(DownloadPhase::Active, std::memory_order_release);
+        return true;
+      },
+      [&](std::string_view bytes) {
+        if (download && download->cancel.load(std::memory_order_relaxed)) {
+          if (err) *err = "download cancelled";
+          return false;
+        }
+        if (downloading) {
+          if (!file.append(bytes, err)) return false;
+          download->received.fetch_add(bytes.size(), std::memory_order_relaxed);
+        } else {
+          if (body_bytes.size() + bytes.size() > 12 * 1024 * 1024) {
+            if (err) *err = "page exceeds 12 MiB text limit";
+            return false;
+          }
+          body_bytes.append(bytes);
+        }
+        return true;
+      }, err, &fin);
+  if (!ok) {
+    if (download && downloading) {
+      download->error = err ? *err : "download failed";
+      download->phase.store(
+          download->cancel.load(std::memory_order_relaxed)
+              ? DownloadPhase::Cancelled : DownloadPhase::Failed,
+          std::memory_order_release);
+    }
+    return std::nullopt;
+  }
   if (final_url) *final_url = fin;
-  const bool failed = resp->status != 200;
-  if (http_status) *http_status = resp->status;
+  if (downloading) {
+    if (download->cancel.load(std::memory_order_relaxed) ||
+        !file.finish(err)) {
+      download->error = err ? *err : "download cancelled";
+      download->phase.store(
+          download->cancel.load(std::memory_order_relaxed)
+              ? DownloadPhase::Cancelled : DownloadPhase::Failed,
+          std::memory_order_release);
+    } else {
+      download->path = file.path();
+      download->final_name = file.filename();
+      download->phase.store(DownloadPhase::Complete, std::memory_order_release);
+    }
+    return std::nullopt; // download, not a displayable document
+  }
+  const bool failed = headers.status != 200;
+  if (http_status) *http_status = failed ? headers.status : 0;
   if (failed) {
-    if (err) *err = http_status_line(resp->status);
+    if (err) *err = http_status_line(headers.status);
     // 4xx / 5xx pages are content too (a site's own 404 page); anything
     // else without a usable body is just an error.
-    if (resp->status < 400 || resp->status > 599) return std::nullopt;
+    if (headers.status < 400 || headers.status > 599) return std::nullopt;
   }
-  std::string type = ascii_lower(resp->content_type);
+  std::string type = ascii_lower(headers.content_type);
   type = type.substr(0, type.find(';'));
   std::string_view tv = type;
   trim_ascii(tv);
   type = std::string(tv);
-  const std::string charset = detect_charset(resp->content_type, resp->body);
-  std::string body = to_utf8(std::move(resp->body), charset);
+  const std::string charset = detect_charset(headers.content_type, body_bytes);
+  std::string body = to_utf8(std::move(body_bytes), charset);
   if (raw_source) *raw_source = body;  // decoded text, before semantic parsing
 
   if (!failed && looks_like_feed(body)) return parse_feed(body, fin, err);

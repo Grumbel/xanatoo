@@ -9,6 +9,7 @@
 // scripts, no layout — a reader, not a browser.
 
 #include "xanatoo/types.hpp"
+#include "xanatoo/download.hpp"
 
 #include <optional>
 #include <string>
@@ -19,8 +20,8 @@ namespace xanatoo {
 // .html / .htm / .xhtml
 bool path_uses_html(std::string_view path);
 
-// http(s) URL that is worth fetching as a page: not an obvious download
-// (.pdf, .zip, images, audio, video, …), which stays with the system browser.
+// http(s) URL to fetch in-app; unsupported response types become downloads.
+// Recognized image URLs continue through the external/image-viewer route.
 bool is_web_url(std::string_view s);
 
 // "external:https://…" links open in the system browser.
@@ -53,7 +54,8 @@ std::string http_status_line(int status);
 std::optional<Document> web_fetch(std::string_view url, std::string* err,
                                   std::string* final_url = nullptr,
                                   int* http_status = nullptr,
-                                  std::string* raw_source = nullptr);
+                                  std::string* raw_source = nullptr,
+                                  DownloadProgress* download = nullptr);
 #endif
 
 }  // namespace xanatoo

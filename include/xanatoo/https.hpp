@@ -3,6 +3,8 @@
 #pragma once
 
 #include <optional>
+#include <functional>
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -17,6 +19,25 @@ struct HttpResult {
   std::string location;
   std::string content_type;
 };
+
+// Streaming GET for large responses. Headers are delivered before any body
+// bytes; on_body receives decoded transfer chunks, without buffering the
+// entire file. Returning false from either callback aborts the transfer.
+struct HttpStreamHeaders {
+  int status = 0;
+  std::string location;
+  std::string content_type;
+  std::string content_disposition;
+  int64_t content_length = -1; // unknown, e.g. chunked
+};
+using HttpHeaderCallback = std::function<bool(const HttpStreamHeaders&)>;
+using HttpBodyCallback = std::function<bool(std::string_view)>;
+
+bool https_get_follow_stream(std::string_view url, std::string_view user_agent,
+                             const HttpHeaderCallback& on_headers,
+                             const HttpBodyCallback& on_body,
+                             std::string* err = nullptr,
+                             std::string* final_url = nullptr);
 
 // HTTP/1.1 request over TLS. `extra_headers` are full header lines ending
 // with "\r\n" (e.g. "Authorization: Bearer …\r\n"). `body` is optional

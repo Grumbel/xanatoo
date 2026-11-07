@@ -6,7 +6,22 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **291** (this delivery is **290**)
+Next bundle number: **292** (this delivery is **291**)
+
+## Status (2026-11-07) — MIME-based web downloads
+
+- Send non-renderable HTTPS responses and `Content-Disposition: attachment`
+  into a streaming download rather than an error page or external browser.
+  Page navigation stays where it was. Hover previews never write files.
+- Added a dockable Downloads panel with bytes/progress, cancel, completion,
+  failed transfer status, saved file path and containing-folder action; a
+  toolbar button opens it without navigating away.
+- Save temporary partial files in the user's Downloads directory, atomically
+  avoiding existing filenames. Filename/MIME rules and non-overwrite handling
+  have standalone checks. Completed files are remembered in the state dir;
+  full GUI build still needs SDL/FreeType headers.
+- Open questions: resumable transfers, TLS certificate verification,
+  broader direct image/viewable-media support.
 
 ## Status (2026-11-07) — Forced-wrap overflow after ordinary text
 

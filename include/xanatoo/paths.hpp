@@ -52,6 +52,9 @@ std::string config_dir();
 std::string state_dir();
 std::string user_data_dir();
 std::string cache_dir();
+// User-visible downloads: XDG user-dirs on Linux, Downloads in the home
+// directory, or a persistent app-data subdirectory on portable/mobile builds.
+std::string downloads_dir();
 
 // Create a directory before the first write into it. False, with an error
 // naming the path on stderr, when that fails.

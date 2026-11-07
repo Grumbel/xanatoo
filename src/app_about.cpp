@@ -67,7 +67,8 @@ AboutSection services() {
                              "document model. Every one is read-only.",
                  {}};
   s.items.push_back({"Web pages", XANATOO_WEB,
-                     "any other http(s) page as a reader view",
+                     "http(s) reader view; unsupported MIME types and "
+                     "attachments stream to the Downloads panel",
                      "https://example.org/", "`-DXANATOO_WEB=ON`"});
   s.items.push_back({"Site maps", XANATOO_WEB,
                      "`sitemap:host` — a site's structure from its XML "

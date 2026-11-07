@@ -58,7 +58,7 @@ void apply_ui_scale(App& app) {
   app.body_px = static_cast<int>(std::lround(app.body_px * ratio));
   app.heading_px = static_cast<int>(std::lround(app.heading_px * ratio));
   for (FloatWindow* w : {&app.help, &app.bl, &app.ol, &app.sm, &app.pg,
-                         &app.history_win, &app.styles_win}) {
+                         &app.history_win, &app.styles_win, &app.downloads_win}) {
     w->x = static_cast<int>(std::lround(w->x * ratio));
     w->y = static_cast<int>(std::lround(w->y * ratio));
     w->w = static_cast<int>(std::lround(w->w * ratio));

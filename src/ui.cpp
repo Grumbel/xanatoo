@@ -241,6 +241,7 @@ const char* menu_icon_for(UiCommand command) {
     case UiCommand::GoUp: return "up";
     case UiCommand::GoHome: return "home";
     case UiCommand::ToggleHistory: return "history";
+    case UiCommand::ToggleDownloads: return "downloads";
     case UiCommand::ToggleOutline: return "outline";
     case UiCommand::ToggleStructure: return "structure";
     case UiCommand::ToggleDiff: return "diff";
@@ -392,7 +393,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
       "strike", "cite", "h1", "h2", "h3", "para", "task", "table",
       "figure", "note", "replace", "outline", "paste", "copy", "new", "open",
       "zoomin", "zoomout", "structure", "diff",
-      "back", "forward", "up", "home", "reload", "stop", "bookmark", "history", "browse", "native", "reader", "sitemap",
+      "back", "forward", "up", "home", "reload", "stop", "bookmark", "history", "downloads", "browse", "native", "reader", "sitemap",
       "linespacing", "measure", "style",
       "format", "insert", "view", "lists",
   };
@@ -481,7 +482,7 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
     // Text fallback when PNG missing (e.g. icons not rasterized yet).
     static const std::unordered_map<std::string, const char*> kShort = {
         {"back", "◀"}, {"forward", "▶"}, {"reload", "↻"}, {"stop", "✕"}, {"bookmark", "★"},
-        {"history", "Hist"}, {"browse", "Browse"}, {"native", "Native"},
+        {"history", "Hist"}, {"downloads", "DL"}, {"browse", "Browse"}, {"native", "Native"},
         {"reader", "Reader"},
         {"linespacing", "≡↕"}, {"measure", "▣|"},
         {"format", "Aa▾"},
@@ -1178,6 +1179,16 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       if (state.history_open) ImGui::PopStyleColor(2);
     }
     {
+      if (state.downloads_open) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                              ImVec4(0.4f, 0.5f, 0.75f, 1.f));
+      }
+      tool_button("tb_downloads", "downloads", "Downloads",
+                  UiCommand::ToggleDownloads, cmd);
+      if (state.downloads_open) ImGui::PopStyleColor(2);
+    }
+    {
       if (state.browse) {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.55f, 0.4f, 1.f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
@@ -1778,6 +1789,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::TogglePage;
       if (ImGui::MenuItem("History", "Ctrl+Shift+H", state.history_open))
         cmd = UiCommand::ToggleHistory;
+      if (ImGui::MenuItem("Downloads", nullptr, state.downloads_open))
+        cmd = UiCommand::ToggleDownloads;
       if (ImGui::MenuItem("Style Sheets", nullptr, state.styles_open))
         cmd = UiCommand::ToggleStylesPanel;
       ImGui::EndMenu();

@@ -37,14 +37,15 @@ struct PanelRef {
   bool open;
 };
 
-std::array<PanelRef, 7> panels(App& app) {
+std::array<PanelRef, 8> panels(App& app) {
   return {{{"help", &app.help, app.help_mode},
            {"outline", &app.ol, app.outline_mode},
            {"backlinks", &app.bl, app.backlinks_mode},
            {"sitemap", &app.sm, app.sitemap.shown},
            {"page", &app.pg, app.page.shown},
            {"history", &app.history_win, app.history_panel_open},
-           {"styles", &app.styles_win, app.styles_panel_open}}};
+           {"styles", &app.styles_win, app.styles_panel_open},
+           {"downloads", &app.downloads_win, app.downloads_panel_open}}};
 }
 
 int unscale(const App& app, int v) {
@@ -305,6 +306,8 @@ void restore_session(App& app) {
       app.history_panel_open = true;
     if (get("styles.open") && *get("styles.open") == "1")
       app.styles_panel_open = true;
+    if (get("downloads.open") && *get("downloads.open") == "1")
+      app.downloads_panel_open = true;
     app.needs_layout = true;
     std::cerr << "session: restored from " << path << "\n";
   } catch (...) {

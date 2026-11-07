@@ -9,6 +9,7 @@
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/html_min.hpp"
 #include "xanatoo/html_page.hpp"
+#include "xanatoo/download.hpp"
 #include "xanatoo/table_grid.hpp"
 #include "xanatoo/native.hpp"
 #include "xanatoo/nav_history.hpp"
@@ -1759,6 +1760,84 @@ void test_layout_forced_wrap_after_regular_text() {
       }
     }
   }
+}
+
+void test_download_mime_and_filenames() {
+  using namespace xanatoo;
+  EXPECT(!download_response("https://example.org/file.pdf", "text/html; charset=utf-8", ""));
+  EXPECT(!download_response("https://example.org/", "application/json", ""));
+  EXPECT(!download_response("https://example.org/feed", "application/rss+xml", ""));
+  EXPECT(!download_response("https://example.org/file.txt", "text/plain", ""));
+  EXPECT(download_response("https://example.org/file.pdf", "application/pdf", ""));
+  EXPECT(download_response("https://example.org/get?id=1", "application/octet-stream", ""));
+  EXPECT(download_response("https://example.org/file.zip", "", ""));
+  EXPECT(download_response("https://example.org/file.txt", "text/plain",
+                           "attachment; filename=readme.txt"));
+  EXPECT_EQ(download_filename("https://example.org/files/archive%20one.zip", ""),
+            "archive one.zip");
+  EXPECT_EQ(download_filename("https://example.org/file",
+                              "attachment; filename=other.zip"), "other.zip");
+  EXPECT_EQ(download_filename("https://example.org/file",
+                              "attachment; filename*=UTF-8''r%C3%A9sum%C3%A9.pdf"),
+            "r\xC3\xA9sum\xC3\xA9.pdf");
+  EXPECT_EQ(download_filename("https://example.org/file",
+                              "attachment; filename=\"../../evil\\file.exe\""),
+            "_.._evilfile.exe");
+  EXPECT_EQ(download_filename("https://example.org/", ""), "download");
+}
+
+void test_download_file_safety() {
+  using namespace xanatoo;
+  namespace fs = std::filesystem;
+  fs::path dir;
+  for (int n = 0; n < 100; ++n) {
+    const fs::path candidate = fs::temp_directory_path() /
+        ("xanatoo-download-test-" + std::to_string(process_id()) + "-" +
+         std::to_string(n));
+    if (fs::create_directory(candidate)) {
+      dir = candidate;
+      break;
+    }
+  }
+  EXPECT(!dir.empty());
+  if (dir.empty()) return;
+  const char* previous = std::getenv("XDG_DOWNLOAD_DIR");
+  const std::string saved = previous ? previous : "";
+#ifdef _WIN32
+  _putenv_s("XDG_DOWNLOAD_DIR", dir.string().c_str());
+#else
+  setenv("XDG_DOWNLOAD_DIR", dir.string().c_str(), 1);
+#endif
+  { std::ofstream(dir / "example.bin", std::ios::binary) << "original"; }
+  std::string error;
+  {
+    DownloadFile file;
+    EXPECT(file.begin("example.bin", &error));
+    EXPECT(file.append("new payload", &error));
+    EXPECT(file.finish(&error));
+    EXPECT_EQ(fs::path(file.path()).filename().string(), "example (1).bin");
+    std::ifstream old(dir / "example.bin", std::ios::binary);
+    EXPECT_EQ(std::string(std::istreambuf_iterator<char>(old),
+                          std::istreambuf_iterator<char>{}), "original");
+    std::ifstream newer(dir / "example (1).bin", std::ios::binary);
+    EXPECT_EQ(std::string(std::istreambuf_iterator<char>(newer),
+                          std::istreambuf_iterator<char>{}), "new payload");
+  }
+  {
+    DownloadFile partial;
+    EXPECT(partial.begin("unfinished.bin", &error));
+    EXPECT(partial.append("some bytes", &error));
+    partial.abort();
+  }
+  for (const auto& entry : fs::directory_iterator(dir))
+    EXPECT(entry.path().extension() != ".part");
+#ifdef _WIN32
+  _putenv_s("XDG_DOWNLOAD_DIR", previous ? saved.c_str() : "");
+#else
+  if (previous) setenv("XDG_DOWNLOAD_DIR", saved.c_str(), 1);
+  else unsetenv("XDG_DOWNLOAD_DIR");
+#endif
+  fs::remove_all(dir);
 }
 
 
@@ -3586,7 +3665,8 @@ void test_html_page() {
   using namespace xanatoo;
   EXPECT(is_web_url("https://example.org"));
   EXPECT(is_web_url("http://example.org/a/b.html?x=1"));
-  EXPECT(!(is_web_url("https://example.org/paper.PDF")));
+  EXPECT(is_web_url("https://example.org/paper.PDF")); // MIME routes to download
+  EXPECT(is_web_url("https://example.org/archive.zip"));
   EXPECT(!(is_web_url("https://example.org/i.png?w=10")));
   EXPECT(!(is_web_url("gemini://example.org/")));
   EXPECT(path_uses_html("/tmp/A.HTM"));
@@ -4540,6 +4620,8 @@ int main() {
   test_hit_test_wrapped_link();
   test_layout_wrap_respects_max_width();
   test_layout_forced_wrap_after_regular_text();
+  test_download_mime_and_filenames();
+  test_download_file_safety();
   test_layout_margins_and_measure();
   test_layout_reader_mode();
   test_inline_images_and_asides();

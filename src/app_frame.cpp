@@ -248,6 +248,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   }
   ui_state.can_nav_forward = can_nav_step(app, 1);
   ui_state.history_open = app.history_panel_open;
+  ui_state.downloads_open = app.downloads_panel_open;
   ui_state.styles_open = app.styles_panel_open;
   ui_state.bookmarks_open = app.bookmarks_panel_open;
   ui_state.bookmarks = app.bookmarks;
@@ -368,7 +369,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::Quit || c == C::OpenDocument || c == C::OpenUrlBar ||
         c == C::NavigateUrl || c == C::NavBack || c == C::NavForward ||
         c == C::GoHome || c == C::GoUp ||
-        c == C::ToggleHistory || c == C::ToggleBookmarks ||
+        c == C::ToggleHistory || c == C::ToggleDownloads || c == C::ToggleBookmarks ||
         c == C::ToggleStylesPanel ||
         c == C::AddBookmark || c == C::RemoveBookmark ||
         c == C::BookmarkPosition || c == C::NewTab ||
@@ -659,6 +660,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       } else if (app.key_focus == KeyFocus::History) {
         app.key_focus = KeyFocus::Document;
       }
+      break;
+    case C::ToggleDownloads:
+      app.downloads_panel_open = !app.downloads_panel_open;
       break;
     case C::ToggleStylesPanel:
       app.styles_panel_open = !app.styles_panel_open;

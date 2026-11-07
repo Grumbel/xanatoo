@@ -109,6 +109,39 @@ std::string state_dir() { return dir_info(DirKind::State).path; }
 std::string user_data_dir() { return dir_info(DirKind::UserData).path; }
 std::string cache_dir() { return dir_info(DirKind::Cache).path; }
 
+std::string downloads_dir() {
+  if (!g_portable_root.empty() || !g_platform[idx(DirKind::UserData)].empty()) {
+    const std::string user = user_data_dir();
+    return user.empty() ? std::string{} : (fs::path(user) / "downloads").string();
+  }
+  // Respect the XDG user-dirs setting (including the usual $HOME expansion).
+  if (const char* direct = std::getenv("XDG_DOWNLOAD_DIR"); absolute(direct))
+    return direct;
+  if (const char* home = std::getenv("HOME"); absolute(home)) {
+#if !defined(_WIN32)
+    const fs::path conf = fs::path(home) / ".config/user-dirs.dirs";
+    std::ifstream in(conf);
+    std::string line;
+    while (std::getline(in, line)) {
+      if (line.rfind("XDG_DOWNLOAD_DIR=", 0) != 0) continue;
+      std::string value = line.substr(17);
+      if (value.size() >= 2 && value.front() == '"' && value.back() == '"')
+        value = value.substr(1, value.size() - 2);
+      if (value.rfind("$HOME/", 0) == 0)
+        return (fs::path(home) / value.substr(6)).string();
+      if (!value.empty() && fs::path(value).is_absolute()) return value;
+    }
+#endif
+    return (fs::path(home) / "Downloads").string();
+  }
+#ifdef _WIN32
+  if (const char* profile = std::getenv("USERPROFILE"); profile && *profile)
+    return (fs::path(profile) / "Downloads").string();
+#endif
+  const std::string user = user_data_dir();
+  return user.empty() ? std::string{} : (fs::path(user) / "downloads").string();
+}
+
 bool ensure_dir(const std::string& dir) {
   if (dir.empty()) return false;
   std::error_code ec;
