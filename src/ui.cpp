@@ -1354,7 +1354,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
                   state.selection);
       edit_button("tb_italic", "italic", "Italic (Ctrl+I)", UiCommand::Italic,
                   state.selection);
-      edit_button("tb_link", "link", "Link (Ctrl+K)", UiCommand::Link,
+      edit_button("tb_link", "link", "Link (Ctrl+Shift+K)", UiCommand::Link,
                   state.selection);
 
       // More format styles
@@ -1676,7 +1676,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Strikethrough", UiCommand::Strike, cmd, state.selection,
                     "Ctrl+Shift+X");
       menu_item_cmd("Code", UiCommand::Code, cmd, state.selection, "Ctrl+`");
-      menu_item_cmd("Link…", UiCommand::Link, cmd, state.selection, "Ctrl+K");
+      menu_item_cmd("Link…", UiCommand::Link, cmd, state.selection, "Ctrl+Shift+K");
       menu_item_cmd("Citation…", UiCommand::Cite, cmd, state.selection,
                     "Ctrl+Shift+C");
       ImGui::Separator();
@@ -1798,7 +1798,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleSitemap;
       if (ImGui::MenuItem("Page Navigation", "Ctrl+Alt+P", state.page_panel))
         cmd = UiCommand::TogglePage;
-      if (ImGui::MenuItem("Search Bar", "Ctrl+Alt+K", state.searchbar))
+      if (ImGui::MenuItem("Search Bar", "Ctrl+K", state.searchbar))
         cmd = state.searchbar ? UiCommand::ToggleSearchBar
                               : UiCommand::FocusSearchBar;
       if (ImGui::MenuItem("History", "Ctrl+Shift+H", state.history_open))
@@ -1960,7 +1960,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Strikethrough", UiCommand::Strike, cmd, state.selection,
                     "Ctrl+Shift+X");
       menu_item_cmd("Code", UiCommand::Code, cmd, state.selection, "Ctrl+`");
-      menu_item_cmd("Link…", UiCommand::Link, cmd, state.selection, "Ctrl+K");
+      menu_item_cmd("Link…", UiCommand::Link, cmd, state.selection, "Ctrl+Shift+K");
       menu_item_cmd("Citation…", UiCommand::Cite, cmd, state.selection,
                     "Ctrl+Shift+C");
       ImGui::Separator();

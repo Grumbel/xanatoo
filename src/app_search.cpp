@@ -27,7 +27,9 @@ std::string search_engine_id(const App& app) {
 }
 
 void show_search_bar(App& app) {
+  if (!app.search.open) app.needs_layout = true;
   app.search.open = true;
+  close_prompt(app);
   app.ui.focus_search();
 }
 

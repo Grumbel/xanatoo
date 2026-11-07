@@ -90,7 +90,7 @@ AboutSection services() {
                      "profiles over relay WebSockets",
                      "nostr:recent", "`-DXANATOO_NOSTR=ON`"});
   s.items.push_back({"Search", true,
-                     "search bar (Ctrl+Alt+K) and `search:<engine>:<words>` "
+                     "search bar (Ctrl+K) and `search:<engine>:<words>` "
                      "pages over the engines of `search.sexp`; every engine "
                      "is a URL template, so each needs the client that "
                      "reads its results (web, feeds, ebooks)",

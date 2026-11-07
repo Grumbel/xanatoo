@@ -1713,6 +1713,15 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   xanatoo::Document& d = doc_of(app, p);
   app.eat_text_input = false;
 
+  // Bar shortcuts are global, including while another text field owns keys.
+  // Dispatch before prompt and ImGui capture checks so focus can move between bars.
+  const SDL_Keycode key = xanatoo::sdl::keycode(ev);
+  if (ctrl && !alt && !shift && (key == SDLK_k || key == SDLK_l)) {
+    execute_command(app, key == SDLK_k ? UiCommand::FocusSearchBar
+                                       : UiCommand::OpenUrlBar);
+    return;
+  }
+
   // Alt+letter opens the matching top-level menu (Windows/GNOME style).
   // Handled before status-prompt isolation so chrome stays reachable.
   if (alt && !ctrl && !shift) {
@@ -1755,7 +1764,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   // Status prompts own Esc / Backspace / Enter; block document keys so
   // arrows do not move the caret while typing a path or query.
   // Path/URL minibuffer also needs Tab (complete), arrows (cursor /
-  // history), Home/End, Delete, and C-a/e/k/u/w.
+  // history), Home/End, Delete, and C-a/e/u/w.
   const bool status_prompt = prompt_active(app);
   if (status_prompt) {
     const SDL_Keycode k = xanatoo::sdl::keycode(ev);
@@ -1773,7 +1782,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         (minibuf_path &&
          (k == SDLK_TAB || k == SDLK_UP || k == SDLK_DOWN || k == SDLK_LEFT ||
           k == SDLK_RIGHT || k == SDLK_HOME || k == SDLK_END ||
-          (ctrl && (k == SDLK_a || k == SDLK_e || k == SDLK_k || k == SDLK_u ||
+          (ctrl && (k == SDLK_a || k == SDLK_e || k == SDLK_u ||
                     k == SDLK_w))));
     if (!prompt_key) return;
   } else if (imgui_keys && xanatoo::sdl::keycode(ev) != SDLK_ESCAPE &&
@@ -1788,10 +1797,6 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   if (!status_prompt && handle_sitemap_key(app, ev, ctrl, alt)) return;
   if (!status_prompt && handle_page_key(app, ev, ctrl, alt)) return;
   if (!status_prompt && handle_styles_key(app, ev, ctrl, alt)) return;
-  if (!status_prompt && xanatoo::sdl::keycode(ev) == SDLK_k && ctrl && alt) {
-    show_search_bar(app);
-    return;
-  }
 
   // Paged reading, read-only: ← → turn the page like PgUp / PgDn.
   if (!status_prompt && browsing(app) && focused_pane(app).pages.on && !ctrl &&
@@ -1874,9 +1879,6 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       app.minibuf.move_home();
     } else if (k == SDLK_END || (ctrl && k == SDLK_e)) {
       app.minibuf.move_end();
-    } else if (ctrl && k == SDLK_k) {
-      app.minibuf.kill_to_end();
-      minibuf_sync_out(app);
     } else if (ctrl && k == SDLK_u) {
       app.minibuf.kill_line();
       minibuf_sync_out(app);
@@ -2516,7 +2518,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       break;
 
     case SDLK_k:
-      if (ctrl && !p.sel.empty()) {
+      if (ctrl && shift && !alt && !p.sel.empty()) {
         std::string text = xanatoo::selected_text(d, p.sel);
         std::string href = "#" + text;
         edit(app);

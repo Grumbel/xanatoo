@@ -117,7 +117,7 @@ enum class UiCommand {
   ToggleOutline,
   ToggleBacklinks,
   ToggleSitemap,  // site structure panel of the focused web page
-  ToggleSearchBar,    // show / hide the search bar (Ctrl+Alt+K focuses it)
+  ToggleSearchBar,    // show / hide the search bar (Ctrl+K focuses it)
   FocusSearchBar,     // show the search bar and focus its field
   Search,             // search bar committed (arg = what was typed)
   SelectSearchEngine, // arg = engine id (search.hpp)
@@ -364,7 +364,7 @@ private:
   std::string url_synced_from_;  // last doc_label pushed into url_input_
   bool focus_url_bar_ = false;   // Ctrl+L / Open URL menu
   char search_input_[512] = {};  // search bar text (kept between searches)
-  bool focus_search_ = false;    // Ctrl+Alt+K / View → Search Bar
+  bool focus_search_ = false;    // Ctrl+K / View → Search Bar
   bool url_bar_editing_ = false;
   bool wanted_text_input_ = false;  // io.WantTextInput last frame
   // Width of the button group right of the URL field (last frame), so the

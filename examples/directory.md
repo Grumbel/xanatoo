@@ -64,7 +64,7 @@ any page. Patterns that work on many sites:
 
 ## Search
 
-**Ctrl+Alt+K** (View → Search Bar) shows the search bar: pick the engine with
+**Ctrl+K** (View → Search Bar) shows the search bar: pick the engine with
 the button at its left, type, **Enter**. In the location bar (**Ctrl+L**) a
 keyword does the same: `w xanadu`, `ax electron spin`, `se wells`. Results
 are ordinary pages with the address `search:<engine>:<words>`, so Back,

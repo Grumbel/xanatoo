@@ -2,7 +2,7 @@
 
 [← Directory](../directory.md)
 
-**Ctrl+Alt+K** (View → Search Bar) opens the search bar under the toolbar,
+**Ctrl+K** (View → Search Bar) opens the search bar under the toolbar,
 **Esc** closes it. The button at its left picks the engine; the choice is
 remembered. **Ctrl+L** accepts `<keyword> <words>` as well.
 

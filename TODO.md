@@ -8,6 +8,13 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-07) — Search and location shortcuts
+
+- Ctrl+K focuses search, Ctrl+L focuses location, and link creation moved to
+  Ctrl+Shift+K. Bar shortcuts now work across ImGui and prompt focus.
+- Offline unit tests passed. Full application build is blocked in this shell
+  by missing SQLite headers. No CLI bundle.
+
 ## Status (2026-11-07) — Tab strip refresh
 
 - Reserved space for the new-tab button beside the scrolling tab strip,

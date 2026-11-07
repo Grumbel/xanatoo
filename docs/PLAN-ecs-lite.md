@@ -18,7 +18,7 @@ Three independent phases; each ends with a green build, passing
   `xdotool windowfocus $(xdotool search --name xanatoo | head -1)`, send
   keys, `import -window root out.png`). Verify: help (F1), outline
   (Ctrl+Shift+O), backlinks, a pop-out document window, split view
-  (Ctrl+\), prompts (Ctrl+O, Ctrl+Shift+S, Ctrl+F, Ctrl+K).
+  (Ctrl+\), prompts (Ctrl+O, Ctrl+Shift+S, Ctrl+F, Ctrl+Shift+K).
 - Commit trailer: `Co-Authored-By: <the executing model>`.
 - Update `AGENTS.md` (source layout / rules) and `TODO.md` at the end of
   each phase.
