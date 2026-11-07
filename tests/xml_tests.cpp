@@ -3,8 +3,11 @@
 
 #include "xanatoo/parse.hpp"
 
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
+#include <locale>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -187,6 +190,42 @@ void test_escapes_and_dispatch() {
         "first\nsecond \r ", "text newline normalization and numeric CR");
 }
 
+// ArkOS ships GCC 9/libstdc++, which has no floating-point charconv.
+// XML scales must still round-trip without depending on the process locale.
+void test_float_scales() {
+  struct CommaDecimal : std::numpunct<char> {
+    char do_decimal_point() const override { return ','; }
+  };
+  const std::locale previous = std::locale::global(
+    std::locale(std::locale::classic(), new CommaDecimal));
+
+  const float values[] = {
+    0.1f, 1.125f, -0.0f, std::numeric_limits<float>::min(),
+    std::numeric_limits<float>::denorm_min(),
+    std::numeric_limits<float>::max(),
+  };
+  for (float value : values) {
+    Document doc;
+    const NodeId root = doc.create(NodeKind::Document);
+    const NodeId image = doc.create(NodeKind::Image, root);
+    doc.get(image).display_scale = value;
+    const std::string xml = serialize_xml(doc);
+    check(xml.find(',') == std::string::npos, "XML uses a decimal point");
+    const Document parsed = parse_xml(xml);
+    const float roundtrip = parsed.get(parsed.get(parsed.root).children[0]).display_scale;
+    check(roundtrip == value && std::signbit(roundtrip) == std::signbit(value),
+          "float scale round-trips exactly");
+  }
+
+  for (std::string_view value : {"", " 1.2", "1.2 ", "1.2junk",
+                                 "1,2", "nan", "inf", "1e999"}) {
+    rejects([&] { (void)parse_xml("<doc><image scale=\"" +
+                                  std::string(value) + "\"/></doc>"); },
+            "invalid float scale rejected");
+  }
+  std::locale::global(previous);
+}
+
 void test_rejections() {
   const std::vector<std::string> bad = {
       "<?xml version=\"1.0\"?><doc/>",
@@ -235,6 +274,7 @@ int main() {
   test_example();
   test_all_blocks();
   test_escapes_and_dispatch();
+  test_float_scales();
   test_rejections();
   if (failures) {
     std::cerr << failures << " XML tests failed\n";

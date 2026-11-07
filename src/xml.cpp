@@ -6,7 +6,10 @@
 #include <charconv>
 #include <cmath>
 #include <cstdint>
+#include <iomanip>
 #include <limits>
+#include <locale>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -137,11 +140,13 @@ void attr_num(std::string& out, std::string_view name, uint64_t value) {
 std::string float_string(float value) {
   if (!std::isfinite(value))
     throw std::invalid_argument("XML export: non-finite scale");
-  char buffer[64];
-  auto result = std::to_chars(buffer, buffer + sizeof(buffer), value);
-  if (result.ec != std::errc{})
-    throw std::invalid_argument("XML export: invalid scale");
-  return {buffer, result.ptr};
+  // GCC 9's libstdc++ (used by ArkOS/R36S) only implements the integer
+  // charconv overloads. Use the classic locale and enough digits to recover
+  // the exact float, independently of the user's numeric locale.
+  std::ostringstream out;
+  out.imbue(std::locale::classic());
+  out << std::setprecision(std::numeric_limits<float>::max_digits10) << value;
+  return out.str();
 }
 
 const char* block_tag(const Node& n) {
@@ -549,9 +554,11 @@ private:
 
   float scale(std::string_view value) {
     float result = 0.f;
-    auto r = std::from_chars(value.data(), value.data() + value.size(), result);
-    if (value.empty() || r.ec != std::errc{} ||
-        r.ptr != value.data() + value.size() || !std::isfinite(result))
+    std::istringstream in{std::string(value)};
+    in.imbue(std::locale::classic());
+    in >> std::noskipws >> result;
+    if (value.empty() || !in || in.peek() != std::char_traits<char>::eof() ||
+        !std::isfinite(result))
       fail("invalid scale attribute");
     return result;
   }

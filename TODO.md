@@ -6,7 +6,21 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **298** (this delivery is **297**)
+Next bundle number: **299** (this delivery is **298**)
+
+## Status (2026-11-07) — R36S GCC 9 and man-page build fixes
+
+- The supplied `nix flake check` log showed two independent failures:
+  floating-point `std::to_chars` / `std::from_chars` in `src/xml.cpp` are not
+  provided by ArkOS's GCC 9 libstdc++, and `mandoc` warned about two
+  man-page sentences on the same line.
+- XML scale import/export now uses classic-locale C++ streams with
+  `max_digits10` precision, while keeping integral `charconv` unchanged.
+  Added exact round-trip checks for extreme finite floats, comma-decimal
+  locale independence, and malformed/nonfinite scale rejection.
+- Fixed the man-page sentence break. Native SDL2 Debug build, all three
+  CTest suites, and local `groff -mdoc` validation pass. An R36S Nix
+  cross-build and `mandoc` lint remain to be checked on a Nix host.
 
 ## Status (2026-11-07) — Reddit OAuth configuration
 
