@@ -282,11 +282,14 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   }
   ui_state.tab_labels.clear();
   ui_state.tab_ids.clear();
+  ui_state.tab_icons.clear();
   ui_state.active_tab = 0;
   for (int ti = 0; ti < static_cast<int>(app.tab_order.size()); ++ti) {
     const BufferId bi = app.tab_order[static_cast<size_t>(ti)];
     ui_state.tab_labels.push_back(buffer_tab_label(app, bi));
     ui_state.tab_ids.push_back(bi);
+    const DocBuffer* tab_buffer = find_buf(app, bi);
+    ui_state.tab_icons.push_back(tab_buffer ? address_icon(app, tab_buffer->path) : nullptr);
     if (bi == app.panes[app.centre_focus].buf) ui_state.active_tab = ti;
   }
   ui_state.has_floating = !app.soft_wins.empty();

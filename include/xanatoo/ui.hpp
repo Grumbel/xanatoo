@@ -266,6 +266,7 @@ struct UiState {
   // Tab strip (labels left→right); active_tab is index into tab_labels.
   std::vector<std::string> tab_labels;
   std::vector<uint32_t> tab_ids;  // buffer id of each tab (stable ImGui ids)
+  std::vector<SDL_Texture*> tab_icons;
   int active_tab = 0;
   bool has_floating = false;
   std::string status_left;

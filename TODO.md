@@ -8,6 +8,12 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-07) — Tab strip refresh
+
+- Reserved space for the new-tab button beside the scrolling tab strip,
+  refreshed the tab spacing and button, and reused cached site icons on tabs.
+- Changed UI units compiled and 3895 offline checks passed. No CLI bundle.
+
 ## Follow-up (2026-11-07) — Location icon borders
 
 - Hide contextual button borders until toggled and inset the icon group from

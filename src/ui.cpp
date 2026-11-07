@@ -1438,7 +1438,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
 
   // ---- Document tab strip (browser-style) ----
   if (!state.tab_labels.empty()) {
-    const float tab_h = 28.f * scale_;
+    const float tab_h = 32.f * scale_;
     ImGui::SetNextWindowPos(
         ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
     ImGui::SetNextWindowSize(ImVec2(vp->Size.x, tab_h));
@@ -1446,13 +1446,20 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
         ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse;
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4.f, 2.f));
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.f, 0.f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4.f * scale_, 3.f * scale_));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.f * scale_, 0.f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(9.f * scale_, 4.f * scale_));
+    ImGui::PushStyleVar(ImGuiStyleVar_TabRounding, 4.f * scale_);
     if (ImGui::Begin("##tabs", nullptr, tab_flags)) {
       // Dragging reorders; the new order goes back as ReorderTabs. Ids are
       // the buffer ids, so a tab keeps its place when the order changes.
       std::vector<std::pair<ImGuiID, uint32_t>> tab_item_ids;
       const float strip_top = vp->Pos.y + result.top_reserved;
+      const float button_w = 26.f * scale_;
+      const float available = ImGui::GetContentRegionAvail().x;
+      const float tabs_w = std::max(1.f, available - button_w - 4.f * scale_);
+      ImGui::BeginChild("##tab-scroll-area", ImVec2(tabs_w, tab_h - 6.f * scale_), false,
+                        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
       if (ImGui::BeginTabBar("##doctabs",
                              ImGuiTabBarFlags_FittingPolicyScroll |
                                  ImGuiTabBarFlags_Reorderable)) {
@@ -1465,7 +1472,10 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
           if (force_sel && i == state.active_tab)
             flags |= ImGuiTabItemFlags_SetSelected;
           bool open = true;
-          std::string id = state.tab_labels[static_cast<size_t>(i)];
+          SDL_Texture* icon = i < static_cast<int>(state.tab_icons.size())
+                                  ? state.tab_icons[static_cast<size_t>(i)] : nullptr;
+          std::string id = icon ? "    " : "";
+          id += state.tab_labels[static_cast<size_t>(i)];
           const uint32_t bid = i < static_cast<int>(state.tab_ids.size())
                                    ? state.tab_ids[static_cast<size_t>(i)]
                                    : static_cast<uint32_t>(i);
@@ -1473,6 +1483,21 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
           id += std::to_string(bid);
           if (ImGui::BeginTabItem(id.c_str(), &open, flags)) {
             ImGui::EndTabItem();
+          }
+          if (icon) {
+            const ImVec2 min = ImGui::GetItemRectMin();
+            const ImVec2 max = ImGui::GetItemRectMax();
+            const float side = 16.f * scale_;
+            const ImVec2 size = icon_size(icon, side);
+            const float x = min.x + 8.f * scale_ + (side - size.x) * 0.5f;
+            const float y = min.y + (max.y - min.y - size.y) * 0.5f;
+            ImDrawList* draw = ImGui::GetWindowDrawList();
+            ImGuiTabBar* bar = ImGui::GetCurrentTabBar();
+            draw->PushClipRect(ImVec2(bar->ScrollingRectMinX, min.y),
+                               ImVec2(bar->ScrollingRectMaxX, max.y), true);
+            draw->AddImage(reinterpret_cast<ImTextureID>(icon), ImVec2(x, y),
+                           ImVec2(x + size.x, y + size.y));
+            draw->PopClipRect();
           }
           tab_item_ids.emplace_back(ImGui::GetItemID(), bid);
           // Dragged well above / below the strip: a tear-off on release.
@@ -1528,6 +1553,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
           tab_force_select_ = true;
         }
       }
+      ImGui::EndChild();
       if (tab_tear_id_ != 0 && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
         const ImVec2 mp = ImGui::GetMousePos();
         cmd = UiCommand::TearTab;
@@ -1539,11 +1565,16 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         tab_tear_id_ = 0;
       }
       ImGui::SameLine();
-      if (ImGui::SmallButton("+")) cmd = UiCommand::NewTab;
+      const int button_colors = push_toolbar_button_style();
+      if (ImGui::Button("+##new-tab", ImVec2(button_w, tab_h - 6.f * scale_)))
+        cmd = UiCommand::NewTab;
+      draw_toolbar_button_bevel();
       if (ImGui::IsItemHovered()) ImGui::SetTooltip("New tab (Ctrl+T)");
+      ImGui::PopStyleVar(2);
+      ImGui::PopStyleColor(button_colors);
     }
     ImGui::End();
-    ImGui::PopStyleVar(2);
+    ImGui::PopStyleVar(4);
     result.top_reserved += tab_h;
   }
 }
