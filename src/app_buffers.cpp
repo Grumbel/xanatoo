@@ -183,8 +183,10 @@ bool is_foreign_path(std::string_view path) {
 }
 
 bool focused_read_only(App& app) {
-  const DocBuffer* b = find_buf(app, focused_pane(app).buf);
-  return b && (is_foreign_path(b->path) ||
+  const Pane& p = focused_pane(app);
+  const DocBuffer* b = find_buf(app, p.buf);
+  return b && ((p.source_buf == p.buf && p.source_doc.has_value()) ||
+               is_foreign_path(b->path) ||
                app.invalid_xml_paths.contains(b->path));
 }
 
@@ -331,7 +333,10 @@ void update_title(App& app) {
   SDL_SetWindowTitle(app.window, title.c_str());
 }
 
-xanatoo::Document& doc_of(App& app, Pane& p) { return buf(app, p.buf).doc; }
+xanatoo::Document& doc_of(App& app, Pane& p) {
+  if (p.source_buf == p.buf && p.source_doc) return *p.source_doc;
+  return buf(app, p.buf).doc;
+}
 
 std::string& path_of(App& app, Pane& p) { return buf(app, p.buf).path; }
 

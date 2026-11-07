@@ -148,6 +148,7 @@ add_executable(xanatoo
   src/render.cpp
   src/parse.cpp
   src/xml.cpp
+  src/source_view.cpp
   src/org.cpp
   src/editor.cpp
   src/images.cpp
@@ -498,6 +499,7 @@ add_executable(xanatoo_tests
   src/document.cpp
   src/parse.cpp
   src/xml.cpp
+  src/source_view.cpp
   src/org.cpp
   src/editor.cpp
   src/reddit.cpp

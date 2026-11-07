@@ -7,11 +7,16 @@
 
 #include "xanatoo/app.hpp"
 #include "xanatoo/parse.hpp"
+#include "xanatoo/source_view.hpp"
 #include "xanatoo/util.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <ctime>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <stdexcept>
 
 namespace xanatoo::app {
 
@@ -143,11 +148,46 @@ std::string today() {
   return buf;
 }
 
+std::optional<xanatoo::SelectorKind> source_pipe(const xanatoo::Locator& loc) {
+  for (const auto& pipe : loc.pipes)
+    if (xanatoo::is_source_pipe(pipe.kind)) return pipe.kind;
+  return std::nullopt;
+}
+
+std::optional<std::string> raw_source_of(const DocBuffer& b) {
+  if (b.raw_source) return b.raw_source;
+  // A local file's raw view reflects the bytes currently on disk, not the
+  // document's possibly edited semantic tree. For fetched pages, use the
+  // saved response body instead of making a second network request.
+  std::error_code ec;
+  if (!std::filesystem::is_regular_file(b.path, ec)) return std::nullopt;
+  std::ifstream in(b.path, std::ios::binary);
+  if (!in) return std::nullopt;
+  return std::string(std::istreambuf_iterator<char>(in),
+                     std::istreambuf_iterator<char>());
+}
+
+xanatoo::Document build_source_view(const DocBuffer& b,
+                                   xanatoo::SelectorKind kind) {
+  std::optional<std::string> raw;
+  if (kind == xanatoo::SelectorKind::SourceRaw) raw = raw_source_of(b);
+  try {
+    return xanatoo::source_view_document(xanatoo::source_view_text(
+        b.doc, kind, raw ? std::optional<std::string_view>(*raw)
+                         : std::nullopt));
+  } catch (const std::invalid_argument& e) {
+    return xanatoo::source_view_document(
+        {"Could not produce source view:\n" + std::string(e.what()) + "\n", "text"});
+  }
+}
+
 }  // namespace
 
 void reset_pane_locator(Pane& p) {
   p.locator = {};
   p.locator_buf = kNoBuffer;
+  p.source_doc.reset();
+  p.source_buf = kNoBuffer;
   p.cut = xanatoo::INVALID_NODE;
   p.marks.clear();
   p.section_focus = false;
@@ -172,7 +212,42 @@ std::string pane_address(App& app, Pane& p) {
 
 void apply_locator(App& app, int pi, xanatoo::Locator loc) {
   Pane& p = app.panes[pi];
-  xanatoo::Document& d = doc_of(app, p);
+  // Source views replace the presentation, not the underlying document.
+  if (const auto source = source_pipe(loc)) {
+    if (loc.pipes.size() != 1 || loc.point) {
+      flash_status(app, "Source pipes currently stand alone (no other selectors)");
+      loc.pipes = {{*source, {}}};
+      loc.point.reset();
+    }
+    p.source_doc = build_source_view(buf(app, p.buf), *source);
+    p.source_buf = p.buf;
+    loc.base.clear();
+    p.locator = std::move(loc);
+    p.locator_buf = p.buf;
+    p.cut = xanatoo::INVALID_NODE;
+    p.marks.clear();
+    p.section_focus = false;
+    p.sel = {};
+    xanatoo::ensure_valid_caret(*p.source_doc, p.sel.focus);
+    p.sel.anchor = p.sel.focus;
+    p.scroll_y = 0.f;
+    p.view_anchor.reset();
+    p.layout = {};
+    drop_height_hints_for_buf(app, p.buf);
+    app.needs_layout = true;
+    return;
+  }
+  const bool was_source = p.source_buf == p.buf && p.source_doc.has_value();
+  if (was_source) {
+    p.source_doc.reset();
+    p.source_buf = kNoBuffer;
+    p.sel = {};
+    p.scroll_y = 0.f;
+    p.view_anchor.reset();
+    p.layout = {};
+    drop_height_hints_for_buf(app, p.buf);
+  }
+  xanatoo::Document& d = buf(app, p.buf).doc;
   const xanatoo::NodeId old_cut = pane_cut(app, p);
   std::string lost;
   const Resolved r = resolve_locator(d, loc, lost);
@@ -222,7 +297,9 @@ void apply_locator(App& app, int pi, xanatoo::Locator loc) {
 }
 
 void set_pane_cut(App& app, Pane& p, xanatoo::NodeId node) {
-  if (pane_cut(app, p) == node) return;
+  if (pane_cut(app, p) == node && !p.source_doc) return;
+  p.source_doc.reset();
+  p.source_buf = kNoBuffer;
   p.marks.clear();
   p.locator = {};
   p.cut = node;
@@ -242,8 +319,20 @@ void clear_pane_point(App& app, Pane& p) {
 
 void refresh_pane_locator(App& app, Pane& p) {
   if (!locator_live(p)) return;
+  if (const auto source = source_pipe(p.locator)) {
+    p.source_doc = build_source_view(buf(app, p.buf), *source);
+    p.source_buf = p.buf;
+    p.cut = xanatoo::INVALID_NODE;
+    p.marks.clear();
+    p.sel = {};
+    xanatoo::ensure_valid_caret(*p.source_doc, p.sel.focus);
+    p.sel.anchor = p.sel.focus;
+    p.layout = {};
+    app.needs_layout = true;
+    return;
+  }
   std::string lost;
-  const Resolved r = resolve_locator(doc_of(app, p), p.locator, lost);
+  const Resolved r = resolve_locator(buf(app, p.buf).doc, p.locator, lost);
   if (!lost.empty()) flash_status(app, "Passage not found: " + lost);
   p.cut = r.cut;
   set_marks(p, r);

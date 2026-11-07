@@ -51,6 +51,7 @@ void fetch_gemini(const std::string& url, FetchShared& out) {
     out.error = "status " + std::to_string(resp->status) + " " + resp->meta;
     return;
   }
+  out.raw_source = resp->body;
   std::string mime = resp->meta;
   for (char& c : mime)
     c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
@@ -153,8 +154,10 @@ void fetch_page(std::string url, std::shared_ptr<FetchShared> out) {
   } else if (xanatoo::is_web_url(url)) {
 #if defined(XANATOO_WEB) && XANATOO_WEB
     out->service = "Web";
+    std::string body;
     out->doc = xanatoo::web_fetch(url, &out->error, &out->final_url,
-                                  &out->http_status);
+                                  &out->http_status, &body);
+    if (out->doc) out->raw_source = std::move(body);
 #endif
   }
   if (!out->doc && out->error.empty()) out->error = "no client for " + url;
@@ -189,6 +192,7 @@ void cache_page(App& app, const FetchJob& job) {
                          [&](const CachedPage& e) { return e.url == job.url; }),
           c.end());
   c.push_back({job.url, job.shared->final_url, *job.shared->doc,
+               job.shared->raw_source,
                xanatoo::sdl::ticks()});
   if (c.size() > kPageCacheMax) c.erase(c.begin());
 }
@@ -235,6 +239,7 @@ void finish_tab(App& app, const FetchJob& job) {
   if (!r.doc && r.input_status != 0 && r.error.empty())
     r.error = "The page asks for input: " + r.input_meta;
   b->doc = r.doc ? std::move(*r.doc) : load_error_doc(job);
+  b->raw_source = std::move(r.raw_source);
   b->path = r.doc ? r.final_url : job.url;
   b->placeholder = false;
   b->dirty = false;
@@ -284,7 +289,8 @@ void finish_navigate(App& app, const FetchJob& job) {
   } else {
     cache_page(app, job);
   }
-  show_doc_in_pane(app, job.pane, std::move(*r.doc), r.final_url);
+  show_doc_in_pane(app, job.pane, std::move(*r.doc), r.final_url,
+                   std::move(r.raw_source));
   // Redirected: the sitemap lists the requested URL.
   if (job.url != r.final_url)
     note_page_seen(app, job.url, buf(app, app.panes[job.pane].buf).doc);

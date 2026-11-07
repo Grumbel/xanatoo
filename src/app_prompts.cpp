@@ -332,7 +332,7 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
         }
         std::string text;
         try {
-          text = xanatoo::serialize_document(d, target);
+          text = xanatoo::serialize_document(buf(app, p.buf).doc, target);
         } catch (const std::invalid_argument& e) {
           std::cerr << "Cannot save " << target << ": " << e.what() << "\n";
           flash_status(app, e.what());

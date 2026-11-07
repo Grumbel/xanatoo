@@ -52,7 +52,8 @@ std::string http_status_line(int status);
 // `http_status`, so the caller can show it under an error banner.
 std::optional<Document> web_fetch(std::string_view url, std::string* err,
                                   std::string* final_url = nullptr,
-                                  int* http_status = nullptr);
+                                  int* http_status = nullptr,
+                                  std::string* raw_source = nullptr);
 #endif
 
 }  // namespace xanatoo

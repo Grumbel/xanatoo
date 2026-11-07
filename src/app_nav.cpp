@@ -262,12 +262,14 @@ static BufferId page_buffer(App& app, int pi) {
 }
 
 void show_doc_in_pane(App& app, int pi, xanatoo::Document doc,
-                      const std::string& label) {
+                      const std::string& label,
+                      std::optional<std::string> raw_source) {
   Pane& p = app.panes[pi];
   p.buf = page_buffer(app, pi);
   DocBuffer& b = buf(app, p.buf);
   b.doc = std::move(doc);
   b.path = label;
+  b.raw_source = std::move(raw_source);
   b.dirty = false;
   b.placeholder = false;
   attach_draft(app, p.buf);
@@ -338,6 +340,7 @@ void open_link_in_tab(App& app, int pi, const std::string& href) {
       }
       if (const CachedPage* c = find_cached_page(app, t.url)) {
         bi = add_buffer(app, c->doc, c->final_url);
+        buf(app, bi).raw_source = c->raw_source;
         break;
       }
       bi = add_buffer(
@@ -497,7 +500,7 @@ static bool open_page(App& app, int pi, std::string target,
       if (const CachedPage* c = find_cached_page(app, target)) {
         // Fresh from a hover preview: no second fetch.
         const std::string final_url = c->final_url;
-        show_doc_in_pane(app, pi, c->doc, final_url);
+        show_doc_in_pane(app, pi, c->doc, final_url, c->raw_source);
         if (xanatoo::is_gemini_url(final_url)) {
           app.gemini_current_url = final_url;
           app.browse_mode = true;

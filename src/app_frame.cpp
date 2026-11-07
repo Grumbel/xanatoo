@@ -689,6 +689,10 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     }
     case C::Save: {
+      if (p.source_buf == p.buf && p.source_doc) {
+        flash_status(app, "Source view is read-only — return to the document to save");
+        break;
+      }
       std::string& spath = path_of(app, p);
       if (spath.empty()) {
         open_prompt(app, PromptKind::SaveAs, "untitled.md");
@@ -709,7 +713,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       } else {
         std::string text;
         try {
-          text = xanatoo::serialize_document(d, spath);
+          text = xanatoo::serialize_document(buf(app, p.buf).doc, spath);
         } catch (const std::invalid_argument& e) {
           std::cerr << "Cannot save " << spath << ": " << e.what() << "\n";
           flash_status(app, e.what());

@@ -48,6 +48,9 @@ hn:item?id=42#id:101             discussion item, pointing to comment 101
 book.md#intro                    same; a bare fragment is a label (as today)
 book.md//id:ch3//text:the%20best,of%20times    range inside a section, cut
 book.md//id:ch3#text:the%20best,of%20times     section cut, range marked
+book.md//source-raw             source file bytes, shown as literal text
+book.md//source-sexpr           current semantic tree as S-expressions
+book.md//source-xml             current semantic tree as restricted XML
 map.png//rect:0.2,0.1,0.3,0.3    crop, usable as an image anywhere
 map.png#rect:0.2,0.1,0.3,0.3     whole image, region framed
 doc.md//id:fig1//rect:0,0,.5,.5  crop of an image inside a document
@@ -59,6 +62,16 @@ Rules:
 - Pipes apply left to right, each to the result of the one before. Selectors
   are typed by what they apply to (document or image), so an image node
   selected from a document takes `rect:`.
+- `source-raw`, `source-sexpr`, `source-xml` are **view transformations**
+  without payloads. They currently stand alone (not combined with cuts or
+  fragments). Up/back from one returns to the rendered document. They keep
+  the underlying semantic document and its edit history unchanged, and the
+  source view itself is read-only. `source-sexpr`/`source-xml` serialize the
+  current in-memory tree, including edits. `source-raw` reads the local file's
+  bytes from disk (which may predate unsaved edits) or the cached decoded text
+  of a fetched HTTP/Gemini response. Service adapters that construct a tree
+  directly, and other sources without a retained body, show an unavailable
+  notice instead. This is not a general binary/hex viewer.
 - At most one `#`, and it comes last.
 - Payloads are percent-encoded (`/`, `#`, `?`, `|`, `%`, spaces). `text:`
   stays encoded in `Selector::value`, since its grammar splits on `,` and `-`

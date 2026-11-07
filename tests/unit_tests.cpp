@@ -29,6 +29,7 @@
 #include "xanatoo/examples.hpp"
 #include "xanatoo/util.hpp"
 #include "xanatoo/parse.hpp"
+#include "xanatoo/source_view.hpp"
 #include "xanatoo/editor.hpp"
 #include "xanatoo/org.hpp"
 #include "xanatoo/types.hpp"
@@ -680,6 +681,34 @@ void test_parse_document_xml_path() {
   EXPECT(output.find("<em>after</em>") != std::string::npos);
   EXPECT_EQ(serialize_document(parse_document(output, "note.xml"), "note.xml"),
             output);
+}
+
+void test_source_view_text() {
+  using namespace xanatoo;
+  const Document doc = parse_markup("# A\n\nThis is *emphasized*.\n");
+  const std::string raw = "<html><p>&amp; \"quoted\"</p></html>\n";
+  const auto r = source_view_text(doc, SelectorKind::SourceRaw, raw);
+  EXPECT_EQ(r.language, "text");
+  EXPECT_EQ(r.text, raw);  // no parsing, escaping, or reserialization
+  const Document rendered = source_view_document(r);
+  const auto& root = rendered.get(rendered.root);
+  EXPECT_EQ(root.children.size(), 1u);
+  if (!root.children.empty()) {
+    const auto& code = rendered.get(root.children[0]);
+    EXPECT_EQ(code.kind, NodeKind::CodeBlock);
+    EXPECT_EQ(code.spans.size(), 1u);
+    if (!code.spans.empty()) EXPECT_EQ(code.spans[0].text, raw);
+  }
+  const auto sx = source_view_text(doc, SelectorKind::SourceSexpr, std::nullopt);
+  EXPECT_EQ(sx.language, "lisp");
+  EXPECT_EQ(sx.text, serialize_sexpr(doc));
+  EXPECT(parse_sexpr(sx.text).root != INVALID_NODE);
+  const auto xml = source_view_text(doc, SelectorKind::SourceXml, std::nullopt);
+  EXPECT_EQ(xml.language, "xml");
+  EXPECT_EQ(xml.text, serialize_xml(doc));
+  EXPECT(parse_xml(xml.text).root != INVALID_NODE);
+  const auto missing = source_view_text(doc, SelectorKind::SourceRaw, std::nullopt);
+  EXPECT(missing.text.find("unavailable") != std::string::npos);
 }
 
 void test_markup_stretch_and_link() {
@@ -1830,6 +1859,25 @@ void test_locator() {
   EXPECT(l.pipes[1].kind == SelectorKind::Text);
   EXPECT_EQ(l.pipes[1].value, "the%20best,of%20times");
   EXPECT(!l.point);
+
+  for (const std::string_view name : {"source-raw", "source-sexpr", "source-xml"}) {
+    l = parse_locator("book.md//" + std::string(name));
+    EXPECT_EQ(l.base, "book.md");
+    EXPECT_EQ(l.pipes.size(), 1u);
+    EXPECT(xanatoo::is_source_pipe(l.pipes[0].kind));
+    EXPECT_EQ(l.pipes[0].value, "");
+    EXPECT_EQ(format_locator(l), "book.md//" + std::string(name));
+    EXPECT(xanatoo::locator_up(l));
+    EXPECT_EQ(format_locator(l), "book.md");
+  }
+  l = parse_locator("https://example.org/p//source-raw");
+  EXPECT_EQ(l.base, "https://example.org/p");
+  EXPECT_EQ(l.pipes[0].kind, SelectorKind::SourceRaw);
+  EXPECT_EQ(format_locator(l), "https://example.org/p//source-raw");
+  l = parse_locator("book.md//source-xml");
+  EXPECT_EQ(l.pipes[0].kind, SelectorKind::SourceXml);
+  l = parse_locator("book.md//source-sexpr");
+  EXPECT_EQ(l.pipes[0].kind, SelectorKind::SourceSexpr);
 
   l = parse_locator("map.png//rect:0.2,0.1,0.3,0.3#at:0.5,0.5");
   EXPECT_EQ(l.base, "map.png");
@@ -4416,6 +4464,7 @@ int main() {
   test_parse_sexpr();
   test_parse_document_sexpr_path();
   test_parse_document_xml_path();
+  test_source_view_text();
   test_markup_stretch_and_link();
   test_markup_blockquote_code_table();
   test_markup_columns();

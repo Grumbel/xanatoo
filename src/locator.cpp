@@ -69,6 +69,11 @@ std::string percent_encode(std::string_view s) {
 }
 
 std::optional<Selector> parse_selector(std::string_view s) {
+  for (const auto& [name, kind] : {
+           SelectorName{"source-raw", SelectorKind::SourceRaw},
+           {"source-sexpr", SelectorKind::SourceSexpr},
+           {"source-xml", SelectorKind::SourceXml}})
+    if (s == name) return Selector{kind, {}};
   const size_t colon = s.find(':');
   if (colon == std::string_view::npos || colon + 1 == s.size())
     return std::nullopt;
@@ -83,12 +88,16 @@ std::optional<Selector> parse_selector(std::string_view s) {
 }
 
 std::string_view selector_name(SelectorKind kind) {
+  if (kind == SelectorKind::SourceRaw) return "source-raw";
+  if (kind == SelectorKind::SourceSexpr) return "source-sexpr";
+  if (kind == SelectorKind::SourceXml) return "source-xml";
   for (const SelectorName& n : kNames)
     if (n.kind == kind) return n.name;
   return {};
 }
 
 std::string format_selector(const Selector& sel) {
+  if (is_source_pipe(sel.kind)) return std::string(selector_name(sel.kind));
   return std::string(selector_name(sel.kind)) + ":" +
          (sel.kind == SelectorKind::Text ? sel.value : percent_encode(sel.value));
 }
@@ -389,6 +398,10 @@ bool locator_up(Locator& loc) {
     return true;
   }
   if (loc.pipes.empty()) return false;
+  if (is_source_pipe(loc.pipes.back().kind)) {
+    loc.pipes.pop_back();  // a view transformation, not a markable fragment
+    return true;
+  }
   loc.point = std::move(loc.pipes.back());
   loc.pipes.pop_back();
   return true;

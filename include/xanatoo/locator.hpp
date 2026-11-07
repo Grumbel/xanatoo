@@ -17,7 +17,16 @@ namespace xanatoo {
 // `//` cuts (the passage is shown as a document of its own), `#` points (the
 // whole thing, with the passage marked).
 
-enum class SelectorKind : uint8_t { Id, Path, Text, Rect, At };
+enum class SelectorKind : uint8_t {
+  Id, Path, Text, Rect, At,
+  SourceRaw, SourceSexpr, SourceXml,  // payload-free document-view pipes
+};
+
+inline bool is_source_pipe(SelectorKind kind) {
+  return kind == SelectorKind::SourceRaw ||
+         kind == SelectorKind::SourceSexpr ||
+         kind == SelectorKind::SourceXml;
+}
 
 struct Selector {
   SelectorKind kind = SelectorKind::Id;
@@ -39,7 +48,8 @@ struct Locator {
 };
 
 // Never fails: without selectors the whole input is the base. Only known
-// selector names at the end of the string are taken, thumtoo pipes
+// selector names or source-raw/source-sexpr/source-xml at the end are taken;
+// thumtoo pipes
 // (`//page:12`) and any other `//` stay in the base.
 Locator parse_locator(std::string_view address);
 std::string format_locator(const Locator& loc);

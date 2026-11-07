@@ -85,6 +85,7 @@ struct DocBuffer {
   BufferId id = kNoBuffer;
   xanatoo::Document doc;
   std::string path;
+  std::optional<std::string> raw_source;  // HTTP/Gemini body before parsing
   bool dirty = false;
   xanatoo::History history;
   // Shows a "Loading …" stand-in until a background fetch replaces it.
@@ -195,6 +196,10 @@ struct Pane {
   // is `buf`. Use pane_cut / pane_address.
   xanatoo::Locator locator;
   BufferId locator_buf = kNoBuffer;
+  // Source pipes are pane-local projections; the shared buffer remains the
+  // semantic document, so another pane can edit or render it independently.
+  std::optional<xanatoo::Document> source_doc;
+  BufferId source_buf = kNoBuffer;
   xanatoo::NodeId cut = xanatoo::INVALID_NODE;  // what the pipes selected
   std::vector<xanatoo::Selection> marks;        // the `#` passage
   BookmarkMarks bookmark_marks;
@@ -380,6 +385,7 @@ enum class FetchPurpose : uint8_t {
 struct FetchShared {
   std::atomic<bool> done{false};
   std::optional<xanatoo::Document> doc;
+  std::optional<std::string> raw_source;
   std::string error;      // with `doc` set: the page is an HTTP error body
   int http_status = 0;    // non-200 answer whose body is in `doc`
   std::string final_url;  // page URL after redirects (buffer path)
@@ -415,6 +421,7 @@ struct CachedPage {
   std::string url;
   std::string final_url;
   xanatoo::Document doc;
+  std::optional<std::string> raw_source;
   Uint32 ticks = 0;
 };
 
@@ -1165,7 +1172,8 @@ void open_link_in_tab(App& app, int pi, const std::string& href);
 // Put a freshly loaded page into pane `pi`: reuses the pane's buffer unless
 // the other visible pane shows it too or it has unsaved edits.
 void show_doc_in_pane(App& app, int pi, xanatoo::Document doc,
-                      const std::string& label);
+                      const std::string& label,
+                      std::optional<std::string> raw_source = std::nullopt);
 // Links in pane `pi` resolve against that pane's page (gemini relative URLs).
 std::string link_base_url(App& app, int pi);
 void open_transclude_in_other_pane(App& app);

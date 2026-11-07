@@ -145,6 +145,9 @@ Addresses can identify *part* of a document:
 notes.md#id:introduction       whole document, passage marked
 notes.md//id:introduction      that section as the current view
 notes.md#text:hypertext        selected text, marked in context
+notes.md//source-raw            original Markdown/HTML text
+notes.md//source-sexpr          live semantic tree as S-expressions
+notes.md//source-xml            live semantic tree as minimal XML
 ```
 
 The `#text:` form accepts a richer quote/context selector as documented in

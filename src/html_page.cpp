@@ -297,7 +297,8 @@ std::string http_status_line(int status) {
 #if defined(XANATOO_WEB) && XANATOO_WEB
 
 std::optional<Document> web_fetch(std::string_view url_in, std::string* err,
-                                  std::string* final_url, int* http_status) {
+                                  std::string* final_url, int* http_status,
+                                  std::string* raw_source) {
   static const std::string kUserAgent =
       std::string("Mozilla/5.0 (compatible; xanatoo/") + version_string() +
       "; +https://github.com/Grumbel/xanatoo)";
@@ -322,6 +323,7 @@ std::optional<Document> web_fetch(std::string_view url_in, std::string* err,
   type = std::string(tv);
   const std::string charset = detect_charset(resp->content_type, resp->body);
   std::string body = to_utf8(std::move(resp->body), charset);
+  if (raw_source) *raw_source = body;  // decoded text, before semantic parsing
 
   if (!failed && looks_like_feed(body)) return parse_feed(body, fin, err);
   if (type.empty() || type == "text/html" || type == "application/xhtml+xml")
