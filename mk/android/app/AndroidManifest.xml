@@ -14,6 +14,7 @@
     <uses-feature android:name="android.hardware.gamepad" android:required="false" />
     <!-- Gemini / Nostr / Reddit / Lemmy and http(s) documents. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:label="xanatoo"
@@ -26,7 +27,7 @@
              side store, unpacked data). -->
         <!-- One window only: a second launch brings the running app back. -->
         <activity
-            android:name="org.libsdl.app.SDLActivity"
+            android:name="org.grumbel.xanatoo.XanatooActivity"
             android:label="xanatoo"
             android:theme="@android:style/Theme.NoTitleBar"
             android:configChanges="orientation|keyboardHidden|keyboard|navigation|screenSize|screenLayout|uiMode"

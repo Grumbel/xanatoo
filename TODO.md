@@ -8,6 +8,16 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-07) — Android update notice
+
+- Android checks the website for a newer APK at startup and offers a system
+  notification linking to the download page. The site publishes the APK's
+  version code and name in a generated manifest. Installation remains user-led.
+- Android 13+ requires notification permission; Android 5.1+ is supported.
+- Java compilation and DEX conversion passed. APK build was still running;
+  verify on a device, including download and installation. Fixed an SDL3 icon
+  size API build error encountered during the first APK build.
+
 ## Status (2026-11-07) — Search and location shortcuts
 
 - Ctrl+K focuses search, Ctrl+L focuses location, and link creation moved to

@@ -26,6 +26,7 @@ NDK="$(resolve_ndk)"
 echo "==> NDK=$NDK"
 BT="$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION"
 PACKAGE_JAR="$ANDROID_HOME/platforms/android-$PACKAGE_PLATFORM/android.jar"
+COMPILE_JAR="$ANDROID_HOME/platforms/android-$COMPILE_PLATFORM/android.jar"
 
 mkdir -p src/jni/src src/jni/SDL/include src/jni/freetype
 cp "$APPLICATION_MK" src/jni/Application.mk
@@ -114,7 +115,11 @@ echo "==> $(printf '%s\n' "$files" | wc -l) data files in assets/xanatoo"
 mkdir -p out
 "$BT/aapt" package -f -M src/AndroidManifest.xml -S src/res -A assets \
   -I "$PACKAGE_JAR" -F out/base.apk
-cp "$SDL_ANDROID_LIBS/dex/classes.dex" out/classes.dex
+mkdir -p out/classes
+javac -encoding UTF-8 --release 8 -classpath "$COMPILE_JAR:$SDL_ANDROID_LIBS/classes" \
+  -d out/classes $(find "$APP_DIR/java" -name '*.java')
+"$BT/d8" --output out --min-api "$PACKAGE_PLATFORM" --lib "$COMPILE_JAR" \
+  $(find "$SDL_ANDROID_LIBS/classes" out/classes -name '*.class')
 for abi in $TARGET_ABIS; do
   mkdir -p "out/lib/$abi"
   cp src/libs/"$abi"/*.so "out/lib/$abi/"

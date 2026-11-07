@@ -122,6 +122,7 @@ let
     env = {
       BUILD_TOOLS_VERSION = buildToolsVersion;
       PACKAGE_PLATFORM = packagePlatform;
+      COMPILE_PLATFORM = compilePlatform;
       TARGET_ABIS = abis;
       APP_NAME = "xanatoo";
       APP_DIR = "${../mk/android/app}";

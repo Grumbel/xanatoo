@@ -36,9 +36,15 @@ namespace xanatoo {
 
 // Fit covers as well as square favicons into the available icon box.
 static ImVec2 icon_size(SDL_Texture* texture, float side) {
+#if XANATOO_SDL3
+  float w = 0, h = 0;
+  if (!SDL_GetTextureSize(texture, &w, &h) || w <= 0 || h <= 0)
+    return ImVec2(side, side);
+#else
   int w = 0, h = 0;
   if (SDL_QueryTexture(texture, nullptr, nullptr, &w, &h) != 0 || w <= 0 || h <= 0)
     return ImVec2(side, side);
+#endif
   const float factor = side / static_cast<float>(std::max(w, h));
   return ImVec2(w * factor, h * factor);
 }

@@ -116,3 +116,13 @@ underneath it. The 640×480 R36S package starts at 75% of the desktop default.
 
 - Certificate verification (system CAs; TOFU for Gemini).
 - Per-glyph font fallback (Android system fonts for scripts DejaVu lacks).
+
+## Updates
+
+When the app starts, it checks the website for a newer Android package at most
+once a day after a successful check. An Android notification links to the
+download page; the user downloads the APK and confirms installation through
+Android. Android 13 and later ask for notification permission when an update
+is found. Failed checks are retried on the next launch. The website publishes
+`downloads/android-update.json` from the same source revision as its APK.
+The installed and downloaded APKs must have matching signing certificates.
