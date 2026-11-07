@@ -1272,6 +1272,7 @@ void split_history_note(App& app, int pi, const std::string& url);
 // while split browsing). `pos` / `total` for the status line "3/7".
 bool split_history_can_step(const App& app, int dir);
 bool split_history_step(App& app, int dir);
+bool split_history_jump(App& app, int steps);
 bool split_history_position(const App& app, int& pos, int& total);
 
 // ---- softwin ----

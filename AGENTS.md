@@ -113,6 +113,12 @@ Panels handle plain keys only while `panel_has_keys(app, …)`; opening or
 clicking a panel focuses it, a pane click / jump / unused plain key returns
 focus to the document. Never let a panel consume keys just because it is open.
 
+Context menus: `ui.cpp` keeps page-content actions separate from View/Panels
+controls. The location `InputText` has clipboard/address/bookmark actions;
+Back/Forward buttons show nearest-first targets derived from the focused
+pane's `NavHistory`, or `SplitHistory` when split browsing. `NavJump` uses a
+signed offset and must preserve the destination's caret/scroll state.
+
 Windows place one way regardless of role: Left / Right docks are side
 columns that take width from the panes (stacked by `dock_seq`), Top /
 Bottom docks are bands between the columns that take height (side by side

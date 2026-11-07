@@ -13,6 +13,7 @@
 #include "xanatoo/table_grid.hpp"
 #include "xanatoo/native.hpp"
 #include "xanatoo/nav_history.hpp"
+#include "xanatoo/history_menu.hpp"
 #include "xanatoo/wikipedia.hpp"
 #include "xanatoo/hackernews.hpp"
 #include "xanatoo/time.hpp"
@@ -1422,6 +1423,26 @@ void test_nav_history_positions_and_forward_link() {
   const Locator destination = parse_locator("page#id:100");
   current.point = destination.point;
   EXPECT_EQ(format_locator(current), "hn:item?id=42//id:thread#100");
+}
+
+void test_history_context_menu_targets() {
+  using namespace xanatoo;
+  const std::vector<std::string> urls = {"home", "one", "two", "three", "four"};
+  const auto back = history_menu_items(urls, 3, -1);
+  EXPECT_EQ(back.size(), 3u);
+  EXPECT_EQ(back[0].url, "two");
+  EXPECT_EQ(back[0].steps, -1);
+  EXPECT_EQ(back[2].url, "home");
+  EXPECT_EQ(back[2].steps, -3);
+  const auto forward = history_menu_items(urls, 3, 1);
+  EXPECT_EQ(forward.size(), 1u);
+  EXPECT_EQ(forward[0].url, "four");
+  EXPECT_EQ(forward[0].steps, 1);
+  EXPECT_EQ(history_menu_items(urls, 3, -1, 2).size(), 2u);
+  EXPECT(history_menu_items(urls, -1, -1).empty());
+  EXPECT(history_menu_items(urls, 5, 1).empty());
+  EXPECT(history_menu_items(urls, 0, -1).empty());
+  EXPECT(history_menu_items(urls, 0, 0).empty());
 }
 
 // Text column = min(pane * (1 - 2 * margin%), measure_chars * avg char),
@@ -4661,6 +4682,7 @@ int main() {
   test_layout_article_gaps();
   test_layout_inline_metadata();
   test_nav_history_positions_and_forward_link();
+  test_history_context_menu_targets();
   test_style_sheets_shipped();
   test_footnotes();
   test_locator();

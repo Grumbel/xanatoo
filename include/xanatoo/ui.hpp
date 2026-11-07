@@ -3,6 +3,7 @@
 #pragma once
 
 #include "xanatoo/sdl.hpp"
+#include "xanatoo/history_menu.hpp"
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -22,6 +23,7 @@ enum class UiCommand {
   NavigateUrl,  // toolbar/menu URL field committed (arg = URL or path)
   NavBack,     // Alt+Left session history
   NavForward,  // Alt+Right
+  NavJump,     // arg = signed number of history steps (Back/Forward context menus)
   GoHome,      // Alt+Home: home page (welcome.md for now)
   GoUp,        // one level up the page hierarchy (UiState::up_url)
   StopLoading, // cancel running page fetches (toolbar Stop, Esc)
@@ -29,6 +31,7 @@ enum class UiCommand {
   ToggleDownloads, // Panels → Downloads
   ToggleStylesPanel, // Panels → Style sheets
   AddBookmark,     // bookmark the selection, else the current page
+  BookmarkPage,    // always bookmark the page, ignoring text selection
   BookmarkPosition,  // bookmark the caret position in the page
   RemoveBookmark,  // remove current (or arg) from bookmarks
   ToggleBookmarks, // Bookmarks manager panel
@@ -240,6 +243,8 @@ struct UiState {
   bool in_stretch = false;
   bool can_nav_back = false;
   bool can_nav_forward = false;
+  std::vector<HistoryMenuItem> back_history;
+  std::vector<HistoryMenuItem> forward_history;
   // Other view of the focused page ("" = none): the native ref of a web
   // page (wikipedia:Title, hn:item?id=1) or the web URL of a native view.
   std::string alternate_url;
@@ -259,6 +264,7 @@ struct UiState {
   bool styles_open = false;
   bool bookmarks_open = false;
   bool current_bookmarked = false;
+  bool page_bookmarked = false;
   int page_bookmarks = 0;  // bookmarks of passages inside the focused page
   // The bookmark a margin-icon menu is for (empty address: none).
   struct BookmarkMenu {
@@ -345,7 +351,8 @@ private:
   void load_icons(SDL_Renderer* renderer);
   const Icon* icon(const char* name) const;
   bool tool_button(const char* id, const char* icon_name, const char* tip,
-                   UiCommand c, UiCommand& out, bool enabled = true);
+                   UiCommand c, UiCommand& out, bool enabled = true,
+                   bool* right_clicked = nullptr);
   bool tool_menu_begin(const char* id, const char* icon_name, const char* tip);
   void toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd);
   void tool_menu_end();
@@ -368,6 +375,11 @@ private:
   char url_input_[2048] = {};
   std::string url_synced_from_;  // last doc_label pushed into url_input_
   bool focus_url_bar_ = false;   // Ctrl+L / Open URL menu
+  bool select_url_bar_ = false;  // context menu: select current field contents
+  bool url_context_selection_ = false;
+  int url_context_begin_ = 0;
+  int url_context_end_ = 0;
+  int url_context_cursor_ = 0;
   char search_input_[512] = {};  // search bar text (kept between searches)
   bool focus_search_ = false;    // Ctrl+K / View → Search Bar
   bool url_bar_editing_ = false;

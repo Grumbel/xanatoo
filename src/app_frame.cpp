@@ -97,6 +97,33 @@ static SDL_Texture* address_icon(App& app, const std::string& address) {
   return image.ok ? image.texture : nullptr;
 }
 
+static void build_history_menu(App& app, xanatoo::UiState& state) {
+  // The toolbar's history lists must describe the very same trail used by
+  // nav_step(), including the shared trail while split browsing.
+  std::vector<std::string> urls;
+  int pos = -1;
+  if (split_browsing(app) && app.focus < kCentreViews) {
+    int one_based = 0, total = 0;
+    if (!split_history_position(app, one_based, total)) return;
+    pos = one_based - 1;
+    for (const SplitHistoryLevel& level : app.split_history.levels) {
+      if (level.opened.empty()) {
+        urls.push_back(level.page.url);
+      } else {
+        for (const SplitHistoryEntry& e : level.opened)
+          urls.push_back(e.url);
+      }
+    }
+  } else {
+    const NavHistory& h = focused_pane(app).nav;
+    pos = h.pos;
+    for (const NavHistoryEntry& e : h.entries) urls.push_back(e.url);
+  }
+  if (pos < 0 || pos >= static_cast<int>(urls.size())) return;
+  state.back_history = xanatoo::history_menu_items(urls, pos, -1);
+  state.forward_history = xanatoo::history_menu_items(urls, pos, 1);
+}
+
 // Fill the chrome-facing snapshot of app state for this frame (also drives the
 // software gamepad pointer, which synthesises mouse events).
 static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
@@ -189,6 +216,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
                            ? std::string("untitled")
                            : pane_address(app, focused_pane(app));
   ui_state.can_nav_back = can_nav_step(app, -1);
+  build_history_menu(app, ui_state);
   {
     const std::string& path = path_of(app, focused_pane(app));
     ui_state.alternate_url = xanatoo::alternate_view_url(path);
@@ -274,6 +302,8 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
     // With a selection the star bookmarks the selection.
     ui_state.current_bookmarked =
         focused_pane(app).sel.empty() &&
+        is_bookmarked(app, pane_address(app, focused_pane(app)));
+    ui_state.page_bookmarked =
         is_bookmarked(app, pane_address(app, focused_pane(app)));
     ui_state.page_bookmarks = bookmarks_in_page(app, focused_pane(app));
     ui_state.bookmark_menu = {};
@@ -368,10 +398,11 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     const bool allowed =
         c == C::Quit || c == C::OpenDocument || c == C::OpenUrlBar ||
         c == C::NavigateUrl || c == C::NavBack || c == C::NavForward ||
+        c == C::NavJump ||
         c == C::GoHome || c == C::GoUp ||
         c == C::ToggleHistory || c == C::ToggleDownloads || c == C::ToggleBookmarks ||
         c == C::ToggleStylesPanel ||
-        c == C::AddBookmark || c == C::RemoveBookmark ||
+        c == C::AddBookmark || c == C::BookmarkPage || c == C::RemoveBookmark ||
         c == C::BookmarkPosition || c == C::NewTab ||
         c == C::CloseTab || c == C::NextTab || c == C::PrevTab ||
         c == C::SelectTab || c == C::PopOut || c == C::PopIn || c == C::Save ||
@@ -499,6 +530,15 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::NavForward:
       if (!nav_step(app, 1)) flash_status(app, "No next page");
       break;
+    case C::NavJump: {
+      const int steps = std::clamp(std::atoi(arg.c_str()), -kMaxNavHistory,
+                                   kMaxNavHistory);
+      if (steps == 0) break;
+      const bool ok = split_browsing(app) && app.focus < kCentreViews
+          ? split_history_jump(app, steps) : nav_step(app, steps);
+      if (!ok) flash_status(app, "History destination no longer available");
+      break;
+    }
     case C::GoHome: {
       const std::string home = home_page(app);
       if (home.empty())
@@ -683,6 +723,15 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::AddBookmark:
       add_bookmark(app, bookmark_for_view(app, p, false));
       break;
+    case C::BookmarkPage: {
+      // URL chrome refers to the page, never the document text selection.
+      xanatoo::Bookmark bm = bookmark_for_view(app, p, false);
+      bm.address = pane_address(app, p);
+      bm.title.clear();
+      bm.quote.clear();
+      add_bookmark(app, std::move(bm));
+      break;
+    }
     case C::BookmarkPosition:
       add_bookmark(app, bookmark_for_view(app, p, true));
       break;

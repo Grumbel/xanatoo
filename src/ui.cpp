@@ -240,6 +240,10 @@ const char* menu_icon_for(UiCommand command) {
     case UiCommand::NavForward: return "forward";
     case UiCommand::GoUp: return "up";
     case UiCommand::GoHome: return "home";
+    case UiCommand::AddBookmark:
+    case UiCommand::BookmarkPage:
+    case UiCommand::BookmarkPosition:
+    case UiCommand::RemoveBookmark: return "bookmark";
     case UiCommand::ToggleHistory: return "history";
     case UiCommand::ToggleDownloads: return "downloads";
     case UiCommand::ToggleOutline: return "outline";
@@ -458,7 +462,8 @@ const Ui::Icon* Ui::icon(const char* name) const {
 }
 
 bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
-                     UiCommand c, UiCommand& out, bool enabled) {
+                     UiCommand c, UiCommand& out, bool enabled,
+                     bool* right_clicked) {
   const Icon* ic = icon(icon_name);
   bool pressed = false;
   ImGui::BeginDisabled(!enabled);
@@ -514,7 +519,10 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
   }
   pop_toolbar_button_style(style_colors);
   ImGui::EndDisabled();
-  if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && tip && tip[0]) {
+  const bool hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
+  if (right_clicked)
+    *right_clicked = hovered && ImGui::IsMouseReleased(ImGuiMouseButton_Right);
+  if (hovered && tip && tip[0]) {
     ImGui::SetTooltip("%s", tip);
   }
   ImGui::SameLine(0.f, 2.f);
@@ -959,10 +967,34 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.f, 4.f));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.f);
   if (ImGui::Begin("##toolbar_browse", nullptr, tb_flags)) {
+    auto history_menu = [&](const char* id,
+                            const std::vector<HistoryMenuItem>& entries,
+                            const char* empty_label) {
+      if (!ImGui::BeginPopup(id)) return;
+      if (entries.empty()) ImGui::TextDisabled("%s", empty_label);
+      for (const HistoryMenuItem& e : entries) {
+        const std::string label = elide_middle(e.url, 68);
+        ImGui::PushID(e.steps);
+        if (ImGui::MenuItem(label.c_str())) {
+          cmd = UiCommand::NavJump;
+          result.arg = std::to_string(e.steps);
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+          ImGui::SetTooltip("%s", e.url.c_str());
+        ImGui::PopID();
+      }
+      ImGui::EndPopup();
+    };
+    bool back_context = false;
     tool_button("tb_back", "back", "Back (Alt+Left)", UiCommand::NavBack, cmd,
-                state.can_nav_back);
+                state.can_nav_back, &back_context);
+    if (back_context) ImGui::OpenPopup("##back_history");
+    history_menu("##back_history", state.back_history, "No previous pages");
+    bool forward_context = false;
     tool_button("tb_fwd", "forward", "Forward (Alt+Right)", UiCommand::NavForward,
-                cmd, state.can_nav_forward);
+                cmd, state.can_nav_forward, &forward_context);
+    if (forward_context) ImGui::OpenPopup("##forward_history");
+    history_menu("##forward_history", state.forward_history, "No next pages");
     {
       const std::string tip = state.up_url.empty()
                                   ? std::string("Up (at the top)")
@@ -1032,7 +1064,12 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         std::snprintf(url_input_, sizeof(url_input_), "%s", want.c_str());
         url_synced_from_ = want;
         focus_url_bar_ = false;
-      } else if (want != url_synced_from_ && !url_bar_editing_) {
+      } else if (select_url_bar_) {
+        // AutoSelectAll on InputText selects the existing edited address.
+        ImGui::SetKeyboardFocusHere();
+        select_url_bar_ = false;
+      } else if (want != url_synced_from_ && !url_bar_editing_ &&
+                 !ImGui::IsPopupOpen("##url_context")) {
         std::snprintf(url_input_, sizeof(url_input_), "%s", want.c_str());
         url_synced_from_ = want;
       }
@@ -1049,6 +1086,23 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
           "##urlbar", url_input_, sizeof(url_input_),
           ImGuiInputTextFlags_EnterReturnsTrue |
               ImGuiInputTextFlags_AutoSelectAll);
+      const ImGuiID url_id = ImGui::GetItemID();
+      const ImGuiInputTextState* input = ImGui::GetInputTextState(url_id);
+      const bool has_selection = input && input->HasSelection();
+      const int selection_start = has_selection ? input->GetSelectionStart() : 0;
+      const int selection_end = has_selection ? input->GetSelectionEnd() : 0;
+      const int cursor = input ? input->GetCursorPos()
+                               : static_cast<int>(std::strlen(url_input_));
+      const bool url_active = ImGui::IsItemActive();
+      const bool url_right_clicked = ImGui::IsItemHovered() &&
+          ImGui::IsMouseReleased(ImGuiMouseButton_Right);
+      if (url_right_clicked) {
+        // Keep the selection while the popup takes keyboard focus.
+        url_context_selection_ = has_selection;
+        url_context_begin_ = selection_start;
+        url_context_end_ = selection_end;
+        url_context_cursor_ = cursor;
+      }
       if (state.location_icon) {
         const ImVec2 p = ImGui::GetItemRectMin();
         const float side = 20.f * scale_;
@@ -1061,10 +1115,62 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       }
       ImGui::PopStyleVar(2);
       ImGui::PopStyleColor(3);
-      url_bar_editing_ = ImGui::IsItemActive();
+      url_bar_editing_ = url_active;
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip(
             "Location — path or gemini:// URL · Enter to open · Ctrl+L focuses");
+      if (url_right_clicked) ImGui::OpenPopup("##url_context");
+      if (ImGui::BeginPopup("##url_context")) {
+        const std::string value = url_input_;
+        const bool selected = url_context_selection_;
+        const int from = url_context_begin_;
+        const int to = url_context_end_;
+        const char* clip = ImGui::GetClipboardText();
+        const std::string clipboard = clip ? clip : "";
+        auto edit_url = [&](const std::string& replacement) {
+          std::string updated = value;
+          const size_t begin = static_cast<size_t>(selected ? from : url_context_cursor_);
+          const size_t end = static_cast<size_t>(selected ? to : url_context_cursor_);
+          if (begin > updated.size() || end > updated.size() || end < begin ||
+              updated.size() - (end - begin) + replacement.size() >= sizeof(url_input_))
+            return;
+          updated.replace(begin, end - begin, replacement);
+          std::snprintf(url_input_, sizeof(url_input_), "%s", updated.c_str());
+          if (ImGuiInputTextState* st = ImGui::GetInputTextState(url_id))
+            st->ReloadUserBufAndMoveToEnd();
+          url_bar_editing_ = true;
+        };
+        if (ImGui::MenuItem("Cut", nullptr, false, selected)) {
+          ImGui::SetClipboardText(value.substr(from, to - from).c_str());
+          edit_url("");
+        }
+        if (ImGui::MenuItem("Copy", nullptr, false, selected))
+          ImGui::SetClipboardText(value.substr(from, to - from).c_str());
+        if (ImGui::MenuItem("Paste", nullptr, false, !clipboard.empty()))
+          edit_url(clipboard);
+        if (ImGui::MenuItem("Select All")) select_url_bar_ = true;
+        ImGui::Separator();
+        if (ImGui::MenuItem("Copy Address", nullptr, false, !value.empty()))
+          ImGui::SetClipboardText(value.c_str());
+        if (ImGui::MenuItem("Open Address", nullptr, false, !value.empty())) {
+          cmd = UiCommand::NavigateUrl;
+          result.arg = value;
+        }
+        if (ImGui::MenuItem("Paste and Go", nullptr, false, !clipboard.empty())) {
+          cmd = UiCommand::NavigateUrl;
+          result.arg = clipboard;
+        }
+        if (state.has_path) {
+          ImGui::Separator();
+          if (state.page_bookmarked) {
+            if (ImGui::MenuItem("Remove Page Bookmark"))
+              cmd = UiCommand::RemoveBookmark;
+          } else if (ImGui::MenuItem("Bookmark This Page")) {
+            cmd = UiCommand::BookmarkPage;
+          }
+        }
+        ImGui::EndPopup();
+      }
       if (enter) {
         cmd = UiCommand::NavigateUrl;
         result.arg = url_input_;
@@ -2001,18 +2107,20 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                     "Alt+Down");
       ImGui::Separator();
     }
-    if (ImGui::MenuItem("Structure Highlight", "Ctrl+Shift+L", state.structure))
-      cmd = UiCommand::ToggleStructure;
-    if (ImGui::MenuItem("Heading Outline", "Ctrl+Shift+O", state.outline))
-      cmd = UiCommand::ToggleOutline;
-    if (ImGui::MenuItem("Diff Marks", "Ctrl+Shift+D", state.diff, state.can_diff))
-      cmd = UiCommand::ToggleDiff;
+    if (state.has_path) {
+      if (state.selection)
+        menu_item_cmd("Bookmark Selection", UiCommand::AddBookmark, cmd);
+      menu_item_cmd(state.page_bookmarked ? "Remove Page Bookmark"
+                                         : "Bookmark This Page",
+                    state.page_bookmarked ? UiCommand::RemoveBookmark
+                                          : UiCommand::BookmarkPage, cmd);
+      menu_item_cmd("Bookmark Reading Position", UiCommand::BookmarkPosition,
+                    cmd);
+      ImGui::Separator();
+    }
     menu_item_cmd("Find…", UiCommand::Find, cmd, true, "Ctrl+F");
     if (!state.browse)
       menu_item_cmd("Replace…", UiCommand::Replace, cmd, true, "Ctrl+H");
-    if (state.chrome_hidden)
-      menu_item_cmd("Show Menus and Toolbars", UiCommand::ToggleChrome, cmd,
-                    true, "F11");
     ImGui::EndPopup();
   }
 

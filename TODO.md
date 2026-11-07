@@ -6,7 +6,22 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **295** (this delivery is **294**)
+Next bundle number: **296** (this delivery is **295**)
+
+## Status (2026-11-07) — Context menus
+
+- Added a right-click location field menu for Cut/Copy/Paste/Select All,
+  Copy/Open Address, Paste and Go, and add/remove page bookmark. It preserves
+  an edited URL and its selection while the popup owns keyboard focus.
+- Right-click Back/Forward now lists up to 20 reachable URLs, nearest first.
+  Selecting an entry jumps by the corresponding history offset, including
+  direct multi-step jumps in the split-browser trail without fetching every
+  intermediate page. The target-index helper has offline unit tests.
+- Removed panel/view toggles from the document context menu. Added explicit
+  bookmark selection, page, and reading-position actions; page bookmarking
+  ignores a text selection. Existing bookmark-margin-icon menus remain.
+- The standalone history-target regression passes. GUI compilation/runtime
+  still requires SDL headers, which are absent from this container.
 
 ## Status (2026-11-07) — Reddit RSS fallback review
 

@@ -578,6 +578,46 @@ bool split_history_step(App& app, int dir) {
   return true;
 }
 
+bool split_history_jump(App& app, int steps) {
+  if (steps == -1 || steps == 1) return split_history_step(app, steps);
+  if (steps == 0) return false;
+  int pos = 0, total = 0;
+  if (!split_history_position(app, pos, total)) return false;
+  const int target = pos + steps;
+  if (target < 1 || target > total) return false;
+
+  // Jump straight to the destination: stepping through intermediate levels
+  // would start unnecessary network requests and replace both panes many times.
+  int remaining = target - 1;
+  SplitHistory& h = app.split_history;
+  for (int i = 0; i < static_cast<int>(h.levels.size()); ++i) {
+    SplitHistoryLevel& level = h.levels[static_cast<size_t>(i)];
+    const int count = std::max(1, static_cast<int>(level.opened.size()));
+    if (remaining >= count) {
+      remaining -= count;
+      continue;
+    }
+    revert_split_preview(app);
+    h.top = i;
+    level.cur = level.opened.empty() ? -1 : remaining;
+    show_entry(app, 0, level.page, h.restore[0]);
+    if (SplitHistoryEntry* e = right_entry(app)) {
+      show_entry(app, 1, *e, h.restore[1]);
+      app.split_trail = {};
+      if (!e->href.empty()) {
+        app.split_trail.href = e->href;
+        app.split_trail.left_page = level.page.url;
+        app.split_trail.target = e->target;
+      }
+    } else {
+      app.split_trail = {};
+    }
+    app.split_preview.shown.clear();
+    return true;
+  }
+  return false;
+}
+
 bool split_history_position(const App& app, int& pos, int& total) {
   const SplitHistory& h = app.split_history;
   if (h.top < 0) return false;
