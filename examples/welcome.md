@@ -3,6 +3,8 @@
 An interactive document workspace — edit, stretch, link, and browse in one place.
 Inspired by *Xanadu*, **HyperCard**, and the *Canon Cat*.
 
+[![xanatoo](xanatoo.png){width=128}](https://xanatoo.github.io/) · [xanatoo.github.io](https://xanatoo.github.io/)
+
 ![A small network of linked nodes](network.png){scale=0.85}
 
 ## Quick start
