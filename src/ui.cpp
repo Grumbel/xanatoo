@@ -34,6 +34,16 @@ namespace fs = std::filesystem;
 
 namespace xanatoo {
 
+// Fit covers as well as square favicons into the available icon box.
+static ImVec2 icon_size(SDL_Texture* texture, float side) {
+  int w = 0, h = 0;
+  if (SDL_QueryTexture(texture, nullptr, nullptr, &w, &h) != 0 || w <= 0 || h <= 0)
+    return ImVec2(side, side);
+  const float factor = side / static_cast<float>(std::max(w, h));
+  return ImVec2(w * factor, h * factor);
+}
+
+
 
 namespace {
 
@@ -1030,12 +1040,22 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1.f, 1.f, 1.f, 1.f));
       ImGui::PushStyleVar(
           ImGuiStyleVar_FramePadding,
-          ImVec2(6.f * scale_,
+          ImVec2((state.location_icon ? 30.f : 6.f) * scale_,
                  std::max(0.f, (field_h - ImGui::GetFontSize()) * 0.5f)));
       bool enter = ImGui::InputText(
           "##urlbar", url_input_, sizeof(url_input_),
           ImGuiInputTextFlags_EnterReturnsTrue |
               ImGuiInputTextFlags_AutoSelectAll);
+      if (state.location_icon) {
+        const ImVec2 p = ImGui::GetItemRectMin();
+        const float side = 20.f * scale_;
+        const ImVec2 size = icon_size(state.location_icon, side);
+        const float y = p.y + (field_h - size.y) * 0.5f;
+        ImGui::GetWindowDrawList()->AddImage(
+            reinterpret_cast<ImTextureID>(state.location_icon),
+            ImVec2(p.x + 5.f * scale_ + (side - size.x) * 0.5f, y),
+            ImVec2(p.x + 5.f * scale_ + (side + size.x) * 0.5f, y + size.y));
+      }
       ImGui::PopStyleVar();
       ImGui::PopStyleColor(3);
       url_bar_editing_ = ImGui::IsItemActive();
@@ -1750,6 +1770,11 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
           std::string label = bookmark_label(b);
           if (label.size() > 64) label = elide_middle(label, 28);
           ImGui::PushID(i);
+          if (static_cast<size_t>(i) < state.bookmark_icons.size() && state.bookmark_icons[i]) {
+            ImGui::Image(reinterpret_cast<ImTextureID>(state.bookmark_icons[i]),
+                         icon_size(state.bookmark_icons[i], ImGui::GetTextLineHeight()));
+            ImGui::SameLine();
+          }
           if (ImGui::MenuItem(label.c_str())) {
             cmd = UiCommand::NavigateUrl;
             result.arg = b.address;
@@ -2000,6 +2025,11 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
           // The quote gets a wrapped line of its own below.
           const std::string label =
               b.quote.empty() || b.title.empty() ? bookmark_label(b) : b.title;
+          if (static_cast<size_t>(i) < state.bookmark_icons.size() && state.bookmark_icons[i]) {
+            ImGui::Image(reinterpret_cast<ImTextureID>(state.bookmark_icons[i]),
+                         icon_size(state.bookmark_icons[i], ImGui::GetTextLineHeight()));
+            ImGui::SameLine();
+          }
           if (ImGui::Selectable(label.c_str(), false,
                                 ImGuiSelectableFlags_AllowDoubleClick)) {
             if (ImGui::IsMouseDoubleClicked(0)) {

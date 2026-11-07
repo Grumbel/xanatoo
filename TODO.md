@@ -8,6 +8,15 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-07) — Location and bookmark icons
+
+- Show cached site icons in the location field and bookmark lists, with PDF
+  thumbnails when supported and the first image of an open imported EPUB.
+  The bundled decoder handles PNG entries in ICO files. Sites declaring only
+  a nonstandard icon URL and bitmap-only ICOs need further support.
+- Changed application files compiled; 3895 offline checks passed. Full app
+  build in this shell is missing the SQLite headers. No CLI bundle.
+
 ## Status (2026-11-06) — Narrow URL bar
 
 - Move the location field to a full-width second row when toolbar controls

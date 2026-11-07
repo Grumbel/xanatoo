@@ -76,6 +76,26 @@ void relayout_if_needed(App& app) {
   }
 }
 
+// Icons share the image cache and its asynchronous remote fetcher.
+static SDL_Texture* address_icon(App& app, const std::string& address) {
+  std::string base = xanatoo::parse_locator(address).base;
+  std::string web = xanatoo::web_url_for(base);
+  if (!web.empty()) base = web;
+  if (xanatoo::starts_with_ci(base, "http://") ||
+      xanatoo::starts_with_ci(base, "https://")) {
+    const size_t start = base.find("://") + 3;
+    const size_t end = base.find_first_of("/?#", start);
+    if (end == start || start >= base.size()) return nullptr;
+    base = base.substr(0, end) + "/favicon.ico";
+  } else {
+    // thumtoo can render the first page of a local PDF as a thumbnail.
+    if (!xanatoo::ends_with(xanatoo::ascii_lower(base), ".pdf")) return nullptr;
+  }
+  const bool remote = xanatoo::is_remote_image(base);
+  const auto& image = remote ? app.images.get(base) : app.images.thumb(base, {}, 128);
+  return image.ok ? image.texture : nullptr;
+}
+
 // Fill the chrome-facing snapshot of app state for this frame (also drives the
 // software gamepad pointer, which synthesises mouse events).
 static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
@@ -218,6 +238,24 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.styles_open = app.styles_panel_open;
   ui_state.bookmarks_open = app.bookmarks_panel_open;
   ui_state.bookmarks = app.bookmarks;
+  ui_state.location_icon = address_icon(app, ui_state.doc_label);
+  // Imported EPUBs are stored as content.md beside their extracted media.
+  // Use the first image in that document as its cover when present.
+  const std::string current = path_of(app, focused_pane(app));
+  if (!ui_state.location_icon && current.find("/epub-import/") != std::string::npos) {
+    const auto& doc = doc_of(app, focused_pane(app));
+    for (const auto& node : doc.nodes) {
+      if (node.kind != xanatoo::NodeKind::Image || node.src.empty()) continue;
+      const auto& cover = app.images.thumb(node.src, fs::path(current).parent_path().string(), 128);
+      if (cover.ok) ui_state.location_icon = cover.texture;
+      break;
+    }
+  }
+  ui_state.bookmark_icons.clear();
+  for (const auto& bookmark : app.bookmarks)
+    ui_state.bookmark_icons.push_back(
+        xanatoo::parse_locator(bookmark.address).base == current && ui_state.location_icon
+            ? ui_state.location_icon : address_icon(app, bookmark.address));
   {
     // With a selection the star bookmarks the selection.
     ui_state.current_bookmarked =

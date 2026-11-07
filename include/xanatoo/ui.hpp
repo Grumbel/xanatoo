@@ -260,6 +260,8 @@ struct UiState {
   } bookmark_menu;
   // Persistent bookmarks for the Bookmarks menu / panel.
   std::vector<Bookmark> bookmarks;
+  SDL_Texture* location_icon = nullptr;
+  std::vector<SDL_Texture*> bookmark_icons;
   // Tab strip (labels left→right); active_tab is index into tab_labels.
   std::vector<std::string> tab_labels;
   std::vector<uint32_t> tab_ids;  // buffer id of each tab (stable ImGui ids)

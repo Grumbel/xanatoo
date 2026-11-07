@@ -20,6 +20,8 @@
 #include <functional>
 #include <utility>
 #include <iostream>
+#include <fstream>
+#include <iterator>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -74,7 +76,34 @@ unsigned char* load_rgba(const std::string& path, int& w, int& h) {
     std::cerr << "image too large: " << path << " (" << w << "x" << h << ")\n";
     return nullptr;
   }
-  return stbi_load(path.c_str(), &w, &h, &comp, 4);
+  if (auto* pixels = stbi_load(path.c_str(), &w, &h, &comp, 4)) return pixels;
+  // ICO containers commonly hold PNG images. Pick the largest decodable
+  // entry; bounds-check offsets because downloaded files are untrusted.
+  std::ifstream in(path, std::ios::binary);
+  std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(in)), {});
+  auto u16 = [&](size_t p) { return unsigned(bytes[p]) | (unsigned(bytes[p+1]) << 8); };
+  auto u32 = [&](size_t p) { return uint32_t(bytes[p]) | (uint32_t(bytes[p+1]) << 8) |
+                                    (uint32_t(bytes[p+2]) << 16) | (uint32_t(bytes[p+3]) << 24); };
+  if (bytes.size() < 6 || u16(0) != 0 || u16(2) != 1) return nullptr;
+  const unsigned count = u16(4);
+  if (count > (bytes.size() - 6) / 16) return nullptr;
+  unsigned char* best = nullptr;
+  int best_area = 0;
+  for (unsigned i = 0; i < count; ++i) {
+    const size_t p = 6 + i * 16;
+    const uint32_t len = u32(p + 8), off = u32(p + 12);
+    if (off > bytes.size() || len > bytes.size() - off || len > 12 * 1024 * 1024) continue;
+    int iw = 0, ih = 0, ic = 0;
+    if (!stbi_info_from_memory(bytes.data() + off, static_cast<int>(len), &iw, &ih, &ic) ||
+        iw <= 0 || ih <= 0 || static_cast<long long>(iw) * ih > kMaxPixels ||
+        iw * ih <= best_area) continue;
+    auto* candidate = stbi_load_from_memory(bytes.data() + off, static_cast<int>(len), &iw, &ih, &ic, 4);
+    if (candidate) {
+      stbi_image_free(best);
+      best = candidate; w = iw; h = ih; best_area = iw * ih;
+    }
+  }
+  return best;
 }
 
 }  // namespace
@@ -84,8 +113,8 @@ Image ImageCache::load(const std::string& resolved_path) {
   if (backend_) {
     std::vector<unsigned char> px;
     int pw = 0, ph = 0;
-    if (!image_backend_decode(resolved_path, kMaxPixels, px, pw, ph)) return {};
-    return to_texture(px.data(), pw, ph);
+    if (image_backend_decode(resolved_path, kMaxPixels, px, pw, ph))
+      return to_texture(px.data(), pw, ph);
   }
 #endif
   int w = 0, h = 0;
