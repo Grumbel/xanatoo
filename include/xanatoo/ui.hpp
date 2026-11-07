@@ -206,6 +206,7 @@ struct UiState {
   std::vector<UiSearchEngine> search_engines;
   std::string search_engine;  // id of the engine in use
   bool has_nav = false;  // focused page has navigation for the panel
+  bool has_site = false; // focused address has a site to search for a sitemap
   bool diff = false;
   bool can_diff = false;  // two independent documents loaded
   bool structure = false;

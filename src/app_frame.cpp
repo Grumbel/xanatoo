@@ -123,6 +123,17 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.backlinks = app.backlinks_mode;
   ui_state.sitemap = app.sitemap.shown;
   ui_state.page_panel = app.page.shown;
+  ui_state.has_nav = page_has_navigation(app);
+#if defined(XANATOO_WEB) && XANATOO_WEB
+  {
+    const std::string& path = path_of(app, focused_pane(app));
+    const std::string web = xanatoo::is_sitemap_ref(path)
+                                ? "https://" + xanatoo::sitemap_ref_host(path) + "/"
+                                : xanatoo::url_host(path).empty()
+                                      ? xanatoo::web_url_for(path) : path;
+    ui_state.has_site = !xanatoo::url_host(web).empty();
+  }
+#endif
   ui_state.searchbar = app.search.open;
   ui_state.search_engine = search_engine_id(app);
   ui_state.search_engines.clear();

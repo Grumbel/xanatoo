@@ -941,8 +941,11 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
   const float min_url_w = 200.f * scale_;
   const float button_w = 32.f * scale_ + 8.f + ImGui::GetStyle().ItemSpacing.x;
   const int right_buttons = state.browse ? 7 : 6;
+  const int url_extras = (state.has_chrome ? 1 : 0) +
+                         (state.has_nav ? 1 : 0) + (state.has_site ? 1 : 0);
   const bool url_own_row = vp->Size.x <
-      12.f + (7 + right_buttons) * button_w + 15.f + min_url_w;
+      12.f + (6 + right_buttons) * button_w + 15.f + min_url_w +
+          url_extras * (30.f * scale_ + 2.f);
   const float browse_h = button_row_h + (url_own_row ? button_row_h : 0.f);
   ImGui::SetNextWindowPos(ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
   ImGui::SetNextWindowSize(ImVec2(vp->Size.x, browse_h));
@@ -984,23 +987,6 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
                   cmd, !state.alternate_url.empty());
       if (state.native_view) ImGui::PopStyleColor(2);
     }
-    {
-      // Pressed in reader mode; enabled while there is chrome to hide.
-      const char* tip = !state.has_chrome && !state.reader
-                            ? "Reader mode (F9; only for web pages with "
-                              "navigation, sidebars or footers)"
-                        : state.reader ? "Reader mode on: show the whole page (F9)"
-                                       : "Reader mode: hide navigation, sidebars "
-                                         "and footers (F9)";
-      if (state.reader) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                              ImVec4(0.4f, 0.5f, 0.75f, 1.f));
-      }
-      tool_button("tb_reader", "reader", tip, UiCommand::ToggleReader, cmd,
-                  state.has_chrome || state.reader);
-      if (state.reader) ImGui::PopStyleColor(2);
-    }
 
     if (!url_own_row) toolbar_separator();
 
@@ -1016,10 +1002,12 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         ImGui::TextDisabled("*");
         ImGui::SameLine(0.f, 2.f);
       }
+      // Context controls stay with the address on either toolbar row.
+      const float extra_w = url_extras * (30.f * scale_ + 2.f);
       // Leave room for the buttons right of the field (measured last frame).
       float field_w =
           ImGui::GetContentRegionAvail().x -
-          (url_own_row ? 0.f : url_right_w_ + 6.f);
+          (url_own_row ? 0.f : url_right_w_ + 6.f) - extra_w;
       if (field_w < 100.f) field_w = 100.f;
       ImGui::SetNextItemWidth(field_w);
       ImGui::SetCursorPosY(row_y + (button_h - field_h) * 0.5f);
@@ -1069,6 +1057,25 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         url_bar_editing_ = false;
         ImGui::ClearActiveID();
       }
+      auto extra = [&](const char* label, const char* tip, UiCommand action, bool on) {
+        ImGui::SameLine(0.f, 2.f);
+        if (on) {
+          ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
+          ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.4f, 0.5f, 0.75f, 1.f));
+        }
+        if (ImGui::Button(label, ImVec2(30.f * scale_, field_h))) cmd = action;
+        if (on) ImGui::PopStyleColor(2);
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", tip);
+      };
+      if (state.has_chrome)
+        extra("R##url_reader", state.reader ? "Show the whole page (F9)" : "Reader mode (F9)",
+              UiCommand::ToggleReader, state.reader);
+      if (state.has_nav)
+        extra("N##url_nav", state.page_panel ? "Close page navigation" : "Open page navigation",
+              UiCommand::TogglePage, state.page_panel);
+      if (state.has_site)
+        extra("S##url_sitemap", state.sitemap ? "Close site map" : "Find and open site map",
+              UiCommand::ToggleSitemap, state.sitemap);
       if (!url_own_row) {
         ImGui::SameLine(0.f, 6.f);
         ImGui::SetCursorPosY(row_y);

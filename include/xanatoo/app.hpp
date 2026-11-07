@@ -1288,6 +1288,7 @@ void close_doc_window(App& app, size_t i);
 FloatWindow* window_of_view(App& app, int pi);
 
 // ---- page panel (app_page.cpp) ----
+bool page_has_navigation(App& app);
 void toggle_page_panel(App& app);
 void update_page_panel(App& app);
 void draw_page_panel(App& app);

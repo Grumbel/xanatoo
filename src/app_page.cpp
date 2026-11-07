@@ -158,6 +158,10 @@ void activate(App& app, const PageRow& r) {
 
 }  // namespace
 
+bool page_has_navigation(App& app) {
+  return !panel_regions(doc_of(app, focused_pane(app))).empty();
+}
+
 void toggle_page_panel(App& app) {
   app.page.shown = !app.page.shown;
   app.page.built = false;
