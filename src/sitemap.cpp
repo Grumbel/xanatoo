@@ -463,7 +463,6 @@ std::optional<SiteTree> sitemap_fetch_tree(std::string_view host_in,
   while (!queue.empty()) {
     std::string url = std::move(queue.front());
     queue.pop_front();
-    if (starts_with_ci(url, "http://")) url = "https://" + url.substr(7);
     if (!visited.insert(url).second) continue;
     if (files >= kMaxFiles) {
       notes.push_back("Stopped after " + std::to_string(kMaxFiles) +

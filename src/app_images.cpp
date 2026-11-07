@@ -35,10 +35,8 @@ constexpr uint64_t kThumbCacheBytes = 128ull * 1024 * 1024;
 // Download `url` to its cache file and build the inline thumbnail.
 bool download_image(const std::string& url) {
 #if defined(XANATOO_HTTPS) && XANATOO_HTTPS
-  std::string fetch = url;
-  if (starts_with_ci(fetch, "http://")) fetch = "https://" + fetch.substr(7);
   std::string err;
-  auto r = xanatoo::https_get_follow(fetch, xanatoo::user_agent("image fetch"), &err);
+  auto r = xanatoo::https_get_follow(url, xanatoo::user_agent("image fetch"), &err);
   if (!r || r->status != 200 || r->body.empty()) {
     std::cerr << "image: " << url << ": "
               << (r ? "HTTP " + std::to_string(r->status) : err) << "\n";

@@ -3536,7 +3536,7 @@ void test_feed_urls() {
   EXPECT(!is_feed_url("https://example.org/feedback"));
   EXPECT(!is_feed_url("https://news.ycombinator.com/item?id=1"));
   EXPECT_EQ(feed_http_url("feed://example.org/rss"), "https://example.org/rss");
-  EXPECT_EQ(feed_http_url("feed:http://example.org/"), "https://example.org/");
+  EXPECT_EQ(feed_http_url("feed:http://example.org/"), "http://example.org/");
   EXPECT(looks_like_feed("\xEF\xBB\xBF<?xml version=\"1.0\"?>\n<!-- c --><rss version=\"2.0\">"));
   EXPECT(looks_like_feed("<feed xmlns=\"http://www.w3.org/2005/Atom\">"));
   EXPECT(!looks_like_feed("<!DOCTYPE html><html><head>"));

@@ -2,12 +2,14 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/https.hpp"
+#include "xanatoo/http_url.hpp"
 #include "xanatoo/tls.hpp"
 #include "xanatoo/util.hpp"
 
 #include <algorithm>
 #include <cctype>
 #include <charconv>
+#include <cerrno>
 #include <cstdlib>
 #include <cstring>
 #include <sstream>
@@ -50,7 +52,56 @@ int tcp_connect(const std::string& host, int port, std::string* err) {
   return fd;
 }
 
+// A single HTTP/1.1 connection. The TLS layer owns secure sockets; the raw
+// layer owns plain sockets. No TLS handshake is attempted for http://.
+class HttpConnection {
+public:
+  HttpConnection() = default;
+  HttpConnection(const HttpConnection&) = delete;
+  HttpConnection& operator=(const HttpConnection&) = delete;
+  ~HttpConnection() { if (plain_fd_ >= 0) ::close(plain_fd_); }
 
+  bool open(const HttpUrl& url, std::string* err) {
+    const int fd = tcp_connect(url.host, url.port, err);
+    if (fd < 0) return false;
+    secure_ = url.secure;
+    if (secure_) return tls_.connect(fd, url.host, err);
+    plain_fd_ = fd;
+    return true;
+  }
+
+  bool write_all(const void* data, size_t size) {
+    if (secure_) return tls_.write_all(data, size);
+    const char* ptr = static_cast<const char*>(data);
+    while (size) {
+#ifdef MSG_NOSIGNAL
+      constexpr int flags = MSG_NOSIGNAL;
+#else
+      constexpr int flags = 0;
+#endif
+      const ssize_t n = ::send(plain_fd_, ptr, size, flags);
+      if (n < 0 && errno == EINTR) continue;
+      if (n <= 0) return false;
+      ptr += n;
+      size -= static_cast<size_t>(n);
+    }
+    return true;
+  }
+
+  int read(void* dst, size_t size) {
+    if (secure_) return tls_.read(dst, size);
+    for (;;) {
+      const ssize_t n = ::recv(plain_fd_, dst, size, 0);
+      if (n < 0 && errno == EINTR) continue;
+      return static_cast<int>(n);
+    }
+  }
+
+private:
+  int plain_fd_ = -1;
+  bool secure_ = false;
+  TlsStream tls_;
+};
 
 }  // namespace
 
@@ -85,32 +136,17 @@ std::optional<HttpResult> https_request(std::string_view method,
                                         std::string_view extra_headers,
                                         std::string_view body_in,
                                         std::string* err) {
-  if (!starts_with_ci(url, "https://")) {
-    if (err) *err = "only https supported";
+  const auto parsed = parse_http_url(url);
+  if (!parsed) {
+    if (err) *err = "invalid http(s) URL";
     return std::nullopt;
   }
-  std::string_view rest = url.substr(8);
-  size_t slash = rest.find('/');
-  std::string host = std::string(
-      slash == std::string_view::npos ? rest : rest.substr(0, slash));
-  std::string path = std::string(
-      slash == std::string_view::npos ? "/" : rest.substr(slash));
-  int port = 443;
-  size_t colon = host.rfind(':');
-  if (colon != std::string::npos) {
-    port = std::atoi(host.c_str() + colon + 1);
-    if (port <= 0) port = 443;
-    host = host.substr(0, colon);
-  }
-
-  int fd = tcp_connect(host, port, err);
-  if (fd < 0) return std::nullopt;
-  TlsStream tls;
-  if (!tls.connect(fd, host, err)) return std::nullopt;
+  HttpConnection conn;
+  if (!conn.open(*parsed, err)) return std::nullopt;
 
   std::ostringstream req;
-  req << method << " " << path << " HTTP/1.1\r\n"
-      << "Host: " << host << "\r\n"
+  req << method << " " << parsed->target << " HTTP/1.1\r\n"
+      << "Host: " << parsed->authority << "\r\n"
       << "User-Agent: " << user_agent << "\r\n"
       << "Accept: application/json, text/plain, */*\r\n"
       << "Accept-Language: en-US,en;q=0.9\r\n"
@@ -121,20 +157,19 @@ std::optional<HttpResult> https_request(std::string_view method,
   req << "\r\n";
   if (!body_in.empty()) req << body_in;
   std::string req_s = req.str();
-  if (!tls.write_all(req_s.data(), req_s.size())) {
-    if (err) *err = "TLS write failed";
+  if (!conn.write_all(req_s.data(), req_s.size())) {
+    if (err) *err = "HTTP write failed";
     return std::nullopt;
   }
 
   std::string data;
   char buf[4096];
   for (;;) {
-    int n = tls.read(buf, sizeof(buf));
+    int n = conn.read(buf, sizeof(buf));
     if (n <= 0) break;
     data.append(buf, static_cast<size_t>(n));
     if (data.size() > 12 * 1024 * 1024) break;
   }
-  tls.close();
 
   size_t hdr_end = data.find("\r\n\r\n");
   if (hdr_end == std::string::npos) {
@@ -194,16 +229,12 @@ std::optional<HttpResult> https_get_follow(std::string_view url,
     if (!resp || resp->status < 300 || resp->status >= 400 ||
         resp->location.empty())
       break;
-    std::string loc = resp->location;
-    if (!starts_with_ci(loc, "https://") && !starts_with_ci(loc, "http://")) {
-      // Relative redirect: resolve against scheme://host of `current`.
-      size_t host_end = current.find('/', current.find("://") + 3);
-      std::string origin = current.substr(0, host_end);
-      if (loc.empty() || loc[0] != '/') loc.insert(loc.begin(), '/');
-      loc = origin + loc;
+    auto next = resolve_http_redirect(current, resp->location);
+    if (!next) {
+      if (err) *err = "unsupported HTTP redirect: " + resp->location;
+      return std::nullopt;
     }
-    if (starts_with_ci(loc, "http://")) loc = "https://" + loc.substr(7);
-    current = std::move(loc);
+    current = std::move(*next);
   }
   if (final_url) *final_url = current;
   return resp;
@@ -280,34 +311,19 @@ bool stream_once(const std::string& url, std::string_view agent,
                  const HttpHeaderCallback& on_headers,
                  const HttpBodyCallback& on_body, HttpStreamHeaders& result,
                  std::string* err) {
-  if (!starts_with_ci(url, "https://")) {
-    if (err) *err = "only https supported";
+  const auto parsed = parse_http_url(url);
+  if (!parsed) {
+    if (err) *err = "invalid http(s) URL";
     return false;
   }
-  std::string_view rest(url.data() + 8, url.size() - 8);
-  const size_t split = rest.find_first_of("/?#");
-  std::string host(rest.substr(0, split));
-  const std::string resource = split == std::string_view::npos ? "/" :
-      rest[split] == '/' ? std::string(rest.substr(split)) :
-      rest[split] == '?' ? "/" + std::string(rest.substr(split)) : "/";
-  // Fragments are client-side addresses and never belong in the request.
-  const std::string path = resource.substr(0, resource.find('#'));
-  int port = 443;
-  if (const size_t colon = host.rfind(':'); colon != std::string::npos) {
-    port = std::atoi(host.c_str() + colon + 1);
-    if (port <= 0) port = 443;
-    host.resize(colon);
-  }
-  int fd = tcp_connect(host, port, err);
-  if (fd < 0) return false;
-  TlsStream tls;
-  if (!tls.connect(fd, host, err)) return false;
-  const std::string req = "GET " + path + " HTTP/1.1\r\nHost: " + host +
+  HttpConnection conn;
+  if (!conn.open(*parsed, err)) return false;
+  const std::string req = "GET " + parsed->target + " HTTP/1.1\r\nHost: " + parsed->authority +
       "\r\nUser-Agent: " + std::string(agent) +
       "\r\nAccept: */*\r\nAccept-Encoding: identity\r\n"
       "Connection: close\r\n\r\n";
-  if (!tls.write_all(req.data(), req.size())) {
-    if (err) *err = "TLS write failed";
+  if (!conn.write_all(req.data(), req.size())) {
+    if (err) *err = "HTTP write failed";
     return false;
   }
   std::string pending;
@@ -317,9 +333,9 @@ bool stream_once(const std::string& url, std::string_view agent,
   int64_t left = -1;
   char buf[8192];
   for (;;) {
-    const int n = tls.read(buf, sizeof(buf));
+    const int n = conn.read(buf, sizeof(buf));
     if (n < 0) {
-      if (err) *err = "TLS receive failed or timed out";
+      if (err) *err = "HTTP receive failed or timed out";
       return false;
     }
     if (n == 0) break;
@@ -419,15 +435,12 @@ bool https_get_follow_stream(std::string_view url, std::string_view user_agent,
       if (final_url) *final_url = current;
       return true;
     }
-    std::string loc = headers.location;
-    if (!starts_with_ci(loc, "https://") && !starts_with_ci(loc, "http://")) {
-      const size_t host_end = current.find('/', current.find("://") + 3);
-      const std::string origin = current.substr(0, host_end);
-      if (loc.empty() || loc[0] != '/') loc.insert(loc.begin(), '/');
-      loc = origin + loc;
+    auto next = resolve_http_redirect(current, headers.location);
+    if (!next) {
+      if (err) *err = "unsupported HTTP redirect: " + headers.location;
+      return false;
     }
-    if (starts_with_ci(loc, "http://")) loc = "https://" + loc.substr(7);
-    current = std::move(loc);
+    current = std::move(*next);
   }
   if (err) *err = "too many HTTP redirects";
   return false;

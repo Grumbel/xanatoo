@@ -1,6 +1,6 @@
 # Web downloads (experimental)
 
-Following an HTTPS link now uses the response's MIME type and
+Following an HTTP or HTTPS link now uses the response's MIME type and
 `Content-Disposition`, rather than excluding `.pdf`, `.zip`, and similar
 extensions before the request. HTML, Markdown, Gemtext, plain text, JSON and
 feeds are still rendered as documents. Other types, or any response declared

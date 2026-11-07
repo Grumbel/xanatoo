@@ -16,7 +16,7 @@ namespace xanatoo {
 // a /feed, /rss, /atom segment, /feeds/…, or ?feed=rss2 / ?format=atom.
 bool is_feed_url(std::string_view s);
 
-// The URL to request: "feed:" stripped, http upgraded to https.
+// The URL to request: "feed:" stripped; explicit http/https preserved.
 std::string feed_http_url(std::string_view s);
 
 // Root element is <rss>, <feed> (Atom) or <rdf:RDF> (RSS 1.0).

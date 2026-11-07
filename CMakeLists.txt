@@ -165,6 +165,7 @@ add_executable(xanatoo
   src/platform.cpp
   src/cli.cpp
   src/paths.cpp
+  src/http_url.cpp
   src/version.cpp
   src/gemini.cpp
   src/nostr.cpp
@@ -576,4 +577,10 @@ add_executable(xanatoo_xml_tests
 )
 target_include_directories(xanatoo_xml_tests PRIVATE include)
 add_test(NAME xml_tests COMMAND xanatoo_xml_tests)
+add_executable(xanatoo_http_url_tests
+  tests/http_url_tests.cpp
+  src/http_url.cpp
+)
+target_include_directories(xanatoo_http_url_tests PRIVATE include)
+add_test(NAME http_url_tests COMMAND xanatoo_http_url_tests)
 endif()

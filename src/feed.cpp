@@ -532,7 +532,7 @@ std::string feed_http_url(std::string_view s) {
     if (starts_with(s, "//")) s.remove_prefix(2);  // feed://host/…
   }
   if (starts_with_ci(s, "https://")) return std::string(s);
-  if (starts_with_ci(s, "http://")) return "https://" + std::string(s.substr(7));
+  if (starts_with_ci(s, "http://")) return std::string(s);
   return "https://" + std::string(s);
 }
 

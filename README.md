@@ -208,7 +208,9 @@ working when those services change.
 **Network security limitation:** the current OpenSSL and Mbed TLS backends
 do **not yet verify peer certificates**. Do not use the built-in network
 clients for sensitive information or authenticated browsing. Certificate
-verification is an outstanding task.
+verification is an outstanding task. Plain `http://` URLs are supported as
+well, but carry data without encryption or authentication; the reader does
+not silently upgrade an explicitly requested HTTP URL.
 
 The project follows [gamepkgstd](https://github.com/Grumbel/gamepkgstd)
 where applicable, with editor-specific exceptions documented in the

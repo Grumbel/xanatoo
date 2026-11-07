@@ -10,8 +10,9 @@
 
 namespace xanatoo {
 
-// Minimal HTTPS client (TlsStream: OpenSSL or Mbed TLS). Used by Reddit, Lemmy, and similar
-// read-only network document sources.
+// Minimal HTTP/1.1 client. http:// uses plain TCP (port 80); https:// uses
+// TlsStream (OpenSSL or Mbed TLS, port 443). The historical `https_*` names
+// accept either scheme so existing service clients share one implementation.
 
 struct HttpResult {
   int status = 0;
@@ -39,7 +40,7 @@ bool https_get_follow_stream(std::string_view url, std::string_view user_agent,
                              std::string* err = nullptr,
                              std::string* final_url = nullptr);
 
-// HTTP/1.1 request over TLS. `extra_headers` are full header lines ending
+// HTTP/1.1 request over TCP or TLS. `extra_headers` are full header lines ending
 // with "\r\n" (e.g. "Authorization: Bearer …\r\n"). `body` is optional
 // request body (sets Content-Length when non-empty).
 std::optional<HttpResult> https_request(std::string_view method,
@@ -53,8 +54,8 @@ std::optional<HttpResult> https_get(std::string_view url,
                                     std::string_view user_agent,
                                     std::string* err = nullptr);
 
-// GET following up to five redirects (relative Location resolved, http
-// upgraded to https). `final_url` receives the last URL requested.
+// GET following up to five redirects (including relative and cross-scheme
+// Location headers). `final_url` receives the last URL requested.
 std::optional<HttpResult> https_get_follow(std::string_view url,
                                            std::string_view user_agent,
                                            std::string* err = nullptr,
