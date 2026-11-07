@@ -6,7 +6,18 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **296** (this delivery is **295**)
+Next bundle number: **297** (this delivery is **296**)
+
+## Status (2026-11-07) — Fix errors from user's Debug build
+
+- Added `<cstring>` for the URL context menu's `std::strlen` use.
+- Compare `FetchShared::service` to `"Reddit"` by contents with
+  `std::string_view`, avoiding the unspecified pointer comparison.
+- Confirmed no other `service ==` string-literal checks and checked the
+  diff for whitespace errors. Native CMake Debug with SDL2, OpenSSL and all
+  network clients enabled built successfully; all three CTest suites passed.
+- Headless Xvfb startup opened `examples/tour.md`, initialized the OpenGL
+  renderer and loaded 55/55 icons. Nix/thumtoo builds were not exercised.
 
 ## Status (2026-11-07) — Context menus
 

@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdio>
 #include <iostream>
+#include <string_view>
 #include <thread>
 
 #include "xanatoo/app.hpp"
@@ -214,7 +215,7 @@ xanatoo::Document load_error_doc(const FetchJob& job) {
     md += "\n[Open in browser](" + std::string(xanatoo::kExternalPrefix) +
           job.url + ")\n";
   xanatoo::Document doc = xanatoo::parse_document(md, "error.md");
-  if (job.shared->service == "Reddit" &&
+  if (std::string_view(job.shared->service) == "Reddit" &&
       xanatoo::starts_with(job.shared->error, "HTTP 403")) {
     const std::string url = xanatoo::is_reddit_ref(job.url) ?
         xanatoo::web_url_for(job.url) : job.url;
