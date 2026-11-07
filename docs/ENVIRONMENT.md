@@ -42,8 +42,10 @@ apt-get -o APT::Sandbox::User=root \
   libsqlite3-dev libssl-dev xvfb xauth
 ```
 
-This enables the complete core application, SQLite draft store, and all the
-OpenSSL-based network clients. A fallback image decoder (stb_image) avoids
+This enables an explicit **SDL2** build of the core application, SQLite draft
+store, and all the OpenSSL-based network clients (the CMake default now
+selects SDL3; pass `-DXANATOO_SDL3=OFF` when using these SDL2 dependencies).
+A fallback image decoder (stb_image) avoids
 the large optional image stack. For the default thumtoo/libvips configuration,
 also install:
 
@@ -68,13 +70,13 @@ elsewhere):
 ```sh
 # Fast core build: all network clients, stb_image instead of thumtoo
 cmake -S . -B /tmp/xanatoo-build -G Ninja \
-  -DCMAKE_BUILD_TYPE=Debug -DXANATOO_THUMTOO=OFF
+  -DCMAKE_BUILD_TYPE=Debug -DXANATOO_SDL3=OFF -DXANATOO_THUMTOO=OFF
 cmake --build /tmp/xanatoo-build --parallel 4
 ctest --test-dir /tmp/xanatoo-build --output-on-failure
 
 # Default desktop features, including thumtoo/libvips
 cmake -S . -B /tmp/xanatoo-build-full -G Ninja \
-  -DCMAKE_BUILD_TYPE=Debug
+  -DCMAKE_BUILD_TYPE=Debug -DXANATOO_SDL3=OFF
 cmake --build /tmp/xanatoo-build-full --parallel 4
 ctest --test-dir /tmp/xanatoo-build-full --output-on-failure
 ```

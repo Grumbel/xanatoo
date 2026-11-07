@@ -9,6 +9,7 @@
 #include "xanatoo/font.hpp"
 #include "xanatoo/paths.hpp"
 #include "xanatoo/platform.hpp"
+#include "xanatoo/reddit_credentials.hpp"
 
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -2131,8 +2132,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_FirstUseEver,
                             ImVec2(0.5f, 0.5f));
-    if (ImGui::Begin("Preferences", &open,
-                     ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGui::SetNextWindowSize(ImVec2(520.f * scale_, 560.f * scale_),
+                            ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Preferences", &open)) {
       // Checkboxes show the state; a click issues the toggle command.
       auto toggle = [&](const char* label, bool on, UiCommand c,
                         const char* tip) {
@@ -2185,12 +2187,84 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ImGui::EndCombo();
       }
       ImGui::TextDisabled("32 px icons at the platform default; text scales too.");
+#if defined(XANATOO_REDDIT) && XANATOO_REDDIT
+      ImGui::SeparatorText("Reddit API (optional)");
+      if (!reddit_credentials_loaded_) {
+        const RedditCredentials c = load_reddit_credentials();
+        std::snprintf(reddit_client_id_, sizeof(reddit_client_id_), "%s",
+                      c.client_id.c_str());
+        std::snprintf(reddit_client_secret_, sizeof(reddit_client_secret_), "%s",
+                      c.client_secret.c_str());
+        reddit_credentials_loaded_ = true;
+      }
+      ImGui::TextWrapped("Reddit may block anonymous requests (HTTP 403). "
+                         "Approved Data API clients can use app-only OAuth credentials.");
+      if (reddit_credentials_from_environment()) {
+        ImGui::TextDisabled("Environment variables override saved credentials.");
+      } else if (load_reddit_credentials().complete()) {
+        ImGui::TextDisabled("Saved credentials configured locally.");
+      } else {
+        ImGui::TextDisabled("No local credentials configured.");
+      }
+      ImGui::InputText("Client ID", reddit_client_id_, sizeof(reddit_client_id_));
+      ImGui::InputText("Client secret", reddit_client_secret_,
+                       sizeof(reddit_client_secret_),
+                       reddit_secret_visible_ ? 0 : ImGuiInputTextFlags_Password);
+      ImGui::SameLine();
+      ImGui::Checkbox("Show", &reddit_secret_visible_);
+      if (no_save()) ImGui::TextDisabled("Saving is disabled for this session.");
+      const bool complete = reddit_client_id_[0] && reddit_client_secret_[0];
+      ImGui::BeginDisabled(!complete || no_save());
+      if (ImGui::Button("Save credentials")) {
+        cmd = UiCommand::SaveRedditCredentials;
+        result.arg = std::string(reddit_client_id_) + "\n" +
+                     reddit_client_secret_;
+      }
+      ImGui::EndDisabled();
+      ImGui::SameLine();
+      ImGui::BeginDisabled(no_save());
+      if (ImGui::Button("Clear saved credentials")) {
+        cmd = UiCommand::ClearRedditCredentials;
+        reddit_client_id_[0] = reddit_client_secret_[0] = '\0';
+      }
+      ImGui::EndDisabled();
+      if (ImGui::TreeNode("How to obtain credentials")) {
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 455.f * scale_);
+        ImGui::TextWrapped("1. Sign in to Reddit and request Data API access "
+                           "for Xanatoo (a read-only desktop client). "
+                           "Reddit requires approval for external apps.");
+        ImGui::TextWrapped("2. If approved, create a personal 'script' OAuth "
+                           "app (not 'installed') in app settings. Copy the ID "
+                           "beneath its name and the client secret.");
+        ImGui::TextWrapped("3. Paste both values above and click Save. "
+                           "You do not need to enter a Reddit password here.");
+        ImGui::TextWrapped("Devvit apps do not provide credentials for "
+                           "external clients. Reddit plans to end legacy "
+                           "public API access in March 2027.");
+        ImGui::PopTextWrapPos();
+        if (ImGui::SmallButton("Request API access"))
+          xanatoo::sdl::open_url(
+              "https://support.reddithelp.com/hc/en-us/requests/new?"
+              "ticket_form_id=14868593862164");
+        ImGui::SameLine();
+        if (ImGui::SmallButton("OAuth app settings"))
+          xanatoo::sdl::open_url("https://www.reddit.com/prefs/apps");
+        ImGui::TreePop();
+      }
+#endif
       ImGui::Spacing();
+#if defined(XANATOO_REDDIT) && XANATOO_REDDIT
+      ImGui::TextDisabled("Display options: view.conf; Reddit keys: reddit.conf.");
+#else
       ImGui::TextDisabled("Saved to view.conf; layout options are in View.");
+#endif
       if (ImGui::Button("Close")) open = false;
     }
     ImGui::End();
     if (!open) cmd = UiCommand::TogglePreferences;
+  } else {
+    reddit_credentials_loaded_ = false;
+    reddit_secret_visible_ = false;
   }
 
   // ---- Bookmarks manager panel ----

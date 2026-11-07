@@ -170,6 +170,7 @@ add_executable(xanatoo
   src/gemini.cpp
   src/nostr.cpp
   src/reddit.cpp
+  src/reddit_credentials.cpp
   src/lemmy.cpp
   src/hackernews.cpp
   src/time.cpp
@@ -506,6 +507,7 @@ add_executable(xanatoo_tests
   src/org.cpp
   src/editor.cpp
   src/reddit.cpp
+  src/reddit_credentials.cpp
   src/lemmy.cpp
   src/hackernews.cpp
   src/time.cpp

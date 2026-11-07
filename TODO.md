@@ -6,7 +6,25 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **297** (this delivery is **296**)
+Next bundle number: **298** (this delivery is **297**)
+
+## Status (2026-11-07) — Reddit OAuth configuration
+
+- Added masked Client ID / secret fields, save and clear buttons, and
+  links to Reddit's Data API access request and legacy app preferences in
+  Edit → Preferences. Environment credentials override saved values.
+- Persist approved app-only credentials in `config_dir()/reddit.conf`,
+  separate from visual settings. On Unix, write atomically with mode 0600;
+  reject control characters, incomplete pairs, and writes under `--no-save`.
+  Read them on each request, so restarts are unnecessary.
+- `docs/REDDIT.md` explains the approval workflow, obtaining credentials
+  when legacy app creation is permitted, security, and Reddit's announced
+  March 2027 public Data API shutdown. Automatic credential creation is not
+  offered: approval and account registration require Reddit-side user action.
+- Added offline round-trip, replacement, permissions, environment override,
+  invalid input and no-save tests; native SDL2 Debug build and CTest passed.
+- Updated the native Ubuntu build recipe in `docs/ENVIRONMENT.md` to select
+  SDL2 explicitly; current CMake defaults to SDL3.
 
 ## Status (2026-11-07) — Fix errors from user's Debug build
 

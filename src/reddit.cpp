@@ -5,6 +5,7 @@
 // Maps listings / posts into Thread + Message document nodes.
 
 #include "xanatoo/reddit.hpp"
+#include "xanatoo/reddit_credentials.hpp"
 
 #include "xanatoo/https.hpp"
 #include "xanatoo/json_min.hpp"
@@ -182,11 +183,10 @@ std::string reddit_user_agent() {
          " (by /u/grumbel; read-only; +https://github.com/Grumbel/xanatoo)";
 }
 
-// App-only OAuth token (client credentials). Empty if env not set or fails.
+// App-only OAuth token (client credentials). Empty if unset or request fails.
 std::string reddit_oauth_token(std::string* err) {
-  const char* id = std::getenv("XANATOO_REDDIT_CLIENT_ID");
-  const char* sec = std::getenv("XANATOO_REDDIT_CLIENT_SECRET");
-  if (!id || !id[0] || !sec || !sec[0]) return {};
+  const RedditCredentials credentials = effective_reddit_credentials();
+  if (!credentials.complete()) return {};
 
   // Basic base64(id:secret) — minimal encoder
   auto b64 = [](const std::string& in) {
@@ -206,7 +206,8 @@ std::string reddit_oauth_token(std::string* err) {
     while (o.size() % 4) o.push_back('=');
     return o;
   };
-  std::string auth = b64(std::string(id) + ":" + sec);
+  std::string auth = b64(credentials.client_id + ":" +
+                         credentials.client_secret);
   std::string extra = "Authorization: Basic " + auth + "\r\n"
                       "Content-Type: application/x-www-form-urlencoded\r\n";
   auto resp = https_request("POST", "https://www.reddit.com/api/v1/access_token",
@@ -514,8 +515,8 @@ std::optional<Document> reddit_fetch(std::string_view url_in, std::string* err) 
       last_err = "HTTP " + std::to_string(resp->status);
       if (resp->status == 403)
         last_err +=
-            " (Reddit blocked this client/IP — try residential network, or set "
-            "XANATOO_REDDIT_CLIENT_ID + XANATOO_REDDIT_CLIENT_SECRET for OAuth)";
+            " (Reddit denied access. See Edit > Preferences > Reddit API "
+            "for approved OAuth credentials)";
       else if (resp->status == 429)
         last_err += " (rate limited — wait and retry)";
       else if (resp->body.size() > 0 && resp->body.size() < 120 &&
@@ -529,6 +530,8 @@ std::optional<Document> reddit_fetch(std::string_view url_in, std::string* err) 
   if (!resp) {
     if (err) *err = !blocked_err.empty() ? blocked_err :
         last_err.empty() ? "no response from Reddit" : last_err;
+    if (err && !oauth_err.empty())
+      *err += "; OAuth: " + oauth_err;
     return std::nullopt;
   }
   if (resp->status != 200) {

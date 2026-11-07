@@ -22,6 +22,7 @@
 #include "xanatoo/locator.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/reddit.hpp"
+#include "xanatoo/reddit_credentials.hpp"
 #include "xanatoo/inflate.hpp"
 #include "xanatoo/search.hpp"
 #include "xanatoo/search_results.hpp"
@@ -1604,6 +1605,65 @@ void test_view_settings_migration() {
     ::setenv("XDG_CONFIG_HOME", saved.c_str(), 1);
   else
     ::unsetenv("XDG_CONFIG_HOME");
+  fs::remove_all(dir);
+}
+
+void test_reddit_credentials() {
+  using namespace xanatoo;
+  namespace fs = std::filesystem;
+  const char* old_xdg = std::getenv("XDG_CONFIG_HOME");
+  const char* old_id = std::getenv("XANATOO_REDDIT_CLIENT_ID");
+  const char* old_secret = std::getenv("XANATOO_REDDIT_CLIENT_SECRET");
+  const std::string saved_xdg = old_xdg ? old_xdg : "";
+  const std::string saved_id = old_id ? old_id : "";
+  const std::string saved_secret = old_secret ? old_secret : "";
+  const fs::path dir = fs::temp_directory_path() /
+                       ("xanatoo-reddit-test-" + std::to_string(process_id()));
+  fs::create_directories(dir);
+  ::setenv("XDG_CONFIG_HOME", dir.c_str(), 1);
+  ::unsetenv("XANATOO_REDDIT_CLIENT_ID");
+  ::unsetenv("XANATOO_REDDIT_CLIENT_SECRET");
+
+  EXPECT(!load_reddit_credentials().complete());
+  EXPECT(!save_reddit_credentials({"id", ""}));
+  EXPECT(!save_reddit_credentials({"id\nmalicious", "secret"}));
+  EXPECT(save_reddit_credentials({"sample-id", "sample-secret"}));
+  const auto saved = load_reddit_credentials();
+  EXPECT(saved.client_id == "sample-id");
+  EXPECT(saved.client_secret == "sample-secret");
+  EXPECT(save_reddit_credentials({"replaced-id", "replaced-secret"}));
+  EXPECT(load_reddit_credentials().client_id == "replaced-id");
+  EXPECT(save_reddit_credentials({"sample-id", "sample-secret"}));
+#ifndef _WIN32
+  const fs::perms mode = fs::status(reddit_credentials_path()).permissions();
+  EXPECT((mode & fs::perms::owner_read) != fs::perms::none);
+  EXPECT((mode & fs::perms::owner_write) != fs::perms::none);
+  EXPECT((mode & fs::perms::group_all) == fs::perms::none);
+  EXPECT((mode & fs::perms::others_all) == fs::perms::none);
+#endif
+  ::setenv("XANATOO_REDDIT_CLIENT_ID", "env-id", 1);
+  ::setenv("XANATOO_REDDIT_CLIENT_SECRET", "env-secret", 1);
+  EXPECT(reddit_credentials_from_environment());
+  EXPECT(effective_reddit_credentials().client_id == "env-id");
+  EXPECT(effective_reddit_credentials().client_secret == "env-secret");
+  ::unsetenv("XANATOO_REDDIT_CLIENT_SECRET");
+  EXPECT(!reddit_credentials_from_environment());
+  EXPECT(effective_reddit_credentials().client_id == "sample-id");
+  set_no_save(true);
+  EXPECT(!save_reddit_credentials({"would-not-save", "value"}));
+  EXPECT(load_reddit_credentials().client_id == "sample-id");
+  set_no_save(false);
+  EXPECT(save_reddit_credentials({}));
+  EXPECT(!fs::exists(reddit_credentials_path()));
+
+  if (old_xdg) ::setenv("XDG_CONFIG_HOME", saved_xdg.c_str(), 1);
+  else ::unsetenv("XDG_CONFIG_HOME");
+  if (old_id) ::setenv("XANATOO_REDDIT_CLIENT_ID", saved_id.c_str(), 1);
+  else ::unsetenv("XANATOO_REDDIT_CLIENT_ID");
+  if (old_secret)
+    ::setenv("XANATOO_REDDIT_CLIENT_SECRET", saved_secret.c_str(), 1);
+  else
+    ::unsetenv("XANATOO_REDDIT_CLIENT_SECRET");
   fs::remove_all(dir);
 }
 
@@ -4677,6 +4737,7 @@ int main() {
   test_examples_in_menu();
   test_tour_example();
   test_view_settings_migration();
+  test_reddit_credentials();
   test_style_sheet_parse();
   test_named_style_scopes();
   test_layout_article_gaps();

@@ -91,7 +91,9 @@ Body font when
 .Fl \-font
 is not given.
 .It Ev XANATOO_REDDIT_CLIENT_ID , XANATOO_REDDIT_CLIENT_SECRET
-Reddit OAuth credentials, used when anonymous access is refused.
+Reddit Data API OAuth credentials (app-only access).
+When both are set, they override the saved credentials from Preferences.
+Reddit requires approval for external API access.
 .It Ev XANATOO_REDDIT_USER_AGENT , XANATOO_LEMMY_USER_AGENT
 User-Agent override for the Reddit and Lemmy clients.
 .El
@@ -99,6 +101,9 @@ User-Agent override for the Reddit and Lemmy clients.
 .Bl -tag -width Ds
 .It Pa $XDG_CONFIG_HOME/xanatoo/view.conf
 Preferences.
+.It Pa $XDG_CONFIG_HOME/xanatoo/reddit.conf
+Optional Reddit OAuth client ID and secret, saved by Edit > Preferences >
+Reddit API. Owner-only permissions on Unix; keep this file private.
 .It Pa $XDG_STATE_HOME/xanatoo/
 Revision store with drafts of unsaved edits, folds, bookmarks and
 history.

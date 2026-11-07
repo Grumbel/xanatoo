@@ -166,6 +166,8 @@ enum class UiCommand {
   ToggleHoverPreview,       // split view: preview hovered links on the right
   ToggleReaderDefault,      // Preferences: reader mode for new views
   TogglePreferences,        // Edit → Preferences window
+  SaveRedditCredentials,    // arg = client_id + newline + client_secret
+  ClearRedditCredentials,   // remove locally saved Reddit credentials
   SetUiScale,               // Preferences: scale chrome and default text
   SelectStyle,              // arg = style sheet name (styles/<name>.xss)
   ReloadStyles,             // rescan styles/ and re-read the active sheet
@@ -381,6 +383,10 @@ private:
   int url_context_end_ = 0;
   int url_context_cursor_ = 0;
   char search_input_[512] = {};  // search bar text (kept between searches)
+  char reddit_client_id_[256] = {};
+  char reddit_client_secret_[256] = {};
+  bool reddit_credentials_loaded_ = false;
+  bool reddit_secret_visible_ = false;
   bool focus_search_ = false;    // Ctrl+K / View → Search Bar
   bool url_bar_editing_ = false;
   bool wanted_text_input_ = false;  // io.WantTextInput last frame

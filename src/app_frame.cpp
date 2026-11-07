@@ -16,6 +16,7 @@
 #include <stdexcept>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/reddit_credentials.hpp"
 #include "xanatoo/platform.hpp"
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/gemini.hpp"
@@ -433,6 +434,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::ViewMeasure ||
         c == C::ToggleSectionFocus || c == C::ToggleJustify ||
         c == C::ToggleHoverPreview || c == C::ToggleAutoUpdates || c == C::TogglePreferences ||
+        c == C::SaveRedditCredentials || c == C::ClearRedditCredentials ||
         c == C::SetUiScale ||
         c == C::SelectStyle || c == C::ReloadStyles;
     if (!allowed) {
@@ -1618,6 +1620,20 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     }
     case C::TogglePreferences:
       app.preferences_open = !app.preferences_open;
+      break;
+    case C::SaveRedditCredentials: {
+      const size_t split = arg.find('\n');
+      const bool saved = split != std::string::npos &&
+          xanatoo::save_reddit_credentials(
+              {arg.substr(0, split), arg.substr(split + 1)});
+      flash_status(app, saved ? "Reddit credentials saved for future requests"
+                              : "Could not save Reddit credentials");
+      break;
+    }
+    case C::ClearRedditCredentials:
+      flash_status(app, xanatoo::save_reddit_credentials({})
+                           ? "Saved Reddit credentials removed"
+                           : "Could not remove Reddit credentials");
       break;
     case C::SetUiScale:
       try {
