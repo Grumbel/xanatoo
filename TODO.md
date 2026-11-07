@@ -6,7 +6,19 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **290** (this delivery is **289**)
+Next bundle number: **291** (this delivery is **290**)
+
+## Status (2026-11-07) — Forced-wrap overflow after ordinary text
+
+- Before laying out a word, check whether it fits beside the already placed
+  words. Move it to a fresh line if not; otherwise the forced-break path used
+  the word's width alone but emitted the earlier text too, overflowing the
+  column and clipping the ↩ continuation marker.
+- Reserve continuation-mark space with the same font role used to draw it;
+  omit the decoration if an unusually narrow float band cannot hold it.
+- Added a metrics-only layout regression with long unspaced text after ordinary
+  words, including a linked inline span, at several column widths and with
+  justification both on and off.
 
 ## Status (2026-11-07) — Flake checks
 

@@ -2730,6 +2730,11 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     mark.x = previous.x + std::max(previous.advance, 1.f);
     mark.y = previous.y;
     mark.advance = static_cast<float>(glyph.advance >> 6);
+    // Very narrow float bands (or a wide fallback glyph) may not have room
+    // for the decoration. Never let the decoration itself spill outside the
+    // available line; the content break still happens without it.
+    if (mark.x - static_cast<float>(glyph.bearing_x) + mark.advance >
+        lx0 + lw) return;
     mark.kind = InlineKind::Text;
     mark.font = role;
     mark.color = {128, 128, 128, 190};
@@ -2831,14 +2836,24 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
       word_lo = i;
       word_w = 0.f;
     }
-    // Move a whole word to the next line only before its first character.
-    // Once a word is in progress, preserve its accumulated prefix and split
-    // that prefix only when the word itself exceeds the measure.
-    if (word_w == 0.f && line_w > 0.f && line_w + adv > lw) {
-      flush_line(word_lo, false);
+    // Decide whether a word fits alongside the text already on this line
+    // *before* accumulating any of its characters. Otherwise an overlong
+    // word can reach the forced-break path with a nonzero line_w: that path
+    // measures only word_w, then emits the preceding text as well, pushing
+    // both the word and its continuation arrow beyond the right edge.
+    if (word_lo == i && line_w > 0.f) {
+      float remaining_word_w = 0.f;
+      for (size_t j = i; j < chars.size(); ++j) {
+        if (chars[j].cp == ' ' || chars[j].cp == '\n' ||
+            chars[j].cp == '\r' || chars[j].img_w > 0.f) break;
+        remaining_word_w += char_adv(chars[j]);
+        if (line_w + remaining_word_w > lw) break;
+      }
+      if (line_w + remaining_word_w > lw)
+        flush_line(word_lo, false);
     }
     if (word_w > 0.f &&
-        word_w + adv + forced_break_mark_width(chars[i].role) > lw) {
+        word_w + adv + forced_break_mark_width(chars[i - 1].role) > lw) {
       const FontRole role = chars[i - 1].role;
       emit_line(line_lo, i, false);
       add_forced_break_mark(role);

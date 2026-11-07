@@ -1699,6 +1699,68 @@ void test_layout_wrap_respects_max_width() {
   }
 }
 
+// An unspaced run following ordinary words must move to a fresh line before
+// its synthetic ↩ breaks. The prefix used to be included in the emitted line
+// but excluded from the width calculation, so the word and mark overflowed.
+void test_layout_forced_wrap_after_regular_text() {
+  using namespace xanatoo;
+  FontSet fonts;
+  std::string path = fontconfig_find("DejaVu Sans", 0, 0);
+  if (path.empty()) path = fontconfig_find("Liberation Sans", 0, 0);
+  if (path.empty() || !fonts.load(nullptr, path, 18, 24)) {
+    std::fprintf(stderr, "SKIP test_layout_forced_wrap_after_regular_text (no font)\n");
+    return;
+  }
+
+  const std::string long_word(160, 'W');
+  // The second case crosses inline-span boundaries (ordinary text + link).
+  for (const std::string& md : {
+           "A brief introduction " + long_word + " followed by words.\n",
+           "Regular words [" + long_word + "](https://example.org) end.\n",
+           "Regular words **" + long_word.substr(0, 80) + "**" +
+               long_word.substr(80) + " end.\n",
+       }) {
+    Document doc = parse_document(md, "long-wrap.md");
+    LayoutEngine engine(fonts, nullptr);
+    for (float pane_w : {280.f, 360.f, 520.f}) {
+      for (bool justify : {false, true}) {
+        LayoutOptions opts;
+        opts.margin_x = 32.f;
+        opts.justify = justify;
+        engine.set_options(opts);
+        const LayoutResult lr = engine.layout(doc, pane_w);
+        const float right = pane_w - opts.margin_x;
+        int forced_marks = 0;
+        float prefix_baseline = -1.f;
+        float word_baseline = -1.f;
+        for (const PositionedGlyph& g : lr.glyphs) {
+          if (g.codepoint == 'A' || g.codepoint == 'R') {
+            if (prefix_baseline < 0.f) prefix_baseline = g.y;
+          }
+          if (g.codepoint == 'W' && word_baseline < 0.f)
+            word_baseline = g.y;
+          if (g.codepoint == 0x21A9 || g.codepoint == 0x21B5)
+            ++forced_marks;
+          if (g.codepoint == ' ' || g.codepoint == 0) continue;
+          const Glyph& met = fonts.pick(g.font).glyph(g.codepoint);
+          const float cell_right = g.x - static_cast<float>(met.bearing_x) +
+                                   static_cast<float>(met.advance >> 6);
+          if (cell_right > right + 1.5f) {
+            std::fprintf(stderr,
+                         "forced wrap overflow: pane=%.0f justify=%d "
+                         "cp=U+%04X right=%.1f expected<=%.1f\n",
+                         pane_w, justify, g.codepoint, cell_right, right);
+          }
+          EXPECT(cell_right <= right + 1.5f);
+        }
+        EXPECT(forced_marks > 0);
+        EXPECT(prefix_baseline >= 0.f);
+        EXPECT(word_baseline > prefix_baseline);
+      }
+    }
+  }
+}
+
 
 void test_utf8_pop_back() {
   using namespace xanatoo;
@@ -4477,6 +4539,7 @@ int main() {
   test_epub_native();
   test_hit_test_wrapped_link();
   test_layout_wrap_respects_max_width();
+  test_layout_forced_wrap_after_regular_text();
   test_layout_margins_and_measure();
   test_layout_reader_mode();
   test_inline_images_and_asides();
