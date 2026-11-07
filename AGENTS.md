@@ -555,6 +555,10 @@ history or distribute patch files.
 - Maps posts/comments to Thread + Message nodes.
 - Optional OAuth: `XANATOO_REDDIT_CLIENT_ID` + `XANATOO_REDDIT_CLIENT_SECRET` (script app) when anonymous `.json` returns 403.
 - Optional UA override: `XANATOO_REDDIT_USER_AGENT`.
+- When a native `reddit:` fetch receives HTTP 403, the error document offers a
+  clickable `reddit_rss_url` fallback. It goes through the normal RSS/Atom
+  reader, without silently retrying another endpoint. Reddit announced that
+  its first-party RSS feeds will end on 2026-11-13.
 
 ## Lemmy
 

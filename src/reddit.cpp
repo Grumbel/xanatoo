@@ -138,6 +138,37 @@ std::string reddit_json_url(std::string_view s) {
   return path_q + query;
 }
 
+std::string reddit_rss_url(std::string_view s) {
+  trim_ascii(s);
+  if (!is_reddit_url(s)) return {};
+  if (starts_with_ci(s, "https://")) s.remove_prefix(8);
+  else if (starts_with_ci(s, "http://")) s.remove_prefix(7);
+
+  const size_t path_start = s.find_first_of("/?#");
+  std::string_view host = s.substr(0, path_start);
+  if (const size_t colon = host.rfind(':'); colon != std::string_view::npos)
+    host = host.substr(0, colon);
+  if (ascii_lower(host) == "redd.it" ||
+      ascii_lower(host) == "www.redd.it") return {};
+
+  std::string_view path = path_start == std::string_view::npos ?
+      std::string_view{} : s.substr(path_start);
+  path = path.substr(0, path.find('#'));
+  const size_t query_at = path.find('?');
+  std::string suffix = query_at == std::string_view::npos ?
+      std::string{} : std::string(path.substr(query_at));
+  path = path.substr(0, query_at);
+  std::string route(path);
+  if (route.empty()) route = "/";
+  if (ends_with(route, ".json"))
+    route.replace(route.size() - 5, 5, ".rss");
+  else if (!ends_with(route, ".rss")) {
+    if (route.back() != '/') route += '/';
+    route += ".rss";
+  }
+  return "https://www.reddit.com" + route + suffix;
+}
+
 #if defined(XANATOO_REDDIT) && XANATOO_REDDIT
 
 namespace {
@@ -420,6 +451,7 @@ std::optional<Document> reddit_fetch(std::string_view url_in, std::string* err) 
 
   std::optional<HttpResult> resp;
   std::string last_err;
+  std::string blocked_err;
   for (const std::string& cand : candidates) {
     std::string current = cand;
     // OAuth API host prefers no .json suffix on path — map listing path.
@@ -488,12 +520,14 @@ std::optional<Document> reddit_fetch(std::string_view url_in, std::string* err) 
       else if (resp->body.size() > 0 && resp->body.size() < 120 &&
                resp->body.find('<') == std::string::npos)
         last_err += ": " + resp->body;
+      if (resp->status == 403 && blocked_err.empty()) blocked_err = last_err;
       resp.reset();
     }
   }
 
   if (!resp) {
-    if (err) *err = last_err.empty() ? "no response from Reddit" : last_err;
+    if (err) *err = !blocked_err.empty() ? blocked_err :
+        last_err.empty() ? "no response from Reddit" : last_err;
     return std::nullopt;
   }
   if (resp->status != 200) {

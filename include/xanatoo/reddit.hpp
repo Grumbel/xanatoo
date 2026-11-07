@@ -18,6 +18,11 @@ bool is_reddit_url(std::string_view s);
 // Returns empty on failure.
 std::string reddit_json_url(std::string_view s);
 
+// Equivalent feed URL for a Reddit listing or comment thread. Normalizes
+// www/old/np hosts, strips fragments, and preserves listing query options.
+// Empty for non-Reddit URLs and redd.it short links (no subreddit path).
+std::string reddit_rss_url(std::string_view s);
+
 #if defined(XANATOO_REDDIT) && XANATOO_REDDIT
 // Fetch a subreddit listing or post+comments via the public .json API.
 // Builds a Document with Thread + Message nodes (read-only).

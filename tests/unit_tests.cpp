@@ -254,6 +254,23 @@ void test_reddit_urls() {
   EXPECT(u.find("raw_json=1") != std::string::npos);
 
   EXPECT(reddit_json_url("https://example.com/r/x").empty());
+
+  EXPECT_EQ(reddit_rss_url("https://www.reddit.com/r/linux"),
+            "https://www.reddit.com/r/linux/.rss");
+  EXPECT_EQ(reddit_rss_url("https://old.reddit.com/r/linux/comments/abc123/title/"),
+            "https://www.reddit.com/r/linux/comments/abc123/title/.rss");
+  EXPECT_EQ(reddit_rss_url("reddit.com/r/linux/new/?count=25#top"),
+            "https://www.reddit.com/r/linux/new/.rss?count=25");
+  EXPECT_EQ(reddit_rss_url("https://reddit.com/r/linux/.json?limit=10"),
+            "https://www.reddit.com/r/linux/.rss?limit=10");
+  EXPECT_EQ(reddit_rss_url("https://www.reddit.com/r/linux/.rss"),
+            "https://www.reddit.com/r/linux/.rss");
+  EXPECT_EQ(reddit_rss_url("reddit.com"), "https://www.reddit.com/.rss");
+  EXPECT_EQ(reddit_rss_url("https://reddit.com/?sort=top"),
+            "https://www.reddit.com/.rss?sort=top");
+  EXPECT(is_feed_url(reddit_rss_url("https://reddit.com/r/linux/new")));
+  EXPECT(reddit_rss_url("https://redd.it/abc123").empty());
+  EXPECT(reddit_rss_url("https://notreddit.com/r/linux").empty());
 }
 
 void test_lemmy_urls() {

@@ -6,7 +6,18 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **293** (this delivery is **292**)
+Next bundle number: **294** (this delivery is **293**)
+
+## Status (2026-11-07) — Reddit HTTP 403 RSS fallback
+
+- Native `reddit:` error documents now offer a clickable Reddit `.rss` link
+  on HTTP 403, using the existing feed reader rather than retrying behind
+  the user's back. Other Reddit errors remain unchanged.
+- `reddit_rss_url` covers homepage, subreddit listings/sorts, comment-thread
+  paths, `.json` variants and query strings; the offline URL checks pass.
+- Important limitation: Reddit's official October 8 changelog announces the
+  end of RSS feed support on 2026-11-13. This is a temporary fallback, and
+  RSS may also return 403 from blocked networks.
 
 ## Status (2026-11-07) — Plain HTTP and scheme-preserving redirects
 

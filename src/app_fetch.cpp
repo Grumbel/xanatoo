@@ -213,7 +213,27 @@ xanatoo::Document load_error_doc(const FetchJob& job) {
       xanatoo::starts_with(job.url, "https://"))
     md += "\n[Open in browser](" + std::string(xanatoo::kExternalPrefix) +
           job.url + ")\n";
-  return xanatoo::parse_document(md, "error.md");
+  xanatoo::Document doc = xanatoo::parse_document(md, "error.md");
+  if (job.shared->service == "Reddit" &&
+      xanatoo::starts_with(job.shared->error, "HTTP 403")) {
+    const std::string url = xanatoo::is_reddit_ref(job.url) ?
+        xanatoo::web_url_for(job.url) : job.url;
+    const std::string rss = xanatoo::reddit_rss_url(url);
+    if (!rss.empty()) {
+      // Build the link as an inline span: URLs from a user's address bar need
+      // not be safe to interpolate into Markdown's (...) link syntax.
+      const xanatoo::NodeId para =
+          doc.create(xanatoo::NodeKind::Paragraph, doc.root);
+      doc.append_text(para, "The Reddit JSON endpoint is blocked. ");
+      xanatoo::InlineSpan link;
+      link.kind = xanatoo::InlineKind::Link;
+      link.text = "Try the Reddit RSS feed";
+      link.href = rss;
+      doc.get(para).spans.push_back(std::move(link));
+      doc.append_text(para, " (if still available).");
+    }
+  }
+  return doc;
 }
 
 // Error page in the pane, like a browser's: the address stays the one that
