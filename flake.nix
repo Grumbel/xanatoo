@@ -217,7 +217,7 @@
           # Compile the SDL-facing drawing, window, event, gamepad and input
           # bridge against SDL3 headers independently of the application build.
           sdl3-api = pkgs.runCommand "xanatoo-check-sdl3-api" {
-            nativeBuildInputs = [ pkgs.pkg-config ];
+            nativeBuildInputs = [ pkgs.pkg-config pkgs.stdenv.cc ];
             buildInputs = [ pkgs.sdl3 ];
           } ''
             c++ -std=c++20 -DXANATOO_SDL3=1 \

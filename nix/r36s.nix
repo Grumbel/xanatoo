@@ -252,6 +252,7 @@ let
       "-DXANATOO_SDL3=ON"
       "-DSDL3_DIR=${sdl3}/lib/cmake/SDL3"
     ] else [
+      "-DXANATOO_SDL3=OFF"
       "-DSDL2_INCLUDE_DIRS=${sysroot}/usr/include/SDL2"
       "-DSDL2_LIBRARIES=${sdlStub}/lib/libSDL2.so"
     ]);

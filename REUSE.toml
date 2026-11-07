@@ -17,6 +17,7 @@ path = [
   "docs/**",
   "examples/**",
   "styles/**",
+  "research/pdf-layout-corpus.json",
   "icons/svg/**",
   "data/icons/**",
   "mk/android/app/res/**",
@@ -42,3 +43,9 @@ SPDX-License-Identifier = "MIT OR Unlicense"
 path = "external/README.md"
 SPDX-FileCopyrightText = "2026 Ingo Ruhnke <grumbel@gmail.com>"
 SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Bundled DejaVu fonts (data/fonts/LICENSE-DejaVu.txt).
+[[annotations]]
+path = "data/fonts/*.ttf"
+SPDX-FileCopyrightText = "2003 Bitstream, Inc.; DejaVu changes are in the public domain"
+SPDX-License-Identifier = "Bitstream-Vera"

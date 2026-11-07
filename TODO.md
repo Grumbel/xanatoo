@@ -8,6 +8,13 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **290** (this delivery is **289**)
 
+## Status (2026-11-07) — Flake checks
+
+- Fixed man-page lint, provided the SDL3 API check with a compiler, and
+  added REUSE metadata for bundled fonts and the PDF research corpus.
+- Explicitly selected SDL2 for its R36S package; the full `nix flake check
+  -L --keep-going` passed. No CLI bundle.
+
 ## Status (2026-11-07) — Opt-in Android updates
 
 - Added an Android Preferences switch for automatic update checks, off by
