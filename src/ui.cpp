@@ -2154,13 +2154,19 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
                         ImVec2(7.f * scale_, 6.f * scale_));
     if (ImGui::Begin("##reply_editor", nullptr, flags)) {
+      auto muted_wrapped = [](const char* label) {
+        ImGui::PushStyleColor(ImGuiCol_Text,
+                              ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+        ImGui::TextWrapped("%s", label);
+        ImGui::PopStyleColor();
+      };
       std::string title = "Reply to ";
       title += state.reply_author.empty() ? "comment" : "@" + state.reply_author;
-      ImGui::TextUnformatted(title.c_str());
+      ImGui::TextWrapped("%s", title.c_str());
       if (!state.reply_label.empty() &&
           ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip("Comment: %s", state.reply_label.c_str());
-      ImGui::TextDisabled("Markdown · preview only, no account connected");
+      muted_wrapped("Markdown · preview only, no account connected");
       const char* format_before = nullptr;
       const char* format_after = nullptr;
       auto format = [&](const char* label, const char* before,
@@ -2205,8 +2211,13 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ui->reply_selection_.end = cb->SelectionEnd;
         return 0;
       };
-      const float edit_h = std::max(70.f, ImGui::GetContentRegionAvail().y -
-                                                51.f * scale_);
+      // Reserve room for the Send control and a wrapped status line. Docking
+      // to a narrow side column may turn the tools and text into more lines;
+      // use the remaining space instead of assuming a one-row toolbar.
+      const float footer_h = ImGui::GetFrameHeightWithSpacing() +
+                             3.f * ImGui::GetTextLineHeightWithSpacing();
+      const float edit_h = std::max(48.f * scale_,
+                                    ImGui::GetContentRegionAvail().y - footer_h);
       if (ImGui::InputTextMultiline(
               "##reply_text", reply_input_, sizeof(reply_input_),
               ImVec2(-1.f, edit_h), ImGuiInputTextFlags_CallbackAlways,
@@ -2238,8 +2249,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         result.arg = reply_input_;
       }
       ImGui::EndDisabled();
-      ImGui::SameLine();
-      ImGui::TextDisabled("Mockup: Send does not post anything");
+      muted_wrapped("Mockup: Send does not post anything");
     }
     ImGui::End();
     ImGui::PopStyleVar();

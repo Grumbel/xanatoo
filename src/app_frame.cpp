@@ -1713,6 +1713,11 @@ void run_chrome(App& app) {
                          xanatoo::sdl::ticks() >= app.status_notice_until
                      ? 0
                      : status_bar_full_h;
+  // ImGui controls inside floating panels use absolute screen coordinates.
+  // Snap/dock frames *before* reading those coordinates: draw_floats() also
+  // places windows, but doing it only there leaves the child controls at the
+  // pre-snap position when a dragged/resized panel reaches a screen edge.
+  place_windows(app);
   xanatoo::UiState ui_state;
   build_ui_state(app, ui_state);
   auto ui_frame = app.ui.begin_frame(ui_state);

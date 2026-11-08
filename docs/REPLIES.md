@@ -8,6 +8,9 @@ containing `Thread` / `Message` nodes.
 For an offline test, open `examples/reply-demo.xml` and right-click any of its
 three comments. The Reply panel is a standard Xanatoo floating window: drag
 its title to move/dock it, resize it from its edges, or close it with the X.
+When a dragged panel snaps to the window edge, its editor follows the same
+snapped geometry as the frame. Labels and controls wrap in narrow side docks;
+a short panel can scroll to reach the Send button.
 
 - The composer accepts multiline text and has **Bold**, **Italic**, **Code**,
   **Link**, and **Quote** buttons. They insert Markdown delimiters around

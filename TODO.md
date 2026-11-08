@@ -6,7 +6,18 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **300** (this delivery is **299**)
+Next bundle number: **301** (this delivery is **300**)
+
+## Status (2026-11-08) — Reply panel edge positioning
+
+- Position floating/docked panels before reading their absolute ImGui child
+  positions for the frame. Previously a panel could snap at draw time after
+  the Reply editor had already used its unsnapped position, separating the
+  editor from its frame when dragged/resized against a window border.
+- Make Reply labels and the mock status wrap in narrow docks, reserve footer
+  space using the actual ImGui available height, and allow small panels to
+  scroll to the Send button. Native Debug build and all three CTest suites
+  pass; interactive dragging on a device still needs a manual check.
 
 ## Status (2026-11-08) — Reply panel mockup
 
