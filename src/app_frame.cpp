@@ -187,6 +187,22 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.selection = !focused_pane(app).sel.empty();
   ui_state.context_comment_native = app.context_comment_native;
   ui_state.context_comment_web = app.context_comment_web;
+  ui_state.context_can_reply =
+      app.context_reply_buffer != kNoBuffer &&
+      app.context_reply_node != xanatoo::INVALID_NODE;
+  ui_state.reply_open = app.reply.open;
+  ui_state.reply_generation = app.reply.generation;
+  ui_state.reply_author = app.reply.author;
+  ui_state.reply_page = app.reply.page;
+  ui_state.reply_label = app.reply.label;
+  ui_state.reply_text = app.reply.text;
+  if (app.reply.open) {
+    auto [x, y, w, h] = float_client_rect(app, app.reply_win);
+    ui_state.reply_x = x;
+    ui_state.reply_y = y;
+    ui_state.reply_w = w;
+    ui_state.reply_h = h;
+  }
   {
     auto& fd = doc_of(app, focused_pane(app));
     auto nid = focused_pane(app).sel.focus.node;
@@ -413,6 +429,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::OpenAbout ||
         c == C::Copy ||
         c == C::CopyPageUrl || c == C::SelectAll || c == C::SelectBlock ||
+        c == C::OpenReply || c == C::EditReply || c == C::SendReply ||
         c == C::Find || c == C::ToggleSplit || c == C::ToggleOutline ||
         c == C::ToggleBacklinks || c == C::ToggleSitemap || c == C::TogglePage ||
         c == C::ToggleSearchBar || c == C::FocusSearchBar || c == C::Search ||
@@ -444,6 +461,36 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
   }
 
   switch (cmd) {
+    case C::OpenReply: {
+      const xanatoo::NodeId id = app.context_reply_node;
+      if (app.context_reply_buffer != p.buf ||
+          id == xanatoo::INVALID_NODE || id >= d.next_id ||
+          d.get(id).kind != xanatoo::NodeKind::Message) break;
+      const auto& message = d.get(id);
+      app.reply.open = true;
+      app.reply.buffer = p.buf;
+      app.reply.node = id;
+      app.reply.page = path_of(app, p);
+      app.reply.label = message.label;
+      app.reply.author = message.src;
+      app.reply.text.clear();
+      app.reply.anchor_y = app.context_reply_y;
+      ++app.reply.generation;
+      app.reply_win.scroll = 0.f;
+      snap_soft_geom(app, app.reply_win.x, app.reply_win.y,
+                     app.reply_win.w, app.reply_win.h);
+      place_windows(app);
+      break;
+    }
+    case C::EditReply:
+      if (app.reply.open) app.reply.text = arg;
+      break;
+    case C::SendReply:
+      if (app.reply.open)
+        flash_status(app, app.reply.text.empty()
+                              ? "Enter a reply before sending"
+                              : "Reply mockup: not sent (no account connected)");
+      break;
     case C::Quit:
       if (stash_all_or_confirm(app)) app.running = false;
       break;
@@ -1685,7 +1732,8 @@ void run_chrome(App& app) {
   // A tab press selects it but may turn into a drag (reorder / tear off),
   // so its mouse capture stays.
   if (ui_frame.cmd != xanatoo::UiCommand::None &&
-      ui_frame.cmd != xanatoo::UiCommand::SelectTab)
+      ui_frame.cmd != xanatoo::UiCommand::SelectTab &&
+      ui_frame.cmd != xanatoo::UiCommand::EditReply)
     app.ui.release_input_capture();
 }
 
@@ -1733,6 +1781,35 @@ void poll_gamepad_axes(App& app) {
 
 // Calls `fn(x0, x1, top, baseline)` (layout coordinates) for each line-run
 // of consecutive glyphs accepted by `match`.
+static bool is_reply_target(App& app, Pane& pane) {
+  if (!app.reply.open || pane.buf != app.reply.buffer ||
+      path_of(app, pane) != app.reply.page) return false;
+  const auto& d = doc_of(app, pane);
+  const auto matches = [&](xanatoo::NodeId id) {
+    if (id == xanatoo::INVALID_NODE || id >= d.next_id) return false;
+    const auto& n = d.get(id);
+    return n.id == id && n.kind == xanatoo::NodeKind::Message &&
+           n.label == app.reply.label;
+  };
+  if (matches(app.reply.node)) return true;
+  // A fetched page may have been reparsed in the same buffer, reassigning
+  // numeric node IDs. Service comment labels are the stable identity.
+  if (!app.reply.label.empty())
+    for (const auto& n : d.nodes)
+      if (matches(n.id)) {
+        app.reply.node = n.id;
+        return true;
+      }
+  return false;
+}
+
+static const xanatoo::LayoutBox* reply_card_box(App& app, Pane& pane) {
+  if (!is_reply_target(app, pane)) return nullptr;
+  for (const auto& card : pane.layout.message_cards)
+    if (card.box.node == app.reply.node) return &card.box;
+  return nullptr;
+}
+
 template <typename Match, typename Fn>
 static void for_each_link_run(App& app, const Pane& pane, Match match,
                               Fn fn) {
@@ -1776,6 +1853,22 @@ static void draw_pane_overlays(App& app, int i) {
   [[maybe_unused]] const float py = static_cast<float>(pane.y);
   [[maybe_unused]] const float ox = static_cast<float>(pane.x);
   [[maybe_unused]] const float draw_scroll = pane.scroll_y - py;
+  // Compose target: persistent amber wash around the precise Message card,
+  // independent of the caret/selection and without editing foreign content.
+  if (const auto* box = reply_card_box(app, pane)) {
+    app.reply.anchor_y = box->y;
+    SDL_Rect r{static_cast<int>(box->x + ox),
+               static_cast<int>(box->y - draw_scroll),
+               static_cast<int>(box->width),
+               static_cast<int>(box->height)};
+    if (r.w > 0 && r.h > 0) {
+      SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
+      SDL_SetRenderDrawColor(app.sdl, 235, 160, 40, 38);
+      xanatoo::sdl::fill_rect(app.sdl, &r);
+      SDL_SetRenderDrawColor(app.sdl, 200, 115, 22, 220);
+      xanatoo::sdl::draw_rect(app.sdl, &r);
+    }
+  }
   // Hover affordances for interactive elements in this pane
   {
     SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
@@ -2757,6 +2850,25 @@ static void draw_pane_scrollbar(App& app, int i) {
                   pal.shadow);
         th::hline(app.sdl, thumb.x + 3, thumb.x + thumb.w - 4, gy + k * 3 + 1,
                   pal.highlight);
+      }
+    }
+    // The target's tick is drawn *over* the thumb so it stays visible even
+    // when the comment is at the current scroll position. The block map also
+    // approximates positions outside the virtualised layout band.
+    if (is_reply_target(app, pane)) {
+      float y = app.reply.anchor_y;
+      if (const auto* box = reply_card_box(app, pane))
+        y = app.reply.anchor_y = box->y;
+      if (y < 0.f) {
+        std::unordered_map<xanatoo::NodeId, float> block_y;
+        section_marks(app, pane, &block_y);
+        if (auto it = block_y.find(app.reply.node); it != block_y.end())
+          y = it->second;
+      }
+      if (y >= 0.f) {
+        mark_at(y - 2.f, 255, 178, 48);
+        mark_at(y, 204, 94, 12);
+        mark_at(y + 2.f, 255, 178, 48);
       }
     }
   }

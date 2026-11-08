@@ -37,6 +37,9 @@ enum class UiCommand {
   ToggleBookmarks, // Bookmarks manager panel
   SelectBookmark,  // arg = address: select its passage in the focused view
   CopyText,        // arg = text for the clipboard (an address)
+  OpenReply,       // right-clicked Message: start a mock reply draft
+  EditReply,       // arg = Markdown currently in the reply editor
+  SendReply,       // mock only: never sends to an external service
   // Tabs / MDI
   NewTab,          // new empty buffer + tab
   CloseTab,        // close focused buffer (Ctrl+W)
@@ -239,6 +242,11 @@ struct UiState {
   bool selection = false;
   std::string context_comment_native;  // passage address for a right-clicked HN comment
   std::string context_comment_web;     // external HN per-comment permalink
+  bool context_can_reply = false;
+  bool reply_open = false;
+  uint64_t reply_generation = 0;
+  std::string reply_author, reply_page, reply_label, reply_text;
+  int reply_x = 0, reply_y = 0, reply_w = 0, reply_h = 0;
   // True when caret is on a ListItem (enables indent/outdent menu items).
   bool on_list_item = false;
   // True when caret is inside a Stretch (enables edit summary).
@@ -383,6 +391,11 @@ private:
   int url_context_end_ = 0;
   int url_context_cursor_ = 0;
   char search_input_[512] = {};  // search bar text (kept between searches)
+  char reply_input_[16384] = {}; // Markdown draft, not sent to any server
+  uint64_t reply_generation_seen_ = 0;
+  struct ReplySelection { int begin = 0, end = 0; } reply_selection_;
+  bool reply_focus_ = false;
+  bool reply_restore_selection_ = false;
   char reddit_client_id_[256] = {};
   char reddit_client_secret_[256] = {};
   bool reddit_credentials_loaded_ = false;

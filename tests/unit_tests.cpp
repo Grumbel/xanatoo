@@ -23,6 +23,7 @@
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/reddit_credentials.hpp"
+#include "xanatoo/reply.hpp"
 #include "xanatoo/inflate.hpp"
 #include "xanatoo/search.hpp"
 #include "xanatoo/search_results.hpp"
@@ -83,6 +84,24 @@ void expect(bool cond, const char* expr, const char* file, int line) {
 
 #define EXPECT(c) expect(!!(c), #c, __FILE__, __LINE__)
 #define EXPECT_EQ(a, b) expect((a) == (b), #a " == " #b, __FILE__, __LINE__)
+
+void test_reply_markdown() {
+  using xanatoo::wrap_reply_markup;
+  auto bold = wrap_reply_markup("hi world!", 3, 8, "**", "**");
+  EXPECT_EQ(bold.text, "hi **world**!");
+  EXPECT_EQ(bold.selection_begin, 5u);
+  EXPECT_EQ(bold.selection_end, 10u);
+  auto empty = wrap_reply_markup("hello", 2, 2, "`", "`");
+  EXPECT_EQ(empty.text, "he``llo");
+  EXPECT_EQ(empty.selection_begin, empty.selection_end);
+  auto reversed = wrap_reply_markup("abcdef", 5, 2, "*", "*");
+  EXPECT_EQ(reversed.text, "ab*cde*f");
+  // ImGui selection offsets are UTF-8 bytes, not code points.
+  auto utf8 = wrap_reply_markup("xäz", 1, 3, "[", "](https://)");
+  EXPECT_EQ(utf8.text, "x[ä](https://)z");
+  auto clamped = wrap_reply_markup("abc", 1, 99, "> ", "");
+  EXPECT_EQ(clamped.text, "a> bc");
+}
 
 void test_sdl_time_bridge() {
   using xanatoo::sdl::ticks_passed;
@@ -4668,6 +4687,7 @@ void test_math() {
 }
 
 int main() {
+  test_reply_markdown();
   test_sdl_time_bridge();
   test_about_markdown();
   test_sitemap();

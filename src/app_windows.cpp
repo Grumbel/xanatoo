@@ -32,6 +32,8 @@ std::pair<int, int> min_size(const FloatWindow& w) {
       return {200, 120};
     case WindowRole::Styles:
       return {200, 140};
+    case WindowRole::Reply:
+      return {300, 240};
     case WindowRole::Help:
     case WindowRole::Document:
       break;
@@ -96,6 +98,9 @@ void close_window(App& app, FloatWindow& w) {
       break;
     case WindowRole::Downloads:
       app.downloads_panel_open = false;
+      break;
+    case WindowRole::Reply:
+      app.reply.open = false;
       break;
     case WindowRole::Document:
       close_doc_window(app, static_cast<size_t>(&w - app.soft_wins.data()));
@@ -254,7 +259,7 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
   // content-scroll roles reserve it for click-free jump/drag.
   const bool in_sb =
       mx >= cx + cw - sb_w && mx <= cx + cw + 2 && my >= cy && my <= cy + ch;
-  if (in_sb) {
+  if (in_sb && w.role != WindowRole::Reply) {
     begin_scroll_drag(app, w, my);
     return;
   }
@@ -290,6 +295,8 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
     case WindowRole::Downloads:
       click_downloads_panel(app, mx, my);
       break;
+    case WindowRole::Reply:
+      break;  // ImGui owns the editor and formatting controls.
     case WindowRole::Outline:
       click_outline(app, w, mx, my);
       break;
@@ -322,6 +329,7 @@ std::vector<FloatWindow*> float_stack(App& app) {
   // Auto-opened downloads should remain visible above detached document
   // windows, just like a browser's downloads popover.
   if (app.downloads_panel_open) st.push_back(&app.downloads_win);
+  if (app.reply.open) st.push_back(&app.reply_win);
   // Docked columns under floating windows, maximized ones on top.
   auto layer = [](const FloatWindow* w) {
     return w->dock == Dock::None ? 1 : w->dock == Dock::Max ? 2 : 0;
@@ -358,6 +366,7 @@ std::tuple<int, int, int, int> float_client_rect(App& app,
     case WindowRole::Styles:
       return window_client_rect(w.x, w.y, w.w, w.h);
     case WindowRole::Downloads:
+    case WindowRole::Reply:
       return window_client_rect(w.x, w.y, w.w, w.h);
     case WindowRole::Document:
       return soft_client_rect(app, w);
@@ -390,6 +399,8 @@ float float_max_scroll(App& app, const FloatWindow& w) {
       return std::max(0.f, static_cast<float>(app.styles.size()) *
                                    std::max(18, app.ui_font.line_height() + 7) +
                                8.f - view_h);
+    case WindowRole::Reply:
+      return 0.f;
     case WindowRole::Downloads: {
       size_t n = 0;
       for (const auto& d : app.downloads)
@@ -654,6 +665,11 @@ void draw_floats(App& app) {
         break;
       case WindowRole::Downloads:
         draw_downloads_panel(app);
+        break;
+      case WindowRole::Reply:
+        draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
+                            "Reply (mockup)", true, w->dock == Dock::None,
+                            0, w->dock == Dock::Max);
         break;
       case WindowRole::Help:
         draw_help_window(app);

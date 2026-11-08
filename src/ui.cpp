@@ -10,6 +10,7 @@
 #include "xanatoo/paths.hpp"
 #include "xanatoo/platform.hpp"
 #include "xanatoo/reddit_credentials.hpp"
+#include "xanatoo/reply.hpp"
 
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -2061,6 +2062,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       }
       ImGui::Separator();
     }
+    if (state.context_can_reply) {
+      menu_item_cmd("Reply…", UiCommand::OpenReply, cmd);
+      ImGui::Separator();
+    }
     if (state.browse) {
       // Read-only: no edit / format / insert / structure items.
       menu_item_cmd("Copy", UiCommand::Copy, cmd, state.selection, "Ctrl+C");
@@ -2124,6 +2129,120 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     if (!state.browse)
       menu_item_cmd("Replace…", UiCommand::Replace, cmd, true, "Ctrl+H");
     ImGui::EndPopup();
+  }
+
+  // ---- Reply composer: custom floating/dockable frame underneath, ImGui
+  // text widget and Markdown tools above it. Nothing here sends a request.
+  if (state.reply_open) {
+    if (reply_generation_seen_ != state.reply_generation) {
+      reply_generation_seen_ = state.reply_generation;
+      std::snprintf(reply_input_, sizeof(reply_input_), "%s",
+                    state.reply_text.c_str());
+      reply_selection_ = {};
+      reply_focus_ = true;
+      reply_restore_selection_ = false;
+    }
+    ImGui::SetNextWindowPos(ImVec2(static_cast<float>(state.reply_x + 4),
+                                   static_cast<float>(state.reply_y + 4)));
+    ImGui::SetNextWindowSize(ImVec2(
+        static_cast<float>(std::max(40, state.reply_w - 8)),
+        static_cast<float>(std::max(40, state.reply_h - 8))));
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoCollapse;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
+                        ImVec2(7.f * scale_, 6.f * scale_));
+    if (ImGui::Begin("##reply_editor", nullptr, flags)) {
+      std::string title = "Reply to ";
+      title += state.reply_author.empty() ? "comment" : "@" + state.reply_author;
+      ImGui::TextUnformatted(title.c_str());
+      if (!state.reply_label.empty() &&
+          ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+        ImGui::SetTooltip("Comment: %s", state.reply_label.c_str());
+      ImGui::TextDisabled("Markdown · preview only, no account connected");
+      const char* format_before = nullptr;
+      const char* format_after = nullptr;
+      auto format = [&](const char* label, const char* before,
+                        const char* after) {
+        if (ImGui::Button(label)) {
+          format_before = before;
+          format_after = after;
+        }
+      };
+      auto next_format_on_same_line = [&](const char* label) {
+        const float next_width = ImGui::CalcTextSize(label).x +
+                                 2.f * ImGui::GetStyle().FramePadding.x;
+        const float right = ImGui::GetWindowPos().x +
+                            ImGui::GetWindowContentRegionMax().x;
+        if (ImGui::GetItemRectMax().x + ImGui::GetStyle().ItemSpacing.x +
+                next_width < right)
+          ImGui::SameLine();
+      };
+      format("Bold", "**", "**");
+      next_format_on_same_line("Italic");
+      format("Italic", "*", "*");
+      next_format_on_same_line("Code");
+      format("Code", "`", "`");
+      next_format_on_same_line("Link");
+      format("Link", "[", "](https://)");
+      next_format_on_same_line("Quote");
+      format("Quote", "> ", "");
+
+      if (reply_focus_) {
+        ImGui::SetKeyboardFocusHere();
+        reply_focus_ = false;
+      }
+      const auto track_selection = [](ImGuiInputTextCallbackData* cb) -> int {
+        auto* ui = static_cast<Ui*>(cb->UserData);
+        if (ui->reply_restore_selection_) {
+          cb->SelectionStart = ui->reply_selection_.begin;
+          cb->SelectionEnd = ui->reply_selection_.end;
+          cb->CursorPos = ui->reply_selection_.end;
+          ui->reply_restore_selection_ = false;
+        }
+        ui->reply_selection_.begin = cb->SelectionStart;
+        ui->reply_selection_.end = cb->SelectionEnd;
+        return 0;
+      };
+      const float edit_h = std::max(70.f, ImGui::GetContentRegionAvail().y -
+                                                51.f * scale_);
+      if (ImGui::InputTextMultiline(
+              "##reply_text", reply_input_, sizeof(reply_input_),
+              ImVec2(-1.f, edit_h), ImGuiInputTextFlags_CallbackAlways,
+              track_selection, this)) {
+        cmd = UiCommand::EditReply;
+        result.arg = reply_input_;
+      }
+      // Apply formatting *after* InputText has finished its frame, so its
+      // retained editor buffer cannot overwrite the newly inserted markup.
+      if (format_before) {
+        const auto wrapped = wrap_reply_markup(
+            reply_input_, static_cast<size_t>(std::max(0, reply_selection_.begin)),
+            static_cast<size_t>(std::max(0, reply_selection_.end)),
+            format_before, format_after);
+        if (wrapped.text.size() < sizeof(reply_input_)) {
+          std::memcpy(reply_input_, wrapped.text.c_str(), wrapped.text.size() + 1);
+          reply_selection_.begin = static_cast<int>(wrapped.selection_begin);
+          reply_selection_.end = static_cast<int>(wrapped.selection_end);
+          reply_restore_selection_ = true;
+          reply_focus_ = true;
+          cmd = UiCommand::EditReply;
+          result.arg = reply_input_;
+        }
+      }
+      const bool can_send = reply_input_[0] != '\0';
+      ImGui::BeginDisabled(!can_send);
+      if (ImGui::Button("Send reply")) {
+        cmd = UiCommand::SendReply;
+        result.arg = reply_input_;
+      }
+      ImGui::EndDisabled();
+      ImGui::SameLine();
+      ImGui::TextDisabled("Mockup: Send does not post anything");
+    }
+    ImGui::End();
+    ImGui::PopStyleVar();
   }
 
   // ---- Preferences ----

@@ -236,7 +236,8 @@ struct Pane {
 enum class Dock : uint8_t { None = 0, Left, Right, Top, Bottom, Max };
 
 enum class WindowRole : uint8_t {
-  Help, Outline, Backlinks, Sitemap, Page, History, Styles, Downloads, Document
+  Help, Outline, Backlinks, Sitemap, Page, History, Styles, Downloads, Reply,
+  Document
 };
 
 // One floating window: help / outline / backlinks panels and document
@@ -281,6 +282,18 @@ inline FloatWindow make_float_panel(WindowRole role, int x, int y, int w,
   f.restore_h = h;
   return f;
 }
+
+// Reply composition is local-only until service account/authentication support
+// exists. BufferId + node/label keep the highlight tied to one comment, never
+// to the current selection or the same numeric node in another document.
+struct ReplyDraft {
+  bool open = false;
+  BufferId buffer = kNoBuffer;
+  xanatoo::NodeId node = xanatoo::INVALID_NODE;
+  std::string page, label, author, text;
+  float anchor_y = -1.f;  // track position while the card is virtualised away
+  uint64_t generation = 0;  // new target: reset ImGui's text/selection state
+};
 
 // What the pointer is currently over (rebuilt on every mouse move).
 // Fullscreen image viewer over the whole window (app_collection.cpp): a
@@ -754,6 +767,8 @@ struct App {
   FloatWindow history_win = make_float_panel(WindowRole::History, 100, 130, 440, 360);
   FloatWindow styles_win = make_float_panel(WindowRole::Styles, 160, 150, 320, 420);
   FloatWindow downloads_win = make_float_panel(WindowRole::Downloads, 120, 160, 520, 380);
+  FloatWindow reply_win = make_float_panel(WindowRole::Reply, 170, 170, 490, 350);
+  ReplyDraft reply;
   SitemapPanel sitemap;
   SearchBar search;
   FloatWindow pg = make_float_panel(WindowRole::Page, 60, 110, 260, 420);
@@ -762,6 +777,9 @@ struct App {
   // Right-clicked HN Message, not necessarily the current text selection.
   std::string context_comment_native;
   std::string context_comment_web;
+  BufferId context_reply_buffer = kNoBuffer;
+  xanatoo::NodeId context_reply_node = xanatoo::INVALID_NODE;
+  float context_reply_y = -1.f;
   Touch touch;
   std::vector<FetchJob> fetches;
   std::vector<std::shared_ptr<xanatoo::DownloadProgress>> downloads;

@@ -1,0 +1,14 @@
+<doc title="Reply panel demo">
+  <thread label="sample-thread" summary="Offline reply mockup">
+    <message label="sample-001" src="Ada" summary="Yesterday">
+      <p>Could the document display both the context and the reply being composed?</p>
+      <p>Right-click this comment and choose Reply to see the editor and target highlight.</p>
+    </message>
+    <message label="sample-002" src="Grace" summary="Today" alt="sample-001">
+      <p>Yes. The target should also remain visible as a marker on the scrollbar.</p>
+    </message>
+    <message label="sample-003" src="Lin" summary="Just now" alt="sample-002">
+      <p>Try Bold, Italic, Code, Link and Quote. Send is a mock action for now.</p>
+    </message>
+  </thread>
+</doc>

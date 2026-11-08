@@ -6,7 +6,24 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **299** (this delivery is **298**)
+Next bundle number: **300** (this delivery is **299**)
+
+## Status (2026-11-08) — Reply panel mockup
+
+- `git pull --ff-only` succeeded; remote master was already at the current
+  local tip. New changes follow that same history.
+- Right-click any semantic Message card (HN, Reddit, Lemmy, Nostr, or local
+  Thread/Message documents) → **Reply…** opens a regular floating/dockable
+  panel with multiline Markdown editing, selection-aware Bold/Italic/Code/
+  Link/Quote controls, and a Send button that reports "not sent" (mockup).
+- The target comment is washed and outlined in amber in the document, with
+  an amber tick drawn over the scrollbar thumb. The last known document
+  position is retained while virtualisation removes the message card from
+  the active layout; stable comment labels rebind after reparses.
+- Added a completely offline exercise page (`examples/reply-demo.xml`) and
+  `docs/REPLIES.md` explaining the mock workflow and lack of network posting.
+- Native SDL2 Debug build and all three CTest suites pass; the offline demo
+  loads under Xvfb. Handheld/R36S and Android builds were not exercised here.
 
 ## Status (2026-11-07) — R36S GCC 9 and man-page build fixes
 

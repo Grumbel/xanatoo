@@ -626,23 +626,30 @@ static void mouse_right_down(App& app, SDL_Event& ev, bool imgui_mouse) {
       float lx = local_x(app, mx, app.focus);
       app.context_comment_native.clear();
       app.context_comment_web.clear();
+      app.context_reply_buffer = kNoBuffer;
+      app.context_reply_node = xanatoo::INVALID_NODE;
+      app.context_reply_y = -1.f;
       const std::string page = path_of(app, p);
-      if (xanatoo::starts_with(page, "hn:item?id=")) {
-        // Target the actual message card, not the nearest text caret (which
-        // might belong to a different comment when clicking empty space).
-        const float doc_y = my + p.scroll_y;
-        for (const auto& card : p.layout.message_cards) {
-          const auto& box = card.box;
-          if (lx < box.x || lx > box.x + box.width || doc_y < box.y ||
-              doc_y > box.y + box.height) continue;
-          const auto& n = doc_of(app, p).get(box.node);
-          if (n.kind != xanatoo::NodeKind::Message || n.label.empty()) continue;
+      // Target the card under the pointer, not the caret/selection (which
+      // can belong to another comment). This works for HN, Reddit, Lemmy,
+      // Nostr and any other document with semantic Message nodes.
+      const float doc_y = my + p.scroll_y;
+      for (const auto& card : p.layout.message_cards) {
+        const auto& box = card.box;
+        if (lx < box.x || lx > box.x + box.width || doc_y < box.y ||
+            doc_y > box.y + box.height) continue;
+        const auto& n = doc_of(app, p).get(box.node);
+        if (n.kind != xanatoo::NodeKind::Message) continue;
+        app.context_reply_buffer = p.buf;
+        app.context_reply_node = box.node;
+        app.context_reply_y = box.y;
+        if (xanatoo::starts_with(page, "hn:item?id=") && !n.label.empty()) {
           app.context_comment_native = page.substr(0, page.find('#')) +
                                        "#id:" + n.label;
           app.context_comment_web =
               "https://news.ycombinator.com/item?id=" + n.label;
-          break;
         }
+        break;
       }
       // A bookmark's margin icon has a menu of its own.
       if (const BookmarkMark* bm = bookmark_icon_at(app, p, lx, my)) {
