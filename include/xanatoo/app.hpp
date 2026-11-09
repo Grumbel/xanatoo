@@ -21,6 +21,7 @@
 #include "xanatoo/download.hpp"
 #include "xanatoo/editor.hpp"
 #include "xanatoo/font.hpp"
+#include "xanatoo/gemini_tofu.hpp"
 #include "xanatoo/images.hpp"
 #include "xanatoo/layout.hpp"
 #include "xanatoo/locator.hpp"
@@ -442,6 +443,9 @@ struct FetchShared {
   // Gemini 10/11: the server asks for input (meta = prompt text).
   int input_status = 0;
   std::string input_meta;
+  // Populated only for a structured Gemini TOFU pin mismatch; distinct
+  // from generic TLS failures, which must never offer a trust bypass.
+  std::optional<xanatoo::GeminiCertificateChange> gemini_change;
 };
 
 // Remote image downloads (app_images.cpp): URLs ImageCache asked for,
@@ -611,6 +615,7 @@ enum class PromptKind : uint8_t {
   EditLink,
   EditCite,
   EditSummary,
+  GeminiTrust,  // explicit approval of a changed Gemini certificate
 };
 
 struct Prompt {
@@ -621,6 +626,9 @@ struct Prompt {
   // Target of EditLink / EditCite / EditSummary.
   xanatoo::NodeId node = xanatoo::INVALID_NODE;
   size_t span = 0;
+  std::optional<xanatoo::GeminiCertificateChange> gemini_change;
+  std::string gemini_retry_url;
+  int gemini_trust_pane = -1;
 };
 
 // Scroll position from the last session, put back once the page is there

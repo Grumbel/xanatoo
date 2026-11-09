@@ -39,7 +39,9 @@ constexpr Uint32 kPageCacheTtl = 5 * 60 * 1000;
 #if defined(XANATOO_GEMINI) && XANATOO_GEMINI
 void fetch_gemini(const std::string& url, FetchShared& out) {
   out.service = "Gemini";
-  auto resp = xanatoo::gemini_fetch(url, &out.error);
+  xanatoo::GeminiCertificateChange changed;
+  auto resp = xanatoo::gemini_fetch(url, &out.error, &changed);
+  if (!changed.host.empty()) out.gemini_change = std::move(changed);
   if (!resp) return;
   out.final_url = resp->final_url;
   if (resp->status == 10 || resp->status == 11) {
@@ -239,11 +241,12 @@ xanatoo::Document load_error_doc(const FetchJob& job) {
 
 // Error page in the pane, like a browser's: the address stays the one that
 // failed. Back returns to the page before.
-void show_load_error(App& app, const FetchJob& job) {
-  if (!stash_or_confirm(app, app.panes[job.pane].buf)) return;
+bool show_load_error(App& app, const FetchJob& job) {
+  if (!stash_or_confirm(app, app.panes[job.pane].buf)) return false;
   show_doc_in_pane(app, job.pane, load_error_doc(job), job.url);
   if (job.record_history)
     push_nav_history(app, job.pane, pane_address(app, app.panes[job.pane]));
+  return true;
 }
 
 // A site's own 4xx / 5xx page, under the official reason.
@@ -322,7 +325,15 @@ void finish_navigate(App& app, const FetchJob& job) {
     app.panes[job.pane].nav.restoring = -1;
     flash_status(app, service + " failed: " + r.error);
     std::cerr << service << ": " << r.error << "\n";
-    show_load_error(app, job);
+    if (show_load_error(app, job) && r.gemini_change) {
+      // The error document displays both full fingerprints. Offer an
+      // explicit keyboard confirmation; Esc preserves the old pin.
+      focus_view(app, job.pane);
+      open_prompt(app, PromptKind::GeminiTrust);
+      app.prompt.gemini_change = *r.gemini_change;
+      app.prompt.gemini_retry_url = job.url;
+      app.prompt.gemini_trust_pane = job.pane;
+    }
     return;
   }
   const bool http_error = r.http_status != 0;

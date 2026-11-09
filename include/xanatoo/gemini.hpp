@@ -6,6 +6,8 @@
 #include <string>
 #include <string_view>
 
+#include "xanatoo/gemini_tofu.hpp"
+
 namespace xanatoo {
 
 // True for gemini:// URLs (scheme case-insensitive).
@@ -36,7 +38,8 @@ struct GeminiResponse {
 // changed certificates before sending any URL (session-only with --no-save).
 // Follows at most a few 30/31 redirects. On failure, nullopt and err set.
 std::optional<GeminiResponse> gemini_fetch(std::string_view url,
-                                           std::string* err = nullptr);
+                                           std::string* err = nullptr,
+                                           GeminiCertificateChange* changed = nullptr);
 #endif
 
 }  // namespace xanatoo

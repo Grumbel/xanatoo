@@ -42,16 +42,30 @@ server. A changed certificate **stops the fetch** and reports the previous
 and presented fingerprints. This detects changes after first contact but
 cannot detect an attacker present during the very first connection.
 
-After independently checking an expected server certificate renewal, the
-user may remove the corresponding pin entry from `gemini-known-hosts` and
-revisit to establish new trust. Xanatoo does not silently replace pins or
-automatically accept changed certificates when the old certificate expires.
+When a pinned certificate changes, the failed page displays both full SHA-256
+fingerprints and a confirmation prompt. **Enter** explicitly trusts the new
+fingerprint and retries the original URL using a fresh TLS connection;
+**Esc** keeps the previous pin. Review the fingerprint through an independent,
+trusted channel before approving: a certificate change might mean legitimate
+renewal or an active interception. There is no automatic acceptance of an
+expired or replaced certificate. The approval is checked against the pin
+that triggered the warning, so a different stored pin cannot be overwritten
+by a stale confirmation. The certificate is checked again before the retried
+request is sent, and any third fingerprint is rejected.
+
+This prompt is shown for foreground navigation failures only. Background-tab
+fetches retain their error document; select the tab and reload to review and
+approve a change. Store read errors, invalid fingerprints, and other TLS
+failures do **not** offer a bypass prompt.
+
 The entries use a `sha256 <hex-encoded-host>:<port> <fingerprint>` format;
 the host is hex-encoded so IPv6 addresses cannot introduce ambiguous delimiters.
 An invalid or unreadable pin file is an error rather than a fresh first use.
 
 With `--no-save`, Xanatoo still checks any existing saved pins, but new pins
-live only in memory for that process. With normal persistence enabled, an
+and explicitly approved replacements live only in memory for that process;
+the on-disk file remains unchanged. A later change to the saved pin invalidates
+the temporary override. With normal persistence enabled, an
 unavailable or unwritable state directory blocks a new Gemini connection;
 the URL is never sent without first establishing trust.
 
@@ -73,14 +87,15 @@ OpenSSL test server with an ephemeral local CA. It checks a trusted matching
 hostname, mismatched hostname, and an untrusted certificate, plus the
 explicit Gemini handshake and its certificate fingerprint.
 `tests/gemini_tofu_tests.cpp` tests persisted/session-only pins, hostname and
-port separation, mismatch rejection and corrupted-store behavior without SDL.
+port separation, structured mismatch reports, explicit replacement approvals,
+stale approvals, session-only overrides and corrupted-store behavior without SDL.
 `tests/http_url_tests.cpp` checks
 HTTPS-to-HTTP downgrade rejection. The tests do not replace integration
 testing of real sites, operating-system trust stores or Android's Mbed TLS
 backend.
 
-**Not yet solved:** an in-app Gemini certificate-change approval/inspection
-panel and first-use trust confirmation. Verified HTTPS/WSS alone does not
+**Not yet solved:** a richer in-app certificate inspection panel and optional
+first-use trust confirmation. Verified HTTPS/WSS alone does not
 authenticate Nostr event authors, relay group membership, NIP-11 master-key
 claims, or API authorization. Each has its own cryptographic and
 application-level checks.

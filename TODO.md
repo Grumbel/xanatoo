@@ -6,7 +6,22 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **321** (this delivery is **320**)
+Next bundle number: **322** (this delivery is **321**)
+
+## Status (2026-11-09) — Gemini certificate replacement confirmation
+
+- Gemini TOFU failures now include structured host/port and previous/presented
+  SHA-256 fingerprints. On a foreground mismatch, Xanatoo shows both hashes in
+  the error document and asks Enter to approve the replacement or Esc to keep
+  the original pin. Approval updates that host:port only and retries with a
+  fresh TLS handshake; other TLS failures cannot trigger the approval UI.
+- Replacement rejects invalid or stale approvals. In `--no-save` mode,
+  approved replacements remain in session memory even when a saved pin exists,
+  and a changed saved pin invalidates the temporary override. No automatic
+  certificate rollover is performed.
+- Pure C++20 Gemini trust-store tests cover replacement, stale approvals,
+  third fingerprints, and session-only overrides; Gemini network code passes
+  C++20 syntax checks. Full SDL/Nix builds and manual UI testing still needed.
 
 ## Status (2026-11-09) — Gemini certificate trust on first use
 
@@ -18,8 +33,8 @@ Next bundle number: **321** (this delivery is **320**)
   owner-only permissions; malformed/unreadable state fails closed. With
   `--no-save`, existing saved pins are still checked and new pins only persist
   in memory for the running session. First connections remain susceptible to
-  interception; a future UI should support explicit trust review and
-  certificate renewal rather than manual pin-file editing.
+  interception; the subsequent confirmation prompt is for *changes* only,
+  not for initial trust.
 - Offline OpenSSL fingerprint and pure trust-store tests pass on Linux, and
   changed Gemini/TLS translation units pass C++20 syntax checks. Full Nix/SDL
   and Mbed TLS Android builds remain to be verified on the target machines.

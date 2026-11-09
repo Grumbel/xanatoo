@@ -19,6 +19,7 @@
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/nostr.hpp"
+#include "xanatoo/paths.hpp"
 #include "xanatoo/parse.hpp"
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/revstore.hpp"
@@ -123,6 +124,36 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
   switch (pr.kind) {
     case PromptKind::None:
       return false;
+
+    case PromptKind::GeminiTrust: {
+      if (!pr.gemini_change) {
+        close_prompt(app);
+        return true;
+      }
+      if (pr.gemini_trust_pane != app.focus ||
+          path_of(app, focused_pane(app)) != pr.gemini_retry_url) {
+        close_prompt(app);
+        flash_status(app, "Gemini trust review is no longer the active page");
+        return true;
+      }
+      const xanatoo::GeminiCertificateChange change = *pr.gemini_change;
+      std::string retry = pr.gemini_retry_url;
+      close_prompt(app);
+      std::string err;
+      if (!xanatoo::gemini_tofu_replace(xanatoo::state_dir(),
+                                       !xanatoo::no_save(), change, &err)) {
+        flash_status(app, "Gemini trust was not updated: " + err);
+        return true;
+      }
+      flash_status(app, "Gemini certificate replacement trusted; reconnecting");
+      // A normal navigation may reuse a page cached before the certificate
+      // changed (or resolve a remote source to an imported document). Force
+      // a new network handshake; the accepted pin is checked again there.
+      forget_cached_page(app, retry);
+      start_fetch(app, FetchPurpose::Navigate, app.focus, retry,
+                  /*record_history=*/false);
+      return true;
+    }
 
     case PromptKind::Search:
       return false;  // Enter falls through to the document

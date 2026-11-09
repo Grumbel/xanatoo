@@ -211,7 +211,9 @@ certificates fail closed (see [TLS notes](docs/TLS.md)); this change has not
 yet been device-tested on all Android targets. Gemini permits self-signed
 certificates using first-contact TOFU pinning; it detects certificate changes
 on subsequent visits but cannot authenticate the **first** connection.
-Review unexpected certificate-change errors before resetting a pin.
+On a certificate change, the failed page shows both SHA-256 fingerprints;
+Enter explicitly trusts the replacement and reconnects, while Esc keeps the
+old pin. Verify the replacement fingerprint independently before accepting it.
 Plain `http://` URLs are supported but carry data without encryption or
 authentication. Redirects may upgrade HTTP to HTTPS, never downgrade HTTPS
 to HTTP.

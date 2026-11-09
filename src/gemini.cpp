@@ -166,7 +166,8 @@ std::string resolve_gemini_url(std::string_view base, std::string_view ref) {
 #if defined(XANATOO_GEMINI) && XANATOO_GEMINI
 
 static std::optional<GeminiResponse> gemini_fetch_once(const GeminiUrl& u,
-                                                       std::string* err) {
+                                                       std::string* err,
+                                                       GeminiCertificateChange* changed) {
   int fd = tcp_connect_host(u.host, u.port, err);
   if (fd < 0) return std::nullopt;
   // Gemini commonly uses self-signed certificates. Verify the persisted
@@ -179,7 +180,7 @@ static std::optional<GeminiResponse> gemini_fetch_once(const GeminiUrl& u,
     return std::nullopt;
   }
   if (!gemini_tofu_check(state_dir(), !no_save(), u.host, u.port,
-                         *fingerprint, err)) return std::nullopt;
+                         *fingerprint, err, changed)) return std::nullopt;
 
   std::string req = u.canonical + "\r\n";
   if (!tls.write_all(req.data(), req.size())) {
@@ -221,7 +222,9 @@ static std::optional<GeminiResponse> gemini_fetch_once(const GeminiUrl& u,
 }
 
 std::optional<GeminiResponse> gemini_fetch(std::string_view url,
-                                           std::string* err) {
+                                           std::string* err,
+                                           GeminiCertificateChange* changed) {
+  if (changed) *changed = {};
   auto u = parse_gemini_url(url);
   if (!u) {
     if (err) *err = "not a gemini:// URL";
@@ -229,7 +232,7 @@ std::optional<GeminiResponse> gemini_fetch(std::string_view url,
   }
 
   for (int hop = 0; hop < 5; ++hop) {
-    auto resp = gemini_fetch_once(*u, err);
+    auto resp = gemini_fetch_once(*u, err, changed);
     if (!resp) return std::nullopt;
     if (resp->status == 30 || resp->status == 31) {
       // redirect — meta is new URL

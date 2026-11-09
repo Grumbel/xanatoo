@@ -30,6 +30,15 @@ Pins& session_pins() {
   return pins;
 }
 
+// A user may approve a replacement without allowing writes (--no-save).
+// Keep the previously persisted fingerprint too: a separate update to the
+// stored pin must not be masked by this temporary approval.
+using Overrides = std::map<std::string, std::pair<std::string, std::string>>;
+Overrides& session_overrides() {
+  static Overrides pins;
+  return pins;
+}
+
 bool fail(std::string* err, std::string msg) {
   if (err) *err = std::move(msg);
   return false;
@@ -141,7 +150,9 @@ bool save(const fs::path& path, const Pins& pins, std::string* err) {
 
 bool gemini_tofu_check(std::string_view directory, bool persist,
                        std::string_view host, int port,
-                       std::string_view fingerprint_sha256, std::string* err) {
+                       std::string_view fingerprint_sha256, std::string* err,
+                       GeminiCertificateChange* changed) {
+  if (changed) *changed = {};
   if (host.empty() || host.size() > 255 || port < 1 || port > 65535 ||
       fingerprint_sha256.size() != 64 || !is_hex(fingerprint_sha256))
     return fail(err, "invalid Gemini host, port or certificate fingerprint");
@@ -153,23 +164,40 @@ bool gemini_tofu_check(std::string_view directory, bool persist,
   Pins saved;
   if (!path.empty() && !load(path, saved, err)) return false;
 
+  const std::string session_key = std::string(directory) + '\n' + key;
   const auto from_disk = saved.find(key);
+  const auto override = session_overrides().find(session_key);
+  if (override != session_overrides().end() &&
+      (from_disk == saved.end() || override->second.first != from_disk->second))
+    return fail(err, "Gemini pin store changed since session-only approval; "
+                     "review the trust store before reconnecting");
+  const auto reject_change = [&](const std::string& old_hash,
+                                 bool on_disk) {
+    if (changed)
+      *changed = {std::string(host), port, old_hash,
+                  std::string(fingerprint_sha256)};
+    return fail(err, "Gemini certificate CHANGED for " + std::string(host) +
+        ':' + std::to_string(port) + "; saved SHA-256 " + old_hash +
+        ", received " + std::string(fingerprint_sha256) +
+        (on_disk ? ". Review both fingerprints before approving a replacement."
+                 : ". Review both fingerprints before approving a session replacement."));
+  };
+
   if (from_disk != saved.end()) {
+    if (override != session_overrides().end()) {
+      if (override->second.second != fingerprint_sha256)
+        return reject_change(override->second.second, true);
+      return true;
+    }
     if (from_disk->second != fingerprint_sha256)
-      return fail(err, "Gemini certificate CHANGED for " + std::string(host) +
-          ':' + std::to_string(port) + "; saved SHA-256 " + from_disk->second +
-          ", received " + std::string(fingerprint_sha256) +
-          ". Inspect the certificate before removing its entry in " +
-          path.string());
+      return reject_change(from_disk->second, true);
     return true;
   }
 
   Pins& session = session_pins();
-  const std::string session_key = std::string(directory) + '\n' + key;
   if (const auto it = session.find(session_key); it != session.end()) {
     if (it->second != fingerprint_sha256)
-      return fail(err, "Gemini certificate CHANGED during this session for " +
-          std::string(host) + ':' + std::to_string(port));
+      return reject_change(it->second, false);
     return true;
   }
 
@@ -179,6 +207,60 @@ bool gemini_tofu_check(std::string_view directory, bool persist,
     if (!save(path, saved, err)) return false;
   }
   session.emplace(session_key, fingerprint_sha256);
+  return true;
+}
+
+bool gemini_tofu_replace(std::string_view directory, bool persist,
+                         const GeminiCertificateChange& change,
+                         std::string* err) {
+  if (change.host.empty() || change.host.size() > 255 ||
+      change.port < 1 || change.port > 65535 ||
+      change.previous_sha256.size() != 64 || !is_hex(change.previous_sha256) ||
+      change.received_sha256.size() != 64 || !is_hex(change.received_sha256) ||
+      change.previous_sha256 == change.received_sha256)
+    return fail(err, "invalid Gemini certificate replacement");
+
+  const std::lock_guard guard(pin_mutex());
+  const std::string key = make_key(change.host, change.port);
+  const std::string session_key = std::string(directory) + '\n' + key;
+  const fs::path path = directory.empty() ? fs::path{} :
+      fs::path(directory) / "gemini-known-hosts";
+  Pins saved;
+  if (!path.empty() && !load(path, saved, err)) return false;
+  auto stored = saved.find(key);
+  const auto existing_override = session_overrides().find(session_key);
+  if (existing_override != session_overrides().end() &&
+      (stored == saved.end() || existing_override->second.first != stored->second))
+    return fail(err, "Gemini pin store changed since session-only approval; "
+                     "review the trust store before reconnecting");
+  if (stored != saved.end()) {
+    // When replacing a second time after a session-only approval, the
+    // expected hash is the approved one, not the unchanged on-disk hash.
+    const std::string current = existing_override != session_overrides().end() ?
+        existing_override->second.second : stored->second;
+    if (current != change.previous_sha256)
+      return fail(err, "Gemini certificate pin changed since review; reload the page");
+    if (persist) {
+      stored->second = change.received_sha256;
+      if (!save(path, saved, err)) return false;
+      session_overrides().erase(session_key);
+      session_pins()[session_key] = change.received_sha256;
+    } else {
+      session_overrides()[session_key] = {stored->second, change.received_sha256};
+    }
+    return true;
+  }
+
+  auto session = session_pins().find(session_key);
+  if (session == session_pins().end() ||
+      session->second != change.previous_sha256)
+    return fail(err, "Gemini certificate pin changed since review; reload the page");
+  if (persist) {
+    if (path.empty()) return fail(err, "no state directory for Gemini TOFU pins");
+    saved.emplace(key, change.received_sha256);
+    if (!save(path, saved, err)) return false;
+  }
+  session->second = change.received_sha256;
   return true;
 }
 
