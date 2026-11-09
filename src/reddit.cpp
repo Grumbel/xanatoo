@@ -8,6 +8,7 @@
 #include "xanatoo/reddit_credentials.hpp"
 
 #include "xanatoo/https.hpp"
+#include "xanatoo/http_url.hpp"
 #include "xanatoo/json_min.hpp"
 #include "xanatoo/util.hpp"
 #include "xanatoo/version.hpp"
@@ -480,6 +481,13 @@ std::optional<Document> reddit_fetch(std::string_view url_in, std::string* err) 
       std::string req_err;
       std::optional<HttpResult> one;
       if (!token.empty()) {
+        const auto target = parse_http_url(current);
+        if (!target || !target->secure ||
+            ascii_lower(target->host) != "oauth.reddit.com") {
+          last_err = "refusing to send Reddit OAuth credentials outside "
+                     "https://oauth.reddit.com";
+          break;
+        }
         std::string extra = "Authorization: Bearer " + token + "\r\n";
         one = https_request("GET", current, reddit_user_agent(), extra, {},
                              &req_err);
@@ -499,7 +507,12 @@ std::optional<Document> reddit_fetch(std::string_view url_in, std::string* err) 
             loc = "https://www.reddit.com/" + loc;
         }
         std::string next = reddit_json_url(loc);
-        current = next.empty() ? loc : next;
+        next = next.empty() ? loc : next;
+        if (!http_redirect_keeps_security(current, next)) {
+          last_err = "refusing HTTPS-to-HTTP Reddit redirect";
+          break;
+        }
+        current = std::move(next);
         continue;
       }
       resp = std::move(one);

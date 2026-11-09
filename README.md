@@ -205,12 +205,15 @@ browser fidelity: it does not execute JavaScript, apply site CSS, or support
 interactive web forms. Several services rely on public APIs and may stop
 working when those services change.
 
-**Network security limitation:** the current OpenSSL and Mbed TLS backends
-do **not yet verify peer certificates**. Do not use the built-in network
-clients for sensitive information or authenticated browsing. Certificate
-verification is an outstanding task. Plain `http://` URLs are supported as
-well, but carry data without encryption or authentication; the reader does
-not silently upgrade an explicitly requested HTTP URL.
+**Network security:** HTTPS and Nostr WSS connections now require a trusted
+server certificate and matching hostname. Missing CA stores and invalid
+certificates fail closed (see [TLS notes](docs/TLS.md)); this change has not
+yet been device-tested on all Android targets. Gemini still permits
+self-signed certificates, **without certificate pinning/TOFU**, so do not
+use it for secrets or authenticated browsing until that is implemented.
+Plain `http://` URLs are supported but carry data without encryption or
+authentication. Redirects may upgrade HTTP to HTTPS, never downgrade HTTPS
+to HTTP.
 
 The project follows [gamepkgstd](https://github.com/Grumbel/gamepkgstd)
 where applicable, with editor-specific exceptions documented in the

@@ -18,6 +18,7 @@
 
 #include <cerrno>
 #include <cstdio>
+#include <cstdlib>
 #include <initializer_list>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -66,6 +67,57 @@ std::string error_text(int rc) {
   return buf;
 }
 
+// Loading hundreds of Android CA files once per HTTPS image/request is
+// prohibitively expensive. The parsed chain is read-only after construction
+// and shared by all verified TLS connections.
+struct SystemTrust {
+  mbedtls_x509_crt chain;
+  bool available = false;
+
+  SystemTrust() {
+    mbedtls_x509_crt_init(&chain);
+#if defined(MBEDTLS_FS_IO)
+    for (const char* variable : {"SSL_CERT_FILE", "NIX_SSL_CERT_FILE"}) {
+      const char* path = std::getenv(variable);
+      if (path && *path && mbedtls_x509_crt_parse_file(&chain, path) >= 0) {
+        available = true;
+        return;
+      }
+    }
+    for (const char* path : {"/etc/ssl/certs/ca-certificates.crt",
+                             "/etc/ssl/cert.pem",
+                             "/etc/pki/tls/certs/ca-bundle.crt"}) {
+      if (mbedtls_x509_crt_parse_file(&chain, path) >= 0) {
+        available = true;
+        return;
+      }
+    }
+    for (const char* variable : {"SSL_CERT_DIR"}) {
+      const char* path = std::getenv(variable);
+      if (path && *path && mbedtls_x509_crt_parse_path(&chain, path) >= 0) {
+        available = true;
+        return;
+      }
+    }
+    for (const char* path : {"/apex/com.android.conscrypt/cacerts",
+                             "/system/etc/security/cacerts",
+                             "/etc/ssl/certs"}) {
+      if (mbedtls_x509_crt_parse_path(&chain, path) >= 0) {
+        available = true;
+        return;
+      }
+    }
+#endif
+  }
+
+  ~SystemTrust() { mbedtls_x509_crt_free(&chain); }
+};
+
+SystemTrust& system_trust() {
+  static SystemTrust trust;  // C++11 thread-safe initialization
+  return trust;
+}
+
 }  // namespace
 
 struct TlsStream::Impl {
@@ -73,7 +125,6 @@ struct TlsStream::Impl {
   mbedtls_ctr_drbg_context drbg;
   mbedtls_ssl_config conf;
   mbedtls_ssl_context ssl;
-  mbedtls_x509_crt trust;
   int fd = -1;
   bool live = false;  // contexts initialised (free them in close())
   bool ok = false;    // handshake done
@@ -107,7 +158,6 @@ bool TlsStream::connect(int fd, const std::string& host, std::string* err,
   mbedtls_ctr_drbg_init(&m.drbg);
   mbedtls_ssl_config_init(&m.conf);
   mbedtls_ssl_init(&m.ssl);
-  mbedtls_x509_crt_init(&m.trust);
   m.live = true;
 
   static const char pers[] = "xanatoo-tls";
@@ -121,29 +171,14 @@ bool TlsStream::connect(int fd, const std::string& host, std::string* err,
   if (rc != 0) return fail("TLS config failed", rc);
   mbedtls_ssl_conf_min_tls_version(&m.conf, MBEDTLS_SSL_VERSION_TLS1_2);
   if (verify_peer) {
-#if defined(MBEDTLS_FS_IO)
-    // Desktop CA bundles and Android's system certificate directory. Never
-    // treat a missing CA store as an authenticated HTTPS connection.
-    int roots = -1;
-    for (const char* file : {"/etc/ssl/certs/ca-certificates.crt",
-                              "/etc/ssl/cert.pem"}) {
-      roots = mbedtls_x509_crt_parse_file(&m.trust, file);
-      if (roots >= 0) break;
-    }
-    if (roots < 0) roots = mbedtls_x509_crt_parse_path(
-        &m.trust, "/system/etc/security/cacerts");
-    if (roots < 0) {
-      if (err) *err = "no system TLS trust store for certificate verification";
+    SystemTrust& roots = system_trust();
+    if (!roots.available) {
+      if (err) *err = "no system TLS CA store (set SSL_CERT_FILE)";
       close();
       return false;
     }
-#else
-    if (err) *err = "Mbed TLS filesystem CA loading is unavailable";
-    close();
-    return false;
-#endif
     mbedtls_ssl_conf_authmode(&m.conf, MBEDTLS_SSL_VERIFY_REQUIRED);
-    mbedtls_ssl_conf_ca_chain(&m.conf, &m.trust, nullptr);
+    mbedtls_ssl_conf_ca_chain(&m.conf, &roots.chain, nullptr);
   } else {
     mbedtls_ssl_conf_authmode(&m.conf, MBEDTLS_SSL_VERIFY_NONE);
   }
@@ -210,7 +245,6 @@ void TlsStream::close() {
   if (m.live) {
     mbedtls_ssl_free(&m.ssl);
     mbedtls_ssl_config_free(&m.conf);
-    mbedtls_x509_crt_free(&m.trust);
     mbedtls_ctr_drbg_free(&m.drbg);
     mbedtls_entropy_free(&m.entropy);
   }

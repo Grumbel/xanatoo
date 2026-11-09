@@ -744,7 +744,7 @@ bool ws_connect(WsConn& c, const std::string& url, std::string* err,
                     "automatic discovery skips private/local relay " + host;
     return false;
   }
-  if (!c.tls.connect(fd, host, err)) return false;
+  if (!c.tls.connect(fd, host, err, true)) return false;
 
   std::string key = "dGhlIHNhbXBsZSBub25jZQ==";
   std::ostringstream req;
@@ -1089,7 +1089,9 @@ RelayNip11Probe probe_relay_nip11(std::string_view relay, bool public_only) {
   std::string err;
   const auto response = https_request("GET", url, "Xanatoo/0.1 (NIP-11)",
       "Accept: application/nostr+json\r\n", {}, &err,
-      HttpRequestSecurity{.verify_tls = true, .public_only = public_only});
+      HttpRequestSecurity{.verify_tls = true, .public_only = public_only,
+                          .require_https = true,
+                          .max_response_bytes = 256 * 1024});
   if (!response) {
     probe.status = "NIP-11 unavailable (" + err + ")";
     return probe;

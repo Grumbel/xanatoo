@@ -89,9 +89,10 @@ cache writes and schema migration.
   no authenticated binding to the relay's key; `[hash]` = hash only, no verified
   author. A missing/invalid NIP-11 response, missing TLS CA trust store or
   build without Schnorr verification leaves metadata **unbound**; discovery
-  still proceeds over WSS and reports the NIP-11 failure. Existing ordinary
-  TLS connections are not yet certificate-verified; this stricter policy is
-  opt-in for NIP-11 identity binding. `[relay]` proves signed provenance at
+  still proceeds over certificate-verified WSS and reports the NIP-11 failure.
+  All WSS connections now check the certificate chain and hostname, separately
+  from whether NIP-11 binds the group metadata to the relay. `[relay]` proves
+  signed provenance at
   observation time, **not** current membership, moderation, freshness or
   enforcement of the group's rules. NIP-42 authentication, encrypted private
   messages and group creation/joining are not implemented.

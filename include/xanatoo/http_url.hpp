@@ -25,4 +25,9 @@ std::optional<HttpUrl> parse_http_url(std::string_view url);
 std::optional<std::string> resolve_http_redirect(std::string_view base,
                                                  std::string_view location);
 
+// Browsers may start at http://, but a redirect must never silently weaken
+// an HTTPS connection into plaintext. Both URLs must already be resolved.
+bool http_redirect_keeps_security(std::string_view from,
+                                  std::string_view to);
+
 }  // namespace xanatoo

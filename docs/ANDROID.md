@@ -82,9 +82,13 @@ ClientHello). The Android module builds with `MBEDTLS_NO_PLATFORM_ENTROPY` +
 `MBEDTLS_ENTROPY_HARDWARE_ALT`; `mbedtls_hardware_poll()` reads
 `/dev/urandom`.
 
-As on desktop, peer certificates are not verified yet (Gemini needs
-TOFU for self-signed certificates; HTTPS / WSS should verify against the
-system CAs, `/system/etc/security/cacerts`).
+HTTPS and Nostr WSS now verify the certificate chain and requested hostname;
+the Mbed TLS backend loads Android CA files from
+`/apex/com.android.conscrypt/cacerts` or `/system/etc/security/cacerts`
+(and desktop/Nix CA bundle paths). If the system CA store cannot be read,
+the connection fails instead of proceeding unverified. This needs device
+testing on Fire OS 5 and newer Android releases. Gemini still accepts
+self-signed certificates without TOFU/pinning (see `docs/TLS.md`).
 
 ## Still off
 
@@ -114,7 +118,7 @@ underneath it. The 640×480 R36S package starts at 75% of the desktop default.
 
 ## Next
 
-- Certificate verification (system CAs; TOFU for Gemini).
+- Test system-CA validation on actual Android versions; implement Gemini TOFU.
 - Per-glyph font fallback (Android system fonts for scripts DejaVu lacks).
 
 ## Updates

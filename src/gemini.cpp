@@ -167,9 +167,10 @@ static std::optional<GeminiResponse> gemini_fetch_once(const GeminiUrl& u,
                                                        std::string* err) {
   int fd = tcp_connect_host(u.host, u.port, err);
   if (fd < 0) return std::nullopt;
-  // Gemini commonly uses self-signed certs; TlsStream does not verify.
+  // Gemini commonly uses self-signed certificates. This deliberately opts
+  // out of PKI verification; TOFU/pinning is still future work.
   TlsStream tls;
-  if (!tls.connect(fd, u.host, err)) return std::nullopt;
+  if (!tls.connect(fd, u.host, err, false)) return std::nullopt;
 
   std::string req = u.canonical + "\r\n";
   if (!tls.write_all(req.data(), req.size())) {

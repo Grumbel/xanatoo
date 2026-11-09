@@ -6,10 +6,10 @@
 // WSS). Backends: tls_openssl.cpp (desktop default) or tls_mbedtls.cpp
 // (Android; -DXANATOO_TLS=mbedtls on desktop), chosen by CMake / ndk-build.
 //
-// TLS 1.2+, SNI = host. Existing Gemini/HTTPS/WSS connections retain their
-// historical unverified behavior. Identity-sensitive requests must explicitly
-// enable certificate-chain and hostname verification (the peer is rejected
-// if the backend cannot load a trust store).
+// TLS 1.2+, SNI = host. Peer certificates and hostnames are verified by
+// default. Gemini deliberately opts out because it commonly uses self-signed
+// certificates; a separate TOFU/pinning mechanism is still needed there.
+// If no system CA store is available, verified connections fail closed.
 
 #include <cstddef>
 #include <memory>
@@ -27,7 +27,7 @@ class TlsStream {
   // Handshake over the connected TCP socket `fd`. The stream owns `fd` from
   // here on (closed by close() / the destructor, also when this fails).
   bool connect(int fd, const std::string& host, std::string* err = nullptr,
-               bool verify_peer = false);
+               bool verify_peer = true);
   bool connected() const;
 
   // Whole buffer; false on error.

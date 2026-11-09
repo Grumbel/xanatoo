@@ -30,5 +30,6 @@ back to `~/Downloads` on Linux. Portable and platform-specific data-directory
 builds save under their user-data directory's `downloads/` subdirectory.
 
 Unlike regular web downloads, ebook imports and remote thumbnails still use
-xanatoo's internal cache. The existing HTTPS backend currently **does not
-verify TLS peer certificates**; see the network warning in the README.
+xanatoo's internal cache. All of these HTTPS paths require certificate-chain
+and hostname verification. Plain HTTP downloads remain explicitly unencrypted;
+see [TLS notes](TLS.md).

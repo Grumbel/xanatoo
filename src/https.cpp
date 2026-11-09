@@ -91,7 +91,7 @@ public:
 
   bool open(const HttpUrl& url, std::string* err,
             HttpRequestSecurity security = {}) {
-    if (security.verify_tls && !url.secure) {
+    if (security.require_https && !url.secure) {
       if (err) *err = "authenticated request requires HTTPS";
       return false;
     }
@@ -204,11 +204,10 @@ std::optional<HttpResult> https_request(std::string_view method,
     int n = conn.read(buf, sizeof(buf));
     if (n <= 0) break;
     data.append(buf, static_cast<size_t>(n));
-    if (security.verify_tls && data.size() > 256 * 1024) {
-      if (err) *err = "authenticated HTTP response exceeds size limit";
+    if (data.size() > security.max_response_bytes) {
+      if (err) *err = "HTTP response exceeds size limit";
       return std::nullopt;
     }
-    if (data.size() > 12 * 1024 * 1024) break;
   }
 
   size_t hdr_end = data.find("\r\n\r\n");
@@ -272,6 +271,10 @@ std::optional<HttpResult> https_get_follow(std::string_view url,
     auto next = resolve_http_redirect(current, resp->location);
     if (!next) {
       if (err) *err = "unsupported HTTP redirect: " + resp->location;
+      return std::nullopt;
+    }
+    if (!http_redirect_keeps_security(current, *next)) {
+      if (err) *err = "HTTPS redirect refused: destination uses plaintext HTTP";
       return std::nullopt;
     }
     current = std::move(*next);
@@ -478,6 +481,10 @@ bool https_get_follow_stream(std::string_view url, std::string_view user_agent,
     auto next = resolve_http_redirect(current, headers.location);
     if (!next) {
       if (err) *err = "unsupported HTTP redirect: " + headers.location;
+      return false;
+    }
+    if (!http_redirect_keeps_security(current, *next)) {
+      if (err) *err = "HTTPS redirect refused: destination uses plaintext HTTP";
       return false;
     }
     current = std::move(*next);

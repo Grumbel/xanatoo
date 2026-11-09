@@ -613,6 +613,19 @@ if(OpenSSL_FOUND)
 endif()
 add_test(NAME nostr_verify_tests COMMAND xanatoo_nostr_verify_tests)
 
+# Exercise the real OpenSSL transport against a local, ephemeral TLS server:
+# matching trusted identity succeeds, hostname/CA mismatches fail, and the
+# explicit Gemini exception remains possible without external network access.
+if(UNIX AND XANATOO_NEED_OPENSSL AND XANATOO_TLS STREQUAL "openssl")
+  find_package(Threads REQUIRED)
+  add_executable(xanatoo_tls_peer_tests
+    tests/tls_peer_tests.cpp src/tls_openssl.cpp)
+  target_include_directories(xanatoo_tls_peer_tests PRIVATE include)
+  target_link_libraries(xanatoo_tls_peer_tests PRIVATE
+    OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
+  add_test(NAME tls_peer_tests COMMAND xanatoo_tls_peer_tests)
+endif()
+
 # SQLite trust-state migration and precedence need real signature verification,
 # so exercise them independently of the SDL application when OpenSSL is used.
 if(XANATOO_SQLITE AND XANATOO_NEED_OPENSSL AND XANATOO_TLS STREQUAL "openssl")

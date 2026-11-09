@@ -6,7 +6,26 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **318** (this delivery is **317**)
+Next bundle number: **319** (this delivery is **318**)
+
+## Status (2026-11-09) — verified HTTPS and Nostr WSS by default
+
+- Made the shared TLS transport validate server certificate chains and
+  hostnames by default, including ordinary HTTPS pages, service requests,
+  streamed downloads/images and Nostr WSS. Gemini deliberately opts out
+  pending TOFU for self-signed certificates. Plain HTTP is still available
+  by explicit URL, but HTTPS-to-HTTP redirects are rejected.
+- Separated the NIP-11 HTTPS/public-only/256 KiB guard from the general
+  12 MiB buffered response limit, so ordinary verified browsing does not
+  inherit the metadata size restriction. Reddit OAuth requests refuse to
+  send bearer tokens outside `https://oauth.reddit.com`.
+- Mbed TLS now caches parsed system CA roots for repeated HTTPS requests;
+  supports common Linux/NixCA and Android Conscrypt paths, and fails closed
+  if none are usable. Added offline OpenSSL socket-pair TLS identity tests,
+  redirect-downgrade tests and `docs/TLS.md`.
+- Changed network units pass desktop C++20 syntax checks; local TLS and URL
+  regressions pass. Full SDL/Nix build, Android Mbed TLS compilation and
+  physical device trust-store testing remain outstanding.
 
 ## Status (2026-11-09) — verified relay identity for NIP-29 metadata
 

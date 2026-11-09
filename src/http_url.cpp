@@ -141,4 +141,11 @@ std::optional<std::string> resolve_http_redirect(std::string_view base,
   return origin + normalize_path(std::string(parent) + std::string(location));
 }
 
+bool http_redirect_keeps_security(std::string_view from,
+                                  std::string_view to) {
+  const auto src = parse_http_url(from);
+  const auto dst = parse_http_url(to);
+  return src && dst && (!src->secure || dst->secure);
+}
+
 }  // namespace xanatoo

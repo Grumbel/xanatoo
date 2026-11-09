@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 #pragma once
 
+#include <cstddef>
 #include <optional>
 #include <functional>
 #include <cstdint>
@@ -22,11 +23,14 @@ struct HttpResult {
 };
 
 // Applied at connection time (before DNS-address selection / TLS handshake).
-// Suitable for NIP-11 discovery over HTTPS. Ordinary web requests use their
-// historical connection policy unless explicitly opted in.
+// HTTPS always verifies its certificate by default; http:// remains available
+// as explicitly plaintext browsing. NIP-11 additionally requires HTTPS,
+// public-only resolved addresses, and a small response bound.
 struct HttpRequestSecurity {
-  bool verify_tls = false;    // require trusted CA and hostname match
+  bool verify_tls = true;     // require trusted CA and hostname for HTTPS
   bool public_only = false;   // reject private/local resolved IPs
+  bool require_https = false; // reject http:// before opening a socket
+  size_t max_response_bytes = 12 * 1024 * 1024;
 };
 
 // Streaming GET for large responses. Headers are delivered before any body

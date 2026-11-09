@@ -20,6 +20,7 @@ void check(bool ok, std::string_view what) {
 int main() {
   using xanatoo::parse_http_url;
   using xanatoo::resolve_http_redirect;
+  using xanatoo::http_redirect_keeps_security;
   auto plain = parse_http_url("http://localhost:8080/a/b?x=1#ignored");
   check(plain.has_value(), "http URL accepted");
   if (plain) {
@@ -57,6 +58,14 @@ int main() {
         "http://b.example/hi", "HTTPS to HTTP preserves destination scheme");
   check(location("http://a.example/", "https://b.example/hi") ==
         "https://b.example/hi", "HTTP to HTTPS upgrade via Location");
+  check(http_redirect_keeps_security("http://a.example", "http://b.example"),
+        "explicit HTTP browsing and redirects remain available");
+  check(http_redirect_keeps_security("http://a.example", "https://b.example"),
+        "HTTP to HTTPS redirect allowed");
+  check(http_redirect_keeps_security("https://a.example", "https://b.example"),
+        "HTTPS to HTTPS redirect allowed");
+  check(!http_redirect_keeps_security("https://a.example", "http://b.example"),
+        "HTTPS to HTTP downgrade must be rejected");
   check(!resolve_http_redirect("http://a.example", "ftp://other/a"),
         "reject unsupported redirect scheme");
   return failures ? 1 : 0;
