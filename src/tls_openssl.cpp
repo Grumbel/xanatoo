@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <ctime>
 #include <mutex>
 
@@ -90,6 +91,17 @@ bool TlsStream::connect(int fd, const std::string& host, std::string* err,
   if (verify_peer) {
     if (SSL_CTX_set_default_verify_paths(impl_->ctx) != 1) {
       if (err) *err = "no system TLS trust store";
+      close();
+      return false;
+    }
+    // OpenSSL's default-path lookup normally honors SSL_CERT_FILE, but some
+    // packaged builds have a fixed CA store. Explicitly load the configured
+    // bundle too, so Nix and test-local trust anchors work consistently.
+    const char* ca_file = std::getenv("SSL_CERT_FILE");
+    if (!ca_file || !*ca_file) ca_file = std::getenv("NIX_SSL_CERT_FILE");
+    if (ca_file && *ca_file &&
+        SSL_CTX_load_verify_locations(impl_->ctx, ca_file, nullptr) != 1) {
+      if (err) *err = std::string("cannot load TLS CA bundle: ") + ca_file;
       close();
       return false;
     }

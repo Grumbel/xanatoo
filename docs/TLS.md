@@ -84,7 +84,10 @@ the temporary override. With normal persistence enabled, an
 unavailable or unwritable state directory blocks a new Gemini connection;
 the URL is never sent without first establishing trust.
 
-On NixOS, a development shell normally provides `SSL_CERT_FILE`; if a
+On NixOS, a development shell normally provides `SSL_CERT_FILE` (or
+`NIX_SSL_CERT_FILE`). The OpenSSL backend explicitly loads that PEM bundle
+as well as the default verification paths, so packaged OpenSSL builds do not
+have to recognize the environment override during default-path lookup. If a
 deployment has no system CA bundle, arrange one in the runtime environment
 before launching Xanatoo. Do not disable verification to work around an
 unavailable trust store.
@@ -97,7 +100,7 @@ connect until the CA loading path is fixed.
 
 ## Regression coverage and limitations
 
-`tests/tls_peer_tests.cpp` opens an offline TLS connection to a temporary
+`tests/tls_peer_tests.cpp` opens an offline `socketpair(AF_UNIX)` TLS connection to a temporary
 OpenSSL test server with an ephemeral local CA. It checks a trusted matching
 hostname, mismatched hostname, and an untrusted certificate, plus the
 explicit Gemini handshake, fingerprint and certificate metadata, including a

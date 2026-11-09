@@ -6,7 +6,18 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **330** (this delivery is **329**)
+Next bundle number: **331** (this delivery is **330**)
+
+## Status (2026-11-09) — Nix TLS trust regression
+
+- `tls_peer_tests` was already fully offline: it handshakes over a local Unix
+  socketpair. Nix reported OpenSSL verification result 18 for the test's
+  self-signed leaf, showing that the ephemeral PEM CA was not loaded into the
+  client store. The OpenSSL backend now explicitly loads `SSL_CERT_FILE` (or
+  `NIX_SSL_CERT_FILE` if unset), in addition to its default verification paths.
+- Host `tls_peer_tests` passes with verified hostname, rejected hostname and
+  untrusted certificate, and explicit unverified Gemini exceptions. A full
+  network-disabled Nix build remains to be checked on NixOS.
 
 ## Status (2026-11-09) — Lemmy Explorer build fix
 
