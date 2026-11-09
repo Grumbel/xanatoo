@@ -690,6 +690,7 @@ struct App {
   TileMode tile_mode = TileMode::Independent;
   bool dragging_sel = false;
   bool dragging_split = false;
+  bool dragging_diff_overview = false;
   bool dragging_scroll = false;
   int page_slider_pane = -1;  // paged view whose bar slider is being dragged
   Uint32 page_turn_at = 0;    // SDL ticks of the last wheel page turn
@@ -804,6 +805,7 @@ struct App {
   bool diff_mode = false;
   std::vector<xanatoo::NodeId> diff_marks[2];
   std::vector<xanatoo::DiffWordMark> diff_words[2];
+  std::vector<float> diff_overview[2];
   bool structure_mode = false;
   bool browse_mode = false;
   // Content only (F11, gamepad X): no menu bar, toolbars, tab strip; the
@@ -1018,6 +1020,8 @@ void layout_panes(App& app);
 int tile_gutter_size(const App& app);
 SDL_Rect tile_divider_rect(const App& app);
 SDL_Rect tile_mode_button_rect(const App& app);
+SDL_Rect tile_diff_track_rect(const App& app);
+bool scroll_diff_overview(App& app, int x, int y);
 
 // ---- Paged reading (app_pages.cpp, docs/PAGED.md) ----
 bool pane_paged(const App& app, const Pane& p);

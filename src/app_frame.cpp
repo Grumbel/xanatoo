@@ -3540,6 +3540,46 @@ void draw_split_chrome(App& app) {
       th::hline(app.sdl, div.x, div.x + div.w - 1,
                 div.y + div.h - 1, pal.shadow);
     }
+    if (app.diff_mode) {
+      const SDL_Rect track = tile_diff_track_rect(app);
+      if (track.w >= 2 && track.h >= 2) {
+        th::fill(app.sdl, track, pal.face_light);
+        const bool rows = app.tile_axis == TileAxis::Rows;
+        const int along = rows ? track.w : track.h;
+        const int across = rows ? track.h : track.w;
+        SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
+        for (int pi = 0; pi < kCentreViews; ++pi) {
+          const int first_lane = (across * pi) / 2;
+          const int lane = std::max(1, across * (pi + 1) / 2 - first_lane);
+          for (float position : app.diff_overview[pi]) {
+            const int at = std::clamp(static_cast<int>(std::lround(
+                position * (along - 1))), 0, along - 1);
+            SDL_Rect marker = rows
+                ? SDL_Rect{track.x + at, track.y + first_lane, 2, lane}
+                : SDL_Rect{track.x + first_lane, track.y + at, lane, 2};
+            SDL_SetRenderDrawColor(app.sdl, 189, 100, 25, 210);
+            xanatoo::sdl::fill_rect(app.sdl, &marker);
+          }
+          const Pane& pane = app.panes[pi];
+          const float height = std::max(static_cast<float>(pane.h),
+                                        pane.layout.content_height);
+          const float begin = std::clamp(pane.scroll_y / height, 0.f, 1.f);
+          const float end = std::clamp(
+              (pane.scroll_y + static_cast<float>(pane.h)) / height, 0.f, 1.f);
+          const int start = static_cast<int>(std::lround(begin * (along - 1)));
+          const int extent = std::max(2, static_cast<int>(std::lround(
+              (end - begin) * (along - 1))));
+          SDL_Rect viewport = rows
+              ? SDL_Rect{track.x + start, track.y + first_lane,
+                         std::min(extent, along - start), lane}
+              : SDL_Rect{track.x + first_lane, track.y + start,
+                         lane, std::min(extent, along - start)};
+          SDL_SetRenderDrawColor(app.sdl, 47, 104, 158, 180);
+          xanatoo::sdl::draw_rect(app.sdl, &viewport);
+        }
+        SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
+      }
+    }
     // The visible badge is also the mode selector (click/right-click). It
     // straddles the gutter so even a thin independent divider is usable.
     const SDL_Rect badge = tile_mode_button_rect(app);

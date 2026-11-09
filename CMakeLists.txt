@@ -622,4 +622,7 @@ add_executable(xanatoo_http_url_tests
 )
 target_include_directories(xanatoo_http_url_tests PRIVATE include)
 add_test(NAME http_url_tests COMMAND xanatoo_http_url_tests)
+add_executable(xanatoo_diff_overview_tests tests/diff_overview_tests.cpp)
+target_include_directories(xanatoo_diff_overview_tests PRIVATE include)
+add_test(NAME diff_overview_tests COMMAND xanatoo_diff_overview_tests)
 endif()

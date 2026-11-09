@@ -13,6 +13,7 @@
 #include <optional>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/diff_overview.hpp"
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/lemmy.hpp"
@@ -176,6 +177,8 @@ void refresh_diff(App& app) {
   app.diff_marks[1].clear();
   app.diff_words[0].clear();
   app.diff_words[1].clear();
+  app.diff_overview[0].clear();
+  app.diff_overview[1].clear();
   if (!app.diff_mode || shared_doc(app)) return;
   const BufferId b0 = app.panes[0].buf, b1 = app.panes[1].buf;
   if (!find_buf(app, b0) || !find_buf(app, b1) || b0 == b1) return;
@@ -183,6 +186,9 @@ void refresh_diff(App& app) {
                               buf(app, b1).doc,
                               app.diff_marks[0], app.diff_marks[1],
                               &app.diff_words[0], &app.diff_words[1]);
+  for (int i = 0; i < kCentreViews; ++i)
+    app.diff_overview[i] = xanatoo::diff_overview_positions(
+        doc_of(app, app.panes[i]), app.diff_marks[i]);
 }
 
 bool pane_reader(const App& app, const Pane& p) {
@@ -298,6 +304,46 @@ SDL_Rect tile_mode_button_rect(const App& app) {
   if (app.tile_axis == TileAxis::Rows)
     return SDL_Rect{div.x + div.w - w - 8, div.y + (div.h - h) / 2, w, h};
   return SDL_Rect{div.x + (div.w - w) / 2, div.y + div.h - h - 8, w, h};
+}
+
+SDL_Rect tile_diff_track_rect(const App& app) {
+  if (!app.split || !app.diff_mode) return SDL_Rect{};
+  const SDL_Rect div = tile_divider_rect(app);
+  const SDL_Rect button = tile_mode_button_rect(app);
+  constexpr int inset = 4;
+  if (app.tile_axis == TileAxis::Rows) {
+    const int width = std::max(0, button.x - div.x - inset * 2);
+    return SDL_Rect{div.x + inset, div.y + inset,
+                    width, std::max(0, div.h - inset * 2)};
+  }
+  const int height = std::max(0, button.y - div.y - inset * 2);
+  return SDL_Rect{div.x + inset, div.y + inset,
+                  std::max(0, div.w - inset * 2), height};
+}
+
+bool scroll_diff_overview(App& app, int x, int y) {
+  const SDL_Rect track = tile_diff_track_rect(app);
+  if (track.w < 2 || track.h < 2 ||
+      x < track.x || x >= track.x + track.w ||
+      y < track.y || y >= track.y + track.h) return false;
+  const bool rows = app.tile_axis == TileAxis::Rows;
+  const float fraction = std::clamp(rows
+      ? static_cast<float>(x - track.x) / static_cast<float>(track.w)
+      : static_cast<float>(y - track.y) / static_cast<float>(track.h),
+      0.f, 1.f);
+  for (int i = 0; i < kCentreViews; ++i) {
+    Pane& pane = app.panes[i];
+    const float height = pane.layout.content_height;
+    const float desired = fraction * height - static_cast<float>(pane.h) / 2.f;
+    if (pane.pages.on) {
+      page_goto_spread(app, pane, spread_at(pane, std::max(0.f, desired)));
+    } else {
+      pane.view_anchor.reset();
+      pane.scroll_y = std::clamp(desired, 0.f, pane_max_scroll(app, pane));
+      ensure_virtual_layout(app, pane);
+    }
+  }
+  return true;
 }
 
 namespace {

@@ -74,6 +74,11 @@ handled by `open_tile_menu`; `tile_divider_rect` and `tile_mode_button_rect`
 are shared by hit-testing and drawing. This is the two-leaf foundation for
 the planned arbitrary tiling tree (`docs/TILING.md`). Session save/restore
 persists axis and relation, with old split sessions mapped to Trail.
+Compare dividers draw the two-lane overview from `App::diff_overview`;
+`diff_overview_positions` (`diff_overview.hpp`, pure C++20) derives markers
+from document-tree order rather than the virtualized visible layout.
+`tile_diff_track_rect` is the common hit/draw geometry; dragging the track
+scrolls both panes to a normalized position, not an exact aligned hunk.
 `app.focus` may be any live slot; tabs act on `app.centre_focus`. Use
 `focus_view`, `live_views` (never `pi < 2`), `other_pane` (never
 `1 - app.focus`), `pane_at(app, x, y)` and `content_y(app, y, pi)`;

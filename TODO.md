@@ -6,7 +6,24 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **314** (this delivery is **313**)
+Next bundle number: **315** (this delivery is **314**)
+
+## Status (2026-11-09) — Compare divider overview
+
+- The widened Compare divider now shows an overview of both documents:
+  orange tick marks indicate diff blocks in each document's sequence, and
+  blue outlines indicate each pane's current viewport. It works with
+  side-by-side and stacked tile arrangements.
+- Clicking/dragging the overview scrolls both panes to corresponding
+  normalized positions, including paged views. The standard document
+  scrollbars remain independent. The overview's document-order markers are
+  approximate, not exact pixel-aligned diff hunks; source mapping and
+  next/previous-hunk navigation remain future work.
+- `diff_overview_positions` traverses the document tree, avoiding missing
+  offscreen blocks when Xanatoo virtualizes large documents. A standalone
+  C++20 test of tree-order mapping, invalid IDs and empty inputs compiles
+  with g++ and passes. The SDL3 GUI still cannot be compiled in this
+  workspace without the NixOS development toolchain.
 
 ## Status (2026-11-09) — tiled browsing, mode-controlled dividers
 

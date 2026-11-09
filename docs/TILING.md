@@ -72,10 +72,12 @@ Work incrementally:
 4. Move Trail and Compare data into explicit pair relationships (`ViewId`
    endpoints), including preview, diff, synced scrolling, and cross-pane
    connector overlays. Each internal divider exposes its own relation menu.
-5. Add a small **diff overview** in Compare dividers: a minimap of changed
-   ranges, clicks to seek a change, drag to scroll both panes, and next/prev
-   hunk actions. Use explicit mapping between source offsets in both docs;
-   ordinary scrolling stays independent unless sync is requested.
+5. Extend the initial **diff overview** in Compare dividers (added in #314):
+   the current two lanes show approximate document-order changed blocks and
+   current viewports; clicks/drags seek to a normalized position in both
+   documents. Next: source-offset mapping for exact changed-range seeking,
+   next/previous hunk actions, and an explicit synchronized-scroll option.
+   Ordinary scrolling stays independent unless sync is requested.
 
 Every internal node must respect minimum tile size, screen bounds, pointer
 capture, toolbars, scrollbars, and docked side panels. A tiny screen may need

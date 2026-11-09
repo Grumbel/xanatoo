@@ -189,6 +189,10 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
         app.ui.open_tile_menu(static_cast<float>(x), static_cast<float>(y));
         return;
       }
+      if (app.diff_mode && scroll_diff_overview(app, x, y)) {
+        app.dragging_diff_overview = true;
+        return;
+      }
       if (within(tile_divider_rect(app), 2)) {
         app.dragging_split = true;
         return;
@@ -757,6 +761,7 @@ void pointer_left_up(App& app, int x, int y) {
   }
   app.dragging_sel = false;
   app.dragging_split = false;
+  app.dragging_diff_overview = false;
   app.dragging_scroll = false;
   page_pointer_up(app);
   app.dragging_image = false;
@@ -788,11 +793,12 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
     if (float_motion(app, mx_i, my_i)) return;
     if (app.page_slider_pane >= 0 && page_pointer_drag(app, mx_i, my_i)) return;
     // Soft-window interactions handled; rest of motion is for panes.
-    if (imgui_mouse) return;
+    if (imgui_mouse && !app.dragging_diff_overview) return;
 
     // Status bar is not part of the document surface.
     if (my_i >= app.win_h - status_bar_h && !app.dragging_sel &&
-        !app.dragging_scroll && !app.dragging_split && !app.dragging_image &&
+        !app.dragging_scroll && !app.dragging_split &&
+        !app.dragging_diff_overview && !app.dragging_image &&
         !app.dragging_block && !app.dragging_col_gap) {
       return;
     }
@@ -800,6 +806,7 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
     // Hovering a soft window (without an active document drag) should not
     // drive pane selection, scroll-hover, or gutter feedback underneath.
     if (!app.dragging_sel && !app.dragging_scroll && !app.dragging_split &&
+        !app.dragging_diff_overview &&
         !app.dragging_image && !app.dragging_block && !app.dragging_col_gap) {
       if (over_float_chrome(app, mx_i, my_i)) return;
     }
@@ -839,6 +846,10 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
       ratio = std::max(0.f, std::min(1.f, ratio));
       sp.scroll_y = ratio * max_s;
       ensure_virtual_layout(app, sp);
+      return;
+    }
+    if (app.dragging_diff_overview) {
+      scroll_diff_overview(app, x, y);
       return;
     }
     if (app.dragging_split && app.split) {
