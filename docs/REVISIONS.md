@@ -70,10 +70,31 @@ App side (`src/app_drafts.cpp`):
 - `--no-save` and builds without SQLite cannot persist layers. The API
   reports failure rather than pretending the data was saved.
 
-Next: compose the enabled layers over document panes by resolving their
-locators (highlight, note anchors, scrollbar marks); keep unresolved anchors
-visible for reattachment. Then add per-annotation edit commands and an
-annotation-layer selector. Avoid interpreting text diffs as annotations.
+Annotation layers are overlays, not inferred from textual diffs. Their own
+history and identity remain separate from the source document's revisions.
+
+## Annotation highlighting (reader integration)
+
+The **Panels → Annotations** window lists independently stored layers, with a
+visibility checkbox and a radio choice of the local layer to edit. **New
+personal layer** creates a fresh history; **Highlight selection** (also in
+the document context menu) attaches the selected text to the active local
+layer. It works on read-only foreign documents, without modifying them or
+creating document drafts. If there is no local layer, the first highlight
+creates one. Annotations save immediately; a failed save is reported.
+
+The app loads layers on startup. Visible targets matching the current page
+are re-resolved through the same durable passage selectors as bookmarks;
+successful ranges are drawn over the document and marked on the scrollbar.
+Unresolved targets remain in the layer and are counted but not yet offered in
+a reattachment UI. Per-user layer visibility is saved in `sidestore.sqlite`,
+not in the layer revision that might later be shared with others.
+
+Limitations: currently only highlighting has an editor command. Annotation
+bodies (text notes/replies) are stored by the backend but not yet exposed as
+text boxes. The first reader pass uses the existing bookmark wash colour;
+per-layer colours, labels, annotation tooltips, permissions, and anchor
+reattachment are still planned.
 
 ## Later phases
 

@@ -30,6 +30,7 @@
 #include "xanatoo/sitemap.hpp"
 #include "xanatoo/revstore.hpp"
 #include "xanatoo/annotations.hpp"
+#include "xanatoo/sidestore.hpp"
 #include "xanatoo/paths.hpp"
 #include "xanatoo/examples.hpp"
 #include "xanatoo/util.hpp"
@@ -310,6 +311,22 @@ void test_annotation_layers() {
   }
   revstore_use_path({});
   fs::remove(db);
+  const fs::path state = fs::temp_directory_path() /
+      ("xanatoo-annotation-visibility-" + std::to_string(process_id()));
+  fs::create_directories(state);
+  set_dir_override(DirKind::State, state.string());
+  std::unordered_set<std::string> hidden;
+  load_hidden_annotation_layers(hidden);
+  EXPECT(hidden.empty());
+  save_annotation_layer_visibility("layer:test", false);
+  load_hidden_annotation_layers(hidden);
+  EXPECT(hidden.contains("layer:test"));
+  save_annotation_layer_visibility("layer:test", true);
+  load_hidden_annotation_layers(hidden);
+  EXPECT(!hidden.contains("layer:test"));
+  set_dir_override(DirKind::State, {});
+  fs::remove(state / "sidestore.sqlite");
+  fs::remove(state);
 #endif
 }
 

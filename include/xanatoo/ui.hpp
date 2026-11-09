@@ -35,6 +35,11 @@ enum class UiCommand {
   BookmarkPosition,  // bookmark the caret position in the page
   RemoveBookmark,  // remove current (or arg) from bookmarks
   ToggleBookmarks, // Bookmarks manager panel
+  ToggleAnnotationsPanel, // annotation layer visibility / selection
+  NewAnnotationLayer,     // new local, independently versioned layer
+  SelectAnnotationLayer,  // arg = layer id (local owner only)
+  ToggleAnnotationLayer,  // arg = layer id; view-only visibility
+  AddAnnotationHighlight,// highlight selected passage in active local layer
   SelectBookmark,  // arg = address: select its passage in the focused view
   CopyText,        // arg = text for the clipboard (an address)
   OpenReply,       // right-clicked Message: start a mock reply draft
@@ -202,6 +207,14 @@ struct UiState {
   bool justify = false;
   bool footnote_overlay = true;
   bool bookmark_marks = true;
+  bool annotations_panel_open = false;
+  struct AnnotationLayerItem {
+    std::string id, name, owner;
+    bool visible = true;
+    bool active = false;
+    size_t count = 0;
+  };
+  std::vector<AnnotationLayerItem> annotation_layers;
   bool hover_preview = false;
   bool auto_updates = false;
   bool reader_default = false;  // ViewSettings::reader_mode

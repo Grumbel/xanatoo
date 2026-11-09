@@ -12,6 +12,7 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <iterator>
 #include <optional>
 #include <stdexcept>
 
@@ -24,6 +25,7 @@
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/parse.hpp"
+#include "xanatoo/revstore.hpp"
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/theme.hpp"
@@ -297,6 +299,13 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.styles_open = app.styles_panel_open;
   ui_state.bookmarks_open = app.bookmarks_panel_open;
   ui_state.bookmarks = app.bookmarks;
+  ui_state.annotations_panel_open = app.annotation_panel_open;
+  ui_state.annotation_layers.clear();
+  for (const auto& layer : app.annotation_layers)
+    ui_state.annotation_layers.push_back({
+        layer.id, layer.name, layer.owner,
+        !app.hidden_annotation_layers.contains(layer.id),
+        layer.id == app.active_annotation_layer, layer.annotations.size()});
   ui_state.location_icon = address_icon(app, ui_state.doc_label);
   // Imported EPUBs are stored as content.md beside their extracted media.
   // Use the first image in that document as its cover when present.
@@ -418,6 +427,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::NavJump ||
         c == C::GoHome || c == C::GoUp ||
         c == C::ToggleHistory || c == C::ToggleDownloads || c == C::ToggleBookmarks ||
+        c == C::ToggleAnnotationsPanel || c == C::NewAnnotationLayer ||
+        c == C::SelectAnnotationLayer || c == C::ToggleAnnotationLayer ||
+        c == C::AddAnnotationHighlight ||
         c == C::ToggleStylesPanel ||
         c == C::AddBookmark || c == C::BookmarkPage || c == C::RemoveBookmark ||
         c == C::BookmarkPosition || c == C::NewTab ||
@@ -769,6 +781,83 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::ToggleBookmarks:
       app.bookmarks_panel_open = !app.bookmarks_panel_open;
       break;
+    case C::ToggleAnnotationsPanel:
+      app.annotation_panel_open = !app.annotation_panel_open;
+      break;
+    case C::ToggleAnnotationLayer:
+      if (app.hidden_annotation_layers.contains(arg))
+        app.hidden_annotation_layers.erase(arg);
+      else
+        app.hidden_annotation_layers.insert(arg);
+      xanatoo::save_annotation_layer_visibility(
+          arg, !app.hidden_annotation_layers.contains(arg));
+      ++app.annotation_layers_gen;
+      break;
+    case C::SelectAnnotationLayer:
+      for (const auto& layer : app.annotation_layers)
+        if (layer.id == arg && layer.owner == "local")
+          app.active_annotation_layer = arg;
+      break;
+    case C::NewAnnotationLayer: {
+      const auto layer = xanatoo::create_annotation_layer(
+          "local", "My annotations " + std::to_string(app.annotation_layers.size() + 1));
+      if (!layer) {
+        flash_status(app, "Could not create annotation layer (revision store unavailable)");
+        break;
+      }
+      app.active_annotation_layer = layer->id;
+      app.annotation_layers.push_back(*layer);
+      ++app.annotation_layers_gen;
+      flash_status(app, "Created a local annotation layer");
+      break;
+    }
+    case C::AddAnnotationHighlight: {
+      if (p.sel.empty() || p.source_buf == p.buf) {
+        flash_status(app, "Select document text to highlight");
+        break;
+      }
+      const std::string address = bookmark_for_view(app, p, false).address;
+      if (address.empty()) break;
+      const DocBuffer& source = buf(app, p.buf);
+      const std::string key = !source.doc_key.empty() ? source.doc_key
+                              : !source.path.empty() ? source.path
+                                                     : std::string();
+      if (key.empty()) {
+        flash_status(app, "Document has no persistent identity yet");
+        break;
+      }
+      auto layer = std::find_if(app.annotation_layers.begin(),
+                                app.annotation_layers.end(),
+                                [&](const auto& l) {
+                                  return l.id == app.active_annotation_layer &&
+                                         l.owner == "local";
+                                });
+      if (layer == app.annotation_layers.end()) {
+        auto created = xanatoo::create_annotation_layer("local", "My annotations");
+        if (!created) {
+          flash_status(app, "Cannot save annotations (revision store unavailable)");
+          break;
+        }
+        app.active_annotation_layer = created->id;
+        app.annotation_layers.push_back(*created);
+        layer = std::prev(app.annotation_layers.end());
+      }
+      xanatoo::Annotation mark;
+      mark.id = xanatoo::new_annotation_id();
+      mark.kind = "highlight";
+      mark.targets.push_back({
+          key, xanatoo::content_id(xanatoo::serialize_sexpr(d)), address});
+      layer->annotations.push_back(std::move(mark));
+      if (!xanatoo::save_annotation_layer(*layer)) {
+        layer->annotations.pop_back();
+        flash_status(app, "Could not save highlight; no document changes made");
+        break;
+      }
+      app.hidden_annotation_layers.erase(layer->id);
+      ++app.annotation_layers_gen;
+      flash_status(app, "Highlighted selection in local annotation layer");
+      break;
+    }
     case C::AddBookmark:
       add_bookmark(app, bookmark_for_view(app, p, false));
       break;
@@ -1954,6 +2043,7 @@ static void draw_pane_overlays(App& app, int i) {
     // Bookmarks inside the page, under the `#` passage of this view's
     // address (a bookmark just opened is that passage, washed once).
     update_bookmark_marks(app, pane);
+    update_annotation_marks(app, pane);
     // Not drawn while an edit waits for them to be found again: the old
     // offsets would wash the wrong text.
     const bool bm_fresh = bookmark_marks_fresh(pane);
@@ -1970,6 +2060,18 @@ static void draw_pane_overlays(App& app, int i) {
       const auto rects = xanatoo::selection_rects(
           pane.layout, m, draw_scroll, app.renderer.glyph_extents());
       app.renderer.draw_selection(rects, ox, c.r, c.g, c.b, c.a);
+    }
+    if (annotation_marks_fresh(pane)) {
+      // Independent layers compose over the source; they never insert spans
+      // or otherwise modify the document tree.
+      const xanatoo::Rgba& c = app.style.bookmark;
+      for (const AnnotationMark& mark : pane.annotation_marks.items) {
+        if (mark.range.empty()) continue;
+        const auto rects = xanatoo::selection_rects(
+            pane.layout, mark.range, draw_scroll,
+            app.renderer.glyph_extents());
+        app.renderer.draw_selection(rects, ox, c.r, c.g, c.b, c.a);
+      }
     }
     for (const BookmarkMark& bm : pane.bookmark_marks.items) {
       if (!bm_fresh) break;
@@ -2789,6 +2891,22 @@ static void draw_pane_scrollbar(App& app, int i) {
         float y = cpos.valid ? cpos.y : -1.f;
         for (xanatoo::NodeId n = bm.range.anchor.node;
              y < 0.f && n != xanatoo::INVALID_NODE; n = bd.get(n).parent)
+          if (auto it = block_y.find(n); it != block_y.end()) y = it->second;
+        if (y >= 0.f) mark_at(y, c.r, c.g, c.b);
+      }
+    }
+    if (annotation_marks_fresh(pane) && !pane.annotation_marks.items.empty()) {
+      std::unordered_map<xanatoo::NodeId, float> block_y;
+      section_marks(app, pane, &block_y);
+      const xanatoo::Document& ad = doc_of(app, pane);
+      const xanatoo::Rgba& c = app.style.bookmark;
+      for (const AnnotationMark& mark : pane.annotation_marks.items) {
+        auto cp = xanatoo::caret_screen_pos(
+            pane.layout, mark.range.anchor, 0.f,
+            static_cast<float>(app.fonts.regular.line_height()));
+        float y = cp.valid ? cp.y : -1.f;
+        for (xanatoo::NodeId n = mark.range.anchor.node;
+             y < 0.f && n != xanatoo::INVALID_NODE; n = ad.get(n).parent)
           if (auto it = block_y.find(n); it != block_y.end()) y = it->second;
         if (y >= 0.f) mark_at(y, c.r, c.g, c.b);
       }

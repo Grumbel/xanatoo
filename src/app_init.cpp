@@ -112,6 +112,11 @@ bool app_init(App& app) {
   app.minibuf_hist_path = load_minibuffer_history("path");
   app.minibuf_hist_url = load_minibuffer_history("url");
   app.bookmarks = load_bookmarks();
+  app.annotation_layers = xanatoo::list_annotation_layers();
+  xanatoo::load_hidden_annotation_layers(app.hidden_annotation_layers);
+  for (const auto& layer : app.annotation_layers)
+    if (layer.owner == "local" && app.active_annotation_layer.empty())
+      app.active_annotation_layer = layer.id;
   load_download_history(app);
   prune_image_caches();
 

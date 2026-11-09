@@ -6,7 +6,24 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **302** (this delivery is **301**)
+Next bundle number: **303** (this delivery is **302**)
+
+## Status (2026-11-09) — Annotation highlights and layer controls
+
+- The Annotations panel lists stored independent layers, creates local
+  layers, picks the active local layer, and toggles which layers are shown.
+  Visibility is per-user state in `sidestore.sqlite`, not published layer data.
+- Highlight Selection from the panel or document context menu commits an
+  annotation targeting a durable passage. This also works on read-only web
+  documents and never dirties or writes their source content.
+- Visible annotations re-resolve against the current document, draw selection
+  washes and scrollbar ticks, and keep unresolved anchors in storage.
+- Focused SQLite integration exercises old-schema migration, independent
+  revisions, conflicts, reopen, and saved visibility. Source syntax checks
+  pass; the full SDL/CMake GUI test suite still needs a development host.
+- Next: annotation text-box UI and editing/deleting notes, annotation
+  indicators with distinct per-layer styling, orphaned-anchor UI, and native
+  database-backed document working/published heads.
 
 ## Status (2026-11-09) — Versioned annotation layer foundation
 

@@ -1902,6 +1902,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleDownloads;
       if (ImGui::MenuItem("Style Sheets", nullptr, state.styles_open))
         cmd = UiCommand::ToggleStylesPanel;
+      if (ImGui::MenuItem("Annotations", nullptr, state.annotations_panel_open))
+        cmd = UiCommand::ToggleAnnotationsPanel;
       ImGui::EndMenu();
     }
     // Go: moving through and between pages, plus the panels that do so.
@@ -2125,6 +2127,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                     cmd);
       ImGui::Separator();
     }
+    if (state.selection)
+      menu_item_cmd("Highlight Selection", UiCommand::AddAnnotationHighlight, cmd);
+    if (state.selection) ImGui::Separator();
     menu_item_cmd("Find…", UiCommand::Find, cmd, true, "Ctrl+F");
     if (!state.browse)
       menu_item_cmd("Replace…", UiCommand::Replace, cmd, true, "Ctrl+H");
@@ -2466,6 +2471,48 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     }
     ImGui::End();
     if (!open) cmd = UiCommand::ToggleBookmarks;
+  }
+
+  // ---- Independent annotation layers (source documents remain untouched) ----
+  if (state.annotations_panel_open) {
+    bool open = true;
+    ImGui::SetNextWindowSize(ImVec2(410.f, 320.f), ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Annotations", &open)) {
+      if (ImGui::Button("New personal layer"))
+        cmd = UiCommand::NewAnnotationLayer;
+      ImGui::SameLine();
+      if (ImGui::Button("Highlight selection"))
+        cmd = UiCommand::AddAnnotationHighlight;
+      if (!state.selection && ImGui::IsItemHovered())
+        ImGui::SetTooltip("Select text in a document first");
+      ImGui::Separator();
+      if (state.annotation_layers.empty()) {
+        ImGui::TextWrapped("No annotation layers yet. Create one to start highlighting.");
+      }
+      for (const auto& layer : state.annotation_layers) {
+        ImGui::PushID(layer.id.c_str());
+        bool visible = layer.visible;
+        if (ImGui::Checkbox("##visible", &visible)) {
+          cmd = UiCommand::ToggleAnnotationLayer;
+          result.arg = layer.id;
+        }
+        ImGui::SameLine();
+        const std::string label = layer.name + " (" + layer.owner + ", " +
+                                  std::to_string(layer.count) + ")";
+        if (layer.owner == "local") {
+          if (ImGui::RadioButton(label.c_str(), layer.active)) {
+            cmd = UiCommand::SelectAnnotationLayer;
+            result.arg = layer.id;
+          }
+        } else {
+          ImGui::TextUnformatted(label.c_str());
+        }
+        ImGui::PopID();
+      }
+      ImGui::TextDisabled("Checkbox: visibility  ·  radio: local edit target");
+    }
+    ImGui::End();
+    if (!open) cmd = UiCommand::ToggleAnnotationsPanel;
   }
 
   result.cmd = cmd;

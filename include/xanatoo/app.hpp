@@ -29,6 +29,7 @@
 #include "xanatoo/paginate.hpp"
 #include "xanatoo/render.hpp"
 #include "xanatoo/sidestore.hpp"
+#include "xanatoo/annotations.hpp"
 #include "xanatoo/search.hpp"
 #include "xanatoo/sitemap.hpp"
 #include "xanatoo/types.hpp"
@@ -160,6 +161,23 @@ struct BookmarkMarks {
   Uint32 at = 0;  // SDL ticks of the last search (throttles while typing)
   std::vector<BookmarkMark> items;
 };
+
+struct AnnotationMark {
+  std::string annotation_id;
+  std::string layer_id;
+  std::string kind;
+  std::string body;
+  xanatoo::Selection range;
+};
+
+struct AnnotationMarks {
+  BufferId buf = kNoBuffer;
+  uint64_t layers_gen = 0;
+  uint64_t layout_gen = 0;
+  Uint32 at = 0;
+  std::vector<AnnotationMark> items;
+  size_t unresolved = 0;
+};
 // Margin icon of a bookmark mark, in pane-local x / content-relative y
 // (bookmark_icons).
 struct BookmarkIcon {
@@ -204,6 +222,7 @@ struct Pane {
   xanatoo::NodeId cut = xanatoo::INVALID_NODE;  // what the pipes selected
   std::vector<xanatoo::Selection> marks;        // the `#` passage
   BookmarkMarks bookmark_marks;
+  AnnotationMarks annotation_marks;
   bool section_focus = false;  // Section Focus: the outline picks the cut
   // Reader mode of this view: page chrome (Chrome nodes) hidden. Unset =
   // ViewSettings::reader_mode; kept across navigation. View state, never
@@ -704,6 +723,11 @@ struct App {
   // Back / Forward use each view's own `Pane::nav`.
   std::vector<std::string> visited;
   std::vector<xanatoo::Bookmark> bookmarks;
+  std::vector<xanatoo::AnnotationLayer> annotation_layers;
+  std::unordered_set<std::string> hidden_annotation_layers;
+  std::string active_annotation_layer;
+  uint64_t annotation_layers_gen = 1;
+  bool annotation_panel_open = false;
   uint64_t bookmarks_gen = 1;  // bumped by every change of `bookmarks`
   std::string bookmark_menu;   // bookmark of the open margin-icon menu
   bool history_panel_open = false;
@@ -1159,6 +1183,8 @@ void update_bookmark_marks(App& app, Pane& p);
 int bookmarks_in_page(App& app, Pane& p);
 // True while the marks match the layout (not waiting for a typing pause).
 bool bookmark_marks_fresh(const Pane& p);
+void update_annotation_marks(App& app, Pane& p);
+bool annotation_marks_fresh(const Pane& p);
 // Margin icons of the marks on screen (one per bookmark, those on one line
 // side by side), pane-local x, y relative to the pane's content top.
 std::vector<BookmarkIcon> bookmark_icons(App& app, Pane& p);

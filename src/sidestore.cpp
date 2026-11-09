@@ -38,7 +38,9 @@ sqlite3* open_db(bool write) {
       "  section_key TEXT NOT NULL,"
       "  folded INTEGER NOT NULL DEFAULT 1,"
       "  PRIMARY KEY (doc_key, section_key)"
-      ");";
+      ");"
+      "CREATE TABLE IF NOT EXISTS annotation_layer_visibility ("
+      "  layer_id TEXT PRIMARY KEY, hidden INTEGER NOT NULL);";
   if (sqlite3_exec(db, schema, nullptr, nullptr, &err) != SQLITE_OK) {
     if (err) sqlite3_free(err);
     sqlite3_close(db);
@@ -157,12 +159,51 @@ void save_section_fold(std::string_view doc_key, std::string_view section_key,
   sqlite3_close(db);
 }
 
+void load_hidden_annotation_layers(std::unordered_set<std::string>& hidden) {
+  hidden.clear();
+  sqlite3* db = open_db(false);
+  if (!db) return;
+  sqlite3_stmt* st = nullptr;
+  if (sqlite3_prepare_v2(db,
+          "SELECT layer_id FROM annotation_layer_visibility WHERE hidden = 1;",
+          -1, &st, nullptr) == SQLITE_OK) {
+    while (sqlite3_step(st) == SQLITE_ROW) {
+      const auto* text = sqlite3_column_text(st, 0);
+      if (text) hidden.emplace(reinterpret_cast<const char*>(text));
+    }
+  }
+  if (st) sqlite3_finalize(st);
+  sqlite3_close(db);
+}
+
+void save_annotation_layer_visibility(std::string_view layer_id, bool visible) {
+  if (layer_id.empty() || no_save()) return;
+  sqlite3* db = open_db(true);
+  if (!db) return;
+  sqlite3_stmt* st = nullptr;
+  const char* sql = visible
+      ? "DELETE FROM annotation_layer_visibility WHERE layer_id = ?;"
+      : "INSERT INTO annotation_layer_visibility(layer_id,hidden) VALUES(?,1) "
+        "ON CONFLICT(layer_id) DO UPDATE SET hidden=1;";
+  if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) == SQLITE_OK) {
+    sqlite3_bind_text(st, 1, layer_id.data(), static_cast<int>(layer_id.size()),
+                      SQLITE_TRANSIENT);
+    sqlite3_step(st);
+  }
+  if (st) sqlite3_finalize(st);
+  sqlite3_close(db);
+}
+
 #else
 // Built without SQLite (e.g. Android first port): folds are not persisted.
 void load_section_folds(std::string_view, std::unordered_set<std::string>& folded_keys) {
   folded_keys.clear();
 }
 void save_section_fold(std::string_view, std::string_view, bool) {}
+void load_hidden_annotation_layers(std::unordered_set<std::string>& hidden) {
+  hidden.clear();
+}
+void save_annotation_layer_visibility(std::string_view, bool) {}
 #endif
 
 void folds_keys_to_ids(const Document& doc,

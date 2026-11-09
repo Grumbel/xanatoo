@@ -397,6 +397,58 @@ bool bookmark_marks_fresh(const Pane& p) {
          p.bookmark_marks.layout_gen == p.layout.generation;
 }
 
+void update_annotation_marks(App& app, Pane& p) {
+  AnnotationMarks& am = p.annotation_marks;
+  const DocBuffer* b = find_buf(app, p.buf);
+  if (!b || p.source_buf == p.buf) {
+    am = {};
+    return;
+  }
+  if (am.buf == p.buf && am.layers_gen == app.annotation_layers_gen &&
+      am.layout_gen == p.layout.generation) return;
+  const Uint32 now = xanatoo::sdl::ticks();
+  if (am.buf == p.buf && am.layers_gen == app.annotation_layers_gen &&
+      now - am.at < 400) return;
+  am.buf = p.buf;
+  am.layers_gen = app.annotation_layers_gen;
+  am.layout_gen = p.layout.generation;
+  am.at = now;
+  am.items.clear();
+  am.unresolved = 0;
+  const std::string page = pane_page(app, p);
+  const std::string key = !b->doc_key.empty() ? b->doc_key : page;
+  const xanatoo::Document& doc = doc_of(app, p);
+  for (const auto& layer : app.annotation_layers) {
+    if (app.hidden_annotation_layers.contains(layer.id)) continue;
+    for (const auto& annotation : layer.annotations) {
+      for (const auto& target : annotation.targets) {
+        if (target.document_key != key && target.document_key != page) continue;
+        auto loc = xanatoo::parse_locator(target.locator);
+        if (loc.base != page && loc.base != key) continue;
+        std::string lost;
+        const Resolved resolved = resolve_locator(doc, loc, lost);
+        const auto range = resolved.mark
+            ? resolved.mark
+            : (resolved.cut != xanatoo::INVALID_NODE
+                ? std::optional<xanatoo::Selection>(
+                      xanatoo::node_range(doc, resolved.cut))
+                : std::nullopt);
+        if (!lost.empty() || !range) {
+          ++am.unresolved; // keep the annotation; its source may have changed
+          continue;
+        }
+        am.items.push_back({annotation.id, layer.id, annotation.kind,
+                            annotation.body, *range});
+      }
+    }
+  }
+}
+
+bool annotation_marks_fresh(const Pane& p) {
+  return p.annotation_marks.buf == p.buf &&
+         p.annotation_marks.layout_gen == p.layout.generation;
+}
+
 std::vector<BookmarkIcon> bookmark_icons(App& app, Pane& p) {
   std::vector<BookmarkIcon> out;
   if (!bookmark_marks_fresh(p)) return out;

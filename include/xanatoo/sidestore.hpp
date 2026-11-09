@@ -26,6 +26,10 @@ void load_section_folds(std::string_view doc_key,
 void save_section_fold(std::string_view doc_key, std::string_view section_key,
                        bool folded);
 
+// Per-user visibility is not part of the versioned, potentially shared layer.
+void load_hidden_annotation_layers(std::unordered_set<std::string>& hidden);
+void save_annotation_layer_visibility(std::string_view layer_id, bool visible);
+
 // Map stable keys ↔ current NodeIds after a document load/layout.
 void folds_keys_to_ids(const Document& doc,
                        const std::unordered_set<std::string>& keys,
