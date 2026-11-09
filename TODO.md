@@ -6,7 +6,29 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **310** (this delivery is **309**)
+Next bundle number: **311** (this delivery is **310**)
+
+## Status (2026-11-09) — Nostr event integrity and cache migration
+
+- Added NIP-01 canonical serialization and SHA-256 event ID checking before
+  accepting downloaded events. On OpenSSL-backed Nostr builds, BIP-340
+  secp256k1 Schnorr signatures are also checked; other TLS builds currently
+  retain hash-only status rather than claiming authenticated identities.
+- Cache rows record hash-only vs signature-verified status. New event/profile
+  queries exclude 309-era unverified rows. Schema migration keeps those
+  observations (no destructive rewrite) and reports their count separately;
+  a later valid re-fetch can upgrade an old row. `--no-save` never migrates.
+- Explorer shows signed, hash-only, and legacy-unverified counts. Incoming
+  invalid event hashes/signatures are rejected before presentation/caching.
+- Added an independent verifier test target and official BIP-340 positive and
+  negative vectors, plus NIP-01 serialization and a fully signed event fixture
+  (checked against an independent signer). OpenSSL and non-OpenSSL
+  verifier tests, no-SQLite syntax checks, and a linked SQLite smoke test
+  (including older-schema migration) pass in this container. Full SDL GUI
+  compilation still needs the user's development environment.
+- Next: equivalent BIP-340 verification when using mbedTLS, stronger strict
+  JSON/UTF-8 validation and NIP-05 lookup, and cache retention/export/clear
+  controls; NIP-29 discovery and actual signing identities remain open.
 
 ## Status (2026-11-09) — Persistent Nostr catalogue and native panels
 

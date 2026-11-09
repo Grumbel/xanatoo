@@ -172,6 +172,7 @@ add_executable(xanatoo
   src/version.cpp
   src/gemini.cpp
   src/nostr.cpp
+  src/nostr_verify.cpp
   src/nostr_store.cpp
   src/reddit.cpp
   src/reddit_credentials.cpp
@@ -319,6 +320,9 @@ endif()
 
 if(XANATOO_NOSTR)
   target_compile_definitions(xanatoo PRIVATE XANATOO_NOSTR=1)
+  if(XANATOO_TLS STREQUAL "openssl")
+    target_compile_definitions(xanatoo PRIVATE XANATOO_NOSTR_VERIFY_OPENSSL=1)
+  endif()
   message(STATUS "Nostr client: ON (WSS, ${XANATOO_TLS})")
 else()
   target_compile_definitions(xanatoo PRIVATE XANATOO_NOSTR=0)
@@ -530,6 +534,7 @@ add_executable(xanatoo_tests
   src/locator.cpp
   src/native.cpp
   src/nostr.cpp
+  src/nostr_verify.cpp
   src/nostr_store.cpp
   src/gemini.cpp
   src/epub_import.cpp
@@ -576,6 +581,31 @@ target_compile_definitions(xanatoo_tests PRIVATE
   "XANATOO_VERSION=\"${PROJECT_VERSION_FULL}\""
 )
 add_test(NAME unit_tests COMMAND xanatoo_tests)
+
+# Parser/integrity tests run independently of SDL. OpenSSL builds additionally
+# exercise the BIP-340 secp256k1 verifier with upstream positive/negative vectors.
+add_executable(xanatoo_nostr_verify_tests
+  tests/nostr_verify_tests.cpp src/nostr_verify.cpp src/util.cpp)
+target_include_directories(xanatoo_nostr_verify_tests PRIVATE include)
+# Keep this cryptography regression independent of the full SDL document app;
+# util.cpp also contains unrelated document helpers that this target never uses.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  target_compile_options(xanatoo_nostr_verify_tests PRIVATE -ffunction-sections -fdata-sections)
+  if(APPLE)
+    target_link_options(xanatoo_nostr_verify_tests PRIVATE -Wl,-dead_strip)
+  else()
+    target_link_options(xanatoo_nostr_verify_tests PRIVATE -Wl,--gc-sections)
+  endif()
+elseif(MSVC)
+  target_compile_options(xanatoo_nostr_verify_tests PRIVATE /Gy)
+  target_link_options(xanatoo_nostr_verify_tests PRIVATE /OPT:REF)
+endif()
+find_package(OpenSSL QUIET)
+if(OpenSSL_FOUND)
+  target_compile_definitions(xanatoo_nostr_verify_tests PRIVATE XANATOO_NOSTR_VERIFY_OPENSSL=1)
+  target_link_libraries(xanatoo_nostr_verify_tests PRIVATE OpenSSL::Crypto)
+endif()
+add_test(NAME nostr_verify_tests COMMAND xanatoo_nostr_verify_tests)
 
 # Parser-only regression tests (no SDL/network/font dependencies). Also useful
 # for the experimental formats while the full application is cross-compiled.

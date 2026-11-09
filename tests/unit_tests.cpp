@@ -22,6 +22,7 @@
 #include "xanatoo/locator.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/nostr_store.hpp"
+#include "xanatoo/nostr_verify.hpp"
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/reddit_credentials.hpp"
 #include "xanatoo/reply.hpp"
@@ -711,14 +712,21 @@ void test_nostr_local_cache() {
   fs::remove(database);
   nostr_set_cache_test_path(database.string());
   const std::string alice(64, 'a'), bob(64, 'b'), carol(64, 'c');
-  const std::string note_id(64, '1'), profile_id(64, '2');
-  const std::string note = "{\"id\":\"" + note_id +
+  const std::string zeros(64, '0');
+  const auto with_valid_id = [&](std::string raw) {
+    auto id = nostr_event_id(raw);
+    EXPECT(id.has_value());
+    if (id) raw.replace(raw.find(zeros), 64, *id);
+    return raw;
+  };
+  const std::string note = with_valid_id("{\"id\":\"" + zeros +
       "\",\"pubkey\":\"" + alice + "\",\"kind\":1,\"created_at\":200,"
       "\"content\":\"hello nostr:" + nostr_bech32("npub", carol) +
-      "\",\"tags\":[[\"p\",\"" + bob + "\"]]}";
-  const std::string profile = "{\"id\":\"" + profile_id +
+      "\",\"tags\":[[\"p\",\"" + bob + "\"]],\"sig\":\"" + zeros + zeros + "\"}");
+  const std::string note_id = json_str_field(note, "id");
+  const std::string profile = with_valid_id("{\"id\":\"" + zeros +
       "\",\"pubkey\":\"" + alice + "\",\"kind\":0,\"created_at\":201,"
-      "\"content\":\"{\\\"display_name\\\":\\\"Alice\\\",\\\"nip05\\\":\\\"alice@example.org\\\"}\",\"tags\":[]}";
+      "\"content\":\"{\\\"display_name\\\":\\\"Alice\\\",\\\"nip05\\\":\\\"alice@example.org\\\"}\",\"tags\":[],\"sig\":\"" + zeros + zeros + "\"}");
 #if defined(XANATOO_SQLITE) && XANATOO_SQLITE
   nostr_cache_events({note, profile, note}, "wss://first.example");
   nostr_cache_events({note}, "wss://second.example");
@@ -728,6 +736,13 @@ void test_nostr_local_cache() {
   EXPECT_EQ(stats.profiles, int64_t(1));
   EXPECT_EQ(stats.pubkeys, int64_t(3));
   EXPECT_EQ(stats.relays, int64_t(2));
+  EXPECT_EQ(stats.signed_events, int64_t(0));  // test builds have no signer backend
+  EXPECT_EQ(stats.legacy_events, int64_t(0));
+  std::string corrupt = note;
+  corrupt[corrupt.find(note_id)] = corrupt[corrupt.find(note_id)] == 'a' ? 'b' : 'a';
+  nostr_cache_events({corrupt}, "wss://bad.example");
+  EXPECT_EQ(nostr_cache_stats().events, int64_t(2));
+  EXPECT_EQ(nostr_cache_stats().relays, int64_t(2));
   const auto people = nostr_cached_people("alice");
   EXPECT_EQ(people.size(), size_t(1));
   if (!people.empty()) {
@@ -759,22 +774,22 @@ void test_nostr_local_cache() {
   EXPECT(!nostr_set_active_local_identity(carol));
   EXPECT(!nostr_add_watch_identity("Invalid", "not-a-public-key"));
   set_no_save(true);
-  nostr_cache_events({"{\"id\":\"" + std::string(64, '3') +
+  nostr_cache_events({with_valid_id("{\"id\":\"" + zeros +
       "\",\"pubkey\":\"" + alice + "\",\"kind\":1,\"created_at\":1,"
-      "\"content\":\"do not persist\",\"tags\":[]}"}, "wss://third.example");
+      "\"content\":\"do not persist\",\"tags\":[],\"sig\":\"" + zeros + zeros + "\"}")}, "wss://third.example");
   EXPECT_EQ(nostr_cache_stats().events, int64_t(2));
   EXPECT(!nostr_add_watch_identity("No-save", bob));
   set_no_save(false);
-  const std::string reply = "{\"id\":\"" + std::string(64, '4') +
+  const std::string reply = with_valid_id("{\"id\":\"" + zeros +
       "\",\"pubkey\":\"" + bob + "\",\"kind\":1,\"created_at\":202,"
-      "\"content\":\"reply\",\"tags\":[[\"e\",\"" + note_id + "\"]]}";
+      "\"content\":\"reply\",\"tags\":[[\"e\",\"" + note_id + "\"]],\"sig\":\"" + zeros + zeros + "\"}");
   nostr_cache_events({reply}, "wss://first.example");
   EXPECT_EQ(nostr_cached_thread_json(note_id).size(), size_t(2));
   EXPECT_EQ(nostr_cached_people(bob)[0].post_count, int64_t(1));
   // An older profile event cannot replace newer observed metadata.
-  const std::string old_profile = "{\"id\":\"" + std::string(64, '5') +
+  const std::string old_profile = with_valid_id("{\"id\":\"" + zeros +
       "\",\"pubkey\":\"" + alice + "\",\"kind\":0,\"created_at\":1,"
-      "\"content\":\"{\\\"display_name\\\":\\\"Old\\\"}\",\"tags\":[]}";
+      "\"content\":\"{\\\"display_name\\\":\\\"Old\\\"}\",\"tags\":[],\"sig\":\"" + zeros + zeros + "\"}");
   nostr_cache_events({old_profile}, "wss://first.example");
   EXPECT_EQ(nostr_cached_people("alice")[0].name, "Alice");
 #else

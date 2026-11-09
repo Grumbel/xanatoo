@@ -22,12 +22,18 @@ the newest kind-0 profile per key. Index pubkeys from event authors, `p`
 tags and NIP-19 mentions. Cache lookups/search operate without a relay.
 
 Privacy/security: local cache may contain personal data and could grow
-indefinitely; future releases need size/export/clear controls. Only treat
-profile metadata as *claimed* names until event IDs and Schnorr signatures
-are validated. NIP-05 identifiers additionally require remote verification.
-The current relay reader does not verify Schnorr signatures. Never treat
-profile metadata as verified identity merely because it is stored locally.
-`--no-save` must disable all persistent cache and identity writes.
+indefinitely; future releases need size/export/clear controls. NIP-01 event
+IDs are now recalculated from their canonical serialized content. When using
+OpenSSL, the Nostr reader also checks BIP-340 Schnorr signatures. On mbedTLS
+or network-disabled test builds, an ID match is **hash-only** and cannot
+authenticate the author. Signed, hash-only, and legacy unverified events are
+counted separately. Historical cache records from before verification remain
+in SQLite with `verification=0`, but are hidden from event searches until
+refetched and checked. A valid refetch can upgrade the row without deleting
+the user's earlier observation. NIP-05 names still require remote
+verification: a valid signature proves only control of the public key, not
+ownership of the claimed web identifier. `--no-save` disables persistent
+cache writes and schema migration.
 
 ## Two native dockable panels
 

@@ -6,6 +6,7 @@
 
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/nostr_store.hpp"
+#include "xanatoo/nostr_verify.hpp"
 #include "xanatoo/util.hpp"
 
 #include "xanatoo/https.hpp"
@@ -1033,6 +1034,7 @@ void collect_ws_events(WsConn& c, std::map<std::string, NostrEvent>& by_id,
     size_t endb = msg.rfind('}');
     if (endb == std::string::npos || endb <= brace) continue;
     const std::string raw = msg.substr(brace, endb - brace + 1);
+    if (nostr_verify_event(raw) == NostrVerification::Invalid) continue;
     NostrEvent ev;
     if (!parse_event_json(raw, ev)) continue;
     downloaded.push_back(raw);
@@ -1203,6 +1205,7 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
       nostr_cached_thread_json(*id);
   if (!recent_mode || by_id.empty()) {
     for (const std::string& raw : cached) {
+      if (nostr_verify_event(raw) == NostrVerification::Invalid) continue;
       NostrEvent e;
       if (parse_event_json(raw, e)) by_id.try_emplace(e.id, std::move(e));
     }

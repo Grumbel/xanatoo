@@ -517,10 +517,13 @@ history or distribute patch files.
 - Relay events and encountered public keys now persist in `nostr.sqlite` via
   `nostr_store.cpp` when SQLite is enabled (no writes under `--no-save`). Events
   are deduplicated by id; distinct source relays, `p` tag/NIP-19 mentioned
-  keys, and newest observed kind-0 metadata are indexed. **Event signatures,
-  IDs and claimed NIP-05 names are not verified yet**. Do not portray the
-  cache as a trusted or exhaustive Nostr directory. `docs/NOSTR.md` has the
-  discovery, privacy and group/channel roadmap.
+  keys, and newest observed kind-0 metadata are indexed. `nostr_verify.cpp`
+  reconstructs NIP-01 event IDs; OpenSSL builds additionally verify BIP-340
+  Schnorr signatures. Other TLS backends cache **hash-checked, unsigned-status**
+  observations only; historic pre-verifier records are preserved as excluded
+  `verification=0` rows and require refetch. The UI distinguishes these cases.
+  Claimed NIP-05 names are NOT verified. Do not portray the cache as a complete
+  or uniformly authenticated Nostr directory. See `docs/NOSTR.md`.
 - Two native dockable `FloatWindow` panels are exposed in Panels: **Nostr
   Explorer** searches local events/people and shows observed counts; **Nostr
   Accounts** manages multiple named *watch-only* public keys. They use ImGui

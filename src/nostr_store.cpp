@@ -6,6 +6,7 @@
 #include "xanatoo/nostr_store.hpp"
 #include "xanatoo/json_min.hpp"
 #include "xanatoo/nostr.hpp"
+#include "xanatoo/nostr_verify.hpp"
 #include "xanatoo/paths.hpp"
 #include "xanatoo/util.hpp"
 
@@ -37,6 +38,20 @@ bool hex_pubkey(std::string_view str) {
 
 #if XANATOO_SQLITE
 
+bool table_has_column(sqlite3* db, const char* table, const char* column) {
+  const std::string sql = std::string("PRAGMA table_info(") + table + ");";
+  sqlite3_stmt* st = nullptr;
+  if (sqlite3_prepare_v2(db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK)
+    return false;
+  bool found = false;
+  while (sqlite3_step(st) == SQLITE_ROW) {
+    const char* name = reinterpret_cast<const char*>(sqlite3_column_text(st, 1));
+    if (name && column == std::string_view(name)) { found = true; break; }
+  }
+  sqlite3_finalize(st);
+  return found;
+}
+
 sqlite3* open_cache(bool writing) {
   if (writing && no_save()) return nullptr;
   const std::string dir = cache_test_path.empty() ? state_dir() : std::string();
@@ -53,18 +68,22 @@ sqlite3* open_cache(bool writing) {
     return nullptr;
   }
   sqlite3_busy_timeout(db, 1500);
-  if (writing) {
+  const bool old_events = !table_has_column(db, "events", "verification");
+  const bool old_people = !table_has_column(db, "people", "profile_verification");
+  if (writing || (!no_save() && (old_events || old_people))) {
     const char* schema =
         "CREATE TABLE IF NOT EXISTS events ("
         " id TEXT PRIMARY KEY, pubkey TEXT NOT NULL, kind INTEGER NOT NULL,"
         " created_at INTEGER NOT NULL, content TEXT NOT NULL,"
-        " raw_json TEXT NOT NULL, first_seen INTEGER NOT NULL);"
+        " raw_json TEXT NOT NULL, first_seen INTEGER NOT NULL,"
+        " verification INTEGER NOT NULL DEFAULT 0);"
         "CREATE INDEX IF NOT EXISTS nostr_events_author ON events(pubkey, kind);"
         "CREATE INDEX IF NOT EXISTS nostr_events_time ON events(created_at DESC);"
         "CREATE TABLE IF NOT EXISTS people ("
         " pubkey TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '',"
         " about TEXT NOT NULL DEFAULT '', nip05 TEXT NOT NULL DEFAULT '',"
         " profile_time INTEGER NOT NULL DEFAULT 0,"
+        " profile_verification INTEGER NOT NULL DEFAULT 0,"
         " first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL);"
         "CREATE TABLE IF NOT EXISTS event_relays ("
         " event_id TEXT NOT NULL, relay TEXT NOT NULL,"
@@ -78,6 +97,21 @@ sqlite3* open_cache(bool writing) {
         "CREATE TABLE IF NOT EXISTS local_settings ("
         " key TEXT PRIMARY KEY, value TEXT NOT NULL);";
     if (sqlite3_exec(db, schema, nullptr, nullptr, nullptr) != SQLITE_OK) {
+      sqlite3_close(db);
+      return nullptr;
+    }
+  }
+  // Preserve earlier observations, but do not misrepresent pre-verifier
+  // records as trusted. They remain in SQLite with verification=0 and are
+  // excluded from validated event queries until legitimately refetched.
+  // Reading an existing database may trigger migration, except --no-save.
+  if (!no_save()) {
+    if ((old_events && !table_has_column(db, "events", "verification") &&
+         sqlite3_exec(db, "ALTER TABLE events ADD COLUMN verification INTEGER NOT NULL DEFAULT 0",
+                      nullptr, nullptr, nullptr) != SQLITE_OK) ||
+        (old_people && !table_has_column(db, "people", "profile_verification") &&
+         sqlite3_exec(db, "ALTER TABLE people ADD COLUMN profile_verification INTEGER NOT NULL DEFAULT 0",
+                      nullptr, nullptr, nullptr) != SQLITE_OK)) {
       sqlite3_close(db);
       return nullptr;
     }
@@ -128,14 +162,20 @@ void nostr_cache_events(const std::vector<std::string>& events,
   sqlite3* db = open_cache(true);
   if (!db) return;
   DbOwner owner{db};
-  Statement put_event(db, "INSERT OR IGNORE INTO events"
-       "(id,pubkey,kind,created_at,content,raw_json,first_seen)"
-       "VALUES(?,?,?,?,?,?,?);");
+  Statement put_event(db, "INSERT INTO events"
+       "(id,pubkey,kind,created_at,content,raw_json,first_seen,verification)"
+       "VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET"
+       " pubkey=excluded.pubkey,kind=excluded.kind,"
+       " created_at=excluded.created_at,content=excluded.content,"
+       " raw_json=excluded.raw_json,verification=excluded.verification"
+       " WHERE events.verification<excluded.verification;");
   Statement put_person(db, "INSERT INTO people(pubkey,first_seen,last_seen)"
        " VALUES(?,?,?) ON CONFLICT(pubkey) DO UPDATE SET"
        " last_seen=MAX(last_seen,excluded.last_seen);");
   Statement put_profile(db, "UPDATE people SET name=?,about=?,nip05=?,"
-       " profile_time=? WHERE pubkey=? AND profile_time<=?;");
+       " profile_time=?,profile_verification=? WHERE pubkey=? AND"
+       " (profile_verification<? OR"
+       " (profile_verification=? AND profile_time<=?));");
   Statement put_relay(db, "INSERT OR IGNORE INTO event_relays(event_id,relay)"
        " VALUES(?,?);");
   Statement put_ref(db, "INSERT OR IGNORE INTO event_refs(event_id,referenced_id)"
@@ -148,8 +188,10 @@ void nostr_cache_events(const std::vector<std::string>& events,
   const int64_t observed = static_cast<int64_t>(std::time(nullptr));
   bool ok = true;
   for (const std::string& raw : events) {
-    // The IDs are still *unverified* (see docs/NOSTR.md). Require correctly
-    // shaped values; do not accept a relay-supplied name as a trusted key.
+    const NostrVerification verification = nostr_verify_event(raw);
+    if (verification == NostrVerification::Invalid) continue;
+    // An ID match alone does not authenticate the author on a build without
+    // Schnorr verification. Preserve that distinction in every cache row.
     const std::string obj = json_top_level(raw);
     std::string id = ascii_lower(json_str_field(obj, "id"));
     std::string author = ascii_lower(json_str_field(obj, "pubkey"));
@@ -165,6 +207,7 @@ void nostr_cache_events(const std::vector<std::string>& events,
     put_event.bind(5, content);
     put_event.bind(6, raw);
     put_event.bind(7, observed);
+    put_event.bind(8, static_cast<int64_t>(verification));
     if (!put_event.exec()) { ok = false; break; }
     if (!relay.empty()) {
       put_relay.reset();
@@ -202,8 +245,11 @@ void nostr_cache_events(const std::vector<std::string>& events,
       put_profile.bind(2, json_str_field(content, "about").substr(0, 4096));
       put_profile.bind(3, json_str_field(content, "nip05").substr(0, 256));
       put_profile.bind(4, timestamp);
-      put_profile.bind(5, author);
-      put_profile.bind(6, timestamp);
+      put_profile.bind(5, static_cast<int64_t>(verification));
+      put_profile.bind(6, author);
+      put_profile.bind(7, static_cast<int64_t>(verification));
+      put_profile.bind(8, static_cast<int64_t>(verification));
+      put_profile.bind(9, timestamp);
       if (!put_profile.exec()) { ok = false; break; }
     }
   }
@@ -219,18 +265,28 @@ NostrCacheStats nostr_cache_stats() {
   sqlite3* db = open_cache(false);
   if (!db) return out;
   DbOwner owner{db};
+  if (!table_has_column(db, "events", "verification")) {
+    Statement old(db, "SELECT COUNT(*) FROM events;");
+    if (old.valid() && old.next()) out.legacy_events = old.integer(0);
+    return out;
+  }
   Statement st(db, "SELECT"
-       " (SELECT COUNT(*) FROM events),"
-       " (SELECT COUNT(*) FROM events WHERE kind=1),"
-       " (SELECT COUNT(*) FROM people WHERE profile_time>0),"
+       " (SELECT COUNT(*) FROM events WHERE verification>0),"
+       " (SELECT COUNT(*) FROM events WHERE kind=1 AND verification>0),"
+       " (SELECT COUNT(*) FROM people WHERE profile_verification>0),"
        " (SELECT COUNT(*) FROM people),"
-       " (SELECT COUNT(DISTINCT relay) FROM event_relays);");
+       " (SELECT COUNT(DISTINCT r.relay) FROM event_relays r"
+       " JOIN events e ON e.id=r.event_id WHERE e.verification>0),"
+       " (SELECT COUNT(*) FROM events WHERE verification=2),"
+       " (SELECT COUNT(*) FROM events WHERE verification=0);");
   if (st.valid() && st.next()) {
     out.events = st.integer(0);
     out.notes = st.integer(1);
     out.profiles = st.integer(2);
     out.pubkeys = st.integer(3);
     out.relays = st.integer(4);
+    out.signed_events = st.integer(5);
+    out.legacy_events = st.integer(6);
   }
 #endif
   return out;
@@ -243,12 +299,16 @@ std::vector<NostrCachedPerson> nostr_cached_people(std::string_view query,
   sqlite3* db = open_cache(false);
   if (!db) return out;
   DbOwner owner{db};
-  Statement st(db, "SELECT p.pubkey,p.name,p.about,p.nip05,p.last_seen,"
-       " COUNT(e.id),COALESCE(SUM(CASE WHEN e.kind=1 THEN 1 ELSE 0 END),0)"
-       " FROM people p LEFT JOIN events e ON e.pubkey=p.pubkey"
+  Statement st(db, "SELECT p.pubkey,"
+       " CASE WHEN p.profile_verification>0 THEN p.name ELSE '' END,"
+       " CASE WHEN p.profile_verification>0 THEN p.about ELSE '' END,"
+       " CASE WHEN p.profile_verification>0 THEN p.nip05 ELSE '' END,p.last_seen,"
+       " COUNT(e.id),COALESCE(SUM(CASE WHEN e.kind=1 THEN 1 ELSE 0 END),0),"
+       " p.profile_verification"
+       " FROM people p LEFT JOIN events e ON e.pubkey=p.pubkey AND e.verification>0"
        " WHERE instr(lower(p.pubkey),lower(?))>0 OR"
-       " instr(lower(p.name),lower(?))>0 OR"
-       " instr(lower(p.nip05),lower(?))>0"
+       " (p.profile_verification>0 AND instr(lower(p.name),lower(?))>0) OR"
+       " (p.profile_verification>0 AND instr(lower(p.nip05),lower(?))>0)"
        " GROUP BY p.pubkey ORDER BY 7 DESC,p.last_seen DESC LIMIT ? OFFSET ?;");
   if (st.valid()) {
     for (int i = 1; i <= 3; ++i) st.bind(i, query);
@@ -256,7 +316,7 @@ std::vector<NostrCachedPerson> nostr_cached_people(std::string_view query,
     st.bind(5, static_cast<int64_t>(std::max(0, offset)));
     while (st.next()) out.push_back({st.text(0), st.text(1), st.text(2),
                                     st.text(3), st.integer(6), st.integer(5),
-                                    st.integer(4)});
+                                    st.integer(4), static_cast<int>(st.integer(7))});
   }
 #else
   (void)query; (void)limit; (void)offset;
@@ -271,11 +331,13 @@ std::vector<NostrCachedEvent> nostr_cached_events(std::string_view query,
   sqlite3* db = open_cache(false);
   if (!db) return out;
   DbOwner owner{db};
-  Statement st(db, "SELECT e.id,e.pubkey,p.name,e.content,e.kind,e.created_at"
+  Statement st(db, "SELECT e.id,e.pubkey,"
+       " CASE WHEN p.profile_verification>0 THEN p.name ELSE '' END,"
+       " e.content,e.kind,e.created_at,e.verification"
        " FROM events e LEFT JOIN people p ON p.pubkey=e.pubkey"
-       " WHERE instr(lower(e.content),lower(?))>0 OR"
+       " WHERE e.verification>0 AND (instr(lower(e.content),lower(?))>0 OR"
        " instr(lower(e.pubkey),lower(?))>0 OR"
-       " instr(lower(p.name),lower(?))>0"
+       " (p.profile_verification>0 AND instr(lower(p.name),lower(?))>0))"
        " ORDER BY e.created_at DESC,e.id DESC LIMIT ? OFFSET ?;");
   if (st.valid()) {
     for (int i = 1; i <= 3; ++i) st.bind(i, query);
@@ -283,7 +345,7 @@ std::vector<NostrCachedEvent> nostr_cached_events(std::string_view query,
     st.bind(5, static_cast<int64_t>(std::max(0, offset)));
     while (st.next()) out.push_back({st.text(0), st.text(1), st.text(2),
                                     st.text(3), static_cast<int>(st.integer(4)),
-                                    st.integer(5)});
+                                    st.integer(5), static_cast<int>(st.integer(6))});
   }
 #else
   (void)query; (void)limit; (void)offset;
@@ -314,8 +376,9 @@ std::vector<std::string> cached_raw(const char* sql, std::string_view key) {
 std::vector<std::string> nostr_cached_thread_json(std::string_view id) {
 #if XANATOO_SQLITE
   if (hex_pubkey(id)) return cached_raw(
-      "SELECT raw_json FROM events WHERE id=? OR id IN"
-      " (SELECT event_id FROM event_refs WHERE referenced_id=?)"
+      "SELECT raw_json FROM events WHERE verification>0"
+      " AND (id=? OR id IN"
+      " (SELECT event_id FROM event_refs WHERE referenced_id=?))"
       " ORDER BY created_at LIMIT 150;", id);
 #else
   (void)id;
@@ -327,6 +390,7 @@ std::vector<std::string> nostr_cached_author_json(std::string_view pk) {
 #if XANATOO_SQLITE
   if (hex_pubkey(pk)) return cached_raw(
       "SELECT raw_json FROM events WHERE pubkey=? AND kind IN (0,1)"
+      " AND verification>0"
       " ORDER BY created_at DESC LIMIT 150;", pk);
 #else
   (void)pk;
@@ -336,7 +400,7 @@ std::vector<std::string> nostr_cached_author_json(std::string_view pk) {
 
 std::vector<std::string> nostr_cached_recent_json() {
 #if XANATOO_SQLITE
-  return cached_raw("SELECT raw_json FROM events WHERE kind=1"
+  return cached_raw("SELECT raw_json FROM events WHERE kind=1 AND verification>0"
                     " ORDER BY created_at DESC LIMIT 80;", {});
 #endif
   return {};

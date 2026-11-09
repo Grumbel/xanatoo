@@ -15,6 +15,8 @@ struct NostrCacheStats {
   int64_t profiles = 0;
   int64_t pubkeys = 0;
   int64_t relays = 0;
+  int64_t signed_events = 0;  // BIP-340 signature-verified events
+  int64_t legacy_events = 0;  // observations from before verification
 };
 
 struct NostrCachedPerson {
@@ -25,6 +27,7 @@ struct NostrCachedPerson {
   int64_t post_count = 0;  // locally observed unique kind-1 events
   int64_t event_count = 0;
   int64_t last_seen = 0;
+  int profile_verification = 0;  // 1: hash checked; 2: BIP-340 checked
 };
 
 struct NostrCachedEvent {
@@ -34,6 +37,7 @@ struct NostrCachedEvent {
   std::string content;
   int kind = 0;
   int64_t created_at = 0;
+  int verification = 0;
 };
 
 struct NostrLocalIdentity {

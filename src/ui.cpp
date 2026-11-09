@@ -2686,9 +2686,14 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                   static_cast<long long>(state.nostr_stats.events),
                   static_cast<long long>(state.nostr_stats.notes),
                   static_cast<long long>(state.nostr_stats.pubkeys));
-      ImGui::TextDisabled("%lld profiles, %lld relays (local sample; unverified)",
+      ImGui::TextDisabled("%lld profiles, %lld relays (local sample)",
                           static_cast<long long>(state.nostr_stats.profiles),
                           static_cast<long long>(state.nostr_stats.relays));
+      ImGui::TextDisabled("%lld signed, %lld hash-only, %lld legacy unverified",
+                          static_cast<long long>(state.nostr_stats.signed_events),
+                          static_cast<long long>(state.nostr_stats.events -
+                                                 state.nostr_stats.signed_events),
+                          static_cast<long long>(state.nostr_stats.legacy_events));
       ImGui::SetNextItemWidth(-80.f * scale_);
       if (ImGui::InputText("##nostr_search", nostr_local_search_,
                            sizeof nostr_local_search_)) {
@@ -2728,16 +2733,19 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
             ImGui::PushID(person.pubkey.c_str());
             const std::string label = (person.name.empty() ?
                 person.pubkey.substr(0, 14) + "…" : person.name) +
-                "  ·  " + std::to_string(person.post_count) + " notes";
+                "  ·  " + std::to_string(person.post_count) + " notes" +
+                (person.profile_verification == 2 ? " [sig]" : "");
             if (ImGui::Selectable(label.c_str())) {
               cmd = UiCommand::NavigateUrl;
               result.arg = "nostr:" + nostr_bech32("npub", person.pubkey);
             }
             if (ImGui::IsItemHovered())
-              ImGui::SetTooltip("%s\n%lld unique events observed\n%s",
+              ImGui::SetTooltip("%s\n%lld unique events observed\n%s\n%s",
                                 person.pubkey.c_str(),
                                 static_cast<long long>(person.event_count),
-                                person.nip05.c_str());
+                                person.nip05.c_str(),
+                                person.profile_verification == 2 ?
+                                  "Profile signature checked" : "Profile not signature verified");
             ImGui::PopID();
           }
         } else {
@@ -2750,7 +2758,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
             std::string summary = ev.content;
             for (char& c : summary) if (c == '\n' || c == '\r') c = ' ';
             if (summary.size() > 110) summary = summary.substr(0, 110) + "…";
-            const std::string label = "kind " + std::to_string(ev.kind) +
+            const std::string label = (ev.verification == 2 ? "[sig] " : "[hash] ") +
+                "kind " + std::to_string(ev.kind) +
                 " · " + name + " · " + summary;
             if (ImGui::Selectable(label.c_str(), false,
                                   ev.kind == 1 ? 0 : ImGuiSelectableFlags_Disabled)) {
