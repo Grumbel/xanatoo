@@ -12,6 +12,7 @@
 #include "xanatoo/app.hpp"
 #include "xanatoo/cli.hpp"
 #include "xanatoo/layout.hpp"
+#include "xanatoo/theme.hpp"
 
 namespace xanatoo::app {
 
@@ -32,6 +33,8 @@ std::pair<int, int> min_size(const FloatWindow& w) {
       return {200, 120};
     case WindowRole::Styles:
       return {200, 140};
+    case WindowRole::Bookmarks:
+      return {240, 180};
     case WindowRole::Reply:
       return {300, 240};
     case WindowRole::Annotations:
@@ -103,6 +106,9 @@ void close_window(App& app, FloatWindow& w) {
       app.styles_panel_open = false;
       if (app.key_focus == KeyFocus::Styles)
         app.key_focus = KeyFocus::Document;
+      break;
+    case WindowRole::Bookmarks:
+      app.bookmarks_panel_open = false;
       break;
     case WindowRole::Downloads:
       app.downloads_panel_open = false;
@@ -279,7 +285,8 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
   // content-scroll roles reserve it for click-free jump/drag.
   const bool in_sb =
       mx >= cx + cw - sb_w && mx <= cx + cw + 2 && my >= cy && my <= cy + ch;
-  if (in_sb && w.role != WindowRole::Reply &&
+  if (in_sb && w.role != WindowRole::Bookmarks &&
+      w.role != WindowRole::Reply &&
       w.role != WindowRole::Annotations &&
       w.role != WindowRole::NostrExplorer &&
       w.role != WindowRole::NostrAccounts) {
@@ -322,6 +329,8 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
       break;  // ImGui owns the editor and formatting controls.
     case WindowRole::Annotations:
       break;  // ImGui owns the form widgets inside the native panel.
+    case WindowRole::Bookmarks:
+      break;  // ImGui owns the bookmark list inside the native panel.
     case WindowRole::NostrExplorer:
     case WindowRole::NostrAccounts:
       break;  // ImGui supplies controls inside the native dockable panels.
@@ -359,6 +368,7 @@ std::vector<FloatWindow*> float_stack(App& app) {
   if (app.nostr_explorer_open) st.push_back(&app.nostr_explorer_win);
   if (app.nostr_accounts_open) st.push_back(&app.nostr_accounts_win);
   if (app.styles_panel_open) st.push_back(&app.styles_win);
+  if (app.bookmarks_panel_open) st.push_back(&app.bookmarks_win);
   if (app.help_mode) st.push_back(&app.help);
   for (auto& sw : app.soft_wins) st.push_back(&sw);
   // Auto-opened downloads should remain visible above detached document
@@ -383,6 +393,41 @@ FloatWindow* float_at(App& app, int x, int y) {
   return nullptr;
 }
 
+// Keep pointer feedback and actual resize initiation in sync. The small
+// outside-edge tolerance is intentional: thin frame edges remain grabbable.
+static int float_resize_bits(const FloatWindow& w, int mx, int my) {
+  if (mx < w.x - help_edge || mx > w.x + w.w + help_edge ||
+      my < w.y - help_edge || my > w.y + w.h + help_edge)
+    return 0;
+  const bool on_r = mx >= w.x + w.w - help_edge &&
+                    my >= w.y + help_title_h && my <= w.y + w.h + help_edge;
+  const bool on_l = mx <= w.x + help_edge &&
+                    my >= w.y + help_title_h && my <= w.y + w.h;
+  const bool on_b = my >= w.y + w.h - help_edge &&
+                    mx >= w.x && mx <= w.x + w.w + help_edge;
+  const bool on_t = my <= w.y + 2 && my >= w.y - help_edge &&
+                    mx >= w.x && mx <= w.x + w.w;
+  switch (w.dock) {
+    case Dock::None: return (on_r ? 1 : 0) | (on_b ? 2 : 0);
+    case Dock::Left: return on_r ? 1 : 0;
+    case Dock::Right: return on_l ? 4 : 0;
+    case Dock::Top: return on_b ? 2 : 0;
+    case Dock::Bottom: return on_t ? 8 : 0;
+    case Dock::Max: return 0;
+  }
+  return 0;
+}
+
+int float_resize_at(App& app, int mx, int my) {
+  auto st = float_stack(app);
+  for (auto it = st.rbegin(); it != st.rend(); ++it) {
+    const FloatWindow& w = **it;
+    const int bits = float_resize_bits(w, mx, my);
+    if (bits || contains(w, mx, my)) return bits;
+  }
+  return 0;
+}
+
 std::tuple<int, int, int, int> float_client_rect(App& app,
                                                  const FloatWindow& w) {
   switch (w.role) {
@@ -399,6 +444,8 @@ std::tuple<int, int, int, int> float_client_rect(App& app,
     case WindowRole::History:
       return window_client_rect(w.x, w.y, w.w, w.h);
     case WindowRole::Styles:
+      return window_client_rect(w.x, w.y, w.w, w.h);
+    case WindowRole::Bookmarks:
       return window_client_rect(w.x, w.y, w.w, w.h);
     case WindowRole::Downloads:
     case WindowRole::Reply:
@@ -438,6 +485,8 @@ float float_max_scroll(App& app, const FloatWindow& w) {
       return std::max(0.f, static_cast<float>(app.styles.size()) *
                                    std::max(18, app.ui_font.line_height() + 7) +
                                8.f - view_h);
+    case WindowRole::Bookmarks:
+      return 0.f;  // ImGui list manages its own vertical scrolling.
     case WindowRole::Reply:
     case WindowRole::Annotations:
     case WindowRole::NostrExplorer:
@@ -469,38 +518,9 @@ bool float_press(App& app, int mx, int my) {
         my < w->y - help_edge || my > w->y + w->h + help_edge)
       continue;
     const bool inside = contains(*w, mx, my);
-    // Free windows resize at right / bottom; a docked one only at the
-    // edge facing the panes (the column width); maximized ones not at all.
-    int bits = 0;
-    const bool on_r = mx >= w->x + w->w - help_edge &&
-                      my >= w->y + help_title_h &&
-                      my <= w->y + w->h + help_edge;
-    const bool on_l = mx <= w->x + help_edge && my >= w->y + help_title_h &&
-                      my <= w->y + w->h;
-    const bool on_b = my >= w->y + w->h - help_edge && mx >= w->x &&
-                      mx <= w->x + w->w + help_edge;
-    // Top edge: a thin strip, the title bar is right below it.
-    const bool on_t = my <= w->y + 2 && my >= w->y - help_edge &&
-                      mx >= w->x && mx <= w->x + w->w;
-    switch (w->dock) {
-      case Dock::None:
-        bits = (on_r ? 1 : 0) | (on_b ? 2 : 0);
-        break;
-      case Dock::Left:
-        bits = on_r ? 1 : 0;
-        break;
-      case Dock::Right:
-        bits = on_l ? 4 : 0;
-        break;
-      case Dock::Top:
-        bits = on_b ? 2 : 0;
-        break;
-      case Dock::Bottom:
-        bits = on_t ? 8 : 0;
-        break;
-      case Dock::Max:
-        break;
-    }
+    // Free windows resize at right/bottom; docked ones at the inner edge.
+    // This is also used by hover cursor feedback.
+    const int bits = float_resize_bits(*w, mx, my);
     if (!bits && !inside) continue;
     // Clicking a panel gives it the keyboard; any other window, the document.
     app.key_focus = w->role == WindowRole::Outline     ? KeyFocus::Outline
@@ -632,7 +652,10 @@ void float_release(App& app, int mx, int my) {
 bool float_wheel(App& app, int mx, int my, int wheel_y) {
   FloatWindow* w = float_at(app, mx, my);
   if (!w || w->role == WindowRole::Document) return false;  // pane scrolls
-  if (w->role == WindowRole::Annotations || w->role == WindowRole::Reply)
+  if (w->role == WindowRole::Annotations || w->role == WindowRole::Reply ||
+      w->role == WindowRole::Bookmarks ||
+      w->role == WindowRole::NostrExplorer ||
+      w->role == WindowRole::NostrAccounts)
     return true;  // the embedded editor owns its own scroll position
   w->scroll -= static_cast<float>(wheel_y) * scroll_wheel_step(*w);
   clamp_scroll_min(*w);
@@ -709,6 +732,11 @@ void draw_floats(App& app) {
       case WindowRole::Styles:
         draw_styles_panel(app);
         break;
+      case WindowRole::Bookmarks:
+        draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
+                            "Bookmarks", true, w->dock == Dock::None,
+                            0, w->dock == Dock::Max);
+        break;
       case WindowRole::Downloads:
         draw_downloads_panel(app);
         break;
@@ -741,6 +769,38 @@ void draw_floats(App& app) {
       case WindowRole::Document:
         draw_soft_window(app, *w);
         break;
+    }
+  }
+  // Small Clearlooks-style grips reveal that adjacent docked panels have a
+  // movable separator (distinct from the dock's outer width/height edge).
+  const auto& pal = xanatoo::theme::palette();
+  for (Dock side : {Dock::Left, Dock::Right, Dock::Top, Dock::Bottom}) {
+    std::vector<FloatWindow*> col;
+    for (FloatWindow* w : float_stack(app))
+      if (w->dock == side) col.push_back(w);
+    std::stable_sort(col.begin(), col.end(),
+                     [](const FloatWindow* a, const FloatWindow* b) {
+                       return a->dock_seq < b->dock_seq;
+                     });
+    const bool horizontal = side == Dock::Top || side == Dock::Bottom;
+    for (size_t i = 0; i + 1 < col.size(); ++i) {
+      const FloatWindow& a = *col[i];
+      const int cx = horizontal ? a.x + a.w : a.x + a.w / 2;
+      const int cy = horizontal ? a.y + a.h / 2 : a.y + a.h;
+      const FloatWindow* covering = float_at(app, cx, cy);
+      if (covering && covering->dock != side) continue;
+      for (int n = -1; n <= 1; ++n) {
+        const int x = cx + (horizontal ? 0 : n * 4);
+        const int y = cy + (horizontal ? n * 4 : 0);
+        SDL_SetRenderDrawColor(app.sdl, pal.shadow.r, pal.shadow.g,
+                               pal.shadow.b, 255);
+        SDL_Rect dark{x, y, 2, 2};
+        xanatoo::sdl::fill_rect(app.sdl, &dark);
+        SDL_SetRenderDrawColor(app.sdl, pal.highlight.r, pal.highlight.g,
+                               pal.highlight.b, 255);
+        SDL_Rect light{x + 1, y + 1, 1, 1};
+        xanatoo::sdl::fill_rect(app.sdl, &light);
+      }
     }
   }
 }

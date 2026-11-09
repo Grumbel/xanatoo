@@ -297,7 +297,7 @@ enum class EventKind {
   RenderReset,
 };
 
-enum class SystemCursor { Arrow, Hand, ResizeEW, ResizeNWSE, Move };
+enum class SystemCursor { Arrow, Hand, ResizeEW, ResizeNS, ResizeNWSE, Move };
 
 inline SDL_Cursor* create_system_cursor(SystemCursor kind) {
 #if defined(XANATOO_SDL3) && XANATOO_SDL3
@@ -305,6 +305,7 @@ inline SDL_Cursor* create_system_cursor(SystemCursor kind) {
     case SystemCursor::Arrow: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
     case SystemCursor::Hand: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_POINTER);
     case SystemCursor::ResizeEW: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_EW_RESIZE);
+    case SystemCursor::ResizeNS: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NS_RESIZE);
     case SystemCursor::ResizeNWSE: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NWSE_RESIZE);
     case SystemCursor::Move: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_MOVE);
   }
@@ -313,6 +314,7 @@ inline SDL_Cursor* create_system_cursor(SystemCursor kind) {
     case SystemCursor::Arrow: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
     case SystemCursor::Hand: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
     case SystemCursor::ResizeEW: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE);
+    case SystemCursor::ResizeNS: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENS);
     case SystemCursor::ResizeNWSE: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENWSE);
     case SystemCursor::Move: return SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEALL);
   }

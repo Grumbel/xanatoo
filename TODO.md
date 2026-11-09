@@ -6,7 +6,24 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **324** (this delivery is **323**)
+Next bundle number: **325** (this delivery is **324**)
+
+## Status (2026-11-09) — UI panel / resize cleanup
+
+- Bookmarks is now a dockable native `FloatWindow`, with ImGui only in its
+  client area. It shares the native close/maximize controls, docking, resizing
+  and session persistence with the other panels. Preferences remains a
+  standalone settings dialog by design.
+- Docked neighbours have movable internal dividers and persisted relative
+  sizes; tile and native frame edges show directional resize pointers, and
+  docked neighbours display subtle separator grips. The SDL2 ImGui cursor
+  backend now notices and restores cursors changed by the native chrome.
+- A click on an ImGui popup or embedded widget cannot also drag the native
+  panel behind it. Fixed the fixed-status-line paint order when a tall free
+  panel extends into its strip; recorded the layering rules in `docs/UI.md`.
+- Pure C++ dock geometry tests pass. The full SDL/Nix application build and
+  hands-on UI testing remain unavailable in this container. Compositing rich
+  ImGui panel bodies in native `float_stack` order is still an open issue.
 
 ## Status (2026-11-09) — Gemini certificate metadata in trust review
 

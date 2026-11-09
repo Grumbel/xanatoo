@@ -37,7 +37,7 @@ struct PanelRef {
   bool open;
 };
 
-std::array<PanelRef, 12> panels(App& app) {
+std::array<PanelRef, 13> panels(App& app) {
   return {{{"help", &app.help, app.help_mode},
            {"outline", &app.ol, app.outline_mode},
            {"backlinks", &app.bl, app.backlinks_mode},
@@ -45,6 +45,7 @@ std::array<PanelRef, 12> panels(App& app) {
            {"page", &app.pg, app.page.shown},
            {"history", &app.history_win, app.history_panel_open},
            {"styles", &app.styles_win, app.styles_panel_open},
+           {"bookmarks", &app.bookmarks_win, app.bookmarks_panel_open},
            {"downloads", &app.downloads_win, app.downloads_panel_open},
            {"annotations", &app.annotation_win, app.annotation_panel_open},
            {"revisions", &app.revision_win, app.revision_panel_open},
@@ -134,6 +135,7 @@ std::string session_text(App& app) {
     out << r.name << ".open=" << (r.open ? 1 : 0) << "\n";
     out << r.name << ".dock=" << static_cast<int>(w.dock) << " "
         << static_cast<int>(w.restore_dock) << " " << w.dock_seq << "\n";
+    out << r.name << ".share=" << w.dock_share << "\n";
     out << r.name << ".geom=" << unscale(app, w.x) << " "
         << unscale(app, w.y) << " " << unscale(app, w.w) << " "
         << unscale(app, w.h) << "\n";
@@ -200,6 +202,11 @@ void restore_session(App& app) {
           w.restore_dock = static_cast<Dock>(d[1]);
           w.dock_seq = d[2];
         }
+      }
+      if (const std::string* v = get(n + ".share")) {
+        const float share = std::stof(*v);
+        if (std::isfinite(share) && share >= 0.01f && share <= 100.f)
+          w.dock_share = share;
       }
       if (const std::string* v = get(n + ".geom")) {
         const auto g = ints(*v);
@@ -323,6 +330,8 @@ void restore_session(App& app) {
       app.history_panel_open = true;
     if (get("styles.open") && *get("styles.open") == "1")
       app.styles_panel_open = true;
+    if (get("bookmarks.open") && *get("bookmarks.open") == "1")
+      app.bookmarks_panel_open = true;
     if (get("downloads.open") && *get("downloads.open") == "1")
       app.downloads_panel_open = true;
     if (get("annotations.open") && *get("annotations.open") == "1")

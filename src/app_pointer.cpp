@@ -117,7 +117,9 @@ void draw_stick_cursor(App& app, SDL_Renderer* r, int cx, int cy,
 
 void set_cursor(App& app, SDL_Cursor* c) {
   if (!c) c = app.cursor_arrow;
-  if (c != app.cursor_current) {
+  // ImGui's SDL backend also changes the cursor each frame. Our cached choice
+  // alone cannot tell whether it replaced the native pane/panel cursor.
+  if (c != app.cursor_current || SDL_GetCursor() != c) {
     SDL_SetCursor(c);
     app.cursor_current = c;
   }

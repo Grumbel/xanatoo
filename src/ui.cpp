@@ -2472,9 +2472,17 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
 
   // ---- Bookmarks manager panel ----
   if (state.bookmarks_open) {
-    bool open = true;
-    ImGui::SetNextWindowSize(ImVec2(480.f, 360.f), ImGuiCond_FirstUseEver);
-    if (ImGui::Begin("Bookmarks", &open)) {
+    // Like Reply / Annotations, this is an editor *inside* the native
+    // FloatWindow. It must never have an independent ImGui title or geometry.
+    ImGui::SetNextWindowPos(ImVec2(float(state.bookmarks_x + 3),
+                                  float(state.bookmarks_y + 3)));
+    ImGui::SetNextWindowSize(ImVec2(float(std::max(1, state.bookmarks_w - 6)),
+                                   float(std::max(1, state.bookmarks_h - 6))));
+    constexpr ImGuiWindowFlags bookmarks_flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoCollapse;
+    if (ImGui::Begin("##bookmarks_panel_body", nullptr, bookmarks_flags)) {
       ImGui::TextDisabled("Persistent bookmarks (state dir: bookmarks)");
       ImGui::Separator();
       if (ImGui::Button(state.current_bookmarked ? "Remove current page"
@@ -2482,10 +2490,6 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                                                  : "Bookmark current page")) {
         cmd = state.current_bookmarked ? UiCommand::RemoveBookmark
                                        : UiCommand::AddBookmark;
-      }
-      ImGui::SameLine();
-      if (ImGui::Button("Close")) {
-        open = false;
       }
       ImGui::Separator();
       if (state.bookmarks.empty()) {
@@ -2539,7 +2543,6 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       }
     }
     ImGui::End();
-    if (!open) cmd = UiCommand::ToggleBookmarks;
   }
 
   // ---- Independent annotation layers (source documents remain untouched) ----

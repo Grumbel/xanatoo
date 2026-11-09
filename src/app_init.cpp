@@ -139,6 +139,7 @@ bool app_init(App& app) {
   app.cursor_arrow = xanatoo::sdl::create_system_cursor(SystemCursor::Arrow);
   app.cursor_hand = xanatoo::sdl::create_system_cursor(SystemCursor::Hand);
   app.cursor_sizewe = xanatoo::sdl::create_system_cursor(SystemCursor::ResizeEW);
+  app.cursor_sizens = xanatoo::sdl::create_system_cursor(SystemCursor::ResizeNS);
   app.cursor_sizenwse = xanatoo::sdl::create_system_cursor(SystemCursor::ResizeNWSE);
   app.cursor_sizeall = xanatoo::sdl::create_system_cursor(SystemCursor::Move);
   app.cursor_current = app.cursor_arrow;
@@ -267,7 +268,8 @@ void app_shutdown(App& app) {
     app.gamepad = nullptr;
   }
   SDL_Cursor** cursors[] = {&app.cursor_arrow, &app.cursor_hand,
-                            &app.cursor_sizewe, &app.cursor_sizenwse,
+                            &app.cursor_sizewe, &app.cursor_sizens,
+                            &app.cursor_sizenwse,
                             &app.cursor_sizeall};
   for (SDL_Cursor** c : cursors) {
     if (*c) xanatoo::sdl::destroy_cursor(*c);

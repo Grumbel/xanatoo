@@ -32,6 +32,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_passage.cpp` | the passage a view shows (`docs/PASSAGES.md`): selectors of the address are view state on `Pane`, `pane_address` / `pane_cut` / `apply_locator`; pure address parsing in `locator.hpp` |
 | `app_chrome.cpp` | status line (`compute_status` is pure data → `draw_status_bar`), floating window frame, client scrollbar |
 | `app_windows.cpp` | floating windows (`FloatWindow`, role = Help/Outline/Backlinks/Sitemap/Page/History/Styles/Document): one z-stack, shared hit-test / drag / resize / scroll / draw |
+| `app_softwin.cpp` / `dock_slices.hpp` | docked panel geometry: adjacent panels in a side column or top/bottom band have persisted relative `dock_share` sizes; drag the separator between them to resize, independently of the dock's outer width/height handle |
 | `search.cpp` | search engines (built-in table + user `search.sexp`), the `search:<engine>:<query>` address, query encoding, Ctrl+L keywords — pure, `search.hpp`, `docs/SEARCH.md` |
 | `search_results.cpp` | JSON search engines → Markdown result documents (`search_results_markdown`, pure; `search_fetch` needs HTTPS): wikipedia / hn / archive / gutendex / lemmy / bluesky mappers; link text is literal in our parser, only brackets are changed |
 | `app_search.cpp` | search bar state (`App::search`, engine = `ViewSettings::search_engine`): show / toggle / select engine / `run_search`; the ImGui row is in `ui.cpp` |
@@ -50,6 +51,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_events.cpp` / `app_windows.cpp` / `ui.cpp` | Reply panel (`WindowRole::Reply`): right-click a semantic Message card → Reply…; `App::reply` holds the target and Markdown draft, the ImGui multiline editor overlays the custom dockable frame, and `app_frame.cpp` paints an amber card wash/scrollbar mark. Mock only; never posts or handles accounts (`docs/REPLIES.md`) |
 | `app_revisions.cpp` / `revstore.cpp` | Document Revisions panel (`WindowRole::Revisions`): native dockable panel shows separate working/published histories with snapshot preview, bounded line diff and conflict-checked restore. Restoring appends a new working child, never mutates the original/import source or publication pointer (`docs/REVISIONS.md`) |
 | `app_windows.cpp` / `ui.cpp` | Annotations panel (`WindowRole::Annotations`): **native** dockable `FloatWindow`, not a standalone ImGui window. ImGui only supplies the rich editing widgets clipped to its client area, as with Reply; annotation revisions remain independent of document history |
+| `app_windows.cpp` / `ui.cpp` | Bookmarks panel (`WindowRole::Bookmarks`): native dockable `FloatWindow`, not a standalone ImGui window; the bookmark list and actions are ImGui widgets inside its client. Preferences remains a separate settings dialog, not a dockable work panel |
 | `app_sitemap.cpp` | Sitemap panel (`WindowRole::Sitemap`, `SitemapPanel`): site tree of the focused page's host, one `SiteCache` per host loaded on a worker thread; "Page" opens `sitemap:host` |
 | `app_downloads.cpp` / `download.cpp` | Downloads panel (`WindowRole::Downloads`): MIME/attachment routing, streaming files, live progress/cancel, and persisted completed-file history; `https_get_follow_stream` decodes HTTP transfer chunks without buffering binaries |
 | `http_url.cpp` / `https.cpp` | Scheme-preserving URL parsing/redirect resolution plus HTTP/1.1 over plain TCP (`http://`) or TLS (`https://`); historical `https_*` entry points accept both; parser is tested without network dependencies |
@@ -143,7 +145,9 @@ signed offset and must preserve the destination's caret/scroll state.
 Windows place one way regardless of role: Left / Right docks are side
 columns that take width from the panes (stacked by `dock_seq`), Top /
 Bottom docks are bands between the columns that take height (side by side
-by `dock_seq`; `dock_band_h`, used by `place_centre_rows`); the size per
+by `dock_seq`; `dock_band_h`, used by `place_centre_rows`). Dock neighbours
+are sized by `FloatWindow::dock_share`, not forced equal; shared separator
+dragging updates only the adjacent pair. The size per
 side is `App::dock_w[4]` (L, R, T, B). Max overlays the client area; every
 frame has a maximize / restore box left of the close box.
 Tabs ↔ windows: dragging a tab past the strip (ImGui, `UiCommand::TearTab`
@@ -158,6 +162,10 @@ split / windows are heading.
 Rules: no behaviour on data types; new modal state goes in `App` (group
 related fields into small records like `FloatPanel` / `Hover`); menus,
 toolbar and shortcuts should route through `execute_command`.
+Mouse cursor feedback must use the same hit-test as the action it advertises:
+`float_resize_at` for native panel edges, `dock_split_at` for neighbours,
+and `tile_divider_rect` for centre tiles. ImGui handles its own controls;
+the SDL2 backend must detect external cursor changes to restore its I-beam.
 
 ## Versioning
 

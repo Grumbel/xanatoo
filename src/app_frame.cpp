@@ -310,6 +310,13 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.downloads_open = app.downloads_panel_open;
   ui_state.styles_open = app.styles_panel_open;
   ui_state.bookmarks_open = app.bookmarks_panel_open;
+  if (app.bookmarks_panel_open) {
+    auto [x, y, w, h] = float_client_rect(app, app.bookmarks_win);
+    ui_state.bookmarks_x = x;
+    ui_state.bookmarks_y = y;
+    ui_state.bookmarks_w = w;
+    ui_state.bookmarks_h = h;
+  }
   ui_state.bookmarks = app.bookmarks;
   ui_state.annotations_panel_open = app.annotation_panel_open;
   ui_state.revisions_panel_open = app.revision_panel_open;
@@ -4107,21 +4114,86 @@ void draw_hover_tooltip(App& app) {
 }
 
 void present_frame(App& app) {
-  if (app.hover.col_gap)
-    set_cursor(app, app.cursor_sizewe);
-  else if (app.hover.image_handle)
-    set_cursor(app, app.cursor_sizenwse);
-  else if (app.hover.grip != xanatoo::INVALID_NODE)
-    set_cursor(app, app.cursor_sizeall);
-  else if (!app.hover.href.empty() || !app.hover.bookmark.empty() ||
-           !app.hover.annotation.empty() ||
-           app.hover.stretch != xanatoo::INVALID_NODE ||
-           app.hover.image != xanatoo::INVALID_NODE ||
-           app.hover.task != xanatoo::INVALID_NODE || app.hover.chrome_notice ||
-           app.hover.transclude != xanatoo::INVALID_NODE)
-    set_cursor(app, app.cursor_hand);
-  else
-    set_cursor(app, app.cursor_arrow);
+  const int mx = static_cast<int>(app.mouse_x);
+  const int my = static_cast<int>(app.mouse_y);
+  const auto floats = float_stack(app);
+  const bool moving_float = std::any_of(floats.begin(), floats.end(),
+      [](const FloatWindow* w) { return w->dragging; });
+  const bool resizing_float = std::any_of(floats.begin(), floats.end(),
+      [](const FloatWindow* w) { return w->resize != 0; });
+  const bool native_drag = moving_float || resizing_float ||
+      app.dock_split_drag.side != Dock::None || app.dragging_split ||
+      app.dragging_diff_overview;
+  // The menu bar, popups and embedded ImGui controls own their own cursors.
+  // In particular, don't turn the text-edit I-beam back into an arrow. An
+  // active native drag owns its pointer even when it leaves its starting area.
+  if (native_drag || !app.ui.captures_point(app.mouse_x, app.mouse_y)) {
+    SDL_Cursor* pointer = app.cursor_arrow;
+    const auto resizing = [&](int bits) -> SDL_Cursor* {
+      if ((bits & (1 | 4)) && (bits & (2 | 8)))
+        return app.cursor_sizenwse;
+      if (bits & (1 | 4)) return app.cursor_sizewe;
+      if (bits & (2 | 8)) return app.cursor_sizens;
+      return nullptr;
+    };
+    const DockSplitAxis divider = app.dock_split_drag.side != Dock::None
+        ? (app.dock_split_drag.side == Dock::Top ||
+           app.dock_split_drag.side == Dock::Bottom
+               ? DockSplitAxis::Horizontal : DockSplitAxis::Vertical)
+        : dock_split_at(app, mx, my);
+    int edge = 0;
+    for (FloatWindow* w : floats)
+      if (w->resize) {
+        edge = w->resize;
+        break;
+      }
+    if (!edge) edge = float_resize_at(app, mx, my);
+    if (app.dragging_split) {
+      pointer = app.tile_axis == TileAxis::Rows
+                    ? app.cursor_sizens : app.cursor_sizewe;
+    } else if (app.dragging_diff_overview) {
+      pointer = app.cursor_hand;
+    } else if (moving_float) {
+      pointer = app.cursor_sizeall;
+    } else if (resizing_float) {
+      pointer = resizing(edge);
+    } else if (divider == DockSplitAxis::Horizontal) {
+      pointer = app.cursor_sizewe;
+    } else if (divider == DockSplitAxis::Vertical) {
+      pointer = app.cursor_sizens;
+    } else if (edge) {
+      pointer = resizing(edge);
+    } else if (!float_at(app, mx, my)) {
+      const auto within = [&](const SDL_Rect& r, int pad = 0) {
+        return mx >= r.x - pad && mx < r.x + r.w + pad &&
+               my >= r.y - pad && my < r.y + r.h + pad;
+      };
+      if (app.split && within(tile_mode_button_rect(app))) {
+        pointer = app.cursor_hand;
+      } else if (app.split && within(tile_divider_rect(app), 2) &&
+                  !(app.diff_mode && within(tile_diff_track_rect(app)))) {
+        pointer = app.tile_axis == TileAxis::Rows
+                      ? app.cursor_sizens : app.cursor_sizewe;
+      } else if (app.split && app.diff_mode &&
+                  within(tile_diff_track_rect(app))) {
+        pointer = app.cursor_hand;
+      } else if (app.hover.col_gap) {
+        pointer = app.cursor_sizewe;
+      } else if (app.hover.image_handle) {
+        pointer = app.cursor_sizenwse;
+      } else if (app.hover.grip != xanatoo::INVALID_NODE) {
+        pointer = app.cursor_sizeall;
+      } else if (!app.hover.href.empty() || !app.hover.bookmark.empty() ||
+                 !app.hover.annotation.empty() ||
+                 app.hover.stretch != xanatoo::INVALID_NODE ||
+                 app.hover.image != xanatoo::INVALID_NODE ||
+                 app.hover.task != xanatoo::INVALID_NODE || app.hover.chrome_notice ||
+                 app.hover.transclude != xanatoo::INVALID_NODE) {
+        pointer = app.cursor_hand;
+      }
+    }
+    set_cursor(app, pointer);
+  }
   app.ui.end_frame(app.sdl);
   if (app.stick_cursor_on) {
     draw_stick_cursor(app, app.sdl, static_cast<int>(app.stick_cx),
@@ -4158,8 +4230,10 @@ void run_frame(App& app) {
   poll_images(app);
   draw_panes(app);
   draw_split_chrome(app);
-  draw_status_bar(app);
   draw_floats(app);
+  // The status line is fixed chrome and rejects pointer input in its strip.
+  // Paint it after free windows too, so a very tall panel cannot cover it.
+  draw_status_bar(app);
   draw_dock_preview(app);
   draw_hover_tooltip(app);
   // The gallery covers document chrome, but ImGui menus/windows must remain

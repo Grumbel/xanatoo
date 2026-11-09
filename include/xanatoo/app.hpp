@@ -269,7 +269,7 @@ struct Pane {
 enum class Dock : uint8_t { None = 0, Left, Right, Top, Bottom, Max };
 
 enum class WindowRole : uint8_t {
-  Help, Outline, Backlinks, Sitemap, Page, History, Styles, Downloads, Reply,
+  Help, Outline, Backlinks, Sitemap, Page, History, Styles, Bookmarks, Downloads, Reply,
   Annotations, Revisions, NostrExplorer, NostrAccounts, Document
 };
 
@@ -286,6 +286,7 @@ struct FloatWindow {
   Dock dock = Dock::None;
   Dock restore_dock = Dock::None;  // placement to return to from Max
   int dock_seq = 0;                // order within a dock column
+  float dock_share = 1.f;          // relative size within that column / band
   int restore_x = 120, restore_y = 70, restore_w = 540, restore_h = 440;
   Uint32 last_title_click = 0;
   // Geometry + interaction (all roles):
@@ -739,6 +740,13 @@ struct App {
   int last_layout_h = 0;
   std::vector<FloatWindow> soft_wins;  // Document-role floats, back→front
   Dock dock_preview = Dock::None;  // drop target while dragging a title
+  struct DockSplitDrag {
+    Dock side = Dock::None;
+    size_t first = 0;    // ordered neighbour index in this dock
+    int start = 0;       // pointer coordinate at press
+    int first_px = 0, second_px = 0;
+    float first_share = 1.f, second_share = 1.f;
+  } dock_split_drag;
   bool tab_drag_preview = false;   // dock_preview comes from a dragged tab
   bool tab_drop_preview = false;   // a dragged window would become a tab
   int dock_w[4] = {280, 360, 200, 200};  // Left / Right width, Top / Bottom height
@@ -837,6 +845,7 @@ struct App {
   SDL_Cursor* cursor_arrow = nullptr;
   SDL_Cursor* cursor_hand = nullptr;
   SDL_Cursor* cursor_sizewe = nullptr;
+  SDL_Cursor* cursor_sizens = nullptr;
   SDL_Cursor* cursor_sizenwse = nullptr;
   SDL_Cursor* cursor_sizeall = nullptr;
   SDL_Cursor* cursor_current = nullptr;
@@ -847,6 +856,7 @@ struct App {
   FloatWindow sm = make_float_panel(WindowRole::Sitemap, 140, 110, 340, 460);
   FloatWindow history_win = make_float_panel(WindowRole::History, 100, 130, 440, 360);
   FloatWindow styles_win = make_float_panel(WindowRole::Styles, 160, 150, 320, 420);
+  FloatWindow bookmarks_win = make_float_panel(WindowRole::Bookmarks, 130, 145, 460, 400);
   FloatWindow downloads_win = make_float_panel(WindowRole::Downloads, 120, 160, 520, 380);
   FloatWindow reply_win = make_float_panel(WindowRole::Reply, 170, 170, 490, 350);
   FloatWindow annotation_win = make_float_panel(WindowRole::Annotations, 150, 110, 430, 540);
@@ -1485,6 +1495,16 @@ void sitemap_step(App& app, int dir);
 // document windows), maximized.
 std::vector<FloatWindow*> float_stack(App& app);
 FloatWindow* float_at(App& app, int x, int y);  // topmost window under (x,y)
+// Same edge hit-test as float_press, including the resize slack outside a frame.
+// bit 1=right, 2=bottom, 4=left, 8=top. Zero if nothing resizable is hit.
+int float_resize_at(App& app, int x, int y);
+// Separator between two adjacent panels sharing a dock, not the dock's
+// outer resize edge. Returned axis is the direction the divider moves.
+enum class DockSplitAxis : uint8_t { None, Horizontal, Vertical };
+DockSplitAxis dock_split_at(App& app, int x, int y);
+bool dock_split_press(App& app, int x, int y);
+bool dock_split_motion(App& app, int x, int y);
+void dock_split_release(App& app);
 std::tuple<int, int, int, int> float_client_rect(App& app,
                                                  const FloatWindow& w);
 float float_max_scroll(App& app, const FloatWindow& w);

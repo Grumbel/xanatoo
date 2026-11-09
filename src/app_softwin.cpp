@@ -13,6 +13,7 @@
 #include <optional>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/dock_slices.hpp"
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/lemmy.hpp"
@@ -194,6 +195,8 @@ void dock_window(App& app, FloatWindow& w, Dock d, int mx, int my) {
     return;
   }
   save_free_geom(w);
+  if (d != w.dock && d != Dock::Max)
+    w.dock_share = 1.f;
   if (d == Dock::Max) {
     if (w.dock != Dock::Max) w.restore_dock = w.dock;
   } else {
@@ -244,9 +247,12 @@ void place_windows(App& app) {
     auto row = dock_column(app, side);
     auto [x, y, bw, bh] = dock_rect(app, side);
     const int n = static_cast<int>(row.size());
+    std::vector<float> shares;
+    for (const FloatWindow* w : row) shares.push_back(w->dock_share);
+    const auto edges = xanatoo::dock_slices(shares, bw);
     for (int i = 0; i < n; ++i) {
-      const int x0 = x + bw * i / n;
-      const int x1 = x + bw * (i + 1) / n;
+      const int x0 = x + edges[static_cast<size_t>(i)];
+      const int x1 = x + edges[static_cast<size_t>(i + 1)];
       set_geom(app, *row[static_cast<size_t>(i)], x0, y, x1 - x0, bh);
     }
   }
@@ -256,9 +262,12 @@ void place_windows(App& app) {
     (void)y;
     (void)h;
     const int n = static_cast<int>(col.size());
+    std::vector<float> shares;
+    for (const FloatWindow* w : col) shares.push_back(w->dock_share);
+    const auto edges = xanatoo::dock_slices(shares, ch);
     for (int i = 0; i < n; ++i) {
-      const int y0 = top + ch * i / n;
-      const int y1 = top + ch * (i + 1) / n;
+      const int y0 = top + edges[static_cast<size_t>(i)];
+      const int y1 = top + edges[static_cast<size_t>(i + 1)];
       set_geom(app, *col[static_cast<size_t>(i)], x, y0, cw, y1 - y0);
     }
   }
@@ -283,6 +292,84 @@ void place_windows(App& app) {
     p.w = cw;
     p.h = ph;
   }
+}
+
+namespace {
+
+struct DockSplitHit {
+  Dock side = Dock::None;
+  size_t first = 0;
+};
+
+DockSplitHit find_dock_split(App& app, int mx, int my) {
+  // A free/maximized window in front covers the separator behind it.
+  FloatWindow* front = float_at(app, mx, my);
+  for (Dock side : {Dock::Left, Dock::Right, Dock::Top, Dock::Bottom}) {
+    if (front && front->dock != side) continue;
+    const auto col = dock_column(app, side);
+    const bool horizontal = is_band(side);  // left/right neighbours
+    for (size_t i = 0; i + 1 < col.size(); ++i) {
+      const FloatWindow& a = *col[i];
+      const int edge = horizontal ? a.x + a.w : a.y + a.h;
+      const int along = horizontal ? mx : my;
+      const int cross = horizontal ? my : mx;
+      const int first_cross = horizontal ? a.y : a.x;
+      const int length = horizontal ? a.h : a.w;
+      if (std::abs(along - edge) <= help_edge &&
+          cross >= first_cross + help_edge &&
+          cross < first_cross + length - help_edge)
+        return {side, i};
+    }
+  }
+  return {};
+}
+
+}  // namespace
+
+DockSplitAxis dock_split_at(App& app, int mx, int my) {
+  const Dock side = find_dock_split(app, mx, my).side;
+  if (side == Dock::Top || side == Dock::Bottom)
+    return DockSplitAxis::Horizontal;
+  if (side == Dock::Left || side == Dock::Right)
+    return DockSplitAxis::Vertical;
+  return DockSplitAxis::None;
+}
+
+bool dock_split_press(App& app, int mx, int my) {
+  const DockSplitHit hit = find_dock_split(app, mx, my);
+  if (hit.side == Dock::None) return false;
+  const auto col = dock_column(app, hit.side);
+  const bool horizontal = is_band(hit.side);
+  const FloatWindow& a = *col[hit.first];
+  const FloatWindow& b = *col[hit.first + 1];
+  app.dock_split_drag = {hit.side, hit.first, horizontal ? mx : my,
+                         horizontal ? a.w : a.h,
+                         horizontal ? b.w : b.h,
+                         a.dock_share, b.dock_share};
+  return true;
+}
+
+bool dock_split_motion(App& app, int mx, int my) {
+  const auto& drag = app.dock_split_drag;
+  if (drag.side == Dock::None) return false;
+  const auto col = dock_column(app, drag.side);
+  if (drag.first + 1 >= col.size()) {
+    dock_split_release(app);
+    return false;
+  }
+  const int point = is_band(drag.side) ? mx : my;
+  auto [a, b] = xanatoo::dock_resize_pair(
+      drag.first_share, drag.second_share, drag.first_px, drag.second_px,
+      point - drag.start);
+  col[drag.first]->dock_share = a;
+  col[drag.first + 1]->dock_share = b;
+  app.needs_layout = true;
+  place_windows(app);
+  return true;
+}
+
+void dock_split_release(App& app) {
+  app.dock_split_drag = {};
 }
 
 bool over_tab_strip(App& app, int x, int y) {

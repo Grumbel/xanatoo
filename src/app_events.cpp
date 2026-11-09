@@ -173,6 +173,15 @@ static void on_mousewheel(App& app, SDL_Event& ev, bool imgui_mouse,
 void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
     const int mxw = x, myw = y;
 
+    // Menus/dialogs and the controls embedded in native panels cover their
+    // own hit areas. A native window behind one must not steal the click.
+    if (app.ui.captures_point(static_cast<float>(x), static_cast<float>(y)))
+      return;
+
+    // The separator between panels in one dock belongs to the dock layout,
+    // rather than either adjacent title bar/client area.
+    if (dock_split_press(app, mxw, myw)) return;
+
     // Floating windows are custom-drawn (not ImGui). Hit-test them
     // before the ImGui capture check and before the document panes.
     if (float_press(app, mxw, myw)) return;
@@ -744,6 +753,7 @@ static void on_mousebuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
 }
 
 void pointer_left_up(App& app, int x, int y) {
+  dock_split_release(app);
   float_release(app, x, y);
   if (app.dragging_block && app.drag_block_id != xanatoo::INVALID_NODE &&
       app.drop_target_id != xanatoo::INVALID_NODE &&
@@ -788,6 +798,7 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
     const int mx_i = static_cast<int>(app.mouse_x);
     const int my_i = static_cast<int>(app.mouse_y);
 
+    if (dock_split_motion(app, mx_i, my_i)) return;
     // Float drag/resize continue even if ImGui wants the mouse
     // (capture flag can lag one frame after a title-bar grab).
     if (float_motion(app, mx_i, my_i)) return;

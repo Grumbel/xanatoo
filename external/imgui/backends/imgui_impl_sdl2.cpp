@@ -648,7 +648,7 @@ static void ImGui_ImplSDL2_UpdateMouseCursor()
     {
         // Show OS mouse cursor
         SDL_Cursor* expected_cursor = bd->MouseCursors[imgui_cursor] ? bd->MouseCursors[imgui_cursor] : bd->MouseCursors[ImGuiMouseCursor_Arrow];
-        if (bd->MouseLastCursor != expected_cursor)
+        if (bd->MouseLastCursor != expected_cursor || SDL_GetCursor() != expected_cursor)
         {
             SDL_SetCursor(expected_cursor); // SDL function doesn't have an early out (see #6113)
             bd->MouseLastCursor = expected_cursor;

@@ -353,6 +353,8 @@ struct UiState {
   bool downloads_open = false;
   bool styles_open = false;
   bool bookmarks_open = false;
+  int bookmarks_x = 0, bookmarks_y = 0;
+  int bookmarks_w = 0, bookmarks_h = 0;
   bool current_bookmarked = false;
   bool page_bookmarked = false;
   int page_bookmarks = 0;  // bookmarks of passages inside the focused page
