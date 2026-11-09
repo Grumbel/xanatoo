@@ -99,7 +99,14 @@ void begin_gesture(App& app, float x, float y) {
   t.pane = pane_at(app, x, y);
   const Pane& p = app.panes[t.pane];
   const bool on_scrollbar = xi >= sb_x(p) && xi < sb_x(p) + kSbW;
-  const bool on_gutter = app.split && std::abs(x - app.panes[1].x) <= 3.f;
+  const SDL_Rect divider = tile_divider_rect(app);
+  const SDL_Rect badge = tile_mode_button_rect(app);
+  const auto within = [&](const SDL_Rect& rc, int pad = 0) {
+    return xi >= rc.x - pad && xi < rc.x + rc.w + pad &&
+           yi >= rc.y - pad && yi < rc.y + rc.h + pad;
+  };
+  const bool on_gutter = app.split &&
+      (within(divider, 3) || within(badge));
   if (on_scrollbar || on_gutter) {
     t.mode = TouchMode::Direct;
     pointer_left_down(app, xi, yi, false);

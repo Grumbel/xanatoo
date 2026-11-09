@@ -55,6 +55,10 @@ constexpr int soft_dock_zone = 36;
 // App::panes slots: two centre views (split), the rest for document windows.
 constexpr int kCentreViews = 2;
 constexpr int kMaxViews = 16;
+// Geometry and relationships are independent: a pair of tiles can be
+// unlinked, linked as a navigation trail, or compared via diff_mode.
+enum class TileAxis { Columns, Rows };
+enum class TileMode { Independent, Trail };
 inline int status_bar_h = 28;       // 0 while content only hides it
 inline int status_bar_full_h = 28;  // scaled height when shown
 constexpr int kMaxNavHistory = 100;
@@ -682,6 +686,8 @@ struct App {
   bool reveal_caret_after_layout = false;
   bool split = false;  // auto-enabled when two files are given
   float split_ratio = 0.5f;
+  TileAxis tile_axis = TileAxis::Columns;
+  TileMode tile_mode = TileMode::Independent;
   bool dragging_sel = false;
   bool dragging_split = false;
   bool dragging_scroll = false;
@@ -1009,6 +1015,9 @@ void set_reader(App& app, Pane& p, bool on);
 // A jump / find hit inside hidden page chrome: leave reader mode first.
 void reveal_chrome(App& app, Pane& p, xanatoo::NodeId target);
 void layout_panes(App& app);
+int tile_gutter_size(const App& app);
+SDL_Rect tile_divider_rect(const App& app);
+SDL_Rect tile_mode_button_rect(const App& app);
 
 // ---- Paged reading (app_pages.cpp, docs/PAGED.md) ----
 bool pane_paged(const App& app, const Pane& p);
@@ -1351,10 +1360,11 @@ void poll_images(App& app);
 // Trim the download and thumbnail caches (background, at startup).
 void prune_image_caches();
 
-// ---- split browsing (app_split.cpp) ----
-// Split view with independent panes (not diff mode): left links open on the
-// right, right links shift the right page left.
+// ---- linked tile navigation (app_split.cpp) ----
+// Only Trail links the two centre tiles: first-tile links open in the
+// second; second-tile navigation advances the shared history.
 bool split_browsing(const App& app);
+void enter_tile_trail(App& app);  // resume matching trail, or seed anew
 // Follow `href` clicked in pane `pi` the split-browsing way. False = not
 // handled (caller falls back to single-pane behaviour).
 bool follow_link_split(App& app, int pi, const std::string& href);

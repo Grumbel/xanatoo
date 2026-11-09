@@ -180,6 +180,21 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
     // Below soft windows: let ImGui keep the event if it wants it.
     if (imgui_mouse) return;
 
+    if (app.split) {
+      const auto within = [&](const SDL_Rect& rc, int pad = 0) {
+        return x >= rc.x - pad && x < rc.x + rc.w + pad &&
+               y >= rc.y - pad && y < rc.y + rc.h + pad;
+      };
+      if (within(tile_mode_button_rect(app))) {
+        app.ui.open_tile_menu(static_cast<float>(x), static_cast<float>(y));
+        return;
+      }
+      if (within(tile_divider_rect(app), 2)) {
+        app.dragging_split = true;
+        return;
+      }
+    }
+
     // Page bar and edge zones of a paged view.
     if (const int pv = page_view_at(app, x, y);
         pv >= 0 && page_pointer_down(app, pv, x, y)) {
@@ -221,16 +236,6 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
         select_bookmark(app, at, address);
         return;
       }
-
-    // Split gutter: checked before the scrollbars so the divider wins the
-    // pixels where the left scrollbar and the right pane meet.
-    if (app.split && at < kCentreViews) {
-      const float gx = static_cast<float>(app.panes[1].x);
-      if (mx >= gx - 6.f && mx <= gx + 4.f) {
-        app.dragging_split = true;
-        return;
-      }
-    }
 
     // Classic scrollbar (right edge): arrows page, track jumps/drags.
     {
@@ -396,7 +401,7 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
       const std::optional<std::string> href = hit->href;
       const bool ctrl_click = (SDL_GetModState() & KMOD_CTRL) != 0;
       if (!ctrl_click && open_link_image(app, app.focus, *href)) return;
-      // Split view: left links open on the right, right links shift left.
+      // Trail mode: first-tile links open in the second, then shift along.
       if (!ctrl_click && follow_link_split(app, app.focus, *href)) {
         reset_blink(app);
         return;
@@ -415,6 +420,7 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
         if (ctrl_click) {
           if (!app.split && app.focus < kCentreViews) {
             app.split = true;
+            app.tile_mode = TileMode::Independent;
             app.needs_layout = true;
           }
           int other = other_pane(app);
@@ -629,6 +635,17 @@ static void mouse_right_down(App& app, SDL_Event& ev, bool imgui_mouse) {
     // them).
     const int rx = ev.button.x, ry = ev.button.y;
     const bool over_soft = over_float_chrome(app, rx, ry);
+    if (!over_soft && !imgui_mouse && app.split) {
+      const auto within = [&](const SDL_Rect& rc, int pad = 0) {
+        return rx >= rc.x - pad && rx < rc.x + rc.w + pad &&
+               ry >= rc.y - pad && ry < rc.y + rc.h + pad;
+      };
+      if (within(tile_divider_rect(app), 3) ||
+          within(tile_mode_button_rect(app))) {
+        app.ui.open_tile_menu(static_cast<float>(rx), static_cast<float>(ry));
+        return;
+      }
+    }
     // Document context menu (ImGui popup).
     if (!over_soft && !imgui_mouse) {
       float mx = static_cast<float>(ev.button.x);
@@ -825,13 +842,22 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
       return;
     }
     if (app.dragging_split && app.split) {
-      float mx = app.mouse_x;
-      // Ratio within the pane area (docked columns excluded).
-      const int area_x = dock_column_w(app, Dock::Left);
-      const int area_w = std::max(
-          1, app.win_w - area_x - dock_column_w(app, Dock::Right));
-      app.split_ratio = (mx - static_cast<float>(area_x)) /
-                        static_cast<float>(area_w);
+      if (app.tile_axis == TileAxis::Rows) {
+        const int area_y = static_cast<int>(app.ui_top) +
+            dock_band_h(app, Dock::Top);
+        const int area_h = std::max(1, app.win_h - status_bar_h - area_y -
+            static_cast<int>(app.ui_bottom) - dock_band_h(app, Dock::Bottom) -
+            tile_gutter_size(app));
+        app.split_ratio = (app.mouse_y - static_cast<float>(area_y)) /
+                          static_cast<float>(area_h);
+      } else {
+        // Ratio within the pane area (docked columns excluded).
+        const int area_x = dock_column_w(app, Dock::Left);
+        const int area_w = std::max(
+            1, app.win_w - area_x - dock_column_w(app, Dock::Right));
+        app.split_ratio = (app.mouse_x - static_cast<float>(area_x)) /
+                          static_cast<float>(area_w);
+      }
       app.split_ratio = std::max(0.15f, std::min(0.85f, app.split_ratio));
       app.needs_layout = true;
       return;
@@ -2207,18 +2233,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
 
     case SDLK_BACKSLASH:
       if (ctrl) {
-        app.split = !app.split;
-        if (app.split) {
-          // Second pane starts on the same buffer as the first.
-          app.panes[1].buf = app.panes[0].buf;
-          app.panes[1].sel = app.panes[0].sel;
-          app.panes[1].scroll_y = app.panes[0].scroll_y;
-        } else if (app.focus == 1) {
-          focus_view(app, 0);
-        } else {
-          app.centre_focus = 0;
-        }
-        app.needs_layout = true;
+        execute_command(app, UiCommand::ToggleSplit);
       }
       break;
 
@@ -2403,23 +2418,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
 
     case SDLK_d:
       if (ctrl && shift) {
-        // Side-by-side version marks (needs two independent docs)
-        if (!app.split) {
-          app.split = true;
-          app.needs_layout = true;
-        }
-        if (shared_doc(app) || app.buffers.size() < 2) {
-          flash_status(app,
-                       "Diff needs two files — Examples → Diff demo, or "
-                       "xanatoo a.md b.md");
-          std::cout << "Diff marks need two open files "
-                       "(xanatoo a.md b.md).\n";
-        } else {
-          app.diff_mode = !app.diff_mode;
-          refresh_diff(app);
-          flash_status(app, app.diff_mode ? "Diff marks on" : "Diff marks off");
-          std::cout << (app.diff_mode ? "Diff marks on\n" : "Diff marks off\n");
-        }
+        execute_command(app, UiCommand::ToggleDiff);
         break;
       }
       break;

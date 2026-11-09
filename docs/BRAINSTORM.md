@@ -354,6 +354,10 @@ not a second changelog.
 
 ## 11. Views, arrangement, documents (windows / tabs / split)
 
+The initial disentangling of Independent / Trail / Compare and stacked vs
+side-by-side geometry is implemented (#313). The remaining arbitrary tiling
+tree and relationship model is planned in [TILING.md](TILING.md).
+
 Today four mechanisms overlap: two fixed panes (split), tabs (which buffer
 the focused pane shows), floating windows (docs or panels), and dock
 columns. Docking is now one model (§ TODO 2026-10-29); the rest should

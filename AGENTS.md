@@ -56,7 +56,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `reddit_credentials.cpp` | `reddit.conf` in `config_dir()` holds optional app-only OAuth credentials with private Unix permissions; `XANATOO_REDDIT_CLIENT_ID` and `XANATOO_REDDIT_CLIENT_SECRET` override only as a complete pair, read on each fetch; Edit → Preferences provides masked editing, save, clear and official signup links (see `docs/REDDIT.md`) |
 | `app_pages.cpp` | paged reading (`docs/PAGED.md`): `Pane::paged` / `PageView`, `paginate_pane` (called by `layout_panes`, cuts the layout with `paginate.hpp`), `page_turn`, page bar + edge zones + column rules (`draw_page_chrome`, `page_pointer_*`); while `pages.on`, `scroll_y` is a multiple of `stride`, `Pane::h` leaves out the bar, `sb_reserve` is 0 — use `pane_max_scroll`, `spread_at`, `page_goto_spread`, never pixel scrolling |
 | `math_parse.cpp` / `math_layout.cpp` / `math_font.cpp` | TeX math (`docs/MATH.md`): `parse_math` (TeX subset → `MathNode`), `layout_math` (TeXbook App. G on a `MathFace`, em units, y up) and the FreeType `MathFont` (MATH table, glyph rasters by glyph id, `draw_math`); `FontSet::math_font()` finds the font on first use. A formula is an `InlineKind::Math` span (`src` = TeX, `display`) laid out as an atom by `layout_paragraph` (`PositionedMath`); never draw math through `Font`. Pure parts are unit-tested with a fake `MathFace` |
-| `app_split.cpp` | split browsing: left links open right, right links shift left, hover previews (`SplitPreview`, only with `ViewSettings::hover_preview`, off by default) |
+| `app_split.cpp` | Trail-mode linked navigation: first-tile links open the second, second-tile links advance the trail; hover previews (`SplitPreview`, only with `ViewSettings::hover_preview`, off by default) |
 | `theme.cpp` | classic palette (`Palette`) + stateless bevel/gradient/window primitives shared with the ImGui theme |
 | `style.cpp` | document style sheets (`styles/*.xss`, S-expressions): `DocStyle` roles → layout spacing/fonts/glyph colours + renderer decoration colours; `apply_style` in `app_view.cpp` |
 
@@ -66,6 +66,14 @@ Document views: `App::panes[kMaxViews]` — slots 0 / 1 are the centre
 Every view has its own rect (`Pane::x/y/w/h`, centre rows from
 `place_centre_rows`, windows from `place_windows`), so the whole pane path
 (layout, raster, caret, editing, overlays, footnotes) serves windows too.
+Centre tiling currently has two slots: `App::tile_axis` chooses columns or
+rows; `App::tile_mode` chooses independent or linked Trail. Compare is a
+diff-marked independent pair (`App::diff_mode`), with a wider mode-coloured
+divider and clickable badge. The divider's right-click menu and badge are
+handled by `open_tile_menu`; `tile_divider_rect` and `tile_mode_button_rect`
+are shared by hit-testing and drawing. This is the two-leaf foundation for
+the planned arbitrary tiling tree (`docs/TILING.md`). Session save/restore
+persists axis and relation, with old split sessions mapped to Trail.
 `app.focus` may be any live slot; tabs act on `app.centre_focus`. Use
 `focus_view`, `live_views` (never `pi < 2`), `other_pane` (never
 `1 - app.focus`), `pane_at(app, x, y)` and `content_y(app, y, pi)`;
@@ -86,7 +94,7 @@ captures the current position and completes deferred restores after fetching.
 `forward_nav_link` feeds the non-document link wash in `draw_pane_overlays`;
 link clicks pass their `NavLink` through `navigate_to_url`; same-document
 anchors use `navigate_anchor_link` so Back can return to the source. `App::visited`
-is only the session log for the History panel. While split browsing, the
+is only the session log for the History panel. Only in Trail mode do the
 centre panes share one trail instead (`App::split_history`, levels = left
 page + pages opened from it on the right): `push_nav_history` forwards to
 it and `nav_step` / `can_nav_step` walk it (`app_split.cpp`). The split trail

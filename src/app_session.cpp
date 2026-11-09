@@ -76,6 +76,9 @@ std::string session_text(App& app) {
   out << "# xanatoo session (restored at the next start)\n";
   out << "split=" << (app.split ? 1 : 0) << "\n";
   out << "split_ratio=" << app.split_ratio << "\n";
+  out << "tile_axis=" << (app.tile_axis == TileAxis::Rows ? "rows" : "columns") << "\n";
+  out << "tile_mode=" << (app.diff_mode ? "compare" :
+      app.tile_mode == TileMode::Trail ? "trail" : "independent") << "\n";
   out << "focus=" << std::clamp(app.centre_focus, 0, 1) << "\n";
   for (int pi = 0; pi < kCentreViews; ++pi) {
     if (!view_live(app, pi) || !find_buf(app, app.panes[pi].buf)) continue;
@@ -288,6 +291,16 @@ void restore_session(App& app) {
       app.split = true;
       if (const std::string* v = get("split_ratio"))
         app.split_ratio = std::clamp(std::stof(*v), 0.1f, 0.9f);
+      if (const std::string* v = get("tile_axis"))
+        app.tile_axis = *v == "rows" ? TileAxis::Rows : TileAxis::Columns;
+      if (const std::string* v = get("tile_mode")) {
+        app.tile_mode = *v == "trail" ? TileMode::Trail : TileMode::Independent;
+        app.diff_mode = *v == "compare";
+        if (app.diff_mode) refresh_diff(app);
+      } else {
+        // Pre-tiling sessions used a split pair as a linked browsing trail.
+        app.tile_mode = TileMode::Trail;
+      }
     }
     if (const std::string* v = get("focus"))
       focus_view(app, split && *v == "1" ? 1 : 0);

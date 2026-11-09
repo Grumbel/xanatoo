@@ -144,6 +144,8 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
       !buf(app, focused_pane(app).buf).placeholder;
   ui_state.has_path = !path_of(app, focused_pane(app)).empty();
   ui_state.split = app.split;
+  ui_state.trail = app.split && app.tile_mode == TileMode::Trail;
+  ui_state.tiles_stacked = app.tile_axis == TileAxis::Rows;
   ui_state.loading = std::any_of(
       app.fetches.begin(), app.fetches.end(), [](const FetchJob& j) {
         return j.purpose == FetchPurpose::Navigate;
@@ -557,7 +559,10 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::Copy ||
         c == C::CopyPageUrl || c == C::SelectAll || c == C::SelectBlock ||
         c == C::OpenReply || c == C::EditReply || c == C::SendReply ||
-        c == C::Find || c == C::ToggleSplit || c == C::ToggleOutline ||
+        c == C::Find || c == C::ToggleSplit || c == C::ToggleTrail ||
+        c == C::TilesIndependent || c == C::TilesTrail ||
+        c == C::TilesCompare || c == C::TilesColumns || c == C::TilesRows ||
+        c == C::ToggleOutline ||
         c == C::ToggleBacklinks || c == C::ToggleSitemap || c == C::TogglePage ||
         c == C::ToggleSearchBar || c == C::FocusSearchBar || c == C::Search ||
         c == C::SelectSearchEngine ||
@@ -1720,7 +1725,55 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     }
     case C::ToggleSplit:
-      app.split = !app.split;
+      if (app.split && app.tile_mode == TileMode::Independent && !app.diff_mode) {
+        app.split = false;
+        if (app.focus == 1) focus_view(app, 0);
+      } else {
+        if (!app.split) {
+          // A new tile starts as a second view on the same document.
+          app.panes[1].buf = app.panes[0].buf;
+          app.panes[1].sel = app.panes[0].sel;
+          app.panes[1].scroll_y = app.panes[0].scroll_y;
+        }
+        app.split = true;
+        app.tile_mode = TileMode::Independent;
+        app.diff_mode = false;
+        refresh_diff(app);
+      }
+      app.needs_layout = true;
+      break;
+    case C::ToggleTrail:
+      if (app.split && app.tile_mode == TileMode::Trail) {
+        app.split = false;
+        if (app.focus == 1) focus_view(app, 0);
+      } else
+        enter_tile_trail(app);
+      app.needs_layout = true;
+      break;
+    case C::TilesIndependent:
+      app.split = true;
+      app.tile_mode = TileMode::Independent;
+      app.diff_mode = false;
+      refresh_diff(app);
+      app.needs_layout = true;
+      break;
+    case C::TilesTrail:
+      enter_tile_trail(app);
+      break;
+    case C::TilesCompare:
+      if (shared_doc(app) || app.buffers.size() < 2) {
+        flash_status(app, "Compare requires two different documents");
+      } else {
+        app.split = true;
+        app.tile_mode = TileMode::Independent;
+        app.diff_mode = true;
+        refresh_diff(app);
+        app.needs_layout = true;
+      }
+      break;
+    case C::TilesColumns:
+    case C::TilesRows:
+      app.tile_axis = cmd == C::TilesRows ? TileAxis::Rows : TileAxis::Columns;
       app.needs_layout = true;
       break;
     case C::ToggleOutline:
@@ -1780,7 +1833,12 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
                      "xanatoo a.md b.md");
       } else {
         app.diff_mode = !app.diff_mode;
+        if (app.diff_mode) {
+          app.split = true;
+          app.tile_mode = TileMode::Independent;
+        }
         refresh_diff(app);
+        app.needs_layout = true;
         flash_status(app, app.diff_mode ? "Diff marks on" : "Diff marks off");
       }
       break;
@@ -1934,6 +1992,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       app.panes[0].buf = d0;
       app.panes[1].buf = d1;
       app.split = true;
+      app.tile_mode = TileMode::Independent;
       focus_view(app, 0);
       for (int pi = 0; pi < kCentreViews; ++pi) {
         Pane& dp = app.panes[pi];
@@ -3465,15 +3524,37 @@ void draw_panes(App& app) {
 void draw_split_chrome(App& app) {
   xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
   if (app.split) {
-    int mid = app.panes[1].x - 3;
-    SDL_Rect div{mid, app.panes[1].y, 6, app.panes[1].h};
-    xanatoo::theme::fill(app.sdl, div, xanatoo::theme::palette().face);
-    xanatoo::theme::vline(app.sdl, div.x, div.y, div.y + div.h - 1,
-                          xanatoo::theme::palette().highlight);
-    xanatoo::theme::vline(app.sdl, div.x + div.w - 1, div.y, div.y + div.h - 1,
-                          xanatoo::theme::palette().shadow);
+    namespace th = xanatoo::theme;
+    const SDL_Rect div = tile_divider_rect(app);
+    const th::Palette& pal = th::palette();
+    const th::Rgb background = app.diff_mode
+        ? th::rgb(0xDB, 0xBD, 0x98)
+        : app.tile_mode == TileMode::Trail ? pal.accent_soft : pal.face_dark;
+    th::fill(app.sdl, div, background);
+    if (app.tile_axis == TileAxis::Columns) {
+      th::vline(app.sdl, div.x, div.y, div.y + div.h - 1, pal.highlight);
+      th::vline(app.sdl, div.x + div.w - 1, div.y,
+                div.y + div.h - 1, pal.shadow);
+    } else {
+      th::hline(app.sdl, div.x, div.x + div.w - 1, div.y, pal.highlight);
+      th::hline(app.sdl, div.x, div.x + div.w - 1,
+                div.y + div.h - 1, pal.shadow);
+    }
+    // The visible badge is also the mode selector (click/right-click). It
+    // straddles the gutter so even a thin independent divider is usable.
+    const SDL_Rect badge = tile_mode_button_rect(app);
+    th::fill(app.sdl, badge, background);
+    th::bevel(app.sdl, badge, th::Bevel::Raised);
+    const char* label = app.diff_mode ? "DIFF" :
+        app.tile_mode == TileMode::Trail ? "TRAIL" : "TILES";
+    const float text_x = static_cast<float>(badge.x +
+        (badge.w - app.ui_font.measure(label)) / 2);
+    const float baseline = static_cast<float>(badge.y +
+        (badge.h - app.ui_font.line_height()) / 2 + app.ui_font.ascender());
+    app.renderer.draw_text(app.ui_font, text_x, baseline, label,
+                           pal.text.r, pal.text.g, pal.text.b);
   }
-  if (app.split && shared_doc(app) &&
+  if (app.split && app.tile_axis == TileAxis::Columns && shared_doc(app) &&
       app.panes[0].sel.focus.node != xanatoo::INVALID_NODE &&
       app.panes[0].sel.focus.node == app.panes[1].sel.focus.node) {
     float lh = static_cast<float>(app.fonts.regular.line_height());

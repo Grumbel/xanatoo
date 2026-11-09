@@ -6,7 +6,27 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **313** (this delivery is **312**)
+Next bundle number: **314** (this delivery is **313**)
+
+## Status (2026-11-09) — tiled browsing, mode-controlled dividers
+
+- Independent tiles no longer implicitly use the linked split navigation
+  history: links and Back/Forward stay within their own pane. The new Trail
+  toolbar button explicitly opts into linked navigation. Switching away
+  retains matching Trail history for later resumption.
+- Both centre views can now be arranged in columns or stacked in rows, with
+  a draggable divider in either direction. The divider is colour-coded by
+  mode, has an always-visible `TILES` / `TRAIL` / `DIFF` badge and a
+  right-click menu for changing mode and orientation. Compare uses a wider
+  divider as the starting point for future diff navigation.
+- Session persistence records tile orientation and mode (older split sessions
+  restore as Trail); Ctrl+Backslash and Ctrl+Shift+D route through the same
+  commands as the menus, avoiding divergent keyboard behaviour.
+- Current centre tiling still supports exactly two views. The follow-up
+  arbitrary recursive layout, stable view relationships, divider minimaps
+  and workspace snapshots are designed in `docs/TILING.md`.
+- Native SDL3 GUI compilation/interaction still requires the project's
+  NixOS toolchain; the checkout environment lacks Nix/CMake/SDL3.
 
 ## Status (2026-11-09) — Nostr Explorer build corrections
 

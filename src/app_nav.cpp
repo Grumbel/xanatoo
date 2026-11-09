@@ -722,6 +722,7 @@ void open_transclude_in_other_pane(App& app) {
   xanatoo::NodeId local = xanatoo::resolve_transclude_local(d, tn.src);
   if (!app.split && app.focus < kCentreViews) {
     app.split = true;
+    app.tile_mode = TileMode::Independent;
     app.needs_layout = true;
   }
   const int other = other_pane(app);

@@ -207,6 +207,7 @@ const char* menu_icon_for(UiCommand command) {
     case UiCommand::PopOut:
     case UiCommand::PopIn:
     case UiCommand::ToggleSplit: return "split";
+    case UiCommand::ToggleTrail: return "history";
     case UiCommand::Save:
     case UiCommand::SaveAs: return "save";
     case UiCommand::Undo: return "undo";
@@ -763,6 +764,12 @@ void Ui::open_context_menu(float x, float y) {
   context_y_ = y;
 }
 
+void Ui::open_tile_menu(float x, float y) {
+  tile_menu_open_ = true;
+  tile_menu_x_ = x;
+  tile_menu_y_ = y;
+}
+
 void Ui::open_bookmark_menu(float x, float y) {
   bookmark_menu_open_ = true;
   context_x_ = x;
@@ -910,7 +917,7 @@ static void view_tools_items(const UiState& state, UiCommand& cmd,
                 cmd);
   if (ImGui::MenuItem("Structure highlight", "Ctrl+Shift+L", state.structure))
     cmd = UiCommand::ToggleStructure;
-  if (ImGui::MenuItem("Diff marks", "Ctrl+Shift+D", state.diff, state.can_diff))
+  if (ImGui::MenuItem("Compare tiles", "Ctrl+Shift+D", state.diff, state.can_diff))
     cmd = UiCommand::ToggleDiff;
   ImGui::Separator();
   menu_item_cmd("Zoom in", UiCommand::ZoomIn, cmd, true, "Ctrl++");
@@ -1251,8 +1258,11 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       // The edit row is hidden: its reading tools move here, the display
       // menus into View tools so the row does not grow.
       tool_button("tb_find", "find", "Find (Ctrl+F)", UiCommand::Find, cmd);
-      toggle_button("tb_split", "split", "Split pane (Ctrl+\\)",
-                    UiCommand::ToggleSplit, state.split);
+      toggle_button("tb_split", "split", "Independent tiles (Ctrl+\\)",
+                    UiCommand::ToggleSplit,
+                    state.split && !state.trail && !state.diff);
+      toggle_button("tb_trail", "history", "Linked navigation trail",
+                    UiCommand::ToggleTrail, state.trail);
       toggle_button("tb_outline", "outline", "Heading outline (Ctrl+Shift+O)",
                     UiCommand::ToggleOutline, state.outline);
       if (tool_menu_begin("tb_viewmenu", "view", "View tools")) {
@@ -1546,8 +1556,12 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       start_group(4);
       edit_button("tb_find", "find", "Find (Ctrl+F)", UiCommand::Find);
       before_group_item();
-      toggle_button("tb_split", "split", "Split pane (Ctrl+\\)",
-                    UiCommand::ToggleSplit, state.split);
+      toggle_button("tb_split", "split", "Independent tiles (Ctrl+\\)",
+                    UiCommand::ToggleSplit,
+                    state.split && !state.trail && !state.diff);
+      before_group_item();
+      toggle_button("tb_trail", "history", "Linked navigation trail",
+                    UiCommand::ToggleTrail, state.trail);
       before_group_item();
       toggle_button("tb_outline", "outline",
                     "Heading outline (Ctrl+Shift+O; Ctrl+Alt+O docks it)",
@@ -1854,11 +1868,19 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ImGui::EndMenu();
       }
       ImGui::Separator();
-      if (ImGui::MenuItem("Split Pane", "Ctrl+\\", state.split))
+      if (ImGui::MenuItem("Independent tiles", "Ctrl+\\",
+                          state.split && !state.trail && !state.diff))
         cmd = UiCommand::ToggleSplit;
+      if (ImGui::MenuItem("Trail (linked navigation)", nullptr, state.trail))
+        cmd = UiCommand::ToggleTrail;
+      if (ImGui::MenuItem("Side by side", nullptr, !state.tiles_stacked))
+        cmd = UiCommand::TilesColumns;
+      if (ImGui::MenuItem("Stacked", nullptr, state.tiles_stacked))
+        cmd = UiCommand::TilesRows;
       if (ImGui::MenuItem("Focus current section", "Ctrl+Alt+F", state.section_focus))
         cmd = UiCommand::ToggleSectionFocus;
-      if (ImGui::MenuItem("Diff Marks", "Ctrl+Shift+D", state.diff, state.can_diff))
+      if (ImGui::MenuItem("Compare tiles", "Ctrl+Shift+D", state.diff,
+                          state.can_diff))
         cmd = UiCommand::ToggleDiff;
       if (ImGui::MenuItem("Structure Highlight", "Ctrl+Shift+L", state.structure))
         cmd = UiCommand::ToggleStructure;
@@ -2036,6 +2058,30 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
 
   // ---- Toolbars + tab strip (all hidden while content only) ----
   if (!state.chrome_hidden) toolbars(state, result, cmd);
+
+  // The divider owns the relationship between tiles. Its badge opens this
+  // menu on left click; right-clicking anywhere on the divider does likewise.
+  if (tile_menu_open_) {
+    ImGui::SetNextWindowPos(ImVec2(tile_menu_x_, tile_menu_y_),
+                            ImGuiCond_Appearing);
+    ImGui::OpenPopup("##tile_menu");
+    tile_menu_open_ = false;
+  }
+  if (ImGui::BeginPopup("##tile_menu")) {
+    if (ImGui::MenuItem("Independent tiles", nullptr,
+                        state.split && !state.trail && !state.diff))
+      cmd = UiCommand::TilesIndependent;
+    if (ImGui::MenuItem("Trail (linked navigation)", nullptr, state.trail))
+      cmd = UiCommand::TilesTrail;
+    if (ImGui::MenuItem("Compare tiles", nullptr, state.diff, state.can_diff))
+      cmd = UiCommand::TilesCompare;
+    ImGui::Separator();
+    if (ImGui::MenuItem("Side by side", nullptr, !state.tiles_stacked))
+      cmd = UiCommand::TilesColumns;
+    if (ImGui::MenuItem("Stacked", nullptr, state.tiles_stacked))
+      cmd = UiCommand::TilesRows;
+    ImGui::EndPopup();
+  }
 
   // ---- Menu of a bookmark's margin icon ----
   if (bookmark_menu_open_) {

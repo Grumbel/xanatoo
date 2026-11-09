@@ -253,13 +253,51 @@ void place_centre_rows(App& app) {
   const int view_h = std::max(
       1, app.win_h - status_bar_h - top - static_cast<int>(app.ui_bottom) -
              dock_band_h(app, Dock::Bottom));
-  for (int pi = 0; pi < kCentreViews; ++pi) {
-    Pane& p = app.panes[pi];
-    const int h = std::max(1, view_h - pane_bar_h(app, p));  // page bar below
-    if (p.h != h) app.needs_layout = true;
-    p.y = top;
-    p.h = h;
+  if (app.split && app.tile_axis == TileAxis::Rows) {
+    const int available = std::max(2, view_h - tile_gutter_size(app));
+    const int first = std::clamp(static_cast<int>(app.split_ratio * available),
+                                 1, available - 1);
+    for (int pi = 0; pi < kCentreViews; ++pi) {
+      Pane& p = app.panes[pi];
+      const int area_h = pi == 0 ? first : available - first;
+      const int h = std::max(1, area_h - pane_bar_h(app, p));
+      if (p.h != h) app.needs_layout = true;
+      p.y = pi == 0 ? top : top + first + tile_gutter_size(app);
+      p.h = h;
+    }
+  } else {
+    for (int pi = 0; pi < kCentreViews; ++pi) {
+      Pane& p = app.panes[pi];
+      const int h = std::max(1, view_h - pane_bar_h(app, p));
+      if (p.h != h) app.needs_layout = true;
+      p.y = top;
+      p.h = h;
+    }
   }
+}
+
+int tile_gutter_size(const App& app) {
+  return app.diff_mode ? 22 : app.tile_mode == TileMode::Trail ? 12 : 8;
+}
+
+SDL_Rect tile_divider_rect(const App& app) {
+  if (!app.split) return SDL_Rect{};
+  const int gap = tile_gutter_size(app);
+  if (app.tile_axis == TileAxis::Rows)
+    return SDL_Rect{app.panes[0].x, app.panes[1].y - gap,
+                    app.panes[0].w, gap};
+  return SDL_Rect{app.panes[1].x - gap, app.panes[0].y,
+                  gap, app.panes[0].h};
+}
+
+SDL_Rect tile_mode_button_rect(const App& app) {
+  if (!app.split) return SDL_Rect{};
+  const SDL_Rect div = tile_divider_rect(app);
+  const int w = static_cast<int>(std::lround(60.f * app.ui_scale));
+  const int h = static_cast<int>(std::lround(22.f * app.ui_scale));
+  if (app.tile_axis == TileAxis::Rows)
+    return SDL_Rect{div.x + div.w - w - 8, div.y + (div.h - h) / 2, w, h};
+  return SDL_Rect{div.x + (div.w - w) / 2, div.y + div.h - h - 8, w, h};
 }
 
 namespace {
@@ -311,8 +349,8 @@ void layout_panes(App& app) {
   const int dock = dock_column_w(app, Dock::Left);
   const int ww =
       std::max(64, app.win_w - dock - dock_column_w(app, Dock::Right));
-  const int gutter = app.split ? 6 : 0;
-  if (app.split) {
+  const int gutter = app.split ? tile_gutter_size(app) : 0;
+  if (app.split && app.tile_axis == TileAxis::Columns) {
     int left_w = static_cast<int>(app.split_ratio * (ww - gutter));
     left_w = std::max(120, std::min(ww - gutter - 120, left_w));
     app.panes[0].sb_left = true;
@@ -324,8 +362,9 @@ void layout_panes(App& app) {
     app.panes[0].sb_left = false;
     app.panes[0].x = dock;
     app.panes[0].w = ww;
+    app.panes[1].sb_left = false;
     app.panes[1].x = dock;
-    app.panes[1].w = 0;
+    app.panes[1].w = app.split ? ww : 0;
   }
   // Clamp pane buffer indices if tabs were closed out from under them.
   for (int pi = 0; pi < 2; ++pi) {
@@ -786,6 +825,8 @@ int pane_at(App& app, float mx, float my) {
       return w->view;
   }
   if (!app.split) return 0;
+  if (app.tile_axis == TileAxis::Rows)
+    return (my >= static_cast<float>(app.panes[1].y)) ? 1 : 0;
   return (mx >= static_cast<float>(app.panes[1].x)) ? 1 : 0;
 }
 

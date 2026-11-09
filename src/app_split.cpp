@@ -351,7 +351,36 @@ void check_trail(App& app) {
 
 }  // namespace
 
-bool split_browsing(const App& app) { return app.split && !app.diff_mode; }
+bool split_browsing(const App& app) {
+  return app.split && app.tile_mode == TileMode::Trail;
+}
+
+void enter_tile_trail(App& app) {
+  // A Trail suspended while looking at the same two pages can resume with
+  // its full Back/Forward history. Independent navigation may have changed
+  // either page in the meantime; then start a new trail from those pages.
+  const SplitHistory& h = app.split_history;
+  bool matches = h.top >= 0 && h.top < static_cast<int>(h.levels.size());
+  if (matches) {
+    const SplitHistoryLevel& level = h.levels[static_cast<size_t>(h.top)];
+    matches = level.page.url == path_of(app, app.panes[0]);
+    if (matches) {
+      const std::string right = path_of(app, app.panes[1]);
+      matches = level.cur >= 0
+          ? (level.cur < static_cast<int>(level.opened.size()) &&
+             level.opened[static_cast<size_t>(level.cur)].url == right)
+          : right.empty();
+    }
+  }
+  if (!matches) app.split_history = {};
+  app.split = true;
+  app.tile_mode = TileMode::Trail;
+  if (app.diff_mode) {
+    app.diff_mode = false;
+    refresh_diff(app);
+  }
+  app.needs_layout = true;
+}
 
 bool follow_link_split(App& app, int pi, const std::string& href) {
   if (!split_browsing(app) || pi >= kCentreViews) return false;
@@ -458,7 +487,9 @@ void update_split_preview(App& app) {
     pv.hover.clear();
     pv.shown.clear();
     app.split_trail = {};
-    app.split_history = {};
+    // Keep the trail while tiles are independent or Compare is active. It
+    // will be resumed if their documents are unchanged, or reseeded when
+    // the user explicitly re-enters Trail after navigating elsewhere.
     return;
   }
   // Something else changed the right pane (tab switch, navigation): the

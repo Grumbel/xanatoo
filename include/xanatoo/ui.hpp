@@ -149,6 +149,12 @@ enum class UiCommand {
   ParagraphLevel,
   // View
   ToggleSplit,
+  ToggleTrail,
+  TilesIndependent,
+  TilesTrail,
+  TilesCompare,
+  TilesColumns,
+  TilesRows,
   ToggleOutline,
   ToggleBacklinks,
   ToggleSitemap,  // site structure panel of the focused web page
@@ -226,6 +232,8 @@ struct UiState {
   bool can_make_local_copy = false;
   bool has_path = false;
   bool split = false;
+  bool trail = false;
+  bool tiles_stacked = false;
   bool outline = false;
   bool section_focus = false;
   bool justify = false;
@@ -414,6 +422,8 @@ public:
 
   // Request a context menu at window coordinates (call from main on right-click).
   void open_context_menu(float x, float y);
+  // Divider badge / right-click: relationship and orientation menu.
+  void open_tile_menu(float x, float y);
   // The menu of a bookmark's margin icon (UiState::bookmark_menu).
   void open_bookmark_menu(float x, float y);
 
@@ -446,9 +456,12 @@ private:
   std::unordered_map<std::string, Icon> icons_;
 
   bool context_open_ = false;
+  bool tile_menu_open_ = false;
   bool bookmark_menu_open_ = false;
   float context_x_ = 0.f;
   float context_y_ = 0.f;
+  float tile_menu_x_ = 0.f;
+  float tile_menu_y_ = 0.f;
 
   // Pending Alt+letter menu to open on the next begin_frame().
   std::string menu_request_;
