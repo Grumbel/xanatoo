@@ -89,11 +89,34 @@ void drop_shadow(SDL_Renderer* r, const SDL_Rect& rc, int offset) {
 void draw_button_face(SDL_Renderer* r, const SDL_Rect& rc, bool pressed,
                       bool hot) {
   const Palette& p = palette();
+  if (rc.w <= 0 || rc.h <= 0) return;
   Rgb top = hot ? p.accent_soft : p.face_light;
-  Rgb bot = hot ? lerp(p.accent_soft, p.face_dark, 0.35f) : p.face_dark;
+  Rgb bot = hot ? lerp(p.accent_soft, p.face_dark, 0.55f) : p.face_dark;
   if (pressed) std::swap(top, bot);
-  vgradient(r, rc, top, bot);
-  bevel(r, rc, pressed ? Bevel::Sunken : Bevel::Raised);
+  if (rc.w < 7 || rc.h < 7) {
+    vgradient(r, rc, top, bot);
+    bevel(r, rc, pressed ? Bevel::Sunken : Bevel::Raised);
+    return;
+  }
+  // GTK2 Clearlooks-inspired raised button: a restrained gradient, rounded
+  // 2px outline, and an inner light edge. Keep the four outer corner pixels
+  // clear so the title-bar yellow or grey parent surface shows through.
+  const int x0 = rc.x, y0 = rc.y;
+  const int x1 = rc.x + rc.w - 1, y1 = rc.y + rc.h - 1;
+  vgradient(r, SDL_Rect{x0 + 1, y0 + 1, rc.w - 2, rc.h - 2}, top, bot);
+  const Rgb border = pressed ? p.dark : p.shadow;
+  hline(r, x0 + 2, x1 - 2, y0, border);
+  hline(r, x0 + 2, x1 - 2, y1, border);
+  vline(r, x0, y0 + 2, y1 - 2, border);
+  vline(r, x1, y0 + 2, y1 - 2, border);
+  set(r, border);
+  xanatoo::sdl::draw_point(r, x0 + 1, y0 + 1);
+  xanatoo::sdl::draw_point(r, x1 - 1, y0 + 1);
+  xanatoo::sdl::draw_point(r, x0 + 1, y1 - 1);
+  xanatoo::sdl::draw_point(r, x1 - 1, y1 - 1);
+  const Rgb inner = pressed ? p.shadow : p.highlight;
+  hline(r, x0 + 2, x1 - 2, y0 + 1, inner);
+  vline(r, x0 + 1, y0 + 2, y1 - 2, inner);
 }
 
 void draw_window_chrome(SDL_Renderer* r, const WindowChrome& w) {
@@ -115,31 +138,29 @@ void draw_window_chrome(SDL_Renderer* r, const WindowChrome& w) {
   // Outer frame
   SDL_SetRenderDrawColor(r, p.frame.r, p.frame.g, p.frame.b, 255);
   xanatoo::sdl::draw_rect(r, &o);
-  // Close box (right), 16x14 inside the 28px hit zone
+  const auto px = [&](int v) { return static_cast<int>(v * w.scale + 0.5f); };
+  const int slot = px(28);
+  const int side = std::min(px(20), std::max(px(12), w.title_h - px(6)));
+  auto control_rect = [&](int index) {
+    return SDL_Rect{o.x + o.w - (index + 1) * slot + (slot - side) / 2,
+                    o.y + (w.title_h - side) / 2, side, side};
+  };
+  // Matching, centred 20px controls inside the existing 28px hit zones.
   if (w.close_box) {
-    auto px = [&](int v) { return static_cast<int>(v * w.scale + 0.5f); };
-    const int bw = px(18), bh = px(15);
-    SDL_Rect cb{o.x + o.w - px(24), o.y + (w.title_h - bh) / 2, bw, bh};
-    draw_button_face(r, cb, false, false);
+    const SDL_Rect cb = control_rect(0);
+    draw_button_face(r, cb, false, w.close_hot);
     set(r, p.text);
     const int cx = cb.x + cb.w / 2, cy = cb.y + cb.h / 2;
-    const int arm = px(3);
-    for (int d = -arm; d <= arm; ++d) {
-      xanatoo::sdl::draw_point(r, cx + d, cy + d);
-      xanatoo::sdl::draw_point(r, cx + d + 1, cy + d);
-      xanatoo::sdl::draw_point(r, cx + d, cy - d);
-      xanatoo::sdl::draw_point(r, cx + d + 1, cy - d);
-    }
+    const int arm = std::max(2, px(4));
+    xanatoo::sdl::draw_line(r, cx - arm, cy - arm, cx + arm, cy + arm);
+    xanatoo::sdl::draw_line(r, cx - arm, cy + arm, cx + arm, cy - arm);
   }
   // Maximize / restore box, one hit zone (28px) left of the close box
   if (w.max_box) {
-    auto px = [&](int v) { return static_cast<int>(v * w.scale + 0.5f); };
-    const int bw = px(18), bh = px(15);
-    SDL_Rect mb{o.x + o.w - px(24) - px(28), o.y + (w.title_h - bh) / 2, bw,
-                bh};
-    draw_button_face(r, mb, false, false);
+    const SDL_Rect mb = control_rect(1);
+    draw_button_face(r, mb, false, w.max_hot);
     set(r, p.text);
-    const int a = px(4);
+    const int a = std::max(2, px(4));
     const int cx = mb.x + mb.w / 2, cy = mb.y + mb.h / 2;
     if (w.maximized) {  // two overlapping squares
       SDL_Rect s1{cx - a, cy - a + 2, a * 2 - 1, a * 2 - 1};

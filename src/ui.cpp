@@ -82,43 +82,34 @@ std::string elide_middle(const std::string& s, size_t keep) {
 
 bool near_eq(float a, float b, float eps) { return std::fabs(a - b) < eps; }
 
-// Toolbar controls are flat until hovered. On hover, a one-pixel raised
-// Clearlooks-style edge appears; holding a button reverses the bevel and uses
-// the darker face. Keep this local so menu and dialog buttons retain the
-// regular ImGui frame style.
+// Toolbar controls use a visible raised face even when idle. Their pressed
+// edge reverses like the classic GTK2 buttons; the same treatment is shared
+// by icon buttons and the text-only fallback.
 int push_toolbar_button_style() {
   const theme::Palette& p = theme::palette();
   ImGuiStyle& s = ImGui::GetStyle();
-  const ImVec4 idle = s.Colors[ImGuiCol_Button];
-  const bool default_idle =
-      near_eq(idle.x, p.face_dark.r / 255.f, 0.01f) &&
-      near_eq(idle.y, p.face_dark.g / 255.f, 0.01f) &&
-      near_eq(idle.z, p.face_dark.b / 255.f, 0.01f);
-  int colors = 0;
-  if (default_idle) {
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-    ++colors;
-  }
   auto color = [](theme::Rgb c) {
     return ImVec4(c.r / 255.f, c.g / 255.f, c.b / 255.f, 1.f);
   };
+  ImGui::PushStyleColor(ImGuiCol_Button, color(p.face_light));
   ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color(p.accent_soft));
   ImGui::PushStyleColor(ImGuiCol_ButtonActive, color(p.face_dark));
-  colors += 2;
-  ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
-  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 2.f);
-  return colors;
+  ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize,
+                      std::max(1.f, s.FrameBorderSize));
+  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, s.FrameRounding);
+  return 3;
 }
 
 void draw_toolbar_button_bevel() {
-  if (!ImGui::IsItemHovered()) return;
   const bool pressed = ImGui::IsItemActive();
   const theme::Palette& p = theme::palette();
   const ImVec2 min = ImGui::GetItemRectMin();
   const ImVec2 max = ImGui::GetItemRectMax();
   ImDrawList* draw = ImGui::GetWindowDrawList();
-  auto rgba = [](theme::Rgb c) {
-    return IM_COL32(c.r, c.g, c.b, 255);
+  const int alpha = std::clamp(static_cast<int>(255.f * ImGui::GetStyle().Alpha),
+                               0, 255);
+  auto rgba = [alpha](theme::Rgb c) {
+    return IM_COL32(c.r, c.g, c.b, alpha);
   };
   const ImU32 light = rgba(pressed ? p.shadow : p.highlight);
   const ImU32 dark = rgba(pressed ? p.highlight : p.shadow);
@@ -128,6 +119,23 @@ void draw_toolbar_button_bevel() {
                 ImVec2(max.x - 1.f, max.y - 1.f), dark);
   draw->AddLine(ImVec2(max.x - 1.f, min.y + 1.f),
                 ImVec2(max.x - 1.f, max.y - 1.f), dark);
+}
+
+// All ordinary panel actions use the same raised detail and GTK-sized frame,
+// rather than mixing ImGui's small (zero vertical padding) and regular buttons.
+bool classic_button(const char* label, const ImVec2& size = ImVec2(0.f, 0.f)) {
+  const bool clicked = ImGui::Button(label, size);
+  draw_toolbar_button_bevel();
+  return clicked;
+}
+
+void same_line_if_fits(const char* next_label) {
+  const ImGuiStyle& s = ImGui::GetStyle();
+  const float available = ImGui::GetWindowPos().x +
+      ImGui::GetWindowContentRegionMax().x - ImGui::GetItemRectMax().x;
+  const float needed = ImGui::CalcTextSize(next_label).x +
+      2.f * s.FramePadding.x + s.ItemSpacing.x;
+  if (available >= needed) ImGui::SameLine();
 }
 
 void draw_toolbar_menu_marker(float scale) {
@@ -311,11 +319,11 @@ void Ui::apply_classic_theme() {
   ImGuiStyle& s = ImGui::GetStyle();
 
   s.WindowPadding = ImVec2(8.f, 8.f);  // canvas windows: help_pad well inset
-  s.FramePadding = ImVec2(6.f, 3.f);
-  s.ItemSpacing = ImVec2(6.f, 4.f);
-  s.ItemInnerSpacing = ImVec2(4.f, 3.f);
-  s.ScrollbarSize = 12.f;  // same as draw_client_scrollbar
-  s.GrabMinSize = 10.f;
+  s.FramePadding = ImVec2(8.f, 5.f);
+  s.ItemSpacing = ImVec2(7.f, 6.f);
+  s.ItemInnerSpacing = ImVec2(5.f, 4.f);
+  s.ScrollbarSize = 14.f;
+  s.GrabMinSize = 16.f;
 
   // Soft corners like Clearlooks; not fully flat, not fully modern.
   // Windows and scrollbars are square like the canvas windows (theme.cpp).
@@ -366,15 +374,15 @@ void Ui::apply_classic_theme() {
   c[ImGuiCol_TitleBgCollapsed] = header;
   c[ImGuiCol_MenuBarBg] = bg2;
   c[ImGuiCol_ScrollbarBg] = P(pal.scroll_trough);  // = theme::draw_vscrollbar
-  c[ImGuiCol_ScrollbarGrab] = P(pal.face);
+  c[ImGuiCol_ScrollbarGrab] = P(pal.face_light);
   c[ImGuiCol_ScrollbarGrabHovered] = P(pal.accent_soft);
   c[ImGuiCol_ScrollbarGrabActive] = P(pal.face_dark);
   c[ImGuiCol_CheckMark] = sel;
   c[ImGuiCol_SliderGrab] = sel;
   c[ImGuiCol_SliderGrabActive] = sel_hi;
-  c[ImGuiCol_Button] = bg3;
-  c[ImGuiCol_ButtonHovered] = C(0xD0, 0xE4, 0xF8);
-  c[ImGuiCol_ButtonActive] = C(0xA8, 0xC8, 0xE8);
+  c[ImGuiCol_Button] = P(pal.face_light);
+  c[ImGuiCol_ButtonHovered] = P(pal.accent_soft);
+  c[ImGuiCol_ButtonActive] = P(pal.face_dark);
   c[ImGuiCol_Header] = header;
   c[ImGuiCol_HeaderHovered] = C(0xC0, 0xD8, 0xF0);
   c[ImGuiCol_HeaderActive] = sel;
@@ -485,9 +493,9 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
   const int style_colors = push_toolbar_button_style();
   if (ic) {
     ImGui::PushID(id);
-    ImVec2 size(32.f * scale_, 32.f * scale_);
-    // Pad hit target a little for classic toolbar feel
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.f, 3.f));
+    const ImVec2 size(28.f * scale_, 28.f * scale_);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+                        ImVec2(4.f * scale_, 4.f * scale_));
     if (ImGui::ImageButton(
             id, reinterpret_cast<ImTextureID>(ic->texture), size,
             ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0),
@@ -526,7 +534,7 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
     }
     label += "##";
     label += id;
-    if (ImGui::SmallButton(label.c_str())) {
+    if (ImGui::Button(label.c_str(), ImVec2(0.f, 36.f * scale_))) {
       pressed = true;
       out = c;
     }
@@ -554,8 +562,9 @@ bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip)
   ImVec2 popup_pos;
   const int style_colors = push_toolbar_button_style();
   if (ic) {
-    ImVec2 size(32.f * scale_, 32.f * scale_);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.f, 3.f));
+    const ImVec2 size(28.f * scale_, 28.f * scale_);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+                        ImVec2(4.f * scale_, 4.f * scale_));
     if (ImGui::ImageButton(
             "##btn", reinterpret_cast<ImTextureID>(ic->texture), size,
             ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0),
@@ -584,7 +593,7 @@ bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip)
       label = id;
     }
     label += " ▾";
-    if (ImGui::SmallButton(label.c_str())) pressed = true;
+    if (ImGui::Button(label.c_str(), ImVec2(0.f, 36.f * scale_))) pressed = true;
     draw_toolbar_button_bevel();
   }
   const ImVec2 button_min = ImGui::GetItemRectMin();
@@ -657,14 +666,7 @@ bool Ui::init(SDL_Window* window, SDL_Renderer* renderer, float ui_scale) {
 
   load_ui_fonts(io, scale_);
   apply_classic_theme();
-  // Slightly roomier chrome once a proportional face is loaded
-  {
-    ImGuiStyle& s = ImGui::GetStyle();
-    s.FramePadding = ImVec2(7.f, 4.f);
-    s.ItemSpacing = ImVec2(7.f, 5.f);
-    s.ScrollbarSize = 14.f;
-    s.ScaleAllSizes(scale_);
-  }
+  ImGui::GetStyle().ScaleAllSizes(scale_);
   load_icons(renderer);
 
 #if defined(XANATOO_SDL3) && XANATOO_SDL3
@@ -1215,18 +1217,22 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         ImGui::SameLine(0.f, 0.f);
         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x,
                                        field_pos.y + 3.f * scale_));
-        ImGui::PushStyleColor(ImGuiCol_Button, on ? ImVec4(0.55f, 0.68f, 0.85f, 1.f)
-                                                  : ImVec4(0.f, 0.f, 0.f, 0.f));
+        const theme::Palette& pal = theme::palette();
+        const theme::Rgb face = on ? pal.accent_soft : pal.face_light;
+        ImGui::PushStyleColor(ImGuiCol_Button,
+                              ImVec4(face.r / 255.f, face.g / 255.f,
+                                     face.b / 255.f, 1.f));
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.f * scale_, 3.f * scale_));
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, on ? 1.f : 0.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f * scale_);
         const Icon* ic = icon(icon_name);
         bool pressed;
         if (ic) {
           pressed = ImGui::ImageButton(id, reinterpret_cast<ImTextureID>(ic->texture),
                                        ImVec2(20.f * scale_, 20.f * scale_));
+          draw_toolbar_button_bevel();
         } else {
           ImGui::PushID(id);
-          pressed = ImGui::Button(fallback, ImVec2(28.f * scale_, 26.f * scale_));
+          pressed = classic_button(fallback, ImVec2(28.f * scale_, 26.f * scale_));
           ImGui::PopID();
         }
         ImGui::PopStyleVar(2);
@@ -1368,7 +1374,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       if (!cur && !state.search_engines.empty()) cur = &state.search_engines[0];
 
       const std::string badge = (cur ? cur->badge : std::string("?")) + "##eng";
-      if (ImGui::Button(badge.c_str(), ImVec2(40.f * scale_, 0.f)))
+      if (classic_button(badge.c_str(), ImVec2(40.f * scale_, 0.f)))
         ImGui::OpenPopup("##search_engines");
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip("Search engine: %s · click to change",
@@ -1402,7 +1408,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       if (ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Escape, false))
         cmd = UiCommand::ToggleSearchBar;
       ImGui::SameLine(0.f, 4.f);
-      const bool go = ImGui::Button("Go", ImVec2(go_w, 0.f));
+      const bool go = classic_button("Go", ImVec2(go_w, 0.f));
       if (enter || go) {
         cmd = UiCommand::Search;
         result.arg = search_input_;
@@ -1728,9 +1734,8 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       }
       ImGui::SameLine();
       const int button_colors = push_toolbar_button_style();
-      if (ImGui::Button("+##new-tab", ImVec2(button_w, tab_h - 6.f * scale_)))
+      if (classic_button("+##new-tab", ImVec2(button_w, tab_h - 6.f * scale_)))
         cmd = UiCommand::NewTab;
-      draw_toolbar_button_bevel();
       if (ImGui::IsItemHovered()) ImGui::SetTooltip("New tab (Ctrl+T)");
       ImGui::PopStyleVar(2);
       ImGui::PopStyleColor(button_colors);
@@ -2278,7 +2283,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       const char* format_after = nullptr;
       auto format = [&](const char* label, const char* before,
                         const char* after) {
-        if (ImGui::Button(label)) {
+        if (classic_button(label)) {
           format_before = before;
           format_after = after;
         }
@@ -2351,7 +2356,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       }
       const bool can_send = reply_input_[0] != '\0';
       ImGui::BeginDisabled(!can_send);
-      if (ImGui::Button("Send reply")) {
+      if (classic_button("Send reply")) {
         cmd = UiCommand::SendReply;
         result.arg = reply_input_;
       }
@@ -2451,7 +2456,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       if (no_save()) ImGui::TextDisabled("Saving is disabled for this session.");
       const bool complete = reddit_client_id_[0] && reddit_client_secret_[0];
       ImGui::BeginDisabled(!complete || no_save());
-      if (ImGui::Button("Save credentials")) {
+      if (classic_button("Save credentials")) {
         cmd = UiCommand::SaveRedditCredentials;
         result.arg = std::string(reddit_client_id_) + "\n" +
                      reddit_client_secret_;
@@ -2459,7 +2464,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::EndDisabled();
       ImGui::SameLine();
       ImGui::BeginDisabled(no_save());
-      if (ImGui::Button("Clear saved credentials")) {
+      if (classic_button("Clear saved credentials")) {
         cmd = UiCommand::ClearRedditCredentials;
         reddit_client_id_[0] = reddit_client_secret_[0] = '\0';
       }
@@ -2478,12 +2483,12 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                            "external clients. Reddit plans to end legacy "
                            "public API access in March 2027.");
         ImGui::PopTextWrapPos();
-        if (ImGui::SmallButton("Request API access"))
+        if (classic_button("Request API access"))
           xanatoo::sdl::open_url(
               "https://support.reddithelp.com/hc/en-us/requests/new?"
               "ticket_form_id=14868593862164");
         ImGui::SameLine();
-        if (ImGui::SmallButton("OAuth app settings"))
+        if (classic_button("OAuth app settings"))
           xanatoo::sdl::open_url("https://www.reddit.com/prefs/apps");
         ImGui::TreePop();
       }
@@ -2494,7 +2499,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
 #else
       ImGui::TextDisabled("Saved to view.conf; layout options are in View.");
 #endif
-      if (ImGui::Button("Close")) open = false;
+      if (classic_button("Close")) open = false;
     }
     ImGui::End();
     if (!open) cmd = UiCommand::TogglePreferences;
@@ -2556,7 +2561,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       if (style_editor_dirty_)
         ImGui::TextWrapped("Save or discard edits before switching themes.");
       ImGui::Separator();
-      if (ImGui::SmallButton("Reload")) cmd = UiCommand::ReloadStyles;
+      if (classic_button("Reload")) cmd = UiCommand::ReloadStyles;
       ImGui::TextDisabled("Default: %s", state.default_style.c_str());
       ImGui::EndChild();
       if (!narrow_panel) ImGui::SameLine();
@@ -2608,11 +2613,12 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ImGui::Text("%s", chosen->title.c_str());
         ImGui::SeparatorText("Create / duplicate");
         ImGui::BeginDisabled(style_editor_dirty_);
-        ImGui::SetNextItemWidth(std::min(190.f, ImGui::GetContentRegionAvail().x * 0.60f));
+        ImGui::SetNextItemWidth(narrow_panel ? -FLT_MIN :
+            std::min(190.f, ImGui::GetContentRegionAvail().x * 0.60f));
         ImGui::InputTextWithHint("##new_style", "my-theme", style_new_name_,
                                  sizeof(style_new_name_));
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Create from selected")) {
+        same_line_if_fits("Create from selected");
+        if (classic_button("Create from selected")) {
           std::string name = style_new_name_;
           if (name.empty()) name = chosen->name + "-custom";
           cmd = UiCommand::StyleCreate;
@@ -2630,18 +2636,18 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                                         ImVec2(-FLT_MIN, std::max(115.f, ImGui::GetContentRegionAvail().y * 0.26f)),
                                         ImGuiInputTextFlags_AllowTabInput))
             style_editor_dirty_ = true;
-          if (ImGui::Button(style_editor_dirty_ ? "Save changes *" : "Save")) {
+          if (classic_button(style_editor_dirty_ ? "Save changes *" : "Save")) {
             cmd = UiCommand::StyleSave;
             result.arg = chosen->name + "\n" + style_editor_;
           }
-          ImGui::SameLine();
-          if (ImGui::SmallButton("Discard changes")) {
+          same_line_if_fits("Discard changes");
+          if (classic_button("Discard changes")) {
             style_editor_dirty_ = false;
             style_editor_loaded_.clear();
           }
-          ImGui::SameLine();
+          same_line_if_fits(style_delete_confirm_ ? "Confirm delete" : "Delete...");
           if (style_delete_confirm_) {
-            if (ImGui::SmallButton("Confirm delete")) {
+            if (classic_button("Confirm delete")) {
               cmd = UiCommand::StyleDelete;
               result.arg = chosen->name;
               style_editor_sheet_ = state.default_style;
@@ -2649,7 +2655,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
               style_editor_dirty_ = false;
               style_delete_confirm_ = false;
             }
-          } else if (ImGui::SmallButton("Delete...")) {
+          } else if (classic_button("Delete...")) {
             style_delete_confirm_ = true;
           }
         } else {
@@ -2696,7 +2702,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
           font_field("Body", style_body_font_, sizeof(style_body_font_));
           font_field("Headings", style_heading_font_, sizeof(style_heading_font_));
           font_field("Code", style_code_font_, sizeof(style_code_font_));
-          if (ImGui::SmallButton("Insert font overrides")) {
+          if (classic_button("Insert font overrides")) {
             auto quoted = [](const char* in) {
               std::string safe;
               for (char c : std::string_view(in)) {
@@ -2731,14 +2737,14 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
           const auto it = state.style_pins.find(key);
           ImGui::TextWrapped("%s: %s", key.c_str(),
                             it == state.style_pins.end() ? "(not assigned)" : it->second.c_str());
-          ImGui::SameLine();
-          if (ImGui::SmallButton("Pin here")) {
+          same_line_if_fits("Pin here");
+          if (classic_button("Pin here")) {
             cmd = UiCommand::StylePin;
             result.arg = key + "\n" + chosen->name;
           }
           if (it != state.style_pins.end()) {
-            ImGui::SameLine();
-            if (ImGui::SmallButton("Unpin")) {
+            same_line_if_fits("Unpin");
+            if (classic_button("Unpin")) {
               cmd = UiCommand::StyleUnpin;
               result.arg = key;
             }
@@ -2747,11 +2753,11 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         }
         if (state.style_pin_candidates.empty())
           ImGui::TextDisabled("Open a web domain or service to assign its style.");
-        ImGui::SetNextItemWidth(-105.f);
+        ImGui::SetNextItemWidth(narrow_panel ? -FLT_MIN : -105.f);
         ImGui::InputTextWithHint("##manual_style_pin", "domain:example.org or service:lemmy",
                                  style_pin_input_, sizeof(style_pin_input_));
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Pin target")) {
+        same_line_if_fits("Pin target");
+        if (classic_button("Pin target")) {
           cmd = UiCommand::StylePin;
           result.arg = std::string(style_pin_input_) + "\n" + chosen->name;
         }
@@ -2759,8 +2765,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
           for (const auto& [key, name] : state.style_pins) {
             ImGui::PushID(key.c_str());
             ImGui::Text("%s = %s", key.c_str(), name.c_str());
-            ImGui::SameLine();
-            if (ImGui::SmallButton("Remove")) {
+            same_line_if_fits("Remove");
+            if (classic_button("Remove")) {
               cmd = UiCommand::StyleUnpin;
               result.arg = key;
             }
@@ -2793,7 +2799,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     if (ImGui::Begin("##bookmarks_panel_body", nullptr, bookmarks_flags)) {
       ImGui::TextDisabled("Persistent bookmarks (state dir: bookmarks)");
       ImGui::Separator();
-      if (ImGui::Button(state.current_bookmarked ? "Remove current page"
+      if (classic_button(state.current_bookmarked ? "Remove current page"
                         : state.selection        ? "Bookmark selection"
                                                  : "Bookmark current page")) {
         cmd = state.current_bookmarked ? UiCommand::RemoveBookmark
@@ -2872,10 +2878,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoCollapse;
     if (ImGui::Begin("##annotation_panel_body", nullptr, annotation_flags)) {
-      if (ImGui::Button("New personal layer"))
+      if (classic_button("New personal layer"))
         cmd = UiCommand::NewAnnotationLayer;
       ImGui::SameLine();
-      if (ImGui::Button("Highlight selection"))
+      if (classic_button("Highlight selection"))
         cmd = UiCommand::AddAnnotationHighlight;
       if (!state.selection && ImGui::IsItemHovered())
         ImGui::SetTooltip("Select text in a document first");
@@ -2909,7 +2915,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::InputTextMultiline("##new_annotation_note", annotation_new_note_,
                                 sizeof(annotation_new_note_), ImVec2(-1.f, 66.f));
       ImGui::BeginDisabled(!state.selection || annotation_new_note_[0] == '\0');
-      if (ImGui::Button("Attach note")) {
+      if (classic_button("Attach note")) {
         cmd = UiCommand::AddAnnotationNote;
         result.arg = annotation_new_note_;
       }
@@ -2977,14 +2983,14 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
             }
             if (too_long) ImGui::TextDisabled("Note too long to edit here");
             ImGui::BeginDisabled(too_long || !pending);
-            if (ImGui::Button("Save note")) {
+            if (classic_button("Save note")) {
               cmd = UiCommand::UpdateAnnotationNote;
               result.arg = annotation_edit_note_;
             }
             ImGui::EndDisabled();
             ImGui::SameLine();
           }
-          if (ImGui::Button("Remove annotation")) {
+          if (classic_button("Remove annotation")) {
             cmd = UiCommand::RemoveAnnotation;
             result.arg = selected->id;
           }
@@ -3013,7 +3019,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
           if (i != 0) {
             ImGui::SameLine();
             ImGui::BeginDisabled(pending_note_changes);
-            if (ImGui::SmallButton("Restore")) {
+            if (classic_button("Restore")) {
               cmd = UiCommand::RestoreAnnotationLayerVersion;
               result.arg = state.annotation_history_layer + "\n" + revision.id;
             }
@@ -3060,7 +3066,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         result.arg = nostr_local_search_;
       }
       ImGui::SameLine();
-      if (ImGui::Button("Refresh")) cmd = UiCommand::NostrRefreshLocal;
+      if (classic_button("Refresh")) cmd = UiCommand::NostrRefreshLocal;
       if (ImGui::RadioButton("People", state.nostr_tab == 0))
         cmd = UiCommand::NostrShowPeople;
       ImGui::SameLine();
@@ -3075,7 +3081,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ImGui::InputTextWithHint("##nostr_group_relay", "relay host or wss:// URL (optional)",
                                  nostr_group_relay_, sizeof nostr_group_relay_);
         ImGui::SameLine();
-        if (ImGui::Button("Discover")) {
+        if (classic_button("Discover")) {
           cmd = UiCommand::NavigateUrl;
           result.arg = "nostr:groups";
           if (nostr_group_relay_[0] != '\0') {
@@ -3086,12 +3092,12 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         if (ImGui::IsItemHovered())
           ImGui::SetTooltip("Empty: scan known NIP-29 hosts and relays from public group lists.\n"
                             "A hostname is enough for a specific relay (TLS is always used).");
-      } else if (ImGui::SmallButton("Fetch recent")) {
+      } else if (classic_button("Fetch recent")) {
         cmd = UiCommand::NavigateUrl;
         result.arg = "nostr:recent";
       }
       ImGui::BeginDisabled(state.nostr_page == 0);
-      if (ImGui::SmallButton("Previous")) cmd = UiCommand::NostrPrevPage;
+      if (classic_button("Previous")) cmd = UiCommand::NostrPrevPage;
       ImGui::EndDisabled();
       ImGui::SameLine();
       ImGui::Text("Page %d", state.nostr_page + 1);
@@ -3099,7 +3105,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::BeginDisabled(!(state.nostr_tab == 0 ? state.nostr_people_more :
                             state.nostr_tab == 1 ? state.nostr_events_more :
                                                    state.nostr_groups_more));
-      if (ImGui::SmallButton("Next")) cmd = UiCommand::NostrNextPage;
+      if (classic_button("Next")) cmd = UiCommand::NostrNextPage;
       ImGui::EndDisabled();
       ImGui::Separator();
       // A child scroll area avoids producing thousands of text widgets when
@@ -3257,22 +3263,22 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
 
       const std::string base = "lemmy:" + state.lemmy_instance + "/api/v3/";
       ImGui::BeginDisabled(!state.lemmy_supported);
-      if (ImGui::SmallButton("Feed")) {
+      if (classic_button("Feed")) {
         cmd = UiCommand::NavigateUrl;
         result.arg = base + "post/list?limit=25&sort=" + state.lemmy_sort;
       }
       ImGui::SameLine();
-      if (ImGui::SmallButton("Find communities")) {
+      if (classic_button("Find communities")) {
         cmd = UiCommand::NavigateUrl;
         result.arg = base + "community/list?limit=50&sort=Active";
       }
       ImGui::SameLine();
-      if (ImGui::SmallButton("Federated peers")) {
+      if (classic_button("Federated peers")) {
         cmd = UiCommand::NavigateUrl;
         result.arg = base + "federated_instances";
       }
       if (lemmy_search_input_[0] != '\0') {
-        if (ImGui::SmallButton("Search server")) {
+        if (classic_button("Search server")) {
           cmd = UiCommand::NavigateUrl;
           result.arg = base + "search?q=" + lemmy_query_escape(lemmy_search_input_) +
                        "&type_=All&limit=50";
@@ -3294,12 +3300,12 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::SetNextItemWidth(-1.f);
       ImGui::InputTextWithHint("##lemmy_add_instance", "Add server hostname or URL",
                                lemmy_instance_input_, sizeof lemmy_instance_input_);
-      if (ImGui::SmallButton("Add instance")) {
+      if (classic_button("Add instance")) {
         cmd = UiCommand::LemmyAddInstance;
         result.arg = lemmy_instance_input_;
       }
       ImGui::SameLine();
-      if (ImGui::SmallButton("Directory")) {
+      if (classic_button("Directory")) {
         cmd = UiCommand::NavigateUrl;
         result.arg = "https://join-lemmy.org/instances";
       }
@@ -3379,7 +3385,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
           result.arg = identity.pubkey;
         }
         ImGui::SameLine();
-        if (ImGui::SmallButton("View profile")) {
+        if (classic_button("View profile")) {
           cmd = UiCommand::NavigateUrl;
           result.arg = "nostr:" + nostr_bech32("npub", identity.pubkey);
         }
@@ -3392,7 +3398,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                        sizeof nostr_identity_label_);
       ImGui::InputText("npub / hex", nostr_identity_pubkey_,
                        sizeof nostr_identity_pubkey_);
-      if (ImGui::Button("Save watch-only identity")) {
+      if (classic_button("Save watch-only identity")) {
         cmd = UiCommand::NostrAddWatchIdentity;
         result.arg = std::string(nostr_identity_label_) + "\n" +
                      nostr_identity_pubkey_;
@@ -3418,7 +3424,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing;
     if (ImGui::Begin("##vkeyboard", nullptr, vk_flags)) {
       auto keybtn = [&](const char* label, const char* payload, float w) {
-        if (ImGui::Button(label, ImVec2(w, 34.f * scale_))) {
+        if (classic_button(label, ImVec2(w, 34.f * scale_))) {
           if (cmd == UiCommand::None) {
             cmd = UiCommand::VirtualKey;
             result.arg = payload;
@@ -3445,7 +3451,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         keybtn(lab, pay, kw);
       }
       ImGui::NewLine();
-      if (ImGui::Button(shift ? "SHIFT" : "Shift", ImVec2(kw * 1.6f, 34.f * scale_)))
+      if (classic_button(shift ? "SHIFT" : "Shift", ImVec2(kw * 1.6f, 34.f * scale_)))
         shift = !shift;
       ImGui::SameLine(0.f, 2.f);
       for (const char* c = row3; *c; ++c) {
@@ -3453,7 +3459,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         char pay[2] = {*c, 0};
         keybtn(lab, pay, kw);
       }
-      if (ImGui::Button("Bksp", ImVec2(kw * 1.8f, 34.f * scale_))) {
+      if (classic_button("Bksp", ImVec2(kw * 1.8f, 34.f * scale_))) {
         if (cmd == UiCommand::None) {
           cmd = UiCommand::VirtualKey;
           result.arg = "\b";
@@ -3467,7 +3473,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         keybtn(lab, pay, kw * 0.95f);
       }
       ImGui::NewLine();
-      if (ImGui::Button(",", ImVec2(kw, 34.f * scale_))) {
+      if (classic_button(",", ImVec2(kw, 34.f * scale_))) {
         if (cmd == UiCommand::None) {
           cmd = UiCommand::VirtualKey;
           result.arg = ",";
@@ -3475,28 +3481,28 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       }
       ImGui::SameLine(0.f, 2.f);
       const float space_w = std::max(100.f, vk_vp->Size.x - kw * 6.f);
-      if (ImGui::Button("Space", ImVec2(space_w, 34.f * scale_))) {
+      if (classic_button("Space", ImVec2(space_w, 34.f * scale_))) {
         if (cmd == UiCommand::None) {
           cmd = UiCommand::VirtualKey;
           result.arg = " ";
         }
       }
       ImGui::SameLine(0.f, 2.f);
-      if (ImGui::Button(".", ImVec2(kw, 34.f * scale_))) {
+      if (classic_button(".", ImVec2(kw, 34.f * scale_))) {
         if (cmd == UiCommand::None) {
           cmd = UiCommand::VirtualKey;
           result.arg = ".";
         }
       }
       ImGui::SameLine(0.f, 2.f);
-      if (ImGui::Button("Enter", ImVec2(kw * 2.f, 34.f * scale_))) {
+      if (classic_button("Enter", ImVec2(kw * 2.f, 34.f * scale_))) {
         if (cmd == UiCommand::None) {
           cmd = UiCommand::VirtualKey;
           result.arg = "\n";
         }
       }
       ImGui::SameLine(0.f, 2.f);
-      if (ImGui::Button("Hide", ImVec2(kw * 1.6f, 34.f * scale_)))
+      if (classic_button("Hide", ImVec2(kw * 1.6f, 34.f * scale_)))
         cmd = UiCommand::ToggleVirtualKeyboard;
     }
     ImGui::End();

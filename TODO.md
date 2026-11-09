@@ -6,7 +6,27 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **333** (this delivery is **332**)
+Next bundle number: **334** (this delivery is **333**)
+
+## Status (2026-11-09) — Clearlooks-style GUI polish
+
+- Kept the BeOS yellow active title tabs, with a more coherent GNOME 2
+  Clearlooks-inspired control palette: cool light grey, white highlights,
+  blue hover/selection, thin dark outlines, and gently rounded raised native
+  button surfaces. Native close and maximize/restore buttons are now matching
+  20px squares centered in their unchanged 28px click zones, with hover
+  feedback and clearer glyphs. Page bar and title actions share that face.
+- The ImGui theme now has consistent button frames, standard-height actions
+  (no zero-vertical-padding SmallButton variants), and 36px toolbar buttons
+  whether an icon is available or the text fallback is used. URL-field icon
+  buttons also have visible faces. Narrow style-manager action rows wrap.
+- Removed pane scrollbar up/down arrows completely, including their mouse
+  hit zones and hover state. The scrollbar track now occupies the full pane
+  height. A shared pure geometry helper keeps thumb drawing, dragging and
+  Shift+click targeting consistent, including short documents with a bottom
+  reading pad. Section/search/bookmark/reply position ticks remain.
+- Pure C++ scrollbar geometry and panel-layer tests passed. Full SDL/ImGui
+  build and visual checks still require the NixOS development toolchain.
 
 ## Status (2026-11-09) — immediate theme selection and font picker layout
 

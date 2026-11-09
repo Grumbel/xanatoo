@@ -21,6 +21,7 @@
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/parse.hpp"
 #include "xanatoo/reddit.hpp"
+#include "xanatoo/scrollbar_geometry.hpp"
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/util.hpp"
 
@@ -257,7 +258,7 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
         return;
       }
 
-    // Classic scrollbar (right edge): arrows page, track jumps/drags.
+    // Full-height scrollbar (right edge): track pages/jumps, thumb drags.
     {
       const int pi = at;
       int sx = sb_x(app.panes[pi]);
@@ -266,38 +267,15 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
       if (mx >= sx && mx < sx + kSbW && my >= 0.f && my < view_h) {
         focus_view(app, pi);
         Pane& sp = app.panes[pi];
-        float content_h = std::max(view_h, sp.layout.content_height);
-        float max_s = std::max(0.f, content_h - view_h + 40.f);
-        const float step =
-            static_cast<float>(app.fonts.regular.line_height()) * 3.f;
-        if (my < static_cast<float>(kSbArrow)) {
-          sp.scroll_y = std::max(0.f, sp.scroll_y - step);
-          ensure_virtual_layout(app, sp);
-          return;
-        }
-        if (my >= view_h - static_cast<float>(kSbArrow)) {
-          sp.scroll_y = std::min(max_s, sp.scroll_y + step);
-          ensure_virtual_layout(app, sp);
-          return;
-        }
-        // Track between arrows: page toward click, or grab the thumb.
-        float track_h =
-            std::max(1.f, view_h - 2.f * static_cast<float>(kSbArrow));
-        float track_my = my - static_cast<float>(kSbArrow);
-        float thumb_h =
-            std::max(20.f, track_h * (view_h / std::max(view_h, content_h)));
-        if (thumb_h > track_h) thumb_h = track_h;
-        float travel = std::max(0.f, track_h - thumb_h);
-        float ratio = (max_s > 0.f) ? (sp.scroll_y / max_s) : 0.f;
-        float thumb_top = ratio * travel;
-        float thumb_bot = thumb_top + thumb_h;
-        if (track_my < thumb_top || track_my > thumb_bot) {
+        const float max_s = pane_max_scroll(app, sp);
+        const auto geom = xanatoo::scrollbar_geometry(
+            view_h, std::max(view_h + max_s, sp.layout.content_height),
+            sp.scroll_y, max_s);
+        if (my < geom.thumb_top || my > geom.thumb_top + geom.thumb_height) {
           // Shift+click jumps; plain click pages toward the click.
           if ((SDL_GetModState() & KMOD_SHIFT) != 0) {
-            float tr = track_my / std::max(1.f, track_h);
-            tr = std::max(0.f, std::min(1.f, tr));
-            sp.scroll_y = tr * max_s;
-          } else if (track_my < thumb_top) {
+            sp.scroll_y = geom.scroll_for_click(my, max_s);
+          } else if (my < geom.thumb_top) {
             sp.scroll_y = std::max(0.f, sp.scroll_y - view_h * 0.85f);
           } else {
             sp.scroll_y = std::min(max_s, sp.scroll_y + view_h * 0.85f);
@@ -308,7 +286,7 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
         // On thumb — drag without jumping.
         app.dragging_scroll = true;
         app.scroll_drag_pane = pi;
-        app.scroll_drag_grab = track_my - thumb_top;
+        app.scroll_drag_grab = my - geom.thumb_top;
         return;
       }
     }
@@ -829,40 +807,15 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
       if (over_float_chrome(app, mx_i, my_i)) return;
     }
 
-    // Scrollbar hover (focused pane) for arrow highlight.
-    if (!app.dragging_scroll) {
-      app.sb_hover = 0;
-      float myh = content_y(app, app.mouse_y, app.focus);
-      const float view_h = static_cast<float>(app.panes[app.focus].h);
-      int sx = sb_x(app.panes[app.focus]);
-      if (app.mouse_x >= sx && app.mouse_x < sx + kSbW &&
-          myh >= 0.f && myh < view_h) {
-        if (myh < static_cast<float>(kSbArrow))
-          app.sb_hover = 1;
-        else if (myh >= view_h - static_cast<float>(kSbArrow))
-          app.sb_hover = 2;
-        else
-          app.sb_hover = 3;
-      }
-    }
-
     if (app.dragging_scroll) {
       float my = content_y(app, app.mouse_y, app.scroll_drag_pane);
       Pane& sp = app.panes[app.scroll_drag_pane];
       const float view_h = static_cast<float>(sp.h);
-      float content_h = std::max(view_h, sp.layout.content_height);
-      float max_s = std::max(0.f, content_h - view_h + 40.f);
-      float track_h =
-          std::max(1.f, view_h - 2.f * static_cast<float>(kSbArrow));
-      float track_my = my - static_cast<float>(kSbArrow);
-      float thumb_h =
-          std::max(20.f, track_h * (view_h / std::max(view_h, content_h)));
-      if (thumb_h > track_h) thumb_h = track_h;
-      float travel = std::max(1.f, track_h - thumb_h);
-      float thumb_top = track_my - app.scroll_drag_grab;
-      float ratio = thumb_top / travel;
-      ratio = std::max(0.f, std::min(1.f, ratio));
-      sp.scroll_y = ratio * max_s;
+      const float max_s = pane_max_scroll(app, sp);
+      const auto geom = xanatoo::scrollbar_geometry(
+          view_h, std::max(view_h + max_s, sp.layout.content_height),
+          sp.scroll_y, max_s);
+      sp.scroll_y = geom.scroll_for_thumb(my - app.scroll_drag_grab, max_s);
       ensure_virtual_layout(app, sp);
       return;
     }

@@ -31,7 +31,6 @@ namespace xanatoo::app {
 void set_chrome_scale(float scale) {
   auto px = [&](int v) { return static_cast<int>(std::lround(v * scale)); };
   kSbW = px(14);
-  kSbArrow = px(14);
   kSbLayoutGutter = kSbW + px(4);
   status_bar_full_h = status_bar_h = px(28);
   help_title_h = px(28);
@@ -133,7 +132,7 @@ std::string fit_text(xanatoo::Font& font, const std::string& text,
 
 SDL_Rect title_button_rect(App& app, const SDL_Rect& outer, const char* label) {
   const int w = app.ui_font.measure(label) + 16;
-  const int h = help_title_h - 10;
+  const int h = help_title_h - static_cast<int>(std::lround(8.f * app.ui_scale));
   return SDL_Rect{outer.x + outer.w - 2 * float_close_w - 4 - w,
                   outer.y + (help_title_h - h) / 2, w, h};
 }
@@ -168,6 +167,12 @@ void draw_floating_frame(App& app, const SDL_Rect& outer,
   w.resizable = resizable;
   w.maximized = maximized;
   w.scale = app.ui_scale;
+  const bool in_title = active && app.mouse_y >= outer.y &&
+      app.mouse_y < outer.y + help_title_h;
+  w.close_hot = in_title && app.mouse_x >= outer.x + outer.w - float_close_w &&
+      app.mouse_x < outer.x + outer.w;
+  w.max_hot = in_title && app.mouse_x >= outer.x + outer.w - 2 * float_close_w &&
+      app.mouse_x < outer.x + outer.w - float_close_w;
   th::draw_window_chrome(app.sdl, w);
   const th::Palette& p = th::palette();
   // Document well: paper surface in a sunken frame under the title strip.

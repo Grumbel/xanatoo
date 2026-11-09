@@ -50,7 +50,6 @@ struct App;
 // Chrome metrics in px at ui scale 1. Variables, not constants: app_init and
 // apply_ui_scale multiply them by the effective display/user scale.
 inline int kSbW = 14;
-inline int kSbArrow = 14;
 inline int kSbLayoutGutter = kSbW + 4;
 constexpr float kBlockGripW = 18.f;
 constexpr int soft_snap_px = 16;
@@ -724,7 +723,6 @@ struct App {
   Uint32 page_turn_at = 0;    // SDL ticks of the last wheel page turn
   int scroll_drag_pane = 0;
   float scroll_drag_grab = 0.f;
-  int sb_hover = 0;
   bool dragging_image = false;
   xanatoo::NodeId resize_image = xanatoo::INVALID_NODE;
   float resize_start_x = 0.f;

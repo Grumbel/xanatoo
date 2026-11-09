@@ -28,6 +28,7 @@
 #include "xanatoo/parse.hpp"
 #include "xanatoo/revstore.hpp"
 #include "xanatoo/reddit.hpp"
+#include "xanatoo/scrollbar_geometry.hpp"
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/theme.hpp"
 #include "xanatoo/time.hpp"
@@ -3349,18 +3350,15 @@ static void draw_pane_scrollbar(App& app, int i) {
       static_cast<float>(app.fonts.regular.line_height());
   [[maybe_unused]] Pane& pane = app.panes[i];
   const float max_scroll = pane_max_scroll(app, pane);
-  // Classic scrollbar: track, ↑/↓, chapter/search markers, thumb.
+  // Clearlooks-style full-height track, chapter/search markers and thumb.
   {
     const float view_h = std::max(1.f, static_cast<float>(pane.h));
-    float content_h = std::max(view_h, pane.layout.content_height);
-    const float arrow = static_cast<float>(kSbArrow);
-    float track_h = std::max(1.f, view_h - 2.f * arrow);
-    // Thumb sized against full view; position on track between arrows.
-    float thumb_h = std::max(20.f, track_h * (view_h / content_h));
-    if (thumb_h > track_h) thumb_h = track_h;
-    float track_travel = std::max(0.f, track_h - thumb_h);
-    float ratio = (max_scroll > 0.f) ? (pane.scroll_y / max_scroll) : 0.f;
-    float thumb_y = static_cast<float>(pane.y) + arrow + ratio * track_travel;
+    // Include the bottom reading pad represented by pane_max_scroll, so a
+    // short page with a small scroll range still has a draggable thumb.
+    float content_h = std::max(view_h + max_scroll, pane.layout.content_height);
+    const auto geom = xanatoo::scrollbar_geometry(
+        view_h, content_h, pane.scroll_y, max_scroll);
+    const float thumb_y = static_cast<float>(pane.y) + geom.thumb_top;
     int sx = sb_x(pane);
     int top = pane.y;
     int vh = static_cast<int>(view_h);
@@ -3376,10 +3374,8 @@ static void draw_pane_scrollbar(App& app, int i) {
     auto mark_at = [&](float doc_y, int r, int g, int b) {
       if (content_h < 1.f) return;
       float frac = std::max(0.f, std::min(1.f, doc_y / content_h));
-      int my = top + static_cast<int>(arrow + frac * track_h);
-      if (my < top + static_cast<int>(arrow) ||
-          my > top + vh - static_cast<int>(arrow))
-        return;
+      int my = top + static_cast<int>(frac * std::max(0.f, view_h - 1.f));
+      my = std::clamp(my, top + 1, top + std::max(1, vh - 2));
       SDL_SetRenderDrawColor(app.sdl, r, g, b, 255);
       SDL_Rect tick{sx + 1, my - 1, kSbW - 2, 2};
       xanatoo::sdl::fill_rect(app.sdl, &tick);
@@ -3450,32 +3446,9 @@ static void draw_pane_scrollbar(App& app, int i) {
       if (cpos.valid) mark_at(cpos.y, 40, 140, 70);
     }
 
-    // ↑ / ↓ buttons (hover highlight when sb_hover matches)
-    auto draw_arrow_btn = [&](int by, bool up) {
-      const bool hot =
-          (&pane == &app.panes[app.focus]) &&
-          ((up && app.sb_hover == 1) || (!up && app.sb_hover == 2));
-      SDL_Rect btn{sx, by, kSbW, kSbArrow};
-      th::draw_button_face(app.sdl, btn, false, hot);
-      int cx = sx + kSbW / 2;
-      int cy = by + kSbArrow / 2;
-      SDL_SetRenderDrawColor(app.sdl, 60, 58, 50, 255);
-      if (up) {
-        xanatoo::sdl::draw_line(app.sdl, cx, cy - 3, cx - 4, cy + 2);
-        xanatoo::sdl::draw_line(app.sdl, cx, cy - 3, cx + 4, cy + 2);
-        xanatoo::sdl::draw_line(app.sdl, cx - 4, cy + 2, cx + 4, cy + 2);
-      } else {
-        xanatoo::sdl::draw_line(app.sdl, cx, cy + 3, cx - 4, cy - 2);
-        xanatoo::sdl::draw_line(app.sdl, cx, cy + 3, cx + 4, cy - 2);
-        xanatoo::sdl::draw_line(app.sdl, cx - 4, cy - 2, cx + 4, cy - 2);
-      }
-    };
-    draw_arrow_btn(top, true);
-    draw_arrow_btn(top + vh - kSbArrow, false);
-
     // Thumb
     SDL_Rect thumb{sx + 1, static_cast<int>(thumb_y), kSbW - 2,
-                   std::max(8, static_cast<int>(thumb_h))};
+                   std::max(1, static_cast<int>(geom.thumb_height))};
     th::draw_button_face(app.sdl, thumb,
                          app.dragging_scroll && app.scroll_drag_pane == i,
                          false);

@@ -25,30 +25,30 @@ constexpr Rgb rgb(int r, int g, int b) {
 
 struct Palette {
   // Surfaces
-  Rgb face = rgb(0xEC, 0xE9, 0xE4);        // window / bar background
-  Rgb face_light = rgb(0xF6, 0xF5, 0xF2);  // gradient top, menu
-  Rgb face_dark = rgb(0xDA, 0xD6, 0xCF);   // gradient bottom, pressed
+  Rgb face = rgb(0xEA, 0xEC, 0xEB);        // Clearlooks grey window face
+  Rgb face_light = rgb(0xFA, 0xFB, 0xFA);  // button gradient top, menus
+  Rgb face_dark = rgb(0xD5, 0xD9, 0xD7);   // button gradient bottom
   Rgb field = rgb(0xFF, 0xFF, 0xFF);       // text entry / sunken well
-  Rgb scroll_trough = rgb(0x5C, 0x5A, 0x55);  // scrollbar trough (dark, vs light thumb)
+  Rgb scroll_trough = rgb(0xDE, 0xE2, 0xE1);  // light recessed scrollbar track
   Rgb paper = rgb(0xF8, 0xF6, 0xF0);       // document canvas
   // Bevel edges
   Rgb highlight = rgb(0xFF, 0xFF, 0xFF);
-  Rgb shadow = rgb(0xA8, 0xA4, 0x9C);
-  Rgb dark = rgb(0x6C, 0x69, 0x62);
-  Rgb frame = rgb(0x7E, 0x7B, 0x74);
+  Rgb shadow = rgb(0x9D, 0xA5, 0xA5);
+  Rgb dark = rgb(0x65, 0x6F, 0x73);
+  Rgb frame = rgb(0x88, 0x93, 0x96);
   // Ink
   Rgb text = rgb(0x2E, 0x34, 0x36);
-  Rgb text_dim = rgb(0x6E, 0x6C, 0x66);
+  Rgb text_dim = rgb(0x65, 0x6D, 0x70);
   // Window title tab (BeOS yellow when active)
   Rgb tab_top = rgb(0xFF, 0xE0, 0x5A);
   Rgb tab_bottom = rgb(0xF2, 0xBE, 0x1A);
-  Rgb tab_idle_top = rgb(0xEE, 0xEC, 0xE8);
-  Rgb tab_idle_bottom = rgb(0xCF, 0xCB, 0xC4);
+  Rgb tab_idle_top = rgb(0xEE, 0xF0, 0xEF);
+  Rgb tab_idle_bottom = rgb(0xC9, 0xCD, 0xCC);
   Rgb tab_text = rgb(0x2A, 0x24, 0x08);
   // Selection / accent (GNOME 2 blue)
-  Rgb accent = rgb(0x4A, 0x90, 0xD9);
-  Rgb accent_dark = rgb(0x2A, 0x62, 0xA8);
-  Rgb accent_soft = rgb(0xC8, 0xDC, 0xF2);
+  Rgb accent = rgb(0x4E, 0x88, 0xB8);
+  Rgb accent_dark = rgb(0x34, 0x65, 0xA4);
+  Rgb accent_soft = rgb(0xD2, 0xE6, 0xF8);
   // Tooltip / notice (BeOS-style pale yellow)
   Rgb notice = rgb(0xFF, 0xFA, 0xD2);
   Rgb notice_text = rgb(0x3A, 0x30, 0x10);
@@ -75,6 +75,8 @@ struct WindowChrome {
   bool resizable = true;  // SE grip
   bool max_box = true;    // maximize / restore widget left of the close box
   bool maximized = false;  // shows the restore glyph
+  bool close_hot = false;
+  bool max_hot = false;
   float scale = 1.f;      // ui scale: close box size
 };
 
