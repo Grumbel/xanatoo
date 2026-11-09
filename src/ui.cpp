@@ -2519,11 +2519,16 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoCollapse;
     if (ImGui::Begin("##styles_panel_body", nullptr, style_flags)) {
-      ImGui::TextDisabled("Reader themes  /  personal .xss files  /  automatic assignments");
+      ImGui::TextWrapped("Reader themes / personal .xss files / automatic assignments");
       ImGui::Separator();
-      const float list_width = std::clamp(ImGui::GetContentRegionAvail().x * 0.31f,
-                                          145.f, 260.f);
-      ImGui::BeginChild("##styles_list", ImVec2(list_width, 0), true);
+      const float available_width = ImGui::GetContentRegionAvail().x;
+      const bool narrow_panel = available_width < 520.f;
+      const float list_width = narrow_panel
+          ? available_width
+          : std::clamp(available_width * 0.31f, 145.f, 260.f);
+      // A side-docked panel may not have room for two columns. Put the
+      // theme list above the editor instead of squeezing the font controls.
+      ImGui::BeginChild("##styles_list", ImVec2(list_width, narrow_panel ? 145.f : 0), true);
       ImGui::TextDisabled("Themes");
       ImGui::Separator();
       if (style_editor_sheet_.empty()) style_editor_sheet_ = state.style;
@@ -2537,6 +2542,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
             style_editor_sheet_ = entry.name;
             style_editor_[0] = '\0';  // file contents loaded below
             style_delete_confirm_ = false;
+            if (!active) {
+              cmd = UiCommand::SelectStyle;
+              result.arg = entry.name;
+            }
           }
         }
         if (ImGui::IsItemHovered())
@@ -2544,11 +2553,13 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                             active ? " (currently applied)" : "");
         ImGui::PopID();
       }
+      if (style_editor_dirty_)
+        ImGui::TextWrapped("Save or discard edits before switching themes.");
       ImGui::Separator();
       if (ImGui::SmallButton("Reload")) cmd = UiCommand::ReloadStyles;
       ImGui::TextDisabled("Default: %s", state.default_style.c_str());
       ImGui::EndChild();
-      ImGui::SameLine();
+      if (!narrow_panel) ImGui::SameLine();
       ImGui::BeginGroup();
       const StyleEntry* chosen = nullptr;
       for (const StyleEntry& entry : state.style_entries)
@@ -2595,11 +2606,6 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
           }
         }
         ImGui::Text("%s", chosen->title.c_str());
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Use this theme")) {
-          cmd = UiCommand::SelectStyle;
-          result.arg = chosen->name;
-        }
         ImGui::SeparatorText("Create / duplicate");
         ImGui::BeginDisabled(style_editor_dirty_);
         ImGui::SetNextItemWidth(std::min(190.f, ImGui::GetContentRegionAvail().x * 0.60f));
@@ -2656,13 +2662,18 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
           // handful of presets that might silently resolve to other faces.
           const auto& faces = fontconfig_list_families();
           ImGui::SetNextItemWidth(-FLT_MIN);
-          ImGui::InputTextWithHint("##font_filter", "Filter installed font families...",
+          ImGui::InputTextWithHint("##font_filter", "Search fonts...",
                                    style_font_filter_, sizeof(style_font_filter_));
           auto font_field = [&](const char* label, char* value, size_t cap) {
             ImGui::PushID(label);
+            // InputText renders a visible label *after* the input. With a
+            // full-width field that label ends up outside the panel, so put
+            // it on its own line and use hidden IDs for both controls.
+            ImGui::TextUnformatted(label);
             ImGui::SetNextItemWidth(-FLT_MIN);
-            ImGui::InputText(label, value, cap);
-            if (ImGui::BeginCombo("Installed fonts", "Choose a family...")) {
+            ImGui::InputText("##family", value, cap);
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            if (ImGui::BeginCombo("##installed_fonts", "Browse fonts...")) {
               std::string filter(style_font_filter_);
               std::transform(filter.begin(), filter.end(), filter.begin(),
                              [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -2675,6 +2686,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                 }
                 if (ImGui::Selectable(face.c_str(), std::string_view(value) == face))
                   std::snprintf(value, cap, "%s", face.c_str());
+                if (ImGui::IsItemHovered())
+                  ImGui::SetTooltip("%s", face.c_str());
               }
               ImGui::EndCombo();
             }

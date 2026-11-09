@@ -6,7 +6,20 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **332** (this delivery is **331**)
+Next bundle number: **333** (this delivery is **332**)
+
+## Status (2026-11-09) — immediate theme selection and font picker layout
+
+- Clicking a theme in the Style Sheets panel now applies it immediately;
+  removed the redundant **Use this theme** button. Unsaved source edits
+  still protect against switching away until saved or discarded, with an
+  explicit message explaining why the list is locked.
+- The body, heading, and code font fields now have separate labels above
+  full-width inputs and font dropdowns, with shorter prompts and full-name
+  tooltips. When docked too narrowly for the two-column manager layout,
+  the theme list moves above the editor instead of clipping its controls.
+- The pure `ui_panel_layers_tests` test passed. Full application/ImGui visual
+  verification remains pending on a host with the SDL/FreeType toolchain.
 
 ## Status (2026-11-09) — style sheet manager and reading themes
 
