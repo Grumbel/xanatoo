@@ -134,6 +134,7 @@ add_executable(xanatoo
   src/paginate.cpp
   src/app_collection.cpp
   src/app_drafts.cpp
+  src/app_revisions.cpp
   src/app_about.cpp
   src/app_passage.cpp
   src/app_report.cpp

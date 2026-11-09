@@ -28,6 +28,7 @@
 #include "xanatoo/nav_history.hpp"
 #include "xanatoo/paginate.hpp"
 #include "xanatoo/render.hpp"
+#include "xanatoo/revstore.hpp"
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/annotations.hpp"
 #include "xanatoo/search.hpp"
@@ -263,7 +264,7 @@ enum class Dock : uint8_t { None = 0, Left, Right, Top, Bottom, Max };
 
 enum class WindowRole : uint8_t {
   Help, Outline, Backlinks, Sitemap, Page, History, Styles, Downloads, Reply,
-  Document
+  Annotations, Revisions, Document
 };
 
 // One floating window: help / outline / backlinks panels and document
@@ -739,6 +740,12 @@ struct App {
   uint64_t annotation_note_created_gen = 0;
   uint64_t annotation_layers_gen = 1;
   bool annotation_panel_open = false;
+  bool revision_panel_open = false;
+  std::string revision_document_key;
+  std::string revision_working, revision_published, revision_selected;
+  std::vector<xanatoo::ObjectRevision> revision_history;
+  std::vector<std::string> revision_preview_lines;
+  bool revision_show_diff = false;
   std::string annotation_history_cached_layer;
   std::string annotation_history_cached_head;
   std::vector<xanatoo::AnnotationLayerRevision> annotation_history_cache;
@@ -806,6 +813,8 @@ struct App {
   FloatWindow styles_win = make_float_panel(WindowRole::Styles, 160, 150, 320, 420);
   FloatWindow downloads_win = make_float_panel(WindowRole::Downloads, 120, 160, 520, 380);
   FloatWindow reply_win = make_float_panel(WindowRole::Reply, 170, 170, 490, 350);
+  FloatWindow annotation_win = make_float_panel(WindowRole::Annotations, 150, 110, 430, 540);
+  FloatWindow revision_win = make_float_panel(WindowRole::Revisions, 120, 140, 550, 560);
   ReplyDraft reply;
   SitemapPanel sitemap;
   SearchBar search;
@@ -1462,6 +1471,12 @@ void draw_floating_frame(App& app, const SDL_Rect& outer,
                          bool maximized = false);
 void draw_client_scrollbar(App& app, int cx, int cy, int cw, int ch,
                            float scroll, float max_scroll);
+
+// ---- database-native document history (app_revisions.cpp) ----
+void refresh_revision_panel(App& app);
+void draw_revision_panel(App& app);
+void click_revision_panel(App& app, int mx, int my);
+float revision_panel_max_scroll(App& app, int client_h);
 
 // ---- frame stages ----
 void sync_window_size(App& app);

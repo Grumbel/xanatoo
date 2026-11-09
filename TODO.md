@@ -6,7 +6,25 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **308** (this delivery is **307**)
+Next bundle number: **309** (this delivery is **308**)
+
+## Status (2026-11-09) — Native revision and annotation panels
+
+- Document revisions now have a native dockable/resizable `FloatWindow`
+  panel, persisted with the session. It lists working/published ancestry,
+  previews snapshots, shows bounded line diffs and restores a selected
+  snapshot as a new working child without altering the publication or
+  immutable imported original.
+- Migrated Annotations from a standalone ImGui window into the same native
+  panel system. ImGui only draws note editing and layer controls *inside*
+  the panel's native client area, as with Reply. Both default to the right
+  dock and appear under Panels.
+- SQLite integration passes imported-original restore, separate publication
+  ancestry, stale-head rejection and cross-document identity checks. Native
+  GUI compilation still requires the user's NixOS development environment.
+- Next: interactive GUI verification of panel scroll/stacking/clipping,
+  graphical document diffs, better converter provenance, per-layer colours
+  and orphan reattachment.
 
 ## Status (2026-11-09) — Imported-source provenance and file-free Save
 

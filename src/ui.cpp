@@ -1772,6 +1772,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                     state.has_path && state.dirty);
       menu_item_cmd("Drafts", UiCommand::OpenDrafts, cmd);
       menu_item_cmd("Local documents", UiCommand::OpenStoredDocuments, cmd);
+      menu_item_cmd("Document revisions…", UiCommand::ToggleRevisionsPanel,
+                    cmd, state.can_show_revisions);
       ImGui::Separator();
       menu_item_cmd("Quit", UiCommand::Quit, cmd, true, "Ctrl+Q");
       ImGui::EndMenu();
@@ -1912,6 +1914,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleStylesPanel;
       if (ImGui::MenuItem("Annotations", nullptr, state.annotations_panel_open))
         cmd = UiCommand::ToggleAnnotationsPanel;
+      if (ImGui::MenuItem("Document revisions", nullptr,
+                          state.revisions_panel_open,
+                          state.can_show_revisions || state.revisions_panel_open))
+        cmd = UiCommand::ToggleRevisionsPanel;
       ImGui::EndMenu();
     }
     // Go: moving through and between pages, plus the panels that do so.
@@ -2486,13 +2492,23 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
 
   // ---- Independent annotation layers (source documents remain untouched) ----
   if (state.annotations_panel_open) {
-    bool open = true;
     if (annotation_note_created_seen_ != state.annotation_note_created_gen) {
       annotation_note_created_seen_ = state.annotation_note_created_gen;
       annotation_new_note_[0] = '\0';
     }
-    ImGui::SetNextWindowSize(ImVec2(430.f, 540.f), ImGuiCond_FirstUseEver);
-    if (ImGui::Begin("Annotations", &open)) {
+    // The title, close/maximize buttons, docking, resize and stacking belong
+    // to FloatWindow::Annotations. ImGui provides only the form controls in
+    // that native panel's client area (as in the Reply composer).
+    ImGui::SetNextWindowPos(ImVec2(static_cast<float>(state.annotation_x + 3),
+                                   static_cast<float>(state.annotation_y + 3)));
+    ImGui::SetNextWindowSize(ImVec2(
+        static_cast<float>(std::max(1, state.annotation_w - 6)),
+        static_cast<float>(std::max(1, state.annotation_h - 6))));
+    constexpr ImGuiWindowFlags annotation_flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoCollapse;
+    if (ImGui::Begin("##annotation_panel_body", nullptr, annotation_flags)) {
       if (ImGui::Button("New personal layer"))
         cmd = UiCommand::NewAnnotationLayer;
       ImGui::SameLine();
@@ -2645,7 +2661,6 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       }
     }
     ImGui::End();
-    if (!open) cmd = UiCommand::ToggleAnnotationsPanel;
   }
 
   result.cmd = cmd;

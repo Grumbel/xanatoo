@@ -74,10 +74,22 @@ document also has an `db-original:doc:<64 hex>` read-only view: both its
 original parsed tree and raw source bytes remain in SQLite even if the source
 later changes or disappears. File → **View original** (or the Original link
 on the documents index) shows that snapshot; Back returns to the working
-document. A stored
-published revision can be loaded separately by its immutable revision ID
-through `load_stored_document_revision`, but there is not yet a GUI browser
-to inspect or restore old working/published revisions.
+document. A stored published revision can also be loaded separately by its
+immutable revision ID through `load_stored_document_revision`.
+
+File → **Document revisions…** (also Panels → **Document revisions**) opens a
+native dockable Xanatoo panel for the current local database document. It
+lists working ancestry and the separate published ancestry, including the
+immutable imported original. Select a snapshot and choose **Preview** to see
+its rendered text or **Diff** to compare it with the current working text
+using `-`/`+` lines. The inline comparison is bounded to 160 lines per side;
+it is a quick inspection, not a complete huge-document diff.
+
+**Restore** appends the selected snapshot's content as a *new working
+revision*, retaining all old revisions and leaving the publication pointer
+and original source untouched. It refuses to restore if the working head has
+changed since the panel read it or while an open copy has unsaved edits. The
+panel uses native docking, resize, close, session restore and UI scaling.
 
 Local file editing switches to a native document when the first edit occurs;
 Ctrl+S on a file/page also imports it rather than writing it back to disk.
@@ -95,10 +107,9 @@ into the native working revision when imported.
 
 **Limitations:** remote import requires the original response body; some
 converter-backed formats still use the converter's path as their source
-alias. The original viewer is read-only, not yet a one-click historical
-restore, and the document revision browser still needs a UI. Remote
-publishing, replication, signatures and portable annotation exchange remain
-future work.
+alias. The revision panel's text diff is bounded and does not yet provide a
+full side-by-side rendered-document comparison. Remote publishing,
+replication, signatures and portable annotation exchange remain future work.
 
 ## Annotation layers (storage foundation)
 
@@ -117,9 +128,9 @@ future work.
   stale writer is rejected instead of silently overwriting someone else's
   changes. Layers can be enumerated, and old versions remain retrievable by
   revision id.
-- No annotation UI, collaboration protocol, signatures, or document changes
-  are implemented yet. Owners are descriptive, not authenticated. Visibility
-  is view-local and should not be baked into the shared annotation contents.
+- Owners are descriptive, not authenticated. Visibility is local UI state
+  and is not baked into shared annotation contents. Collaboration protocol,
+  signatures and portable layer exchange remain future work.
 - `--no-save` and builds without SQLite cannot persist layers. The API
   reports failure rather than pretending the data was saved.
 
@@ -128,8 +139,10 @@ history and identity remain separate from the source document's revisions.
 
 ## Annotation highlights and notes (reader integration)
 
-The **Panels → Annotations** window lists independently stored layers, with a
-visibility checkbox and a radio choice of the local layer to edit. **New
+The native, dockable **Panels → Annotations** panel lists independently stored
+layers, with a visibility checkbox and a radio choice of the local layer to
+edit. Its frame is a native `FloatWindow`; ImGui only provides the embedded
+form widgets inside the panel client area, as in the Reply composer. **New
 personal layer** creates a fresh history; **Highlight selection** (also in
 the document context menu) attaches the selected text to the active local
 layer. It works on read-only foreign documents, without modifying them or

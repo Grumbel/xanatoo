@@ -310,6 +310,18 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.bookmarks_open = app.bookmarks_panel_open;
   ui_state.bookmarks = app.bookmarks;
   ui_state.annotations_panel_open = app.annotation_panel_open;
+  ui_state.revisions_panel_open = app.revision_panel_open;
+  {
+    const DocBuffer* b = find_buf(app, focused_pane(app).buf);
+    ui_state.can_show_revisions = b && !!find_stored_document(b->doc_key);
+  }
+  if (app.annotation_panel_open) {
+    auto [x, y, w, h] = float_client_rect(app, app.annotation_win);
+    ui_state.annotation_x = x;
+    ui_state.annotation_y = y;
+    ui_state.annotation_w = w;
+    ui_state.annotation_h = h;
+  }
   ui_state.annotation_note_created_gen = app.annotation_note_created_gen;
   ui_state.annotation_layers.clear();
   for (const auto& layer : app.annotation_layers)
@@ -491,7 +503,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::NavJump ||
         c == C::GoHome || c == C::GoUp ||
         c == C::ToggleHistory || c == C::ToggleDownloads || c == C::ToggleBookmarks ||
-        c == C::ToggleAnnotationsPanel || c == C::NewAnnotationLayer ||
+        c == C::ToggleAnnotationsPanel || c == C::ToggleRevisionsPanel ||
+        c == C::NewAnnotationLayer ||
         c == C::SelectAnnotationLayer || c == C::ToggleAnnotationLayer ||
         c == C::AddAnnotationHighlight || c == C::AddAnnotationNote ||
         c == C::SelectAnnotation || c == C::UpdateAnnotationNote ||
@@ -856,6 +869,24 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     case C::ToggleAnnotationsPanel:
       app.annotation_panel_open = !app.annotation_panel_open;
+      break;
+    case C::ToggleRevisionsPanel:
+      if (app.revision_panel_open) {
+        app.revision_panel_open = false;
+      } else {
+        const DocBuffer* b = find_buf(app, p.buf);
+        if (!b || !find_stored_document(b->doc_key)) {
+          flash_status(app, "Open a local database document to view its revisions");
+          break;
+        }
+        app.revision_document_key = b->doc_key;
+        app.revision_selected.clear();
+        app.revision_working.clear();
+        app.revision_published.clear();
+        app.revision_win.scroll = 0.f;
+        app.revision_panel_open = true;
+        refresh_revision_panel(app);
+      }
       break;
     case C::ToggleAnnotationLayer:
       if (app.hidden_annotation_layers.contains(arg))

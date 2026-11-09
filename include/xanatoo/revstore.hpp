@@ -3,6 +3,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -142,5 +143,18 @@ std::optional<StoredDocument> publish_stored_document(
 // Always verifies that the revision belongs to this document identity.
 std::optional<std::string> load_stored_document_revision(
     std::string_view key, std::string_view revision);
+
+// Working ancestry (newest first), followed by published ancestry not already
+// seen. Includes the immutable import original when present. A caller may
+// select any entry without altering either document head.
+std::vector<ObjectRevision> stored_document_history(std::string_view key,
+                                                    size_t limit = 64);
+
+// Restore the bytes of a historical snapshot as a *new working revision*.
+// `expected_working` protects against stale browser panes and concurrent
+// writers; the publication pointer and old history remain unchanged.
+std::optional<StoredDocument> restore_stored_document_revision(
+    std::string_view key, std::string_view revision,
+    std::string_view expected_working, std::string_view title);
 
 }  // namespace xanatoo

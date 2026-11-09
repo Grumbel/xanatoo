@@ -34,6 +34,10 @@ std::pair<int, int> min_size(const FloatWindow& w) {
       return {200, 140};
     case WindowRole::Reply:
       return {300, 240};
+    case WindowRole::Annotations:
+      return {260, 260};
+    case WindowRole::Revisions:
+      return {300, 240};
     case WindowRole::Help:
     case WindowRole::Document:
       break;
@@ -101,6 +105,12 @@ void close_window(App& app, FloatWindow& w) {
       break;
     case WindowRole::Reply:
       app.reply.open = false;
+      break;
+    case WindowRole::Annotations:
+      app.annotation_panel_open = false;
+      break;
+    case WindowRole::Revisions:
+      app.revision_panel_open = false;
       break;
     case WindowRole::Document:
       close_doc_window(app, static_cast<size_t>(&w - app.soft_wins.data()));
@@ -259,7 +269,8 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
   // content-scroll roles reserve it for click-free jump/drag.
   const bool in_sb =
       mx >= cx + cw - sb_w && mx <= cx + cw + 2 && my >= cy && my <= cy + ch;
-  if (in_sb && w.role != WindowRole::Reply) {
+  if (in_sb && w.role != WindowRole::Reply &&
+      w.role != WindowRole::Annotations) {
     begin_scroll_drag(app, w, my);
     return;
   }
@@ -297,6 +308,11 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
       break;
     case WindowRole::Reply:
       break;  // ImGui owns the editor and formatting controls.
+    case WindowRole::Annotations:
+      break;  // ImGui owns the form widgets inside the native panel.
+    case WindowRole::Revisions:
+      click_revision_panel(app, mx, my);
+      break;
     case WindowRole::Outline:
       click_outline(app, w, mx, my);
       break;
@@ -323,6 +339,8 @@ std::vector<FloatWindow*> float_stack(App& app) {
   if (app.sitemap.shown) st.push_back(&app.sm);
   if (app.page.shown) st.push_back(&app.pg);
   if (app.history_panel_open) st.push_back(&app.history_win);
+  if (app.annotation_panel_open) st.push_back(&app.annotation_win);
+  if (app.revision_panel_open) st.push_back(&app.revision_win);
   if (app.styles_panel_open) st.push_back(&app.styles_win);
   if (app.help_mode) st.push_back(&app.help);
   for (auto& sw : app.soft_wins) st.push_back(&sw);
@@ -367,6 +385,8 @@ std::tuple<int, int, int, int> float_client_rect(App& app,
       return window_client_rect(w.x, w.y, w.w, w.h);
     case WindowRole::Downloads:
     case WindowRole::Reply:
+    case WindowRole::Annotations:
+    case WindowRole::Revisions:
       return window_client_rect(w.x, w.y, w.w, w.h);
     case WindowRole::Document:
       return soft_client_rect(app, w);
@@ -400,7 +420,10 @@ float float_max_scroll(App& app, const FloatWindow& w) {
                                    std::max(18, app.ui_font.line_height() + 7) +
                                8.f - view_h);
     case WindowRole::Reply:
+    case WindowRole::Annotations:
       return 0.f;
+    case WindowRole::Revisions:
+      return revision_panel_max_scroll(app, ch);
     case WindowRole::Downloads: {
       size_t n = 0;
       for (const auto& d : app.downloads)
@@ -588,6 +611,8 @@ void float_release(App& app, int mx, int my) {
 bool float_wheel(App& app, int mx, int my, int wheel_y) {
   FloatWindow* w = float_at(app, mx, my);
   if (!w || w->role == WindowRole::Document) return false;  // pane scrolls
+  if (w->role == WindowRole::Annotations || w->role == WindowRole::Reply)
+    return true;  // the embedded editor owns its own scroll position
   w->scroll -= static_cast<float>(wheel_y) * scroll_wheel_step(*w);
   clamp_scroll_min(*w);
   return true;
@@ -670,6 +695,14 @@ void draw_floats(App& app) {
         draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
                             "Reply (mockup)", true, w->dock == Dock::None,
                             0, w->dock == Dock::Max);
+        break;
+      case WindowRole::Annotations:
+        draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
+                            "Annotations", true, w->dock == Dock::None,
+                            0, w->dock == Dock::Max);
+        break;
+      case WindowRole::Revisions:
+        draw_revision_panel(app);
         break;
       case WindowRole::Help:
         draw_help_window(app);

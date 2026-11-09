@@ -36,6 +36,7 @@ enum class UiCommand {
   RemoveBookmark,  // remove current (or arg) from bookmarks
   ToggleBookmarks, // Bookmarks manager panel
   ToggleAnnotationsPanel, // annotation layer visibility / selection
+  ToggleRevisionsPanel,  // native database document revision browser
   NewAnnotationLayer,     // new local, independently versioned layer
   SelectAnnotationLayer,  // arg = layer id (local owner only)
   ToggleAnnotationLayer,  // arg = layer id; view-only visibility
@@ -219,6 +220,9 @@ struct UiState {
   bool footnote_overlay = true;
   bool bookmark_marks = true;
   bool annotations_panel_open = false;
+  int annotation_x = 0, annotation_y = 0, annotation_w = 0, annotation_h = 0;
+  bool revisions_panel_open = false;
+  bool can_show_revisions = false;
   struct AnnotationLayerItem {
     std::string id, name, owner;
     bool visible = true;

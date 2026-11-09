@@ -15,6 +15,7 @@
 #include <ctime>
 #include <filesystem>
 #include <random>
+#include <unordered_set>
 
 namespace fs = std::filesystem;
 
@@ -576,6 +577,35 @@ std::optional<std::string> load_stored_document_revision(
   return record->data;
 }
 
+std::vector<ObjectRevision> stored_document_history(std::string_view key,
+                                                    size_t limit) {
+  const auto head = find_stored_document(key);
+  if (!head || limit == 0) return {};
+  std::vector<ObjectRevision> out;
+  std::unordered_set<std::string> seen;
+  auto follow = [&](std::string id) {
+    while (!id.empty() && out.size() < limit && seen.insert(id).second) {
+      auto revision = load_object_revision(id);
+      if (!revision || revision->key != key ||
+          (revision->kind != "working" && revision->kind != "published" &&
+           revision->kind != "original")) break;
+      id = revision->parent;
+      out.push_back(std::move(*revision));
+    }
+  };
+  follow(head->working);
+  follow(head->published);
+  return out;
+}
+
+std::optional<StoredDocument> restore_stored_document_revision(
+    std::string_view key, std::string_view revision,
+    std::string_view expected_working, std::string_view title) {
+  const auto snapshot = load_stored_document_revision(key, revision);
+  if (!snapshot) return std::nullopt;
+  return save_stored_document(key, *snapshot, expected_working, title);
+}
+
 #else
 
 std::optional<DraftHead> find_draft(std::string_view) { return std::nullopt; }
@@ -623,6 +653,13 @@ std::optional<StoredDocument> publish_stored_document(
 }
 std::optional<std::string> load_stored_document_revision(
     std::string_view, std::string_view) {
+  return std::nullopt;
+}
+std::vector<ObjectRevision> stored_document_history(std::string_view, size_t) {
+  return {};
+}
+std::optional<StoredDocument> restore_stored_document_revision(
+    std::string_view, std::string_view, std::string_view, std::string_view) {
   return std::nullopt;
 }
 
