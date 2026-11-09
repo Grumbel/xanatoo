@@ -500,6 +500,7 @@ add_executable(xanatoo_tests
   src/paths.cpp
   src/version.cpp
   src/revstore.cpp
+  src/sidestore.cpp
   src/annotations.cpp
   src/minibuffer.cpp
   src/document.cpp

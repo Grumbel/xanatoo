@@ -6,7 +6,20 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **305** (this delivery is **304**)
+Next bundle number: **306** (this delivery is **305**)
+
+## Status (2026-11-09) — Fix native unit-test linker
+
+- The supplied NixOS build log showed `xanatoo_tests` missing the
+  `load_hidden_annotation_layers` and `save_annotation_layer_visibility`
+  definitions. `sidestore.cpp` already belonged to the app target but was
+  absent from the separate test executable's source list.
+- Added `src/sidestore.cpp` to `xanatoo_tests` in CMake. This is the exact
+  implementation of the missing functions and uses dependencies already
+  linked into the target (SQLite, document, paths and utilities).
+- Focused standalone SQLite integration still passes for layer revisions,
+  history restoration and stored visibility. Full native CMake/Nix verification
+  awaits the user's development environment.
 
 ## Status (2026-11-09) — Annotation history restore and clickable tabs
 
