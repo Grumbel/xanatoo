@@ -34,6 +34,7 @@ std::pair<int, int> min_size(const FloatWindow& w) {
     case WindowRole::Styles:
       return {420, 310};
     case WindowRole::Bookmarks:
+    case WindowRole::Subscriptions:
       return {240, 180};
     case WindowRole::Reply:
       return {300, 240};
@@ -110,6 +111,9 @@ void close_window(App& app, FloatWindow& w) {
       break;
     case WindowRole::Bookmarks:
       app.bookmarks_panel_open = false;
+      break;
+    case WindowRole::Subscriptions:
+      app.subscriptions_panel_open = false;
       break;
     case WindowRole::Downloads:
       app.downloads_panel_open = false;
@@ -291,6 +295,7 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
       mx >= cx + cw - sb_w && mx <= cx + cw + 2 && my >= cy && my <= cy + ch;
   if (in_sb && w.role != WindowRole::Styles &&
       w.role != WindowRole::Bookmarks &&
+      w.role != WindowRole::Subscriptions &&
       w.role != WindowRole::Reply &&
       w.role != WindowRole::Annotations &&
       w.role != WindowRole::NostrExplorer &&
@@ -329,6 +334,8 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
       break;  // ImGui owns the form widgets inside the native panel.
     case WindowRole::Bookmarks:
       break;  // ImGui owns the bookmark list inside the native panel.
+    case WindowRole::Subscriptions:
+      break;  // ImGui owns subscription controls in its native window.
     case WindowRole::NostrExplorer:
     case WindowRole::LemmyExplorer:
     case WindowRole::NostrAccounts:
@@ -369,6 +376,7 @@ std::vector<FloatWindow*> float_stack(App& app) {
   if (app.nostr_accounts_open) st.push_back(&app.nostr_accounts_win);
   if (app.styles_panel_open) st.push_back(&app.styles_win);
   if (app.bookmarks_panel_open) st.push_back(&app.bookmarks_win);
+  if (app.subscriptions_panel_open) st.push_back(&app.subscriptions_win);
   if (app.help_mode) st.push_back(&app.help);
   for (auto& sw : app.soft_wins) st.push_back(&sw);
   // Auto-opened downloads should remain visible above detached document
@@ -452,6 +460,7 @@ std::tuple<int, int, int, int> float_client_rect(App& app,
     case WindowRole::Styles:
       return window_client_rect(w.x, w.y, w.w, w.h);
     case WindowRole::Bookmarks:
+    case WindowRole::Subscriptions:
       return window_client_rect(w.x, w.y, w.w, w.h);
     case WindowRole::Downloads:
     case WindowRole::Reply:
@@ -491,6 +500,7 @@ float float_max_scroll(App& app, const FloatWindow& w) {
     case WindowRole::Styles:
       return 0.f;  // ImGui handles scrolling.
     case WindowRole::Bookmarks:
+    case WindowRole::Subscriptions:
       return 0.f;  // ImGui list manages its own vertical scrolling.
     case WindowRole::Reply:
     case WindowRole::Annotations:
@@ -654,6 +664,7 @@ bool float_wheel(App& app, int mx, int my, int wheel_y) {
   if (w->role == WindowRole::Annotations || w->role == WindowRole::Reply ||
       w->role == WindowRole::Styles ||
       w->role == WindowRole::Bookmarks ||
+      w->role == WindowRole::Subscriptions ||
       w->role == WindowRole::NostrExplorer ||
       w->role == WindowRole::LemmyExplorer ||
       w->role == WindowRole::NostrAccounts)
@@ -741,6 +752,12 @@ void draw_floats(App& app) {
                             "Bookmarks", true, w->dock == Dock::None,
                             0, w->dock == Dock::Max);
         app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Bookmarks);
+        break;
+      case WindowRole::Subscriptions:
+        draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
+                            "Subscriptions", true, w->dock == Dock::None,
+                            0, w->dock == Dock::Max);
+        app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Subscriptions);
         break;
       case WindowRole::Downloads:
         draw_downloads_panel(app);

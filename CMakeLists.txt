@@ -124,6 +124,7 @@ add_executable(xanatoo
   src/app_chrome.cpp
   src/app_keymap.cpp
   src/app_fetch.cpp
+  src/app_subscriptions.cpp
   src/app_downloads.cpp
   src/app_split.cpp
   src/app_footnotes.cpp
@@ -157,6 +158,7 @@ add_executable(xanatoo
   src/images.cpp
   src/ui.cpp
   src/util.cpp
+  src/subscriptions.cpp
   src/minibuffer.cpp
   src/sidestore.cpp
   src/revstore.cpp
@@ -695,6 +697,10 @@ add_test(NAME dock_slices_tests COMMAND xanatoo_dock_slices_tests)
 add_executable(xanatoo_ui_panel_layers_tests tests/ui_panel_layers_tests.cpp)
 target_include_directories(xanatoo_ui_panel_layers_tests PRIVATE include)
 add_test(NAME ui_panel_layers_tests COMMAND xanatoo_ui_panel_layers_tests)
+add_executable(xanatoo_subscription_tests
+  tests/subscription_tests.cpp src/subscriptions.cpp src/document.cpp)
+target_include_directories(xanatoo_subscription_tests PRIVATE include)
+add_test(NAME subscription_tests COMMAND xanatoo_subscription_tests)
 add_executable(xanatoo_scrollbar_geometry_tests tests/scrollbar_geometry_tests.cpp)
 target_include_directories(xanatoo_scrollbar_geometry_tests PRIVATE include)
 add_test(NAME scrollbar_geometry_tests COMMAND xanatoo_scrollbar_geometry_tests)

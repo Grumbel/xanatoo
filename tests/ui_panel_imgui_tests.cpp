@@ -33,6 +33,15 @@ int main() {
       ImGui::EndChild();
     }
     ImGui::End();
+    ImGui::SetNextWindowPos(ImVec2(20.f, 260.f));
+    ImGui::SetNextWindowSize(ImVec2(220.f, 210.f));
+    if (ImGui::Begin("##subscriptions_panel_body")) {
+      ImGui::TextUnformatted("Subscriptions");
+      if (ImGui::BeginChild("##subscription_results", ImVec2(140.f, 100.f)))
+        ImGui::TextUnformatted("Watched feeds");
+      ImGui::EndChild();
+    }
+    ImGui::End();
     ImGui::SetNextWindowPos(ImVec2(470.f, 240.f));
     ImGui::SetNextWindowSize(ImVec2(220.f, 210.f));
     if (ImGui::Begin("##lemmy_explorer_body")) {
@@ -52,6 +61,7 @@ int main() {
 
   bool parent = false, child = false, chrome = false;
   bool lemmy_parent = false, lemmy_child = false;
+  bool subs_parent = false, subs_child = false;
   const ImDrawData* data = ImGui::GetDrawData();
   assert(data);
   for (int i = 0; i < data->CmdListsCount; ++i) {
@@ -67,10 +77,15 @@ int main() {
       lemmy_parent = layer == xanatoo::UiPanelLayer::LemmyExplorer;
     if (name.find("##lemmy_explorer_body/##lemmy_results_") == 0)
       lemmy_child = layer == xanatoo::UiPanelLayer::LemmyExplorer;
+    if (name == "##subscriptions_panel_body")
+      subs_parent = layer == xanatoo::UiPanelLayer::Subscriptions;
+    if (name.find("##subscriptions_panel_body/##subscription_results_") == 0)
+      subs_child = layer == xanatoo::UiPanelLayer::Subscriptions;
     if (name == "Preferences")
       chrome = layer == xanatoo::UiPanelLayer::Chrome;
   }
-  assert(parent && child && lemmy_parent && lemmy_child && chrome);
+  assert(parent && child && lemmy_parent && lemmy_child &&
+         subs_parent && subs_child && chrome);
 
   // Native z-order can change without the two embedded ImGui windows being
   // focused. Both root and scrollable child must follow the same ordering.

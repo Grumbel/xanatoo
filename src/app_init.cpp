@@ -68,7 +68,9 @@ bool app_init(App& app) {
   for (FloatWindow* w : {&app.help, &app.bl, &app.ol, &app.sm, &app.pg,
                          &app.history_win, &app.styles_win, &app.downloads_win,
                          &app.annotation_win, &app.revision_win,
-                         &app.nostr_explorer_win, &app.nostr_accounts_win}) {
+                         &app.nostr_explorer_win, &app.nostr_accounts_win,
+                         &app.bookmarks_win, &app.subscriptions_win,
+                         &app.lemmy_explorer_win}) {
     w->x = static_cast<int>(std::lround(w->x * app.ui_scale));
     w->y = static_cast<int>(std::lround(w->y * app.ui_scale));
     w->w = static_cast<int>(std::lround(w->w * app.ui_scale));
@@ -79,7 +81,9 @@ bool app_init(App& app) {
   for (FloatWindow* w : {&app.help, &app.bl, &app.ol, &app.sm, &app.pg,
                          &app.history_win, &app.styles_win, &app.downloads_win,
                          &app.annotation_win, &app.revision_win,
-                         &app.nostr_explorer_win, &app.nostr_accounts_win}) {
+                         &app.nostr_explorer_win, &app.nostr_accounts_win,
+                         &app.bookmarks_win, &app.subscriptions_win,
+                         &app.lemmy_explorer_win}) {
     w->restore_x = w->x;
     w->restore_y = w->y;
     w->restore_w = w->w;
@@ -148,6 +152,7 @@ bool app_init(App& app) {
   app.minibuf_hist_path = load_minibuffer_history("path");
   app.minibuf_hist_url = load_minibuffer_history("url");
   app.bookmarks = load_bookmarks();
+  app.subscriptions = load_subscriptions();
   app.annotation_layers = xanatoo::list_annotation_layers();
   xanatoo::load_hidden_annotation_layers(app.hidden_annotation_layers);
   for (const auto& layer : app.annotation_layers)

@@ -1968,6 +1968,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleHistory;
       if (ImGui::MenuItem("Downloads", nullptr, state.downloads_open))
         cmd = UiCommand::ToggleDownloads;
+      if (ImGui::MenuItem("Subscriptions", nullptr, state.subscriptions_open))
+        cmd = UiCommand::ToggleSubscriptions;
       if (ImGui::MenuItem("Style Sheets", nullptr, state.styles_open))
         cmd = UiCommand::ToggleStylesPanel;
       if (ImGui::MenuItem("Annotations", nullptr, state.annotations_panel_open))
@@ -2018,6 +2020,15 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     }
     force_menu("Bookmarks");
     if (ImGui::BeginMenu("Bookmarks")) {
+      if (ImGui::MenuItem(state.current_subscribed ? "Unsubscribe current feed" :
+                          "Subscribe to current feed", nullptr, false,
+                          state.current_subscribed || state.current_subscribable)) {
+        cmd = state.current_subscribed ? UiCommand::Unsubscribe : UiCommand::Subscribe;
+        result.arg = state.subscription_address;
+      }
+      if (ImGui::MenuItem("Show Subscriptions…", nullptr, state.subscriptions_open))
+        cmd = UiCommand::ToggleSubscriptions;
+      ImGui::Separator();
       const char* add_label = state.current_bookmarked ? "Remove Bookmark"
                               : state.selection        ? "Bookmark Selection"
                                                        : "Bookmark This Page";
@@ -2859,6 +2870,135 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     ImGui::End();
   }
 
+  // ---- Subscriptions: changing remote feeds (distinct from static bookmarks) ----
+  if (state.subscriptions_open) {
+    ImGui::SetNextWindowPos(ImVec2(float(state.subscriptions_x + 3),
+                                  float(state.subscriptions_y + 3)));
+    ImGui::SetNextWindowSize(ImVec2(float(std::max(1, state.subscriptions_w - 6)),
+                                   float(std::max(1, state.subscriptions_h - 6))));
+    constexpr ImGuiWindowFlags subscriptions_flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoCollapse;
+    if (ImGui::Begin("##subscriptions_panel_body", nullptr, subscriptions_flags)) {
+      int unread_total = 0;
+      for (const auto& s : state.subscriptions)
+        unread_total += std::min<uint32_t>(s.unread, 9999);
+      ImGui::Text("%zu watched sources", state.subscriptions.size());
+      if (unread_total > 0) {
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(0.18f, 0.40f, 0.75f, 1.f),
+                           "  %d new", unread_total);
+      }
+      ImGui::PushStyleColor(ImGuiCol_Text,
+                            ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+      ImGui::TextWrapped("Lemmy communities/people, Nostr authors/groups, RSS/Atom and more");
+      ImGui::PopStyleColor();
+      ImGui::Separator();
+      if (state.current_subscribable && !state.current_subscribed &&
+          classic_button("Subscribe to current page")) {
+        cmd = UiCommand::Subscribe;
+        result.arg = state.subscription_address;
+      }
+      if (state.current_subscribed && classic_button("Unsubscribe current page")) {
+        cmd = UiCommand::Unsubscribe;
+        result.arg = state.subscription_address;
+      }
+      ImGui::TextUnformatted("Add a feed or community address:");
+      ImGui::SetNextItemWidth(-1.f);
+      ImGui::InputText("##subscription_url", subscription_input_,
+                       sizeof(subscription_input_));
+      if (classic_button("Add subscription")) {
+        cmd = UiCommand::Subscribe;
+        result.arg = subscription_input_;
+      }
+      if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("For example: lemmy:lemmy.world/c/technology,\n"
+                          "nostr:npub1..., or https://example.org/feed.xml");
+      same_line_if_fits("Refresh all");
+      if (classic_button("Refresh all")) cmd = UiCommand::SubscriptionRefresh;
+      ImGui::Separator();
+      if (state.subscriptions.empty()) {
+        ImGui::TextWrapped("No subscriptions yet. Add a source above or navigate "
+                           "to a Lemmy community or Nostr profile and subscribe.");
+      }
+      for (const auto& s : state.subscriptions) {
+        ImGui::PushID(s.address.c_str());
+        const std::string name = s.title.empty() ? s.address : s.title;
+        if (s.unread) {
+          ImGui::TextColored(ImVec4(0.17f, 0.41f, 0.76f, 1.f),
+                             "● %u new", s.unread);
+          ImGui::SameLine();
+        }
+        ImGui::TextWrapped("%s", name.c_str());
+        if (name != s.address) {
+          ImGui::PushStyleColor(ImGuiCol_Text,
+                                ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+          ImGui::TextWrapped("%s", s.address.c_str());
+          ImGui::PopStyleColor();
+        }
+        if (s.pending) {
+          ImGui::TextDisabled("Checking for new content…");
+        } else if (!s.error.empty()) {
+          ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.74f, 0.27f, 0.14f, 1.f));
+          ImGui::TextWrapped("Check failed: %s", s.error.c_str());
+          ImGui::PopStyleColor();
+        } else if (!s.initialized) {
+          ImGui::TextDisabled("Waiting for first successful check");
+        } else {
+          const auto now = static_cast<int64_t>(std::time(nullptr));
+          const int64_t mins = std::max<int64_t>(0, (now - s.checked_at) / 60);
+          if (mins < 60) ImGui::TextDisabled("Last checked %lld min ago",
+                                            static_cast<long long>(mins));
+          else ImGui::TextDisabled("Last checked %lld h ago",
+                                   static_cast<long long>(mins / 60));
+        }
+        if (classic_button("Open")) {
+          cmd = UiCommand::SubscriptionOpen;
+          result.arg = s.address;
+        }
+        same_line_if_fits("Refresh");
+        if (classic_button("Refresh")) {
+          cmd = UiCommand::SubscriptionRefresh;
+          result.arg = s.address;
+        }
+        if (s.unread) {
+          same_line_if_fits("Mark read");
+          if (classic_button("Mark read")) {
+            cmd = UiCommand::SubscriptionMarkRead;
+            result.arg = s.address;
+          }
+        }
+        same_line_if_fits("Remove…");
+        if (subscription_remove_confirm_ == s.address) {
+          if (classic_button("Confirm removal")) {
+            cmd = UiCommand::Unsubscribe;
+            result.arg = s.address;
+            subscription_remove_confirm_.clear();
+          }
+        } else if (classic_button("Remove…")) {
+          subscription_remove_confirm_ = s.address;
+        }
+        static constexpr int intervals[] = {5, 15, 30, 60, 180, 720, 1440};
+        ImGui::SetNextItemWidth(-1.f);
+        std::string frequency = "Every " + std::to_string(s.interval_minutes) + " min";
+        if (ImGui::BeginCombo("##subscription_frequency", frequency.c_str())) {
+          for (int mins : intervals) {
+            std::string option = "Every " + std::to_string(mins) + " min";
+            if (ImGui::Selectable(option.c_str(), mins == s.interval_minutes)) {
+              cmd = UiCommand::SubscriptionInterval;
+              result.arg = s.address + "\n" + std::to_string(mins);
+            }
+          }
+          ImGui::EndCombo();
+        }
+        ImGui::Separator();
+        ImGui::PopID();
+      }
+    }
+    ImGui::End();
+  }
+
   // ---- Independent annotation layers (source documents remain untouched) ----
   if (state.annotations_panel_open) {
     if (annotation_note_created_seen_ != state.annotation_note_created_gen) {
@@ -3124,6 +3264,13 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
               cmd = UiCommand::NavigateUrl;
               result.arg = "nostr:" + nostr_bech32("npub", person.pubkey);
             }
+            if (ImGui::BeginPopupContextItem("##nostr_person_sub")) {
+              if (ImGui::MenuItem("Subscribe to author")) {
+                cmd = UiCommand::Subscribe;
+                result.arg = "nostr:" + nostr_bech32("npub", person.pubkey);
+              }
+              ImGui::EndPopup();
+            }
             if (ImGui::IsItemHovered())
               ImGui::SetTooltip("%s\n%lld unique events observed\n%s\n%s",
                                 person.pubkey.c_str(),
@@ -3173,6 +3320,13 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                                   href.empty() ? ImGuiSelectableFlags_Disabled : 0)) {
               cmd = UiCommand::NavigateUrl;
               result.arg = href;
+            }
+            if (!href.empty() && ImGui::BeginPopupContextItem("##nostr_group_sub")) {
+              if (ImGui::MenuItem("Subscribe to group")) {
+                cmd = UiCommand::Subscribe;
+                result.arg = href;
+              }
+              ImGui::EndPopup();
             }
             if (ImGui::IsItemHovered())
               ImGui::SetTooltip("Group: %s\nRelay: %s\nParent: %s\n%s\n"
@@ -3347,6 +3501,15 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
               cmd = UiCommand::NavigateUrl;
               result.arg = item.ref;
             }
+          }
+          if ((current == LemmyEntryKind::Community ||
+               current == LemmyEntryKind::Person) &&
+              ImGui::BeginPopupContextItem("##lemmy_sub")) {
+            if (ImGui::MenuItem("Subscribe")) {
+              cmd = UiCommand::Subscribe;
+              result.arg = item.ref;
+            }
+            ImGui::EndPopup();
           }
           if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", current == LemmyEntryKind::Instance ?

@@ -333,6 +333,27 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
     ui_state.bookmarks_h = h;
   }
   ui_state.bookmarks = app.bookmarks;
+  ui_state.subscriptions_open = app.subscriptions_panel_open;
+  if (app.subscriptions_panel_open) {
+    auto [x, y, w, h] = float_client_rect(app, app.subscriptions_win);
+    ui_state.subscriptions_x = x;
+    ui_state.subscriptions_y = y;
+    ui_state.subscriptions_w = w;
+    ui_state.subscriptions_h = h;
+  }
+  ui_state.subscriptions.reserve(app.subscriptions.size());
+  for (const auto& s : app.subscriptions)
+    ui_state.subscriptions.push_back({s.address, s.title, s.error,
+                                      s.interval_minutes, s.checked_at,
+                                      s.unread, s.initialized, s.pending_job != 0});
+  ui_state.subscription_address = subscription_source_address(
+      pane_address(app, focused_pane(app)));
+  ui_state.current_subscribable = subscribable_source(ui_state.subscription_address) &&
+                                  remote_fetch_supported(ui_state.subscription_address, nullptr);
+  ui_state.current_subscribed = std::any_of(app.subscriptions.begin(),
+      app.subscriptions.end(), [&](const auto& s) {
+        return s.address == ui_state.subscription_address;
+      });
   ui_state.annotations_panel_open = app.annotation_panel_open;
   ui_state.revisions_panel_open = app.revision_panel_open;
   ui_state.nostr_explorer_open = app.nostr_explorer_open;
@@ -570,6 +591,10 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::NavJump ||
         c == C::GoHome || c == C::GoUp ||
         c == C::ToggleHistory || c == C::ToggleDownloads || c == C::ToggleBookmarks ||
+        c == C::ToggleSubscriptions || c == C::Subscribe ||
+        c == C::Unsubscribe || c == C::SubscriptionOpen ||
+        c == C::SubscriptionMarkRead || c == C::SubscriptionRefresh ||
+        c == C::SubscriptionInterval ||
         c == C::ToggleAnnotationsPanel || c == C::ToggleRevisionsPanel ||
         c == C::ToggleNostrExplorer || c == C::ToggleNostrAccounts ||
         c == C::ToggleLemmyExplorer || c == C::LemmySetTab ||
@@ -944,6 +969,34 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::ToggleBookmarks:
       app.bookmarks_panel_open = !app.bookmarks_panel_open;
       break;
+    case C::ToggleSubscriptions:
+      app.subscriptions_panel_open = !app.subscriptions_panel_open;
+      break;
+    case C::Subscribe:
+      add_subscription(app, arg.empty() ? parse_locator(pane_address(app, p)).base : arg);
+      break;
+    case C::Unsubscribe:
+      remove_subscription(app, arg);
+      break;
+    case C::SubscriptionOpen:
+      open_subscription(app, arg);
+      break;
+    case C::SubscriptionMarkRead:
+      mark_subscription_read(app, arg);
+      break;
+    case C::SubscriptionRefresh:
+      request_subscription_refresh(app, arg);
+      break;
+    case C::SubscriptionInterval: {
+      const size_t newline = arg.find('\n');
+      if (newline != std::string::npos) {
+        const std::string minutes = arg.substr(newline + 1);
+        try {
+          set_subscription_interval(app, arg.substr(0, newline), std::stoi(minutes));
+        } catch (const std::exception&) {}  // malformed command, no change
+      }
+      break;
+    }
     case C::ToggleAnnotationsPanel:
       app.annotation_panel_open = !app.annotation_panel_open;
       break;
@@ -4259,6 +4312,7 @@ void run_frame(App& app) {
   update_touch(app);
   sync_nav_history(app);  // capture scroll before a completed fetch swaps pages
   poll_fetches(app);
+  poll_subscriptions(app);
   sync_nav_history(app);  // apply Back/Forward restore after remote loads
   autosave_drafts(app);
   autosave_session(app);

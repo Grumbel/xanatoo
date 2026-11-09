@@ -7,6 +7,7 @@
 #include "xanatoo/nostr_store.hpp"
 #include "xanatoo/lemmy_directory.hpp"
 #include "xanatoo/style.hpp"
+#include "xanatoo/subscriptions.hpp"
 #include "xanatoo/ui_panel_layers.hpp"
 #include <string>
 #include <optional>
@@ -40,6 +41,13 @@ enum class UiCommand {
   BookmarkPosition,  // bookmark the caret position in the page
   RemoveBookmark,  // remove current (or arg) from bookmarks
   ToggleBookmarks, // Bookmarks manager panel
+  ToggleSubscriptions, // watched feeds / communities / accounts
+  Subscribe, // add a source by address (empty = current page)
+  Unsubscribe, // remove subscription by address
+  SubscriptionOpen, // open and mark read
+  SubscriptionMarkRead, // mark read without opening
+  SubscriptionRefresh, // force a fetch now (empty = all)
+  SubscriptionInterval, // address + newline + integer minutes
   ToggleAnnotationsPanel, // annotation layer visibility / selection
   ToggleRevisionsPanel,  // native database document revision browser
   ToggleNostrExplorer, // local relay event / pubkey catalogue
@@ -399,6 +407,22 @@ struct UiState {
   } bookmark_menu;
   // Persistent bookmarks for the Bookmarks menu / panel.
   std::vector<Bookmark> bookmarks;
+  bool subscriptions_open = false;
+  int subscriptions_x = 0, subscriptions_y = 0;
+  int subscriptions_w = 0, subscriptions_h = 0;
+  bool current_subscribable = false;
+  bool current_subscribed = false;
+  std::string subscription_address;
+  // Excludes the potentially large per-source recent-ID snapshots; the UI
+  // needs only status data, not the change-detection state.
+  struct SubscriptionItem {
+    std::string address, title, error;
+    int interval_minutes = 15;
+    int64_t checked_at = 0;
+    uint32_t unread = 0;
+    bool initialized = false, pending = false;
+  };
+  std::vector<SubscriptionItem> subscriptions;
   SDL_Texture* location_icon = nullptr;
   std::vector<SDL_Texture*> bookmark_icons;
   // Tab strip (labels left→right); active_tab is index into tab_labels.
@@ -525,6 +549,8 @@ private:
   int url_context_end_ = 0;
   int url_context_cursor_ = 0;
   char search_input_[512] = {};  // search bar text (kept between searches)
+  char subscription_input_[1024] = {};
+  std::string subscription_remove_confirm_;
   char nostr_local_search_[512] = {};
   char nostr_group_relay_[512] = {};
   char lemmy_search_input_[256] = {};

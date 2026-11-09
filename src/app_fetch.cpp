@@ -536,7 +536,7 @@ uint64_t start_fetch(App& app, FetchPurpose purpose, int pane,
   job.buf = tab_buf;
   job.started = xanatoo::sdl::ticks();
   job.shared = std::make_shared<FetchShared>();
-  if (purpose != FetchPurpose::Preview) {
+  if (purpose != FetchPurpose::Preview && purpose != FetchPurpose::Subscription) {
     job.shared->download = std::make_shared<xanatoo::DownloadProgress>();
     job.shared->download->url = url;
     app.downloads.push_back(job.shared->download);
@@ -544,11 +544,13 @@ uint64_t start_fetch(App& app, FetchPurpose purpose, int pane,
   // There is no pthread runtime in the initial browser build. Its network
   // services are disabled, so resolve unsupported fetches synchronously.
 #ifdef __EMSCRIPTEN__
-  fetch_page(url, job.shared, purpose != FetchPurpose::Preview);
+  fetch_page(url, job.shared, purpose != FetchPurpose::Preview &&
+                              purpose != FetchPurpose::Subscription);
 #else
   // Detached: a cancelled job just finishes into its (orphaned) shared state.
   std::thread(fetch_page, url, job.shared,
-              purpose != FetchPurpose::Preview).detach();
+              purpose != FetchPurpose::Preview &&
+              purpose != FetchPurpose::Subscription).detach();
 #endif
   app.fetches.push_back(std::move(job));
   return app.fetches.back().id;
@@ -581,7 +583,9 @@ void poll_fetches(App& app) {
     if (job.shared->download && job.shared->download->phase.load() ==
                                     xanatoo::DownloadPhase::Pending)
       job.shared->download->phase.store(xanatoo::DownloadPhase::Skipped);
-    if (job.purpose == FetchPurpose::Navigate) {
+    if (job.purpose == FetchPurpose::Subscription) {
+      finish_subscription_fetch(app, job);
+    } else if (job.purpose == FetchPurpose::Navigate) {
       finish_navigate(app, job);
     } else if (job.purpose == FetchPurpose::Tab) {
       finish_tab(app, job);
@@ -644,6 +648,7 @@ void cancel_preview_fetch(App& app) {
 const FetchJob* pane_fetch(const App& app, int pi) {
   const FetchJob* preview = nullptr;
   for (const FetchJob& j : app.fetches) {
+    if (j.purpose == FetchPurpose::Subscription) continue;
     if (j.pane != pi) continue;
     if (j.purpose == FetchPurpose::Navigate) return &j;
     preview = &j;

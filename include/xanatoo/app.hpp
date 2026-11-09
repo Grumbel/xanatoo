@@ -39,6 +39,7 @@
 #include "xanatoo/ui.hpp"
 #include "xanatoo/tile_tree.hpp"
 #include "xanatoo/tls.hpp"
+#include "xanatoo/subscriptions.hpp"
 #include "xanatoo/view_settings.hpp"
 
 // Application world: plain data (App + the records below) and free-function
@@ -270,7 +271,8 @@ enum class Dock : uint8_t { None = 0, Left, Right, Top, Bottom, Max };
 
 enum class WindowRole : uint8_t {
   Help, Outline, Backlinks, Sitemap, Page, History, Styles, Bookmarks, Downloads, Reply,
-  Annotations, Revisions, NostrExplorer, NostrAccounts, LemmyExplorer, Document
+  Annotations, Revisions, NostrExplorer, NostrAccounts, LemmyExplorer,
+  Subscriptions, Document
 };
 
 inline UiPanelLayer embedded_panel_layer(WindowRole role) {
@@ -278,6 +280,7 @@ inline UiPanelLayer embedded_panel_layer(WindowRole role) {
     case WindowRole::Styles: return UiPanelLayer::Styles;
     case WindowRole::Reply: return UiPanelLayer::Reply;
     case WindowRole::Bookmarks: return UiPanelLayer::Bookmarks;
+    case WindowRole::Subscriptions: return UiPanelLayer::Subscriptions;
     case WindowRole::Annotations: return UiPanelLayer::Annotations;
     case WindowRole::NostrExplorer: return UiPanelLayer::NostrExplorer;
     case WindowRole::NostrAccounts: return UiPanelLayer::NostrAccounts;
@@ -442,6 +445,7 @@ enum class FetchPurpose : uint8_t {
   Navigate,  // show in `pane` when done
   Preview,   // split-pane hover preview: goes to the page cache
   Tab,       // fill the stand-in buffer `buf` of a background tab
+  Subscription, // check a watched source without opening/altering its view
 };
 
 // Written by the worker, read by the main thread once `done` is set.
@@ -774,6 +778,9 @@ struct App {
   // Back / Forward use each view's own `Pane::nav`.
   std::vector<std::string> visited;
   std::vector<xanatoo::Bookmark> bookmarks;
+  std::vector<xanatoo::Subscription> subscriptions;
+  bool subscriptions_panel_open = false;
+  int64_t next_subscription_auto_at = 0;
   std::vector<xanatoo::AnnotationLayer> annotation_layers;
   std::unordered_set<std::string> hidden_annotation_layers;
   std::string active_annotation_layer;
@@ -876,6 +883,7 @@ struct App {
   FloatWindow history_win = make_float_panel(WindowRole::History, 100, 130, 440, 360);
   FloatWindow styles_win = make_float_panel(WindowRole::Styles, 140, 100, 700, 560);
   FloatWindow bookmarks_win = make_float_panel(WindowRole::Bookmarks, 130, 145, 460, 400);
+  FloatWindow subscriptions_win = make_float_panel(WindowRole::Subscriptions, 170, 155, 590, 480);
   FloatWindow downloads_win = make_float_panel(WindowRole::Downloads, 120, 160, 520, 380);
   FloatWindow reply_win = make_float_panel(WindowRole::Reply, 170, 170, 490, 350);
   FloatWindow annotation_win = make_float_panel(WindowRole::Annotations, 150, 110, 430, 540);
@@ -1356,6 +1364,17 @@ uint64_t start_fetch(App& app, FetchPurpose purpose, int pane,
                      BufferId tab_buf = kNoBuffer);
 // Apply finished jobs (once per frame).
 void poll_fetches(App& app);
+// Subscriptions use the same read-only fetch workers, never a pane or tab.
+bool subscribable_source(std::string_view address);
+std::string subscription_source_address(std::string_view address);
+void add_subscription(App& app, std::string address);
+void remove_subscription(App& app, const std::string& address);
+void open_subscription(App& app, const std::string& address);
+void mark_subscription_read(App& app, const std::string& address);
+void request_subscription_refresh(App& app, const std::string& address = {});
+void set_subscription_interval(App& app, const std::string& address, int minutes);
+void poll_subscriptions(App& app);
+void finish_subscription_fetch(App& app, const FetchJob& job);
 // Drop pane `pi`'s running navigation (-1: all navigations). True if any.
 bool cancel_fetches(App& app, int pi = -1);
 void cancel_preview_fetch(App& app);

@@ -6,7 +6,28 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **334** (this delivery is **333**)
+Next bundle number: **335** (this delivery is **334**)
+
+## Status (2026-11-09) — Subscriptions panel
+
+- Native dockable Subscriptions panel shares the Bookmarks window geometry,
+  ImGui stacking, session restoration and Clearlooks-style controls. The
+  Bookmarks menu can add/remove the current changing source. The panel accepts
+  manually entered Lemmy communities/users, Nostr accounts/groups, RSS/Atom,
+  Reddit and Hacker News lists, with Open, refresh one/all, mark read, remove
+  confirmation and per-source refresh intervals.
+- Reused the existing read-only background fetch path with a dedicated
+  `FetchPurpose::Subscription`, so checks never navigate a pane or trigger a
+  download. Checks are bounded to two concurrent jobs; automatic starts are
+  throttled to one every five seconds. First successful check sets baseline;
+  subsequent checks compare up to 256 stable post/event/permalink keys and
+  retain unread counts until opened or marked read. Network errors preserve
+  the previous baseline and show in the panel.
+- Atomic persistence in `subscriptions.txt` tracks watched addresses, titles,
+  intervals, checked timestamps, unread counts and latest item IDs. Separate
+  pure C++ tests cover change counting, reordering, refresh scheduling,
+  persistence and `--no-save` semantics. Full SDL/Nix builds and native panel
+  visual tests remain pending on a NixOS host.
 
 ## Status (2026-11-09) — Clearlooks-style GUI polish
 
