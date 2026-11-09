@@ -6,7 +6,17 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **326** (this delivery is **325**)
+Next bundle number: **327** (this delivery is **326**)
+
+## Status (2026-11-09) — Gemini certificate type include fix
+
+- `app.hpp` owns an `std::optional<TlsPeerCertificate>` in the background
+  fetch state, so it now directly includes `tls.hpp`. Previously translation
+  units such as `app_nav.cpp` that included `app.hpp` before `gemini.hpp`
+  failed because the complete certificate type was not declared yet.
+- TLS's public header has no OpenSSL or Mbed TLS includes; this change is
+  independent of the configured network backend. Full Nix/SDL compilation
+  is still pending on the native development environment.
 
 ## Status (2026-11-09) — embedded panel paint ordering
 

@@ -38,6 +38,7 @@
 #include "xanatoo/types.hpp"
 #include "xanatoo/ui.hpp"
 #include "xanatoo/tile_tree.hpp"
+#include "xanatoo/tls.hpp"
 #include "xanatoo/view_settings.hpp"
 
 // Application world: plain data (App + the records below) and free-function
