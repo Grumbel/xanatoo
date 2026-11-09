@@ -6,7 +6,16 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **312** (this delivery is **311**)
+Next bundle number: **313** (this delivery is **312**)
+
+## Status (2026-11-09) — Nostr Explorer build corrections
+
+- Corrected the Events-tab label expression in `ui.cpp`: start the label
+  with a `std::string` before appending the literal `"kind "`.
+- Corrected `app_fetch.cpp`'s Nostr completion check: compare the service
+  name as text (`std::string_view`) rather than comparing two pointers.
+- Both changes address diagnostics from the user's native SDL3 Debug build;
+  a full GUI rebuild still needs to be confirmed on that NixOS setup.
 
 ## Status (2026-11-09) — NIP-29 relay-group catalogue and discovery
 

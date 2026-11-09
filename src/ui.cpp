@@ -2777,7 +2777,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
             std::string summary = ev.content;
             for (char& c : summary) if (c == '\n' || c == '\r') c = ' ';
             if (summary.size() > 110) summary = summary.substr(0, 110) + "…";
-            const std::string label = (ev.verification == 2 ? "[sig] " : "[hash] ") +
+            const std::string label = std::string(ev.verification == 2 ? "[sig] " : "[hash] ") +
                 "kind " + std::to_string(ev.kind) +
                 " · " + name + " · " + summary;
             if (ImGui::Selectable(label.c_str(), false,
