@@ -328,7 +328,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.lemmy_instance = app.lemmy_instance;
   ui_state.lemmy_sort = app.lemmy_sort;
   ui_state.lemmy_instance_only = app.lemmy_instance_only;
-  ui_state.lemmy_supported = remote_fetch_supported("lemmy:lemmy.world/c/technology");
+  ui_state.lemmy_supported = remote_fetch_supported("lemmy:lemmy.world/c/technology", nullptr);
   if (app.lemmy_explorer_open) {
     auto [x, y, w, h] = float_client_rect(app, app.lemmy_explorer_win);
     ui_state.lemmy_explorer_x = x;

@@ -6,7 +6,13 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **329** (this delivery is **328**)
+Next bundle number: **330** (this delivery is **329**)
+
+## Status (2026-11-09) — Lemmy Explorer build fix
+
+- Corrected `build_ui_state` to pass an explicit null diagnostic pointer to
+  `remote_fetch_supported`, which requires two arguments. Previously this
+  prevented `src/app_frame.cpp` from compiling in Lemmy-enabled builds.
 
 ## Status (2026-11-09) — Lemmy Explorer and instance discovery
 
