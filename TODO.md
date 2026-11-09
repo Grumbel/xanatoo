@@ -6,7 +6,18 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **336** (this delivery is **335**)
+Next bundle number: **337** (this delivery is **336**)
+
+## Status (2026-11-10) — raised toolbar hover correction
+
+- Removed the blue hover background that made toolbar controls look selected
+  or sunken. At rest they remain transparent; hovering gives a neutral light
+  face, rounded frame, and the same inset top-left highlight / bottom-right
+  shadow as raised panel buttons. Press reverses the inset bevel and darkens
+  the face, making its state visually distinct from hover.
+- The inset bevel helper is shared between ordinary always-raised buttons and
+  hover-only toolbar controls, retaining the corner-safe geometry introduced
+  in bundle 335. Full SDL/Nix visual verification is still pending.
 
 ## Status (2026-11-10) — Clearlooks toolbar/scrollbar follow-up
 

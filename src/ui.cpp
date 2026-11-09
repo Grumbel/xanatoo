@@ -91,16 +91,19 @@ int push_toolbar_button_style() {
     return ImVec4(c.r / 255.f, c.g / 255.f, c.b / 255.f, alpha);
   };
   ImGui::PushStyleColor(ImGuiCol_Button, color(p.face_light, 0.f));
-  ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color(p.accent_soft));
+  // Neutral light face reads as raised; blue suggested a selected/pressed tab.
+  ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color(p.face_light));
   ImGui::PushStyleColor(ImGuiCol_ButtonActive, color(p.face_dark));
   ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
   ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, s.FrameRounding);
   return 3;
 }
 
-// Only the hovered toolbar item gets a raised outline. ImGui draws the rounded
-// face itself; the extra outline follows its radius instead of cutting across
-// its corners with square, overlapping pixel lines.
+void draw_button_inner_bevel();
+
+// Only hovered/pressed toolbar items get a raised face. The round outline and
+// light top-left / dark bottom-right inset establish the raised direction;
+// pressing reverses those edges instead of relying on a blue hover fill.
 void draw_toolbar_hover_face() {
   if (!ImGui::IsItemHovered() && !ImGui::IsItemActive()) return;
   const bool pressed = ImGui::IsItemActive();
@@ -115,11 +118,12 @@ void draw_toolbar_hover_face() {
       ImVec2(max.x - 0.5f, max.y - 0.5f),
       IM_COL32(edge.r, edge.g, edge.b, alpha),
       ImGui::GetStyle().FrameRounding);
+  draw_button_inner_bevel();
 }
 
-// Classic action buttons stay raised at rest. Restrict the bevel highlight to
-// the *inside* of ImGui's rounded frame, avoiding its four curved corners.
-void draw_regular_button_highlight() {
+// Keep the bevel inside ImGui's rounded frame so the highlight and shadow
+// lines do not cut across the corners. Regular buttons show this at rest too.
+void draw_button_inner_bevel() {
   const ImVec2 min = ImGui::GetItemRectMin();
   const ImVec2 max = ImGui::GetItemRectMax();
   if (max.x - min.x < 12.f || max.y - min.y < 12.f) return;
@@ -147,7 +151,7 @@ void draw_regular_button_highlight() {
 // rather than mixing ImGui's small (zero vertical padding) and regular buttons.
 bool classic_button(const char* label, const ImVec2& size = ImVec2(0.f, 0.f)) {
   const bool clicked = ImGui::Button(label, size);
-  draw_regular_button_highlight();
+  draw_button_inner_bevel();
   return clicked;
 }
 
