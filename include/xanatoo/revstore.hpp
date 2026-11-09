@@ -102,6 +102,25 @@ struct StoredDocument {
   int64_t time = 0;
 };
 
+// Provenance of a document imported from a file or fetched page. The first
+// snapshot is immutable, including the exact original source bytes. Reopening
+// the source can locate the local working copy through `source`.
+struct DocumentOrigin {
+  std::string key;
+  std::string source;    // canonical file:<path> or source URL
+  std::string revision;  // immutable original document tree (S-expression)
+  std::string raw;       // content id of exact source bytes
+};
+
+std::optional<DocumentOrigin> find_document_origin(std::string_view key);
+std::optional<StoredDocument> find_imported_document(std::string_view source);
+// Idempotent by source. A later fetch/open cannot replace the first original
+// or silently overwrite an existing working copy.
+std::optional<StoredDocument> import_stored_document(
+    std::string_view source, std::string_view original_bytes,
+    std::string_view original_document, std::string_view working_document,
+    std::string_view title);
+
 std::optional<StoredDocument> find_stored_document(std::string_view key);
 std::vector<StoredDocument> list_stored_documents();
 

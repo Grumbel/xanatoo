@@ -136,6 +136,12 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.can_publish =
       (focused_path.empty() || is_stored_document_ref(focused_path)) &&
       !buf(app, focused_pane(app).buf).placeholder;
+  std::error_code source_ec;
+  ui_state.can_make_local_copy =
+      (is_stored_original_ref(focused_path) ||
+       is_in_app_remote_url(focused_path) ||
+       fs::is_regular_file(focused_path, source_ec)) &&
+      !buf(app, focused_pane(app).buf).placeholder;
   ui_state.has_path = !path_of(app, focused_pane(app)).empty();
   ui_state.split = app.split;
   ui_state.loading = std::any_of(
@@ -495,7 +501,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::BookmarkPosition || c == C::NewTab ||
         c == C::CloseTab || c == C::NextTab || c == C::PrevTab ||
         c == C::SelectTab || c == C::PopOut || c == C::PopIn || c == C::Save ||
-        c == C::Publish ||
+        c == C::Publish || c == C::EditLocalCopy || c == C::ViewOriginal ||
         c == C::SaveAs || c == C::ExportSexpr || c == C::ExportXml ||
         c == C::ExportMarkdown ||
         c == C::Reload || c == C::ForceReload || c == C::OpenDrafts ||
@@ -1022,48 +1028,32 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         flash_status(app, "Source view is read-only — return to the document to save");
         break;
       }
-      std::string& spath = path_of(app, p);
-      if (spath.empty() || is_stored_document_ref(spath)) {
-        if (save_stored_buffer(app, p.buf)) {
-          app.discard_armed = false;
-          flash_status(app, "Saved working document in local database");
-        } else {
-          flash_status(app, "Could not save working document in local database");
-        }
-      } else if (app.invalid_xml_paths.contains(spath)) {
+      const std::string spath = path_of(app, p);
+      if (app.invalid_xml_paths.contains(spath)) {
         flash_status(app, "Invalid XML is read-only — fix the file and reload");
-      } else if (xanatoo::path_uses_html(spath) || is_in_app_remote_url(spath)) {
-        // HTML is imported one way: writing Markdown over it would destroy
-        // the original, and a URL is not a file.
-        std::string stem =
-            fs::path(spath.substr(0, spath.find_first_of("?#"))).stem().string();
-        if (is_in_app_remote_url(spath))  // into the current directory
-          open_prompt(app, PromptKind::SaveAs,
-                      (stem.empty() ? std::string("page") : stem) + ".md");
-        else
-          open_prompt(app, PromptKind::SaveAs,
-                      fs::path(spath).replace_extension(".md").string());
-        flash_status(app, "Read-only page — save an editable Markdown copy");
+      } else if (make_stored_copy(app, p.buf) &&
+                 save_stored_buffer(app, focused_pane(app).buf)) {
+        app.discard_armed = false;
+        flash_status(app, "Saved working document in local database");
       } else {
-        std::string text;
-        try {
-          text = xanatoo::serialize_document(buf(app, p.buf).doc, spath);
-        } catch (const std::invalid_argument& e) {
-          std::cerr << "Cannot save " << spath << ": " << e.what() << "\n";
-          flash_status(app, e.what());
-          break;
-        }
-        std::ofstream out(spath);
-        if (out) {
-          out << text;
-          buf(app, p.buf).dirty = false;
-          note_saved(app, p.buf, text);
-          app.discard_armed = false;
-          update_title(app);
-          flash_status(app, "Saved " + spath);
-          std::cout << "Saved: " << spath << "\n";
-        }
+        flash_status(app, "Could not save to local database; original was not changed");
       }
+      break;
+    }
+    case C::EditLocalCopy:
+      if (make_stored_copy(app, p.buf))
+        flash_status(app, "Editing local database copy; original preserved");
+      else
+        flash_status(app, "Could not make local copy; original preserved");
+      break;
+    case C::ViewOriginal: {
+      const std::string path = path_of(app, p);
+      if (is_stored_document_ref(path) &&
+          find_document_origin(path.substr(3)) &&
+          navigate_pane(app, app.focus, "db-original:" + path.substr(3)))
+        flash_status(app, "Viewing immutable original; Back returns to working copy");
+      else
+        flash_status(app, "This document has no imported original");
       break;
     }
     case C::Publish:
@@ -1077,12 +1067,20 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         flash_status(app, "Only database-native documents can be published locally");
       }
       break;
-    case C::SaveAs:
-      open_prompt(app, PromptKind::SaveAs,
-                  (path_of(app, p).empty() ||
-                   is_stored_document_ref(path_of(app, p)))
-                      ? "untitled.md" : path_of(app, p));
+    case C::SaveAs: {
+      const std::string path = path_of(app, p);
+      std::string suggested = "untitled.md";
+      if (is_in_app_remote_url(path)) {
+        suggested = "page.md";
+      } else if (!path.empty() && !is_stored_document_ref(path) &&
+                 !is_stored_original_ref(path)) {
+        const fs::path fp(path);
+        suggested = (fp.parent_path() /
+                     (fp.stem().string() + "-export.md")).string();
+      }
+      open_prompt(app, PromptKind::SaveAs, std::move(suggested));
       break;
+    }
     case C::ExportSexpr:
     case C::ExportXml:
     case C::ExportMarkdown: {
@@ -1091,13 +1089,14 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       const char* ext = as_sexp ? ".sexp" : as_xml ? ".xml" : ".md";
       std::string cur = path_of(app, p);
       std::string target;
-      if (cur.empty() || is_stored_document_ref(cur)) {
+      if (cur.empty() || is_stored_document_ref(cur) ||
+          is_stored_original_ref(cur) || is_in_app_remote_url(cur)) {
         target = std::string("untitled") + ext;
       } else {
         std::filesystem::path fp(cur);
-        target = fp.stem().string() + ext;
+        target = fp.stem().string() + "-export" + ext;
         if (fp.has_parent_path() && !fp.parent_path().empty())
-          target = (fp.parent_path() / (fp.stem().string() + ext)).string();
+          target = (fp.parent_path() / (fp.stem().string() + "-export" + ext)).string();
       }
       open_prompt(app, PromptKind::SaveAs, std::move(target));
       break;
@@ -1121,6 +1120,12 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
           flash_status(app, "Could not reload local document");
         else
           flash_status(app, "Reloaded local working revision");
+        break;
+      }
+      if (is_stored_original_ref(rpath)) {
+        const std::string stable_ref = rpath;
+        if (!open_stored_original(app, app.focus, stable_ref))
+          flash_status(app, "Could not reload immutable original");
         break;
       }
       if (rpath == kAboutPage) {

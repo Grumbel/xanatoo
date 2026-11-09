@@ -78,7 +78,12 @@ sqlite3* db() {
       // autosaved working state and a deliberately published snapshot.
       "CREATE TABLE IF NOT EXISTS document_heads ("
       "  key TEXT PRIMARY KEY, working TEXT NOT NULL, published TEXT,"
-      "  title TEXT NOT NULL DEFAULT '', time INTEGER NOT NULL);";
+      "  title TEXT NOT NULL DEFAULT '', time INTEGER NOT NULL);"
+      // An immutable imported source is never a working revision. Its raw
+      // bytes and parsed tree survive later source changes or disappearance.
+      "CREATE TABLE IF NOT EXISTS document_origins ("
+      "  key TEXT PRIMARY KEY, source TEXT NOT NULL UNIQUE,"
+      "  original TEXT NOT NULL, raw TEXT NOT NULL);";
   if (path.empty() || sqlite3_open(path.c_str(), &g_db) != SQLITE_OK ||
       sqlite3_exec(g_db, schema, nullptr, nullptr, nullptr) != SQLITE_OK) {
     if (g_db) sqlite3_close(g_db);
@@ -411,6 +416,61 @@ std::optional<StoredDocument> find_stored_document(std::string_view key) {
   return d && native_document_key(key) ? stored_head(d, key) : std::nullopt;
 }
 
+std::optional<DocumentOrigin> find_document_origin(std::string_view key) {
+  sqlite3* d = db();
+  if (!d || !native_document_key(key)) return std::nullopt;
+  Stmt s(d, "SELECT key, source, original, raw FROM document_origins "
+            "WHERE key = ?;", {key});
+  if (!s.row()) return std::nullopt;
+  return DocumentOrigin{s.text(0), s.text(1), s.text(2), s.text(3)};
+}
+
+std::optional<StoredDocument> find_imported_document(std::string_view source) {
+  sqlite3* d = db();
+  if (!d || source.empty()) return std::nullopt;
+  Stmt s(d, "SELECT key FROM document_origins WHERE source = ?;", {source});
+  return s.row() ? stored_head(d, s.text(0)) : std::nullopt;
+}
+
+std::optional<StoredDocument> import_stored_document(
+    std::string_view source, std::string_view original_bytes,
+    std::string_view original_document, std::string_view working_document,
+    std::string_view title) {
+  sqlite3* d = db();
+  if (!d || source.empty()) return std::nullopt;
+  Txn txn(d);
+  if (!txn.started) return std::nullopt;
+  // First import wins. Never replace a known original or an edited working
+  // head with a later fetch of the same URL or file path.
+  Stmt previous(d, "SELECT key FROM document_origins WHERE source = ?;",
+                {source});
+  if (previous.row()) {
+    auto current = stored_head(d, previous.text(0));
+    return txn.commit() ? current : std::nullopt;
+  }
+  const std::string key = new_doc_key();
+  const int64_t now = static_cast<int64_t>(std::time(nullptr));
+  const std::string raw_cid = content_id(original_bytes);
+  const std::string body_cid = content_id(original_document);
+  const std::string working_cid = content_id(working_document);
+  if (!put_object(d, raw_cid, original_bytes) ||
+      !put_object(d, body_cid, original_document) ||
+      !put_object(d, working_cid, working_document)) return std::nullopt;
+  const std::string original = put_revision(d, key, {}, body_cid,
+                                            "original", now);
+  const std::string working = put_revision(d, key, original, working_cid,
+                                           "working", now);
+  if (original.empty() || working.empty()) return std::nullopt;
+  Stmt head(d, "INSERT INTO document_heads(key,working,title,time) "
+               "VALUES(?,?,?,CAST(? AS INTEGER));",
+            {key, working, title, std::to_string(now)});
+  Stmt origin(d, "INSERT INTO document_origins(key,source,original,raw) "
+                 "VALUES(?,?,?,?);", {key, source, original, raw_cid});
+  if (!head.run() || !origin.run()) return std::nullopt;
+  if (!txn.commit()) return std::nullopt;
+  return StoredDocument{key, std::string(title), working, {}, now};
+}
+
 std::vector<StoredDocument> list_stored_documents() {
   sqlite3* d = db();
   if (!d) return {};
@@ -510,7 +570,8 @@ std::optional<std::string> load_stored_document_revision(
   if (!native_document_key(key) || revision.empty()) return std::nullopt;
   const auto record = load_object_revision(revision);
   if (!record || record->key != key ||
-      (record->kind != "working" && record->kind != "published"))
+      (record->kind != "working" && record->kind != "published" &&
+       record->kind != "original"))
     return std::nullopt;
   return record->data;
 }
@@ -538,6 +599,17 @@ std::string commit_object_revision(std::string_view, std::string_view,
   return {};
 }
 std::optional<StoredDocument> find_stored_document(std::string_view) {
+  return std::nullopt;
+}
+std::optional<DocumentOrigin> find_document_origin(std::string_view) {
+  return std::nullopt;
+}
+std::optional<StoredDocument> find_imported_document(std::string_view) {
+  return std::nullopt;
+}
+std::optional<StoredDocument> import_stored_document(
+    std::string_view, std::string_view, std::string_view, std::string_view,
+    std::string_view) {
   return std::nullopt;
 }
 std::vector<StoredDocument> list_stored_documents() { return {}; }

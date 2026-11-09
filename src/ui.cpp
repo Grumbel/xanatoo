@@ -1756,7 +1756,11 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Save", UiCommand::Save, cmd, true, "Ctrl+S");
       menu_item_cmd("Publish locally", UiCommand::Publish, cmd,
                     state.can_publish);
-      menu_item_cmd("Save As…", UiCommand::SaveAs, cmd, true, "Ctrl+Shift+S");
+      menu_item_cmd("Edit local copy", UiCommand::EditLocalCopy, cmd,
+                    state.can_make_local_copy);
+      menu_item_cmd("View original", UiCommand::ViewOriginal, cmd,
+                    state.can_publish);
+      menu_item_cmd("Export a copy…", UiCommand::SaveAs, cmd, true, "Ctrl+Shift+S");
       menu_item_cmd("Export as S-expression…", UiCommand::ExportSexpr, cmd, true);
       menu_item_cmd("Export as XML (experimental)…", UiCommand::ExportXml, cmd, true);
       menu_item_cmd("Export as Markdown…", UiCommand::ExportMarkdown, cmd, true);

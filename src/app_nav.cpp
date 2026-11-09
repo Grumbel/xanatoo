@@ -320,6 +320,27 @@ void open_link_in_tab(App& app, int pi, const std::string& href) {
         flash_status(app, "Use File → Local documents to open the index");
         return;
       }
+      if (is_stored_original_ref(path)) {
+        const std::string key = path.substr(12);
+        const auto origin = xanatoo::find_document_origin(key);
+        const auto body = origin ? xanatoo::load_stored_document_revision(
+                                       key, origin->revision)
+                                 : std::nullopt;
+        if (!body) {
+          flash_status(app, "Original source snapshot not found");
+          return;
+        }
+        bi = find_buffer(app, path);
+        if (bi == kNoBuffer)
+          bi = add_buffer(app, xanatoo::parse_sexpr(*body), path);
+        break;
+      }
+      std::error_code source_ec;
+      if (fs::is_regular_file(path, source_ec)) {
+        if (const auto saved = xanatoo::find_imported_document(
+                xanatoo::file_doc_key(path)))
+          path = "db:" + saved->key;
+      }
       if (is_stored_document_ref(path)) {
         const auto head = xanatoo::find_stored_document(path.substr(3));
         const auto body = head ? xanatoo::load_stored_document_revision(
@@ -360,6 +381,27 @@ void open_link_in_tab(App& app, int pi, const std::string& href) {
       break;
     }
     case LinkKind::Remote: {
+      if (const auto stored = xanatoo::find_imported_document(t.url)) {
+        const std::string ref = "db:" + stored->key;
+        bi = find_buffer(app, ref);
+        if (bi == kNoBuffer) {
+          const auto body = xanatoo::load_stored_document_revision(
+              stored->key, stored->working);
+          if (!body) {
+            flash_status(app, "Local document not found");
+            return;
+          }
+          bi = add_buffer(app, xanatoo::parse_sexpr(*body), ref);
+          DocBuffer& b = buf(app, bi);
+          b.doc_key = stored->key;
+          b.stored_working = stored->working;
+          b.stored_published = stored->published;
+          b.stored_title = stored->title;
+          b.base_id = xanatoo::content_id(
+              xanatoo::serialize_document(b.doc, {}));
+        }
+        break;
+      }
       std::string why;
       if (!remote_fetch_supported(t.url, &why)) {
         flash_status(app, why);
@@ -456,7 +498,8 @@ bool navigate_pane(App& app, int pi, std::string target, bool record_history,
     p.nav.pending_link = std::move(via);
   }
   if (xanatoo::starts_with(target, "draft:") ||
-      target == kDocumentsPage || is_stored_document_ref(target))
+      target == kDocumentsPage || is_stored_document_ref(target) ||
+      is_stored_original_ref(target))
     return open_page(app, pi, std::move(target), record_history);
   xanatoo::Locator loc = xanatoo::parse_locator(target);
   const bool selectors = loc.has_selectors();
@@ -519,6 +562,24 @@ static bool open_page(App& app, int pi, std::string target,
     if (!open_stored_document(app, pi, target)) return false;
     if (record_history) push_nav_history(app, pi, target);
     return true;
+  }
+  if (is_stored_original_ref(target)) {
+    if (!open_stored_original(app, pi, target)) return false;
+    if (record_history) push_nav_history(app, pi, target);
+    return true;
+  }
+  // Returning to a source alias opens its persisted editable version. The
+  // immutable original is always available under db-original:doc:<id>.
+  const bool remote_source = is_in_app_remote_url(target);
+  std::error_code source_ec;
+  if (remote_source || fs::is_regular_file(target, source_ec)) {
+    const std::string source = remote_source ? target : file_doc_key(target);
+    if (const auto stored = find_imported_document(source)) {
+      const std::string local_ref = "db:" + stored->key;
+      if (!open_stored_document(app, pi, local_ref)) return false;
+      if (record_history) push_nav_history(app, pi, local_ref);
+      return true;
+    }
   }
   if (target == kAboutPage) {
     const int saved = app.focus;

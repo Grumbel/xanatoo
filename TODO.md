@@ -6,7 +6,31 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **307** (this delivery is **306**)
+Next bundle number: **308** (this delivery is **307**)
+
+## Status (2026-11-09) — Imported-source provenance and file-free Save
+
+- Added a `document_origins` table linking a file/URL alias to a native key,
+  its immutable original parsed tree and a content-addressed copy of its exact
+  source bytes. Reimporting cannot overwrite either original or working head.
+- The first edit to a local file detaches it into native SQLite revisions;
+  Ctrl+S likewise imports source documents instead of writing over the file.
+  File → Edit local copy enables editing a fetched read-only page after
+  preserving its response and source snapshot.
+- Opening a known file/URL again resolves to its local working copy; the
+  alias also works via startup file arguments and the Open File dialog.
+  File → View original and `db-original:doc:<id>` display the immutable parsed
+  snapshot without modifying the working document. The documents index links
+  to both versions.
+- Save As is now explicitly **Export a copy**. Export does not retarget the
+  document and rejects existing output files, avoiding accidental overwrites.
+- Focused SQLite integration passes for first-import preservation, replay of
+  source aliases, idempotence and original ancestry, alongside annotation
+  history and native published revisions. No-SQLite syntax checks pass.
+  Full SDL GUI compilation still requires a development environment.
+- Next: GUI revision browser (including restoring the original as a *new*
+  working revision), per-source import improvements for converter formats,
+  robust remote aliases and explicit publishing destinations.
 
 ## Status (2026-11-09) — Database-native documents, autosave and local Publish
 

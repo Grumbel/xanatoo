@@ -62,6 +62,8 @@ enum class UiCommand {
   PopIn,           // top floating window → tab in focused pane
   Save,
   Publish,       // snapshot current database-native working revision locally
+  EditLocalCopy, // preserve source; switch to editable local database document
+  ViewOriginal,  // show immutable imported source snapshot
 
   SaveAs,
   ExportSexpr,
@@ -208,6 +210,7 @@ struct UiSearchEngine {
 struct UiState {
   bool dirty = false;
   bool can_publish = false;
+  bool can_make_local_copy = false;
   bool has_path = false;
   bool split = false;
   bool outline = false;

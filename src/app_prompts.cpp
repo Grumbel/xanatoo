@@ -21,6 +21,7 @@
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/parse.hpp"
 #include "xanatoo/reddit.hpp"
+#include "xanatoo/revstore.hpp"
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/util.hpp"
 
@@ -54,7 +55,7 @@ const char* prompt_label(PromptKind k) {
     case PromptKind::UrlBar:
       return "URL: ";
     case PromptKind::SaveAs:
-      return "Save as: ";
+      return "Export as: ";
     case PromptKind::InsertImage:
       return "Image path: ";
     case PromptKind::InsertFigure:
@@ -273,6 +274,14 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
         std::cerr << "Open: file not found: " << path << "\n";
         return true;  // prompt stays open
       }
+      if (const auto stored = xanatoo::find_imported_document(
+              xanatoo::file_doc_key(path))) {
+        if (navigate_pane(app, app.focus, "db:" + stored->key)) {
+          minibuf_commit_path_hist(app);
+          close_prompt(app);
+        }
+        return true;
+      }
       const BufferId existing = find_buffer(app, path);
       nav_history_capture(p.nav, pane_address(app, p), p.sel, p.scroll_y);
       p.nav.pending_link = {};
@@ -321,9 +330,14 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
     case PromptKind::SaveAs: {
       minibuf_sync_out(app);
       if (!pr.text.empty()) {
-        const bool export_only = path_of(app, p).empty() ||
-                                 is_stored_document_ref(path_of(app, p));
         const std::string target = xanatoo::expand_user_path(pr.text);
+        // Export never changes the document's source or identity, and never
+        // truncates an existing file without an explicit overwrite flow.
+        std::error_code exists_ec;
+        if (fs::exists(target, exists_ec)) {
+          flash_status(app, "Export target already exists; choose another filename");
+          return true;
+        }
         if (app.invalid_xml_paths.contains(target)) {
           flash_status(app, "Cannot overwrite an XML file that failed to import");
           return true;
@@ -345,18 +359,8 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
           std::cerr << "Failed to save: " << target << "\n";
         } else {
           out << text;
-          if (export_only) {
-            // Exporting a native document must never replace its stable
-            // database identity with a filesystem path.
-          } else {
-            path_of(app, p) = target;
-            buf(app, p.buf).dirty = false;
-            note_saved(app, p.buf, text);
-            app.discard_armed = false;
-            update_title(app);
-          }
-          flash_status(app, (export_only ? "Exported " : "Saved as ") + target);
-          std::cout << (export_only ? "Exported: " : "Saved as: ") << target << "\n";
+          flash_status(app, "Exported " + target);
+          std::cout << "Exported: " << target << "\n";
           minibuf_commit_path_hist(app);
         }
       }

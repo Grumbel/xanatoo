@@ -29,6 +29,7 @@
 #include "xanatoo/parse.hpp"
 #include "xanatoo/paths.hpp"
 #include "xanatoo/reddit.hpp"
+#include "xanatoo/revstore.hpp"
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/util.hpp"
 
@@ -172,7 +173,8 @@ bool is_foreign_path(std::string_view path) {
       xanatoo::starts_with(path, "https://"))
     return true;
   if (xanatoo::path_uses_html(path) || xanatoo::is_pandoc_path(path)) return true;
-  if (path == kDraftsPage || path == kDocumentsPage || path == kAboutPage)
+  if (path == kDraftsPage || path == kDocumentsPage || path == kAboutPage ||
+      is_stored_original_ref(path))
     return true;
   // Directory listings (navigate_pane gives them a trailing '/').
   std::error_code ec;
@@ -301,6 +303,8 @@ std::string buffer_tab_label(App& app, BufferId bi) {
   const std::string& path = b->path;
   if (path.empty()) {
     s += "untitled";
+  } else if (is_stored_original_ref(path)) {
+    s += "Original (read-only)";
   } else if (is_stored_document_ref(path)) {
     s += b->stored_title.empty() ? "untitled" : b->stored_title;
   } else if (is_in_app_remote_url(path)) {
@@ -417,6 +421,14 @@ void mark_dirty(App& app) {
   const BufferId di = focused_pane(app).buf;
   app.discard_armed = false;  // new edits require a fresh discard warning
   if (find_buf(app, di)) {
+    // The first edit to an imported local file detaches the editor from
+    // the filesystem. The file remains an immutable source, not a save target.
+    const std::string path = buf(app, di).path;
+    std::error_code ec;
+    if (!path.empty() && !is_stored_document_ref(path) &&
+        !is_foreign_path(path) && fs::is_regular_file(path, ec) &&
+        !find_imported_document(file_doc_key(path)))
+      make_stored_copy(app, di);
     note_edit(app, buf(app, di));
     // Virtualization: drop height hints for the edited node and ancestors
     // so the next layout remeasures only the affected spine (not the world).

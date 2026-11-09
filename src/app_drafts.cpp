@@ -14,6 +14,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <stdexcept>
 
 namespace fs = std::filesystem;
 
@@ -223,6 +224,64 @@ bool save_stored_buffer(App& app, BufferId id) {
   return b && write_stored_working(app, *b);
 }
 
+bool make_stored_copy(App& app, BufferId id) {
+  DocBuffer* b = find_buf(app, id);
+  if (!b || b->placeholder) return false;
+  if (is_stored_document_ref(b->path)) return true;
+  if (is_stored_original_ref(b->path)) {
+    const bool ok = open_stored_document(
+        app, app.focus, "db:" + b->path.substr(12));
+    if (ok) app.browse_mode = false;
+    return ok;
+  }
+  if (b->path.empty()) return write_stored_working(app, *b);
+
+  const bool remote = is_in_app_remote_url(b->path);
+  const bool local = !remote && regular_file(b->path);
+  if (!remote && !local) return false;
+  const std::string source = remote ? b->path : file_doc_key(b->path);
+  if (const auto existing = find_imported_document(source)) {
+    if (b->dirty) {
+      flash_status(app, "Local copy already exists; unsaved file edits remain in drafts");
+      return false;
+    }
+    const bool ok = open_stored_document(app, app.focus, "db:" + existing->key);
+    if (ok) app.browse_mode = false;
+    return ok;
+  }
+  if (remote && !b->raw_source) {
+    flash_status(app, "Cannot preserve original source: response bytes unavailable");
+    return false;
+  }
+  const std::string raw = remote ? *b->raw_source : read_file(b->path);
+  std::string initial, working;
+  try {
+    initial = serialize_sexpr(remote ? b->doc : parse_document(raw, b->path));
+    working = serialize_sexpr(b->doc);
+  } catch (const std::invalid_argument&) {
+    flash_status(app, "Cannot import an invalid source document");
+    return false;
+  }
+  const auto head = import_stored_document(
+      source, raw, initial, working,
+      draft_title(*b, serialize_document(b->doc, {})));
+  if (!head) return false;
+  if (!b->draft_id.empty()) drop_draft(b->doc_key);
+  b->doc_key = head->key;
+  b->path = "db:" + head->key;
+  b->stored_working = head->working;
+  b->stored_published = head->published;
+  b->stored_title = head->title;
+  b->base_id = content_id(serialize_document(b->doc, {}));
+  b->draft_id.clear();
+  b->draft_due = 0;
+  b->dirty = false;
+  b->raw_source.reset();
+  app.browse_mode = false;
+  update_title(app);
+  return true;
+}
+
 bool publish_stored_buffer(App& app, BufferId id) {
   DocBuffer* b = find_buf(app, id);
   if (!b || !write_stored_working(app, *b)) return false;
@@ -301,7 +360,10 @@ void open_stored_documents_page(App& app) {
       if (c == '[' || c == ']' || c == '(' || c == ')' || c == '\n' ||
           c == '\r')
         c = ' ';
-    md += "- [" + title + "](db:" + d.key + ") — " +
+    md += "- [" + title + "](db:" + d.key + ")";
+    if (find_document_origin(d.key))
+      md += " · [Original](db-original:" + d.key + ")";
+    md += " — " +
           format_time(d.time) +
           (d.published.empty() ? ", unpublished\n" : ", published\n");
   }
@@ -327,6 +389,21 @@ bool open_stored_document(App& app, int pi, const std::string& ref) {
   b.stored_title = head->title;
   b.base_id = content_id(serialize_document(b.doc, {}));
   b.dirty = false;
+  return true;
+}
+
+bool open_stored_original(App& app, int pi, const std::string& ref) {
+  if (!is_stored_original_ref(ref)) return false;
+  const std::string key = ref.substr(12);
+  const auto origin = find_document_origin(key);
+  const auto body = origin ? load_stored_document_revision(key, origin->revision)
+                           : std::nullopt;
+  if (!body) {
+    flash_status(app, "Original source snapshot not found");
+    return false;
+  }
+  if (!stash_or_confirm(app, app.panes[pi].buf)) return false;
+  show_doc_in_pane(app, pi, parse_sexpr(*body), ref);
   return true;
 }
 

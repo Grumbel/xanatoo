@@ -865,6 +865,7 @@ void autosave_drafts(App& app);       // per frame: write drafts that are due
 void note_saved(App& app, BufferId id, const std::string& text);
 bool save_stored_buffer(App& app, BufferId id);
 bool publish_stored_buffer(App& app, BufferId id);
+bool make_stored_copy(App& app, BufferId id);
 // Drop the draft and reload the file (File → Revert to Saved).
 void revert_buffer(App& app, BufferId id);
 // "drafts:" page listing every stored draft; "draft:<key>" opens one.
@@ -872,6 +873,9 @@ inline constexpr const char* kDraftsPage = "drafts:";
 inline constexpr const char* kDocumentsPage = "documents:";
 inline bool is_stored_document_ref(std::string_view path) {
   return path.size() == 71 && path.starts_with("db:doc:");
+}
+inline bool is_stored_original_ref(std::string_view path) {
+  return path.size() == 80 && path.starts_with("db-original:doc:");
 }
 void open_drafts_page(App& app);
 // "about:" page: services, formats and libraries of this build (app_about.cpp).
@@ -882,6 +886,7 @@ void open_about_page(App& app);
 void print_startup_report(App& app);
 bool open_draft(App& app, int pi, const std::string& ref);
 bool open_stored_document(App& app, int pi, const std::string& ref);
+bool open_stored_original(App& app, int pi, const std::string& ref);
 void open_stored_documents_page(App& app);
 
 // ---- buffers ----

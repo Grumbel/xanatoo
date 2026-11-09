@@ -378,6 +378,34 @@ void test_stored_documents() {
   EXPECT(list_stored_documents().empty());
   auto first = save_stored_document(key, "(document one)", "", "My document");
   EXPECT(first.has_value());
+  const std::string source = "file:/example/original.md";
+  const std::string raw = "# Untouched source\n";
+  auto imported = import_stored_document(source, raw, "(original-tree)",
+                                         "(locally-edited-tree)", "Imported");
+  EXPECT(imported.has_value());
+  if (imported) {
+    auto provenance = find_document_origin(imported->key);
+    EXPECT(provenance.has_value());
+    if (provenance) {
+      EXPECT_EQ(provenance->source, source);
+      EXPECT_EQ(load_object(provenance->raw), std::optional<std::string>(raw));
+      EXPECT_EQ(load_stored_document_revision(imported->key,
+                                              provenance->revision),
+                std::optional<std::string>("(original-tree)"));
+      const auto working = load_object_revision(imported->working);
+      EXPECT(working && working->parent == provenance->revision);
+    }
+    EXPECT_EQ(load_stored_document_revision(imported->key, imported->working),
+              std::optional<std::string>("(locally-edited-tree)"));
+    auto same = import_stored_document(source, "CHANGED", "(new-original)",
+                                       "(overwrite)", "New title");
+    EXPECT(same && same->key == imported->key &&
+           same->working == imported->working);
+    auto by_source = find_imported_document(source);
+    EXPECT(by_source && by_source->key == imported->key);
+    EXPECT(!find_imported_document("file:/unrelated.md"));
+    EXPECT(!find_document_origin(key));
+  }
   if (first) {
     EXPECT(first->published.empty());
     EXPECT(!first->working.empty());
@@ -420,9 +448,13 @@ void test_stored_documents() {
     }
     auto second = save_stored_document(other, "(different)", "", "Another");
     EXPECT(second.has_value());
-    EXPECT_EQ(list_stored_documents().size(), 2u);
+    EXPECT_EQ(list_stored_documents().size(), 3u);
     revstore_use_path(db.string()); // close/reopen persisted state
     auto reopened = find_stored_document(key);
+    auto imported_after_reopen = find_imported_document(source);
+    EXPECT(imported_after_reopen && imported &&
+           imported_after_reopen->key == imported->key &&
+           imported_after_reopen->working == imported->working);
     EXPECT(reopened && reopened->title == "New title");
     EXPECT(reopened && !reopened->published.empty());
     EXPECT(!load_stored_document_revision(other, first->working));

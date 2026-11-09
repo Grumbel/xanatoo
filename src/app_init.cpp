@@ -25,6 +25,32 @@ namespace fs = std::filesystem;
 
 namespace xanatoo::app {
 
+// A command-line source path is an alias of its previously imported working
+// document. Startup must honor the same alias as regular navigation.
+static void add_startup_document(App& app, xanatoo::Document doc,
+                                 std::string path) {
+  if (!path.empty()) {
+    const std::string source = is_in_app_remote_url(path)
+        ? path : xanatoo::file_doc_key(path);
+    if (const auto stored = xanatoo::find_imported_document(source)) {
+      if (const auto data = xanatoo::load_stored_document_revision(
+              stored->key, stored->working)) {
+        const BufferId id = add_buffer(
+            app, xanatoo::parse_sexpr(*data), "db:" + stored->key);
+        DocBuffer& b = buf(app, id);
+        b.doc_key = stored->key;
+        b.stored_working = stored->working;
+        b.stored_published = stored->published;
+        b.stored_title = stored->title;
+        b.base_id = xanatoo::content_id(
+            xanatoo::serialize_document(b.doc, {}));
+        return;
+      }
+    }
+  }
+  add_buffer(app, std::move(doc), std::move(path));
+}
+
 bool app_init(App& app) {
   // Load the user's chrome scale before deriving any pixel geometry.
   xanatoo::load_view_settings(app.view_settings);
@@ -138,7 +164,7 @@ bool app_init(App& app) {
       // page.
       if (xanatoo::is_pandoc_path(p0) && r0.empty()) b0_doc = load_doc(app, p0);
     }
-    add_buffer(app, std::move(b0_doc), std::move(b0_path));
+    add_startup_document(app, std::move(b0_doc), std::move(b0_path));
     if (!p1.empty()) {
       std::string b1_path;
       xanatoo::Document b1_doc;
@@ -148,7 +174,7 @@ bool app_init(App& app) {
         b1_doc = load_doc_or_placeholder(app, b1_path);
         if (xanatoo::is_pandoc_path(p1) && r1.empty()) b1_doc = load_doc(app, p1);
       }
-      add_buffer(app, std::move(b1_doc), std::move(b1_path));
+      add_startup_document(app, std::move(b1_doc), std::move(b1_path));
     }
   }
   for (const auto& b : app.buffers) app.tab_order.push_back(b.id);

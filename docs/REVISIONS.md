@@ -40,6 +40,10 @@ revision. Neither says anything about trust or truth.
   immutable parent chains (`kind=working` and `kind=published`) and neither
   overwrites the other. The document's bytes live in `objects`, encoded with
   the internal S-expression representation, not a filesystem path.
+- `document_origins(key, source, original, raw)` — immutable provenance for an
+  imported file or fetched page: a stable source alias, the original parsed
+  document revision, and a content-addressed copy of the exact source bytes.
+  Reimporting the source never overwrites that original or the working head.
 
 App side (`src/app_drafts.cpp`):
 
@@ -65,19 +69,36 @@ conflicting writes rather than replacing another editor's version.
 
 File → **Local documents** or `documents:` lists these persisted documents.
 Each document opens at `db:doc:<64 hex>`, retaining its stable identity on
-reload or between runs. The tab shows the stored short title. Native
-document File → Save As and Export commands write a file as an *export*;
-the working document remains attached to its database key. A stored
+reload or between runs. The tab shows the stored short title. An imported
+document also has an `db-original:doc:<64 hex>` read-only view: both its
+original parsed tree and raw source bytes remain in SQLite even if the source
+later changes or disappears. File → **View original** (or the Original link
+on the documents index) shows that snapshot; Back returns to the working
+document. A stored
 published revision can be loaded separately by its immutable revision ID
 through `load_stored_document_revision`, but there is not yet a GUI browser
 to inspect or restore old working/published revisions.
 
-**Migration is incomplete:** previously opened files still use the legacy
-draft and save workflow, and Ctrl+S on one of those paths still writes the
-file. A later increment should import the source version into a native
-document without overwriting it, and distinguish the original from the local
-editable version. Remote publishing, replication, signatures and portable
-annotation exchange are likewise future work.
+Local file editing switches to a native document when the first edit occurs;
+Ctrl+S on a file/page also imports it rather than writing it back to disk.
+For read-only remote pages File → **Edit local copy** explicitly imports the
+fetched page and switches into edit mode, provided the response bytes are
+available. File and URL source names are aliases of the database copy: opening
+the same source again returns the existing working head. Command-line file
+opening and the Open File dialog follow those aliases, too.
+
+Files are reserved for export: **Export a copy** and the typed Export commands
+write a file but do not change the working document's identity or dirty state.
+An existing output file is rejected instead of silently overwritten. The
+legacy file draft history remains readable and its unsaved edits are carried
+into the native working revision when imported.
+
+**Limitations:** remote import requires the original response body; some
+converter-backed formats still use the converter's path as their source
+alias. The original viewer is read-only, not yet a one-click historical
+restore, and the document revision browser still needs a UI. Remote
+publishing, replication, signatures and portable annotation exchange remain
+future work.
 
 ## Annotation layers (storage foundation)
 
