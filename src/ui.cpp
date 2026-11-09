@@ -92,7 +92,7 @@ int push_toolbar_button_style() {
   };
   ImGui::PushStyleColor(ImGuiCol_Button, color(p.face_light, 0.f));
   // Neutral light face reads as raised; blue suggested a selected/pressed tab.
-  ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color(p.face_light));
+  ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color(p.highlight));
   ImGui::PushStyleColor(ImGuiCol_ButtonActive, color(p.face_dark));
   ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
   ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, s.FrameRounding);
@@ -407,7 +407,7 @@ void Ui::apply_classic_theme() {
   c[ImGuiCol_SliderGrab] = sel;
   c[ImGuiCol_SliderGrabActive] = sel_hi;
   c[ImGuiCol_Button] = P(pal.face_light);
-  c[ImGuiCol_ButtonHovered] = P(pal.accent_soft);
+  c[ImGuiCol_ButtonHovered] = P(pal.highlight);
   c[ImGuiCol_ButtonActive] = P(pal.face_dark);
   c[ImGuiCol_Header] = header;
   c[ImGuiCol_HeaderHovered] = C(0xC0, 0xD8, 0xF0);
@@ -985,7 +985,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
     if (on) {
       ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                            ImVec4(0.4f, 0.5f, 0.75f, 1.f));
+                            ImVec4(1.f, 1.f, 1.f, 1.f));
     }
     tool_button(id, icon, tip, c, cmd);
     if (on) ImGui::PopStyleColor(2);
@@ -1080,7 +1080,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       if (state.native_view) {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                              ImVec4(0.4f, 0.5f, 0.75f, 1.f));
+                              ImVec4(1.f, 1.f, 1.f, 1.f));
       }
       tool_button("tb_native", "native", tip.c_str(), UiCommand::ToggleNative,
                   cmd, !state.alternate_url.empty());
@@ -1301,7 +1301,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       if (lit) {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                              ImVec4(0.4f, 0.5f, 0.75f, 1.f));
+                              ImVec4(1.f, 1.f, 1.f, 1.f));
       }
       tool_button("tb_bookmark", "bookmark", bm_tip.c_str(),
                   state.current_bookmarked ? UiCommand::RemoveBookmark
@@ -1348,7 +1348,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       if (state.history_open) {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                              ImVec4(0.4f, 0.5f, 0.75f, 1.f));
+                              ImVec4(1.f, 1.f, 1.f, 1.f));
       }
       tool_button("tb_history", "history", "Session history (Ctrl+Shift+H)",
                   UiCommand::ToggleHistory, cmd);
@@ -1358,7 +1358,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       if (state.downloads_open) {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                              ImVec4(0.4f, 0.5f, 0.75f, 1.f));
+                              ImVec4(1.f, 1.f, 1.f, 1.f));
       }
       tool_button("tb_downloads", "downloads", "Downloads",
                   UiCommand::ToggleDownloads, cmd);
@@ -1368,7 +1368,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       if (state.browse) {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.55f, 0.4f, 1.f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                              ImVec4(0.35f, 0.6f, 0.45f, 1.f));
+                              ImVec4(1.f, 1.f, 1.f, 1.f));
       }
       tool_button("tb_browse", "browse",
                   state.browse ? "Browse mode on — F2 to edit"

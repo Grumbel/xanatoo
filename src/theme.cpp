@@ -90,8 +90,8 @@ void draw_button_face(SDL_Renderer* r, const SDL_Rect& rc, bool pressed,
                       bool hot) {
   const Palette& p = palette();
   if (rc.w <= 0 || rc.h <= 0) return;
-  Rgb top = hot ? p.accent_soft : p.face_light;
-  Rgb bot = hot ? lerp(p.accent_soft, p.face_dark, 0.55f) : p.face_dark;
+  Rgb top = hot ? p.highlight : p.face_light;
+  Rgb bot = hot ? lerp(p.highlight, p.face_dark, 0.55f) : p.face_dark;
   if (pressed) std::swap(top, bot);
   if (rc.w < 7 || rc.h < 7) {
     vgradient(r, rc, top, bot);

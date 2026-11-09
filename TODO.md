@@ -6,7 +6,18 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **337** (this delivery is **336**)
+Next bundle number: **338** (this delivery is **337**)
+
+## Status (2026-11-10) — white button hover highlights
+
+- Standard ImGui panel buttons, flat toolbar buttons, and native raised buttons
+  now use white hover highlights instead of pale blue. This includes native
+  window controls and page-navigation buttons through the shared
+  `draw_button_face` painter. The gradient retains the raised bevel; pressed
+  feedback and non-button selection accents remain unchanged.
+- Replaced the remaining blue/green `ImGuiCol_ButtonHovered` overrides in
+  toggled toolbar calls with white. Selection and scrollbar-accent colours are
+  unchanged. Full Nix/SDL visual verification remains pending.
 
 ## Status (2026-11-10) — raised toolbar hover correction
 
