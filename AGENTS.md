@@ -635,6 +635,20 @@ history or distribute patch files.
 
 - Read-only client via Lemmy **API v3** JSON (`/api/v3/post/list`, `/api/v3/post`).
 - Gated by `XANATOO_LEMMY` (default ON; needs OpenSSL).
-- `lemmy:<instance>/c/<community>` and `lemmy:<instance>/post/<id>` refs.
+- `lemmy:<instance>/c/<community>`, `/u/<person>` and `/post/<id>` refs.
 - Maps posts/comments to Thread + Message nodes.
+- **Lemmy Explorer** in Panels is a native, dockable `FloatWindow` with an
+  embedded ImGui form (not a separate ImGui window). It offers locally
+  discovered Instances, Communities, People and Posts; profile/community/post
+  navigation stays native. Search and sort/filter controls are per-panel.
+- `lemmy_discovery.cpp` parses successful API v3 JSON responses without I/O;
+  `lemmy_directory.cpp` merges bounded, thread-safe observations and persists
+  them in `state_dir()/lemmy-directory.txt` (in-memory only under `--no-save`).
+  API lists, search results, profile posts and comment authors populate the
+  catalogue. Federated peers come from `/api/v3/federated_instances`;
+  blocked hosts are omitted, linked/allowed peers retained. There is a small
+  built-in seed directory and an Add instance control; no central service or
+  account is necessary. Only valid ASCII hostnames are stored.
+- API v3 is the existing network client's protocol; Lemmy 1.0 introduced API
+  v4 with different endpoints. v4-only servers require a later client update.
 - Optional UA override: `XANATOO_LEMMY_USER_AGENT`.

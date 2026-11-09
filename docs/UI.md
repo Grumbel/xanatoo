@@ -12,7 +12,7 @@ keyboard/mouse behaviour. The dock/tile model is intentionally more flexible.
 - A panel that can be docked, detached, resized, or maximized is a `FloatWindow`.
   `float_stack` drives both painting and hit-testing; no separate ImGui title
   bar or independent ImGui placement is allowed for that panel.
-- Rich forms (Reply, Bookmarks, Annotations, Nostr) use borderless ImGui
+- Rich forms (Reply, Bookmarks, Annotations, Nostr, Lemmy) use borderless ImGui
   content in the native panel client rect. All title bars, close/maximize
   buttons, docking and resizing remain native.
 - Preferences is an application settings **dialog**, not a dockable work panel.
@@ -38,7 +38,7 @@ keyboard/mouse behaviour. The dock/tile model is intentionally more flexible.
    draw lists, rendered in `Ui::end_frame` above the SDL chrome.
 
 `Ui::prepare_render` finalizes ImGui draw lists after `run_chrome`, before
-`draw_floats`. The `ui_panel_layer` classifier recognizes the five embedded
+`draw_floats`. The `ui_panel_layer` classifier recognizes the six embedded
 panel roots and their child windows. Tooltips and popups remain foreground
 ImGui windows. Each modern SDL2/SDL3 render pass receives only its selected
 draw lists, preserving their native FloatWindow z-order. The old SDL2
@@ -65,7 +65,7 @@ The vendored-ImGui regression exercises two overlapping native panel bodies,
 each with a child, and swaps their stacking order without focusing them. It
 also verifies that standalone chrome windows stay out of the panel layers.
 Desktop checks should still cover actual mouse down/up, wheel and cursor
-transitions while dragging floating windows over Reply/Bookmarks/Nostr, plus
+transitions while dragging floating windows over Reply/Bookmarks/Nostr/Lemmy, plus
 the SDL2 triangle-renderer fallback (which still uses one draw pass).
 
 ## Resize affordances

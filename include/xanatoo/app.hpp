@@ -271,7 +271,7 @@ enum class Dock : uint8_t { None = 0, Left, Right, Top, Bottom, Max };
 
 enum class WindowRole : uint8_t {
   Help, Outline, Backlinks, Sitemap, Page, History, Styles, Bookmarks, Downloads, Reply,
-  Annotations, Revisions, NostrExplorer, NostrAccounts, Document
+  Annotations, Revisions, NostrExplorer, NostrAccounts, LemmyExplorer, Document
 };
 
 inline UiPanelLayer embedded_panel_layer(WindowRole role) {
@@ -281,6 +281,7 @@ inline UiPanelLayer embedded_panel_layer(WindowRole role) {
     case WindowRole::Annotations: return UiPanelLayer::Annotations;
     case WindowRole::NostrExplorer: return UiPanelLayer::NostrExplorer;
     case WindowRole::NostrAccounts: return UiPanelLayer::NostrAccounts;
+    case WindowRole::LemmyExplorer: return UiPanelLayer::LemmyExplorer;
     default: return UiPanelLayer::Chrome;
   }
 }
@@ -783,6 +784,12 @@ struct App {
   bool annotation_panel_open = false;
   bool revision_panel_open = false;
   bool nostr_explorer_open = false;
+  bool lemmy_explorer_open = false;
+  int lemmy_tab = 0;  // 0: instances, 1: communities, 2: people, 3: posts
+  std::string lemmy_search;
+  std::string lemmy_instance = "lemmy.world";
+  std::string lemmy_sort = "Hot";
+  bool lemmy_instance_only = false;
   bool nostr_accounts_open = false;
   int nostr_tab = 0;  // 0: people, 1: events, 2: NIP-29 groups
   std::string nostr_search;
@@ -874,6 +881,7 @@ struct App {
   FloatWindow annotation_win = make_float_panel(WindowRole::Annotations, 150, 110, 430, 540);
   FloatWindow revision_win = make_float_panel(WindowRole::Revisions, 120, 140, 550, 560);
   FloatWindow nostr_explorer_win = make_float_panel(WindowRole::NostrExplorer, 180, 120, 560, 520);
+  FloatWindow lemmy_explorer_win = make_float_panel(WindowRole::LemmyExplorer, 190, 130, 560, 520);
   FloatWindow nostr_accounts_win = make_float_panel(WindowRole::NostrAccounts, 200, 150, 440, 440);
   ReplyDraft reply;
   SitemapPanel sitemap;

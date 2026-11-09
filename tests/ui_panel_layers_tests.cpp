@@ -13,12 +13,16 @@ int main() {
   assert(ui_panel_layer("##annotation_panel_body") == UiPanelLayer::Annotations);
   assert(ui_panel_layer("##nostr_explorer_body") == UiPanelLayer::NostrExplorer);
   assert(ui_panel_layer("##nostr_accounts_body") == UiPanelLayer::NostrAccounts);
+  assert(ui_panel_layer("##lemmy_explorer_body") == UiPanelLayer::LemmyExplorer);
+  assert(ui_panel_layer("##lemmy_explorer_body/##lemmy_results_12345678") ==
+         UiPanelLayer::LemmyExplorer);
   assert(ui_panel_layer("##nostr_explorer_body/##nostr_results_89ABCDEF") ==
          UiPanelLayer::NostrExplorer);
   assert(ui_panel_layer("##reply_editor/child_00000001") == UiPanelLayer::Reply);
   // A lookalike name must not become part of a native panel's draw pass.
   assert(ui_panel_layer("##reply_editor_extra") == UiPanelLayer::Chrome);
   assert(ui_panel_layer("##nostr_explorer_body_else") == UiPanelLayer::Chrome);
+  assert(ui_panel_layer("##lemmy_explorer_body_else") == UiPanelLayer::Chrome);
   assert(ui_panel_layer("Preferences") == UiPanelLayer::Chrome);
   assert(ui_panel_layer("##vkeyboard") == UiPanelLayer::Chrome);
   assert(ui_panel_layer("##Menu_00") == UiPanelLayer::Chrome);

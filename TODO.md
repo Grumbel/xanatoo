@@ -6,7 +6,25 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **328** (this delivery is **327**)
+Next bundle number: **329** (this delivery is **328**)
+
+## Status (2026-11-09) — Lemmy Explorer and instance discovery
+
+- Panels → **Lemmy Explorer** is a native dockable/floating panel. Its embedded
+  ImGui content participates in native draw-list and pointer z-order. Four
+  tabs show observed servers, communities, people and posts. Local filtering,
+  server-only view, feed sorting and opening discovered entries are supported;
+  selected server, sort, tab and scope survive session restoration.
+- A 16-instance starter directory, Add instance, and the official Lemmy
+  directory link offer manual discovery; fetching a server's federated peer
+  list records linked and allowed servers (not blocked ones). Successful
+  community lists, post feeds, searches and user pages automatically populate
+  the locally persistent directory without requiring an account. Public
+  API-v3 read-only endpoints are reused and native person links open profiles.
+- Pure Lemmy JSON discovery tests, `lemmy.cpp` and catalogue C++ compilations,
+  native panel-layer tests and vendored ImGui child draw-list tests pass.
+  A full SDL/Nix build and visual interaction testing remain pending here.
+  Lemmy v4-only instances are not yet supported by this API-v3 client.
 
 ## Status (2026-11-09) — native/ImGui pointer stacking cleanup
 

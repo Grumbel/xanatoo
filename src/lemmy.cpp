@@ -5,6 +5,7 @@
 // Maps posts/comments into Thread + Message document nodes.
 
 #include "xanatoo/lemmy.hpp"
+#include "xanatoo/lemmy_directory.hpp"
 #include "xanatoo/native.hpp"
 #include "xanatoo/util.hpp"
 
@@ -18,6 +19,7 @@
 #include <cstring>
 #include <iostream>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -48,7 +50,8 @@ bool path_looks_lemmy(std::string_view path) {
   if (low.rfind("/post/", 0) == 0 || low.find("/post/") != std::string::npos)
     return true;
   if (low.find("/api/v3/") != std::string::npos) return true;
-  // /u/name is common but too generic — skip
+  // /u/name is used by many non-Lemmy sites. Explicit lemmy: refs can open
+  // profiles, but don't convert arbitrary web profile URLs into Lemmy refs.
   return false;
 }
 
@@ -96,12 +99,14 @@ struct LemmyPost {
   std::string url;           // external link URL (link posts)
   std::string ap_id;         // ActivityPub id, usually https://host/post/N
   std::string author;
+  std::string author_actor; // remote creator actor_id, for profile links
   std::string community;
   std::string community_url; // https://host/c/name when known
   std::string published;
   int64_t score = 0;
   int64_t comments = 0;
   bool is_comment = false;
+  int64_t source_post_id = 0; // post containing this comment
   int64_t parent_id = 0;  // parent comment id (0 = under post)
   std::string path;      // Lemmy comment path for sort/order
 };
@@ -120,6 +125,7 @@ LemmyPost parse_post_view(std::string_view view_json) {
   p.ap_id = json_str_field(post, "ap_id");
   p.published = json_str_field(post, "published");
   p.author = json_str_field(creator, "name");
+  p.author_actor = json_str_field(creator, "actor_id");
   p.community = json_str_field(community, "name");
   if (p.community.empty()) p.community = json_str_field(community, "title");
   p.community_url = json_str_field(community, "actor_id");
@@ -136,9 +142,11 @@ LemmyPost parse_comment_view(std::string_view view_json) {
   std::string_view counts = json_object_after_key(view_json, "counts");
   if (comment.empty()) comment = view_json;
   p.id = json_int_field(comment, "id");
+  p.source_post_id = json_int_field(comment, "post_id");
   p.body = json_str_field(comment, "content");
   p.published = json_str_field(comment, "published");
   p.author = json_str_field(creator, "name");
+  p.author_actor = json_str_field(creator, "actor_id");
   p.score = json_int_field(counts, "score");
   // Lemmy path: "0.<id>" (top-level) or "0.<parent>.….<id>" (nested).
   // parent_id = immediate parent comment id, or 0 if top-level under the post.
@@ -179,6 +187,20 @@ void append_message(Document& doc, NodeId thread, const LemmyPost& post,
   Node& n = doc.get(msg);
   n.label = std::to_string(post.id);
   n.src = post.author.empty() ? "[deleted]" : post.author;
+  if (!post.author.empty()) {
+    const std::string home = lemmy_instance_host(origin);
+    std::string actor = lemmy_instance_host(post.author_actor);
+    std::string name = post.author;
+    if (!actor.empty() && actor != home && name.find('@') == std::string::npos)
+      name += "@" + actor;
+    if (!home.empty() && name.find_first_of("/?#&") == std::string::npos) {
+      InlineSpan a;
+      a.kind = InlineKind::Link;
+      a.text = post.author;
+      a.href = "lemmy:" + home + "/u/" + name;
+      n.spans.push_back(std::move(a));
+    }
+  }
   std::string meta;
   if (!post.published.empty()) meta = format_time_iso(post.published);
   if (post.score != 0) {
@@ -189,7 +211,7 @@ void append_message(Document& doc, NodeId thread, const LemmyPost& post,
 
   // Threading: Message layout walks alt → parent Message.label for indent.
   if (post.is_comment) {
-    if (post.parent_id > 0)
+    if (root_post_id > 0 && post.parent_id > 0)
       n.alt = std::to_string(post.parent_id);
     else if (root_post_id > 0)
       n.alt = std::to_string(root_post_id);
@@ -220,6 +242,17 @@ void append_message(Document& doc, NodeId thread, const LemmyPost& post,
   if (!post.body.empty()) {
     NodeId para = doc.create(NodeKind::Paragraph, msg);
     doc.append_text(para, post.body);
+  }
+  // A profile lists comments across unrelated posts, without a single root
+  // thread. Link each comment back to its discussion for context.
+  if (post.is_comment && root_post_id == 0 && post.source_post_id > 0) {
+    NodeId link_row = doc.create(NodeKind::Paragraph, msg);
+    InlineSpan link;
+    link.kind = InlineKind::Link;
+    link.text = "View discussion";
+    link.href = "lemmy:" + lemmy_instance_host(origin) + "/post/" +
+                std::to_string(post.source_post_id);
+    doc.get(link_row).spans.push_back(std::move(link));
   }
   // Link posts: show external URL (may open in browser if not Lemmy).
   if (!post.is_comment && !post.url.empty() && post.url != permalink) {
@@ -269,14 +302,15 @@ void append_message(Document& doc, NodeId thread, const LemmyPost& post,
 Document build_document(const std::string& title,
                         const std::vector<LemmyPost>& posts,
                         std::vector<LemmyPost> comments,
-                        const std::string& origin) {
+                        const std::string& origin,
+                        bool profile = false) {
   Document doc;
   NodeId root = doc.create(NodeKind::Document);
   NodeId thread = doc.create(NodeKind::Thread, root);
   doc.get(thread).summary = title.empty() ? "Lemmy" : title;
   doc.get(thread).label = "lemmy";
 
-  int64_t root_post_id = posts.empty() ? 0 : posts.front().id;
+  int64_t root_post_id = posts.empty() || profile ? 0 : posts.front().id;
 
   for (const auto& p : posts) append_message(doc, thread, p, origin, 0);
 
@@ -305,6 +339,7 @@ Document build_document(const std::string& title,
 struct ParsedUrl {
   std::string origin;       // https://host
   std::string community;    // from /c/name
+  std::string person;       // from /u/name[@remote.host]
   int64_t post_id = 0;      // from /post/id
   std::string api_path;     // if already /api/v3/...
 };
@@ -352,6 +387,11 @@ ParsedUrl parse_lemmy_url(std::string_view s) {
     out.community = path.substr(s0, s1 - s0);
   }
 
+  if (low.rfind("/u/", 0) == 0) {
+    size_t stop = path.find('/', 3);
+    out.person = path.substr(3, stop == std::string::npos ? stop : stop - 3);
+  }
+
   size_t ppos = low.find("/post/");
   if (ppos != std::string::npos) {
     size_t s0 = ppos + 6;
@@ -363,13 +403,9 @@ ParsedUrl parse_lemmy_url(std::string_view s) {
 }  // namespace
 
 std::optional<Document> lemmy_fetch(std::string_view url_in, std::string* err) {
-  if (!is_lemmy_url(url_in)) {
-    if (err) *err = "not a Lemmy community/post URL";
-    return std::nullopt;
-  }
   ParsedUrl pu = parse_lemmy_url(url_in);
-  if (pu.origin.empty()) {
-    if (err) *err = "could not parse Lemmy URL";
+  if (pu.origin.empty() || (!is_lemmy_url(url_in) && pu.person.empty())) {
+    if (err) *err = "not a Lemmy community/post/profile/API URL";
     return std::nullopt;
   }
 
@@ -379,8 +415,12 @@ std::optional<Document> lemmy_fetch(std::string_view url_in, std::string* err) {
   } else if (pu.post_id > 0) {
     api_url = pu.origin + "/api/v3/post?id=" + std::to_string(pu.post_id);
   } else if (!pu.community.empty()) {
-    api_url = pu.origin + "/api/v3/post/list?community_name=" + pu.community +
+    api_url = pu.origin + "/api/v3/post/list?community_name=" +
+              lemmy_query_escape(pu.community) +
               "&limit=25&sort=Hot";
+  } else if (!pu.person.empty()) {
+    api_url = pu.origin + "/api/v3/user?username=" +
+              lemmy_query_escape(pu.person) + "&limit=25&sort=New";
   } else {
     api_url = pu.origin + "/api/v3/post/list?limit=25&sort=Hot";
   }
@@ -424,6 +464,55 @@ std::optional<Document> lemmy_fetch(std::string_view url_in, std::string* err) {
          std::isspace(static_cast<unsigned char>(body[start])))
     ++start;
   std::string_view json(body.data() + start, body.size() - start);
+  const std::string instance = lemmy_instance_host(pu.origin);
+  lemmy_directory_observe(instance, json);
+
+  // Dedicated explorer actions use the same authenticated-free API endpoint
+  // as the regular reader, but display directory links instead of attempting
+  // to interpret a list of communities/peers as a list of posts.
+  const auto directory_entries = lemmy_discover_payload(instance, json);
+  auto make_directory_document = [&](std::string_view heading,
+                                      bool communities_only,
+                                      bool instances_only) {
+    Document doc;
+    NodeId root = doc.create(NodeKind::Document);
+    doc.meta.title = std::string(heading);
+    NodeId header = doc.create(NodeKind::Heading, root);
+    doc.get(header).level = 1;
+    doc.append_text(header, std::string(heading));
+    std::set<std::string> seen;
+    int count = 0;
+    for (const auto& item : directory_entries) {
+      if ((communities_only && item.kind != LemmyEntryKind::Community) ||
+          (instances_only && item.kind != LemmyEntryKind::Instance) ||
+          (!communities_only && !instances_only &&
+           item.kind == LemmyEntryKind::Instance)) continue;
+      if (instances_only && item.name == instance) continue;
+      if (!seen.insert(item.ref).second || ++count > 200) continue;
+      NodeId row = doc.create(NodeKind::Paragraph, root);
+      InlineSpan link;
+      link.kind = InlineKind::Link;
+      link.text = item.title;
+      link.href = item.ref;
+      doc.get(row).spans.push_back(std::move(link));
+      if (item.title != item.name || item.score) {
+        std::string detail = " · " + item.name;
+        if (item.score) detail += " · " + std::to_string(item.score);
+        doc.append_text(row, detail);
+      }
+    }
+    if (count == 0) {
+      NodeId row = doc.create(NodeKind::Paragraph, root);
+      doc.append_text(row, "No public entries returned by this server.");
+    }
+    return doc;
+  };
+  if (pu.api_path.find("/community/list") != std::string::npos)
+    return make_directory_document("Lemmy communities · " + instance, true, false);
+  if (pu.api_path.find("/federated_instances") != std::string::npos)
+    return make_directory_document("Lemmy federated servers · " + instance, false, true);
+  if (pu.api_path.find("/search") != std::string::npos)
+    return make_directory_document("Lemmy search · " + instance, false, false);
 
   std::vector<LemmyPost> posts;
   std::vector<LemmyPost> comments;
@@ -446,8 +535,17 @@ std::optional<Document> lemmy_fetch(std::string_view url_in, std::string* err) {
     auto post_views = json_object_array_after_key(json, "posts");
     for (const auto& pv : post_views)
       posts.push_back(parse_post_view(pv));
-    if (!pu.community.empty())
+    if (!pu.person.empty()) {
+      // GetPersonDetails includes both the person's submissions and comments.
+      for (const auto& cv : json_object_array_after_key(json, "comments"))
+        comments.push_back(parse_comment_view(cv));
+    }
+    if (!pu.person.empty())
+      title = "u/" + pu.person;
+    else if (!pu.community.empty())
       title = "c/" + pu.community;
+    else if (!pu.api_path.empty())
+      title = "Lemmy · " + instance;
     else if (!posts.empty() && !posts.front().community.empty())
       title = "c/" + posts.front().community;
     else
@@ -456,7 +554,7 @@ std::optional<Document> lemmy_fetch(std::string_view url_in, std::string* err) {
 
   // Fetch comments for a single post when the post endpoint omitted them.
   int64_t need_comments_for = 0;
-  if (comments.empty()) {
+  if (comments.empty() && pu.person.empty()) {
     if (pu.post_id > 0)
       need_comments_for = pu.post_id;
     else if (posts.size() == 1 && posts.front().id > 0)
@@ -478,6 +576,7 @@ std::optional<Document> lemmy_fetch(std::string_view url_in, std::string* err) {
       std::string_view cjson(cresp->body.data() + cs,
                              cresp->body.size() - cs);
       auto comment_views = json_object_array_after_key(cjson, "comments");
+      lemmy_directory_observe(instance, cjson);
       for (const auto& cv : comment_views)
         comments.push_back(parse_comment_view(cv));
     } else {
@@ -488,7 +587,7 @@ std::optional<Document> lemmy_fetch(std::string_view url_in, std::string* err) {
 
   std::cerr << "Lemmy: " << posts.size() << " post(s), " << comments.size()
             << " comment(s)\n";
-  return build_document(title, posts, comments, pu.origin);
+  return build_document(title, posts, comments, pu.origin, !pu.person.empty());
 }
 
 #endif  // XANATOO_LEMMY

@@ -4433,6 +4433,9 @@ void test_wikipedia() {
   EXPECT_EQ(native_url_for("https://lemmy.world/api/v3/post/list"), "");
   EXPECT_EQ(web_url_for("lemmy:programming.dev/post/7"),
             "https://programming.dev/post/7");
+  EXPECT_EQ(web_url_for("lemmy:lemmy.world/u/alice@programming.dev"),
+            "https://lemmy.world/u/alice@programming.dev");
+  EXPECT_EQ(native_url_for("https://example.org/u/alice"), "");
   EXPECT(!is_lemmy_ref("lemmy:"));
   EXPECT_EQ(web_url_for("wikipedia:de:Hypertext#A"),
             "https://de.wikipedia.org/wiki/Hypertext#A");

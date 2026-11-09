@@ -33,6 +33,15 @@ int main() {
       ImGui::EndChild();
     }
     ImGui::End();
+    ImGui::SetNextWindowPos(ImVec2(470.f, 240.f));
+    ImGui::SetNextWindowSize(ImVec2(220.f, 210.f));
+    if (ImGui::Begin("##lemmy_explorer_body")) {
+      ImGui::TextUnformatted("Lemmy communities");
+      if (ImGui::BeginChild("##lemmy_results", ImVec2(150.f, 100.f)))
+        ImGui::TextUnformatted("Discovered servers");
+      ImGui::EndChild();
+    }
+    ImGui::End();
     ImGui::SetNextWindowPos(ImVec2(320.f, 50.f));
     ImGui::SetNextWindowSize(ImVec2(200.f, 200.f));
     if (ImGui::Begin("Preferences"))
@@ -42,6 +51,7 @@ int main() {
   }
 
   bool parent = false, child = false, chrome = false;
+  bool lemmy_parent = false, lemmy_child = false;
   const ImDrawData* data = ImGui::GetDrawData();
   assert(data);
   for (int i = 0; i < data->CmdListsCount; ++i) {
@@ -53,10 +63,14 @@ int main() {
       parent = layer == xanatoo::UiPanelLayer::NostrExplorer;
     if (name.find("##nostr_explorer_body/##nostr_results_") == 0)
       child = layer == xanatoo::UiPanelLayer::NostrExplorer;
+    if (name == "##lemmy_explorer_body")
+      lemmy_parent = layer == xanatoo::UiPanelLayer::LemmyExplorer;
+    if (name.find("##lemmy_explorer_body/##lemmy_results_") == 0)
+      lemmy_child = layer == xanatoo::UiPanelLayer::LemmyExplorer;
     if (name == "Preferences")
       chrome = layer == xanatoo::UiPanelLayer::Chrome;
   }
-  assert(parent && child && chrome);
+  assert(parent && child && lemmy_parent && lemmy_child && chrome);
 
   // Native z-order can change without the two embedded ImGui windows being
   // focused. Both root and scrollable child must follow the same ordering.

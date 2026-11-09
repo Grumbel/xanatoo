@@ -178,6 +178,8 @@ add_executable(xanatoo
   src/reddit.cpp
   src/reddit_credentials.cpp
   src/lemmy.cpp
+  src/lemmy_discovery.cpp
+  src/lemmy_directory.cpp
   src/hackernews.cpp
   src/time.cpp
   src/ebooks.cpp
@@ -520,6 +522,8 @@ add_executable(xanatoo_tests
   src/reddit.cpp
   src/reddit_credentials.cpp
   src/lemmy.cpp
+  src/lemmy_discovery.cpp
+  src/lemmy_directory.cpp
   src/hackernews.cpp
   src/time.cpp
   src/ebooks.cpp
@@ -691,6 +695,10 @@ add_test(NAME dock_slices_tests COMMAND xanatoo_dock_slices_tests)
 add_executable(xanatoo_ui_panel_layers_tests tests/ui_panel_layers_tests.cpp)
 target_include_directories(xanatoo_ui_panel_layers_tests PRIVATE include)
 add_test(NAME ui_panel_layers_tests COMMAND xanatoo_ui_panel_layers_tests)
+add_executable(xanatoo_lemmy_discovery_tests
+  tests/lemmy_discovery_tests.cpp src/lemmy_discovery.cpp)
+target_include_directories(xanatoo_lemmy_discovery_tests PRIVATE include)
+add_test(NAME lemmy_discovery_tests COMMAND xanatoo_lemmy_discovery_tests)
 add_executable(xanatoo_ui_panel_imgui_tests
   tests/ui_panel_imgui_tests.cpp
   external/imgui/imgui.cpp

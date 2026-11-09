@@ -16,6 +16,7 @@
 #include <sstream>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/lemmy_directory.hpp"
 #include "xanatoo/paths.hpp"
 #include "xanatoo/util.hpp"
 
@@ -37,7 +38,7 @@ struct PanelRef {
   bool open;
 };
 
-std::array<PanelRef, 13> panels(App& app) {
+std::array<PanelRef, 14> panels(App& app) {
   return {{{"help", &app.help, app.help_mode},
            {"outline", &app.ol, app.outline_mode},
            {"backlinks", &app.bl, app.backlinks_mode},
@@ -50,6 +51,7 @@ std::array<PanelRef, 13> panels(App& app) {
            {"annotations", &app.annotation_win, app.annotation_panel_open},
            {"revisions", &app.revision_win, app.revision_panel_open},
            {"nostr-explorer", &app.nostr_explorer_win, app.nostr_explorer_open},
+           {"lemmy-explorer", &app.lemmy_explorer_win, app.lemmy_explorer_open},
            {"nostr-accounts", &app.nostr_accounts_win, app.nostr_accounts_open}}};
 }
 
@@ -130,6 +132,10 @@ std::string session_text(App& app) {
     if (v.find('\n') == std::string::npos) out << "visit=" << v << "\n";
   for (int i = 0; i < 4; ++i)
     out << "dock_w" << i << "=" << unscale(app, app.dock_w[i]) << "\n";
+  out << "lemmy.instance=" << app.lemmy_instance << "\n";
+  out << "lemmy.tab=" << app.lemmy_tab << "\n";
+  out << "lemmy.sort=" << app.lemmy_sort << "\n";
+  out << "lemmy.instance_only=" << (app.lemmy_instance_only ? 1 : 0) << "\n";
   for (const PanelRef& r : panels(app)) {
     const FloatWindow& w = *r.win;
     out << r.name << ".open=" << (r.open ? 1 : 0) << "\n";
@@ -347,6 +353,24 @@ void restore_session(App& app) {
       app.nostr_explorer_open = true;
       refresh_nostr_catalogue(app);
     }
+    if (const std::string* v = get("lemmy.instance")) {
+      const std::string host = xanatoo::lemmy_instance_host(*v);
+      if (!host.empty()) {
+        xanatoo::lemmy_directory_add_instance(host);
+        app.lemmy_instance = host;
+      }
+    }
+    if (const std::string* v = get("lemmy.tab"))
+      if (*v == "0" || *v == "1" || *v == "2" || *v == "3")
+        app.lemmy_tab = (*v)[0] - '0';
+    if (const std::string* v = get("lemmy.sort"))
+      if (*v == "Hot" || *v == "New" || *v == "Active" ||
+          *v == "TopDay" || *v == "TopWeek")
+        app.lemmy_sort = *v;
+    if (const std::string* v = get("lemmy.instance_only"))
+      app.lemmy_instance_only = *v == "1";
+    if (get("lemmy-explorer.open") && *get("lemmy-explorer.open") == "1")
+      app.lemmy_explorer_open = true;
     if (get("nostr-accounts.open") && *get("nostr-accounts.open") == "1") {
       app.nostr_accounts_open = true;
       refresh_nostr_catalogue(app);

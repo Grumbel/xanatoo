@@ -12,6 +12,7 @@
 #include "xanatoo/platform.hpp"
 #include "xanatoo/reddit_credentials.hpp"
 #include "xanatoo/reply.hpp"
+#include "xanatoo/util.hpp"
 #include "ui_panel_imgui_order.hpp"
 
 #include "imgui.h"
@@ -1966,6 +1967,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::Separator();
       if (ImGui::MenuItem("Nostr Explorer", nullptr, state.nostr_explorer_open))
         cmd = UiCommand::ToggleNostrExplorer;
+      if (ImGui::MenuItem("Lemmy Explorer", nullptr, state.lemmy_explorer_open,
+                          state.lemmy_supported || state.lemmy_explorer_open))
+        cmd = UiCommand::ToggleLemmyExplorer;
       if (ImGui::MenuItem("Nostr Accounts", nullptr, state.nostr_accounts_open))
         cmd = UiCommand::ToggleNostrAccounts;
       ImGui::EndMenu();
@@ -2743,7 +2747,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   // ---- Nostr catalogue, embedded in a native FloatWindow ----
   // Geometry, title, stacking, docking and clipping belong to Xanatoo.
   // ImGui supplies only the searchable list controls within its client well.
-  constexpr ImGuiWindowFlags nostr_panel_flags =
+  constexpr ImGuiWindowFlags embedded_panel_flags =
       ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
       ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoCollapse;
@@ -2752,7 +2756,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                                   float(state.nostr_explorer_y + 3)));
     ImGui::SetNextWindowSize(ImVec2(float(std::max(1, state.nostr_explorer_w - 6)),
                                    float(std::max(1, state.nostr_explorer_h - 6))));
-    if (ImGui::Begin("##nostr_explorer_body", nullptr, nostr_panel_flags)) {
+    if (ImGui::Begin("##nostr_explorer_body", nullptr, embedded_panel_flags)) {
       ImGui::Text("Observed: %lld events, %lld notes, %lld people",
                   static_cast<long long>(state.nostr_stats.events),
                   static_cast<long long>(state.nostr_stats.notes),
@@ -2909,13 +2913,179 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     ImGui::End();
   }
 
+  // ---- Lemmy discovery catalogue, inside its native dockable panel ----
+  if (state.lemmy_explorer_open) {
+    ImGui::SetNextWindowPos(ImVec2(float(state.lemmy_explorer_x + 3),
+                                  float(state.lemmy_explorer_y + 3)));
+    ImGui::SetNextWindowSize(ImVec2(
+        float(std::max(1, state.lemmy_explorer_w - 6)),
+        float(std::max(1, state.lemmy_explorer_h - 6))));
+    if (ImGui::Begin("##lemmy_explorer_body", nullptr, embedded_panel_flags)) {
+      int counts[4] = {};
+      for (const auto& entry : state.lemmy_entries)
+        ++counts[static_cast<int>(entry.kind)];
+      ImGui::TextDisabled("%d servers · %d communities · %d people · %d posts",
+                          counts[0], counts[1], counts[2], counts[3]);
+      if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Public read-only catalogue stored locally; no login required");
+      ImGui::SetNextItemWidth(-1.f);
+      if (ImGui::BeginCombo("##lemmy_instance", state.lemmy_instance.c_str())) {
+        for (const auto& entry : state.lemmy_entries) {
+          if (entry.kind != LemmyEntryKind::Instance) continue;
+          const bool selected = entry.name == state.lemmy_instance;
+          if (ImGui::Selectable(entry.name.c_str(), selected)) {
+            cmd = UiCommand::LemmySetInstance;
+            result.arg = entry.name;
+          }
+          if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+      }
+      if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("API instance for Feed, Communities, Search and Peer discovery");
+
+      ImGui::SetNextItemWidth(-100.f * scale_);
+      if (ImGui::InputTextWithHint("##lemmy_filter", "Filter observed entries…",
+                                   lemmy_search_input_, sizeof lemmy_search_input_)) {
+        cmd = UiCommand::LemmySetSearch;
+        result.arg = lemmy_search_input_;
+      }
+      ImGui::SameLine();
+      bool only_this_server = state.lemmy_instance_only;
+      if (ImGui::Checkbox("This server", &only_this_server))
+        cmd = UiCommand::LemmyToggleInstanceOnly;
+      if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Filter discovered communities, people and posts to the selected server");
+
+      if (ImGui::RadioButton("Servers", state.lemmy_tab == 0)) {
+        cmd = UiCommand::LemmySetTab; result.arg = "0";
+      }
+      ImGui::SameLine();
+      if (ImGui::RadioButton("Communities", state.lemmy_tab == 1)) {
+        cmd = UiCommand::LemmySetTab; result.arg = "1";
+      }
+      ImGui::SameLine();
+      if (ImGui::RadioButton("People", state.lemmy_tab == 2)) {
+        cmd = UiCommand::LemmySetTab; result.arg = "2";
+      }
+      ImGui::SameLine();
+      if (ImGui::RadioButton("Posts", state.lemmy_tab == 3)) {
+        cmd = UiCommand::LemmySetTab; result.arg = "3";
+      }
+
+      const std::string base = "lemmy:" + state.lemmy_instance + "/api/v3/";
+      ImGui::BeginDisabled(!state.lemmy_supported);
+      if (ImGui::SmallButton("Feed")) {
+        cmd = UiCommand::NavigateUrl;
+        result.arg = base + "post/list?limit=25&sort=" + state.lemmy_sort;
+      }
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Find communities")) {
+        cmd = UiCommand::NavigateUrl;
+        result.arg = base + "community/list?limit=50&sort=Active";
+      }
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Federated peers")) {
+        cmd = UiCommand::NavigateUrl;
+        result.arg = base + "federated_instances";
+      }
+      if (lemmy_search_input_[0] != '\0') {
+        if (ImGui::SmallButton("Search server")) {
+          cmd = UiCommand::NavigateUrl;
+          result.arg = base + "search?q=" + lemmy_query_escape(lemmy_search_input_) +
+                       "&type_=All&limit=50";
+        }
+        ImGui::SameLine();
+      }
+      ImGui::SetNextItemWidth(114.f * scale_);
+      if (ImGui::BeginCombo("Feed sort", state.lemmy_sort.c_str())) {
+        for (const char* option : {"Hot", "Active", "New", "TopDay", "TopWeek"}) {
+          if (ImGui::Selectable(option, state.lemmy_sort == option)) {
+            cmd = UiCommand::LemmySetSort;
+            result.arg = option;
+          }
+        }
+        ImGui::EndCombo();
+      }
+      ImGui::EndDisabled();
+
+      ImGui::SetNextItemWidth(-1.f);
+      ImGui::InputTextWithHint("##lemmy_add_instance", "Add server hostname or URL",
+                               lemmy_instance_input_, sizeof lemmy_instance_input_);
+      if (ImGui::SmallButton("Add instance")) {
+        cmd = UiCommand::LemmyAddInstance;
+        result.arg = lemmy_instance_input_;
+      }
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Directory")) {
+        cmd = UiCommand::NavigateUrl;
+        result.arg = "https://join-lemmy.org/instances";
+      }
+      if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Official Lemmy server directory on join-lemmy.org");
+      ImGui::Separator();
+
+      if (ImGui::BeginChild("##lemmy_results", ImVec2(0.f, 0.f), false)) {
+        const LemmyEntryKind current = static_cast<LemmyEntryKind>(state.lemmy_tab);
+        const std::string query = ascii_lower(state.lemmy_search);
+        int matching = 0;
+        for (const auto& item : state.lemmy_entries) {
+          if (item.kind != current) continue;
+          if (state.lemmy_instance_only && current != LemmyEntryKind::Instance &&
+              item.instance != state.lemmy_instance) continue;
+          if (!query.empty() &&
+              ascii_lower(item.title).find(query) == std::string::npos &&
+              ascii_lower(item.name).find(query) == std::string::npos &&
+              ascii_lower(item.instance).find(query) == std::string::npos)
+            continue;
+          if (++matching > 250) continue; // bounded widget count for large catalogues
+          ImGui::PushID(item.ref.c_str());
+          std::string label = item.title;
+          if (item.title != item.name) label += " · " + item.name;
+          if (current != LemmyEntryKind::Instance)
+            label += " · " + item.instance;
+          if (item.score) {
+            label += " · " + std::to_string(item.score);
+            label += current == LemmyEntryKind::Community ? " subscribers" :
+                     current == LemmyEntryKind::Person ? " posts" : " points";
+          }
+          const bool selected = current == LemmyEntryKind::Instance &&
+                                item.name == state.lemmy_instance;
+          if (ImGui::Selectable(label.c_str(), selected)) {
+            if (current == LemmyEntryKind::Instance) {
+              cmd = UiCommand::LemmySetInstance;
+              result.arg = item.name;
+            } else {
+              cmd = UiCommand::NavigateUrl;
+              result.arg = item.ref;
+            }
+          }
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", current == LemmyEntryKind::Instance ?
+                "Select this server for feed, community and search actions" :
+                item.ref.c_str());
+          ImGui::PopID();
+        }
+        if (matching == 0) {
+          ImGui::TextWrapped(current == LemmyEntryKind::Instance ?
+              "No matching instances. Add a server or discover federated peers." :
+              "No cached matches yet. Browse a server feed, search it, or find communities to collect public names and posts.");
+        } else if (matching > 250) {
+          ImGui::TextDisabled("Showing first 250 of %d matches. Narrow the filter to find more.", matching);
+        }
+      }
+      ImGui::EndChild();
+    }
+    ImGui::End();
+  }
+
   // ---- Account aliases: separate native panel, deliberately watch-only ----
   if (state.nostr_accounts_open) {
     ImGui::SetNextWindowPos(ImVec2(float(state.nostr_accounts_x + 3),
                                   float(state.nostr_accounts_y + 3)));
     ImGui::SetNextWindowSize(ImVec2(float(std::max(1, state.nostr_accounts_w - 6)),
                                    float(std::max(1, state.nostr_accounts_h - 6))));
-    if (ImGui::Begin("##nostr_accounts_body", nullptr, nostr_panel_flags)) {
+    if (ImGui::Begin("##nostr_accounts_body", nullptr, embedded_panel_flags)) {
       ImGui::TextWrapped("Watch-only identities (public keys only). These cannot sign or publish events.");
       if (state.nostr_identities.empty())
         ImGui::TextDisabled("No local identities configured.");

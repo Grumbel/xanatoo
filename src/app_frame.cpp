@@ -23,6 +23,7 @@
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/html_page.hpp"
 #include "xanatoo/lemmy.hpp"
+#include "xanatoo/lemmy_directory.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/parse.hpp"
 #include "xanatoo/revstore.hpp"
@@ -321,6 +322,21 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.annotations_panel_open = app.annotation_panel_open;
   ui_state.revisions_panel_open = app.revision_panel_open;
   ui_state.nostr_explorer_open = app.nostr_explorer_open;
+  ui_state.lemmy_explorer_open = app.lemmy_explorer_open;
+  ui_state.lemmy_tab = app.lemmy_tab;
+  ui_state.lemmy_search = app.lemmy_search;
+  ui_state.lemmy_instance = app.lemmy_instance;
+  ui_state.lemmy_sort = app.lemmy_sort;
+  ui_state.lemmy_instance_only = app.lemmy_instance_only;
+  ui_state.lemmy_supported = remote_fetch_supported("lemmy:lemmy.world/c/technology");
+  if (app.lemmy_explorer_open) {
+    auto [x, y, w, h] = float_client_rect(app, app.lemmy_explorer_win);
+    ui_state.lemmy_explorer_x = x;
+    ui_state.lemmy_explorer_y = y;
+    ui_state.lemmy_explorer_w = w;
+    ui_state.lemmy_explorer_h = h;
+    ui_state.lemmy_entries = xanatoo::lemmy_directory_list();
+  }
   ui_state.nostr_accounts_open = app.nostr_accounts_open;
   ui_state.nostr_tab = app.nostr_tab;
   ui_state.nostr_search = app.nostr_search;
@@ -542,6 +558,10 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::ToggleHistory || c == C::ToggleDownloads || c == C::ToggleBookmarks ||
         c == C::ToggleAnnotationsPanel || c == C::ToggleRevisionsPanel ||
         c == C::ToggleNostrExplorer || c == C::ToggleNostrAccounts ||
+        c == C::ToggleLemmyExplorer || c == C::LemmySetTab ||
+        c == C::LemmySetSearch || c == C::LemmySetInstance ||
+        c == C::LemmyAddInstance || c == C::LemmySetSort ||
+        c == C::LemmyToggleInstanceOnly ||
         c == C::NostrSearchLocal || c == C::NostrShowPeople ||
         c == C::NostrShowEvents || c == C::NostrShowGroups ||
         c == C::NostrRefreshLocal ||
@@ -937,6 +957,40 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::ToggleNostrExplorer:
       app.nostr_explorer_open = !app.nostr_explorer_open;
       if (app.nostr_explorer_open) refresh_nostr_catalogue(app);
+      break;
+    case C::ToggleLemmyExplorer:
+      app.lemmy_explorer_open = !app.lemmy_explorer_open;
+      break;
+    case C::LemmySetTab:
+      if (arg.size() == 1 && arg[0] >= '0' && arg[0] <= '3')
+        app.lemmy_tab = arg[0] - '0';
+      break;
+    case C::LemmySetSearch:
+      app.lemmy_search = arg.substr(0, 200);
+      break;
+    case C::LemmySetInstance: {
+      const std::string host = xanatoo::lemmy_instance_host(arg);
+      if (!host.empty()) app.lemmy_instance = host;
+      break;
+    }
+    case C::LemmyAddInstance: {
+      const std::string host = xanatoo::lemmy_instance_host(arg);
+      if (host.empty()) {
+        flash_status(app, "Enter a valid Lemmy instance hostname");
+      } else {
+        xanatoo::lemmy_directory_add_instance(host);
+        app.lemmy_instance = host;
+        flash_status(app, "Added Lemmy instance " + host);
+      }
+      break;
+    }
+    case C::LemmySetSort:
+      if (arg == "Hot" || arg == "New" || arg == "Active" ||
+          arg == "TopDay" || arg == "TopWeek")
+        app.lemmy_sort = arg;
+      break;
+    case C::LemmyToggleInstanceOnly:
+      app.lemmy_instance_only = !app.lemmy_instance_only;
       break;
     case C::ToggleNostrAccounts:
       app.nostr_accounts_open = !app.nostr_accounts_open;
@@ -2199,6 +2253,7 @@ void run_chrome(App& app) {
   if (ui_frame.cmd != xanatoo::UiCommand::None &&
       ui_frame.cmd != xanatoo::UiCommand::SelectTab &&
       ui_frame.cmd != xanatoo::UiCommand::EditReply &&
+      ui_frame.cmd != xanatoo::UiCommand::LemmySetSearch &&
       ui_frame.cmd != xanatoo::UiCommand::NostrSearchLocal)
     app.ui.release_input_capture();
 }

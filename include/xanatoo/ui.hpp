@@ -5,6 +5,7 @@
 #include "xanatoo/sdl.hpp"
 #include "xanatoo/history_menu.hpp"
 #include "xanatoo/nostr_store.hpp"
+#include "xanatoo/lemmy_directory.hpp"
 #include "xanatoo/ui_panel_layers.hpp"
 #include <string>
 #include <optional>
@@ -41,6 +42,13 @@ enum class UiCommand {
   ToggleAnnotationsPanel, // annotation layer visibility / selection
   ToggleRevisionsPanel,  // native database document revision browser
   ToggleNostrExplorer, // local relay event / pubkey catalogue
+  ToggleLemmyExplorer, // collected Lemmy instances, communities, users, posts
+  LemmySetTab,         // arg = 0..3
+  LemmySetSearch,      // arg = local filter text
+  LemmySetInstance,    // arg = known instance host
+  LemmyAddInstance,    // arg = https://host or host
+  LemmySetSort,        // arg = Hot, New, Active, TopDay, TopWeek
+  LemmyToggleInstanceOnly,
   ToggleNostrAccounts, // local watch-only identities, signer management later
   NostrSearchLocal,    // arg = search text
   NostrShowPeople,     // people vs event result tab
@@ -251,6 +259,14 @@ struct UiState {
   bool revisions_panel_open = false;
   bool can_show_revisions = false;
   bool nostr_explorer_open = false;
+  bool lemmy_explorer_open = false;
+  bool lemmy_supported = false;
+  int lemmy_tab = 0;
+  std::string lemmy_search, lemmy_instance, lemmy_sort;
+  bool lemmy_instance_only = false;
+  int lemmy_explorer_x = 0, lemmy_explorer_y = 0;
+  int lemmy_explorer_w = 0, lemmy_explorer_h = 0;
+  std::vector<LemmyDirectoryEntry> lemmy_entries;
   bool nostr_accounts_open = false;
   int nostr_tab = 0;
   std::string nostr_search;
@@ -499,6 +515,8 @@ private:
   char search_input_[512] = {};  // search bar text (kept between searches)
   char nostr_local_search_[512] = {};
   char nostr_group_relay_[512] = {};
+  char lemmy_search_input_[256] = {};
+  char lemmy_instance_input_[256] = {};
   char nostr_identity_label_[160] = {};
   char nostr_identity_pubkey_[256] = {};
   char reply_input_[16384] = {}; // Markdown draft, not sent to any server

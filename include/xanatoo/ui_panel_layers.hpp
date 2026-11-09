@@ -7,11 +7,11 @@
 
 namespace xanatoo {
 
-// The five ImGui bodies whose title, geometry and stacking belong to native
+// The six ImGui bodies whose title, geometry and stacking belong to native
 // FloatWindows. Children use ImGui's "parent/child_ID" window naming scheme.
 // Menus, tooltips and popups have their own windows and must remain foreground.
 enum class UiPanelLayer { Chrome, Reply, Bookmarks, Annotations,
-                          NostrExplorer, NostrAccounts };
+                          NostrExplorer, NostrAccounts, LemmyExplorer };
 
 inline const char* ui_panel_root(UiPanelLayer layer) {
   switch (layer) {
@@ -20,6 +20,7 @@ inline const char* ui_panel_root(UiPanelLayer layer) {
     case UiPanelLayer::Annotations: return "##annotation_panel_body";
     case UiPanelLayer::NostrExplorer: return "##nostr_explorer_body";
     case UiPanelLayer::NostrAccounts: return "##nostr_accounts_body";
+    case UiPanelLayer::LemmyExplorer: return "##lemmy_explorer_body";
     case UiPanelLayer::Chrome: return nullptr;
   }
   return nullptr;
@@ -38,6 +39,7 @@ inline UiPanelLayer ui_panel_layer(std::string_view owner) {
   constexpr UiPanelLayer panels[] = {
     UiPanelLayer::Reply, UiPanelLayer::Bookmarks, UiPanelLayer::Annotations,
     UiPanelLayer::NostrExplorer, UiPanelLayer::NostrAccounts,
+    UiPanelLayer::LemmyExplorer,
   };
   for (const auto layer : panels) {
     const std::string_view prefix(ui_panel_root(layer));
