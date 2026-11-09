@@ -6,7 +6,20 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **327** (this delivery is **326**)
+Next bundle number: **328** (this delivery is **327**)
+
+## Status (2026-11-09) — native/ImGui pointer stacking cleanup
+
+- Embedded Reply/Bookmarks/Annotations/Nostr ImGui roots and nested children
+  now follow `float_stack` for hit-testing as well as paint order. Native-only
+  panels mask covered editors, while global popups and dialogs keep priority.
+- Mouse-down, motion and wheel events are filtered before ImGui receives them
+  if they land on a native foreground panel covering an embedded editor;
+  mouse-up remains forwarded. Touch and cursor selection share the same test,
+  and the gamepad pointer respects native occlusion.
+- Pure C++ ownership tests and a live vendored-ImGui overlap/child stacking
+  test pass. No SDL/Nix development tools are available here to build the
+  complete app; desktop interaction testing is still required.
 
 ## Status (2026-11-09) — Gemini certificate type include fix
 

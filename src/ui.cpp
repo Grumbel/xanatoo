@@ -12,6 +12,7 @@
 #include "xanatoo/platform.hpp"
 #include "xanatoo/reddit_credentials.hpp"
 #include "xanatoo/reply.hpp"
+#include "ui_panel_imgui_order.hpp"
 
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -729,14 +730,25 @@ bool Ui::want_capture_mouse() const {
   return ImGui::GetIO().WantCaptureMouse;
 }
 
-bool Ui::captures_point(float x, float y) const {
+bool Ui::pointer_obscured(float x, float y,
+                          std::optional<UiPanelLayer> native_top) const {
+  if (!ready_ || !native_top) return false;
+  if (ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId |
+                                 ImGuiPopupFlags_AnyPopupLevel)) return false;
+  ImGuiWindow* hovered = nullptr;
+  ImGui::FindHoveredWindowEx(ImVec2(x, y), true, &hovered, nullptr);
+  return hovered && ui_panel_obscured(ui_panel_layer(hovered->Name), native_top);
+}
+
+bool Ui::captures_point(float x, float y,
+                         std::optional<UiPanelLayer> native_top) const {
   if (!ready_) return false;
   if (ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId |
                                  ImGuiPopupFlags_AnyPopupLevel))
     return true;
   ImGuiWindow* hovered = nullptr;
   ImGui::FindHoveredWindowEx(ImVec2(x, y), true, &hovered, nullptr);
-  return hovered != nullptr;
+  return hovered && !ui_panel_obscured(ui_panel_layer(hovered->Name), native_top);
 }
 
 void Ui::release_input_capture() {
@@ -1732,14 +1744,23 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   ImGui_ImplSDLRenderer2_NewFrame();
   ImGui_ImplSDL2_NewFrame();
 #endif
+  // The SDL backend may have queued the physical mouse over a form obscured
+  // by a native-only (or different) FloatWindow. Keep hidden widgets from
+  // receiving hover, wheel and activation while the native frame is above.
+  // Button/wheel events at such positions are also filtered at event entry.
+  const bool pointer_hidden = pointer_obscured(
+      state.pointer_x, state.pointer_y, state.pointer_native_top);
+  if (pointer_hidden)
+    ImGui::GetIO().AddMousePosEvent(-FLT_MAX, -FLT_MAX);
   ImGui::NewFrame();
   // Stick is an *extra* pointer. Only drive ImGui from it while the stick is
   // actively used (axis motion or A/B held); otherwise leave the real mouse.
   if (state.stick_cursor && state.stick_active) {
     ImGuiIO& io = ImGui::GetIO();
-    io.MousePos = ImVec2(state.stick_cx, state.stick_cy);
-    io.MouseDown[0] = state.stick_lmb;
-    io.MouseDown[1] = state.stick_rmb;
+    io.MousePos = pointer_hidden ? ImVec2(-FLT_MAX, -FLT_MAX)
+                                 : ImVec2(state.stick_cx, state.stick_cy);
+    io.MouseDown[0] = !pointer_hidden && state.stick_lmb;
+    io.MouseDown[1] = !pointer_hidden && state.stick_rmb;
   }
 
   UiCommand cmd = UiCommand::None;
@@ -3030,6 +3051,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     result.bottom_reserved = vk_h;
   }
 
+  // Match the native paint stack for ImGui input, including child widgets.
+  sync_embedded_imgui_order(state.native_panel_order);
   return result;
 }
 

@@ -274,6 +274,17 @@ enum class WindowRole : uint8_t {
   Annotations, Revisions, NostrExplorer, NostrAccounts, Document
 };
 
+inline UiPanelLayer embedded_panel_layer(WindowRole role) {
+  switch (role) {
+    case WindowRole::Reply: return UiPanelLayer::Reply;
+    case WindowRole::Bookmarks: return UiPanelLayer::Bookmarks;
+    case WindowRole::Annotations: return UiPanelLayer::Annotations;
+    case WindowRole::NostrExplorer: return UiPanelLayer::NostrExplorer;
+    case WindowRole::NostrAccounts: return UiPanelLayer::NostrAccounts;
+    default: return UiPanelLayer::Chrome;
+  }
+}
+
 // One floating window: help / outline / backlinks panels and document
 // windows share geometry, docking + interaction state; role picks the
 // content.
@@ -1496,6 +1507,9 @@ void sitemap_step(App& app, int dir);
 // document windows), maximized.
 std::vector<FloatWindow*> float_stack(App& app);
 FloatWindow* float_at(App& app, int x, int y);  // topmost window under (x,y)
+// nullopt = no native frame; Chrome = a native-only panel, which covers any
+// embedded ImGui form belonging to a different window.
+std::optional<UiPanelLayer> float_layer_at(App& app, int x, int y);
 // Same edge hit-test as float_press, including the resize slack outside a frame.
 // bit 1=right, 2=bottom, 4=left, 8=top. Zero if nothing resizable is hit.
 int float_resize_at(App& app, int x, int y);

@@ -393,6 +393,12 @@ FloatWindow* float_at(App& app, int x, int y) {
   return nullptr;
 }
 
+std::optional<UiPanelLayer> float_layer_at(App& app, int x, int y) {
+  if (const FloatWindow* w = float_at(app, x, y))
+    return embedded_panel_layer(w->role);
+  return std::nullopt;
+}
+
 // Keep pointer feedback and actual resize initiation in sync. The small
 // outside-edge tolerance is intentional: thin frame edges remain grabbable.
 static int float_resize_bits(const FloatWindow& w, int mx, int my) {

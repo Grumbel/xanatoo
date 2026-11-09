@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 #include "xanatoo/ui_panel_layers.hpp"
+#include "ui_panel_imgui_order.hpp"
 
 #include "imgui.h"
+#include "imgui_internal.h"
 
 #include <cassert>
 #include <string_view>
@@ -55,5 +57,40 @@ int main() {
       chrome = layer == xanatoo::UiPanelLayer::Chrome;
   }
   assert(parent && child && chrome);
+
+  // Native z-order can change without the two embedded ImGui windows being
+  // focused. Both root and scrollable child must follow the same ordering.
+  for (int frame = 0; frame < 3; ++frame) {
+    ImGui::NewFrame();
+    ImGui::SetNextWindowPos(ImVec2(50.f, 60.f));
+    ImGui::SetNextWindowSize(ImVec2(270.f, 230.f));
+    if (ImGui::Begin("##reply_editor")) {
+      if (ImGui::BeginChild("##reply_child", ImVec2(240.f, 170.f)))
+        ImGui::TextUnformatted("Reply text");
+      ImGui::EndChild();
+    }
+    ImGui::End();
+    ImGui::SetNextWindowPos(ImVec2(70.f, 80.f));
+    ImGui::SetNextWindowSize(ImVec2(270.f, 230.f));
+    if (ImGui::Begin("##bookmarks_panel_body")) {
+      if (ImGui::BeginChild("##bookmarks_child", ImVec2(240.f, 170.f)))
+        ImGui::TextUnformatted("Bookmarks list");
+      ImGui::EndChild();
+    }
+    ImGui::End();
+    xanatoo::sync_embedded_imgui_order({xanatoo::UiPanelLayer::Reply,
+                                        xanatoo::UiPanelLayer::Bookmarks});
+    ImGui::Render();
+  }
+  auto hovered_layer = [] {
+    ImGuiWindow* hovered = nullptr;
+    ImGui::FindHoveredWindowEx(ImVec2(130.f, 140.f), true, &hovered, nullptr);
+    assert(hovered);
+    return xanatoo::ui_panel_layer(hovered->Name);
+  };
+  assert(hovered_layer() == xanatoo::UiPanelLayer::Bookmarks);
+  xanatoo::sync_embedded_imgui_order({xanatoo::UiPanelLayer::Bookmarks,
+                                      xanatoo::UiPanelLayer::Reply});
+  assert(hovered_layer() == xanatoo::UiPanelLayer::Reply);
   ImGui::DestroyContext();
 }

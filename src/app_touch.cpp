@@ -69,7 +69,7 @@ void begin_gesture(App& app, float x, float y) {
   t.on_float = false;
   t.on_lightbox = false;
   const int xi = static_cast<int>(x), yi = static_cast<int>(y);
-  if (app.ui.captures_point(x, y)) {
+  if (app.ui.captures_point(x, y, float_layer_at(app, xi, yi))) {
     t.mode = TouchMode::Ignored;
     return;
   }

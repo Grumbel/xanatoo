@@ -3,6 +3,7 @@
 #include "xanatoo/ui_panel_layers.hpp"
 
 #include <cassert>
+#include <optional>
 
 int main() {
   using xanatoo::UiPanelLayer;
@@ -23,4 +24,16 @@ int main() {
   assert(ui_panel_layer("##Menu_00") == UiPanelLayer::Chrome);
   assert(ui_panel_layer("##Tooltip_00") == UiPanelLayer::Chrome);
   assert(ui_panel_layer("") == UiPanelLayer::Chrome);
+  assert(std::string_view(xanatoo::ui_panel_root(UiPanelLayer::Reply)) ==
+         "##reply_editor");
+  assert(xanatoo::ui_panel_root(UiPanelLayer::Chrome) == nullptr);
+  using xanatoo::ui_panel_obscured;
+  // A native-only panel covers every embedded form underneath it.
+  assert(ui_panel_obscured(UiPanelLayer::Reply, UiPanelLayer::Chrome));
+  // A different embedded form may be above the one ImGui had hovered.
+  assert(ui_panel_obscured(UiPanelLayer::Bookmarks, UiPanelLayer::Reply));
+  // The foreground form and global chrome still receive input.
+  assert(!ui_panel_obscured(UiPanelLayer::Reply, UiPanelLayer::Reply));
+  assert(!ui_panel_obscured(UiPanelLayer::Chrome, UiPanelLayer::Reply));
+  assert(!ui_panel_obscured(UiPanelLayer::Reply, std::nullopt));
 }

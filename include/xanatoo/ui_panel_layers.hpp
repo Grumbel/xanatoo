@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 #pragma once
 
+#include <optional>
 #include <string_view>
 
 namespace xanatoo {
@@ -12,20 +13,39 @@ namespace xanatoo {
 enum class UiPanelLayer { Chrome, Reply, Bookmarks, Annotations,
                           NostrExplorer, NostrAccounts };
 
+inline const char* ui_panel_root(UiPanelLayer layer) {
+  switch (layer) {
+    case UiPanelLayer::Reply: return "##reply_editor";
+    case UiPanelLayer::Bookmarks: return "##bookmarks_panel_body";
+    case UiPanelLayer::Annotations: return "##annotation_panel_body";
+    case UiPanelLayer::NostrExplorer: return "##nostr_explorer_body";
+    case UiPanelLayer::NostrAccounts: return "##nostr_accounts_body";
+    case UiPanelLayer::Chrome: return nullptr;
+  }
+  return nullptr;
+}
+
+// A top native frame owns the pointer unless the ImGui hit belongs to that
+// frame's own embedded form. Chrome (menus, dialogs, popups) stays above all
+// native panels. nullopt means that no native frame covers the pointer.
+inline bool ui_panel_obscured(UiPanelLayer hovered,
+                              std::optional<UiPanelLayer> native_top) {
+  return native_top && hovered != UiPanelLayer::Chrome &&
+         hovered != *native_top;
+}
+
 inline UiPanelLayer ui_panel_layer(std::string_view owner) {
-  constexpr struct { std::string_view prefix; UiPanelLayer layer; } panels[] = {
-    {"##reply_editor", UiPanelLayer::Reply},
-    {"##bookmarks_panel_body", UiPanelLayer::Bookmarks},
-    {"##annotation_panel_body", UiPanelLayer::Annotations},
-    {"##nostr_explorer_body", UiPanelLayer::NostrExplorer},
-    {"##nostr_accounts_body", UiPanelLayer::NostrAccounts},
+  constexpr UiPanelLayer panels[] = {
+    UiPanelLayer::Reply, UiPanelLayer::Bookmarks, UiPanelLayer::Annotations,
+    UiPanelLayer::NostrExplorer, UiPanelLayer::NostrAccounts,
   };
-  for (const auto& panel : panels) {
-    if (owner == panel.prefix ||
-        (owner.size() > panel.prefix.size() &&
-         owner.substr(0, panel.prefix.size()) == panel.prefix &&
-         owner[panel.prefix.size()] == '/'))
-      return panel.layer;
+  for (const auto layer : panels) {
+    const std::string_view prefix(ui_panel_root(layer));
+    if (owner == prefix ||
+        (owner.size() > prefix.size() &&
+         owner.substr(0, prefix.size()) == prefix &&
+         owner[prefix.size()] == '/'))
+      return layer;
   }
   return UiPanelLayer::Chrome;
 }

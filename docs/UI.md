@@ -18,8 +18,10 @@ keyboard/mouse behaviour. The dock/tile model is intentionally more flexible.
 - Preferences is an application settings **dialog**, not a dockable work panel.
   Main menus, toolbars, context menus, tooltips, and the virtual keyboard are
   also ImGui chrome rather than `FloatWindow`s.
-- A native press must not act through an ImGui popup or embedded widget:
-  consult `Ui::captures_point` before native floating-window hit-tests.
+- Native mouse/touch routing consults `Ui::captures_point` with the frontmost
+  `FloatWindow` at the pointer. A hidden embedded widget cannot intercept a
+  frame/title click on a native-only panel or on another embedded panel.
+  Popups and dialogs remain above all native frames.
 
 ## Paint order
 
@@ -44,10 +46,27 @@ per-triangle fallback, which caches a whole UI frame as one texture, retains
 single-pass rendering for compatibility; its embedded controls can still
 overlap foreground native frames.
 
-**Interaction follow-up:** ImGui's input hit-testing still has its own window
-ordering. A foreground native-only panel covering an embedded ImGui form can
-leave the hidden form's widgets interactive. Synchronizing the two hit-test
-stacks and visual checking of overlapping free windows remain outstanding.
+## Pointer ownership and input stacking
+
+- Every UI frame synchronizes the embedded ImGui root windows **and their
+  children** with native `float_stack` back-to-front order. Non-panel ImGui
+  chrome retains the foreground layer.
+- The frontmost native role under the pointer is compared with the ImGui
+  window from the previous frame's hit-test. When they disagree, an obscured
+  embedded editor cannot receive mouse-down, motion, or wheel events. The
+  next ImGui frame masks that mouse position as unavailable to suppress
+  hover/tooltips over the hidden form. Mouse-up still reaches ImGui so an
+  interrupted widget drag cannot leave its button stuck.
+- Touch and native mouse cursor selection use the same ownership check as
+  mouse presses. A gamepad-driven pointer is likewise masked while its native
+  foreground window hides a form.
+
+The vendored-ImGui regression exercises two overlapping native panel bodies,
+each with a child, and swaps their stacking order without focusing them. It
+also verifies that standalone chrome windows stay out of the panel layers.
+Desktop checks should still cover actual mouse down/up, wheel and cursor
+transitions while dragging floating windows over Reply/Bookmarks/Nostr, plus
+the SDL2 triangle-renderer fallback (which still uses one draw pass).
 
 ## Resize affordances
 
@@ -68,5 +87,5 @@ The pure `dock_slices_tests` exercise distribution, resizing, minimum lengths
 and invalid persisted weight fallback; `ui_panel_layers_tests` verifies exact
 embedded-window/child classification and excludes popups and chrome. A second
 test, `ui_panel_imgui_tests`, produces actual vendored ImGui draw lists and
-checks parent, child and dialog classifications. Interactive SDL/ImGui overlap
-testing still needs a desktop build.
+checks parent, child and dialog classifications along with overlapping window
+input order. Interactive SDL/ImGui overlap testing still needs a desktop build.

@@ -697,6 +697,6 @@ add_executable(xanatoo_ui_panel_imgui_tests
   external/imgui/imgui_draw.cpp
   external/imgui/imgui_tables.cpp
   external/imgui/imgui_widgets.cpp)
-target_include_directories(xanatoo_ui_panel_imgui_tests PRIVATE include external/imgui)
+target_include_directories(xanatoo_ui_panel_imgui_tests PRIVATE include src external/imgui)
 add_test(NAME ui_panel_imgui_tests COMMAND xanatoo_ui_panel_imgui_tests)
 endif()

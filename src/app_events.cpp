@@ -175,8 +175,15 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
 
     // Menus/dialogs and the controls embedded in native panels cover their
     // own hit areas. A native window behind one must not steal the click.
-    if (app.ui.captures_point(static_cast<float>(x), static_cast<float>(y)))
+    if (app.ui.captures_point(static_cast<float>(x), static_cast<float>(y),
+                              float_layer_at(app, x, y)))
       return;
+    // The previous ImGui text field may still own keyboard focus even though
+    // a native frame now covers it. Clicking the foreground frame transfers
+    // focus away from the invisible editor as well as blocking its mouse hit.
+    if (app.ui.pointer_obscured(static_cast<float>(x), static_cast<float>(y),
+                                float_layer_at(app, x, y)))
+      app.ui.release_input_capture();
 
     // The separator between panels in one dock belongs to the dock layout,
     // rather than either adjacent title bar/client area.
@@ -2736,7 +2743,29 @@ void handle_event(App& app, SDL_Event& ev) {
     xanatoo::sdl::set_keycode(ev, SDLK_ESCAPE);
   }
   if (lightbox_event(app, ev)) return;  // fullscreen viewer owns the input
-  app.ui.process_event(ev);
+  // An obscured ImGui form can otherwise receive the down/wheel before the
+  // next frame's native panel order is synchronized. Do still forward button
+  // releases so an ImGui drag cannot be left held when a panel crosses it.
+  bool native_obscures_ui = false;
+  const auto kind = xanatoo::sdl::event_kind(ev);
+  if (kind == xanatoo::sdl::EventKind::MouseButtonDown ||
+      kind == xanatoo::sdl::EventKind::MouseMotion ||
+      kind == xanatoo::sdl::EventKind::MouseWheel) {
+    int mx = 0, my = 0;
+    if (kind == xanatoo::sdl::EventKind::MouseButtonDown) {
+      mx = static_cast<int>(ev.button.x);
+      my = static_cast<int>(ev.button.y);
+    } else if (kind == xanatoo::sdl::EventKind::MouseMotion) {
+      mx = static_cast<int>(ev.motion.x);
+      my = static_cast<int>(ev.motion.y);
+    } else {
+      xanatoo::sdl::mouse_position(&mx, &my);
+    }
+    native_obscures_ui = app.ui.pointer_obscured(
+        static_cast<float>(mx), static_cast<float>(my),
+        float_layer_at(app, mx, my));
+  }
+  if (!native_obscures_ui) app.ui.process_event(ev);
   // Mouse events SDL synthesises from touches only drive ImGui chrome; the
   // document surface gets the raw finger events (app_touch.cpp).
   if (is_touch_mouse_event(ev)) return;

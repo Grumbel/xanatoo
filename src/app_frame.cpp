@@ -2170,6 +2170,16 @@ void run_chrome(App& app) {
   place_windows(app);
   xanatoo::UiState ui_state;
   build_ui_state(app, ui_state);
+  ui_state.pointer_x = ui_state.stick_active ? ui_state.stick_cx : app.mouse_x;
+  ui_state.pointer_y = ui_state.stick_active ? ui_state.stick_cy : app.mouse_y;
+  ui_state.pointer_native_top = float_layer_at(
+      app, static_cast<int>(ui_state.pointer_x),
+      static_cast<int>(ui_state.pointer_y));
+  for (const FloatWindow* w : float_stack(app)) {
+    const auto layer = embedded_panel_layer(w->role);
+    if (layer != xanatoo::UiPanelLayer::Chrome)
+      ui_state.native_panel_order.push_back(layer);
+  }
   auto ui_frame = app.ui.begin_frame(ui_state);
   app.ui_top = ui_frame.top_reserved;
   app.ui_bottom = ui_frame.bottom_reserved;
@@ -4127,7 +4137,8 @@ void present_frame(App& app) {
   // The menu bar, popups and embedded ImGui controls own their own cursors.
   // In particular, don't turn the text-edit I-beam back into an arrow. An
   // active native drag owns its pointer even when it leaves its starting area.
-  if (native_drag || !app.ui.captures_point(app.mouse_x, app.mouse_y)) {
+  if (native_drag || !app.ui.captures_point(
+          app.mouse_x, app.mouse_y, float_layer_at(app, mx, my))) {
     SDL_Cursor* pointer = app.cursor_arrow;
     const auto resizing = [&](int bits) -> SDL_Cursor* {
       if ((bits & (1 | 4)) && (bits & (2 | 8)))

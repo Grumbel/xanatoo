@@ -7,6 +7,7 @@
 #include "xanatoo/nostr_store.hpp"
 #include "xanatoo/ui_panel_layers.hpp"
 #include <string>
+#include <optional>
 #include <vector>
 #include <unordered_map>
 
@@ -228,6 +229,11 @@ struct UiSearchEngine {
 };
 
 struct UiState {
+  // Native FloatWindows determine both the painted and interactive stacking
+  // of embedded ImGui forms. Chrome remains on top of all native windows.
+  std::vector<UiPanelLayer> native_panel_order;
+  std::optional<UiPanelLayer> pointer_native_top;
+  float pointer_x = 0.f, pointer_y = 0.f;
   bool dirty = false;
   bool can_publish = false;
   bool can_make_local_copy = false;
@@ -409,7 +415,12 @@ public:
   // True when ImGui chrome (any window from the last frame, or an open popup)
   // owns window point (x, y). Unlike want_capture_mouse() this does not
   // depend on where the mouse was last frame, so touches can be routed.
-  bool captures_point(float x, float y) const;
+  bool captures_point(float x, float y,
+                      std::optional<UiPanelLayer> native_top = std::nullopt) const;
+  // Used by event routing so a hidden embedded editor does not receive a
+  // queued mouse press/wheel before ImGui's next NewFrame().
+  bool pointer_obscured(float x, float y,
+                        std::optional<UiPanelLayer> native_top) const;
 
   // After a menu/toolbar command, drop ImGui's active widget so the next
   // keystroke goes to the document instead of the chrome.
