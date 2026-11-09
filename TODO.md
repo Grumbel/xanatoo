@@ -6,7 +6,17 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **319** (this delivery is **318**)
+Next bundle number: **320** (this delivery is **319**)
+
+## Status (2026-11-09) — Nostr group-store test SDL3 build fix
+
+- Fixed the new `xanatoo_nostr_group_store_tests` target to use the selected
+  SDL2/SDL3 backend and link its imported target. The target previously
+  compiled `src/paths.cpp` without `XANATOO_SDL3=1` or an SDL include path,
+  so the default SDL3 configuration incorrectly included `<SDL.h>` and failed.
+- This container lacks the full SDL/Nix development tools; the fix is
+  checked against CMake target wiring and awaits an actual `nix build` or
+  `nix develop` build on NixOS.
 
 ## Status (2026-11-09) — verified HTTPS and Nostr WSS by default
 

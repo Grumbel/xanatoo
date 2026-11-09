@@ -635,10 +635,14 @@ if(XANATOO_SQLITE AND XANATOO_NEED_OPENSSL AND XANATOO_TLS STREQUAL "openssl")
     src/util.cpp src/paths.cpp)
   target_include_directories(xanatoo_nostr_group_store_tests PRIVATE
     include ${SDL2_INCLUDE_DIRS})
+  # paths.cpp includes sdl.hpp for executable_dir() on non-Linux hosts.
+  # Match the app's SDL ABI, and inherit the SDL3 imported target's include
+  # directory (SDL2_INCLUDE_DIRS is intentionally empty in SDL3 builds).
   target_compile_definitions(xanatoo_nostr_group_store_tests PRIVATE
-    XANATOO_SQLITE=1 XANATOO_NOSTR=0 XANATOO_NOSTR_VERIFY_OPENSSL=1)
+    XANATOO_SQLITE=1 XANATOO_NOSTR=0 XANATOO_NOSTR_VERIFY_OPENSSL=1
+    XANATOO_SDL3=$<BOOL:${XANATOO_SDL3}>)
   target_link_libraries(xanatoo_nostr_group_store_tests PRIVATE
-    xanatoo_sqlite3 OpenSSL::Crypto)
+    xanatoo_sqlite3 OpenSSL::Crypto ${SDL2_LIBRARIES})
   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(xanatoo_nostr_group_store_tests PRIVATE
       -ffunction-sections -fdata-sections)
