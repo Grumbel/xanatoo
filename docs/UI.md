@@ -25,21 +25,29 @@ keyboard/mouse behaviour. The dock/tile model is intentionally more flexible.
 
 1. Document panes, including overlays, footnotes, scrollbars and page chrome.
 2. Centre tile split chrome.
-3. All native floating/docked frames and client content, back to front, with
-   resize grips between docked neighbours.
+3. All native floating/docked frames and client content, back to front. Each
+   embedded ImGui form is submitted immediately after its owning native frame;
+   nested ImGui child windows remain part of that form. Resize grips between
+   docked neighbours are drawn after the panels.
 4. Fixed status line (on top of a floating frame that extends too far down),
    and transient docking preview / native hover tooltip.
 5. Modal lightbox above native document chrome.
-6. ImGui menu bar, toolbars, popups, settings dialog, and embedded panel forms,
-   rendered in `Ui::end_frame` above the SDL chrome.
+6. ImGui menu bar, toolbars, popups, settings dialog, and other non-panel
+   draw lists, rendered in `Ui::end_frame` above the SDL chrome.
 
-**Remaining integration work:** ImGui embedded panel forms are still composited
-in the final ImGui pass, independently of the native `float_stack`. When a
-free native window overlaps a panel with embedded ImGui widgets, its widgets
-can paint above the foreground native frame. A proper solution needs a single
-ordered compositor for both backends (or per-panel ImGui rendering), not
-another ad-hoc SDL rectangle drawn over the text. Test that case when the
-render/compositor paths can be unified.
+`Ui::prepare_render` finalizes ImGui draw lists after `run_chrome`, before
+`draw_floats`. The `ui_panel_layer` classifier recognizes the five embedded
+panel roots and their child windows. Tooltips and popups remain foreground
+ImGui windows. Each modern SDL2/SDL3 render pass receives only its selected
+draw lists, preserving their native FloatWindow z-order. The old SDL2
+per-triangle fallback, which caches a whole UI frame as one texture, retains
+single-pass rendering for compatibility; its embedded controls can still
+overlap foreground native frames.
+
+**Interaction follow-up:** ImGui's input hit-testing still has its own window
+ordering. A foreground native-only panel covering an embedded ImGui form can
+leave the hidden form's widgets interactive. Synchronizing the two hit-test
+stacks and visual checking of overlapping free windows remain outstanding.
 
 ## Resize affordances
 
@@ -57,5 +65,8 @@ render/compositor paths can be unified.
   native pointers are never forced on top of an ImGui-owned hit area.
 
 The pure `dock_slices_tests` exercise distribution, resizing, minimum lengths
-and invalid persisted weight fallback; interactive SDL/ImGui overlap testing
-still needs a desktop build.
+and invalid persisted weight fallback; `ui_panel_layers_tests` verifies exact
+embedded-window/child classification and excludes popups and chrome. A second
+test, `ui_panel_imgui_tests`, produces actual vendored ImGui draw lists and
+checks parent, child and dialog classifications. Interactive SDL/ImGui overlap
+testing still needs a desktop build.

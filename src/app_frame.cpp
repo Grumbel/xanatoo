@@ -4230,6 +4230,9 @@ void run_frame(App& app) {
   poll_images(app);
   draw_panes(app);
   draw_split_chrome(app);
+  // Freeze ImGui's draw lists before painting native frames. Rich panel forms
+  // now composite inside float_stack rather than across everything at the end.
+  app.ui.prepare_render();
   draw_floats(app);
   // The status line is fixed chrome and rejects pointer input in its strip.
   // Paint it after free windows too, so a very tall panel cannot cover it.

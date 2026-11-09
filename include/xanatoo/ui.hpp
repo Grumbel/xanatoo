@@ -5,6 +5,7 @@
 #include "xanatoo/sdl.hpp"
 #include "xanatoo/history_menu.hpp"
 #include "xanatoo/nostr_store.hpp"
+#include "xanatoo/ui_panel_layers.hpp"
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -430,6 +431,11 @@ public:
   void open_bookmark_menu(float x, float y);
 
   UiFrameResult begin_frame(const UiState& state);
+  // Finalize ImGui's command lists before native panels are painted. Each
+  // embedded form is then drawn immediately after its owning native frame;
+  // application chrome and popups are painted last in end_frame().
+  void prepare_render();
+  void render_embedded_panel(SDL_Renderer* renderer, UiPanelLayer panel);
   void end_frame(SDL_Renderer* renderer);
 
   bool ready() const { return ready_; }
@@ -452,6 +458,8 @@ private:
   void tool_menu_end();
 
   bool ready_ = false;
+  bool render_prepared_ = false;
+  bool layered_panels_ = false;
   float scale_ = 1.f;
   SDL_Window* window_ = nullptr;
   SDL_Renderer* renderer_ = nullptr;

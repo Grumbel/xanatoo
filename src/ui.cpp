@@ -1724,6 +1724,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
 UiFrameResult Ui::begin_frame(const UiState& state) {
   UiFrameResult result;
   if (!ready_) return result;
+  render_prepared_ = false;
 
 #if defined(XANATOO_SDL3) && XANATOO_SDL3
   xanatoo::imgui_sdl3::new_frame();
@@ -3032,18 +3033,86 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   return result;
 }
 
-void Ui::end_frame(SDL_Renderer* renderer) {
+void Ui::prepare_render() {
   if (!ready_) return;
+  if (render_prepared_) return;
   // A text field (URL bar) just took focus: on-screen keyboard (Android).
   const bool wants_text = ImGui::GetIO().WantTextInput;
   if (wants_text && !wanted_text_input_) platform_request_keyboard(window_);
   wanted_text_input_ = wants_text;
   ImGui::Render();
+  render_prepared_ = true;
 #if defined(XANATOO_SDL3) && XANATOO_SDL3
-  xanatoo::imgui_sdl3::render(ImGui::GetDrawData(), renderer);
+  layered_panels_ = true;
 #else
-  ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
+  // The pre-2.0.18 SDL fallback caches a *whole* UI render in one texture;
+  // rendering individual lists would invalidate that cache repeatedly. Keep
+  // the historical single-pass path for those older R36S SDL libraries.
+  layered_panels_ = !ImGui_ImplSDLRenderer2_UsesTriangleFallback();
 #endif
+}
+
+// ImGui produces one draw list per window (and separate lists for child
+// windows). Partition those existing lists without rebuilding widgets or
+// changing their input state; each panel's lists can then be composited in
+// exactly the same order as its native FloatWindow frame.
+static void render_ui_layer(SDL_Renderer* renderer, UiPanelLayer layer,
+                            bool chrome_only) {
+  ImDrawData* full = ImGui::GetDrawData();
+  if (!full) return;
+  std::vector<ImDrawList*> lists;
+  int vertices = 0, indices = 0;
+  for (int i = 0; i < full->CmdListsCount; ++i) {
+    ImDrawList* list = full->CmdLists[i];
+    const UiPanelLayer owner = ui_panel_layer(
+        list->_OwnerName ? std::string_view(list->_OwnerName) : std::string_view());
+    if ((chrome_only && owner != UiPanelLayer::Chrome) ||
+        (!chrome_only && owner != layer))
+      continue;
+    lists.push_back(list);
+    vertices += list->VtxBuffer.Size;
+    indices += list->IdxBuffer.Size;
+  }
+  if (lists.empty()) return;
+  // ImDrawData owns the pointer array (ImVector), so never shallow-copy it:
+  // a copied array would be freed twice at the end of this temporary pass.
+  ImDrawData selected;
+  selected.Valid = full->Valid;
+  selected.DisplayPos = full->DisplayPos;
+  selected.DisplaySize = full->DisplaySize;
+  selected.FramebufferScale = full->FramebufferScale;
+  selected.CmdLists.resize(static_cast<int>(lists.size()));
+  for (int i = 0; i < static_cast<int>(lists.size()); ++i)
+    selected.CmdLists[i] = lists[static_cast<size_t>(i)];
+  selected.CmdListsCount = static_cast<int>(lists.size());
+  selected.TotalVtxCount = vertices;
+  selected.TotalIdxCount = indices;
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  xanatoo::imgui_sdl3::render(&selected, renderer);
+#else
+  ImGui_ImplSDLRenderer2_RenderDrawData(&selected, renderer);
+#endif
+}
+
+void Ui::render_embedded_panel(SDL_Renderer* renderer, UiPanelLayer panel) {
+  if (!ready_ || !render_prepared_ || !layered_panels_ ||
+      panel == UiPanelLayer::Chrome) return;
+  render_ui_layer(renderer, panel, false);
+}
+
+void Ui::end_frame(SDL_Renderer* renderer) {
+  if (!ready_) return;
+  prepare_render();
+  if (layered_panels_) {
+    render_ui_layer(renderer, UiPanelLayer::Chrome, true);
+  } else {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+    xanatoo::imgui_sdl3::render(ImGui::GetDrawData(), renderer);
+#else
+    ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
+#endif
+  }
+  render_prepared_ = false;
 }
 
 }  // namespace xanatoo

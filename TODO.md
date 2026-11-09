@@ -6,7 +6,20 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **325** (this delivery is **324**)
+Next bundle number: **326** (this delivery is **325**)
+
+## Status (2026-11-09) — embedded panel paint ordering
+
+- Prepared ImGui's display lists before native window painting; five rich
+  embedded panel bodies (Reply, Bookmarks, Annotations, Nostr Explorer and
+  Nostr Accounts) now render immediately after their own FloatWindow frames
+  in the shared back-to-front stack. Menus, popups, tooltips, toolbars and the
+  settings dialog remain on top. Child ImGui windows are classified with their
+  parent panel; pure and live vendored-ImGui draw-list tests pass.
+- Old SDL2/R36S per-triangle caching still uses the historical single render
+  pass until its cache is reworked. Interactive hit-testing above obscured
+  widgets and desktop UI testing remain pending; no full SDL/Nix build tools
+  are available in this environment.
 
 ## Status (2026-11-09) — UI panel / resize cleanup
 

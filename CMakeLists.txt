@@ -688,4 +688,15 @@ add_test(NAME tile_tree_tests COMMAND xanatoo_tile_tree_tests)
 add_executable(xanatoo_dock_slices_tests tests/dock_slices_tests.cpp)
 target_include_directories(xanatoo_dock_slices_tests PRIVATE include)
 add_test(NAME dock_slices_tests COMMAND xanatoo_dock_slices_tests)
+add_executable(xanatoo_ui_panel_layers_tests tests/ui_panel_layers_tests.cpp)
+target_include_directories(xanatoo_ui_panel_layers_tests PRIVATE include)
+add_test(NAME ui_panel_layers_tests COMMAND xanatoo_ui_panel_layers_tests)
+add_executable(xanatoo_ui_panel_imgui_tests
+  tests/ui_panel_imgui_tests.cpp
+  external/imgui/imgui.cpp
+  external/imgui/imgui_draw.cpp
+  external/imgui/imgui_tables.cpp
+  external/imgui/imgui_widgets.cpp)
+target_include_directories(xanatoo_ui_panel_imgui_tests PRIVATE include external/imgui)
+add_test(NAME ui_panel_imgui_tests COMMAND xanatoo_ui_panel_imgui_tests)
 endif()

@@ -736,6 +736,7 @@ void draw_floats(App& app) {
         draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
                             "Bookmarks", true, w->dock == Dock::None,
                             0, w->dock == Dock::Max);
+        app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Bookmarks);
         break;
       case WindowRole::Downloads:
         draw_downloads_panel(app);
@@ -744,11 +745,13 @@ void draw_floats(App& app) {
         draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
                             "Reply (mockup)", true, w->dock == Dock::None,
                             0, w->dock == Dock::Max);
+        app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Reply);
         break;
       case WindowRole::Annotations:
         draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
                             "Annotations", true, w->dock == Dock::None,
                             0, w->dock == Dock::Max);
+        app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Annotations);
         break;
       case WindowRole::Revisions:
         draw_revision_panel(app);
@@ -757,11 +760,13 @@ void draw_floats(App& app) {
         draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
                             "Nostr Explorer", true, w->dock == Dock::None,
                             0, w->dock == Dock::Max);
+        app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::NostrExplorer);
         break;
       case WindowRole::NostrAccounts:
         draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
                             "Nostr Accounts", true, w->dock == Dock::None,
                             0, w->dock == Dock::Max);
+        app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::NostrAccounts);
         break;
       case WindowRole::Help:
         draw_help_window(app);
