@@ -135,6 +135,7 @@ add_executable(xanatoo
   src/app_collection.cpp
   src/app_drafts.cpp
   src/app_revisions.cpp
+  src/app_nostr.cpp
   src/app_about.cpp
   src/app_passage.cpp
   src/app_report.cpp
@@ -171,6 +172,7 @@ add_executable(xanatoo
   src/version.cpp
   src/gemini.cpp
   src/nostr.cpp
+  src/nostr_store.cpp
   src/reddit.cpp
   src/reddit_credentials.cpp
   src/lemmy.cpp
@@ -528,6 +530,7 @@ add_executable(xanatoo_tests
   src/locator.cpp
   src/native.cpp
   src/nostr.cpp
+  src/nostr_store.cpp
   src/gemini.cpp
   src/epub_import.cpp
   src/epub_native.cpp

@@ -500,6 +500,11 @@ void poll_fetches(App& app) {
     }
   }
   for (FetchJob& job : done) {
+    // Workers may have added Nostr events and newly seen public keys. Update
+    // the explorer from the main thread after the fetch, not on every frame.
+    if (job.shared->service == "Nostr" &&
+        (app.nostr_explorer_open || app.nostr_accounts_open))
+      refresh_nostr_catalogue(app);
     if (job.shared->download && job.shared->download->phase.load() ==
                                     xanatoo::DownloadPhase::Pending)
       job.shared->download->phase.store(xanatoo::DownloadPhase::Skipped);

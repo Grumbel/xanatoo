@@ -26,6 +26,7 @@
 #include "xanatoo/locator.hpp"
 #include "xanatoo/minibuffer.hpp"
 #include "xanatoo/nav_history.hpp"
+#include "xanatoo/nostr_store.hpp"
 #include "xanatoo/paginate.hpp"
 #include "xanatoo/render.hpp"
 #include "xanatoo/revstore.hpp"
@@ -264,7 +265,7 @@ enum class Dock : uint8_t { None = 0, Left, Right, Top, Bottom, Max };
 
 enum class WindowRole : uint8_t {
   Help, Outline, Backlinks, Sitemap, Page, History, Styles, Downloads, Reply,
-  Annotations, Revisions, Document
+  Annotations, Revisions, NostrExplorer, NostrAccounts, Document
 };
 
 // One floating window: help / outline / backlinks panels and document
@@ -741,6 +742,18 @@ struct App {
   uint64_t annotation_layers_gen = 1;
   bool annotation_panel_open = false;
   bool revision_panel_open = false;
+  bool nostr_explorer_open = false;
+  bool nostr_accounts_open = false;
+  bool nostr_people_tab = true;
+  std::string nostr_search;
+  int nostr_page = 0;
+  bool nostr_people_more = false;
+  bool nostr_events_more = false;
+  NostrCacheStats nostr_stats;
+  std::vector<NostrCachedPerson> nostr_people;
+  std::vector<NostrCachedEvent> nostr_events;
+  std::vector<NostrLocalIdentity> nostr_identities;
+  std::string nostr_active_identity;
   std::string revision_document_key;
   std::string revision_working, revision_published, revision_selected;
   std::vector<xanatoo::ObjectRevision> revision_history;
@@ -815,6 +828,8 @@ struct App {
   FloatWindow reply_win = make_float_panel(WindowRole::Reply, 170, 170, 490, 350);
   FloatWindow annotation_win = make_float_panel(WindowRole::Annotations, 150, 110, 430, 540);
   FloatWindow revision_win = make_float_panel(WindowRole::Revisions, 120, 140, 550, 560);
+  FloatWindow nostr_explorer_win = make_float_panel(WindowRole::NostrExplorer, 180, 120, 560, 520);
+  FloatWindow nostr_accounts_win = make_float_panel(WindowRole::NostrAccounts, 200, 150, 440, 440);
   ReplyDraft reply;
   SitemapPanel sitemap;
   SearchBar search;
@@ -846,6 +861,10 @@ struct App {
 };
 
 // ---- session (app_session.cpp) ----
+// Nostr's local SQLite observation catalogue, refreshed only on open/search
+// or the explicit Refresh action (not with a database query per frame).
+void refresh_nostr_catalogue(App& app);
+
 // Write state_dir()/session.conf (at shutdown); restore it at startup when
 // no document was named on the command line; put the saved scroll back once
 // its page has loaded (per frame).

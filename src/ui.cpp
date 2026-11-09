@@ -7,6 +7,7 @@
 #include "xanatoo/view_settings.hpp"
 #include <cmath>
 #include "xanatoo/font.hpp"
+#include "xanatoo/nostr.hpp"
 #include "xanatoo/paths.hpp"
 #include "xanatoo/platform.hpp"
 #include "xanatoo/reddit_credentials.hpp"
@@ -1918,6 +1919,11 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                           state.revisions_panel_open,
                           state.can_show_revisions || state.revisions_panel_open))
         cmd = UiCommand::ToggleRevisionsPanel;
+      ImGui::Separator();
+      if (ImGui::MenuItem("Nostr Explorer", nullptr, state.nostr_explorer_open))
+        cmd = UiCommand::ToggleNostrExplorer;
+      if (ImGui::MenuItem("Nostr Accounts", nullptr, state.nostr_accounts_open))
+        cmd = UiCommand::ToggleNostrAccounts;
       ImGui::EndMenu();
     }
     // Go: moving through and between pages, plus the panels that do so.
@@ -2659,6 +2665,147 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
           ImGui::PopID();
         }
       }
+    }
+    ImGui::End();
+  }
+
+  // ---- Nostr catalogue, embedded in a native FloatWindow ----
+  // Geometry, title, stacking, docking and clipping belong to Xanatoo.
+  // ImGui supplies only the searchable list controls within its client well.
+  constexpr ImGuiWindowFlags nostr_panel_flags =
+      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+      ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoCollapse;
+  if (state.nostr_explorer_open) {
+    ImGui::SetNextWindowPos(ImVec2(float(state.nostr_explorer_x + 3),
+                                  float(state.nostr_explorer_y + 3)));
+    ImGui::SetNextWindowSize(ImVec2(float(std::max(1, state.nostr_explorer_w - 6)),
+                                   float(std::max(1, state.nostr_explorer_h - 6))));
+    if (ImGui::Begin("##nostr_explorer_body", nullptr, nostr_panel_flags)) {
+      ImGui::Text("Observed: %lld events, %lld notes, %lld people",
+                  static_cast<long long>(state.nostr_stats.events),
+                  static_cast<long long>(state.nostr_stats.notes),
+                  static_cast<long long>(state.nostr_stats.pubkeys));
+      ImGui::TextDisabled("%lld profiles, %lld relays (local sample; unverified)",
+                          static_cast<long long>(state.nostr_stats.profiles),
+                          static_cast<long long>(state.nostr_stats.relays));
+      ImGui::SetNextItemWidth(-80.f * scale_);
+      if (ImGui::InputText("##nostr_search", nostr_local_search_,
+                           sizeof nostr_local_search_)) {
+        cmd = UiCommand::NostrSearchLocal;
+        result.arg = nostr_local_search_;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Refresh")) cmd = UiCommand::NostrRefreshLocal;
+      if (ImGui::RadioButton("People", state.nostr_show_people))
+        cmd = UiCommand::NostrShowPeople;
+      ImGui::SameLine();
+      if (ImGui::RadioButton("Events", !state.nostr_show_people))
+        cmd = UiCommand::NostrShowEvents;
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Fetch recent")) {
+        cmd = UiCommand::NavigateUrl;
+        result.arg = "nostr:recent";
+      }
+      ImGui::BeginDisabled(state.nostr_page == 0);
+      if (ImGui::SmallButton("Previous")) cmd = UiCommand::NostrPrevPage;
+      ImGui::EndDisabled();
+      ImGui::SameLine();
+      ImGui::Text("Page %d", state.nostr_page + 1);
+      ImGui::SameLine();
+      ImGui::BeginDisabled(!(state.nostr_show_people ? state.nostr_people_more :
+                            state.nostr_events_more));
+      if (ImGui::SmallButton("Next")) cmd = UiCommand::NostrNextPage;
+      ImGui::EndDisabled();
+      ImGui::Separator();
+      // A child scroll area avoids producing thousands of text widgets when
+      // an explorer panel is shrunk or docked beneath another panel.
+      if (ImGui::BeginChild("##nostr_results", ImVec2(0.f, 0.f), false)) {
+        if (state.nostr_show_people) {
+          if (state.nostr_people.empty())
+            ImGui::TextWrapped("No matching public keys cached yet. Fetch recent notes, or open an npub1 / note1 address.");
+          for (const auto& person : state.nostr_people) {
+            ImGui::PushID(person.pubkey.c_str());
+            const std::string label = (person.name.empty() ?
+                person.pubkey.substr(0, 14) + "…" : person.name) +
+                "  ·  " + std::to_string(person.post_count) + " notes";
+            if (ImGui::Selectable(label.c_str())) {
+              cmd = UiCommand::NavigateUrl;
+              result.arg = "nostr:" + nostr_bech32("npub", person.pubkey);
+            }
+            if (ImGui::IsItemHovered())
+              ImGui::SetTooltip("%s\n%lld unique events observed\n%s",
+                                person.pubkey.c_str(),
+                                static_cast<long long>(person.event_count),
+                                person.nip05.c_str());
+            ImGui::PopID();
+          }
+        } else {
+          if (state.nostr_events.empty())
+            ImGui::TextWrapped("No matching cached events. Only events downloaded by this client appear here.");
+          for (const auto& ev : state.nostr_events) {
+            ImGui::PushID(ev.id.c_str());
+            const std::string name = ev.author_name.empty() ?
+                ev.pubkey.substr(0, 12) + "…" : ev.author_name;
+            std::string summary = ev.content;
+            for (char& c : summary) if (c == '\n' || c == '\r') c = ' ';
+            if (summary.size() > 110) summary = summary.substr(0, 110) + "…";
+            const std::string label = "kind " + std::to_string(ev.kind) +
+                " · " + name + " · " + summary;
+            if (ImGui::Selectable(label.c_str(), false,
+                                  ev.kind == 1 ? 0 : ImGuiSelectableFlags_Disabled)) {
+              cmd = UiCommand::NavigateUrl;
+              result.arg = "nostr:" + nostr_bech32("note", ev.id);
+            }
+            if (ImGui::IsItemHovered())
+              ImGui::SetTooltip("%s\n%s", ev.id.c_str(), ev.pubkey.c_str());
+            ImGui::PopID();
+          }
+        }
+      }
+      ImGui::EndChild();
+    }
+    ImGui::End();
+  }
+
+  // ---- Account aliases: separate native panel, deliberately watch-only ----
+  if (state.nostr_accounts_open) {
+    ImGui::SetNextWindowPos(ImVec2(float(state.nostr_accounts_x + 3),
+                                  float(state.nostr_accounts_y + 3)));
+    ImGui::SetNextWindowSize(ImVec2(float(std::max(1, state.nostr_accounts_w - 6)),
+                                   float(std::max(1, state.nostr_accounts_h - 6))));
+    if (ImGui::Begin("##nostr_accounts_body", nullptr, nostr_panel_flags)) {
+      ImGui::TextWrapped("Watch-only identities (public keys only). These cannot sign or publish events.");
+      if (state.nostr_identities.empty())
+        ImGui::TextDisabled("No local identities configured.");
+      for (const auto& identity : state.nostr_identities) {
+        ImGui::PushID(identity.pubkey.c_str());
+        if (ImGui::RadioButton(identity.label.c_str(),
+                               identity.pubkey == state.nostr_selected_identity)) {
+          cmd = UiCommand::NostrSelectIdentity;
+          result.arg = identity.pubkey;
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("View profile")) {
+          cmd = UiCommand::NavigateUrl;
+          result.arg = "nostr:" + nostr_bech32("npub", identity.pubkey);
+        }
+        ImGui::TextDisabled("%s…", identity.pubkey.substr(0, 24).c_str());
+        ImGui::PopID();
+      }
+      ImGui::Separator();
+      ImGui::TextUnformatted("Add or rename a public identity");
+      ImGui::InputText("Label", nostr_identity_label_,
+                       sizeof nostr_identity_label_);
+      ImGui::InputText("npub / hex", nostr_identity_pubkey_,
+                       sizeof nostr_identity_pubkey_);
+      if (ImGui::Button("Save watch-only identity")) {
+        cmd = UiCommand::NostrAddWatchIdentity;
+        result.arg = std::string(nostr_identity_label_) + "\n" +
+                     nostr_identity_pubkey_;
+      }
+      ImGui::Separator();
+      ImGui::TextWrapped("Creating an account with a signing key needs secure NIP-46 remote signing or encrypted NIP-49 key storage. No private keys are accepted here.");
     }
     ImGui::End();
   }

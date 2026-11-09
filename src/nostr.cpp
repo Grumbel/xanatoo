@@ -5,6 +5,7 @@
 // mapped into Thread / Message document nodes.
 
 #include "xanatoo/nostr.hpp"
+#include "xanatoo/nostr_store.hpp"
 #include "xanatoo/util.hpp"
 
 #include "xanatoo/https.hpp"
@@ -1016,9 +1017,10 @@ std::vector<std::string> default_relays() {
 }
 
 void collect_ws_events(WsConn& c, std::map<std::string, NostrEvent>& by_id,
-                       int timeout_sec) {
+                       int timeout_sec, std::string_view relay) {
   // Seed from any bytes left after the HTTP upgrade (first WS frames).
   std::string carry = std::move(c.carry);
+  std::vector<std::string> downloaded;
   auto deadline =
       std::chrono::steady_clock::now() + std::chrono::seconds(timeout_sec);
   while (std::chrono::steady_clock::now() < deadline) {
@@ -1030,10 +1032,15 @@ void collect_ws_events(WsConn& c, std::map<std::string, NostrEvent>& by_id,
     if (brace == std::string::npos) continue;
     size_t endb = msg.rfind('}');
     if (endb == std::string::npos || endb <= brace) continue;
+    const std::string raw = msg.substr(brace, endb - brace + 1);
     NostrEvent ev;
-    if (!parse_event_json(msg.substr(brace, endb - brace + 1), ev)) continue;
+    if (!parse_event_json(raw, ev)) continue;
+    downloaded.push_back(raw);
     by_id.insert_or_assign(ev.id, std::move(ev));
   }
+  // Persist every received event kind, including profile events and duplicates
+  // from different relays (the DB deduplicates by id and records source).
+  nostr_cache_events(downloaded, relay);
 }
 
 void query_relay(const std::string& relay, const std::string& event_id,
@@ -1053,7 +1060,7 @@ void query_relay(const std::string& relay, const std::string& event_id,
     if (last_err) *last_err = "WS send failed";
     return;
   }
-  collect_ws_events(c, by_id, 5);
+  collect_ws_events(c, by_id, 5, relay);
   ws_send_text(c, std::string("[\"CLOSE\",\"") + sub + "\"]");
 }
 
@@ -1073,7 +1080,7 @@ void query_recent(const std::string& relay,
     if (last_err) *last_err = "WS send failed";
     return;
   }
-  collect_ws_events(c, by_id, 6);
+  collect_ws_events(c, by_id, 6, relay);
   ws_send_text(c, std::string("[\"CLOSE\",\"") + sub + "\"]");
 }
 
@@ -1094,7 +1101,7 @@ void query_author(const std::string& relay, const std::string& pubkey,
     if (last_err) *last_err = "WS send failed";
     return;
   }
-  collect_ws_events(c, by_id, 6);
+  collect_ws_events(c, by_id, 6, relay);
   ws_send_text(c, std::string("[\"CLOSE\",\"") + sub + "\"]");
 }
 
@@ -1120,7 +1127,7 @@ void query_profiles(const std::string& relay,
                     "],\"limit\":40}]";
   if (!ws_send_text(c, req)) return;
   std::map<std::string, NostrEvent> tmp;
-  collect_ws_events(c, tmp, 4);
+  collect_ws_events(c, tmp, 4, relay);
   ws_send_text(c, std::string("[\"CLOSE\",\"") + sub + "\"]");
   for (auto& kv : tmp) {
     if (kv.second.kind != 0) continue;
@@ -1187,6 +1194,20 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
     if (!recent_mode && id && by_id.count(*id) && by_id.size() >= 3) break;
   }
 
+  // Local-first history is useful even when a relay has pruned old events.
+  // On total network failure it is also an offline fallback. The source is
+  // explicitly a *cache*, never a proof of event signature or identity.
+  const bool got_live_events = !by_id.empty();
+  std::vector<std::string> cached = recent_mode ? nostr_cached_recent_json() :
+      author ? nostr_cached_author_json(*author) :
+      nostr_cached_thread_json(*id);
+  if (!recent_mode || by_id.empty()) {
+    for (const std::string& raw : cached) {
+      NostrEvent e;
+      if (parse_event_json(raw, e)) by_id.try_emplace(e.id, std::move(e));
+    }
+  }
+
   if (by_id.empty()) {
     if (err) {
       if (recent_mode) {
@@ -1233,11 +1254,18 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
       if (seen_pk.insert(pk).second) pubkeys.push_back(std::move(pk));
   }
   std::map<std::string, std::string> profiles;
+  for (const auto& pk : pubkeys) {
+    const auto local = nostr_cached_people(pk, 1);
+    if (!local.empty() && local[0].pubkey == pk && !local[0].name.empty())
+      profiles[pk] = local[0].name;
+  }
   std::string prof_err;
-  for (const auto& r : relays) {
-    if (r.rfind("wss://", 0) != 0) continue;
-    query_profiles(r, pubkeys, profiles, &prof_err);
-    if (profiles.size() >= pubkeys.size()) break;
+  if (got_live_events) {
+    for (const auto& r : relays) {
+      if (r.rfind("wss://", 0) != 0) continue;
+      query_profiles(r, pubkeys, profiles, &prof_err);
+      if (profiles.size() >= pubkeys.size()) break;
+    }
   }
 
   std::vector<NostrEvent> events;

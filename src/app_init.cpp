@@ -67,7 +67,8 @@ bool app_init(App& app) {
   // Panel geometry defaults (px at scale 1).
   for (FloatWindow* w : {&app.help, &app.bl, &app.ol, &app.sm, &app.pg,
                          &app.history_win, &app.styles_win, &app.downloads_win,
-                         &app.annotation_win, &app.revision_win}) {
+                         &app.annotation_win, &app.revision_win,
+                         &app.nostr_explorer_win, &app.nostr_accounts_win}) {
     w->x = static_cast<int>(std::lround(w->x * app.ui_scale));
     w->y = static_cast<int>(std::lround(w->y * app.ui_scale));
     w->w = static_cast<int>(std::lround(w->w * app.ui_scale));
@@ -77,7 +78,8 @@ bool app_init(App& app) {
     w = static_cast<int>(std::lround(w * app.ui_scale));
   for (FloatWindow* w : {&app.help, &app.bl, &app.ol, &app.sm, &app.pg,
                          &app.history_win, &app.styles_win, &app.downloads_win,
-                         &app.annotation_win, &app.revision_win}) {
+                         &app.annotation_win, &app.revision_win,
+                         &app.nostr_explorer_win, &app.nostr_accounts_win}) {
     w->restore_x = w->x;
     w->restore_y = w->y;
     w->restore_w = w->w;
@@ -88,6 +90,8 @@ bool app_init(App& app) {
   app.pg.dock = Dock::Left;  // like frames: a side column
   app.annotation_win.dock = Dock::Right;
   app.revision_win.dock = Dock::Right;
+  app.nostr_explorer_win.dock = Dock::Right;
+  app.nostr_accounts_win.dock = Dock::Right;
   // Preferred paths are optional — FontConfig resolves a full family set.
   auto existing_font = [](std::string path) {
     if (!path.empty() && !fs::exists(path)) {

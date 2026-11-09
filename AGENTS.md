@@ -514,6 +514,19 @@ history or distribute patch files.
 
 - WSS over `TlsStream` (`tls.hpp`).
 - Read-only note/thread fetch gated by `XANATOO_NOSTR` (default ON; needs OpenSSL).
+- Relay events and encountered public keys now persist in `nostr.sqlite` via
+  `nostr_store.cpp` when SQLite is enabled (no writes under `--no-save`). Events
+  are deduplicated by id; distinct source relays, `p` tag/NIP-19 mentioned
+  keys, and newest observed kind-0 metadata are indexed. **Event signatures,
+  IDs and claimed NIP-05 names are not verified yet**. Do not portray the
+  cache as a trusted or exhaustive Nostr directory. `docs/NOSTR.md` has the
+  discovery, privacy and group/channel roadmap.
+- Two native dockable `FloatWindow` panels are exposed in Panels: **Nostr
+  Explorer** searches local events/people and shows observed counts; **Nostr
+  Accounts** manages multiple named *watch-only* public keys. They use ImGui
+  only for embedded form controls. No signing-capable accounts, private-key
+  input or outbound publication exist yet; add NIP-46/NIP-49 key management
+  before offering actual identity creation or posting.
 - Opens `note1` / `nevent1` / `nostr:…` / 64-hex via Ctrl+L → Thread+Message layout.
 - `npub1` / `nprofile1` open the author's profile + recent notes. Message
   headers link the author (`nostr:npub1…`) and date (`nostr:note1…`) via
@@ -534,7 +547,8 @@ history or distribute patch files.
 - Links to images (`is_image_url`: http(s) or local path by extension)
   open the lightbox over every image link of the page (`open_link_image`,
   checked before split / external handling), never the system browser.
-- No posting or key management in v1.
+- No posting or secret-key management in v1. Publication transport options
+  (WebDAV, static export, Nostr, IPFS) are sketched in `docs/PUBLISHING.md`.
 
 ## Images through thumtoo (`image_backend.hpp`)
 

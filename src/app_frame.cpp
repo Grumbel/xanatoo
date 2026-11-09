@@ -311,6 +311,32 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.bookmarks = app.bookmarks;
   ui_state.annotations_panel_open = app.annotation_panel_open;
   ui_state.revisions_panel_open = app.revision_panel_open;
+  ui_state.nostr_explorer_open = app.nostr_explorer_open;
+  ui_state.nostr_accounts_open = app.nostr_accounts_open;
+  ui_state.nostr_show_people = app.nostr_people_tab;
+  ui_state.nostr_search = app.nostr_search;
+  ui_state.nostr_page = app.nostr_page;
+  ui_state.nostr_people_more = app.nostr_people_more;
+  ui_state.nostr_events_more = app.nostr_events_more;
+  ui_state.nostr_stats = app.nostr_stats;
+  ui_state.nostr_people = app.nostr_people;
+  ui_state.nostr_events = app.nostr_events;
+  ui_state.nostr_identities = app.nostr_identities;
+  ui_state.nostr_selected_identity = app.nostr_active_identity;
+  if (app.nostr_explorer_open) {
+    auto [x, y, w, h] = float_client_rect(app, app.nostr_explorer_win);
+    ui_state.nostr_explorer_x = x;
+    ui_state.nostr_explorer_y = y;
+    ui_state.nostr_explorer_w = w;
+    ui_state.nostr_explorer_h = h;
+  }
+  if (app.nostr_accounts_open) {
+    auto [x, y, w, h] = float_client_rect(app, app.nostr_accounts_win);
+    ui_state.nostr_accounts_x = x;
+    ui_state.nostr_accounts_y = y;
+    ui_state.nostr_accounts_w = w;
+    ui_state.nostr_accounts_h = h;
+  }
   {
     const DocBuffer* b = find_buf(app, focused_pane(app).buf);
     ui_state.can_show_revisions = b && !!find_stored_document(b->doc_key);
@@ -504,6 +530,11 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::GoHome || c == C::GoUp ||
         c == C::ToggleHistory || c == C::ToggleDownloads || c == C::ToggleBookmarks ||
         c == C::ToggleAnnotationsPanel || c == C::ToggleRevisionsPanel ||
+        c == C::ToggleNostrExplorer || c == C::ToggleNostrAccounts ||
+        c == C::NostrSearchLocal || c == C::NostrShowPeople ||
+        c == C::NostrShowEvents || c == C::NostrRefreshLocal ||
+        c == C::NostrPrevPage || c == C::NostrNextPage ||
+        c == C::NostrAddWatchIdentity || c == C::NostrSelectIdentity ||
         c == C::NewAnnotationLayer ||
         c == C::SelectAnnotationLayer || c == C::ToggleAnnotationLayer ||
         c == C::AddAnnotationHighlight || c == C::AddAnnotationNote ||
@@ -886,6 +917,57 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         app.revision_win.scroll = 0.f;
         app.revision_panel_open = true;
         refresh_revision_panel(app);
+      }
+      break;
+    case C::ToggleNostrExplorer:
+      app.nostr_explorer_open = !app.nostr_explorer_open;
+      if (app.nostr_explorer_open) refresh_nostr_catalogue(app);
+      break;
+    case C::ToggleNostrAccounts:
+      app.nostr_accounts_open = !app.nostr_accounts_open;
+      if (app.nostr_accounts_open) refresh_nostr_catalogue(app);
+      break;
+    case C::NostrSearchLocal:
+      app.nostr_search = arg;
+      app.nostr_page = 0;
+      refresh_nostr_catalogue(app);
+      break;
+    case C::NostrShowPeople:
+      app.nostr_people_tab = true;
+      app.nostr_page = 0;
+      refresh_nostr_catalogue(app);
+      break;
+    case C::NostrShowEvents:
+      app.nostr_people_tab = false;
+      app.nostr_page = 0;
+      refresh_nostr_catalogue(app);
+      break;
+    case C::NostrRefreshLocal:
+      refresh_nostr_catalogue(app);
+      break;
+    case C::NostrPrevPage:
+      if (app.nostr_page > 0) --app.nostr_page;
+      refresh_nostr_catalogue(app);
+      break;
+    case C::NostrNextPage:
+      if (app.nostr_people_tab ? app.nostr_people_more : app.nostr_events_more)
+        ++app.nostr_page;
+      refresh_nostr_catalogue(app);
+      break;
+    case C::NostrAddWatchIdentity: {
+      const auto sep = arg.find('\n');
+      const bool ok = sep != std::string::npos &&
+          nostr_add_watch_identity(arg.substr(0, sep), arg.substr(sep + 1));
+      flash_status(app, ok ? "Added watch-only Nostr identity" :
+                           "Invalid Nostr public key or local database unavailable");
+      if (ok) refresh_nostr_catalogue(app);
+      break;
+    }
+    case C::NostrSelectIdentity:
+      if (std::any_of(app.nostr_identities.begin(), app.nostr_identities.end(),
+                      [&](const auto& item) { return item.pubkey == arg; })) {
+        app.nostr_active_identity = arg;
+        nostr_set_active_local_identity(arg);
       }
       break;
     case C::ToggleAnnotationLayer:
@@ -2031,7 +2113,8 @@ void run_chrome(App& app) {
   // so its mouse capture stays.
   if (ui_frame.cmd != xanatoo::UiCommand::None &&
       ui_frame.cmd != xanatoo::UiCommand::SelectTab &&
-      ui_frame.cmd != xanatoo::UiCommand::EditReply)
+      ui_frame.cmd != xanatoo::UiCommand::EditReply &&
+      ui_frame.cmd != xanatoo::UiCommand::NostrSearchLocal)
     app.ui.release_input_capture();
 }
 

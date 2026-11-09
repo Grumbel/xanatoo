@@ -37,7 +37,7 @@ struct PanelRef {
   bool open;
 };
 
-std::array<PanelRef, 10> panels(App& app) {
+std::array<PanelRef, 12> panels(App& app) {
   return {{{"help", &app.help, app.help_mode},
            {"outline", &app.ol, app.outline_mode},
            {"backlinks", &app.bl, app.backlinks_mode},
@@ -47,7 +47,9 @@ std::array<PanelRef, 10> panels(App& app) {
            {"styles", &app.styles_win, app.styles_panel_open},
            {"downloads", &app.downloads_win, app.downloads_panel_open},
            {"annotations", &app.annotation_win, app.annotation_panel_open},
-           {"revisions", &app.revision_win, app.revision_panel_open}}};
+           {"revisions", &app.revision_win, app.revision_panel_open},
+           {"nostr-explorer", &app.nostr_explorer_win, app.nostr_explorer_open},
+           {"nostr-accounts", &app.nostr_accounts_win, app.nostr_accounts_open}}};
 }
 
 int unscale(const App& app, int v) {
@@ -318,6 +320,14 @@ void restore_session(App& app) {
         app.revision_document_key = b->doc_key;
         app.revision_panel_open = true;
       }
+    }
+    if (get("nostr-explorer.open") && *get("nostr-explorer.open") == "1") {
+      app.nostr_explorer_open = true;
+      refresh_nostr_catalogue(app);
+    }
+    if (get("nostr-accounts.open") && *get("nostr-accounts.open") == "1") {
+      app.nostr_accounts_open = true;
+      refresh_nostr_catalogue(app);
     }
     app.needs_layout = true;
     std::cerr << "session: restored from " << path << "\n";

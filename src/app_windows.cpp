@@ -38,6 +38,10 @@ std::pair<int, int> min_size(const FloatWindow& w) {
       return {260, 260};
     case WindowRole::Revisions:
       return {300, 240};
+    case WindowRole::NostrExplorer:
+      return {340, 260};
+    case WindowRole::NostrAccounts:
+      return {300, 240};
     case WindowRole::Help:
     case WindowRole::Document:
       break;
@@ -111,6 +115,12 @@ void close_window(App& app, FloatWindow& w) {
       break;
     case WindowRole::Revisions:
       app.revision_panel_open = false;
+      break;
+    case WindowRole::NostrExplorer:
+      app.nostr_explorer_open = false;
+      break;
+    case WindowRole::NostrAccounts:
+      app.nostr_accounts_open = false;
       break;
     case WindowRole::Document:
       close_doc_window(app, static_cast<size_t>(&w - app.soft_wins.data()));
@@ -270,7 +280,9 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
   const bool in_sb =
       mx >= cx + cw - sb_w && mx <= cx + cw + 2 && my >= cy && my <= cy + ch;
   if (in_sb && w.role != WindowRole::Reply &&
-      w.role != WindowRole::Annotations) {
+      w.role != WindowRole::Annotations &&
+      w.role != WindowRole::NostrExplorer &&
+      w.role != WindowRole::NostrAccounts) {
     begin_scroll_drag(app, w, my);
     return;
   }
@@ -310,6 +322,9 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
       break;  // ImGui owns the editor and formatting controls.
     case WindowRole::Annotations:
       break;  // ImGui owns the form widgets inside the native panel.
+    case WindowRole::NostrExplorer:
+    case WindowRole::NostrAccounts:
+      break;  // ImGui supplies controls inside the native dockable panels.
     case WindowRole::Revisions:
       click_revision_panel(app, mx, my);
       break;
@@ -341,6 +356,8 @@ std::vector<FloatWindow*> float_stack(App& app) {
   if (app.history_panel_open) st.push_back(&app.history_win);
   if (app.annotation_panel_open) st.push_back(&app.annotation_win);
   if (app.revision_panel_open) st.push_back(&app.revision_win);
+  if (app.nostr_explorer_open) st.push_back(&app.nostr_explorer_win);
+  if (app.nostr_accounts_open) st.push_back(&app.nostr_accounts_win);
   if (app.styles_panel_open) st.push_back(&app.styles_win);
   if (app.help_mode) st.push_back(&app.help);
   for (auto& sw : app.soft_wins) st.push_back(&sw);
@@ -387,6 +404,8 @@ std::tuple<int, int, int, int> float_client_rect(App& app,
     case WindowRole::Reply:
     case WindowRole::Annotations:
     case WindowRole::Revisions:
+    case WindowRole::NostrExplorer:
+    case WindowRole::NostrAccounts:
       return window_client_rect(w.x, w.y, w.w, w.h);
     case WindowRole::Document:
       return soft_client_rect(app, w);
@@ -421,6 +440,8 @@ float float_max_scroll(App& app, const FloatWindow& w) {
                                8.f - view_h);
     case WindowRole::Reply:
     case WindowRole::Annotations:
+    case WindowRole::NostrExplorer:
+    case WindowRole::NostrAccounts:
       return 0.f;
     case WindowRole::Revisions:
       return revision_panel_max_scroll(app, ch);
@@ -703,6 +724,16 @@ void draw_floats(App& app) {
         break;
       case WindowRole::Revisions:
         draw_revision_panel(app);
+        break;
+      case WindowRole::NostrExplorer:
+        draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
+                            "Nostr Explorer", true, w->dock == Dock::None,
+                            0, w->dock == Dock::Max);
+        break;
+      case WindowRole::NostrAccounts:
+        draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
+                            "Nostr Accounts", true, w->dock == Dock::None,
+                            0, w->dock == Dock::Max);
         break;
       case WindowRole::Help:
         draw_help_window(app);

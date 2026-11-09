@@ -4,6 +4,7 @@
 
 #include "xanatoo/sdl.hpp"
 #include "xanatoo/history_menu.hpp"
+#include "xanatoo/nostr_store.hpp"
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -37,6 +38,16 @@ enum class UiCommand {
   ToggleBookmarks, // Bookmarks manager panel
   ToggleAnnotationsPanel, // annotation layer visibility / selection
   ToggleRevisionsPanel,  // native database document revision browser
+  ToggleNostrExplorer, // local relay event / pubkey catalogue
+  ToggleNostrAccounts, // local watch-only identities, signer management later
+  NostrSearchLocal,    // arg = search text
+  NostrShowPeople,     // people vs event result tab
+  NostrShowEvents,
+  NostrRefreshLocal,   // reload DB observations
+  NostrPrevPage,       // previous 100 locally observed records
+  NostrNextPage,
+  NostrAddWatchIdentity, // arg = label + newline + npub/hex key
+  NostrSelectIdentity, // arg = saved public key
   NewAnnotationLayer,     // new local, independently versioned layer
   SelectAnnotationLayer,  // arg = layer id (local owner only)
   ToggleAnnotationLayer,  // arg = layer id; view-only visibility
@@ -223,6 +234,22 @@ struct UiState {
   int annotation_x = 0, annotation_y = 0, annotation_w = 0, annotation_h = 0;
   bool revisions_panel_open = false;
   bool can_show_revisions = false;
+  bool nostr_explorer_open = false;
+  bool nostr_accounts_open = false;
+  bool nostr_show_people = true;
+  std::string nostr_search;
+  int nostr_page = 0;
+  bool nostr_people_more = false;
+  bool nostr_events_more = false;
+  int nostr_explorer_x = 0, nostr_explorer_y = 0;
+  int nostr_explorer_w = 0, nostr_explorer_h = 0;
+  int nostr_accounts_x = 0, nostr_accounts_y = 0;
+  int nostr_accounts_w = 0, nostr_accounts_h = 0;
+  NostrCacheStats nostr_stats;
+  std::vector<NostrCachedPerson> nostr_people;
+  std::vector<NostrCachedEvent> nostr_events;
+  std::vector<NostrLocalIdentity> nostr_identities;
+  std::string nostr_selected_identity;
   struct AnnotationLayerItem {
     std::string id, name, owner;
     bool visible = true;
@@ -433,6 +460,9 @@ private:
   int url_context_end_ = 0;
   int url_context_cursor_ = 0;
   char search_input_[512] = {};  // search bar text (kept between searches)
+  char nostr_local_search_[512] = {};
+  char nostr_identity_label_[160] = {};
+  char nostr_identity_pubkey_[256] = {};
   char reply_input_[16384] = {}; // Markdown draft, not sent to any server
   uint64_t reply_generation_seen_ = 0;
   char annotation_new_note_[16384] = {};

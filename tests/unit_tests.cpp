@@ -21,6 +21,7 @@
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/locator.hpp"
 #include "xanatoo/nostr.hpp"
+#include "xanatoo/nostr_store.hpp"
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/reddit_credentials.hpp"
 #include "xanatoo/reply.hpp"
@@ -700,6 +701,90 @@ void test_nostr_content() {
   }
   auto mentioned = nostr_mentioned_pubkeys("cc nostr:" + npub + ", nostr:bogus");
   EXPECT_EQ(mentioned.size(), size_t(1));
+}
+
+void test_nostr_local_cache() {
+  using namespace xanatoo;
+  namespace fs = std::filesystem;
+  const fs::path database = fs::temp_directory_path() /
+      ("xanatoo-nostr-test-" + std::to_string(process_id()) + ".sqlite");
+  fs::remove(database);
+  nostr_set_cache_test_path(database.string());
+  const std::string alice(64, 'a'), bob(64, 'b'), carol(64, 'c');
+  const std::string note_id(64, '1'), profile_id(64, '2');
+  const std::string note = "{\"id\":\"" + note_id +
+      "\",\"pubkey\":\"" + alice + "\",\"kind\":1,\"created_at\":200,"
+      "\"content\":\"hello nostr:" + nostr_bech32("npub", carol) +
+      "\",\"tags\":[[\"p\",\"" + bob + "\"]]}";
+  const std::string profile = "{\"id\":\"" + profile_id +
+      "\",\"pubkey\":\"" + alice + "\",\"kind\":0,\"created_at\":201,"
+      "\"content\":\"{\\\"display_name\\\":\\\"Alice\\\",\\\"nip05\\\":\\\"alice@example.org\\\"}\",\"tags\":[]}";
+#if defined(XANATOO_SQLITE) && XANATOO_SQLITE
+  nostr_cache_events({note, profile, note}, "wss://first.example");
+  nostr_cache_events({note}, "wss://second.example");
+  const auto stats = nostr_cache_stats();
+  EXPECT_EQ(stats.events, int64_t(2));
+  EXPECT_EQ(stats.notes, int64_t(1));
+  EXPECT_EQ(stats.profiles, int64_t(1));
+  EXPECT_EQ(stats.pubkeys, int64_t(3));
+  EXPECT_EQ(stats.relays, int64_t(2));
+  const auto people = nostr_cached_people("alice");
+  EXPECT_EQ(people.size(), size_t(1));
+  if (!people.empty()) {
+    EXPECT_EQ(people[0].name, "Alice");
+    EXPECT_EQ(people[0].post_count, int64_t(1));
+    EXPECT_EQ(people[0].event_count, int64_t(2));
+    EXPECT_EQ(people[0].nip05, "alice@example.org");
+  }
+  EXPECT_EQ(nostr_cached_people(bob).size(), size_t(1));
+  EXPECT_EQ(nostr_cached_people(carol).size(), size_t(1));
+  EXPECT_EQ(nostr_cached_events("hello").size(), size_t(1));
+  EXPECT_EQ(nostr_cached_people({}, 1, 0).size(), size_t(1));
+  EXPECT_EQ(nostr_cached_people({}, 1, 1).size(), size_t(1));
+  EXPECT(nostr_cached_people({}, 1, 3).empty());
+  EXPECT_EQ(nostr_cached_events({}, 1, 1).size(), size_t(1));
+  EXPECT(nostr_cached_events({}, 1, 2).empty());
+  EXPECT_EQ(nostr_cached_recent_json().size(), size_t(1));
+  EXPECT_EQ(nostr_cached_author_json(alice).size(), size_t(2));
+  EXPECT_EQ(nostr_cached_thread_json(note_id).size(), size_t(1));
+  EXPECT(nostr_add_watch_identity("Alice watch", nostr_bech32("npub", alice)));
+  EXPECT(nostr_add_watch_identity("Alice renamed", alice));
+  EXPECT(nostr_add_watch_identity("Bob watch", bob));
+  EXPECT_EQ(nostr_local_identities().size(), size_t(2));
+  EXPECT_EQ(nostr_local_identities()[0].label, "Alice renamed");
+  EXPECT(nostr_set_active_local_identity(alice));
+  EXPECT_EQ(nostr_active_local_identity(), alice);
+  EXPECT(nostr_set_active_local_identity(bob));
+  EXPECT_EQ(nostr_active_local_identity(), bob);
+  EXPECT(!nostr_set_active_local_identity(carol));
+  EXPECT(!nostr_add_watch_identity("Invalid", "not-a-public-key"));
+  set_no_save(true);
+  nostr_cache_events({"{\"id\":\"" + std::string(64, '3') +
+      "\",\"pubkey\":\"" + alice + "\",\"kind\":1,\"created_at\":1,"
+      "\"content\":\"do not persist\",\"tags\":[]}"}, "wss://third.example");
+  EXPECT_EQ(nostr_cache_stats().events, int64_t(2));
+  EXPECT(!nostr_add_watch_identity("No-save", bob));
+  set_no_save(false);
+  const std::string reply = "{\"id\":\"" + std::string(64, '4') +
+      "\",\"pubkey\":\"" + bob + "\",\"kind\":1,\"created_at\":202,"
+      "\"content\":\"reply\",\"tags\":[[\"e\",\"" + note_id + "\"]]}";
+  nostr_cache_events({reply}, "wss://first.example");
+  EXPECT_EQ(nostr_cached_thread_json(note_id).size(), size_t(2));
+  EXPECT_EQ(nostr_cached_people(bob)[0].post_count, int64_t(1));
+  // An older profile event cannot replace newer observed metadata.
+  const std::string old_profile = "{\"id\":\"" + std::string(64, '5') +
+      "\",\"pubkey\":\"" + alice + "\",\"kind\":0,\"created_at\":1,"
+      "\"content\":\"{\\\"display_name\\\":\\\"Old\\\"}\",\"tags\":[]}";
+  nostr_cache_events({old_profile}, "wss://first.example");
+  EXPECT_EQ(nostr_cached_people("alice")[0].name, "Alice");
+#else
+  nostr_cache_events({note, profile}, "wss://first.example");
+  EXPECT_EQ(nostr_cache_stats().events, int64_t(0));
+  EXPECT(nostr_cached_people().empty());
+#endif
+  nostr_set_cache_test_path({});
+  std::error_code ec;
+  fs::remove(database, ec);
 }
 
 
@@ -4991,6 +5076,7 @@ int main() {
   test_gemini_urls();
   test_nostr_refs();
   test_nostr_content();
+  test_nostr_local_cache();
   test_parse_markup();
   test_parse_unclaimed_block_lines();
   test_parse_gemtext();

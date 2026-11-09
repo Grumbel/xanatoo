@@ -6,7 +6,34 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **309** (this delivery is **308**)
+Next bundle number: **310** (this delivery is **309**)
+
+## Status (2026-11-09) — Persistent Nostr catalogue and native panels
+
+- Wrote a transport-independent publication plan (`docs/PUBLISHING.md`):
+  immutable local revisions, WebDAV/static hosting, Nostr announcements and
+  discussion, IPFS archival/pinning, receipts, and exportable manifests.
+- Documented Nostr feature development, identities, relay trust limitations,
+  and current groups/communities/channels in `docs/NOSTR.md`. NIP-29
+  relay-based groups are the preferred future group discovery target;
+  NIP-72/NIP-28 remain legacy reading/interoperability possibilities.
+- Relay fetches now persist their original event JSON, individual relay
+  observations, replies and encountered author/mention public keys to
+  `state_dir()/nostr.sqlite`. Unique events are counted only once; kind-0
+  metadata is kept by latest event timestamp and distinguished from verified
+  identity. Cache can recover viewed notes/profiles after relay failure.
+- Panels → **Nostr Explorer** and **Nostr Accounts** are native float/dock
+  panels with ImGui only for embedded controls. Explorer searches and pages
+  through cached people/events and shows local note/event/key/relay stats. Accounts
+  saves multiple named **watch-only** public identities and their selection;
+  it deliberately cannot generate signing keys or publish yet.
+- Cache and accounts are optional with SQLite, and `--no-save` suppresses
+  writes. A linked SQLite runtime smoke test passes; no-SQLite source syntax
+  checks pass. Full GUI build/interaction requires SDL development packages.
+- Next: verify event IDs and Schnorr signatures before trusting stored
+  events; implement cache retention/export/clear, relay-based discovery,
+  richer event-kind views, NIP-29 groups, and secure NIP-46 or NIP-49-backed
+  signing identities. UI docking/clipping needs hands-on verification.
 
 ## Status (2026-11-09) — Native revision and annotation panels
 
