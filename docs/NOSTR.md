@@ -50,10 +50,25 @@ cache writes and schema migration.
 - **Groups** tab: list NIP-29 groups observed from relays, their claimed names,
   parent IDs, privacy/join flags and locally observed message counts. These
   counts are relay-scoped and deduplicate the same event received twice.
-- **Discover** accepts an explicit `wss://` group relay and fetches up to 250
-  public `kind:39000` metadata events (`nostr:groups@wss://relay.example`).
-  With an empty relay field, `nostr:groups` samples general public relays,
-  which often have no group metadata at all. Selecting a group opens its
+- **Discover** without a relay (`nostr:groups`) scans up to five group-hosting
+  relays: previously observed NIP-29 hosts, two project-published public NIP-29
+  relay addresses, and relay hints from cached public NIP-51 `kind:10009`
+  lists. When fewer than five hosts are known, Xanatoo also samples public
+  `kind:10009` lists on one general relay to learn more group-hosting relays.
+  Each group relay is queried for up to 250 public `kind:39000` metadata
+  events; the resulting page reports every attempted relay and its result.
+  Automatically followed relay hints must resolve to public IP addresses;
+  the explicitly entered relay option remains available for local test hosts.
+  The cache retains the discovery results for future browsing; scans can be
+  incomplete, and public group lists are untrusted hints, not a global index.
+  The seed relays are documented by the projects
+  [groups-relay](https://github.com/max21dev/groups-relay) and
+  [obelisk-relay](https://github.com/obelisk-app/obelisk-relay), not guaranteed
+  to be available at scan time.
+- **Discover** with an address searches a specific relay; it accepts plain
+  hosts (`relay.example`), `https://` or `wss://` URLs and always uses an
+  encrypted WebSocket. For example `nostr:groups@relay.example` is normalized
+  to `nostr:groups@wss://relay.example`. Selecting a group opens its
   relay-specific timeline and fetches up to 100 recent `kind:1/9/11`
   `h`-tagged messages. The internally generated address is
   `nostr:group@<hex-encoded-relay>.<hex-encoded-group-id>` (not a

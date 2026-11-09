@@ -21,6 +21,7 @@
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/locator.hpp"
 #include "xanatoo/nostr.hpp"
+#include "xanatoo/nostr_relays.hpp"
 #include "xanatoo/nostr_store.hpp"
 #include "xanatoo/nostr_verify.hpp"
 #include "xanatoo/reddit.hpp"
@@ -796,6 +797,21 @@ void test_nostr_local_cache() {
   // NIP-29 group identity is (relay, group ID), not the d/h tag by itself.
   const std::string relay_a = "wss://groups-a.example";
   const std::string relay_b = "wss://groups-b.example";
+  EXPECT_EQ(nostr_normalize_relay(" groups-a.example/ "), relay_a);
+  EXPECT_EQ(nostr_normalize_relay("https://GROUPS-a.example"),
+            relay_a);
+  EXPECT_EQ(nostr_normalize_relay("ws://groups-a.example"), relay_a);
+  EXPECT(nostr_normalize_relay(" ").empty());
+  EXPECT(nostr_normalize_relay("wss://").empty());
+  EXPECT(nostr_normalize_relay("https://user@host.example").empty());
+  EXPECT(nostr_normalize_relay("ftp://host.example").empty());
+  EXPECT(nostr_normalize_relay("host.example:65536").empty());
+  EXPECT(nostr_normalize_relay("host.example/#fragment").empty());
+  const auto hints = nostr_group_list_relay_hints({
+      {"group", "tech", "groups-a.example", "Tech"},
+      {"r", "wss://groups-b.example"}, {"r", "groups-a.example"},
+      {"group", "invalid", "http://user@bad.example"}});
+  EXPECT_EQ(hints, (std::vector<std::string>{relay_a, relay_b}));
   const std::string metadata_a = with_valid_id("{\"id\":\"" + zeros +
       "\",\"pubkey\":\"" + alice + "\",\"kind\":39000,\"created_at\":305,"
       "\"content\":\"\",\"tags\":[[\"d\",\"tech\"],[\"name\",\"Technology\"],"
@@ -811,6 +827,15 @@ void test_nostr_local_cache() {
       "\"sig\":\"" + zeros + zeros + "\"}");
   nostr_cache_events({metadata_a, group_msg, group_msg}, relay_a);
   nostr_cache_events({metadata_b, group_msg}, relay_b);
+  const std::string group_list = with_valid_id("{\"id\":\"" + zeros +
+      "\",\"pubkey\":\"" + alice + "\",\"kind\":10009,\"created_at\":307,"
+      "\"content\":\"\",\"tags\":[[\"group\",\"tech\",\"" + relay_a +
+      "\",\"Tech\"],[\"r\",\"" + relay_b + "\"]],"
+      "\"sig\":\"" + zeros + zeros + "\"}");
+  nostr_cache_events({group_list}, "wss://first.example");
+  EXPECT_EQ(nostr_cached_group_lists_json().size(), size_t(1));
+  EXPECT_EQ(nostr_cached_group_relays().size(), size_t(2));
+  EXPECT_EQ(nostr_cached_group_relays(1).size(), size_t(1));
   EXPECT_EQ(nostr_cache_stats().groups, int64_t(2));
   EXPECT_EQ(nostr_cached_groups("tech").size(), size_t(2));
   EXPECT_EQ(nostr_cached_groups("technology").size(), size_t(1));

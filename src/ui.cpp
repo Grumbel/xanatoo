@@ -2759,10 +2759,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       if (ImGui::RadioButton("Groups", state.nostr_tab == 2))
         cmd = UiCommand::NostrShowGroups;
       if (state.nostr_tab == 2) {
-        ImGui::TextDisabled("Discover on a NIP-29 relay (blank = public relay sample):");
+        ImGui::TextDisabled("Discover automatically, or specify a group relay:");
         ImGui::SetNextItemWidth(-95.f * scale_);
-        ImGui::InputText("##nostr_group_relay", nostr_group_relay_,
-                         sizeof nostr_group_relay_);
+        ImGui::InputTextWithHint("##nostr_group_relay", "relay host or wss:// URL (optional)",
+                                 nostr_group_relay_, sizeof nostr_group_relay_);
         ImGui::SameLine();
         if (ImGui::Button("Discover")) {
           cmd = UiCommand::NavigateUrl;
@@ -2772,6 +2772,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
             result.arg += nostr_group_relay_;
           }
         }
+        if (ImGui::IsItemHovered())
+          ImGui::SetTooltip("Empty: scan known NIP-29 hosts and relays from public group lists.\n"
+                            "A hostname is enough for a specific relay (TLS is always used).");
       } else if (ImGui::SmallButton("Fetch recent")) {
         cmd = UiCommand::NavigateUrl;
         result.arg = "nostr:recent";
@@ -2838,7 +2841,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
           }
         } else {
           if (state.nostr_groups.empty())
-            ImGui::TextWrapped("No NIP-29 groups cached yet. Discover on a relay, or browse group messages with an h tag.");
+            ImGui::TextWrapped("No NIP-29 groups cached yet. Use Discover to scan known group relays, or enter a specific host.");
           for (const auto& group : state.nostr_groups) {
             ImGui::PushID(group.relay.c_str());
             ImGui::PushID(group.group_id.c_str());

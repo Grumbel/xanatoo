@@ -582,6 +582,12 @@ target_compile_definitions(xanatoo_tests PRIVATE
 )
 add_test(NAME unit_tests COMMAND xanatoo_tests)
 
+# Group-discovery URL/hint parsing is dependency-free and also runnable with
+# a standalone C++20 compiler when SDL/SQLite are unavailable.
+add_executable(xanatoo_nostr_relay_tests tests/nostr_relay_tests.cpp)
+target_include_directories(xanatoo_nostr_relay_tests PRIVATE include)
+add_test(NAME nostr_relay_tests COMMAND xanatoo_nostr_relay_tests)
+
 # Parser/integrity tests run independently of SDL. OpenSSL builds additionally
 # exercise the BIP-340 secp256k1 verifier with upstream positive/negative vectors.
 add_executable(xanatoo_nostr_verify_tests

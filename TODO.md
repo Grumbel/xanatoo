@@ -6,7 +6,26 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **316** (this delivery is **315**)
+Next bundle number: **317** (this delivery is **316**)
+
+## Status (2026-11-09) — NIP-29 discovery without manual relay setup
+
+- The Groups tab now accepts a bare relay hostname, `http(s)://` or `ws(s)://`
+  address, normalizes to a secure `wss://` connection, and gives a useful error
+  for malformed entries instead of demanding users know the URL scheme.
+- Empty-input discovery prioritizes locally observed group hosts, seeds with
+  two NIP-29-specific public relays and learns additional hosts from NIP-51
+  public `kind:10009` group lists (both cached and a bounded live sample).
+  It scans at most five group relays per request and reports relay-by-relay
+  results in the returned document. Autodiscovered targets must resolve to
+  public IP addresses; manually selected local test relays remain supported.
+- Relay candidates and public group lists are suggestions, not a global index
+  or proof of group membership; NIP-11 master-key binding is still pending.
+- Added a standalone pure-C++20 URL/hint regression target, which compiles and
+  passes without the native dependencies. `src/nostr.cpp` passes Nostr-enabled
+  syntax checking and `src/nostr_store.cpp` passes non-SQLite syntax checking.
+  The full SDL/SQLite build and live network discovery still need validation
+  in the NixOS development shell.
 
 ## Status (2026-11-09) — recursive tile geometry foundation
 

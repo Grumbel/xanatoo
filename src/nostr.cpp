@@ -5,6 +5,7 @@
 // mapped into Thread / Message document nodes.
 
 #include "xanatoo/nostr.hpp"
+#include "xanatoo/nostr_relays.hpp"
 #include "xanatoo/nostr_store.hpp"
 #include "xanatoo/nostr_verify.hpp"
 #include "xanatoo/util.hpp"
@@ -688,19 +689,33 @@ bool tcp_connect_timeout(int fd, const sockaddr* addr, socklen_t len,
 }
 
 std::string normalize_relay_url(std::string r) {
-  while (!r.empty() && std::isspace(static_cast<unsigned char>(r.front())))
-    r.erase(r.begin());
-  while (!r.empty() && std::isspace(static_cast<unsigned char>(r.back())))
-    r.pop_back();
-  if (r.empty()) return {};
-  // Plain host → wss
-  if (r.rfind("ws://", 0) == 0) return {};  // refuse cleartext
-  if (r.rfind("wss://", 0) != 0) r = "wss://" + r;
-  while (r.size() > 8 && r.back() == '/') r.pop_back();
-  return r;
+  return nostr_normalize_relay(r);
 }
 
-bool ws_connect(WsConn& c, const std::string& url, std::string* err) {
+// Automatically discovered relay hints come from other users' NIP-51 lists.
+// Never let an untrusted hint connect us to loopback, LAN or special addresses.
+bool public_relay_address(const sockaddr* addr) {
+  if (addr->sa_family == AF_INET) {
+    const auto ip = ntohl(reinterpret_cast<const sockaddr_in*>(addr)->sin_addr.s_addr);
+    const unsigned a = ip >> 24, b = (ip >> 16) & 255;
+    return !(a == 0 || a == 10 || a == 127 || a >= 224 ||
+             (a == 100 && b >= 64 && b <= 127) ||
+             (a == 169 && b == 254) ||
+             (a == 172 && b >= 16 && b <= 31) ||
+             (a == 192 && (b == 0 || b == 168)) ||
+             (a == 198 && (b == 18 || b == 19)));
+  }
+  if (addr->sa_family == AF_INET6) {
+    const auto* ip = &reinterpret_cast<const sockaddr_in6*>(addr)->sin6_addr;
+    return !(IN6_IS_ADDR_LOOPBACK(ip) || IN6_IS_ADDR_UNSPECIFIED(ip) ||
+             IN6_IS_ADDR_LINKLOCAL(ip) || IN6_IS_ADDR_MULTICAST(ip) ||
+             IN6_IS_ADDR_V4MAPPED(ip) || (ip->s6_addr[0] & 0xfe) == 0xfc);
+  }
+  return false;
+}
+
+bool ws_connect(WsConn& c, const std::string& url, std::string* err,
+                bool public_only = false) {
   std::string host, path;
   int port = 443;
   if (!parse_wss_url(url, host, path, port)) {
@@ -726,7 +741,10 @@ bool ws_connect(WsConn& c, const std::string& url, std::string* err) {
   }
 
   int fd = -1;
+  bool attempted = false;
   for (addrinfo* p = res; p; p = p->ai_next) {
+    if (public_only && !public_relay_address(p->ai_addr)) continue;
+    attempted = true;
     fd = ::socket(p->ai_family, p->ai_socktype, p->ai_protocol);
     if (fd < 0) continue;
     timeval tv{};
@@ -740,7 +758,8 @@ bool ws_connect(WsConn& c, const std::string& url, std::string* err) {
   }
   freeaddrinfo(res);
   if (fd < 0) {
-    if (err) *err = "connect failed " + host;
+    if (err) *err = attempted ? "connect failed " + host :
+                    "automatic discovery skips private/local relay " + host;
     return false;
   }
   if (!c.tls.connect(fd, host, err)) return false;
@@ -1130,10 +1149,10 @@ std::string quote_nostr_filter(std::string_view s) {
 
 void query_group_metadata(const std::string& relay,
                           std::map<std::string, NostrEvent>& by_id,
-                          std::string* last_err) {
+                          std::string* last_err, bool public_only = false) {
   WsConn c;
   std::string err;
-  if (!ws_connect(c, relay, &err)) {
+  if (!ws_connect(c, relay, &err, public_only)) {
     if (last_err) *last_err = err;
     return;
   }
@@ -1145,6 +1164,26 @@ void query_group_metadata(const std::string& relay,
   }
   collect_ws_events(c, by_id, 7, relay);
   ws_send_text(c, "[\"CLOSE\",\"xanatoo-groups\"]");
+}
+
+void query_group_lists(const std::string& relay,
+                       std::map<std::string, NostrEvent>& by_id,
+                       std::string* last_err) {
+  WsConn c;
+  std::string err;
+  if (!ws_connect(c, relay, &err)) {
+    if (last_err) *last_err = err;
+    return;
+  }
+  // These are voluntarily published public NIP-51 lists. They help find
+  // group *hosts*, not group membership or authoritative group metadata.
+  if (!ws_send_text(c,
+      "[\"REQ\",\"xanatoo-group-lists\",{\"kinds\":[10009],\"limit\":100}]")) {
+    if (last_err) *last_err = "WS send failed";
+    return;
+  }
+  collect_ws_events(c, by_id, 4, relay);
+  ws_send_text(c, "[\"CLOSE\",\"xanatoo-group-lists\"]");
 }
 
 void query_group_timeline(const std::string& relay, std::string_view group_id,
@@ -1255,7 +1294,14 @@ bool parse_group_address(std::string_view addr, std::string& relay,
          !group_id.empty();
 }
 
-Document group_directory_document(std::string_view relay_filter) {
+struct GroupRelayProbe {
+  std::string relay;
+  std::string result;
+};
+
+Document group_directory_document(std::string_view relay_filter,
+                                  const std::vector<GroupRelayProbe>& probes,
+                                  std::string_view list_lookup) {
   Document doc;
   NodeId root = doc.create(NodeKind::Document);
   doc.meta.title = "Nostr groups (observed)";
@@ -1265,6 +1311,20 @@ Document group_directory_document(std::string_view relay_filter) {
       "NIP-29 relay-based groups from the local cache. A group is identified "
       "by its hosting relay AND group ID. Metadata is a relay claim, not yet "
       "authenticated against the relay's NIP-11 master key.");
+  if (!list_lookup.empty()) {
+    NodeId p = doc.create(NodeKind::Paragraph, root);
+    doc.append_text(p, std::string("Public NIP-51 list lookup: ") +
+                      std::string(list_lookup));
+  }
+  if (!probes.empty()) {
+    NodeId report = doc.create(NodeKind::Paragraph, root);
+    doc.append_text(report, "Discovery searched " +
+        std::to_string(probes.size()) + " relay(s). Individual results:");
+    for (const auto& probe : probes) {
+      NodeId p = doc.create(NodeKind::Paragraph, root);
+      doc.append_text(p, probe.relay + " · " + probe.result);
+    }
+  }
   int shown = 0;
   for (const auto& group : groups) {
     if (!relay_filter.empty() && group.relay != relay_filter) continue;
@@ -1348,28 +1408,69 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
         return std::nullopt;
       }
     } else if (low.rfind("groups@", 0) == 0) {
-      if (stripped.substr(7).rfind("wss://", 0) != 0) {
-        if (err) *err = "NIP-29 discovery requires a wss:// relay";
-        return std::nullopt;
-      }
       group_relay = normalize_relay_url(stripped.substr(7));
-      if (group_relay.rfind("wss://", 0) != 0 || group_relay.size() > 512) {
-        if (err) *err = "NIP-29 discovery requires a wss:// relay";
+      if (group_relay.empty() && !stripped.substr(7).empty()) {
+        if (err) *err = "Invalid Nostr relay address (enter a hostname or wss:// URL)";
         return std::nullopt;
       }
     }
-    const std::vector<std::string> relays = group_relay.empty() ?
-        default_relays() : std::vector<std::string>{group_relay};
+    std::vector<std::string> relays;
+    std::string list_lookup;
+    constexpr size_t kMaxAutoGroupRelays = 5;
+    const auto add_relay = [&](std::string_view hint) {
+      if (relays.size() >= kMaxAutoGroupRelays) return;
+      const std::string normalized = normalize_relay_url(std::string(hint));
+      if (!normalized.empty() &&
+          std::find(relays.begin(), relays.end(), normalized) == relays.end())
+        relays.push_back(normalized);
+    };
+    if (!group_relay.empty()) {
+      add_relay(group_relay);
+    } else {
+      // Prefer hosts already seen serving groups. On a fresh installation,
+      // bootstrap with real NIP-29 relay implementations (not general relays).
+      for (const auto& known : nostr_cached_group_relays(2)) add_relay(known);
+      add_relay("wss://relay.groups.nip29.com");
+      add_relay("wss://public.obelisk.ar");
+
+      const auto collect_hints = [&](const NostrEvent& event) {
+        if (event.kind != 10009) return;
+        for (const auto& hint : nostr_group_list_relay_hints(event.tags))
+          add_relay(hint);
+      };
+      for (const auto& raw : nostr_cached_group_lists_json()) {
+        if (nostr_verify_event(raw) == NostrVerification::Invalid) continue;
+        NostrEvent ev;
+        if (parse_event_json(raw, ev)) collect_hints(ev);
+      }
+      if (relays.size() < kMaxAutoGroupRelays) {
+        // A single public list query can reveal group relay addresses that
+        // we would never find by asking ordinary relays for kind:39000.
+        std::map<std::string, NostrEvent> lists;
+        std::string list_err;
+        query_group_lists(default_relays().front(), lists, &list_err);
+        if (!list_err.empty())
+          std::cerr << "Nostr group-list discovery: " << list_err << "\n";
+        list_lookup = default_relays().front() + " · " +
+            (list_err.empty() ? std::to_string(lists.size()) +
+             " validated public lists" : "failed: " + list_err);
+        for (const auto& [id, event] : lists) collect_hints(event);
+      }
+    }
     std::map<std::string, NostrEvent> observed;
-    int tried = 0;
+    std::vector<GroupRelayProbe> probes;
     for (const auto& relay : relays) {
-      if (tried++ >= (group_relay.empty() ? 3 : 1)) break;
+      if (probes.size() >= (group_relay.empty() ? kMaxAutoGroupRelays : 1)) break;
       std::string one_err;
+      const size_t before = observed.size();
       if (group_mode)
         query_group_timeline(relay, group_id, observed, &one_err);
       else
-        query_group_metadata(relay, observed, &one_err);
+        query_group_metadata(relay, observed, &one_err, group_relay.empty());
       if (!one_err.empty()) std::cerr << "Nostr group: " << one_err << "\n";
+      probes.push_back({relay, one_err.empty() ?
+          std::to_string(observed.size() - before) + " new validated events" :
+          "failed: " + one_err});
       // For group timelines, messages are scoped to exactly one relay.
       if (group_mode) break;
     }
@@ -1383,7 +1484,7 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
     }
     // This document is also usable offline; the Explorer provides richer
     // searching, per-relay counts and a click-through to a group timeline.
-    return group_directory_document(group_relay);
+    return group_directory_document(group_relay, probes, list_lookup);
   }
   const bool recent_mode =
       (low == "recent" || low == "firehose" || low == "latest");

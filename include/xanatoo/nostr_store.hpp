@@ -85,6 +85,9 @@ std::vector<NostrCachedGroup> nostr_cached_groups(std::string_view query = {},
                                                  int offset = 0);
 std::vector<std::string> nostr_cached_group_json(std::string_view relay,
                                                   std::string_view group_id);
+// Previously observed hosts plus public NIP-51 group lists inform discovery.
+std::vector<std::string> nostr_cached_group_relays(int limit = 100);
+std::vector<std::string> nostr_cached_group_lists_json(int limit = 100);
 // Exact relay JSON for offline fallback. These are local, unverified copies.
 std::vector<std::string> nostr_cached_thread_json(std::string_view event_id);
 std::vector<std::string> nostr_cached_author_json(std::string_view pubkey);

@@ -530,6 +530,42 @@ std::vector<std::string> nostr_cached_group_json(std::string_view relay,
   return out;
 }
 
+std::vector<std::string> nostr_cached_group_relays(int limit) {
+  std::vector<std::string> out;
+#if XANATOO_SQLITE
+  sqlite3* db = open_cache(false);
+  if (!db) return out;
+  DbOwner owner{db};
+  Statement st(db, "SELECT relay FROM groups GROUP BY relay"
+                   " ORDER BY MAX(last_seen) DESC LIMIT ?;");
+  if (st.valid()) {
+    st.bind(1, static_cast<int64_t>(std::clamp(limit, 1, 500)));
+    while (st.next()) out.push_back(st.text(0));
+  }
+#else
+  (void)limit;
+#endif
+  return out;
+}
+
+std::vector<std::string> nostr_cached_group_lists_json(int limit) {
+  std::vector<std::string> out;
+#if XANATOO_SQLITE
+  sqlite3* db = open_cache(false);
+  if (!db) return out;
+  DbOwner owner{db};
+  Statement st(db, "SELECT raw_json FROM events WHERE kind=10009"
+                   " AND verification>0 ORDER BY created_at DESC LIMIT ?;");
+  if (st.valid()) {
+    st.bind(1, static_cast<int64_t>(std::clamp(limit, 1, 500)));
+    while (st.next()) out.push_back(st.text(0));
+  }
+#else
+  (void)limit;
+#endif
+  return out;
+}
+
 namespace {
 
 #if XANATOO_SQLITE
