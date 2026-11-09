@@ -64,4 +64,29 @@ bool record_save(std::string_view key, std::string_view text);
 // Forget the draft of `key` (its revisions stay in the store).
 bool drop_draft(std::string_view key);
 
+// Immutable typed objects use the same content-addressed `objects` and
+// `revisions` tables as drafts, but have independent mutable heads. The caller
+// supplies the head it read; a stale writer cannot silently replace another
+// writer's head. Empty expected_head means the object must not yet exist.
+// This is also the foundation for versioned annotation layers.
+struct ObjectRevision {
+  std::string id;
+  std::string key;
+  std::string parent;
+  std::string kind;
+  std::string content;
+  std::string data;
+  int64_t time = 0;
+};
+
+std::optional<ObjectRevision> load_object_revision(std::string_view revision);
+std::optional<ObjectRevision> find_object_head(std::string_view key);
+std::vector<ObjectRevision> list_object_heads(std::string_view kind);
+// Returns the revision id, or empty on failure/conflict. Identical content is
+// a no-op that returns the current revision id.
+std::string commit_object_revision(std::string_view key,
+                                   std::string_view kind,
+                                   std::string_view data,
+                                   std::string_view expected_head);
+
 }  // namespace xanatoo

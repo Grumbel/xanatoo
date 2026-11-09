@@ -29,6 +29,7 @@
 #include "xanatoo/search_results.hpp"
 #include "xanatoo/sitemap.hpp"
 #include "xanatoo/revstore.hpp"
+#include "xanatoo/annotations.hpp"
 #include "xanatoo/paths.hpp"
 #include "xanatoo/examples.hpp"
 #include "xanatoo/util.hpp"
@@ -231,6 +232,82 @@ void test_revstore() {
   EXPECT(drop_draft(key));
   EXPECT(!find_draft(key));
 
+  revstore_use_path({});
+  fs::remove(db);
+#endif
+}
+
+void test_annotation_layers() {
+  using namespace xanatoo;
+  AnnotationLayer layer;
+  layer.id = "layer:alice";
+  layer.owner = "Alice";
+  layer.name = "Alice's notes";
+  Annotation note;
+  note.id = "anno:1";
+  note.kind = "note";
+  note.body = "Comment with binary and umlaut: ä";
+  note.body.insert(13, 1, '\0');
+  note.style = "margin";
+  note.targets.push_back({"doc:article", "sha256:original", "article#text:hello"});
+  note.targets.push_back({"doc:other", "sha256:other", "other#id:section"});
+  layer.annotations.push_back(note);
+  const std::string bytes = serialize_annotation_layer(layer);
+  EXPECT(!bytes.empty());
+  auto parsed = parse_annotation_layer(bytes);
+  EXPECT(parsed.has_value());
+  if (parsed) {
+    EXPECT_EQ(parsed->annotations, layer.annotations);
+    EXPECT_EQ(parsed->owner, layer.owner);
+    EXPECT_EQ(serialize_annotation_layer(*parsed), bytes);
+  }
+  EXPECT(!parse_annotation_layer(bytes.substr(0, bytes.size() - 1)));
+  EXPECT(!parse_annotation_layer(bytes + "garbage"));
+  EXPECT(!parse_annotation_layer("not an annotation layer"));
+  layer.annotations.push_back(note);
+  EXPECT(serialize_annotation_layer(layer).empty()); // duplicate stable id
+  layer.annotations.pop_back();
+  layer.annotations[0].targets.clear();
+  EXPECT(serialize_annotation_layer(layer).empty()); // no target
+
+#if XANATOO_SQLITE
+  namespace fs = std::filesystem;
+  const fs::path db = fs::temp_directory_path() /
+      ("xanatoo-annotations-" + std::to_string(process_id()) + ".sqlite");
+  fs::remove(db);
+  revstore_use_path(db.string());
+  auto alice = create_annotation_layer("Alice", "Read-through");
+  auto bob = create_annotation_layer("Bob", "Peer review");
+  EXPECT(alice.has_value() && bob.has_value());
+  if (alice && bob) {
+    const std::string empty_rev = alice->revision;
+    EXPECT(!empty_rev.empty());
+    auto initial = load_annotation_layer(alice->id);
+    EXPECT(initial && initial->revision == empty_rev);
+    auto stale = *alice;
+    alice->annotations.push_back(note);
+    EXPECT(save_annotation_layer(*alice));
+    EXPECT(alice->revision != empty_rev);
+    EXPECT(!save_annotation_layer(stale)); // optimistic concurrency
+    auto historical = load_annotation_layer(alice->id, empty_rev);
+    EXPECT(historical && historical->annotations.empty());
+    auto current = load_annotation_layer(alice->id);
+    EXPECT(current && current->annotations == alice->annotations);
+    auto stored = load_object_revision(alice->revision);
+    EXPECT(stored && stored->parent == empty_rev);
+    EXPECT(save_annotation_layer(*alice)); // unchanged means no new revision
+    EXPECT_EQ(current->revision, alice->revision);
+    auto bob_again = load_annotation_layer(bob->id);
+    EXPECT(bob_again && bob_again->annotations.empty());
+    EXPECT_EQ(list_annotation_layers().size(), 2u);
+    EXPECT(!load_annotation_layer(bob->id, alice->revision));
+    // Annotation history and local file drafts share the object store but
+    // must never move one another's heads.
+    EXPECT(!put_draft("file:/notes.md", "changed", "base", "notes").empty());
+    EXPECT(find_draft("file:/notes.md").has_value());
+    auto alice_again = load_annotation_layer(alice->id);
+    EXPECT(alice_again && alice_again->revision == alice->revision);
+  }
   revstore_use_path({});
   fs::remove(db);
 #endif
@@ -4696,6 +4773,7 @@ int main() {
   test_inflate();
   test_sha256();
   test_revstore();
+  test_annotation_layers();
   test_front_matter_and_preamble();
   test_collection();
   test_wikipedia();

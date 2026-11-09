@@ -6,7 +6,24 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **301** (this delivery is **300**)
+Next bundle number: **302** (this delivery is **301**)
+
+## Status (2026-11-09) — Versioned annotation layer foundation
+
+- Add immutable typed-object revisions and independent `object_heads` in the
+  existing SQLite revision store, preserving legacy drafts and file heads.
+- Add annotation layers as versioned collections (owner, name, stable
+  annotation IDs, kinds, bodies, styles and multi-document passage targets).
+  A layer stores only references/annotations, never a copy of source content.
+- Layer saves use optimistic revision checks; historical layers can be loaded
+  by revision id, and corrupt/truncated snapshots are rejected.
+- Focused SQLite integration test passed against the runtime library, including
+  a pre-existing database schema, reopen, independent heads, and legacy drafts.
+  Changed sources also compile without SQLite. Full CMake/SDL test suites
+  need a development host with their headers and tools installed.
+- Next: render enabled layers, persist per-user visibility, edit annotations
+  from the UI, and eventually generalize document save/publish heads. The
+  current file-based editing behavior is unchanged in this increment.
 
 ## Status (2026-11-08) — Reply panel edge positioning
 

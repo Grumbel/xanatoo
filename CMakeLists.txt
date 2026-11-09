@@ -158,6 +158,7 @@ add_executable(xanatoo
   src/minibuffer.cpp
   src/sidestore.cpp
   src/revstore.cpp
+  src/annotations.cpp
   src/epub_import.cpp
   src/epub_native.cpp
   src/view_settings.cpp
@@ -499,6 +500,7 @@ add_executable(xanatoo_tests
   src/paths.cpp
   src/version.cpp
   src/revstore.cpp
+  src/annotations.cpp
   src/minibuffer.cpp
   src/document.cpp
   src/parse.cpp

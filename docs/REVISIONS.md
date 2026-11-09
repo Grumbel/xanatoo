@@ -31,6 +31,9 @@ revision. Neither says anything about trust or truth.
   \ncontent …\nkind …\ntime …\n`).
 - `heads(doc_key, latest, draft, base, title, time)` — the mutable
   pointer: latest revision, current draft, saved content it started from.
+- `object_heads(key, revision, kind)` — independent heads for versioned typed
+  objects; shares the immutable `objects` and `revisions` tables, never the
+  file/draft head pointer. Existing databases acquire this table in place.
 
 App side (`src/app_drafts.cpp`):
 
@@ -43,6 +46,34 @@ App side (`src/app_drafts.cpp`):
   Saved drops the draft (its revisions stay). File → Drafts / `drafts:`
   lists every draft; untitled ones open as `draft:doc:<hex>`.
 - Without SQLite the old "repeat to discard" confirmation remains.
+
+## Annotation layers (storage foundation)
+
+`include/xanatoo/annotations.hpp`, `src/annotations.cpp`:
+
+- A layer (`layer:<random-id>`) is an independently versioned typed object.
+  Its snapshots contain the layer's owner/name and an ordered collection of
+  annotations, encoded as canonical, length-delimited binary, not a modified
+  copy of the article. The layer's `revision` is the immutable revision id.
+- Each annotation has a stable id, kind, body, optional style name, and one
+  or more targets. Each target records a document key, the document revision
+  at annotation time, and a serialized passage locator. These can refer to
+  different documents. This storage layer does not resolve/reanchor locators.
+- Multiple users' layers can independently advance and later be composed on
+  the same document. A layer save checks the revision the caller loaded; a
+  stale writer is rejected instead of silently overwriting someone else's
+  changes. Layers can be enumerated, and old versions remain retrievable by
+  revision id.
+- No annotation UI, collaboration protocol, signatures, or document changes
+  are implemented yet. Owners are descriptive, not authenticated. Visibility
+  is view-local and should not be baked into the shared annotation contents.
+- `--no-save` and builds without SQLite cannot persist layers. The API
+  reports failure rather than pretending the data was saved.
+
+Next: compose the enabled layers over document panes by resolving their
+locators (highlight, note anchors, scrollbar marks); keep unresolved anchors
+visible for reattachment. Then add per-annotation edit commands and an
+annotation-layer selector. Avoid interpreting text diffs as annotations.
 
 ## Later phases
 

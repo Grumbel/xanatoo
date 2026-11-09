@@ -69,7 +69,11 @@ sqlite3* db() {
       "CREATE INDEX IF NOT EXISTS revisions_doc ON revisions(doc_key, time);"
       "CREATE TABLE IF NOT EXISTS heads ("
       "  doc_key TEXT PRIMARY KEY, latest TEXT, draft TEXT, base TEXT,"
-      "  title TEXT, time INTEGER);";
+      "  title TEXT, time INTEGER);"
+      // Typed object heads are separate from the legacy file/draft heads:
+      // moving an annotation layer must never change a document's draft.
+      "CREATE TABLE IF NOT EXISTS object_heads ("
+      "  key TEXT PRIMARY KEY, revision TEXT NOT NULL, kind TEXT NOT NULL);";
   if (path.empty() || sqlite3_open(path.c_str(), &g_db) != SQLITE_OK ||
       sqlite3_exec(g_db, schema, nullptr, nullptr, nullptr) != SQLITE_OK) {
     if (g_db) sqlite3_close(g_db);
@@ -174,15 +178,17 @@ bool set_head(sqlite3* d, std::string_view key, std::string_view latest,
 struct Txn {
   sqlite3* d;
   bool done = false;
+  bool started = false;
   explicit Txn(sqlite3* db_) : d(db_) {
-    sqlite3_exec(d, "BEGIN;", nullptr, nullptr, nullptr);
+    started = sqlite3_exec(d, "BEGIN IMMEDIATE;", nullptr, nullptr, nullptr) == SQLITE_OK;
   }
   bool commit() {
+    if (!started) return false;
     done = sqlite3_exec(d, "COMMIT;", nullptr, nullptr, nullptr) == SQLITE_OK;
     return done;
   }
   ~Txn() {
-    if (!done) sqlite3_exec(d, "ROLLBACK;", nullptr, nullptr, nullptr);
+    if (started && !done) sqlite3_exec(d, "ROLLBACK;", nullptr, nullptr, nullptr);
   }
 };
 #endif
@@ -250,6 +256,7 @@ std::string put_draft(std::string_view key, std::string_view text,
   const int64_t now = static_cast<int64_t>(std::time(nullptr));
   const std::string cid = content_id(text);
   Txn txn(d);
+  if (!txn.started) return {};
   const HeadRow h = head_row(d, key);
   std::string parent = h.latest;
   std::string base = h.base;
@@ -274,6 +281,7 @@ bool record_save(std::string_view key, std::string_view text) {
   const int64_t now = static_cast<int64_t>(std::time(nullptr));
   const std::string cid = content_id(text);
   Txn txn(d);
+  if (!txn.started) return false;
   const HeadRow h = head_row(d, key);
   if (!put_object(d, cid, text)) return false;
   const std::string rev = put_revision(d, key, h.latest, cid, "save", now);
@@ -288,6 +296,90 @@ bool drop_draft(std::string_view key) {
   return s.run();
 }
 
+std::optional<ObjectRevision> load_object_revision(std::string_view revision) {
+  sqlite3* d = db();
+  if (!d) return std::nullopt;
+  Stmt s(d, "SELECT doc_key, COALESCE(parent, ''), kind, content, time "
+            "FROM revisions WHERE id = ?;", {revision});
+  if (!s.row()) return std::nullopt;
+  ObjectRevision r;
+  r.id = revision;
+  r.key = s.text(0);
+  r.parent = s.text(1);
+  r.kind = s.text(2);
+  r.content = s.text(3);
+  r.time = sqlite3_column_int64(s.st, 4);
+  auto body = load_object(r.content);
+  if (!body) return std::nullopt;
+  r.data = std::move(*body);
+  return r;
+}
+
+std::optional<ObjectRevision> find_object_head(std::string_view key) {
+  sqlite3* d = db();
+  if (!d) return std::nullopt;
+  Stmt s(d, "SELECT revision FROM object_heads WHERE key = ?;", {key});
+  if (!s.row()) return std::nullopt;
+  return load_object_revision(s.text(0));
+}
+
+std::vector<ObjectRevision> list_object_heads(std::string_view kind) {
+  std::vector<std::string> ids;
+  sqlite3* d = db();
+  if (!d) return {};
+  {
+    Stmt s(d, "SELECT revision FROM object_heads WHERE kind = ? ORDER BY key;",
+           {kind});
+    while (s.row()) ids.push_back(s.text(0));
+  }
+  std::vector<ObjectRevision> out;
+  for (const std::string& id : ids)
+    if (auto r = load_object_revision(id); r && r->kind == kind)
+      out.push_back(std::move(*r));
+  return out;
+}
+
+std::string commit_object_revision(std::string_view key,
+                                   std::string_view kind,
+                                   std::string_view data,
+                                   std::string_view expected_head) {
+  sqlite3* d = db();
+  if (!d || key.empty() || kind.empty()) return {};
+  Txn txn(d);
+  if (!txn.started) return {};
+  std::string current, current_kind;
+  {
+    Stmt previous(d, "SELECT revision, kind FROM object_heads WHERE key = ?;", {key});
+    if (previous.row()) {
+      current = previous.text(0);
+      current_kind = previous.text(1);
+    }
+  }
+  if (current != expected_head || (!current.empty() && current_kind != kind))
+    return {};
+  const std::string cid = content_id(data);
+  if (!current.empty()) {
+    bool same = false;
+    {
+      Stmt last(d, "SELECT content FROM revisions WHERE id = ?;", {current});
+      if (!last.row()) return {};
+      same = last.text(0) == cid;
+    }
+    if (same) return txn.commit() ? current : std::string();
+  }
+  if (!put_object(d, cid, data)) return {};
+  const std::string rev = put_revision(d, key, current, cid, kind,
+                                       static_cast<int64_t>(std::time(nullptr)));
+  if (rev.empty()) return {};
+  {
+    Stmt head(d, "INSERT INTO object_heads(key, revision, kind) VALUES(?,?,?) "
+                 "ON CONFLICT(key) DO UPDATE SET revision=excluded.revision, "
+                 "kind=excluded.kind;", {key, rev, kind});
+    if (!head.run()) return {};
+  }
+  return txn.commit() ? rev : std::string();
+}
+
 #else
 
 std::optional<DraftHead> find_draft(std::string_view) { return std::nullopt; }
@@ -299,6 +391,17 @@ std::string put_draft(std::string_view, std::string_view, std::string_view,
 }
 bool record_save(std::string_view, std::string_view) { return false; }
 bool drop_draft(std::string_view) { return false; }
+std::optional<ObjectRevision> load_object_revision(std::string_view) {
+  return std::nullopt;
+}
+std::optional<ObjectRevision> find_object_head(std::string_view) {
+  return std::nullopt;
+}
+std::vector<ObjectRevision> list_object_heads(std::string_view) { return {}; }
+std::string commit_object_revision(std::string_view, std::string_view,
+                                   std::string_view, std::string_view) {
+  return {};
+}
 
 #endif
 
