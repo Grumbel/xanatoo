@@ -34,6 +34,12 @@ revision. Neither says anything about trust or truth.
 - `object_heads(key, revision, kind)` — independent heads for versioned typed
   objects; shares the immutable `objects` and `revisions` tables, never the
   file/draft head pointer. Existing databases acquire this table in place.
+- `document_heads(key, working, published, title, time)` — database-native
+  logical documents (`doc:<64 hex>`). `working` advances with autosaves;
+  `published` advances **only** on explicit local Publish. These are separate
+  immutable parent chains (`kind=working` and `kind=published`) and neither
+  overwrites the other. The document's bytes live in `objects`, encoded with
+  the internal S-expression representation, not a filesystem path.
 
 App side (`src/app_drafts.cpp`):
 
@@ -46,6 +52,32 @@ App side (`src/app_drafts.cpp`):
   Saved drops the draft (its revisions stay). File → Drafts / `drafts:`
   lists every draft; untitled ones open as `draft:doc:<hex>`.
 - Without SQLite the old "repeat to discard" confirmation remains.
+
+## Database-native working and published documents
+
+File → New creates a random document identity and immediately writes its
+first working revision to the local SQLite store. Subsequent edits are
+autosaved on the draft debounce, and Ctrl+S commits the current working
+revision immediately. File → **Publish locally** records the current working
+content in a separate publication history; this does **not** upload anything
+or configure a remote destination. Optimistic revision-head checks reject
+conflicting writes rather than replacing another editor's version.
+
+File → **Local documents** or `documents:` lists these persisted documents.
+Each document opens at `db:doc:<64 hex>`, retaining its stable identity on
+reload or between runs. The tab shows the stored short title. Native
+document File → Save As and Export commands write a file as an *export*;
+the working document remains attached to its database key. A stored
+published revision can be loaded separately by its immutable revision ID
+through `load_stored_document_revision`, but there is not yet a GUI browser
+to inspect or restore old working/published revisions.
+
+**Migration is incomplete:** previously opened files still use the legacy
+draft and save workflow, and Ctrl+S on one of those paths still writes the
+file. A later increment should import the source version into a native
+document without overwriting it, and distinguish the original from the local
+editable version. Remote publishing, replication, signatures and portable
+annotation exchange are likewise future work.
 
 ## Annotation layers (storage foundation)
 
@@ -120,8 +152,8 @@ currently restores an entire layer snapshot, not one annotation in isolation.
 Automatic autosaving happens on idle/blur rather than after every keystroke.
 Annotations use the existing bookmark wash colour; per-layer
 colours, interactive margin text boxes, permissions, and anchor reattachment
-are still planned. Published layer exchange and database-native document
-working/published heads remain separate future work.
+are still planned. Published layer exchange remains future work. Database-native
+working/published heads now exist, separately from annotation histories.
 
 ## Later phases
 

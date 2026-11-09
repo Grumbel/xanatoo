@@ -61,6 +61,7 @@ enum class UiCommand {
   PopOut,          // focused buffer → floating window
   PopIn,           // top floating window → tab in focused pane
   Save,
+  Publish,       // snapshot current database-native working revision locally
 
   SaveAs,
   ExportSexpr,
@@ -70,6 +71,7 @@ enum class UiCommand {
   ForceReload,
   RevertToSaved,  // drop the buffer's draft and reload the file
   OpenDrafts,     // "drafts:" page: every stored unsaved draft
+  OpenStoredDocuments,  // "documents:" page: database-native working documents
   Quit,
   // Edit
   Undo,
@@ -205,6 +207,7 @@ struct UiSearchEngine {
 
 struct UiState {
   bool dirty = false;
+  bool can_publish = false;
   bool has_path = false;
   bool split = false;
   bool outline = false;

@@ -73,7 +73,12 @@ sqlite3* db() {
       // Typed object heads are separate from the legacy file/draft heads:
       // moving an annotation layer must never change a document's draft.
       "CREATE TABLE IF NOT EXISTS object_heads ("
-      "  key TEXT PRIMARY KEY, revision TEXT NOT NULL, kind TEXT NOT NULL);";
+      "  key TEXT PRIMARY KEY, revision TEXT NOT NULL, kind TEXT NOT NULL);"
+      // Files are export/import. A native document has two durable heads:
+      // autosaved working state and a deliberately published snapshot.
+      "CREATE TABLE IF NOT EXISTS document_heads ("
+      "  key TEXT PRIMARY KEY, working TEXT NOT NULL, published TEXT,"
+      "  title TEXT NOT NULL DEFAULT '', time INTEGER NOT NULL);";
   if (path.empty() || sqlite3_open(path.c_str(), &g_db) != SQLITE_OK ||
       sqlite3_exec(g_db, schema, nullptr, nullptr, nullptr) != SQLITE_OK) {
     if (g_db) sqlite3_close(g_db);
@@ -380,6 +385,136 @@ std::string commit_object_revision(std::string_view key,
   return txn.commit() ? rev : std::string();
 }
 
+namespace {
+
+std::optional<StoredDocument> stored_head(sqlite3* d, std::string_view key) {
+  Stmt s(d, "SELECT key, title, working, COALESCE(published, ''), time "
+            "FROM document_heads WHERE key = ?;", {key});
+  if (!s.row()) return std::nullopt;
+  StoredDocument head;
+  head.key = s.text(0);
+  head.title = s.text(1);
+  head.working = s.text(2);
+  head.published = s.text(3);
+  head.time = sqlite3_column_int64(s.st, 4);
+  return head;
+}
+
+bool native_document_key(std::string_view key) {
+  return key.size() == 68 && key.starts_with("doc:");
+}
+
+}  // namespace
+
+std::optional<StoredDocument> find_stored_document(std::string_view key) {
+  sqlite3* d = db();
+  return d && native_document_key(key) ? stored_head(d, key) : std::nullopt;
+}
+
+std::vector<StoredDocument> list_stored_documents() {
+  sqlite3* d = db();
+  if (!d) return {};
+  Stmt s(d, "SELECT key, title, working, COALESCE(published, ''), time "
+            "FROM document_heads ORDER BY time DESC, key;", {});
+  std::vector<StoredDocument> out;
+  while (s.row()) {
+    StoredDocument h;
+    h.key = s.text(0);
+    h.title = s.text(1);
+    h.working = s.text(2);
+    h.published = s.text(3);
+    h.time = sqlite3_column_int64(s.st, 4);
+    out.push_back(std::move(h));
+  }
+  return out;
+}
+
+std::optional<StoredDocument> save_stored_document(
+    std::string_view key, std::string_view document,
+    std::string_view expected_working, std::string_view title) {
+  sqlite3* d = db();
+  if (!d || !native_document_key(key)) return std::nullopt;
+  Txn txn(d);
+  if (!txn.started) return std::nullopt;
+  auto head = stored_head(d, key);
+  if ((head && head->working != expected_working) ||
+      (!head && !expected_working.empty())) return std::nullopt;
+  const int64_t now = static_cast<int64_t>(std::time(nullptr));
+  const std::string cid = content_id(document);
+  std::string revision;
+  if (head) {
+    Stmt prev(d, "SELECT content FROM revisions WHERE id = ?;",
+              {head->working});
+    if (!prev.row()) return std::nullopt;
+    if (prev.text(0) == cid) revision = head->working; // metadata-only edit
+  }
+  if (revision.empty()) {
+    if (!put_object(d, cid, document)) return std::nullopt;
+    revision = put_revision(d, key, expected_working, cid, "working", now);
+    if (revision.empty()) return std::nullopt;
+  }
+  if (head) {
+    Stmt update(d, "UPDATE document_heads SET working = ?, title = ?, "
+                   "time = CAST(? AS INTEGER) WHERE key = ?;",
+                {revision, title, std::to_string(now), key});
+    if (!update.run()) return std::nullopt;
+    head->working = revision;
+    head->title = title;
+    head->time = now;
+  } else {
+    Stmt insert(d, "INSERT INTO document_heads(key, working, title, time) "
+                   "VALUES(?,?,?,CAST(? AS INTEGER));",
+                {key, revision, title, std::to_string(now)});
+    if (!insert.run()) return std::nullopt;
+    head = StoredDocument{std::string(key), std::string(title), revision, {}, now};
+  }
+  return txn.commit() ? head : std::nullopt;
+}
+
+std::optional<StoredDocument> publish_stored_document(
+    std::string_view key, std::string_view expected_working,
+    std::string_view expected_published) {
+  sqlite3* d = db();
+  if (!d || !native_document_key(key)) return std::nullopt;
+  Txn txn(d);
+  if (!txn.started) return std::nullopt;
+  auto head = stored_head(d, key);
+  if (!head || head->working != expected_working ||
+      head->published != expected_published) return std::nullopt;
+  Stmt working(d, "SELECT content FROM revisions "
+                  "WHERE id = ? AND doc_key = ? AND kind = 'working';",
+               {expected_working, key});
+  if (!working.row()) return std::nullopt;
+  const std::string cid = working.text(0);
+  if (!head->published.empty()) {
+    Stmt last(d, "SELECT content FROM revisions WHERE id = ?;",
+              {head->published});
+    if (!last.row()) return std::nullopt;
+    if (last.text(0) == cid) return txn.commit() ? head : std::nullopt;
+  }
+  const int64_t now = static_cast<int64_t>(std::time(nullptr));
+  const std::string revision = put_revision(
+      d, key, head->published, cid, "published", now);
+  if (revision.empty()) return std::nullopt;
+  Stmt update(d, "UPDATE document_heads SET published = ?, "
+                 "time = CAST(? AS INTEGER) WHERE key = ?;",
+              {revision, std::to_string(now), key});
+  if (!update.run()) return std::nullopt;
+  head->published = revision;
+  head->time = now;
+  return txn.commit() ? head : std::nullopt;
+}
+
+std::optional<std::string> load_stored_document_revision(
+    std::string_view key, std::string_view revision) {
+  if (!native_document_key(key) || revision.empty()) return std::nullopt;
+  const auto record = load_object_revision(revision);
+  if (!record || record->key != key ||
+      (record->kind != "working" && record->kind != "published"))
+    return std::nullopt;
+  return record->data;
+}
+
 #else
 
 std::optional<DraftHead> find_draft(std::string_view) { return std::nullopt; }
@@ -401,6 +536,22 @@ std::vector<ObjectRevision> list_object_heads(std::string_view) { return {}; }
 std::string commit_object_revision(std::string_view, std::string_view,
                                    std::string_view, std::string_view) {
   return {};
+}
+std::optional<StoredDocument> find_stored_document(std::string_view) {
+  return std::nullopt;
+}
+std::vector<StoredDocument> list_stored_documents() { return {}; }
+std::optional<StoredDocument> save_stored_document(
+    std::string_view, std::string_view, std::string_view, std::string_view) {
+  return std::nullopt;
+}
+std::optional<StoredDocument> publish_stored_document(
+    std::string_view, std::string_view, std::string_view) {
+  return std::nullopt;
+}
+std::optional<std::string> load_stored_document_revision(
+    std::string_view, std::string_view) {
+  return std::nullopt;
 }
 
 #endif

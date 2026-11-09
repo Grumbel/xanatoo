@@ -89,4 +89,39 @@ std::string commit_object_revision(std::string_view key,
                                    std::string_view data,
                                    std::string_view expected_head);
 
+// Database-native documents are independent from legacy file/draft heads.
+// `working` changes through autosaves; `published` is an explicit, immutable
+// snapshot of one working revision. Both have independent parent chains.
+// The bytes are the internal canonical document representation (S-expression
+// today), never a file path or an export format.
+struct StoredDocument {
+  std::string key;
+  std::string title;
+  std::string working;    // current editable revision id
+  std::string published;  // last deliberately published revision id, if any
+  int64_t time = 0;
+};
+
+std::optional<StoredDocument> find_stored_document(std::string_view key);
+std::vector<StoredDocument> list_stored_documents();
+
+// Create when `expected_working` is empty, or append to an existing working
+// head. Optimistic concurrency and the publication pointer are both retained.
+// A failed save cannot change either head or the supplied expected revision.
+std::optional<StoredDocument> save_stored_document(
+    std::string_view key, std::string_view document,
+    std::string_view expected_working, std::string_view title);
+
+// Publish precisely the working version the caller reviewed. Publishing does
+// not advance or change the working head. The published parent points to the
+// previous publication rather than the previous working edit.
+std::optional<StoredDocument> publish_stored_document(
+    std::string_view key, std::string_view expected_working,
+    std::string_view expected_published);
+
+// For opening a head or inspecting a historical working/published snapshot.
+// Always verifies that the revision belongs to this document identity.
+std::optional<std::string> load_stored_document_revision(
+    std::string_view key, std::string_view revision);
+
 }  // namespace xanatoo

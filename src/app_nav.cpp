@@ -19,6 +19,7 @@
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/parse.hpp"
 #include "xanatoo/reddit.hpp"
+#include "xanatoo/revstore.hpp"
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/native.hpp"
 #include "xanatoo/util.hpp"
@@ -315,6 +316,32 @@ void open_link_in_tab(App& app, int pi, const std::string& href) {
       return;
     case LinkKind::Doc: {
       std::string path = xanatoo::parse_locator(t.url).base;
+      if (path == kDocumentsPage) {
+        flash_status(app, "Use File → Local documents to open the index");
+        return;
+      }
+      if (is_stored_document_ref(path)) {
+        const auto head = xanatoo::find_stored_document(path.substr(3));
+        const auto body = head ? xanatoo::load_stored_document_revision(
+                                     head->key, head->working)
+                               : std::nullopt;
+        if (!body) {
+          flash_status(app, "Local document not found");
+          return;
+        }
+        bi = find_buffer(app, path);
+        if (bi == kNoBuffer) {
+          bi = add_buffer(app, xanatoo::parse_sexpr(*body), path);
+          DocBuffer& b = buf(app, bi);
+          b.doc_key = head->key;
+          b.stored_working = head->working;
+          b.stored_published = head->published;
+          b.stored_title = head->title;
+          b.base_id = xanatoo::content_id(
+              xanatoo::serialize_document(b.doc, {}));
+        }
+        break;
+      }
       std::error_code ec;
       if (fs::is_directory(path, ec)) {
         std::string dir = fs::weakly_canonical(path, ec).string();
@@ -428,7 +455,8 @@ bool navigate_pane(App& app, int pi, std::string target, bool record_history,
     if (!via.href.empty()) via.from_url = shown;
     p.nav.pending_link = std::move(via);
   }
-  if (xanatoo::starts_with(target, "draft:"))
+  if (xanatoo::starts_with(target, "draft:") ||
+      target == kDocumentsPage || is_stored_document_ref(target))
     return open_page(app, pi, std::move(target), record_history);
   xanatoo::Locator loc = xanatoo::parse_locator(target);
   const bool selectors = loc.has_selectors();
@@ -475,6 +503,20 @@ static bool open_page(App& app, int pi, std::string target,
     app.focus = pi;  // open_drafts_page shows in the focused pane
     open_drafts_page(app);
     app.focus = saved;
+    if (record_history) push_nav_history(app, pi, target);
+    return true;
+  }
+  if (target == kDocumentsPage) {
+    if (!stash_or_confirm(app, p.buf)) return false;
+    const int saved = app.focus;
+    app.focus = pi;
+    open_stored_documents_page(app);
+    app.focus = saved;
+    if (record_history) push_nav_history(app, pi, target);
+    return true;
+  }
+  if (is_stored_document_ref(target)) {
+    if (!open_stored_document(app, pi, target)) return false;
     if (record_history) push_nav_history(app, pi, target);
     return true;
   }

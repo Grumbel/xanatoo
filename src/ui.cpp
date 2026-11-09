@@ -1754,6 +1754,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                     "Ctrl+Shift+P");
       ImGui::Separator();
       menu_item_cmd("Save", UiCommand::Save, cmd, true, "Ctrl+S");
+      menu_item_cmd("Publish locally", UiCommand::Publish, cmd,
+                    state.can_publish);
       menu_item_cmd("Save As…", UiCommand::SaveAs, cmd, true, "Ctrl+Shift+S");
       menu_item_cmd("Export as S-expression…", UiCommand::ExportSexpr, cmd, true);
       menu_item_cmd("Export as XML (experimental)…", UiCommand::ExportXml, cmd, true);
@@ -1765,6 +1767,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       menu_item_cmd("Revert to Saved", UiCommand::RevertToSaved, cmd,
                     state.has_path && state.dirty);
       menu_item_cmd("Drafts", UiCommand::OpenDrafts, cmd);
+      menu_item_cmd("Local documents", UiCommand::OpenStoredDocuments, cmd);
       ImGui::Separator();
       menu_item_cmd("Quit", UiCommand::Quit, cmd, true, "Ctrl+Q");
       ImGui::EndMenu();

@@ -364,6 +364,74 @@ void test_annotation_layers() {
 #endif
 }
 
+void test_stored_documents() {
+#if XANATOO_SQLITE
+  using namespace xanatoo;
+  namespace fs = std::filesystem;
+  const fs::path db = fs::temp_directory_path() /
+      ("xanatoo-stored-docs-" + std::to_string(process_id()) + ".sqlite");
+  fs::remove(db);
+  revstore_use_path(db.string());
+  const std::string key = new_doc_key();
+  const std::string other = new_doc_key();
+  EXPECT(!find_stored_document(key));
+  EXPECT(list_stored_documents().empty());
+  auto first = save_stored_document(key, "(document one)", "", "My document");
+  EXPECT(first.has_value());
+  if (first) {
+    EXPECT(first->published.empty());
+    EXPECT(!first->working.empty());
+    EXPECT_EQ(load_stored_document_revision(key, first->working),
+              std::optional<std::string>("(document one)"));
+    EXPECT(!save_stored_document(key, "overwrite", "", "wrong head"));
+    EXPECT(!load_stored_document_revision(other, first->working));
+    EXPECT(!save_stored_document("file:/somewhere.md", "bad", "", "bad"));
+
+    auto initial_pub = publish_stored_document(key, first->working, "");
+    EXPECT(initial_pub.has_value());
+    if (initial_pub) {
+      EXPECT(initial_pub->working == first->working);
+      EXPECT(!initial_pub->published.empty());
+      EXPECT_EQ(load_stored_document_revision(key, initial_pub->published),
+                std::optional<std::string>("(document one)"));
+
+      auto edited = save_stored_document(key, "(document two)", first->working,
+                                         "New title");
+      EXPECT(edited.has_value());
+      if (edited) {
+        EXPECT(edited->published == initial_pub->published);
+        EXPECT(edited->working != first->working);
+        EXPECT(!publish_stored_document(key, first->working,
+                                        initial_pub->published));
+        EXPECT(!save_stored_document(key, "stale", first->working, "stale"));
+        auto second_pub = publish_stored_document(
+            key, edited->working, initial_pub->published);
+        EXPECT(second_pub.has_value());
+        if (second_pub) {
+          const auto pub_record = load_object_revision(second_pub->published);
+          EXPECT(pub_record && pub_record->parent == initial_pub->published);
+          EXPECT_EQ(load_stored_document_revision(key, second_pub->published),
+                    std::optional<std::string>("(document two)"));
+          auto same = publish_stored_document(key, edited->working,
+                                               second_pub->published);
+          EXPECT(same && same->published == second_pub->published);
+        }
+      }
+    }
+    auto second = save_stored_document(other, "(different)", "", "Another");
+    EXPECT(second.has_value());
+    EXPECT_EQ(list_stored_documents().size(), 2u);
+    revstore_use_path(db.string()); // close/reopen persisted state
+    auto reopened = find_stored_document(key);
+    EXPECT(reopened && reopened->title == "New title");
+    EXPECT(reopened && !reopened->published.empty());
+    EXPECT(!load_stored_document_revision(other, first->working));
+  }
+  revstore_use_path({});
+  fs::remove(db);
+#endif
+}
+
 void test_json_min() {
   using namespace xanatoo;
   const char* j =
@@ -4825,6 +4893,7 @@ int main() {
   test_sha256();
   test_revstore();
   test_annotation_layers();
+  test_stored_documents();
   test_front_matter_and_preamble();
   test_collection();
   test_wikipedia();

@@ -172,7 +172,8 @@ bool is_foreign_path(std::string_view path) {
       xanatoo::starts_with(path, "https://"))
     return true;
   if (xanatoo::path_uses_html(path) || xanatoo::is_pandoc_path(path)) return true;
-  if (path == kDraftsPage || path == kAboutPage) return true;
+  if (path == kDraftsPage || path == kDocumentsPage || path == kAboutPage)
+    return true;
   // Directory listings (navigate_pane gives them a trailing '/').
   std::error_code ec;
   if (xanatoo::ends_with(path, "/") ||
@@ -300,6 +301,8 @@ std::string buffer_tab_label(App& app, BufferId bi) {
   const std::string& path = b->path;
   if (path.empty()) {
     s += "untitled";
+  } else if (is_stored_document_ref(path)) {
+    s += b->stored_title.empty() ? "untitled" : b->stored_title;
   } else if (is_in_app_remote_url(path)) {
     // URL: host + last path segment ("geminiprotocol.net/.../x.gmi"); ASCII
     // dots because the ImGui tab font has no "…".

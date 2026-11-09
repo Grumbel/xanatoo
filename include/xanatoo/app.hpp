@@ -98,6 +98,9 @@ struct DocBuffer {
   std::string doc_key;
   std::string base_id;
   std::string draft_id;
+  std::string stored_working;   // database-native head (no file path)
+  std::string stored_published; // independent last published head
+  std::string stored_title;     // friendly local tab label
   Uint32 draft_due = 0;
 };
 
@@ -860,10 +863,16 @@ void autosave_drafts(App& app);       // per frame: write drafts that are due
 // `text` was written to `b.path`: record the save, clear the draft (also
 // the one under a previous key after Save As).
 void note_saved(App& app, BufferId id, const std::string& text);
+bool save_stored_buffer(App& app, BufferId id);
+bool publish_stored_buffer(App& app, BufferId id);
 // Drop the draft and reload the file (File → Revert to Saved).
 void revert_buffer(App& app, BufferId id);
 // "drafts:" page listing every stored draft; "draft:<key>" opens one.
 inline constexpr const char* kDraftsPage = "drafts:";
+inline constexpr const char* kDocumentsPage = "documents:";
+inline bool is_stored_document_ref(std::string_view path) {
+  return path.size() == 71 && path.starts_with("db:doc:");
+}
 void open_drafts_page(App& app);
 // "about:" page: services, formats and libraries of this build (app_about.cpp).
 inline constexpr const char* kAboutPage = "about:";
@@ -872,6 +881,8 @@ void open_about_page(App& app);
 // at runtime, video / renderer / OpenGL, controllers, directories.
 void print_startup_report(App& app);
 bool open_draft(App& app, int pi, const std::string& ref);
+bool open_stored_document(App& app, int pi, const std::string& ref);
+void open_stored_documents_page(App& app);
 
 // ---- buffers ----
 std::string resolve_open_path(App& app, std::string path);

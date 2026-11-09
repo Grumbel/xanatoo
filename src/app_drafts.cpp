@@ -35,7 +35,8 @@ bool regular_file(const std::string& path) {
 
 // Label for the drafts page: file name, else the first line of the text.
 std::string draft_title(const DocBuffer& b, const std::string& text) {
-  if (!b.path.empty()) return path_title(b.path);
+  if (!b.path.empty() && !is_stored_document_ref(b.path))
+    return path_title(b.path);
   std::string_view rest = text;
   while (!rest.empty()) {
     const size_t nl = rest.find('\n');
@@ -53,10 +54,39 @@ std::string draft_title(const DocBuffer& b, const std::string& text) {
   return "untitled";
 }
 
+// Pathless documents are database-native. Their working revisions are
+// committed on the same debounce as legacy file drafts, but never written to
+// a file. Publishing advances a different head (see revstore.cpp).
+bool write_stored_working(App& app, DocBuffer& b) {
+  if ((!b.path.empty() && !is_stored_document_ref(b.path)) || b.placeholder)
+    return false;
+  if (b.doc_key.empty()) b.doc_key = new_doc_key();
+  const std::string text = serialize_sexpr(b.doc);
+  const std::string title = draft_title(b, serialize_document(b.doc, {}));
+  const auto head = save_stored_document(b.doc_key, text, b.stored_working, title);
+  if (!head) {
+    std::cerr << "Document store unavailable or working revision changed\n";
+    return false;
+  }
+  if (!b.draft_id.empty()) drop_draft(b.doc_key);
+  b.stored_working = head->working;
+  b.stored_published = head->published;
+  b.stored_title = head->title;
+  b.path = "db:" + b.doc_key;
+  b.base_id = content_id(serialize_document(b.doc, {}));
+  b.draft_id.clear();
+  b.draft_due = 0;
+  b.dirty = false;
+  update_title(app);
+  return true;
+}
+
 // Write `b`'s current text as its draft (no-op when unchanged). Undoing
 // every edit drops the draft and makes the buffer clean again.
 bool write_draft(App& app, DocBuffer& b) {
   b.draft_due = 0;
+  if (b.path.empty() || is_stored_document_ref(b.path))
+    return write_stored_working(app, b);
   const std::string text = serialize_document(b.doc, b.path);
   const std::string cid = content_id(text);
   if (cid == b.draft_id) return true;
@@ -102,6 +132,9 @@ bool attach_draft(App& app, BufferId id) {
   b->doc_key.clear();
   b->base_id.clear();
   b->draft_id.clear();
+  b->stored_working.clear();
+  b->stored_published.clear();
+  b->stored_title.clear();
   b->draft_due = 0;
   if (b->path.empty() || b->placeholder || is_foreign_path(b->path) ||
       !regular_file(b->path))
@@ -176,10 +209,28 @@ void note_saved(App& app, BufferId id, const std::string& text) {
   if (!b->doc_key.empty() && b->doc_key != key && !b->draft_id.empty())
     drop_draft(b->doc_key);  // Save As: the draft lived under the old key
   b->doc_key = key;
+  b->stored_working.clear();
+  b->stored_published.clear();
+  b->stored_title.clear();
   record_save(key, text);
   b->base_id = content_id(text);
   b->draft_id.clear();
   b->draft_due = 0;
+}
+
+bool save_stored_buffer(App& app, BufferId id) {
+  DocBuffer* b = find_buf(app, id);
+  return b && write_stored_working(app, *b);
+}
+
+bool publish_stored_buffer(App& app, BufferId id) {
+  DocBuffer* b = find_buf(app, id);
+  if (!b || !write_stored_working(app, *b)) return false;
+  const auto head = publish_stored_document(
+      b->doc_key, b->stored_working, b->stored_published);
+  if (!head) return false;
+  b->stored_published = head->published;
+  return true;
 }
 
 void revert_buffer(App& app, BufferId id) {
@@ -233,6 +284,49 @@ bool open_draft(App& app, int pi, const std::string& ref) {
   b.dirty = true;
   update_title(app);
   flash_status(app, "Draft restored — Save As gives it a file");
+  return true;
+}
+
+void open_stored_documents_page(App& app) {
+  std::string md = "# Local documents\n\n"
+                   "Working versions are saved automatically. Publishing "
+                   "creates a separate, immutable local snapshot. "
+                   "Nothing is uploaded.\n\n";
+  const auto documents = list_stored_documents();
+  if (documents.empty()) md += "No local documents. Use File → New.\n";
+  for (const StoredDocument& d : documents) {
+    std::string title = d.title.empty() ? "untitled" : d.title;
+    // The index is Markdown; escape user-controlled link markup in titles.
+    for (char& c : title)
+      if (c == '[' || c == ']' || c == '(' || c == ')' || c == '\n' ||
+          c == '\r')
+        c = ' ';
+    md += "- [" + title + "](db:" + d.key + ") — " +
+          format_time(d.time) +
+          (d.published.empty() ? ", unpublished\n" : ", published\n");
+  }
+  show_doc_in_pane(app, app.focus, parse_document(md, {}), kDocumentsPage);
+}
+
+bool open_stored_document(App& app, int pi, const std::string& ref) {
+  if (!is_stored_document_ref(ref)) return false;
+  if (!stash_or_confirm(app, app.panes[pi].buf)) return false;
+  const std::string key = ref.substr(3);
+  const auto head = find_stored_document(key);
+  const auto body = head ? load_stored_document_revision(key, head->working)
+                         : std::nullopt;
+  if (!body) {
+    flash_status(app, "Local document not found");
+    return false;
+  }
+  show_doc_in_pane(app, pi, parse_sexpr(*body), ref);
+  DocBuffer& b = buf(app, app.panes[pi].buf);
+  b.doc_key = key;
+  b.stored_working = head->working;
+  b.stored_published = head->published;
+  b.stored_title = head->title;
+  b.base_id = content_id(serialize_document(b.doc, {}));
+  b.dirty = false;
   return true;
 }
 

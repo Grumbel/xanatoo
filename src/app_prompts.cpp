@@ -321,6 +321,8 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
     case PromptKind::SaveAs: {
       minibuf_sync_out(app);
       if (!pr.text.empty()) {
+        const bool export_only = path_of(app, p).empty() ||
+                                 is_stored_document_ref(path_of(app, p));
         const std::string target = xanatoo::expand_user_path(pr.text);
         if (app.invalid_xml_paths.contains(target)) {
           flash_status(app, "Cannot overwrite an XML file that failed to import");
@@ -343,13 +345,18 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
           std::cerr << "Failed to save: " << target << "\n";
         } else {
           out << text;
-          path_of(app, p) = target;
-          buf(app, p.buf).dirty = false;
-          note_saved(app, p.buf, text);
-          app.discard_armed = false;
-          update_title(app);
-          flash_status(app, "Saved as " + target);
-          std::cout << "Saved as: " << target << "\n";
+          if (export_only) {
+            // Exporting a native document must never replace its stable
+            // database identity with a filesystem path.
+          } else {
+            path_of(app, p) = target;
+            buf(app, p.buf).dirty = false;
+            note_saved(app, p.buf, text);
+            app.discard_armed = false;
+            update_title(app);
+          }
+          flash_status(app, (export_only ? "Exported " : "Saved as ") + target);
+          std::cout << (export_only ? "Exported: " : "Saved as: ") << target << "\n";
           minibuf_commit_path_hist(app);
         }
       }

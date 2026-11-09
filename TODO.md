@@ -6,7 +6,28 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **306** (this delivery is **305**)
+Next bundle number: **307** (this delivery is **306**)
+
+## Status (2026-11-09) — Database-native documents, autosave and local Publish
+
+- Added `document_heads` to the existing SQLite revision store. Native
+  `doc:<64 hex>` keys have independent append-only working and published
+  ancestry. Save and publish validate expected heads, and every old revision
+  can be loaded by ID. Existing file/draft heads and annotation layers are
+  unaffected.
+- File → New immediately creates a stored document; edits autosave working
+  revisions, Ctrl+S saves the working head, and File → Publish locally
+  creates an explicit publication snapshot without contacting any network.
+- File → Local documents (`documents:`) lists persisted native documents;
+  `db:doc:<64 hex>` opens/reopens one across sessions. Export and Save As
+  write a file but keep a native document's database identity unchanged.
+- SQLite integration passed for saving, publication ancestry, stale heads,
+  distinct owners and reopening; no-SQLite source checks pass. Full native
+  SDL/CMake build remains to be checked on the user's NixOS development host.
+- Next: migrate edits of imported files/remote documents into native working
+  revisions while keeping the untouched original; add a revision browser with
+  restore/diff, and configure explicit publication destinations. Annotation
+  layers stay independent of all source/document revisions.
 
 ## Status (2026-11-09) — Fix native unit-test linker
 
