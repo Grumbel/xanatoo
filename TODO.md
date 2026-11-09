@@ -6,7 +6,22 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **335** (this delivery is **334**)
+Next bundle number: **336** (this delivery is **335**)
+
+## Status (2026-11-10) — Clearlooks toolbar/scrollbar follow-up
+
+- Split toolbar and regular button drawing: toolbar icon/text buttons are
+  borderless and transparent at rest, showing a rounded raised outline only
+  on hover/press; selected URL actions retain a flat tinted indicator. Regular
+  dialog/panel buttons stay raised with corner-safe inset bevel highlights,
+  eliminating the square-edge overlays on ImGui's rounded button frames.
+- The native full-height scrollbars use a dedicated cool blue-grey gradient
+  thumb with a darker outline against a lighter trough, retaining their
+  existing metadata markers and drag behavior. ImGui scrollbars use matching
+  higher-contrast thumb colours for idle, hovered and active states.
+- Vendored ImGui panel tests, pure scrollbar geometry tests and native theme
+  syntax check passed. Full Nix/SDL build and visual inspection remain pending
+  on a host with the complete dependencies.
 
 ## Status (2026-11-09) — Subscriptions panel
 

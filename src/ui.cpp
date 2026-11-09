@@ -82,50 +82,72 @@ std::string elide_middle(const std::string& s, size_t keep) {
 
 bool near_eq(float a, float b, float eps) { return std::fabs(a - b) < eps; }
 
-// Toolbar controls use a visible raised face even when idle. Their pressed
-// edge reverses like the classic GTK2 buttons; the same treatment is shared
-// by icon buttons and the text-only fallback.
+// Toolbar buttons are flat until hovered/pressed, unlike the always-raised
+// buttons in dialogs and panels. Icon and text fallbacks share this style.
 int push_toolbar_button_style() {
   const theme::Palette& p = theme::palette();
   ImGuiStyle& s = ImGui::GetStyle();
-  auto color = [](theme::Rgb c) {
-    return ImVec4(c.r / 255.f, c.g / 255.f, c.b / 255.f, 1.f);
+  auto color = [](theme::Rgb c, float alpha = 1.f) {
+    return ImVec4(c.r / 255.f, c.g / 255.f, c.b / 255.f, alpha);
   };
-  ImGui::PushStyleColor(ImGuiCol_Button, color(p.face_light));
+  ImGui::PushStyleColor(ImGuiCol_Button, color(p.face_light, 0.f));
   ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color(p.accent_soft));
   ImGui::PushStyleColor(ImGuiCol_ButtonActive, color(p.face_dark));
-  ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize,
-                      std::max(1.f, s.FrameBorderSize));
+  ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
   ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, s.FrameRounding);
   return 3;
 }
 
-void draw_toolbar_button_bevel() {
+// Only the hovered toolbar item gets a raised outline. ImGui draws the rounded
+// face itself; the extra outline follows its radius instead of cutting across
+// its corners with square, overlapping pixel lines.
+void draw_toolbar_hover_face() {
+  if (!ImGui::IsItemHovered() && !ImGui::IsItemActive()) return;
   const bool pressed = ImGui::IsItemActive();
   const theme::Palette& p = theme::palette();
   const ImVec2 min = ImGui::GetItemRectMin();
   const ImVec2 max = ImGui::GetItemRectMax();
-  ImDrawList* draw = ImGui::GetWindowDrawList();
   const int alpha = std::clamp(static_cast<int>(255.f * ImGui::GetStyle().Alpha),
                                0, 255);
-  auto rgba = [alpha](theme::Rgb c) {
-    return IM_COL32(c.r, c.g, c.b, alpha);
-  };
-  const ImU32 light = rgba(pressed ? p.shadow : p.highlight);
-  const ImU32 dark = rgba(pressed ? p.highlight : p.shadow);
-  draw->AddLine(ImVec2(min.x + 1.f, min.y), ImVec2(max.x - 2.f, min.y), light);
-  draw->AddLine(ImVec2(min.x, min.y + 1.f), ImVec2(min.x, max.y - 2.f), light);
-  draw->AddLine(ImVec2(min.x + 1.f, max.y - 1.f),
-                ImVec2(max.x - 1.f, max.y - 1.f), dark);
-  draw->AddLine(ImVec2(max.x - 1.f, min.y + 1.f),
-                ImVec2(max.x - 1.f, max.y - 1.f), dark);
+  const theme::Rgb edge = pressed ? p.dark : p.frame;
+  ImGui::GetWindowDrawList()->AddRect(
+      ImVec2(min.x + 0.5f, min.y + 0.5f),
+      ImVec2(max.x - 0.5f, max.y - 0.5f),
+      IM_COL32(edge.r, edge.g, edge.b, alpha),
+      ImGui::GetStyle().FrameRounding);
+}
+
+// Classic action buttons stay raised at rest. Restrict the bevel highlight to
+// the *inside* of ImGui's rounded frame, avoiding its four curved corners.
+void draw_regular_button_highlight() {
+  const ImVec2 min = ImGui::GetItemRectMin();
+  const ImVec2 max = ImGui::GetItemRectMax();
+  if (max.x - min.x < 12.f || max.y - min.y < 12.f) return;
+  const theme::Palette& p = theme::palette();
+  const bool pressed = ImGui::IsItemActive();
+  const theme::Rgb edge = pressed ? p.shadow : p.highlight;
+  const theme::Rgb lower_edge = pressed ? p.highlight : p.shadow;
+  const int alpha = std::clamp(static_cast<int>(255.f * ImGui::GetStyle().Alpha),
+                               0, 255);
+  const ImU32 col = IM_COL32(edge.r, edge.g, edge.b, alpha);
+  const ImU32 lower_col = IM_COL32(lower_edge.r, lower_edge.g,
+                                  lower_edge.b, alpha);
+  ImDrawList* draw = ImGui::GetWindowDrawList();
+  draw->AddLine(ImVec2(min.x + 3.f, min.y + 1.5f),
+                ImVec2(max.x - 4.f, min.y + 1.5f), col);
+  draw->AddLine(ImVec2(min.x + 1.5f, min.y + 3.f),
+                ImVec2(min.x + 1.5f, max.y - 4.f), col);
+  draw->AddLine(ImVec2(min.x + 3.f, max.y - 2.f),
+                ImVec2(max.x - 4.f, max.y - 2.f), lower_col);
+  draw->AddLine(ImVec2(max.x - 2.f, min.y + 3.f),
+                ImVec2(max.x - 2.f, max.y - 4.f), lower_col);
 }
 
 // All ordinary panel actions use the same raised detail and GTK-sized frame,
 // rather than mixing ImGui's small (zero vertical padding) and regular buttons.
 bool classic_button(const char* label, const ImVec2& size = ImVec2(0.f, 0.f)) {
   const bool clicked = ImGui::Button(label, size);
-  draw_toolbar_button_bevel();
+  draw_regular_button_highlight();
   return clicked;
 }
 
@@ -374,9 +396,9 @@ void Ui::apply_classic_theme() {
   c[ImGuiCol_TitleBgCollapsed] = header;
   c[ImGuiCol_MenuBarBg] = bg2;
   c[ImGuiCol_ScrollbarBg] = P(pal.scroll_trough);  // = theme::draw_vscrollbar
-  c[ImGuiCol_ScrollbarGrab] = P(pal.face_light);
-  c[ImGuiCol_ScrollbarGrabHovered] = P(pal.accent_soft);
-  c[ImGuiCol_ScrollbarGrabActive] = P(pal.face_dark);
+  c[ImGuiCol_ScrollbarGrab] = P(pal.scroll_thumb_bottom);
+  c[ImGuiCol_ScrollbarGrabHovered] = C(0x7E, 0x9F, 0xB9);
+  c[ImGuiCol_ScrollbarGrabActive] = P(pal.scroll_thumb_edge);
   c[ImGuiCol_CheckMark] = sel;
   c[ImGuiCol_SliderGrab] = sel;
   c[ImGuiCol_SliderGrabActive] = sel_hi;
@@ -503,7 +525,7 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
       pressed = true;
       out = c;
     }
-    draw_toolbar_button_bevel();
+    draw_toolbar_hover_face();
     ImGui::PopStyleVar();
     ImGui::PopID();
   } else {
@@ -538,7 +560,7 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
       pressed = true;
       out = c;
     }
-    draw_toolbar_button_bevel();
+    draw_toolbar_hover_face();
   }
   pop_toolbar_button_style(style_colors);
   ImGui::EndDisabled();
@@ -570,7 +592,7 @@ bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip)
             ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0),
             ImVec4(1, 1, 1, 1.f)))
       pressed = true;
-    draw_toolbar_button_bevel();
+    draw_toolbar_hover_face();
     draw_toolbar_menu_marker(scale_);
     ImGui::PopStyleVar();
   } else {
@@ -594,7 +616,7 @@ bool Ui::tool_menu_begin(const char* id, const char* icon_name, const char* tip)
     }
     label += " ▾";
     if (ImGui::Button(label.c_str(), ImVec2(0.f, 36.f * scale_))) pressed = true;
-    draw_toolbar_button_bevel();
+    draw_toolbar_hover_face();
   }
   const ImVec2 button_min = ImGui::GetItemRectMin();
   const ImVec2 button_max = ImGui::GetItemRectMax();
@@ -1217,26 +1239,29 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         ImGui::SameLine(0.f, 0.f);
         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x,
                                        field_pos.y + 3.f * scale_));
+        const int style_colors = push_toolbar_button_style();
         const theme::Palette& pal = theme::palette();
-        const theme::Rgb face = on ? pal.accent_soft : pal.face_light;
-        ImGui::PushStyleColor(ImGuiCol_Button,
-                              ImVec4(face.r / 255.f, face.g / 255.f,
-                                     face.b / 255.f, 1.f));
+        if (on) {
+          const theme::Rgb face = pal.accent_soft;
+          ImGui::PushStyleColor(ImGuiCol_Button,
+                                ImVec4(face.r / 255.f, face.g / 255.f,
+                                       face.b / 255.f, 1.f));
+        }
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.f * scale_, 3.f * scale_));
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.f * scale_);
         const Icon* ic = icon(icon_name);
         bool pressed;
         if (ic) {
           pressed = ImGui::ImageButton(id, reinterpret_cast<ImTextureID>(ic->texture),
                                        ImVec2(20.f * scale_, 20.f * scale_));
-          draw_toolbar_button_bevel();
         } else {
           ImGui::PushID(id);
-          pressed = classic_button(fallback, ImVec2(28.f * scale_, 26.f * scale_));
+          pressed = ImGui::Button(fallback, ImVec2(28.f * scale_, 26.f * scale_));
           ImGui::PopID();
         }
-        ImGui::PopStyleVar(2);
-        ImGui::PopStyleColor();
+        draw_toolbar_hover_face();
+        ImGui::PopStyleVar();
+        if (on) ImGui::PopStyleColor();
+        pop_toolbar_button_style(style_colors);
         if (pressed) cmd = action;
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", tip);
       };
@@ -1734,8 +1759,9 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       }
       ImGui::SameLine();
       const int button_colors = push_toolbar_button_style();
-      if (classic_button("+##new-tab", ImVec2(button_w, tab_h - 6.f * scale_)))
+      if (ImGui::Button("+##new-tab", ImVec2(button_w, tab_h - 6.f * scale_)))
         cmd = UiCommand::NewTab;
+      draw_toolbar_hover_face();
       if (ImGui::IsItemHovered()) ImGui::SetTooltip("New tab (Ctrl+T)");
       ImGui::PopStyleVar(2);
       ImGui::PopStyleColor(button_colors);

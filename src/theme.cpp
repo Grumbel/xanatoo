@@ -119,6 +119,32 @@ void draw_button_face(SDL_Renderer* r, const SDL_Rect& rc, bool pressed,
   vline(r, x0 + 1, y0 + 2, y1 - 2, inner);
 }
 
+void draw_scroll_thumb(SDL_Renderer* r, const SDL_Rect& rc, bool pressed) {
+  if (rc.w <= 0 || rc.h <= 0) return;
+  const Palette& p = palette();
+  if (rc.w < 4 || rc.h < 4) {
+    fill(r, rc, p.scroll_thumb_edge);
+    return;
+  }
+  // Separate blue-grey thumb from the almost-white trough. The dark outline
+  // stays visible even over section/search markers behind the movable thumb.
+  Rgb top = p.scroll_thumb_top;
+  Rgb bottom = p.scroll_thumb_bottom;
+  if (pressed) std::swap(top, bottom);
+  vgradient(r, SDL_Rect{rc.x + 1, rc.y + 1, rc.w - 2, rc.h - 2}, top, bottom);
+  const int x1 = rc.x + rc.w - 1, y1 = rc.y + rc.h - 1;
+  hline(r, rc.x, x1, rc.y, p.scroll_thumb_edge);
+  hline(r, rc.x, x1, y1, p.scroll_thumb_edge);
+  vline(r, rc.x, rc.y + 1, y1 - 1, p.scroll_thumb_edge);
+  vline(r, x1, rc.y + 1, y1 - 1, p.scroll_thumb_edge);
+  if (rc.w > 6 && rc.h > 6) {
+    hline(r, rc.x + 2, x1 - 2, rc.y + 1,
+          pressed ? p.shadow : p.highlight);
+    vline(r, rc.x + 1, rc.y + 2, y1 - 2,
+          pressed ? p.shadow : p.highlight);
+  }
+}
+
 void draw_window_chrome(SDL_Renderer* r, const WindowChrome& w) {
   const Palette& p = palette();
   const SDL_Rect& o = w.outer;
@@ -197,7 +223,7 @@ void draw_vscrollbar(SDL_Renderer* r, const SDL_Rect& trough, float scroll,
   const float ratio = std::clamp(scroll / max_scroll, 0.f, 1.f);
   SDL_Rect thumb{trough.x + 1, trough.y + 1 + static_cast<int>(ratio * track),
                  trough.w - 2, static_cast<int>(thumb_h)};
-  draw_button_face(r, thumb, false, false);
+  draw_scroll_thumb(r, thumb);
   if (thumb_out) *thumb_out = thumb;
 }
 

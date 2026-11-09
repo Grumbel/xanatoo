@@ -3502,9 +3502,8 @@ static void draw_pane_scrollbar(App& app, int i) {
     // Thumb
     SDL_Rect thumb{sx + 1, static_cast<int>(thumb_y), kSbW - 2,
                    std::max(1, static_cast<int>(geom.thumb_height))};
-    th::draw_button_face(app.sdl, thumb,
-                         app.dragging_scroll && app.scroll_drag_pane == i,
-                         false);
+    th::draw_scroll_thumb(app.sdl, thumb,
+                          app.dragging_scroll && app.scroll_drag_pane == i);
     // Grip ridges (BeOS-style) when the thumb is tall enough.
     if (thumb.h >= 24) {
       const int gy = thumb.y + thumb.h / 2;

@@ -29,7 +29,10 @@ struct Palette {
   Rgb face_light = rgb(0xFA, 0xFB, 0xFA);  // button gradient top, menus
   Rgb face_dark = rgb(0xD5, 0xD9, 0xD7);   // button gradient bottom
   Rgb field = rgb(0xFF, 0xFF, 0xFF);       // text entry / sunken well
-  Rgb scroll_trough = rgb(0xDE, 0xE2, 0xE1);  // light recessed scrollbar track
+  Rgb scroll_trough = rgb(0xE7, 0xEA, 0xEC);  // light recessed scrollbar track
+  Rgb scroll_thumb_top = rgb(0xC1, 0xD0, 0xDA);  // cool raised thumb
+  Rgb scroll_thumb_bottom = rgb(0x8D, 0xA6, 0xB7);
+  Rgb scroll_thumb_edge = rgb(0x5B, 0x73, 0x85);
   Rgb paper = rgb(0xF8, 0xF6, 0xF0);       // document canvas
   // Bevel edges
   Rgb highlight = rgb(0xFF, 0xFF, 0xFF);
@@ -94,5 +97,7 @@ void draw_vscrollbar(SDL_Renderer* r, const SDL_Rect& trough, float scroll,
 // Raised push-button face; `pressed` flips to sunken + darker face.
 void draw_button_face(SDL_Renderer* r, const SDL_Rect& rc, bool pressed = false,
                       bool hot = false);
+// High-contrast scrollbar thumb, separate from the ordinary button face.
+void draw_scroll_thumb(SDL_Renderer* r, const SDL_Rect& rc, bool pressed = false);
 
 }  // namespace xanatoo::theme
