@@ -58,6 +58,16 @@ that triggered the warning, so a different stored pin cannot be overwritten
 by a stale confirmation. The certificate is checked again before the retried
 request is sent, and any third fingerprint is rejected.
 
+The certificate review document also shows the leaf certificate's subject,
+issuer, validity start/end in UTC, and self-signed status. The SHA-256
+fingerprints are grouped into short blocks so they can wrap without losing
+any hex digits. OpenSSL verifies a purported self-signature using the leaf's
+own public key. The Mbed TLS backend reports the subject/issuer names and
+dates but marks self-signature verification as **unknown**: matching issuer
+and subject names alone would not prove a valid self-signature. These fields
+are descriptive and **do not establish CA or hostname authentication** for
+Gemini. Peer-controlled names are rendered as literal text, not Markdown.
+
 First-contact and replacement prompts are shown for foreground navigation
 only. Background-tab fetches retain their error document; select the tab and
 reload to review and approve the certificate. Store read errors, invalid
@@ -90,7 +100,8 @@ connect until the CA loading path is fixed.
 `tests/tls_peer_tests.cpp` opens an offline TLS connection to a temporary
 OpenSSL test server with an ephemeral local CA. It checks a trusted matching
 hostname, mismatched hostname, and an untrusted certificate, plus the
-explicit Gemini handshake and its certificate fingerprint.
+explicit Gemini handshake, fingerprint and certificate metadata, including a
+self-issued leaf signed by a different key (which is not self-signed).
 `tests/gemini_tofu_tests.cpp` tests first-contact challenges, approval before
 pinning, concurrent first-use approvals, persisted/session-only pins, hostname
 and port separation, structured mismatch reports, explicit replacement
@@ -101,8 +112,9 @@ HTTPS-to-HTTP downgrade rejection. The tests do not replace integration
 testing of real sites, operating-system trust stores or Android's Mbed TLS
 backend.
 
-**Not yet solved:** a richer in-app certificate inspection panel with
-validity dates, issuer and self-signed status. Verified HTTPS/WSS alone does not
+**Not yet solved:** separate modal certificate inspection with SAN display,
+explicit expiry warnings and Mbed TLS self-signature verification. Verified
+HTTPS/WSS alone does not
 authenticate Nostr event authors, relay group membership, NIP-11 master-key
 claims, or API authorization. Each has its own cryptographic and
 application-level checks.

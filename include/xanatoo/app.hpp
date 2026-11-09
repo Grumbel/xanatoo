@@ -449,6 +449,7 @@ struct FetchShared {
   // First-contact TLS handshake completed, but no request was sent and no
   // pin was written. Requires explicit confirmation on the main thread.
   std::optional<xanatoo::GeminiCertificateFirstUse> gemini_first_use;
+  std::optional<xanatoo::TlsPeerCertificate> gemini_certificate;
 };
 
 // Remote image downloads (app_images.cpp): URLs ImageCache asked for,

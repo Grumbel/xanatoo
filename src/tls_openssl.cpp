@@ -5,10 +5,13 @@
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <openssl/buffer.h>
 
 #include <arpa/inet.h>
 #include <unistd.h>
 
+#include <algorithm>
+#include <ctime>
 #include <mutex>
 
 namespace xanatoo {
@@ -23,6 +26,35 @@ void init_once() {
     SSL_load_error_strings();
     OpenSSL_add_all_algorithms();
   });
+}
+
+std::string certificate_name(X509_NAME* name) {
+  if (!name) return {};
+  BIO* output = BIO_new(BIO_s_mem());
+  if (!output) return {};
+  std::string result;
+  if (X509_NAME_print_ex(output, name, 0, XN_FLAG_RFC2253) >= 0) {
+    BUF_MEM* buffer = nullptr;
+    BIO_get_mem_ptr(output, &buffer);
+    if (buffer && buffer->data) {
+      const size_t size = std::min(static_cast<size_t>(buffer->length),
+                                   size_t{1024});
+      result.assign(buffer->data, size);
+      if (size < buffer->length) result += "…";
+    }
+  }
+  BIO_free(output);
+  return result;
+}
+
+std::string certificate_time(const ASN1_TIME* time) {
+  if (!time) return {};
+  std::tm utc{};
+  if (ASN1_TIME_to_tm(time, &utc) != 1) return {};
+  char buffer[32];
+  if (std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S UTC", &utc) == 0)
+    return {};
+  return buffer;
 }
 
 }  // namespace
@@ -123,6 +155,31 @@ std::optional<std::string> TlsStream::peer_certificate_sha256() const {
     result += hex[digest[i] & 15];
   }
   return result;
+}
+
+std::optional<TlsPeerCertificate> TlsStream::peer_certificate_details() const {
+  if (!connected()) return std::nullopt;
+  X509* cert = SSL_get1_peer_certificate(impl_->ssl);
+  if (!cert) return std::nullopt;
+  TlsPeerCertificate details;
+  details.subject = certificate_name(X509_get_subject_name(cert));
+  details.issuer = certificate_name(X509_get_issuer_name(cert));
+  details.not_before = certificate_time(X509_get0_notBefore(cert));
+  details.not_after = certificate_time(X509_get0_notAfter(cert));
+  details.self_issued = X509_NAME_cmp(X509_get_subject_name(cert),
+                                      X509_get_issuer_name(cert)) == 0;
+  details.self_signed = false;
+  if (details.self_issued) {
+    EVP_PKEY* key = X509_get_pubkey(cert);
+    if (key) {
+      details.self_signed = X509_verify(cert, key) == 1;
+      EVP_PKEY_free(key);
+    } else {
+      details.self_signed.reset();
+    }
+  }
+  X509_free(cert);
+  return details;
 }
 
 bool TlsStream::write_all(const void* data, size_t n) {

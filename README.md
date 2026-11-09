@@ -215,6 +215,8 @@ before sending the URL. This does not authenticate the **first** connection.
 On later certificate changes, the failed page shows both fingerprints;
 Enter trusts the replacement and reconnects, while Esc keeps the old pin.
 Verify fingerprints independently before accepting them.
+The Gemini review page also displays certificate subject, issuer, validity
+dates, and self-signature status (when the TLS backend can verify it).
 Plain `http://` URLs are supported but carry data without encryption or
 authentication. Redirects may upgrade HTTP to HTTPS, never downgrade HTTPS
 to HTTP.

@@ -218,6 +218,12 @@ toolbar and shortcuts should route through `execute_command`.
 ## Shared network helpers
 
 - `include/xanatoo/tls.hpp` — `TlsStream` (connect over a socket fd with SNI, peer certificate SHA-256, write_all / read / pending; owns the fd). Backends `src/tls_openssl.cpp` (desktop default) and `src/tls_mbedtls.cpp` (Android; `-DXANATOO_TLS=mbedtls`). Certificate-chain/hostname verification defaults ON; Gemini explicitly opts out of CA verification and enforces `gemini_tofu.cpp` pins before sending URLs. Never call OpenSSL / Mbed TLS directly elsewhere.
+- `TlsStream::peer_certificate_details()` supplies printable subject/issuer,
+  UTC validity dates and self-issuance/self-signature status for Gemini trust
+  review. OpenSSL checks the actual self-signature; Mbed TLS reports unknown
+  until that signature can be verified portably. Certificate names are untrusted
+  text: do not parse them as Markdown or conflate matching DNs with a valid
+  cryptographic self-signature.
 - `include/xanatoo/https.hpp` + `src/https.cpp` — HTTPS GET/POST over `TlsStream` (chunked bodies decoded; `https_get_follow` follows redirects without HTTPS→HTTP downgrade) plus `tcp_connect_host` for Gemini / Nostr (built when any network feature is ON). Keep NIP-11 HTTPS-only/public-only/256 KiB limits independent of ordinary verified HTTPS browsing. See `docs/TLS.md`.
 - `include/xanatoo/json_min.hpp` — tiny JSON field/object helpers for read-only API clients (header-only). The `*_field` lookups are flat (first match anywhere): use `json_top_level(obj)` when nested objects repeat a key.
 

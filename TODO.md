@@ -6,7 +6,20 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **323** (this delivery is **322**)
+Next bundle number: **324** (this delivery is **323**)
+
+## Status (2026-11-09) — Gemini certificate metadata in trust review
+
+- Gemini first-use and changed-pin reviews now display the leaf certificate
+  subject, issuer, validity start/end (UTC), and self-signature status beside
+  full SHA-256 hashes. Hashes are grouped for wrapping, and peer-controlled
+  names are added as literal document spans, not interpreted as Markdown.
+- OpenSSL verifies an alleged self-signature using the certificate's own key;
+  Mbed TLS exposes self-issued name equality but marks actual self-signature
+  verification as unknown. Details remain informational, not CA trust.
+- Offline OpenSSL tests cover date/name extraction and deliberately misleading
+  self-issued certificates signed with a different key. Full SDL/Nix UI and
+  Mbed TLS builds still need testing on the target machines.
 
 ## Status (2026-11-09) — Gemini first-contact certificate review
 

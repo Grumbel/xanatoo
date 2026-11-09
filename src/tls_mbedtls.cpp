@@ -67,6 +67,20 @@ std::string error_text(int rc) {
   return buf;
 }
 
+std::string certificate_name(const mbedtls_x509_name* name) {
+  if (!name) return {};
+  char buffer[1024];
+  const int count = mbedtls_x509_dn_gets(buffer, sizeof(buffer), name);
+  return count >= 0 ? std::string(buffer) : std::string{};
+}
+
+std::string certificate_time(const mbedtls_x509_time& time) {
+  char buffer[32];
+  std::snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d %02d:%02d:%02d UTC",
+                time.year, time.mon, time.day, time.hour, time.min, time.sec);
+  return buffer;
+}
+
 // Loading hundreds of Android CA files once per HTTPS image/request is
 // prohibitively expensive. The parsed chain is read-only after construction
 // and shared by all verified TLS connections.
@@ -221,6 +235,23 @@ std::optional<std::string> TlsStream::peer_certificate_sha256() const {
     result += hex[digest[i] & 15];
   }
   return result;
+}
+
+std::optional<TlsPeerCertificate> TlsStream::peer_certificate_details() const {
+  if (!connected()) return std::nullopt;
+  const mbedtls_x509_crt* cert = mbedtls_ssl_get_peer_cert(&impl_->ssl);
+  if (!cert) return std::nullopt;
+  TlsPeerCertificate details;
+  details.subject = certificate_name(&cert->subject);
+  details.issuer = certificate_name(&cert->issuer);
+  details.not_before = certificate_time(cert->valid_from);
+  details.not_after = certificate_time(cert->valid_to);
+  details.self_issued = !details.subject.empty() &&
+                        details.subject == details.issuer;
+  // The Mbed TLS public certificate API exposes matching names, but that
+  // alone does not prove the self-signature. Report it as unknown rather than
+  // claim the certificate has a valid self-signature without verifying it.
+  return details;
 }
 
 bool TlsStream::write_all(const void* data, size_t n) {

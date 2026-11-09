@@ -7,6 +7,7 @@
 #include <string_view>
 
 #include "xanatoo/gemini_tofu.hpp"
+#include "xanatoo/tls.hpp"
 
 namespace xanatoo {
 
@@ -41,7 +42,8 @@ struct GeminiResponse {
 std::optional<GeminiResponse> gemini_fetch(std::string_view url,
                                            std::string* err = nullptr,
                                            GeminiCertificateChange* changed = nullptr,
-                                           GeminiCertificateFirstUse* first_use = nullptr);
+                                           GeminiCertificateFirstUse* first_use = nullptr,
+                                           std::optional<TlsPeerCertificate>* review_cert = nullptr);
 #endif
 
 }  // namespace xanatoo

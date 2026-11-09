@@ -41,7 +41,8 @@ void fetch_gemini(const std::string& url, FetchShared& out) {
   out.service = "Gemini";
   xanatoo::GeminiCertificateChange changed;
   xanatoo::GeminiCertificateFirstUse first_use;
-  auto resp = xanatoo::gemini_fetch(url, &out.error, &changed, &first_use);
+  auto resp = xanatoo::gemini_fetch(url, &out.error, &changed, &first_use,
+                                   &out.gemini_certificate);
   if (!changed.host.empty()) out.gemini_change = std::move(changed);
   if (!first_use.host.empty()) out.gemini_first_use = std::move(first_use);
   if (!resp) return;
@@ -214,14 +215,68 @@ void cache_page(App& app, const FetchJob& job) {
 xanatoo::Document load_error_doc(const FetchJob& job) {
   const bool certificate_review = job.shared->gemini_change ||
                                   job.shared->gemini_first_use;
-  std::string md = (certificate_review ? "# Gemini certificate review\n\n`" :
-                                        "# Could not load page\n\n`") + job.url + "`\n\n" +
-                   job.shared->error + "\n";
+  std::string md;
+  if (certificate_review) {
+    md = "# Gemini certificate review\n\n"
+         "The TLS handshake completed, but the request URL was not sent. "
+         "Check the certificate details independently before trusting it.\n";
+  } else {
+    md = "# Could not load page\n\n`" + job.url + "`\n\n" +
+         job.shared->error + "\n";
+  }
   if (xanatoo::starts_with(job.url, "http://") ||
       xanatoo::starts_with(job.url, "https://"))
     md += "\n[Open in browser](" + std::string(xanatoo::kExternalPrefix) +
           job.url + ")\n";
   xanatoo::Document doc = xanatoo::parse_document(md, "error.md");
+  if (certificate_review) {
+    auto field = [&](const char* label, std::string value) {
+      // Certificate names are peer-controlled. Keep them as literal text
+      // spans, never interpolate into Markdown where links could be injected.
+      const xanatoo::NodeId para =
+          doc.create(xanatoo::NodeKind::Paragraph, doc.root);
+      doc.append_text(para, std::string(label) + ": ",
+                      xanatoo::InlineKind::Strong);
+      doc.append_text(para, value.empty() ? "Unavailable" : std::move(value));
+    };
+    auto fingerprint = [](std::string_view hash) {
+      // Add word-break opportunities without dropping any SHA-256 hex digits.
+      std::string grouped;
+      for (size_t i = 0; i < hash.size(); i += 8) {
+        if (i) grouped += ' ';
+        grouped.append(hash.substr(i, 8));
+      }
+      return grouped;
+    };
+    field("Requested URL", job.url);
+    if (job.shared->gemini_change) {
+      const auto& change = *job.shared->gemini_change;
+      field("Trust state", "The certificate differs from the saved pin");
+      field("Previously trusted SHA-256", fingerprint(change.previous_sha256));
+      field("Presented SHA-256", fingerprint(change.received_sha256));
+    } else if (job.shared->gemini_first_use) {
+      field("Trust state", "First contact; no certificate is pinned yet");
+      field("Presented SHA-256",
+            fingerprint(job.shared->gemini_first_use->fingerprint_sha256));
+    }
+    if (job.shared->gemini_certificate) {
+      const auto& cert = *job.shared->gemini_certificate;
+      field("Subject", cert.subject);
+      field("Issuer", cert.issuer);
+      field("Valid from", cert.not_before);
+      field("Valid until", cert.not_after);
+      if (cert.self_signed.has_value())
+        field("Self-signed", *cert.self_signed ?
+              "Yes (self-signature verified)" : "No");
+      else
+        field("Self-signed", cert.self_issued ?
+              "Unknown (subject and issuer match; signature not verified)" :
+              "Unknown");
+    } else {
+      field("Certificate metadata", "Unavailable from the TLS backend");
+    }
+    field("Action", "Enter: trust this certificate and retry; Esc: cancel");
+  }
   if (std::string_view(job.shared->service) == "Reddit" &&
       xanatoo::starts_with(job.shared->error, "HTTP 403")) {
     const std::string url = xanatoo::is_reddit_ref(job.url) ?

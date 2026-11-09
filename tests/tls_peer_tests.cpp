@@ -73,7 +73,8 @@ struct TestIdentity {
 };
 
 bool handshake(SSL_CTX* server_ctx, const std::string& host,
-               bool verify_peer, std::string* fingerprint = nullptr) {
+               bool verify_peer, std::string* fingerprint = nullptr,
+               std::optional<xanatoo::TlsPeerCertificate>* details = nullptr) {
   int fds[2];
   check(socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0, "create socketpair");
   std::thread server([&] {
@@ -90,6 +91,8 @@ bool handshake(SSL_CTX* server_ctx, const std::string& host,
   const bool ok = client.connect(fds[0], host, &err, verify_peer);
   if (ok && fingerprint)
     *fingerprint = client.peer_certificate_sha256().value_or("");
+  if (ok && details)
+    *details = client.peer_certificate_details();
   client.close();
   server.join();
   if (!ok) std::cerr << "Expected TLS rejection for " << host << ": " << err << '\n';
@@ -133,9 +136,20 @@ int main() {
       expected += hex[digest[i] & 15];
     }
     std::string actual;
-    check(handshake(server.get(), "relay.example", true, &actual),
+    std::optional<xanatoo::TlsPeerCertificate> details;
+    check(handshake(server.get(), "relay.example", true, &actual, &details),
           "trusted certificate and matching hostname should connect");
     check(actual == expected, "TLS exposes the peer's SHA-256 fingerprint");
+    check(details && details->subject.find("CN=relay.example") != std::string::npos &&
+          details->issuer.find("CN=relay.example") != std::string::npos,
+          "TLS exposes printable subject and issuer names");
+    check(details->not_before.size() == 23 &&
+          details->not_before.ends_with("UTC") &&
+          details->not_after.size() == 23 &&
+          details->not_after.ends_with("UTC"),
+          "TLS exposes validity dates in UTC");
+    check(details->self_issued && details->self_signed == true,
+          "self-signature must be verified, not merely inferred");
     check(!handshake(server.get(), "different.example", true),
           "trusted certificate with wrong hostname must fail");
     check(handshake(server.get(), "different.example", false, &actual),
@@ -154,6 +168,25 @@ int main() {
           "matching hostname with untrusted certificate must fail");
     check(handshake(untrusted.get(), "relay.example", false),
           "Gemini-style self-signed exception permits untrusted certificate");
+
+    TestIdentity wrong_signer;
+    TestIdentity self_issued_but_not_signed;
+    check(X509_sign(self_issued_but_not_signed.cert.get(),
+                    wrong_signer.key.get(), EVP_sha256()) > 0,
+          "prepare a self-issued certificate signed by a different key");
+    Owner<SSL_CTX, SSL_CTX_free> misleading(SSL_CTX_new(TLS_server_method()),
+                                           SSL_CTX_free);
+    check(bool(misleading) &&
+          SSL_CTX_use_certificate(misleading.get(),
+                                  self_issued_but_not_signed.cert.get()) == 1 &&
+          SSL_CTX_use_PrivateKey(misleading.get(),
+                                 self_issued_but_not_signed.key.get()) == 1,
+          "configure a certificate with matching issuer/subject only");
+    check(handshake(misleading.get(), "relay.example", false,
+                    nullptr, &details),
+          "Gemini handshake accepts a certificate without CA validation");
+    check(details && details->self_issued && details->self_signed == false,
+          "matching subject and issuer are not proof of a self-signature");
     if (previous) setenv("SSL_CERT_FILE", previous_file.c_str(), 1);
     else unsetenv("SSL_CERT_FILE");
     std::remove(path);

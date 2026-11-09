@@ -18,6 +18,19 @@
 
 namespace xanatoo {
 
+// Human-readable information from the leaf certificate after a successful
+// handshake. Dates are in UTC. `self_issued` only compares subject and issuer;
+// `self_signed` additionally verifies the leaf's own signature when supported
+// (nullopt means the backend could not determine this).
+struct TlsPeerCertificate {
+  std::string subject;
+  std::string issuer;
+  std::string not_before;
+  std::string not_after;
+  bool self_issued = false;
+  std::optional<bool> self_signed;
+};
+
 class TlsStream {
  public:
   TlsStream();
@@ -35,6 +48,10 @@ class TlsStream {
   // a successful handshake. No certificate or hash error => nullopt.
   // Gemini checks this before sending any application data.
   std::optional<std::string> peer_certificate_sha256() const;
+
+  // Certificate identity and validity for Gemini's explicit trust review.
+  // This is descriptive information, not proof of CA or hostname trust.
+  std::optional<TlsPeerCertificate> peer_certificate_details() const;
 
   // Whole buffer; false on error.
   bool write_all(const void* data, size_t n);
