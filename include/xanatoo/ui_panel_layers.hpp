@@ -7,16 +7,17 @@
 
 namespace xanatoo {
 
-// The six ImGui bodies whose title, geometry and stacking belong to native
+// The embedded ImGui bodies whose title, geometry and stacking belong to native
 // FloatWindows. Children use ImGui's "parent/child_ID" window naming scheme.
 // Menus, tooltips and popups have their own windows and must remain foreground.
-enum class UiPanelLayer { Chrome, Reply, Bookmarks, Annotations,
+enum class UiPanelLayer { Chrome, Reply, Bookmarks, Styles, Annotations,
                           NostrExplorer, NostrAccounts, LemmyExplorer };
 
 inline const char* ui_panel_root(UiPanelLayer layer) {
   switch (layer) {
     case UiPanelLayer::Reply: return "##reply_editor";
     case UiPanelLayer::Bookmarks: return "##bookmarks_panel_body";
+    case UiPanelLayer::Styles: return "##styles_panel_body";
     case UiPanelLayer::Annotations: return "##annotation_panel_body";
     case UiPanelLayer::NostrExplorer: return "##nostr_explorer_body";
     case UiPanelLayer::NostrAccounts: return "##nostr_accounts_body";
@@ -37,7 +38,8 @@ inline bool ui_panel_obscured(UiPanelLayer hovered,
 
 inline UiPanelLayer ui_panel_layer(std::string_view owner) {
   constexpr UiPanelLayer panels[] = {
-    UiPanelLayer::Reply, UiPanelLayer::Bookmarks, UiPanelLayer::Annotations,
+    UiPanelLayer::Reply, UiPanelLayer::Bookmarks, UiPanelLayer::Styles,
+    UiPanelLayer::Annotations,
     UiPanelLayer::NostrExplorer, UiPanelLayer::NostrAccounts,
     UiPanelLayer::LemmyExplorer,
   };

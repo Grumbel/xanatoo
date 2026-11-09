@@ -26,12 +26,17 @@
 
 #include <cstdlib>
 #include <algorithm>
+#include <cctype>
+#include <cfloat>
 #include <cstdio>
 #include <ctime>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #define STBI_ONLY_PNG
@@ -192,6 +197,8 @@ void fill_style_items(const UiState& state, UiCommand& cmd, std::string& arg) {
     }
   }
   ImGui::Separator();
+  if (ImGui::MenuItem("Manage / edit style sheets..."))
+    cmd = UiCommand::ToggleStylesPanel;
   if (ImGui::MenuItem("Reload style sheets"))
     cmd = UiCommand::ReloadStyles;
 }
@@ -2494,6 +2501,268 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   } else {
     reddit_credentials_loaded_ = false;
     reddit_secret_visible_ = false;
+  }
+
+  // ---- Style sheet manager / editor, embedded in its native FloatWindow ----
+  if (state.styles_open) {
+    if (state.style_save_generation != style_save_seen_) {
+      style_save_seen_ = state.style_save_generation;
+      style_editor_dirty_ = false;
+      style_editor_loaded_.clear();
+    }
+    ImGui::SetNextWindowPos(ImVec2(float(state.styles_x + 3),
+                                  float(state.styles_y + 3)));
+    ImGui::SetNextWindowSize(ImVec2(float(std::max(1, state.styles_w - 6)),
+                                   float(std::max(1, state.styles_h - 6))));
+    constexpr ImGuiWindowFlags style_flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoCollapse;
+    if (ImGui::Begin("##styles_panel_body", nullptr, style_flags)) {
+      ImGui::TextDisabled("Reader themes  /  personal .xss files  /  automatic assignments");
+      ImGui::Separator();
+      const float list_width = std::clamp(ImGui::GetContentRegionAvail().x * 0.31f,
+                                          145.f, 260.f);
+      ImGui::BeginChild("##styles_list", ImVec2(list_width, 0), true);
+      ImGui::TextDisabled("Themes");
+      ImGui::Separator();
+      if (style_editor_sheet_.empty()) style_editor_sheet_ = state.style;
+      for (const StyleEntry& entry : state.style_entries) {
+        ImGui::PushID(entry.name.c_str());
+        const bool selected = style_editor_sheet_ == entry.name;
+        const bool active = state.style == entry.name;
+        std::string label = (active ? "● " : "  ") + entry.title;
+        if (ImGui::Selectable(label.c_str(), selected)) {
+          if (!style_editor_dirty_) {
+            style_editor_sheet_ = entry.name;
+            style_editor_[0] = '\0';  // file contents loaded below
+            style_delete_confirm_ = false;
+          }
+        }
+        if (ImGui::IsItemHovered())
+          ImGui::SetTooltip("%s%s", entry.name.c_str(),
+                            active ? " (currently applied)" : "");
+        ImGui::PopID();
+      }
+      ImGui::Separator();
+      if (ImGui::SmallButton("Reload")) cmd = UiCommand::ReloadStyles;
+      ImGui::TextDisabled("Default: %s", state.default_style.c_str());
+      ImGui::EndChild();
+      ImGui::SameLine();
+      ImGui::BeginGroup();
+      const StyleEntry* chosen = nullptr;
+      for (const StyleEntry& entry : state.style_entries)
+        if (entry.name == style_editor_sheet_) { chosen = &entry; break; }
+      if (!chosen && !state.style_entries.empty()) {
+        // A failed Create command must not strand the editor on a missing
+        // name. On success the newly created sheet appears in this list.
+        style_editor_sheet_ = state.style;
+        for (const StyleEntry& entry : state.style_entries)
+          if (entry.name == style_editor_sheet_) { chosen = &entry; break; }
+        if (!chosen) {
+          chosen = &state.style_entries.front();
+          style_editor_sheet_ = chosen->name;
+        }
+      }
+      if (chosen) {
+        const fs::path user_styles = fs::path(user_data_dir()) / "styles";
+        std::error_code ec;
+        const bool writable = !chosen->path.empty() &&
+            fs::weakly_canonical(fs::path(chosen->path).parent_path(), ec) ==
+            fs::weakly_canonical(user_styles, ec);
+        // Editor changes are held in the ImGui state until explicitly saved;
+        // switching themes is disabled while there are unsaved changes.
+        if (style_editor_sheet_ != style_editor_loaded_) {
+          style_editor_loaded_ = style_editor_sheet_;
+          std::ifstream file(chosen->path);
+          std::ostringstream contents;
+          if (file) contents << file.rdbuf();
+          const std::string source = contents.str();
+          std::snprintf(style_editor_, sizeof(style_editor_), "%s", source.c_str());
+          style_editor_dirty_ = false;
+          DocStyle resolved;
+          if (load_style(chosen->name, resolved)) {
+            auto first = [](const std::vector<std::string>& names,
+                            const char* fallback) {
+              return names.empty() ? std::string(fallback) : names.front();
+            };
+            std::snprintf(style_body_font_, sizeof(style_body_font_), "%s",
+                          first(resolved.fonts.body, "sans-serif").c_str());
+            std::snprintf(style_heading_font_, sizeof(style_heading_font_), "%s",
+                          first(resolved.fonts.heading, "sans-serif").c_str());
+            std::snprintf(style_code_font_, sizeof(style_code_font_), "%s",
+                          first(resolved.fonts.code, "monospace").c_str());
+          }
+        }
+        ImGui::Text("%s", chosen->title.c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Use this theme")) {
+          cmd = UiCommand::SelectStyle;
+          result.arg = chosen->name;
+        }
+        ImGui::SeparatorText("Create / duplicate");
+        ImGui::BeginDisabled(style_editor_dirty_);
+        ImGui::SetNextItemWidth(std::min(190.f, ImGui::GetContentRegionAvail().x * 0.60f));
+        ImGui::InputTextWithHint("##new_style", "my-theme", style_new_name_,
+                                 sizeof(style_new_name_));
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Create from selected")) {
+          std::string name = style_new_name_;
+          if (name.empty()) name = chosen->name + "-custom";
+          cmd = UiCommand::StyleCreate;
+          result.arg = name + "\n" + chosen->name;
+          style_editor_sheet_ = name;
+          style_editor_loaded_.clear();
+          style_editor_dirty_ = false;
+        }
+        ImGui::EndDisabled();
+        ImGui::SeparatorText("Source editor");
+        if (writable) {
+          ImGui::TextDisabled("%s", chosen->path.c_str());
+          if (ImGui::InputTextMultiline("##style_source", style_editor_,
+                                        sizeof(style_editor_),
+                                        ImVec2(-FLT_MIN, std::max(115.f, ImGui::GetContentRegionAvail().y * 0.26f)),
+                                        ImGuiInputTextFlags_AllowTabInput))
+            style_editor_dirty_ = true;
+          if (ImGui::Button(style_editor_dirty_ ? "Save changes *" : "Save")) {
+            cmd = UiCommand::StyleSave;
+            result.arg = chosen->name + "\n" + style_editor_;
+          }
+          ImGui::SameLine();
+          if (ImGui::SmallButton("Discard changes")) {
+            style_editor_dirty_ = false;
+            style_editor_loaded_.clear();
+          }
+          ImGui::SameLine();
+          if (style_delete_confirm_) {
+            if (ImGui::SmallButton("Confirm delete")) {
+              cmd = UiCommand::StyleDelete;
+              result.arg = chosen->name;
+              style_editor_sheet_ = state.default_style;
+              style_editor_loaded_.clear();
+              style_editor_dirty_ = false;
+              style_delete_confirm_ = false;
+            }
+          } else if (ImGui::SmallButton("Delete...")) {
+            style_delete_confirm_ = true;
+          }
+        } else {
+          ImGui::TextWrapped("Bundled preset (read-only). Create a personal copy above to edit it.");
+          ImGui::TextDisabled("Your files are saved under XDG_DATA_HOME/xanatoo/styles.");
+        }
+        ImGui::SeparatorText("Font selection");
+        if (writable) {
+          // List the actual installed FontConfig families, not a guessed
+          // handful of presets that might silently resolve to other faces.
+          const auto& faces = fontconfig_list_families();
+          ImGui::SetNextItemWidth(-FLT_MIN);
+          ImGui::InputTextWithHint("##font_filter", "Filter installed font families...",
+                                   style_font_filter_, sizeof(style_font_filter_));
+          auto font_field = [&](const char* label, char* value, size_t cap) {
+            ImGui::PushID(label);
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            ImGui::InputText(label, value, cap);
+            if (ImGui::BeginCombo("Installed fonts", "Choose a family...")) {
+              std::string filter(style_font_filter_);
+              std::transform(filter.begin(), filter.end(), filter.begin(),
+                             [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+              for (const std::string& face : faces) {
+                if (!filter.empty()) {
+                  std::string lower = face;
+                  std::transform(lower.begin(), lower.end(), lower.begin(),
+                                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                  if (lower.find(filter) == std::string::npos) continue;
+                }
+                if (ImGui::Selectable(face.c_str(), std::string_view(value) == face))
+                  std::snprintf(value, cap, "%s", face.c_str());
+              }
+              ImGui::EndCombo();
+            }
+            ImGui::PopID();
+          };
+          font_field("Body", style_body_font_, sizeof(style_body_font_));
+          font_field("Headings", style_heading_font_, sizeof(style_heading_font_));
+          font_field("Code", style_code_font_, sizeof(style_code_font_));
+          if (ImGui::SmallButton("Insert font overrides")) {
+            auto quoted = [](const char* in) {
+              std::string safe;
+              for (char c : std::string_view(in)) {
+                if (c == '"' || c == '\\') safe.push_back('\\');
+                if (c != '\n' && c != '\r') safe.push_back(c);
+              }
+              return "\"" + safe + "\"";
+            };
+            const std::string rule =
+                "\n(fonts (body " + quoted(style_body_font_) + ")" +
+                " (heading " + quoted(style_heading_font_) + ")" +
+                " (code " + quoted(style_code_font_) + "))\n";
+            std::string source(style_editor_);
+            // Parenthesized sheets must keep the extra rule inside the
+            // (stylesheet ...) wrapper. Our new templates are unwrapped.
+            const auto forms = SExprParser(source).parse_all();
+            if (forms.size() == 1 && is_form(forms.front(), "stylesheet")) {
+              const auto close = source.find_last_of(')');
+              if (close != std::string::npos) source.insert(close, rule);
+            } else source += rule;
+            if (source.size() < sizeof(style_editor_)) {
+              std::snprintf(style_editor_, sizeof(style_editor_), "%s", source.c_str());
+              style_editor_dirty_ = true;
+            }
+          }
+        } else {
+          ImGui::TextDisabled("Duplicate this preset to customize its fonts.");
+        }
+        ImGui::SeparatorText("Automatic styles");
+        for (const std::string& key : state.style_pin_candidates) {
+          ImGui::PushID(key.c_str());
+          const auto it = state.style_pins.find(key);
+          ImGui::TextWrapped("%s: %s", key.c_str(),
+                            it == state.style_pins.end() ? "(not assigned)" : it->second.c_str());
+          ImGui::SameLine();
+          if (ImGui::SmallButton("Pin here")) {
+            cmd = UiCommand::StylePin;
+            result.arg = key + "\n" + chosen->name;
+          }
+          if (it != state.style_pins.end()) {
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Unpin")) {
+              cmd = UiCommand::StyleUnpin;
+              result.arg = key;
+            }
+          }
+          ImGui::PopID();
+        }
+        if (state.style_pin_candidates.empty())
+          ImGui::TextDisabled("Open a web domain or service to assign its style.");
+        ImGui::SetNextItemWidth(-105.f);
+        ImGui::InputTextWithHint("##manual_style_pin", "domain:example.org or service:lemmy",
+                                 style_pin_input_, sizeof(style_pin_input_));
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Pin target")) {
+          cmd = UiCommand::StylePin;
+          result.arg = std::string(style_pin_input_) + "\n" + chosen->name;
+        }
+        if (ImGui::TreeNode("All saved assignments")) {
+          for (const auto& [key, name] : state.style_pins) {
+            ImGui::PushID(key.c_str());
+            ImGui::Text("%s = %s", key.c_str(), name.c_str());
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Remove")) {
+              cmd = UiCommand::StyleUnpin;
+              result.arg = key;
+            }
+            ImGui::PopID();
+          }
+          ImGui::TreePop();
+        }
+      }
+      ImGui::EndGroup();
+    }
+    ImGui::End();
+  } else {
+    style_editor_sheet_.clear();
+    style_editor_loaded_.clear();
+    style_editor_dirty_ = false;
   }
 
   // ---- Bookmarks manager panel ----

@@ -1463,10 +1463,12 @@ static bool handle_page_key(App& app, const SDL_Event& ev, bool ctrl,
   return false;
 }
 
-// Style Sheets panel: with focus, arrows / Home / End choose a sheet,
-// Enter applies it, and Escape closes the panel.
+// The embedded ImGui editor owns selection, arrows and Enter; only the
+// native-panel Escape close shortcut remains here.
 static bool handle_styles_key(App& app, const SDL_Event& ev, bool ctrl,
                               bool alt) {
+  (void)ctrl;
+  (void)alt;
   if (!panel_has_keys(app, KeyFocus::Styles)) return false;
   const SDL_Keycode k = xanatoo::sdl::keycode(ev);
   if (k == SDLK_ESCAPE) {
@@ -1474,47 +1476,7 @@ static bool handle_styles_key(App& app, const SDL_Event& ev, bool ctrl,
     app.key_focus = KeyFocus::Document;
     return true;
   }
-  if (app.styles.empty()) {
-    panel_key_unused(app, ev, ctrl, alt);
-    return false;
-  }
-  const int last = static_cast<int>(app.styles.size()) - 1;
-  app.styles_sel = std::clamp(app.styles_sel, 0, last);
-  bool used = true;
-  switch (k) {
-    case SDLK_UP:
-      app.styles_sel = std::max(0, app.styles_sel - 1);
-      break;
-    case SDLK_DOWN:
-      app.styles_sel = std::min(last, app.styles_sel + 1);
-      break;
-    case SDLK_HOME:
-      app.styles_sel = 0;
-      break;
-    case SDLK_END:
-      app.styles_sel = last;
-      break;
-    case SDLK_RETURN:
-    case SDLK_KP_ENTER:
-      apply_style(app, app.styles[static_cast<size_t>(app.styles_sel)].name);
-      break;
-    default:
-      used = false;
-      break;
-  }
-  if (!used) {
-    panel_key_unused(app, ev, ctrl, alt);
-    return false;
-  }
-  const float step = static_cast<float>(
-      std::max(18, app.ui_font.line_height() + 7));
-  auto [cx, cy, cw, ch] = float_client_rect(app, app.styles_win);
-  const float top = static_cast<float>(app.styles_sel) * step;
-  if (top < app.styles_win.scroll)
-    app.styles_win.scroll = top;
-  else if (top + step > app.styles_win.scroll + static_cast<float>(ch))
-    app.styles_win.scroll = top + step - static_cast<float>(ch);
-  return true;
+  return false;
 }
 
 // Outline panel (when it has keyboard focus): Esc/toggle close; arrows,

@@ -6,7 +6,32 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **331** (this delivery is **330**)
+Next bundle number: **332** (this delivery is **331**)
+
+## Status (2026-11-09) — style sheet manager and reading themes
+
+- Added Editorial, Linen, Blue Hour and Forum styles, each with multiple
+  installed-font fallbacks and more deliberate spacing, page backgrounds,
+  text/link colours and comment-card hierarchy. The default, Reddit and
+  Hacker News styles also separate comment cards more generously; Compact
+  intentionally stays dense. Every shipped `.xss` parses as one document.
+- Replaced the native Style Sheets panel's simple click list with an embedded,
+  dockable ImGui manager. It selects themes, duplicates bundled templates into
+  `$XDG_DATA_HOME/xanatoo/styles`, edits personal `.xss` source, inserts font
+  rules from a searchable FontConfig family listing or typed family names, validates and
+  atomically saves, and offers confirmed deletion. Unsaved source prevents
+  accidental selection changes. Source edits remain fully user-owned.
+- Exact-host/domain pins (including Lemmy instances) and service pins are
+  stored in `style-pins.conf`. A domain pin wins over service-wide pins, then
+  `view.conf` supplies the fallback. The active view's effective style follows
+  navigation without rewriting the saved global default. The manager can pin
+  the selected sheet for the current page and remove saved pins.
+- Pure panel-layer compilation/run and a standalone `style.cpp` smoke test
+  passed: all 16 shipped sheets loaded without warnings, and the personal
+  sheet create/save/delete and persistent pin lifecycles worked. The main
+  offline unit suite has matching regression tests. Full SDL/Nix/FontConfig
+  compilation and visual checking remain pending because their development
+  dependencies are absent here.
 
 ## Status (2026-11-09) — Nix TLS trust regression
 

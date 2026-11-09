@@ -276,6 +276,7 @@ enum class WindowRole : uint8_t {
 
 inline UiPanelLayer embedded_panel_layer(WindowRole role) {
   switch (role) {
+    case WindowRole::Styles: return UiPanelLayer::Styles;
     case WindowRole::Reply: return UiPanelLayer::Reply;
     case WindowRole::Bookmarks: return UiPanelLayer::Bookmarks;
     case WindowRole::Annotations: return UiPanelLayer::Annotations;
@@ -815,8 +816,9 @@ struct App {
   std::string bookmark_menu;   // bookmark of the open margin-icon menu
   bool history_panel_open = false;
   bool styles_panel_open = false;
+  xanatoo::StylePins style_pins;
+  uint64_t style_save_generation = 0;
   bool downloads_panel_open = false;
-  int styles_sel = 0;
   bool preferences_open = false;  // Edit → Preferences (ImGui window)
   bool bookmarks_panel_open = false;
   std::string status_notice;
@@ -874,7 +876,7 @@ struct App {
   FloatWindow ol = make_float_panel(WindowRole::Outline, 40, 100, 320, 420);
   FloatWindow sm = make_float_panel(WindowRole::Sitemap, 140, 110, 340, 460);
   FloatWindow history_win = make_float_panel(WindowRole::History, 100, 130, 440, 360);
-  FloatWindow styles_win = make_float_panel(WindowRole::Styles, 160, 150, 320, 420);
+  FloatWindow styles_win = make_float_panel(WindowRole::Styles, 140, 100, 700, 560);
   FloatWindow bookmarks_win = make_float_panel(WindowRole::Bookmarks, 130, 145, 460, 400);
   FloatWindow downloads_win = make_float_panel(WindowRole::Downloads, 120, 160, 520, 380);
   FloatWindow reply_win = make_float_panel(WindowRole::Reply, 170, 170, 490, 350);
@@ -1042,7 +1044,7 @@ void layout_help(App& app);
 std::tuple<int, int, int, int> help_client_rect(App& app);
 
 // ---- view ----
-void apply_view_settings(App& app);
+void apply_view_settings(App& app, bool persist = true);
 void refresh_outline(App& app);
 void refresh_backlinks(App& app);
 void invalidate_height_around(App& app, Pane& pane, xanatoo::NodeId id);
@@ -1125,6 +1127,7 @@ std::string body_font_path(const App& app);
 // Load style sheet `name` (re-reading the file), reload fonts if its
 // families changed, relayout everything and remember it in view.conf.
 void apply_style(App& app, const std::string& name);
+void sync_pinned_style(App& app);
 // Rescan style_dirs() and re-read the active sheet (after editing a .xss).
 void reload_styles(App& app);
 void nav_page(App& app, bool up);
@@ -1584,7 +1587,6 @@ void draw_status_bar(App& app);
 void draw_outline_panel(App& app);
 void draw_backlinks_panel(App& app);
 void draw_history_panel(App& app);
-void draw_styles_panel(App& app);
 void draw_help_window(App& app);
 void draw_floats(App& app);  // all floating windows, back→front
 void draw_dock_preview(App& app);

@@ -252,8 +252,15 @@ the SDL2 backend must detect external cursor changes to restore its I-beam.
   `Font::glyph` draws codepoints the face lacks from fallback faces
   (`fallback_font_paths`: FontConfig coverage sort, fixed list on Android);
   line metrics stay the primary face's.
-- Selected sheet = `ViewSettings::style` (view.conf); toolbar style button and
-  View → Style sheet issue `UiCommand::SelectStyle` / `ReloadStyles`.
+- `ViewSettings::style` (view.conf) is the global *fallback* sheet; the toolbar
+  and View menu issue `UiCommand::SelectStyle` / `ReloadStyles`. The dockable
+  Styles panel uses an embedded ImGui editor and `style.cpp` helpers to create,
+  validate, atomically save and delete user-owned `.xss` sources. Shipped
+  presets remain read-only; users duplicate them to customize.
+- Domain/service pins persist separately in `style-pins.conf`, with exact
+  domain keys checked before service keys. `sync_pinned_style` changes only
+  the resolved active look, never the saved global fallback. Do not write the
+  active pinned sheet into `view.conf` on navigation.
 
 ## Shared S-expression reader (`sexpr.hpp`)
 

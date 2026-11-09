@@ -27,14 +27,14 @@ namespace fs = std::filesystem;
 
 namespace xanatoo::app {
 
-void apply_view_settings(App& app) {
+void apply_view_settings(App& app, bool persist) {
   keep_views(app);
   app.view_settings.clamp();
   app.layout_engine.set_options(
       xanatoo::LayoutOptions::from_view(app.view_settings, app.ui_scale));
   for (Pane& p : app.panes) p.height_cache.clear();
   app.needs_layout = true;
-  if (!xanatoo::save_view_settings(app.view_settings))
+  if (persist && !xanatoo::save_view_settings(app.view_settings))
     std::cerr << "Could not persist view settings to "
               << xanatoo::view_settings_path() << "\n";
 }
@@ -648,7 +648,7 @@ std::string body_font_path(const App& app) {
   return app.style.fonts.body.empty() ? app.env_font_path : std::string{};
 }
 
-void apply_style(App& app, const std::string& name) {
+static void set_style(App& app, const std::string& name, bool set_default) {
   xanatoo::DocStyle next;
   std::string err;
   if (!xanatoo::load_style(name, next, &err)) {
@@ -668,18 +668,34 @@ void apply_style(App& app, const std::string& name) {
   }
   apply_font_sizes(app);
   app.help_needs_layout = true;
-  app.view_settings.style = app.style.name;
-  apply_view_settings(app);  // drops height hints, relayouts, saves view.conf
+  if (set_default) app.view_settings.style = app.style.name;
+  apply_view_settings(app, set_default);  // relayout; only explicit choices save view.conf
   std::string msg = "Style: " + app.style.title;
   if (!app.style.warnings.empty())
     msg += " (" + std::to_string(app.style.warnings.size()) +
            " warning(s), see stderr)";
-  flash_status(app, msg);
+  if (set_default) flash_status(app, msg);
+}
+
+void apply_style(App& app, const std::string& name) {
+  set_style(app, name, true);
+}
+
+void sync_pinned_style(App& app) {
+  const std::string wanted = xanatoo::style_for_url(
+      app.style_pins, path_of(app, focused_pane(app)),
+      app.view_settings.style);
+  if (wanted != app.style.name) {
+    xanatoo::DocStyle check;
+    if (xanatoo::load_style(wanted, check))
+      set_style(app, wanted, false);
+  }
 }
 
 void reload_styles(App& app) {
   app.styles = xanatoo::list_styles();
-  apply_style(app, app.style.name);
+  set_style(app, app.style.name, false);
+  flash_status(app, "Reloaded style sheets");
 }
 
 void nav_page(App& app, bool up) {

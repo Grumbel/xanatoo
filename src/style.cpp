@@ -6,8 +6,10 @@
 #include "xanatoo/paths.hpp"
 #include "xanatoo/sexpr.hpp"
 #include "xanatoo/view_settings.hpp"
+#include "xanatoo/util.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -527,12 +529,14 @@ DocStyle builtin_style() {
     b.color = {88, 86, 80, 255};
     b.border = {170, 168, 160, 255};
   }
-  blk(BlockRole::Thread).space_after = px(10);
+  blk(BlockRole::Thread).space_before = px(12);
+  blk(BlockRole::Thread).space_after = px(18);
   blk(BlockRole::Thread).font = FontRole::Heading;
   {
     BlockStyle& b = blk(BlockRole::Message);
     b.font = FontRole::Small;
-    b.space_after = px(8);
+    b.space_before = px(4);
+    b.space_after = px(14);
     b.border = {40, 130, 140, 255};
     b.background = {255, 255, 255, 150};
   }
@@ -679,6 +683,196 @@ bool load_style(const std::string& name, DocStyle& out, std::string* error) {
   out.name = name.empty() ? "default" : name;
   apply_forms(out, forms, out.name);
   return true;
+}
+
+bool valid_style_name(std::string_view name) {
+  if (name.empty() || name.size() > 80 || name == "." || name == "..")
+    return false;
+  return std::all_of(name.begin(), name.end(), [](unsigned char c) {
+    return std::isalnum(c) || c == '-' || c == '_';
+  });
+}
+
+namespace {
+
+fs::path user_style_path(std::string_view name) {
+  return fs::path(user_data_dir()) / "styles" / (std::string(name) + kStyleExt);
+}
+
+bool fail_style(std::string* error, std::string reason) {
+  if (error) *error = std::move(reason);
+  return false;
+}
+
+// The shared SExprParser deliberately recovers from missing ')' and stray
+// closers (useful when importing documents). A style editor needs strict
+// balanced input before replacing a working sheet.
+bool balanced_style(std::string_view source) {
+  int depth = 0;
+  bool quote = false, comment = false, escape = false;
+  for (char c : source) {
+    if (comment) {
+      if (c == '\n') comment = false;
+    } else if (quote) {
+      if (escape) escape = false;
+      else if (c == '\\') escape = true;
+      else if (c == '"') quote = false;
+    } else if (c == ';') comment = true;
+    else if (c == '"') quote = true;
+    else if (c == '(') ++depth;
+    else if (c == ')' && --depth < 0) return false;
+  }
+  return depth == 0 && !quote;
+}
+
+std::string pin_path() {
+  const std::string dir = config_dir();
+  return dir.empty() ? std::string{} : (fs::path(dir) / "style-pins.conf").string();
+}
+
+std::string lower_host(std::string_view s) {
+  std::string h(s);
+  std::transform(h.begin(), h.end(), h.begin(), [](unsigned char c) {
+    return static_cast<char>(std::tolower(c));
+  });
+  if (!h.empty() && h.back() == '.') h.pop_back();
+  return h;
+}
+
+}  // namespace
+
+bool save_user_style(std::string_view name, std::string_view source,
+                     std::string* error) {
+  if (!valid_style_name(name))
+    return fail_style(error, "Use a name containing letters, digits, - or _");
+  if (source.empty() || source.size() > 65536 || !balanced_style(source))
+    return fail_style(error, "Style source is empty, too large or has unmatched parentheses/quotes");
+  DocStyle check = builtin_style();
+  apply_style_source(check, source, std::string(name));
+  if (!check.warnings.empty())
+    return fail_style(error, check.warnings.front());
+  if (no_save()) return fail_style(error, "Saving disabled (--no-save)");
+  const std::string dir = user_data_dir();
+  if (dir.empty() || !ensure_dir((fs::path(dir) / "styles").string()))
+    return fail_style(error, "Cannot create user style directory");
+  if (!write_file_atomic(user_style_path(name).string(), source))
+    return fail_style(error, "Cannot write user style sheet");
+  return true;
+}
+
+bool create_user_style(std::string_view name, std::string_view parent,
+                       std::string* error) {
+  if (!valid_style_name(name) || !valid_style_name(parent))
+    return fail_style(error, "Invalid style name");
+  if (name == "default")
+    return fail_style(error, "The built-in default name is reserved");
+  if (fs::exists(user_style_path(name)) || !find_style_path(std::string(name)).empty())
+    return fail_style(error, "That style name already exists");
+  DocStyle check;
+  if (!load_style(std::string(parent), check, error)) return false;
+  std::string title(name);
+  std::replace(title.begin(), title.end(), '-', ' ');
+  std::string source = ";; Personal Xanatoo style sheet — edit freely.\n"
+                       "(name \"" + title + "\")\n"
+                       "(description \"Custom reading style\")\n"
+                       "(inherit \"" + std::string(parent) + "\")\n\n"
+                       ";; Examples:\n"
+                       ";; (fonts (body \"Atkinson Hyperlegible\" \"sans-serif\"))\n"
+                       ";; (role message (space-before 0.35em) (space-after 0.9em))\n";
+  return save_user_style(name, source, error);
+}
+
+bool delete_user_style(std::string_view name, std::string* error) {
+  if (!valid_style_name(name) || name == "default" || no_save() ||
+      user_data_dir().empty())
+    return fail_style(error, "Cannot delete this sheet");
+  std::error_code ec;
+  if (!fs::remove(user_style_path(name), ec))
+    return fail_style(error, ec ? ec.message() : "Not a user-owned sheet");
+  return true;
+}
+
+std::vector<std::string> style_pin_keys(std::string_view url) {
+  std::vector<std::string> keys;
+  if (url.empty()) return keys;
+  const size_t colon = url.find(':');
+  if (colon == std::string_view::npos) return keys;
+  std::string service = lower_host(url.substr(0, colon));
+  std::string_view rest = url.substr(colon + 1);
+  if (service == "https" || service == "http" || service == "gemini") {
+    if (rest.substr(0, 2) != "//") return keys;
+    rest.remove_prefix(2);
+    service = service == "gemini" ? "gemini" : "web";
+  } else if (service != "lemmy" && service != "hn" &&
+             service != "reddit" && service != "wikipedia" &&
+             service != "nostr") {
+    return keys;
+  }
+  if (service == "web" || service == "gemini" || service == "lemmy") {
+    std::string_view host = rest.substr(0, rest.find_first_of("/?#"));
+    // A network port does not identify a different domain. Bracketed IPv6
+    // literals are intentionally service-only until address pins exist.
+    if (!host.empty() && host.front() != '[') {
+      const size_t port = host.rfind(':');
+      if (port != std::string_view::npos && host.find(':') == port)
+        host = host.substr(0, port);
+    }
+    // For Lemmy refs, the first path component is an instance domain.
+    if (!host.empty() && host.front() != '[' &&
+        host.find('@') == std::string_view::npos &&
+        host.find('=') == std::string_view::npos &&
+        host.find('\\') == std::string_view::npos &&
+        host.find(' ') == std::string_view::npos &&
+        (host.find('.') != std::string_view::npos || host == "localhost"))
+      keys.push_back("domain:" + lower_host(host));
+  }
+  keys.push_back("service:" + service);
+  return keys;
+}
+
+bool valid_style_pin_key(std::string_view key) {
+  const bool domain = key.substr(0, 7) == "domain:";
+  const bool service = key.substr(0, 8) == "service:";
+  if (!domain && !service) return false;
+  const auto name = key.substr(domain ? 7 : 8);
+  if (name.empty() || name.size() > (domain ? 253u : 80u)) return false;
+  return std::all_of(name.begin(), name.end(), [domain](unsigned char c) {
+    return std::isalnum(c) || c == '-' || c == '_' || (domain && c == '.');
+  });
+}
+
+std::string style_for_url(const StylePins& pins, std::string_view url,
+                          std::string_view fallback) {
+  for (const std::string& key : style_pin_keys(url)) {
+    auto it = pins.find(key);
+    if (it != pins.end()) return it->second;
+  }
+  return std::string(fallback);
+}
+
+StylePins load_style_pins() {
+  StylePins pins;
+  std::ifstream in(pin_path());
+  std::string line;
+  while (std::getline(in, line)) {
+    const size_t eq = line.find('=');
+    if (eq == std::string::npos || line.empty() || line[0] == '#') continue;
+    std::string key = line.substr(0, eq), value = line.substr(eq + 1);
+    if (valid_style_pin_key(key) && valid_style_name(value))
+      pins[std::move(key)] = std::move(value);
+  }
+  return pins;
+}
+
+bool save_style_pins(const StylePins& pins) {
+  if (no_save()) return true;
+  const std::string dir = config_dir();
+  if (dir.empty() || !ensure_dir(dir)) return false;
+  std::string source = "# Xanatoo automatic reading styles: domain > service > default\n";
+  for (const auto& [key, value] : pins)
+    if (valid_style_name(value) && valid_style_pin_key(key))
+      source += key + "=" + value + "\n";
+  return write_file_atomic(pin_path(), source);
 }
 
 }  // namespace xanatoo

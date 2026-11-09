@@ -106,6 +106,7 @@ bool app_init(App& app) {
     app.env_font_path = existing_font(env);
   // View prefs name the style sheet, which picks the fonts.
   app.styles = xanatoo::list_styles();
+  app.style_pins = xanatoo::load_style_pins();
   init_search(app);
   {
     std::string err;

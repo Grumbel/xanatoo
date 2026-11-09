@@ -132,6 +132,10 @@ std::string ui_font_path(bool bold = false);
 // First family of `names` that FontConfig has installed, else "".
 std::string fontconfig_pick_family(const std::vector<std::string>& names);
 
+// Enumerate actual installed font families for the style editor; on systems
+// without FontConfig, return the three generic families instead.
+const std::vector<std::string>& fontconfig_list_families();
+
 class MathFont;
 
 // Body regular/bold/italic + heading + monospace for code.

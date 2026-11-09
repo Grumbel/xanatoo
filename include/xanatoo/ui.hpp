@@ -6,6 +6,7 @@
 #include "xanatoo/history_menu.hpp"
 #include "xanatoo/nostr_store.hpp"
 #include "xanatoo/lemmy_directory.hpp"
+#include "xanatoo/style.hpp"
 #include "xanatoo/ui_panel_layers.hpp"
 #include <string>
 #include <optional>
@@ -217,6 +218,11 @@ enum class UiCommand {
   SetUiScale,               // Preferences: scale chrome and default text
   SelectStyle,              // arg = style sheet name (styles/<name>.xss)
   ReloadStyles,             // rescan styles/ and re-read the active sheet
+  StyleCreate,              // arg = new stem + '\n' + parent stem
+  StyleSave,                // arg = stem + '\n' + source
+  StyleDelete,              // arg = user-owned stem
+  StylePin,                 // arg = domain:host/service:name + '\n' + stem
+  StyleUnpin,               // arg = domain:host/service:name
 };
 
 
@@ -375,6 +381,12 @@ struct UiState {
   bool history_open = false;
   bool downloads_open = false;
   bool styles_open = false;
+  int styles_x = 0, styles_y = 0, styles_w = 0, styles_h = 0;
+  std::vector<StyleEntry> style_entries;
+  StylePins style_pins;
+  uint64_t style_save_generation = 0;
+  std::vector<std::string> style_pin_candidates;
+  std::string default_style;
   bool bookmarks_open = false;
   int bookmarks_x = 0, bookmarks_y = 0;
   int bookmarks_w = 0, bookmarks_h = 0;
@@ -517,6 +529,18 @@ private:
   char nostr_group_relay_[512] = {};
   char lemmy_search_input_[256] = {};
   char lemmy_instance_input_[256] = {};
+  std::string style_editor_sheet_;
+  std::string style_editor_loaded_;
+  char style_editor_[65536] = {};
+  char style_new_name_[81] = {};
+  char style_body_font_[128] = {};
+  char style_heading_font_[128] = {};
+  char style_code_font_[128] = {};
+  char style_font_filter_[128] = {};
+  char style_pin_input_[256] = {};
+  bool style_editor_dirty_ = false;
+  uint64_t style_save_seen_ = 0;
+  bool style_delete_confirm_ = false;
   char nostr_identity_label_[160] = {};
   char nostr_identity_pubkey_[256] = {};
   char reply_input_[16384] = {}; // Markdown draft, not sent to any server

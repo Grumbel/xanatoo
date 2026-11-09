@@ -4,6 +4,7 @@
 #include "xanatoo/font.hpp"
 #include "xanatoo/math_font.hpp"
 #include "xanatoo/paths.hpp"
+#include <algorithm>
 #ifndef XANATOO_FONTCONFIG
 #define XANATOO_FONTCONFIG 1
 #endif
@@ -464,6 +465,45 @@ std::string fontconfig_pick_family(const std::vector<std::string>& names) {
     if (same) return name;
   }
   return {};
+#endif
+}
+
+const std::vector<std::string>& fontconfig_list_families() {
+#if !XANATOO_FONTCONFIG
+  static const std::vector<std::string> generic = {
+      "serif", "sans-serif", "monospace"};
+  return generic;
+#else
+  static const std::vector<std::string> installed = [] {
+    std::vector<std::string> out{"serif", "sans-serif", "monospace"};
+    if (!FcInit()) return out;
+    FcPattern* pattern = FcPatternCreate();
+    FcObjectSet* objects = FcObjectSetBuild(FC_FAMILY, static_cast<const char*>(nullptr));
+    if (!pattern || !objects) {
+      if (pattern) FcPatternDestroy(pattern);
+      if (objects) FcObjectSetDestroy(objects);
+      return out;
+    }
+    FcFontSet* fonts = FcFontList(nullptr, pattern, objects);
+    if (fonts) {
+      for (int i = 0; i < fonts->nfont; ++i) {
+        for (int j = 0;; ++j) {
+          FcChar8* family = nullptr;
+          if (FcPatternGetString(fonts->fonts[i], FC_FAMILY, j, &family) !=
+              FcResultMatch) break;
+          if (family && *family)
+            out.emplace_back(reinterpret_cast<const char*>(family));
+        }
+      }
+      FcFontSetDestroy(fonts);
+    }
+    FcObjectSetDestroy(objects);
+    FcPatternDestroy(pattern);
+    std::sort(out.begin(), out.end());
+    out.erase(std::unique(out.begin(), out.end()), out.end());
+    return out;
+  }();
+  return installed;
 #endif
 }
 

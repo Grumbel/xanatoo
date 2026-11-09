@@ -131,6 +131,7 @@ static void build_history_menu(App& app, xanatoo::UiState& state) {
 // Fill the chrome-facing snapshot of app state for this frame (also drives the
 // software gamepad pointer, which synthesises mouse events).
 static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
+  sync_pinned_style(app);
   ui_state.dirty =
       buf(app, focused_pane(app).buf).dirty;
   const auto& focused_path = path_of(app, focused_pane(app));
@@ -195,6 +196,11 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.styles.clear();
   for (const auto& e : app.styles) ui_state.styles.emplace_back(e.name, e.title);
   ui_state.style = app.style.name;
+  ui_state.default_style = app.view_settings.style;
+  ui_state.style_entries = app.styles;
+  ui_state.style_pins = app.style_pins;
+  ui_state.style_save_generation = app.style_save_generation;
+  ui_state.style_pin_candidates = xanatoo::style_pin_keys(path_of(app, focused_pane(app)));
   ui_state.browse = browsing(app);
   ui_state.chrome_hidden = app.chrome_hidden;
   ui_state.virtual_keyboard = app.virtual_keyboard;
@@ -310,6 +316,13 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.history_open = app.history_panel_open;
   ui_state.downloads_open = app.downloads_panel_open;
   ui_state.styles_open = app.styles_panel_open;
+  if (app.styles_panel_open) {
+    auto [x, y, w, h] = float_client_rect(app, app.styles_win);
+    ui_state.styles_x = x;
+    ui_state.styles_y = y;
+    ui_state.styles_w = w;
+    ui_state.styles_h = h;
+  }
   ui_state.bookmarks_open = app.bookmarks_panel_open;
   if (app.bookmarks_panel_open) {
     auto [x, y, w, h] = float_client_rect(app, app.bookmarks_win);
@@ -573,6 +586,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::SelectAnnotation || c == C::UpdateAnnotationNote ||
         c == C::RemoveAnnotation || c == C::RestoreAnnotationLayerVersion ||
         c == C::ToggleStylesPanel ||
+        c == C::StyleCreate || c == C::StyleSave ||
+        c == C::StyleDelete || c == C::StylePin || c == C::StyleUnpin ||
         c == C::AddBookmark || c == C::BookmarkPage || c == C::RemoveBookmark ||
         c == C::BookmarkPosition || c == C::NewTab ||
         c == C::CloseTab || c == C::NextTab || c == C::PrevTab ||
@@ -921,11 +936,6 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       app.styles_panel_open = !app.styles_panel_open;
       if (app.styles_panel_open) {
         app.key_focus = KeyFocus::Styles;
-        for (int i = 0; i < static_cast<int>(app.styles.size()); ++i)
-          if (app.styles[static_cast<size_t>(i)].name == app.style.name) {
-            app.styles_sel = i;
-            break;
-          }
       } else if (app.key_focus == KeyFocus::Styles) {
         app.key_focus = KeyFocus::Document;
       }
@@ -2125,6 +2135,66 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     case C::ReloadStyles:
       reload_styles(app);
+      break;
+    case C::StyleCreate: {
+      const auto pos = arg.find('\n');
+      if (pos == std::string::npos) break;
+      std::string err;
+      if (xanatoo::create_user_style(arg.substr(0, pos), arg.substr(pos + 1), &err)) {
+        reload_styles(app);
+        flash_status(app, "Created style " + arg.substr(0, pos));
+      } else flash_status(app, "Style: " + err);
+      break;
+    }
+    case C::StyleSave: {
+      const auto pos = arg.find('\n');
+      if (pos == std::string::npos) break;
+      std::string err;
+      if (xanatoo::save_user_style(arg.substr(0, pos), arg.substr(pos + 1), &err)) {
+        ++app.style_save_generation;
+        reload_styles(app);
+        flash_status(app, "Saved style " + arg.substr(0, pos));
+      } else flash_status(app, "Style: " + err);
+      break;
+    }
+    case C::StyleDelete: {
+      std::string err;
+      if (xanatoo::delete_user_style(arg, &err)) {
+        for (auto it = app.style_pins.begin(); it != app.style_pins.end();) {
+          if (it->second == arg) it = app.style_pins.erase(it);
+          else ++it;
+        }
+        xanatoo::save_style_pins(app.style_pins);
+        if (app.view_settings.style == arg) app.view_settings.style = "default";
+        if (app.style.name == arg) apply_style(app, app.view_settings.style);
+        reload_styles(app);
+        flash_status(app, "Deleted style " + arg);
+      } else flash_status(app, "Style: " + err);
+      break;
+    }
+    case C::StylePin: {
+      const auto pos = arg.find('\n');
+      if (pos == std::string::npos ||
+          !xanatoo::valid_style_name(arg.substr(pos + 1))) break;
+      std::string key = arg.substr(0, pos);
+      std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
+      if (!xanatoo::valid_style_pin_key(key)) {
+        flash_status(app, "Style pin: use domain:host or service:name");
+        break;
+      }
+      app.style_pins[std::move(key)] = arg.substr(pos + 1);
+      if (!xanatoo::save_style_pins(app.style_pins))
+        flash_status(app, "Cannot save style assignments");
+      sync_pinned_style(app);
+      break;
+    }
+    case C::StyleUnpin:
+      app.style_pins.erase(arg);
+      if (!xanatoo::save_style_pins(app.style_pins))
+        flash_status(app, "Cannot save style assignments");
+      sync_pinned_style(app);
       break;
     case C::ToggleFootnoteOverlay:
       app.view_settings.footnote_overlay = !app.view_settings.footnote_overlay;
@@ -3929,66 +3999,6 @@ void draw_history_panel(App& app) {
     app.renderer.draw_text(app.ui_font, static_cast<float>(cx + 8),
                            static_cast<float>(cy + 8 + app.ui_font.ascender()),
                            "No pages visited this session", pal.text_dim.r,
-                           pal.text_dim.g, pal.text_dim.b);
-  xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
-  draw_client_scrollbar(app, cx, cy, cw, ch, w.scroll, max_s);
-}
-
-void draw_styles_panel(App& app) {
-  if (!app.styles_panel_open) return;
-  FloatWindow& w = app.styles_win;
-  if (w.dock == Dock::None) {
-    w.w = std::max(w.w, 200);
-    w.h = std::max(w.h, 140);
-  }
-  auto [cx, cy, cw, ch] = float_client_rect(app, w);
-  const float step = static_cast<float>(
-      std::max(18, app.ui_font.line_height() + 7));
-  if (app.styles.empty())
-    app.styles_sel = 0;
-  else
-    app.styles_sel = std::clamp(app.styles_sel, 0,
-                                static_cast<int>(app.styles.size()) - 1);
-  const float content_h = static_cast<float>(app.styles.size()) * step + 8.f;
-  const float max_s = std::max(0.f, content_h - static_cast<float>(ch));
-  w.scroll = std::clamp(w.scroll, 0.f, max_s);
-
-  const SDL_Rect outer{w.x, w.y, w.w, w.h};
-  const bool focused = panel_has_keys(app, KeyFocus::Styles);
-  draw_floating_frame(app, outer, "Style Sheets", focused,
-                      w.dock == Dock::None, 0, w.dock == Dock::Max);
-  SDL_Rect clip{cx, cy, cw, ch};
-  xanatoo::sdl::set_clip_rect(app.sdl, &clip);
-  const auto& pal = xanatoo::theme::palette();
-  float row_y = static_cast<float>(cy) - w.scroll;
-  for (int row = 0; row < static_cast<int>(app.styles.size()); ++row) {
-    if (row_y > static_cast<float>(cy + ch)) break;
-    if (row_y + step >= static_cast<float>(cy)) {
-      const xanatoo::StyleEntry& style =
-          app.styles[static_cast<size_t>(row)];
-      const bool active = style.name == app.style.name;
-      const bool selected = row == app.styles_sel;
-      const int ry = static_cast<int>(row_y);
-      if (selected || active)
-        xanatoo::theme::fill(app.sdl, SDL_Rect{cx + 1, ry, cw - 2,
-                                               static_cast<int>(step)},
-                             selected && focused ? pal.accent : pal.face_dark);
-      const int baseline = ry + (static_cast<int>(step) -
-                                 app.ui_font.line_height()) / 2 +
-                           app.ui_font.ascender();
-      const std::string& label = style.title.empty() ? style.name : style.title;
-      const xanatoo::theme::Rgb ink =
-          selected && focused ? pal.highlight : pal.text;
-      app.renderer.draw_text(
-          app.ui_font, static_cast<float>(cx + 8), static_cast<float>(baseline),
-          fit_text(app.ui_font, label, cw - 28), ink.r, ink.g, ink.b);
-    }
-    row_y += step;
-  }
-  if (app.styles.empty())
-    app.renderer.draw_text(app.ui_font, static_cast<float>(cx + 8),
-                           static_cast<float>(cy + 8 + app.ui_font.ascender()),
-                           "No style sheets found", pal.text_dim.r,
                            pal.text_dim.g, pal.text_dim.b);
   xanatoo::sdl::set_clip_rect(app.sdl, nullptr);
   draw_client_scrollbar(app, cx, cy, cw, ch, w.scroll, max_s);

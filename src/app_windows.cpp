@@ -32,7 +32,7 @@ std::pair<int, int> min_size(const FloatWindow& w) {
     case WindowRole::Backlinks:
       return {200, 120};
     case WindowRole::Styles:
-      return {200, 140};
+      return {420, 310};
     case WindowRole::Bookmarks:
       return {240, 180};
     case WindowRole::Reply:
@@ -289,7 +289,8 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
   // content-scroll roles reserve it for click-free jump/drag.
   const bool in_sb =
       mx >= cx + cw - sb_w && mx <= cx + cw + 2 && my >= cy && my <= cy + ch;
-  if (in_sb && w.role != WindowRole::Bookmarks &&
+  if (in_sb && w.role != WindowRole::Styles &&
+      w.role != WindowRole::Bookmarks &&
       w.role != WindowRole::Reply &&
       w.role != WindowRole::Annotations &&
       w.role != WindowRole::NostrExplorer &&
@@ -316,15 +317,7 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
       break;
     }
     case WindowRole::Styles: {
-      auto [cx, cy, cw, ch] = float_client_rect(app, w);
-      const float step = static_cast<float>(
-          std::max(18, app.ui_font.line_height() + 7));
-      const int row = static_cast<int>(
-          (static_cast<float>(my - cy) + w.scroll) / step);
-      if (row >= 0 && row < static_cast<int>(app.styles.size())) {
-        app.styles_sel = row;
-        apply_style(app, app.styles[static_cast<size_t>(row)].name);
-      }
+      // ImGui owns the manager's selection and editor.
       break;
     }
     case WindowRole::Downloads:
@@ -496,9 +489,7 @@ float float_max_scroll(App& app, const FloatWindow& w) {
                                    std::max(18, app.ui_font.line_height() + 7) +
                                8.f - view_h);
     case WindowRole::Styles:
-      return std::max(0.f, static_cast<float>(app.styles.size()) *
-                                   std::max(18, app.ui_font.line_height() + 7) +
-                               8.f - view_h);
+      return 0.f;  // ImGui handles scrolling.
     case WindowRole::Bookmarks:
       return 0.f;  // ImGui list manages its own vertical scrolling.
     case WindowRole::Reply:
@@ -545,13 +536,6 @@ bool float_press(App& app, int mx, int my) {
                     : w->role == WindowRole::History   ? KeyFocus::History
                     : w->role == WindowRole::Styles    ? KeyFocus::Styles
                                                        : KeyFocus::Document;
-    if (w->role == WindowRole::Styles) {
-      for (int i = 0; i < static_cast<int>(app.styles.size()); ++i)
-        if (app.styles[static_cast<size_t>(i)].name == app.style.name) {
-          app.styles_sel = i;
-          break;
-        }
-    }
     if (w->role == WindowRole::Document) {
       // Raise to top of the document stack; `w` is stale afterwards.
       const size_t idx = static_cast<size_t>(w - app.soft_wins.data());
@@ -668,6 +652,7 @@ bool float_wheel(App& app, int mx, int my, int wheel_y) {
   FloatWindow* w = float_at(app, mx, my);
   if (!w || w->role == WindowRole::Document) return false;  // pane scrolls
   if (w->role == WindowRole::Annotations || w->role == WindowRole::Reply ||
+      w->role == WindowRole::Styles ||
       w->role == WindowRole::Bookmarks ||
       w->role == WindowRole::NostrExplorer ||
       w->role == WindowRole::LemmyExplorer ||
@@ -746,7 +731,10 @@ void draw_floats(App& app) {
         draw_history_panel(app);
         break;
       case WindowRole::Styles:
-        draw_styles_panel(app);
+        draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
+                            "Style Sheets", true, w->dock == Dock::None,
+                            0, w->dock == Dock::Max);
+        app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Styles);
         break;
       case WindowRole::Bookmarks:
         draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},

@@ -6,9 +6,58 @@ from the markup. A sheet styles **semantic roles** (paragraph, header, note,
 link, …), never markup structure, and there are no selectors or specificity.
 
 Pick one from the toolbar's style button (next to *Text width*) or
-**View → Style sheet**. The choice is a reader preference stored as
+**View → Style sheet**. Open **Panels → Style Sheets** (or **View →
+Style sheet → Manage / edit style sheets**) for the native, dockable
+theme manager. The choice is a reader preference stored as
 `style=<name>` in `~/.config/xanatoo/view.conf`. Editing a sheet takes effect
 via **Reload style sheets** in the same menu.
+
+The manager lists the bundled presets and personal sheets; the active one is
+marked with a dot. Select any preset to apply it. To customize it, enter a
+new file name such as `my-editorial` and choose **Create from selected**.
+The new personal sheet inherits the original, so only changes need to be
+specified. Select it, edit the actual `.xss` S-expression source, then
+**Save changes**; syntax and role/property warnings are checked before the
+working file is replaced. **Discard changes** reloads the file. Only
+user-owned sheets can be edited or deleted; installed presets stay read-only.
+The personal source stays yours across app upgrades.
+
+The **Font selection** section lists all families reported by FontConfig,
+with a search filter, rather than presenting unavailable face names. On
+systems without FontConfig it offers generic serif/sans/mono families. You
+can also type a family name for body, headings and code. **Insert font
+overrides** adds a `(fonts …)` rule to your editor buffer;
+save to apply it. Font families are tried in order (fall back to the system
+default if none are installed); the reader's explicit `--font` still wins.
+
+### Domain and service assignments
+
+Open a page, select a theme in the manager and use **Pin here** next to the
+observed domain and/or service. Domain pins take priority over service pins:
+
+- `domain:lemmy.world` — pages on that Lemmy instance (overrides the Lemmy
+  service pin).
+- `service:lemmy` — all Lemmy refs without a more specific domain pin.
+- `domain:example.org` — pages from the exact HTTP(S) hostname.
+- `service:web` — other HTTP(S) pages without a hostname pin.
+- Other supported services include `hn`, `reddit`, `nostr`, `wikipedia` and
+  `gemini`. The latter can also be pinned by domain.
+
+Every pin and its theme is listed under **All saved assignments**, where you
+can remove it. You can also type a `domain:host` or `service:name` key into
+the manager's manual target field to pin a theme without visiting that page
+first. Pins are persisted separately in
+`$XDG_CONFIG_HOME/xanatoo/style-pins.conf` (default
+`~/.config/xanatoo/style-pins.conf`); no network access is involved. Pages
+without a matching pin use the regular global `view.conf` theme. Changing
+documents or tabs changes the *effective* theme, not the saved default.
+Deleting a personal sheet removes any pins that point to it.
+
+The built-in themes include airy **Editorial**, warm **Linen**, low-glare
+**Blue Hour** and discussion-focused **Forum** alongside the earlier default,
+Night, Sepia Book, Reddit, Hacker News and accessibility styles. Discussion
+cards now have more breathing room between replies; **Compact** is available
+when you deliberately want dense threads.
 
 ## Precedence
 
@@ -215,7 +264,8 @@ sites in broad strokes: HN uses Verdana at `body-scale` 0.85 under an orange
 `thread` band, article headings with small inline source hostnames and
 caption-sized points / discussion links; Reddit uses blue authors with zebra
 nesting under a pale blue band; Wikipedia uses serif titles over grey `header`
-rules. They are ordinary sheets — the selection is still global, not per site.
+rules. They are ordinary sheets: pin them per domain/service in the manager,
+or select one as the global fallback.
 
 ## Implementation
 
@@ -228,6 +278,9 @@ rules. They are ordinary sheets — the selection is still global, not per site.
   also uses for decorations; pagination preserves those scopes.
 - `apply_style` (`app_view.cpp`) reloads fonts when the families change,
   drops height hints and relayouts panes, help and floating windows.
+- `style_pin_keys`, `load_style_pins`, `style_for_url` (`style.cpp`)
+  resolve and persist explicit reader style associations. They do not rewrite
+  documents or their content.
 
 ## Not yet
 

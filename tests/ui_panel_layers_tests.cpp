@@ -10,6 +10,8 @@ int main() {
   using xanatoo::ui_panel_layer;
   assert(ui_panel_layer("##reply_editor") == UiPanelLayer::Reply);
   assert(ui_panel_layer("##bookmarks_panel_body") == UiPanelLayer::Bookmarks);
+  assert(ui_panel_layer("##styles_panel_body") == UiPanelLayer::Styles);
+  assert(ui_panel_layer("##styles_panel_body/##styles_list_12345678") == UiPanelLayer::Styles);
   assert(ui_panel_layer("##annotation_panel_body") == UiPanelLayer::Annotations);
   assert(ui_panel_layer("##nostr_explorer_body") == UiPanelLayer::NostrExplorer);
   assert(ui_panel_layer("##nostr_accounts_body") == UiPanelLayer::NostrAccounts);
@@ -21,6 +23,7 @@ int main() {
   assert(ui_panel_layer("##reply_editor/child_00000001") == UiPanelLayer::Reply);
   // A lookalike name must not become part of a native panel's draw pass.
   assert(ui_panel_layer("##reply_editor_extra") == UiPanelLayer::Chrome);
+  assert(ui_panel_layer("##styles_panel_body_else") == UiPanelLayer::Chrome);
   assert(ui_panel_layer("##nostr_explorer_body_else") == UiPanelLayer::Chrome);
   assert(ui_panel_layer("##lemmy_explorer_body_else") == UiPanelLayer::Chrome);
   assert(ui_panel_layer("Preferences") == UiPanelLayer::Chrome);

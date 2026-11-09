@@ -187,4 +187,25 @@ std::vector<StyleEntry> list_styles();
 bool load_style(const std::string& name, DocStyle& out,
                 std::string* error = nullptr);
 
+// User-owned sheets live in the high-priority XDG user-data style directory.
+// A shipped sheet must be duplicated before editing. Names are safe file
+// stems, never paths. Source is checked before an atomic replacement.
+bool valid_style_name(std::string_view name);
+bool save_user_style(std::string_view name, std::string_view source,
+                     std::string* error = nullptr);
+bool create_user_style(std::string_view name, std::string_view parent,
+                       std::string* error = nullptr);
+bool delete_user_style(std::string_view name, std::string* error = nullptr);
+
+// Reader-defined per-domain / per-service overrides. Keys are of the form
+// domain:example.org or service:lemmy; matching domains take precedence over
+// services. The unpinned default remains ViewSettings::style.
+using StylePins = std::map<std::string, std::string>;
+bool valid_style_pin_key(std::string_view key);
+std::vector<std::string> style_pin_keys(std::string_view url);
+std::string style_for_url(const StylePins& pins, std::string_view url,
+                          std::string_view fallback);
+StylePins load_style_pins();
+bool save_style_pins(const StylePins& pins);
+
 }  // namespace xanatoo

@@ -1703,6 +1703,62 @@ void test_style_sheets_shipped() {
   EXPECT(!load_style("no-such-sheet", missing));
 }
 
+void test_style_assignments() {
+  using namespace xanatoo;
+  EXPECT(valid_style_name("my-reading-theme"));
+  EXPECT(valid_style_name("Linen_2"));
+  EXPECT(!valid_style_name("../night"));
+  EXPECT(!valid_style_name("my sheet"));
+  EXPECT(!valid_style_name(""));
+  EXPECT(valid_style_pin_key("domain:example.org"));
+  EXPECT(valid_style_pin_key("service:lemmy"));
+  EXPECT(!valid_style_pin_key("domain:example.org=evil"));
+  EXPECT(!valid_style_pin_key("service:"));
+  EXPECT_EQ(style_pin_keys("https://Example.Org/news"),
+            (std::vector<std::string>{"domain:example.org", "service:web"}));
+  EXPECT_EQ(style_pin_keys("https://Example.Org:8443/news"),
+            (std::vector<std::string>{"domain:example.org", "service:web"}));
+  EXPECT_EQ(style_pin_keys("lemmy:lemmy.world/c/technology"),
+            (std::vector<std::string>{"domain:lemmy.world", "service:lemmy"}));
+  EXPECT_EQ(style_pin_keys("reddit:r/popular"),
+            (std::vector<std::string>{"service:reddit"}));
+  EXPECT(style_pin_keys("/tmp/local.md").empty());
+  StylePins pins{{"service:web", "editorial"},
+                 {"domain:example.org", "linen"},
+                 {"service:reddit", "forum"}};
+  EXPECT_EQ(style_for_url(pins, "https://example.org/a", "default"), "linen");
+  EXPECT_EQ(style_for_url(pins, "http://elsewhere.org/a", "default"), "editorial");
+  EXPECT_EQ(style_for_url(pins, "reddit:r/popular", "default"), "forum");
+  EXPECT_EQ(style_for_url(pins, "/tmp/local.md", "default"), "default");
+
+  namespace fs = std::filesystem;
+  const fs::path root = fs::temp_directory_path() /
+      ("xanatoo-style-manager-" + std::to_string(process_id()));
+  fs::create_directories(root);
+  set_dir_override(DirKind::UserData, root.string());
+  set_dir_override(DirKind::Config, root.string());
+  std::string err;
+  EXPECT(create_user_style("my-reading-theme", "default", &err));
+  DocStyle doc;
+  EXPECT(load_style("my-reading-theme", doc, &err));
+  EXPECT_EQ(doc.title, "my reading theme");
+  EXPECT(!save_user_style("my-reading-theme", "(page (color \"#abc\")", &err));
+  EXPECT(save_user_style("my-reading-theme",
+                         "(name \"Testing\")\n(page (background \"#f6f0e3\"))\n",
+                         &err));
+  EXPECT(load_style("my-reading-theme", doc, &err));
+  EXPECT_EQ(doc.title, "Testing");
+  EXPECT(!create_user_style("my-reading-theme", "default", &err));
+  EXPECT(save_style_pins(pins));
+  EXPECT_EQ(load_style_pins(), pins);
+  EXPECT(delete_user_style("my-reading-theme", &err));
+  EXPECT(!delete_user_style("my-reading-theme", &err));
+  EXPECT(!delete_user_style("default", &err));
+  set_dir_override(DirKind::UserData, {});
+  set_dir_override(DirKind::Config, {});
+  fs::remove_all(root);
+}
+
 // The hostname must share the title's line without inheriting its heading
 // size. A metadata discussion link keeps its Link kind / href but uses the
 // same muted inline role in a caption.
@@ -5234,6 +5290,7 @@ int main() {
   test_nav_history_positions_and_forward_link();
   test_history_context_menu_targets();
   test_style_sheets_shipped();
+  test_style_assignments();
   test_footnotes();
   test_locator();
   test_text_selectors();
