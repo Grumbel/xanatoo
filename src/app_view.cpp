@@ -259,26 +259,35 @@ void place_centre_rows(App& app) {
   const int view_h = std::max(
       1, app.win_h - status_bar_h - top - static_cast<int>(app.ui_bottom) -
              dock_band_h(app, Dock::Bottom));
-  if (app.split && app.tile_axis == TileAxis::Rows) {
-    const int available = std::max(2, view_h - tile_gutter_size(app));
-    const int first = std::clamp(static_cast<int>(app.split_ratio * available),
-                                 1, available - 1);
-    for (int pi = 0; pi < kCentreViews; ++pi) {
-      Pane& p = app.panes[pi];
-      const int area_h = pi == 0 ? first : available - first;
-      const int h = std::max(1, area_h - pane_bar_h(app, p));
-      if (p.h != h) app.needs_layout = true;
-      p.y = pi == 0 ? top : top + first + tile_gutter_size(app);
-      p.h = h;
-    }
-  } else {
-    for (int pi = 0; pi < kCentreViews; ++pi) {
-      Pane& p = app.panes[pi];
-      const int h = std::max(1, view_h - pane_bar_h(app, p));
-      if (p.h != h) app.needs_layout = true;
-      p.y = top;
-      p.h = h;
-    }
+  const int dock = dock_column_w(app, Dock::Left);
+  const int width = std::max(64, app.win_w - dock -
+                             dock_column_w(app, Dock::Right));
+  TileTree tiles(0);
+  if (app.split) tiles.split(0, 1, app.tile_axis, app.split_ratio);
+  const TileGeometry geometry = tiles.geometry(
+      TileRect{dock, top, width, view_h}, tile_gutter_size(app));
+  for (const TileArea& area : geometry.tiles) {
+    Pane& p = app.panes[area.view];
+    const bool left_scroll = app.split &&
+        app.tile_axis == TileAxis::Columns && area.view == 0;
+    const int x = area.rect.x + (left_scroll ? kSbW : 0);
+    const int w = std::max(1, area.rect.w - (left_scroll ? kSbW : 0));
+    const int h = std::max(1, area.rect.h - pane_bar_h(app, p));
+    if (p.w != w || p.h != h) app.needs_layout = true;
+    p.sb_left = left_scroll;
+    p.x = x;
+    p.y = area.rect.y;
+    p.w = w;
+    p.h = h;
+  }
+  if (!app.split) {
+    // The hidden second view keeps its document state but draws nothing.
+    Pane& p = app.panes[1];
+    p.sb_left = false;
+    p.x = dock;
+    p.y = top;
+    p.w = 0;
+    p.h = std::max(1, view_h - pane_bar_h(app, p));
   }
 }
 
@@ -391,27 +400,6 @@ void keep_views(App& app) {
 void layout_panes(App& app) {
   // Window views take their rects from the window placement.
   place_windows(app);
-  // Docked window columns take their width from the pane area.
-  const int dock = dock_column_w(app, Dock::Left);
-  const int ww =
-      std::max(64, app.win_w - dock - dock_column_w(app, Dock::Right));
-  const int gutter = app.split ? tile_gutter_size(app) : 0;
-  if (app.split && app.tile_axis == TileAxis::Columns) {
-    int left_w = static_cast<int>(app.split_ratio * (ww - gutter));
-    left_w = std::max(120, std::min(ww - gutter - 120, left_w));
-    app.panes[0].sb_left = true;
-    app.panes[0].x = dock + kSbW;
-    app.panes[0].w = left_w - kSbW;
-    app.panes[1].x = dock + left_w + gutter;
-    app.panes[1].w = ww - left_w - gutter;
-  } else {
-    app.panes[0].sb_left = false;
-    app.panes[0].x = dock;
-    app.panes[0].w = ww;
-    app.panes[1].sb_left = false;
-    app.panes[1].x = dock;
-    app.panes[1].w = app.split ? ww : 0;
-  }
   // Clamp pane buffer indices if tabs were closed out from under them.
   for (int pi = 0; pi < 2; ++pi) {
     if (!find_buf(app, app.panes[pi].buf) && !app.tab_order.empty()) {

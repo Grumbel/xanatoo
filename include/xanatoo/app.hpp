@@ -36,6 +36,7 @@
 #include "xanatoo/sitemap.hpp"
 #include "xanatoo/types.hpp"
 #include "xanatoo/ui.hpp"
+#include "xanatoo/tile_tree.hpp"
 #include "xanatoo/view_settings.hpp"
 
 // Application world: plain data (App + the records below) and free-function
@@ -57,7 +58,6 @@ constexpr int kCentreViews = 2;
 constexpr int kMaxViews = 16;
 // Geometry and relationships are independent: a pair of tiles can be
 // unlinked, linked as a navigation trail, or compared via diff_mode.
-enum class TileAxis { Columns, Rows };
 enum class TileMode { Independent, Trail };
 inline int status_bar_h = 28;       // 0 while content only hides it
 inline int status_bar_full_h = 28;  // scaled height when shown

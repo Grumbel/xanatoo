@@ -74,6 +74,10 @@ handled by `open_tile_menu`; `tile_divider_rect` and `tile_mode_button_rect`
 are shared by hit-testing and drawing. This is the two-leaf foundation for
 the planned arbitrary tiling tree (`docs/TILING.md`). Session save/restore
 persists axis and relation, with old split sessions mapped to Trail.
+The pure recursive geometry/split/close model is `tile_tree.hpp`: it is
+unit-tested without SDL, and `place_centre_rows` uses its two-leaf adapter.
+Do not equate its capacity for N leaves with N-view application support:
+navigation, hit-testing, windows and sessions still assume centre slots 0/1.
 Compare dividers draw the two-lane overview from `App::diff_overview`;
 `diff_overview_positions` (`diff_overview.hpp`, pure C++20) derives markers
 from document-tree order rather than the virtualized visible layout.

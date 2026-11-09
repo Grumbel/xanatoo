@@ -6,7 +6,28 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **315** (this delivery is **314**)
+Next bundle number: **316** (this delivery is **315**)
+
+## Status (2026-11-09) — recursive tile geometry foundation
+
+- Added a pure C++20 `TileTree` model with stable external view IDs, nested
+  horizontal/vertical splits, per-node ratios, recursive geometry and
+  divider enumeration. Splitting an existing leaf preserves its view ID;
+  closing any leaf except the last collapses its parent without replacing
+  the surviving document view.
+- The existing centre-pane layout now calculates its rectangles through
+  this tree, with a two-leaf adapter for the current `App::split` state.
+  Normal two-pane column and row layouts, page bars, docked columns, and
+  the left scrollbar remain supported.
+- New standalone portable `tile_tree_tests` cover columns, rows, four
+  nested tiles, close/collapse, view identities and invalid operations.
+  The g++ C++20 test compiles and passes. SDL3 GUI regression compilation
+  still needs the NixOS development environment.
+- The geometry model can represent arbitrarily many nested tiles, but the
+  application **still presents only two centre views**. The next integration
+  must bind live `Pane` slots to tree leaves, update focus/tab/nav/hit-test,
+  and offer Split/Close Tile commands with per-divider controls. Avoid
+  treating extra centre leaves as floating windows.
 
 ## Status (2026-11-09) — Compare divider overview
 

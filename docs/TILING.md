@@ -43,7 +43,12 @@ serializing its complete stack.
 
 ## Next: arbitrary tile trees
 
-Replace the fixed two-centre-slot layout with a tree of nodes:
+The pure geometry model is now implemented in `tile_tree.hpp` (#315), and
+the existing two centre panes already use it for their computed rectangles.
+It supports nested split/close, retaining stable leaf view IDs. The runtime
+still needs to host more than two centre views.
+
+Replace the remaining fixed centre-slot assumptions with the tree of nodes:
 
 ```
 TileNode = Leaf(ViewId)
@@ -64,8 +69,9 @@ Work incrementally:
 
 1. Introduce stable `ViewId` handles for centre tiles, reusing the existing
    `Pane` view state. Decouple navigation from fixed indices `0` / `1`.
-2. Move layout / pointer hit-testing / drag ratios to a recursive `TileNode`
-   model, keeping a compatibility two-leaf tree initially.
+2. ~~Move layout to a recursive `TileNode` model with a two-leaf adapter.~~
+   Done in #315. Next, move pointer hit-testing and divider drag ratios to
+   the tree, then permit new leaf view IDs in the live centre set.
 3. Add Split Horizontally / Split Vertically / Close Tile / Move Tile actions.
    Closing a leaf collapses its parent split without invalidating surviving
    views' navigation state.
