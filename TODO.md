@@ -6,7 +6,18 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **338** (this delivery is **337**)
+Next bundle number: **339** (this delivery is **338**)
+
+## Status (2026-11-10) — active document tab emphasis
+
+- Document tabs now have a distinct raised active state: pale white selected
+  face, a 1px rounded outline, stronger dark text and a thin 2px amber
+  overline echoing BeOS title tabs. Inactive tabs are darker with muted text;
+  hover uses white rather than blue. Only the document strip opts into the
+  outlined/overline tab style, keeping other ImGui panels unchanged.
+- Preserved existing tab reordering, close buttons, icon clipping, tear-off,
+  selection synchronization and the flat new-tab toolbar action. Visual
+  verification still needs a host with the complete SDL/Nix toolchain.
 
 ## Status (2026-11-10) — white button hover highlights
 

@@ -418,11 +418,15 @@ void Ui::apply_classic_theme() {
   c[ImGuiCol_ResizeGrip] = P(pal.shadow);
   c[ImGuiCol_ResizeGripHovered] = sel_hi;
   c[ImGuiCol_ResizeGripActive] = sel;
-  c[ImGuiCol_Tab] = bg3;
-  c[ImGuiCol_TabHovered] = C(0xD0, 0xE4, 0xF8);
-  c[ImGuiCol_TabActive] = C(0xE8, 0xF0, 0xF8);
-  c[ImGuiCol_TabUnfocused] = bg3;
-  c[ImGuiCol_TabUnfocusedActive] = bg2;
+  // A light, outlined active tab lifts off the muted inactive tabs. The warm
+  // overline echoes the BeOS window titles without colouring the whole tab.
+  c[ImGuiCol_Tab] = C(0xDC, 0xE0, 0xDE);
+  c[ImGuiCol_TabHovered] = P(pal.highlight);
+  c[ImGuiCol_TabSelected] = P(pal.face_light);
+  c[ImGuiCol_TabSelectedOverline] = P(pal.tab_bottom);
+  c[ImGuiCol_TabDimmed] = P(pal.face_dark);
+  c[ImGuiCol_TabDimmedSelected] = P(pal.face_light);
+  c[ImGuiCol_TabDimmedSelectedOverline] = P(pal.tab_bottom);
   c[ImGuiCol_TableHeaderBg] = header;
   c[ImGuiCol_TableBorderStrong] = border;
   c[ImGuiCol_TableBorderLight] = C(0xC8, 0xC6, 0xC2);
@@ -1647,6 +1651,8 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.f * scale_, 0.f));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(9.f * scale_, 4.f * scale_));
     ImGui::PushStyleVar(ImGuiStyleVar_TabRounding, 4.f * scale_);
+    ImGui::PushStyleVar(ImGuiStyleVar_TabBorderSize, 1.f);
+    ImGui::PushStyleVar(ImGuiStyleVar_TabBarOverlineSize, 2.f * scale_);
     if (ImGui::Begin("##tabs", nullptr, tab_flags)) {
       // Dragging reorders; the new order goes back as ReorderTabs. Ids are
       // the buffer ids, so a tab keeps its place when the order changes.
@@ -1659,7 +1665,8 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
       if (ImGui::BeginTabBar("##doctabs",
                              ImGuiTabBarFlags_FittingPolicyScroll |
-                                 ImGuiTabBarFlags_Reorderable)) {
+                                 ImGuiTabBarFlags_Reorderable |
+                                 ImGuiTabBarFlags_DrawSelectedOverline)) {
         const bool force_sel = tab_force_select_;
         tab_force_select_ = false;
         for (int i = 0; i < static_cast<int>(state.tab_labels.size()); ++i) {
@@ -1678,9 +1685,16 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
                                    : static_cast<uint32_t>(i);
           id += "###tab";
           id += std::to_string(bid);
+          const theme::Rgb ink = i == state.active_tab
+                                     ? theme::palette().text
+                                     : theme::palette().text_dim;
+          ImGui::PushStyleColor(ImGuiCol_Text,
+                                ImVec4(ink.r / 255.f, ink.g / 255.f,
+                                       ink.b / 255.f, 1.f));
           if (ImGui::BeginTabItem(id.c_str(), &open, flags)) {
             ImGui::EndTabItem();
           }
+          ImGui::PopStyleColor();
           if (icon) {
             const ImVec2 min = ImGui::GetItemRectMin();
             const ImVec2 max = ImGui::GetItemRectMax();
@@ -1771,7 +1785,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       ImGui::PopStyleColor(button_colors);
     }
     ImGui::End();
-    ImGui::PopStyleVar(4);
+    ImGui::PopStyleVar(6);
     result.top_reserved += tab_h;
   }
 }
