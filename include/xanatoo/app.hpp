@@ -446,6 +446,9 @@ struct FetchShared {
   // Populated only for a structured Gemini TOFU pin mismatch; distinct
   // from generic TLS failures, which must never offer a trust bypass.
   std::optional<xanatoo::GeminiCertificateChange> gemini_change;
+  // First-contact TLS handshake completed, but no request was sent and no
+  // pin was written. Requires explicit confirmation on the main thread.
+  std::optional<xanatoo::GeminiCertificateFirstUse> gemini_first_use;
 };
 
 // Remote image downloads (app_images.cpp): URLs ImageCache asked for,
@@ -615,7 +618,7 @@ enum class PromptKind : uint8_t {
   EditLink,
   EditCite,
   EditSummary,
-  GeminiTrust,  // explicit approval of a changed Gemini certificate
+  GeminiTrust,  // explicit approval of first-contact / changed certificate
 };
 
 struct Prompt {
@@ -627,6 +630,7 @@ struct Prompt {
   xanatoo::NodeId node = xanatoo::INVALID_NODE;
   size_t span = 0;
   std::optional<xanatoo::GeminiCertificateChange> gemini_change;
+  std::optional<xanatoo::GeminiCertificateFirstUse> gemini_first_use;
   std::string gemini_retry_url;
   int gemini_trust_pane = -1;
 };

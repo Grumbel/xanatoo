@@ -40,8 +40,10 @@ constexpr Uint32 kPageCacheTtl = 5 * 60 * 1000;
 void fetch_gemini(const std::string& url, FetchShared& out) {
   out.service = "Gemini";
   xanatoo::GeminiCertificateChange changed;
-  auto resp = xanatoo::gemini_fetch(url, &out.error, &changed);
+  xanatoo::GeminiCertificateFirstUse first_use;
+  auto resp = xanatoo::gemini_fetch(url, &out.error, &changed, &first_use);
   if (!changed.host.empty()) out.gemini_change = std::move(changed);
+  if (!first_use.host.empty()) out.gemini_first_use = std::move(first_use);
   if (!resp) return;
   out.final_url = resp->final_url;
   if (resp->status == 10 || resp->status == 11) {
@@ -210,7 +212,10 @@ void cache_page(App& app, const FetchJob& job) {
 }
 
 xanatoo::Document load_error_doc(const FetchJob& job) {
-  std::string md = "# Could not load page\n\n`" + job.url + "`\n\n" +
+  const bool certificate_review = job.shared->gemini_change ||
+                                  job.shared->gemini_first_use;
+  std::string md = (certificate_review ? "# Gemini certificate review\n\n`" :
+                                        "# Could not load page\n\n`") + job.url + "`\n\n" +
                    job.shared->error + "\n";
   if (xanatoo::starts_with(job.url, "http://") ||
       xanatoo::starts_with(job.url, "https://"))
@@ -325,12 +330,14 @@ void finish_navigate(App& app, const FetchJob& job) {
     app.panes[job.pane].nav.restoring = -1;
     flash_status(app, service + " failed: " + r.error);
     std::cerr << service << ": " << r.error << "\n";
-    if (show_load_error(app, job) && r.gemini_change) {
-      // The error document displays both full fingerprints. Offer an
-      // explicit keyboard confirmation; Esc preserves the old pin.
+    if (show_load_error(app, job) &&
+        (r.gemini_change || r.gemini_first_use)) {
+      // The error document shows the presented SHA-256 fingerprint (and
+      // the old pin on replacements). No URL was sent to an unknown peer.
       focus_view(app, job.pane);
       open_prompt(app, PromptKind::GeminiTrust);
-      app.prompt.gemini_change = *r.gemini_change;
+      app.prompt.gemini_change = r.gemini_change;
+      app.prompt.gemini_first_use = r.gemini_first_use;
       app.prompt.gemini_retry_url = job.url;
       app.prompt.gemini_trust_pane = job.pane;
     }

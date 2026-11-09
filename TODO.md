@@ -6,7 +6,22 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **322** (this delivery is **321**)
+Next bundle number: **323** (this delivery is **322**)
+
+## Status (2026-11-09) — Gemini first-contact certificate review
+
+- The Gemini network client no longer silently pins the first certificate.
+  After its TLS handshake, an unknown host:port presents its full leaf SHA-256
+  fingerprint in an error/review document, with Enter to trust it and Esc to
+  cancel. No Gemini URL is sent and no stored or session pin is created until
+  approval; acceptance forces a fresh network fetch and pin recheck.
+- First-use approval refuses to overwrite a pin established by another fetch,
+  while duplicate approval of the same fingerprint is safe. In `--no-save`,
+  first-use trust is session-only. Invalid or unreadable trust state never
+  offers a bypass. Background tabs require selecting and reloading to review.
+- Offline Gemini TOFU tests cover first-use review, saved/session-only
+  approvals and conflicting pins; the Gemini network code passes C++20 syntax
+  checks. A full SDL/Nix build and hands-on prompt testing remain pending.
 
 ## Status (2026-11-09) — Gemini certificate replacement confirmation
 
@@ -33,8 +48,8 @@ Next bundle number: **322** (this delivery is **321**)
   owner-only permissions; malformed/unreadable state fails closed. With
   `--no-save`, existing saved pins are still checked and new pins only persist
   in memory for the running session. First connections remain susceptible to
-  interception; the subsequent confirmation prompt is for *changes* only,
-  not for initial trust.
+  interception; first-use confirmation now provides a review opportunity but
+  cannot verify the fingerprint independently.
 - Offline OpenSSL fingerprint and pure trust-store tests pass on Linux, and
   changed Gemini/TLS translation units pass C++20 syntax checks. Full Nix/SDL
   and Mbed TLS Android builds remain to be verified on the target machines.

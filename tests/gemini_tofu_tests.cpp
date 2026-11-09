@@ -30,16 +30,61 @@ int main() {
   const std::string c(64, 'c');
   std::string err;
   xanatoo::GeminiCertificateChange changed;
+  xanatoo::GeminiCertificateFirstUse first_use;
   auto tofu = [&](bool persist, std::string host, int port,
                   const std::string& hash) {
     err.clear();
     return xanatoo::gemini_tofu_check(dir.string(), persist, host, port,
                                       hash, &err, &changed);
   };
+  auto review_first = [&](bool persist, std::string host, int port,
+                          const std::string& hash) {
+    err.clear();
+    return xanatoo::gemini_tofu_check(dir.string(), persist, host, port,
+                                      hash, &err, &changed, &first_use);
+  };
+  auto trust_first = [&](bool persist,
+                         const xanatoo::GeminiCertificateFirstUse& trust) {
+    err.clear();
+    return xanatoo::gemini_tofu_approve_first_use(dir.string(), persist,
+                                                  trust, &err);
+  };
   auto approve = [&](bool persist, const xanatoo::GeminiCertificateChange& change) {
     err.clear();
     return xanatoo::gemini_tofu_replace(dir.string(), persist, change, &err);
   };
+
+  check(!review_first(true, "newcapsule.org", 1965, a) &&
+        err.find("FIRST CONTACT") != std::string::npos,
+        "first contact requires review when challenge output is requested");
+  check(first_use.host == "newcapsule.org" && first_use.port == 1965 &&
+        first_use.fingerprint_sha256 == a && changed.host.empty(),
+        "first-use challenge contains the presented certificate fingerprint");
+  check(!fs::exists(file), "first-use review must not save a pin");
+  const auto first_pending = first_use;
+  check(!review_first(true, "newcapsule.org", 1965, b),
+        "a different first-contact certificate still requires review");
+  check(!fs::exists(file), "no pin is created by repeated first-use reviews");
+  check(trust_first(true, first_pending), "explicit first-use trust persists the pin");
+  check(trust_first(true, first_pending), "confirming the same pin twice is safe");
+  check(fs::exists(file), "the first-use approval writes the known-hosts file");
+  check(review_first(true, "newcapsule.org", 1965, a) &&
+        first_use.host.empty(), "confirmed first use now passes automatically");
+  check(!review_first(true, "newcapsule.org", 1965, b) &&
+        changed.previous_sha256 == a && first_use.host.empty(),
+        "untrusted second fingerprint becomes a change, not a new first use");
+
+  check(!review_first(true, "concurrent.org", 1965, a),
+        "concurrent host first-contact review is pending");
+  const auto concurrent_pending = first_use;
+  check(tofu(true, "concurrent.org", 1965, b),
+        "another connection can pin a different certificate first");
+  check(!trust_first(true, concurrent_pending) &&
+        err.find("pinned differently") != std::string::npos,
+        "a stale first-contact approval must not replace an existing pin");
+  check(!review_first(true, "concurrent.org", 1965, a) &&
+        changed.previous_sha256 == b,
+        "stale first-use confirmation leaves the other certificate intact");
 
   check(tofu(true, "example.org", 1965, a), "first certificate is pinned");
   check(fs::exists(file), "persist a Gemini known-hosts file");
@@ -66,10 +111,17 @@ int main() {
   check(tofu(true, "other.org", 1965, b), "different host has separate pin");
   check(!tofu(false, "example.org", 1965, a),
         "--no-save still enforces existing persisted pins");
+  const auto session_replacement = changed;
 
   std::ifstream saved(file);
   const std::string initial((std::istreambuf_iterator<char>(saved)), {});
-  check(approve(false, changed),
+  check(!review_first(false, "newsession.org", 1965, a) &&
+        !first_use.host.empty(), "--no-save first contact still requires review");
+  check(trust_first(false, first_use),
+        "--no-save explicit first-use approval succeeds without persisting");
+  check(review_first(false, "newsession.org", 1965, a) &&
+        first_use.host.empty(), "--no-save first-use trust lasts for this process");
+  check(approve(false, session_replacement),
         "--no-save allows an explicitly reviewed session-only replacement");
   check(tofu(false, "example.org", 1965, a),
         "session-only replacement can temporarily trust the old certificate");
@@ -95,6 +147,11 @@ int main() {
 
   check(!xanatoo::gemini_tofu_check("", true, "example.org", 1965, a, &err),
         "no state directory must fail closed for persistent first use");
+  xanatoo::GeminiCertificateFirstUse empty_state;
+  check(!xanatoo::gemini_tofu_check("", true, "no-state.org", 1965, a,
+                                    &err, nullptr, &empty_state) &&
+        empty_state.host.empty(),
+        "unwritable persistent first use must not offer an approval challenge");
   check(!tofu(true, "new.org", 1965, "not-a-hash"),
         "malformed fingerprints are rejected");
   check(changed.host.empty(), "invalid fingerprint is not an approvable mismatch");

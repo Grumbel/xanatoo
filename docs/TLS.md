@@ -35,12 +35,17 @@ can upgrade HTTP to HTTPS but never downgrade an HTTPS connection to HTTP.
 
 Gemini often uses self-signed certificates instead of publicly trusted CAs.
 On the **first** successful TLS handshake, Xanatoo hashes the server's leaf
-certificate (SHA-256) and saves that fingerprint under the hostname and TCP
-port in `state_dir()/gemini-known-hosts`. The fingerprint is checked before
-the client sends its Gemini request, including after redirects to another
-server. A changed certificate **stops the fetch** and reports the previous
-and presented fingerprints. This detects changes after first contact but
-cannot detect an attacker present during the very first connection.
+certificate (SHA-256) and displays the full fingerprint in a first-contact
+review page. **No Gemini URL is sent and no pin is saved until the user
+explicitly accepts the certificate** (Enter; Esc cancels). Acceptance pins
+the certificate under its hostname and TCP port in
+`state_dir()/gemini-known-hosts`, then retries the connection. Subsequent
+connections require this fingerprint, including after redirects to another
+server. A changed certificate **stops the fetch** and reports both the
+previous and newly presented fingerprints. First-contact approval does not
+authenticate the certificate by itself: an attacker present on the first
+connection can still show a misleading fingerprint. Compare it through a
+trusted independent channel whenever possible.
 
 When a pinned certificate changes, the failed page displays both full SHA-256
 fingerprints and a confirmation prompt. **Enter** explicitly trusts the new
@@ -53,10 +58,10 @@ that triggered the warning, so a different stored pin cannot be overwritten
 by a stale confirmation. The certificate is checked again before the retried
 request is sent, and any third fingerprint is rejected.
 
-This prompt is shown for foreground navigation failures only. Background-tab
-fetches retain their error document; select the tab and reload to review and
-approve a change. Store read errors, invalid fingerprints, and other TLS
-failures do **not** offer a bypass prompt.
+First-contact and replacement prompts are shown for foreground navigation
+only. Background-tab fetches retain their error document; select the tab and
+reload to review and approve the certificate. Store read errors, invalid
+fingerprints, and other TLS failures do **not** offer a bypass prompt.
 
 The entries use a `sha256 <hex-encoded-host>:<port> <fingerprint>` format;
 the host is hex-encoded so IPv6 addresses cannot introduce ambiguous delimiters.
@@ -86,16 +91,18 @@ connect until the CA loading path is fixed.
 OpenSSL test server with an ephemeral local CA. It checks a trusted matching
 hostname, mismatched hostname, and an untrusted certificate, plus the
 explicit Gemini handshake and its certificate fingerprint.
-`tests/gemini_tofu_tests.cpp` tests persisted/session-only pins, hostname and
-port separation, structured mismatch reports, explicit replacement approvals,
-stale approvals, session-only overrides and corrupted-store behavior without SDL.
+`tests/gemini_tofu_tests.cpp` tests first-contact challenges, approval before
+pinning, concurrent first-use approvals, persisted/session-only pins, hostname
+and port separation, structured mismatch reports, explicit replacement
+approvals, stale approvals, session-only overrides and corrupted-store
+behavior without SDL.
 `tests/http_url_tests.cpp` checks
 HTTPS-to-HTTP downgrade rejection. The tests do not replace integration
 testing of real sites, operating-system trust stores or Android's Mbed TLS
 backend.
 
-**Not yet solved:** a richer in-app certificate inspection panel and optional
-first-use trust confirmation. Verified HTTPS/WSS alone does not
+**Not yet solved:** a richer in-app certificate inspection panel with
+validity dates, issuer and self-signed status. Verified HTTPS/WSS alone does not
 authenticate Nostr event authors, relay group membership, NIP-11 master-key
 claims, or API authorization. Each has its own cryptographic and
 application-level checks.

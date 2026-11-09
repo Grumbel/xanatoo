@@ -261,11 +261,17 @@ StatusLine compute_status(App& app) {
         label += "    Enter confirm · Esc cancel";
         break;
       case PromptKind::GeminiTrust:
-        label = "Gemini certificate CHANGED";
+        label = pr.gemini_first_use ? "Gemini FIRST CONTACT" :
+                                       "Gemini certificate CHANGED";
         if (pr.gemini_change)
           label += " for " + pr.gemini_change->host + ":" +
                    std::to_string(pr.gemini_change->port);
-        label += "  ·  Review hashes above · Enter trust new certificate · Esc keep old";
+        else if (pr.gemini_first_use)
+          label += " for " + pr.gemini_first_use->host + ":" +
+                   std::to_string(pr.gemini_first_use->port);
+        label += pr.gemini_first_use ?
+            "  ·  Review fingerprint · Enter trust server · Esc cancel" :
+            "  ·  Review hashes · Enter trust replacement · Esc keep old";
         break;
       case PromptKind::Replace:
         label = "Find: " + shown_or_dots;

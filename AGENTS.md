@@ -595,6 +595,13 @@ history or distribute patch files.
 - Gemtext parser is always built (`.gmi` / `.gemini`).
 - Network client is gated by `XANATOO_GEMINI` (default ON; needs OpenSSL).
 - URL entry is Ctrl+L / `UiCommand::OpenUrlBar` → `navigate_to_url`.
+- After the TLS handshake, unknown host:port leaf SHA-256 fingerprints must be
+  reviewed and explicitly trusted before sending any Gemini URL or saving a
+  pin. Changed certificates also require explicit review. Review state goes
+  from the fetch worker to a foreground prompt; approval is compare-and-swap
+  against saved/session trust and the retry forces a fresh TLS handshake.
+  `--no-save` approvals stay in memory. See `docs/TLS.md` and the pure
+  `gemini_tofu_tests.cpp` suite; do not bypass this with another fetch path.
 
 ## Reddit
 

@@ -126,7 +126,7 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
       return false;
 
     case PromptKind::GeminiTrust: {
-      if (!pr.gemini_change) {
+      if (!pr.gemini_change && !pr.gemini_first_use) {
         close_prompt(app);
         return true;
       }
@@ -136,16 +136,22 @@ bool commit_prompt(App& app, bool ctrl, bool shift) {
         flash_status(app, "Gemini trust review is no longer the active page");
         return true;
       }
-      const xanatoo::GeminiCertificateChange change = *pr.gemini_change;
+      const auto change = pr.gemini_change;
+      const auto first_use = pr.gemini_first_use;
       std::string retry = pr.gemini_retry_url;
       close_prompt(app);
       std::string err;
-      if (!xanatoo::gemini_tofu_replace(xanatoo::state_dir(),
-                                       !xanatoo::no_save(), change, &err)) {
+      const bool trusted = change ?
+          xanatoo::gemini_tofu_replace(xanatoo::state_dir(),
+                                      !xanatoo::no_save(), *change, &err) :
+          xanatoo::gemini_tofu_approve_first_use(xanatoo::state_dir(),
+                                                 !xanatoo::no_save(),
+                                                 *first_use, &err);
+      if (!trusted) {
         flash_status(app, "Gemini trust was not updated: " + err);
         return true;
       }
-      flash_status(app, "Gemini certificate replacement trusted; reconnecting");
+      flash_status(app, "Gemini certificate trusted; reconnecting");
       // A normal navigation may reuse a page cached before the certificate
       // changed (or resolve a remote source to an imported document). Force
       // a new network handshake; the accepted pin is checked again there.

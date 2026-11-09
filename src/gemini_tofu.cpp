@@ -50,6 +50,12 @@ bool is_hex(std::string_view s) {
   });
 }
 
+bool valid_identity(std::string_view host, int port,
+                    std::string_view fingerprint) {
+  return !host.empty() && host.size() <= 255 && port >= 1 && port <= 65535 &&
+         fingerprint.size() == 64 && is_hex(fingerprint);
+}
+
 std::string make_key(std::string_view host, int port) {
   // Hex encoding makes the on-disk representation unambiguous, even for
   // bracket-free IPv6 addresses, Unicode hostnames and control characters.
@@ -151,10 +157,11 @@ bool save(const fs::path& path, const Pins& pins, std::string* err) {
 bool gemini_tofu_check(std::string_view directory, bool persist,
                        std::string_view host, int port,
                        std::string_view fingerprint_sha256, std::string* err,
-                       GeminiCertificateChange* changed) {
+                       GeminiCertificateChange* changed,
+                       GeminiCertificateFirstUse* first_use) {
   if (changed) *changed = {};
-  if (host.empty() || host.size() > 255 || port < 1 || port > 65535 ||
-      fingerprint_sha256.size() != 64 || !is_hex(fingerprint_sha256))
+  if (first_use) *first_use = {};
+  if (!valid_identity(host, port, fingerprint_sha256))
     return fail(err, "invalid Gemini host, port or certificate fingerprint");
 
   const std::lock_guard guard(pin_mutex());
@@ -201,12 +208,56 @@ bool gemini_tofu_check(std::string_view directory, bool persist,
     return true;
   }
 
+  if (persist && path.empty())
+    return fail(err, "no state directory for Gemini TOFU pins");
+  if (first_use) {
+    *first_use = {std::string(host), port, std::string(fingerprint_sha256)};
+    return fail(err, "Gemini FIRST CONTACT for " + std::string(host) + ':' +
+        std::to_string(port) + "; presented SHA-256 " +
+        std::string(fingerprint_sha256) +
+        ". Verify this fingerprint before trusting the server.");
+  }
   if (persist) {
-    if (path.empty()) return fail(err, "no state directory for Gemini TOFU pins");
     saved.emplace(key, fingerprint_sha256);
     if (!save(path, saved, err)) return false;
   }
   session.emplace(session_key, fingerprint_sha256);
+  return true;
+}
+
+bool gemini_tofu_approve_first_use(std::string_view directory, bool persist,
+                                  const GeminiCertificateFirstUse& first_use,
+                                  std::string* err) {
+  if (!valid_identity(first_use.host, first_use.port,
+                      first_use.fingerprint_sha256))
+    return fail(err, "invalid Gemini first-use certificate fingerprint");
+
+  const std::lock_guard guard(pin_mutex());
+  const std::string key = make_key(first_use.host, first_use.port);
+  const std::string session_key = std::string(directory) + '\n' + key;
+  const fs::path path = directory.empty() ? fs::path{} :
+      fs::path(directory) / "gemini-known-hosts";
+  Pins saved;
+  if (!path.empty() && !load(path, saved, err)) return false;
+
+  if (const auto it = saved.find(key); it != saved.end()) {
+    if (it->second != first_use.fingerprint_sha256)
+      return fail(err, "Gemini certificate was pinned differently since first-use review");
+    return true;  // another fetch approved the same fingerprint
+  }
+  auto& session = session_pins();
+  if (const auto it = session.find(session_key); it != session.end()) {
+    if (it->second != first_use.fingerprint_sha256)
+      return fail(err, "Gemini certificate was pinned differently since first-use review");
+    return true;
+  }
+
+  if (persist) {
+    if (path.empty()) return fail(err, "no state directory for Gemini TOFU pins");
+    saved.emplace(key, first_use.fingerprint_sha256);
+    if (!save(path, saved, err)) return false;
+  }
+  session.emplace(session_key, first_use.fingerprint_sha256);
   return true;
 }
 

@@ -167,7 +167,8 @@ std::string resolve_gemini_url(std::string_view base, std::string_view ref) {
 
 static std::optional<GeminiResponse> gemini_fetch_once(const GeminiUrl& u,
                                                        std::string* err,
-                                                       GeminiCertificateChange* changed) {
+                                                       GeminiCertificateChange* changed,
+                                                       GeminiCertificateFirstUse* first_use) {
   int fd = tcp_connect_host(u.host, u.port, err);
   if (fd < 0) return std::nullopt;
   // Gemini commonly uses self-signed certificates. Verify the persisted
@@ -180,7 +181,7 @@ static std::optional<GeminiResponse> gemini_fetch_once(const GeminiUrl& u,
     return std::nullopt;
   }
   if (!gemini_tofu_check(state_dir(), !no_save(), u.host, u.port,
-                         *fingerprint, err, changed)) return std::nullopt;
+                         *fingerprint, err, changed, first_use)) return std::nullopt;
 
   std::string req = u.canonical + "\r\n";
   if (!tls.write_all(req.data(), req.size())) {
@@ -223,8 +224,14 @@ static std::optional<GeminiResponse> gemini_fetch_once(const GeminiUrl& u,
 
 std::optional<GeminiResponse> gemini_fetch(std::string_view url,
                                            std::string* err,
-                                           GeminiCertificateChange* changed) {
+                                           GeminiCertificateChange* changed,
+                                           GeminiCertificateFirstUse* first_use) {
   if (changed) *changed = {};
+  // Never permit silent first-use pinning even when a caller does not ask
+  // for the structured review output.
+  GeminiCertificateFirstUse ignored_first_use;
+  if (!first_use) first_use = &ignored_first_use;
+  *first_use = {};
   auto u = parse_gemini_url(url);
   if (!u) {
     if (err) *err = "not a gemini:// URL";
@@ -232,7 +239,7 @@ std::optional<GeminiResponse> gemini_fetch(std::string_view url,
   }
 
   for (int hop = 0; hop < 5; ++hop) {
-    auto resp = gemini_fetch_once(*u, err, changed);
+    auto resp = gemini_fetch_once(*u, err, changed, first_use);
     if (!resp) return std::nullopt;
     if (resp->status == 30 || resp->status == 31) {
       // redirect — meta is new URL
