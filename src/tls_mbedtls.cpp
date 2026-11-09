@@ -204,6 +204,25 @@ bool TlsStream::connect(int fd, const std::string& host, std::string* err,
 
 bool TlsStream::connected() const { return impl_->ok; }
 
+std::optional<std::string> TlsStream::peer_certificate_sha256() const {
+  if (!connected()) return std::nullopt;
+  const mbedtls_x509_crt* cert = mbedtls_ssl_get_peer_cert(&impl_->ssl);
+  if (!cert || !cert->raw.p || !cert->raw.len) return std::nullopt;
+  unsigned char digest[32];
+  size_t size = 0;
+  if (psa_hash_compute(PSA_ALG_SHA_256, cert->raw.p, cert->raw.len,
+                       digest, sizeof(digest), &size) != PSA_SUCCESS ||
+      size != sizeof(digest)) return std::nullopt;
+  static constexpr char hex[] = "0123456789abcdef";
+  std::string result;
+  result.reserve(size * 2);
+  for (size_t i = 0; i < size; ++i) {
+    result += hex[digest[i] >> 4];
+    result += hex[digest[i] & 15];
+  }
+  return result;
+}
+
 bool TlsStream::write_all(const void* data, size_t n) {
   if (!impl_->ok) return false;
   const unsigned char* p = static_cast<const unsigned char*>(data);

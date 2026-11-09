@@ -11,7 +11,7 @@ Gemini, with OpenSSL on desktop and Mbed TLS on Android.
 | `https://` | Required by default | Buffered APIs, HTML, media, images and streaming downloads share this policy. |
 | Nostr `wss://` | Required | Invalid/untrusted relay certificates prevent the WebSocket connection. |
 | NIP-11 `https://` | Required | Additionally demands HTTPS, public resolved IP addresses for automatic discovery, and a 256 KiB response limit. |
-| Gemini `gemini://` | **Not implemented** | Self-signed certificates remain accepted without TOFU/pinning. Treat the server as unauthenticated. |
+| Gemini `gemini://` | TOFU (SHA-256 leaf certificate pin) | First contact is unauthenticated; later connections require the same certificate per host and port. |
 | `http://` | Not applicable | Explicitly requested plaintext HTTP is allowed. Redirects from HTTPS back to HTTP are rejected. |
 
 For verified connections, the certificate must chain to a trusted root and
@@ -31,6 +31,30 @@ can upgrade HTTP to HTTPS but never downgrade an HTTPS connection to HTTP.
   `/etc/ssl/certs`. The parsed roots are cached across connections. This
   requires a build with `MBEDTLS_FS_IO` enabled.
 
+## Gemini trust on first use
+
+Gemini often uses self-signed certificates instead of publicly trusted CAs.
+On the **first** successful TLS handshake, Xanatoo hashes the server's leaf
+certificate (SHA-256) and saves that fingerprint under the hostname and TCP
+port in `state_dir()/gemini-known-hosts`. The fingerprint is checked before
+the client sends its Gemini request, including after redirects to another
+server. A changed certificate **stops the fetch** and reports the previous
+and presented fingerprints. This detects changes after first contact but
+cannot detect an attacker present during the very first connection.
+
+After independently checking an expected server certificate renewal, the
+user may remove the corresponding pin entry from `gemini-known-hosts` and
+revisit to establish new trust. Xanatoo does not silently replace pins or
+automatically accept changed certificates when the old certificate expires.
+The entries use a `sha256 <hex-encoded-host>:<port> <fingerprint>` format;
+the host is hex-encoded so IPv6 addresses cannot introduce ambiguous delimiters.
+An invalid or unreadable pin file is an error rather than a fresh first use.
+
+With `--no-save`, Xanatoo still checks any existing saved pins, but new pins
+live only in memory for that process. With normal persistence enabled, an
+unavailable or unwritable state directory blocks a new Gemini connection;
+the URL is never sent without first establishing trust.
+
 On NixOS, a development shell normally provides `SSL_CERT_FILE`; if a
 deployment has no system CA bundle, arrange one in the runtime environment
 before launching Xanatoo. Do not disable verification to work around an
@@ -47,12 +71,16 @@ connect until the CA loading path is fixed.
 `tests/tls_peer_tests.cpp` opens an offline TLS connection to a temporary
 OpenSSL test server with an ephemeral local CA. It checks a trusted matching
 hostname, mismatched hostname, and an untrusted certificate, plus the
-explicit unverified Gemini behavior. `tests/http_url_tests.cpp` checks
+explicit Gemini handshake and its certificate fingerprint.
+`tests/gemini_tofu_tests.cpp` tests persisted/session-only pins, hostname and
+port separation, mismatch rejection and corrupted-store behavior without SDL.
+`tests/http_url_tests.cpp` checks
 HTTPS-to-HTTP downgrade rejection. The tests do not replace integration
 testing of real sites, operating-system trust stores or Android's Mbed TLS
 backend.
 
-**Not yet solved:** Gemini TOFU/pinning and a certificate-change prompt;
-verified HTTPS/WSS alone does not authenticate Nostr event authors, relay
-group membership, NIP-11 master-key claims, or API authorization. Each has
-its own cryptographic and application-level checks.
+**Not yet solved:** an in-app Gemini certificate-change approval/inspection
+panel and first-use trust confirmation. Verified HTTPS/WSS alone does not
+authenticate Nostr event authors, relay group membership, NIP-11 master-key
+claims, or API authorization. Each has its own cryptographic and
+application-level checks.

@@ -87,8 +87,9 @@ the Mbed TLS backend loads Android CA files from
 `/apex/com.android.conscrypt/cacerts` or `/system/etc/security/cacerts`
 (and desktop/Nix CA bundle paths). If the system CA store cannot be read,
 the connection fails instead of proceeding unverified. This needs device
-testing on Fire OS 5 and newer Android releases. Gemini still accepts
-self-signed certificates without TOFU/pinning (see `docs/TLS.md`).
+testing on Fire OS 5 and newer Android releases. Gemini accepts self-signed
+certificates via persistent TOFU fingerprints; first contact is unauthenticated
+and fingerprint extraction still needs Mbed TLS device testing (see `docs/TLS.md`).
 
 ## Still off
 
@@ -118,7 +119,7 @@ underneath it. The 640×480 R36S package starts at 75% of the desktop default.
 
 ## Next
 
-- Test system-CA validation on actual Android versions; implement Gemini TOFU.
+- Test system-CA validation and Gemini TOFU on actual Android versions.
 - Per-glyph font fallback (Android system fonts for scripts DejaVu lacks).
 
 ## Updates

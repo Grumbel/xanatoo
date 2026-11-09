@@ -32,7 +32,8 @@ struct GeminiResponse {
   std::string final_url;  // after limited redirects
 };
 
-// Fetch over TLS (TOFU-style: accept cert without pinning for now).
+// Fetch over TLS, pinning the first certificate per host:port and refusing
+// changed certificates before sending any URL (session-only with --no-save).
 // Follows at most a few 30/31 redirects. On failure, nullopt and err set.
 std::optional<GeminiResponse> gemini_fetch(std::string_view url,
                                            std::string* err = nullptr);

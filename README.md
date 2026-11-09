@@ -208,9 +208,10 @@ working when those services change.
 **Network security:** HTTPS and Nostr WSS connections now require a trusted
 server certificate and matching hostname. Missing CA stores and invalid
 certificates fail closed (see [TLS notes](docs/TLS.md)); this change has not
-yet been device-tested on all Android targets. Gemini still permits
-self-signed certificates, **without certificate pinning/TOFU**, so do not
-use it for secrets or authenticated browsing until that is implemented.
+yet been device-tested on all Android targets. Gemini permits self-signed
+certificates using first-contact TOFU pinning; it detects certificate changes
+on subsequent visits but cannot authenticate the **first** connection.
+Review unexpected certificate-change errors before resetting a pin.
 Plain `http://` URLs are supported but carry data without encryption or
 authentication. Redirects may upgrade HTTP to HTTPS, never downgrade HTTPS
 to HTTP.

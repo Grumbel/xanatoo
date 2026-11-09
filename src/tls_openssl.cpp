@@ -106,6 +106,25 @@ bool TlsStream::connect(int fd, const std::string& host, std::string* err,
 
 bool TlsStream::connected() const { return impl_->ssl != nullptr; }
 
+std::optional<std::string> TlsStream::peer_certificate_sha256() const {
+  if (!connected()) return std::nullopt;
+  X509* cert = SSL_get1_peer_certificate(impl_->ssl);
+  if (!cert) return std::nullopt;
+  unsigned char digest[EVP_MAX_MD_SIZE];
+  unsigned int size = 0;
+  const bool hashed = X509_digest(cert, EVP_sha256(), digest, &size) == 1;
+  X509_free(cert);
+  if (!hashed || size != 32) return std::nullopt;
+  static constexpr char hex[] = "0123456789abcdef";
+  std::string result;
+  result.reserve(size * 2);
+  for (unsigned i = 0; i < size; ++i) {
+    result += hex[digest[i] >> 4];
+    result += hex[digest[i] & 15];
+  }
+  return result;
+}
+
 bool TlsStream::write_all(const void* data, size_t n) {
   if (!impl_->ssl) return false;
   const char* p = static_cast<const char*>(data);

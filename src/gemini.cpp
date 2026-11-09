@@ -5,6 +5,8 @@
 
 #include "xanatoo/https.hpp"
 #include "xanatoo/tls.hpp"
+#include "xanatoo/gemini_tofu.hpp"
+#include "xanatoo/paths.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -167,10 +169,17 @@ static std::optional<GeminiResponse> gemini_fetch_once(const GeminiUrl& u,
                                                        std::string* err) {
   int fd = tcp_connect_host(u.host, u.port, err);
   if (fd < 0) return std::nullopt;
-  // Gemini commonly uses self-signed certificates. This deliberately opts
-  // out of PKI verification; TOFU/pinning is still future work.
+  // Gemini commonly uses self-signed certificates. Verify the persisted
+  // TOFU fingerprint after the handshake but BEFORE sending the URL.
   TlsStream tls;
   if (!tls.connect(fd, u.host, err, false)) return std::nullopt;
+  const auto fingerprint = tls.peer_certificate_sha256();
+  if (!fingerprint) {
+    if (err) *err = "Gemini peer did not provide a usable certificate";
+    return std::nullopt;
+  }
+  if (!gemini_tofu_check(state_dir(), !no_save(), u.host, u.port,
+                         *fingerprint, err)) return std::nullopt;
 
   std::string req = u.canonical + "\r\n";
   if (!tls.write_all(req.data(), req.size())) {

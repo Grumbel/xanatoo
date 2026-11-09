@@ -73,7 +73,7 @@ struct TestIdentity {
 };
 
 bool handshake(SSL_CTX* server_ctx, const std::string& host,
-               bool verify_peer) {
+               bool verify_peer, std::string* fingerprint = nullptr) {
   int fds[2];
   check(socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0, "create socketpair");
   std::thread server([&] {
@@ -88,6 +88,8 @@ bool handshake(SSL_CTX* server_ctx, const std::string& host,
   xanatoo::TlsStream client;
   std::string err;
   const bool ok = client.connect(fds[0], host, &err, verify_peer);
+  if (ok && fingerprint)
+    *fingerprint = client.peer_certificate_sha256().value_or("");
   client.close();
   server.join();
   if (!ok) std::cerr << "Expected TLS rejection for " << host << ": " << err << '\n';
@@ -119,12 +121,26 @@ int main() {
     const std::string previous_file = previous ? previous : "";
     check(setenv("SSL_CERT_FILE", path, 1) == 0, "configure test CA store");
 
-    check(handshake(server.get(), "relay.example", true),
+    unsigned char digest[EVP_MAX_MD_SIZE];
+    unsigned int digest_size = 0;
+    check(X509_digest(identity.cert.get(), EVP_sha256(), digest,
+                      &digest_size) == 1 && digest_size == 32,
+          "hash the test server's leaf certificate");
+    static constexpr char hex[] = "0123456789abcdef";
+    std::string expected;
+    for (unsigned i = 0; i < digest_size; ++i) {
+      expected += hex[digest[i] >> 4];
+      expected += hex[digest[i] & 15];
+    }
+    std::string actual;
+    check(handshake(server.get(), "relay.example", true, &actual),
           "trusted certificate and matching hostname should connect");
+    check(actual == expected, "TLS exposes the peer's SHA-256 fingerprint");
     check(!handshake(server.get(), "different.example", true),
           "trusted certificate with wrong hostname must fail");
-    check(handshake(server.get(), "different.example", false),
+    check(handshake(server.get(), "different.example", false, &actual),
           "explicit Gemini-style self-signed exception should still work");
+    check(actual == expected, "unverified Gemini still sees the leaf fingerprint");
 
     TestIdentity untrusted_identity;
     Owner<SSL_CTX, SSL_CTX_free> untrusted(SSL_CTX_new(TLS_server_method()),

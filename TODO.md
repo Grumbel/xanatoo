@@ -6,7 +6,23 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **320** (this delivery is **319**)
+Next bundle number: **321** (this delivery is **320**)
+
+## Status (2026-11-09) — Gemini certificate trust on first use
+
+- Added SHA-256 peer-leaf fingerprint extraction to both TLS backends. Gemini
+  now records the first certificate by hostname and port and checks it after
+  each handshake *before* writing the Gemini URL. Unexpected replacements
+  stop the fetch with previous/received fingerprints; no automatic rollover.
+- Pins live in `state_dir()/gemini-known-hosts` with atomic replacement and
+  owner-only permissions; malformed/unreadable state fails closed. With
+  `--no-save`, existing saved pins are still checked and new pins only persist
+  in memory for the running session. First connections remain susceptible to
+  interception; a future UI should support explicit trust review and
+  certificate renewal rather than manual pin-file editing.
+- Offline OpenSSL fingerprint and pure trust-store tests pass on Linux, and
+  changed Gemini/TLS translation units pass C++20 syntax checks. Full Nix/SDL
+  and Mbed TLS Android builds remain to be verified on the target machines.
 
 ## Status (2026-11-09) — Nostr group-store test SDL3 build fix
 

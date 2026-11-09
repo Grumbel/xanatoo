@@ -171,6 +171,7 @@ add_executable(xanatoo
   src/http_url.cpp
   src/version.cpp
   src/gemini.cpp
+  src/gemini_tofu.cpp
   src/nostr.cpp
   src/nostr_verify.cpp
   src/nostr_store.cpp
@@ -537,6 +538,7 @@ add_executable(xanatoo_tests
   src/nostr_verify.cpp
   src/nostr_store.cpp
   src/gemini.cpp
+  src/gemini_tofu.cpp
   src/epub_import.cpp
   src/epub_native.cpp
   src/view_settings.cpp
@@ -673,6 +675,10 @@ add_executable(xanatoo_http_url_tests
 )
 target_include_directories(xanatoo_http_url_tests PRIVATE include)
 add_test(NAME http_url_tests COMMAND xanatoo_http_url_tests)
+add_executable(xanatoo_gemini_tofu_tests
+  tests/gemini_tofu_tests.cpp src/gemini_tofu.cpp)
+target_include_directories(xanatoo_gemini_tofu_tests PRIVATE include)
+add_test(NAME gemini_tofu_tests COMMAND xanatoo_gemini_tofu_tests)
 add_executable(xanatoo_diff_overview_tests tests/diff_overview_tests.cpp)
 target_include_directories(xanatoo_diff_overview_tests PRIVATE include)
 add_test(NAME diff_overview_tests COMMAND xanatoo_diff_overview_tests)

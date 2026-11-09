@@ -7,12 +7,13 @@
 // (Android; -DXANATOO_TLS=mbedtls on desktop), chosen by CMake / ndk-build.
 //
 // TLS 1.2+, SNI = host. Peer certificates and hostnames are verified by
-// default. Gemini deliberately opts out because it commonly uses self-signed
-// certificates; a separate TOFU/pinning mechanism is still needed there.
+// default. Gemini deliberately opts out of CA verification because it commonly
+// uses self-signed certificates; it verifies a stored TOFU fingerprint instead.
 // If no system CA store is available, verified connections fail closed.
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace xanatoo {
@@ -29,6 +30,11 @@ class TlsStream {
   bool connect(int fd, const std::string& host, std::string* err = nullptr,
                bool verify_peer = true);
   bool connected() const;
+
+  // SHA-256 of the peer's full DER leaf certificate (lowercase hex), after
+  // a successful handshake. No certificate or hash error => nullopt.
+  // Gemini checks this before sending any application data.
+  std::optional<std::string> peer_certificate_sha256() const;
 
   // Whole buffer; false on error.
   bool write_all(const void* data, size_t n);
