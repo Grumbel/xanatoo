@@ -58,4 +58,12 @@ std::vector<AnnotationLayer> list_annotation_layers();
 // on success it advances layer.revision. Nothing touches source documents.
 bool save_annotation_layer(AnnotationLayer& layer);
 
+// Versioned edits. A failed commit leaves both the layer contents and its
+// revision cursor untouched; deletion only removes the annotation from the
+// new head (the earlier snapshot remains available by revision id).
+bool add_annotation(AnnotationLayer& layer, Annotation annotation);
+bool update_annotation_body(AnnotationLayer& layer, std::string_view annotation_id,
+                            std::string_view body);
+bool remove_annotation(AnnotationLayer& layer, std::string_view annotation_id);
+
 }  // namespace xanatoo

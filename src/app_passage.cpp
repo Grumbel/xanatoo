@@ -449,6 +449,27 @@ bool annotation_marks_fresh(const Pane& p) {
          p.annotation_marks.layout_gen == p.layout.generation;
 }
 
+void select_annotation(App& app, int pi, const std::string& annotation_id) {
+  Pane& p = app.panes[pi];
+  update_annotation_marks(app, p);
+  if (annotation_marks_fresh(p)) {
+    for (const AnnotationMark& mark : p.annotation_marks.items) {
+      if (mark.annotation_id != annotation_id) continue;
+      p.sel = mark.range;
+      const xanatoo::NodeId cut = pane_cut(app, p);
+      if (cut != xanatoo::INVALID_NODE &&
+          !within(doc_of(app, p), mark.range.anchor.node, cut))
+        set_pane_cut(app, p, xanatoo::INVALID_NODE);
+      std::swap(p.sel.anchor, p.sel.focus);
+      scroll_caret_into_view(app, p);
+      std::swap(p.sel.anchor, p.sel.focus);
+      app.needs_layout = true;
+      return;
+    }
+  }
+  flash_status(app, "Annotation anchor could not be resolved");
+}
+
 std::vector<BookmarkIcon> bookmark_icons(App& app, Pane& p) {
   std::vector<BookmarkIcon> out;
   if (!bookmark_marks_fresh(p)) return out;

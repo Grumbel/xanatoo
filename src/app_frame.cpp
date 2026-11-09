@@ -300,12 +300,46 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.bookmarks_open = app.bookmarks_panel_open;
   ui_state.bookmarks = app.bookmarks;
   ui_state.annotations_panel_open = app.annotation_panel_open;
+  ui_state.annotation_note_created_gen = app.annotation_note_created_gen;
   ui_state.annotation_layers.clear();
   for (const auto& layer : app.annotation_layers)
     ui_state.annotation_layers.push_back({
         layer.id, layer.name, layer.owner,
         !app.hidden_annotation_layers.contains(layer.id),
         layer.id == app.active_annotation_layer, layer.annotations.size()});
+  ui_state.annotations.clear();
+  if (app.annotation_panel_open) {
+    Pane& pane = focused_pane(app);
+    update_annotation_marks(app, pane);
+    const DocBuffer* source = find_buf(app, pane.buf);
+    std::string page = path_of(app, pane);
+    if (page.empty()) page = app.gemini_current_url;
+    const std::string key = source && !source->doc_key.empty()
+                                ? source->doc_key : page;
+    if (source && pane.source_buf != pane.buf && !key.empty()) {
+      for (const auto& layer : app.annotation_layers) {
+        if (app.hidden_annotation_layers.contains(layer.id)) continue;
+        for (const auto& annotation : layer.annotations) {
+          if (std::none_of(annotation.targets.begin(), annotation.targets.end(),
+                           [&](const auto& target) {
+                             return target.document_key == key ||
+                                    target.document_key == page;
+                           })) continue;
+          const bool resolved = annotation_marks_fresh(pane) &&
+              std::any_of(pane.annotation_marks.items.begin(),
+                          pane.annotation_marks.items.end(),
+                          [&](const AnnotationMark& mark) {
+                            return mark.layer_id == layer.id &&
+                                   mark.annotation_id == annotation.id;
+                          });
+          ui_state.annotations.push_back({
+              annotation.id, layer.id, layer.owner, annotation.kind,
+              annotation.body, resolved,
+              annotation.id == app.selected_annotation_id});
+        }
+      }
+    }
+  }
   ui_state.location_icon = address_icon(app, ui_state.doc_label);
   // Imported EPUBs are stored as content.md beside their extracted media.
   // Use the first image in that document as its cover when present.
@@ -429,7 +463,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::ToggleHistory || c == C::ToggleDownloads || c == C::ToggleBookmarks ||
         c == C::ToggleAnnotationsPanel || c == C::NewAnnotationLayer ||
         c == C::SelectAnnotationLayer || c == C::ToggleAnnotationLayer ||
-        c == C::AddAnnotationHighlight ||
+        c == C::AddAnnotationHighlight || c == C::AddAnnotationNote ||
+        c == C::SelectAnnotation || c == C::UpdateAnnotationNote ||
+        c == C::RemoveAnnotation ||
         c == C::ToggleStylesPanel ||
         c == C::AddBookmark || c == C::BookmarkPage || c == C::RemoveBookmark ||
         c == C::BookmarkPosition || c == C::NewTab ||
@@ -811,9 +847,15 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       flash_status(app, "Created a local annotation layer");
       break;
     }
-    case C::AddAnnotationHighlight: {
+    case C::AddAnnotationHighlight:
+    case C::AddAnnotationNote: {
+      const bool is_note = cmd == C::AddAnnotationNote;
+      if (is_note && arg.empty()) {
+        flash_status(app, "Write a note before attaching it");
+        break;
+      }
       if (p.sel.empty() || p.source_buf == p.buf) {
-        flash_status(app, "Select document text to highlight");
+        flash_status(app, "Select document text to annotate");
         break;
       }
       const std::string address = bookmark_for_view(app, p, false).address;
@@ -844,18 +886,60 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       }
       xanatoo::Annotation mark;
       mark.id = xanatoo::new_annotation_id();
-      mark.kind = "highlight";
+      mark.kind = is_note ? "note" : "highlight";
+      if (is_note) mark.body = arg;
       mark.targets.push_back({
           key, xanatoo::content_id(xanatoo::serialize_sexpr(d)), address});
-      layer->annotations.push_back(std::move(mark));
-      if (!xanatoo::save_annotation_layer(*layer)) {
-        layer->annotations.pop_back();
-        flash_status(app, "Could not save highlight; no document changes made");
+      const std::string id = mark.id;
+      if (!xanatoo::add_annotation(*layer, std::move(mark))) {
+        flash_status(app, "Could not save annotation; no document changes made");
         break;
       }
-      app.hidden_annotation_layers.erase(layer->id);
+      app.selected_annotation_id = id;
+      if (is_note) ++app.annotation_note_created_gen;
+      if (app.hidden_annotation_layers.erase(layer->id))
+        xanatoo::save_annotation_layer_visibility(layer->id, true);
       ++app.annotation_layers_gen;
-      flash_status(app, "Highlighted selection in local annotation layer");
+      flash_status(app, is_note ? "Attached note to document passage"
+                                : "Highlighted selection in local annotation layer");
+      break;
+    }
+    case C::SelectAnnotation: {
+      app.selected_annotation_id = arg;
+      select_annotation(app, app.focus, arg);
+      break;
+    }
+    case C::UpdateAnnotationNote:
+    case C::RemoveAnnotation: {
+      const std::string id = cmd == C::RemoveAnnotation
+                                 ? arg : app.selected_annotation_id;
+      auto layer = std::find_if(app.annotation_layers.begin(),
+                                app.annotation_layers.end(),
+                                [&](const auto& candidate) {
+        return candidate.owner == "local" &&
+            std::any_of(candidate.annotations.begin(),
+                        candidate.annotations.end(),
+                        [&](const auto& annotation) {
+                          return annotation.id == id;
+                        });
+      });
+      if (layer == app.annotation_layers.end()) {
+        flash_status(app, "Annotation is not in an editable local layer");
+        break;
+      }
+      const bool removed = cmd == C::RemoveAnnotation;
+      const bool saved = removed
+          ? xanatoo::remove_annotation(*layer, id)
+          : xanatoo::update_annotation_body(*layer, id, arg);
+      if (!saved) {
+        flash_status(app, "Could not save annotation revision");
+        break;
+      }
+      if (removed && app.selected_annotation_id == id)
+        app.selected_annotation_id.clear();
+      ++app.annotation_layers_gen;
+      flash_status(app, removed ? "Annotation removed (history preserved)"
+                                : "Annotation note saved to layer history");
       break;
     }
     case C::AddBookmark:
@@ -2071,6 +2155,24 @@ static void draw_pane_overlays(App& app, int i) {
             pane.layout, mark.range, draw_scroll,
             app.renderer.glyph_extents());
         app.renderer.draw_selection(rects, ox, c.r, c.g, c.b, c.a);
+        if (mark.annotation_id == app.selected_annotation_id)
+          app.renderer.draw_selection(rects, ox, c.r, c.g, c.b, c.a);
+        if (mark.kind == "note") {
+          // A small text-box tab at the passage anchor distinguishes a note
+          // from a plain highlight. The note body is edited in the separate
+          // Annotations panel; no node is inserted into the source tree.
+          const auto cp = xanatoo::caret_screen_pos(
+              pane.layout, mark.range.anchor, draw_scroll, lh);
+          if (cp.valid && cp.y >= clip_y && cp.y < clip_y + pane.h) {
+            const int x = static_cast<int>(cp.x + ox) - 11;
+            const int y = static_cast<int>(cp.y - cp.height * 0.8f);
+            const SDL_Rect tab{x, y, 9, 8};
+            SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(app.sdl, c.r, c.g, c.b, 225);
+            xanatoo::sdl::fill_rect(app.sdl, &tab);
+            xanatoo::sdl::draw_line(app.sdl, x + 5, y + 8, x + 7, y + 10);
+          }
+        }
       }
     }
     for (const BookmarkMark& bm : pane.bookmark_marks.items) {

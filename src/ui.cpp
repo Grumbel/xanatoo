@@ -2129,6 +2129,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     }
     if (state.selection)
       menu_item_cmd("Highlight Selection", UiCommand::AddAnnotationHighlight, cmd);
+    if (state.selection)
+      menu_item_cmd("Annotate Selection…", UiCommand::ToggleAnnotationsPanel,
+                    cmd, !state.annotations_panel_open);
     if (state.selection) ImGui::Separator();
     menu_item_cmd("Find…", UiCommand::Find, cmd, true, "Ctrl+F");
     if (!state.browse)
@@ -2476,7 +2479,11 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   // ---- Independent annotation layers (source documents remain untouched) ----
   if (state.annotations_panel_open) {
     bool open = true;
-    ImGui::SetNextWindowSize(ImVec2(410.f, 320.f), ImGuiCond_FirstUseEver);
+    if (annotation_note_created_seen_ != state.annotation_note_created_gen) {
+      annotation_note_created_seen_ = state.annotation_note_created_gen;
+      annotation_new_note_[0] = '\0';
+    }
+    ImGui::SetNextWindowSize(ImVec2(430.f, 540.f), ImGuiCond_FirstUseEver);
     if (ImGui::Begin("Annotations", &open)) {
       if (ImGui::Button("New personal layer"))
         cmd = UiCommand::NewAnnotationLayer;
@@ -2510,6 +2517,93 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ImGui::PopID();
       }
       ImGui::TextDisabled("Checkbox: visibility  ·  radio: local edit target");
+      ImGui::Separator();
+      ImGui::TextUnformatted("Attach a note to selected text");
+      ImGui::InputTextMultiline("##new_annotation_note", annotation_new_note_,
+                                sizeof(annotation_new_note_), ImVec2(-1.f, 66.f));
+      ImGui::BeginDisabled(!state.selection || annotation_new_note_[0] == '\0');
+      if (ImGui::Button("Attach note")) {
+        cmd = UiCommand::AddAnnotationNote;
+        result.arg = annotation_new_note_;
+      }
+      ImGui::EndDisabled();
+      if (!state.selection) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("Select a passage first");
+      }
+      ImGui::Separator();
+      ImGui::TextUnformatted("Annotations on this page");
+      if (state.annotations.empty())
+        ImGui::TextDisabled("None in visible layers");
+      const UiState::AnnotationItem* selected = nullptr;
+      for (const auto& item : state.annotations) {
+        ImGui::PushID(item.id.c_str());
+        const char* label = item.kind == "note" ? "Note" : "Highlight";
+        if (ImGui::Selectable(label, item.selected)) {
+          cmd = UiCommand::SelectAnnotation;
+          result.arg = item.id;
+        }
+        if (item.selected) selected = &item;
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s%s", item.owner.c_str(),
+                            item.resolved ? "" : " (anchor not found)");
+        if (!item.body.empty()) {
+          ImGui::Indent();
+          ImGui::TextWrapped("%s", item.body.c_str());
+          ImGui::Unindent();
+        }
+        ImGui::PopID();
+      }
+      const std::string selected_id = selected ? selected->id : std::string();
+      const std::string selected_body = selected ? selected->body : std::string();
+      if (selected_id != annotation_edit_synced_id_ ||
+          selected_body != annotation_edit_synced_body_) {
+        annotation_edit_synced_id_ = selected_id;
+        annotation_edit_synced_body_ = selected_body;
+        std::snprintf(annotation_edit_note_, sizeof(annotation_edit_note_),
+                      "%s", selected_body.c_str());
+      }
+      if (selected) {
+        ImGui::Separator();
+        ImGui::Text("Selected: %s", selected->kind.c_str());
+        if (selected->owner == "local") {
+          if (selected->kind == "note") {
+            const bool too_long = selected->body.size() >=
+                                  sizeof(annotation_edit_note_) ||
+                                  selected->body.find('\0') != std::string::npos;
+            const bool changed = ImGui::InputTextMultiline(
+                "##edit_annotation_note", annotation_edit_note_,
+                sizeof(annotation_edit_note_), ImVec2(-1.f, 88.f));
+            if (changed) annotation_note_last_edit_ = ImGui::GetTime();
+            const bool pending = selected->body != annotation_edit_note_;
+            // Commit after typing pauses or the editor loses focus. Each
+            // commit creates a layer revision, never a source document edit.
+            if (!too_long && pending &&
+                (ImGui::IsItemDeactivatedAfterEdit() ||
+                 (annotation_note_last_edit_ > 0.0 &&
+                  ImGui::GetTime() - annotation_note_last_edit_ > 0.8))) {
+              cmd = UiCommand::UpdateAnnotationNote;
+              result.arg = annotation_edit_note_;
+              annotation_note_last_edit_ = 0.0;
+            }
+            if (too_long) ImGui::TextDisabled("Note too long to edit here");
+            ImGui::BeginDisabled(too_long || !pending);
+            if (ImGui::Button("Save note")) {
+              cmd = UiCommand::UpdateAnnotationNote;
+              result.arg = annotation_edit_note_;
+            }
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+          }
+          if (ImGui::Button("Remove annotation")) {
+            cmd = UiCommand::RemoveAnnotation;
+            result.arg = selected->id;
+          }
+          ImGui::TextDisabled("Previous versions remain in layer history");
+        } else {
+          ImGui::TextDisabled("Other people's layers are read-only");
+        }
+      }
     }
     ImGui::End();
     if (!open) cmd = UiCommand::ToggleAnnotationsPanel;

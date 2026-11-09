@@ -6,7 +6,27 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **303** (this delivery is **302**)
+Next bundle number: **304** (this delivery is **303**)
+
+## Status (2026-11-09) — Editable note overlays and revisioned removal
+
+- Annotations now attach Markdown/text notes to a selected passage in an
+  independently versioned local layer. The page gets a distinct note tab;
+  sources remain untouched. Other people's layers remain read-only.
+- The Annotations panel lists entries on the current page, including lost
+  anchors; selecting an entry jumps to its resolved passage. Notes have
+  a multiline editor with save-on-idle (0.8s), save-on-blur and manual Save;
+  Remove advances the layer head but retains the previous revision.
+- Shared mutation helpers for add/edit/remove save a copy first, so conflict
+  or SQLite failure cannot change the caller's layer or revision cursor.
+  Note drafts clear only after confirmed creation; un-hiding a layer on
+  creation also persists its visibility setting.
+- Focused SQLite integration passes for history, edits, deletes, stale edits,
+  and reopen, plus no-SQLite source syntax checks and whitespace validation.
+  Full SDL GUI compilation and hands-on UI verification need a development host.
+- Next: clickable annotation margin tabs, history browser / restore command,
+  layer-specific styling and anchor reattachment; then native local-database
+  document working/published heads and publishing destinations.
 
 ## Status (2026-11-09) — Annotation highlights and layer controls
 

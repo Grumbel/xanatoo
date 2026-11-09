@@ -298,6 +298,26 @@ void test_annotation_layers() {
     EXPECT(stored && stored->parent == empty_rev);
     EXPECT(save_annotation_layer(*alice)); // unchanged means no new revision
     EXPECT_EQ(current->revision, alice->revision);
+    // Edits and removals append new layer revisions without changing the
+    // original document or destroying earlier versions of this layer.
+    const auto before_edit = alice->revision;
+    EXPECT(update_annotation_body(*alice, note.id, "Revised note text"));
+    EXPECT(alice->annotations[0].body == "Revised note text");
+    EXPECT(load_annotation_layer(alice->id, before_edit)->annotations[0].body ==
+           note.body);
+    const auto before_delete = alice->revision;
+    EXPECT(remove_annotation(*alice, note.id));
+    EXPECT(alice->annotations.empty());
+    EXPECT(load_annotation_layer(alice->id, before_delete)->annotations.size() == 1);
+    EXPECT(!remove_annotation(*alice, note.id));
+    EXPECT(!update_annotation_body(*alice, note.id, "missing"));
+    EXPECT(add_annotation(*alice, note));
+    EXPECT(!add_annotation(*alice, note));
+    auto out_of_date = *alice;
+    EXPECT(update_annotation_body(*alice, note.id, "newest"));
+    EXPECT(!update_annotation_body(out_of_date, note.id, "stale"));
+    EXPECT(out_of_date.annotations[0].body == note.body);
+    EXPECT(out_of_date.revision != alice->revision);
     auto bob_again = load_annotation_layer(bob->id);
     EXPECT(bob_again && bob_again->annotations.empty());
     EXPECT_EQ(list_annotation_layers().size(), 2u);

@@ -73,7 +73,7 @@ App side (`src/app_drafts.cpp`):
 Annotation layers are overlays, not inferred from textual diffs. Their own
 history and identity remain separate from the source document's revisions.
 
-## Annotation highlighting (reader integration)
+## Annotation highlights and notes (reader integration)
 
 The **Panels → Annotations** window lists independently stored layers, with a
 visibility checkbox and a radio choice of the local layer to edit. **New
@@ -87,14 +87,31 @@ The app loads layers on startup. Visible targets matching the current page
 are re-resolved through the same durable passage selectors as bookmarks;
 successful ranges are drawn over the document and marked on the scrollbar.
 Unresolved targets remain in the layer and are counted but not yet offered in
-a reattachment UI. Per-user layer visibility is saved in `sidestore.sqlite`,
+an automated reattachment UI. Per-user layer visibility is saved in `sidestore.sqlite`,
 not in the layer revision that might later be shared with others.
 
-Limitations: currently only highlighting has an editor command. Annotation
-bodies (text notes/replies) are stored by the backend but not yet exposed as
-text boxes. The first reader pass uses the existing bookmark wash colour;
-per-layer colours, labels, annotation tooltips, permissions, and anchor
-reattachment are still planned.
+**Attach a note** writes a text-box body into the active local layer, pointed
+at the selected passage. Notes are represented by a small tab at their text
+anchor, as well as an overlay wash and a scrollbar mark; they do not add
+document nodes or alter the saved page. The Annotations panel lists items on
+the current page, including unresolved items, and selecting one jumps to its
+resolved passage. Other owners' items can be viewed but not edited.
+
+Local notes have a multiline text editor, with an explicit Save and an
+automatic commit after 0.8 seconds without typing or when the editor loses
+focus. Remove annotation deletes the entry from the **current layer head**;
+older layer revisions retain it. On write failure the in-memory layer and
+its revision cursor remain unchanged; a new note draft is only cleared once
+its create operation succeeds. Each successful edit creates an immutable
+revision (identical content does not duplicate revisions). This is a layer
+history, entirely separate from document undo/drafts.
+
+Limitations: the panel has no history browser or undo button for layer edits
+yet, and automatic autosaving happens on idle/blur rather than after every
+keystroke. Annotations use the existing bookmark wash colour; per-layer
+colours, interactive margin text boxes, permissions, and anchor reattachment
+are still planned. Published layer exchange and database-native document
+working/published heads remain separate future work.
 
 ## Later phases
 

@@ -726,6 +726,8 @@ struct App {
   std::vector<xanatoo::AnnotationLayer> annotation_layers;
   std::unordered_set<std::string> hidden_annotation_layers;
   std::string active_annotation_layer;
+  std::string selected_annotation_id;
+  uint64_t annotation_note_created_gen = 0;
   uint64_t annotation_layers_gen = 1;
   bool annotation_panel_open = false;
   uint64_t bookmarks_gen = 1;  // bumped by every change of `bookmarks`
@@ -1185,6 +1187,7 @@ int bookmarks_in_page(App& app, Pane& p);
 bool bookmark_marks_fresh(const Pane& p);
 void update_annotation_marks(App& app, Pane& p);
 bool annotation_marks_fresh(const Pane& p);
+void select_annotation(App& app, int pi, const std::string& annotation_id);
 // Margin icons of the marks on screen (one per bookmark, those on one line
 // side by side), pane-local x, y relative to the pane's content top.
 std::vector<BookmarkIcon> bookmark_icons(App& app, Pane& p);

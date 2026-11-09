@@ -40,6 +40,10 @@ enum class UiCommand {
   SelectAnnotationLayer,  // arg = layer id (local owner only)
   ToggleAnnotationLayer,  // arg = layer id; view-only visibility
   AddAnnotationHighlight,// highlight selected passage in active local layer
+  AddAnnotationNote,    // arg = note text; attach to selected passage
+  SelectAnnotation,     // arg = annotation id in visible current page
+  UpdateAnnotationNote, // arg = replacement body for selected local note
+  RemoveAnnotation,     // arg = annotation id in local layer
   SelectBookmark,  // arg = address: select its passage in the focused view
   CopyText,        // arg = text for the clipboard (an address)
   OpenReply,       // right-clicked Message: start a mock reply draft
@@ -215,6 +219,13 @@ struct UiState {
     size_t count = 0;
   };
   std::vector<AnnotationLayerItem> annotation_layers;
+  struct AnnotationItem {
+    std::string id, layer_id, owner, kind, body;
+    bool resolved = false;
+    bool selected = false;
+  };
+  std::vector<AnnotationItem> annotations;
+  uint64_t annotation_note_created_gen = 0;
   bool hover_preview = false;
   bool auto_updates = false;
   bool reader_default = false;  // ViewSettings::reader_mode
@@ -406,6 +417,12 @@ private:
   char search_input_[512] = {};  // search bar text (kept between searches)
   char reply_input_[16384] = {}; // Markdown draft, not sent to any server
   uint64_t reply_generation_seen_ = 0;
+  char annotation_new_note_[16384] = {};
+  char annotation_edit_note_[16384] = {};
+  std::string annotation_edit_synced_id_;
+  std::string annotation_edit_synced_body_;
+  double annotation_note_last_edit_ = 0.0;
+  uint64_t annotation_note_created_seen_ = 0;
   struct ReplySelection { int begin = 0, end = 0; } reply_selection_;
   bool reply_focus_ = false;
   bool reply_restore_selection_ = false;

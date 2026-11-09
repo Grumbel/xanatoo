@@ -4,6 +4,7 @@
 #include "xanatoo/annotations.hpp"
 #include "xanatoo/revstore.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 #include <unordered_set>
@@ -162,6 +163,43 @@ bool save_annotation_layer(AnnotationLayer& layer) {
                                                        layer.revision);
   if (revision.empty()) return false;
   layer.revision = revision;
+  return true;
+}
+
+bool add_annotation(AnnotationLayer& layer, Annotation annotation) {
+  if (annotation.id.empty() || annotation.kind.empty() ||
+      annotation.targets.empty() ||
+      std::any_of(layer.annotations.begin(), layer.annotations.end(),
+                  [&](const Annotation& a) { return a.id == annotation.id; }))
+    return false;
+  AnnotationLayer updated = layer;
+  updated.annotations.push_back(std::move(annotation));
+  if (!save_annotation_layer(updated)) return false;
+  layer = std::move(updated);
+  return true;
+}
+
+bool update_annotation_body(AnnotationLayer& layer, std::string_view annotation_id,
+                            std::string_view body) {
+  AnnotationLayer updated = layer;
+  auto it = std::find_if(updated.annotations.begin(), updated.annotations.end(),
+                         [&](const Annotation& a) { return a.id == annotation_id; });
+  if (it == updated.annotations.end() || it->kind != "note") return false;
+  if (it->body == body) return true;
+  it->body = body;
+  if (!save_annotation_layer(updated)) return false;
+  layer = std::move(updated);
+  return true;
+}
+
+bool remove_annotation(AnnotationLayer& layer, std::string_view annotation_id) {
+  AnnotationLayer updated = layer;
+  auto it = std::find_if(updated.annotations.begin(), updated.annotations.end(),
+                         [&](const Annotation& a) { return a.id == annotation_id; });
+  if (it == updated.annotations.end()) return false;
+  updated.annotations.erase(it);
+  if (!save_annotation_layer(updated)) return false;
+  layer = std::move(updated);
   return true;
 }
 
