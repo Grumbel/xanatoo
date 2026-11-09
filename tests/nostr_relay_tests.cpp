@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 // Pure NIP-29 discovery tests: no network, TLS, SQLite or SDL dependencies.
 #include "xanatoo/nostr_relays.hpp"
+#include "xanatoo/nostr_nip11.hpp"
 
 #include <cassert>
 #include <iostream>
@@ -36,5 +37,22 @@ int main() {
       {"p", "not-a-relay"}});
   assert((hints == std::vector<std::string>{
       relay, "wss://another.example"}));
+  assert(nostr_nip11_url("wss://groups.example.org/path") ==
+         "https://groups.example.org/path");
+  assert(nostr_nip11_url("http://groups.example.org").empty());
+  const std::string master(64, 'a'), admin(64, 'b');
+  const auto nip11 = nostr_parse_nip11("{\"pubkey\":\"" + admin +
+      "\",\"supported_nips\":[1,11,29],\"other\":{\"self\":\"" + admin +
+      "\"},\"self\":\"" + master + "\"}");
+  assert(nip11 && nip11->relay_self == master && nip11->advertises_nip29);
+  assert(nostr_relay_master_matches(master, master, true));
+  assert(!nostr_relay_master_matches(master, master, false));
+  assert(!nostr_relay_master_matches(master, admin, true));
+  const auto nested = nostr_parse_nip11("{\"pubkey\":\"" + admin +
+      "\",\"nested\":{\"supported_nips\":[29]}}");
+  assert(nested && nested->relay_self.empty() && !nested->advertises_nip29);
+  const auto string_nip = nostr_parse_nip11("{\"supported_nips\":[\"29\"]}");
+  assert(string_nip && !string_nip->advertises_nip29);
+  assert(!nostr_parse_nip11("<html>not NIP-11</html>"));
   std::cout << "NIP-29 relay normalization and NIP-51 hints: PASS\n";
 }

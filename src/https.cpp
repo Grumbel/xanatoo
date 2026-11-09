@@ -3,6 +3,7 @@
 
 #include "xanatoo/https.hpp"
 #include "xanatoo/http_url.hpp"
+#include "xanatoo/net_address.hpp"
 #include "xanatoo/tls.hpp"
 #include "xanatoo/util.hpp"
 
@@ -12,6 +13,8 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
+#include <fcntl.h>
+#include <poll.h>
 #include <sstream>
 #include <string>
 
@@ -24,7 +27,8 @@
 namespace xanatoo {
 namespace {
 
-int tcp_connect(const std::string& host, int port, std::string* err) {
+int tcp_connect(const std::string& host, int port, std::string* err,
+                bool public_only = false) {
   addrinfo hints {};
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_family = AF_UNSPEC;
@@ -35,7 +39,10 @@ int tcp_connect(const std::string& host, int port, std::string* err) {
     return -1;
   }
   int fd = -1;
+  bool attempted = false;
   for (addrinfo* p = res; p; p = p->ai_next) {
+    if (public_only && !public_ip_address(p->ai_addr)) continue;
+    attempted = true;
     fd = ::socket(p->ai_family, p->ai_socktype, p->ai_protocol);
     if (fd < 0) continue;
     timeval tv;
@@ -43,12 +50,33 @@ int tcp_connect(const std::string& host, int port, std::string* err) {
     tv.tv_usec = 0;
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-    if (::connect(fd, p->ai_addr, p->ai_addrlen) == 0) break;
+    if (public_only) {
+      // Untrusted auto-discovery must not block on an unresponsive host for
+      // the default OS TCP connect timeout (sometimes many minutes).
+      const int flags = fcntl(fd, F_GETFL, 0);
+      if (flags >= 0 && fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0) {
+        int result = ::connect(fd, p->ai_addr, p->ai_addrlen);
+        if (result < 0 && errno == EINPROGRESS) {
+          pollfd wait{fd, POLLOUT, 0};
+          if (::poll(&wait, 1, 4000) > 0) {
+            socklen_t len = sizeof(result);
+            if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &result, &len) == 0 &&
+                result == 0) result = 0;
+            else result = -1;
+          } else result = -1;
+        }
+        fcntl(fd, F_SETFL, flags);
+        if (result == 0) break;
+      }
+    } else if (::connect(fd, p->ai_addr, p->ai_addrlen) == 0) {
+      break;
+    }
     ::close(fd);
     fd = -1;
   }
   freeaddrinfo(res);
-  if (fd < 0 && err) *err = "connect failed to " + host;
+  if (fd < 0 && err) *err = attempted ? "connect failed to " + host :
+                          "private/local address excluded for " + host;
   return fd;
 }
 
@@ -61,11 +89,16 @@ public:
   HttpConnection& operator=(const HttpConnection&) = delete;
   ~HttpConnection() { if (plain_fd_ >= 0) ::close(plain_fd_); }
 
-  bool open(const HttpUrl& url, std::string* err) {
-    const int fd = tcp_connect(url.host, url.port, err);
+  bool open(const HttpUrl& url, std::string* err,
+            HttpRequestSecurity security = {}) {
+    if (security.verify_tls && !url.secure) {
+      if (err) *err = "authenticated request requires HTTPS";
+      return false;
+    }
+    const int fd = tcp_connect(url.host, url.port, err, security.public_only);
     if (fd < 0) return false;
     secure_ = url.secure;
-    if (secure_) return tls_.connect(fd, url.host, err);
+    if (secure_) return tls_.connect(fd, url.host, err, security.verify_tls);
     plain_fd_ = fd;
     return true;
   }
@@ -135,21 +168,24 @@ std::optional<HttpResult> https_request(std::string_view method,
                                         std::string_view user_agent,
                                         std::string_view extra_headers,
                                         std::string_view body_in,
-                                        std::string* err) {
+                                        std::string* err,
+                                        HttpRequestSecurity security) {
   const auto parsed = parse_http_url(url);
   if (!parsed) {
     if (err) *err = "invalid http(s) URL";
     return std::nullopt;
   }
   HttpConnection conn;
-  if (!conn.open(*parsed, err)) return std::nullopt;
+  if (!conn.open(*parsed, err, security)) return std::nullopt;
 
   std::ostringstream req;
+  const bool custom_accept = ascii_lower(extra_headers).find("accept:") !=
+      std::string::npos;
   req << method << " " << parsed->target << " HTTP/1.1\r\n"
       << "Host: " << parsed->authority << "\r\n"
-      << "User-Agent: " << user_agent << "\r\n"
-      << "Accept: application/json, text/plain, */*\r\n"
-      << "Accept-Language: en-US,en;q=0.9\r\n"
+      << "User-Agent: " << user_agent << "\r\n";
+  if (!custom_accept) req << "Accept: application/json, text/plain, */*\r\n";
+  req << "Accept-Language: en-US,en;q=0.9\r\n"
       << "Connection: close\r\n";
   if (!extra_headers.empty()) req << extra_headers;
   if (!body_in.empty())
@@ -168,6 +204,10 @@ std::optional<HttpResult> https_request(std::string_view method,
     int n = conn.read(buf, sizeof(buf));
     if (n <= 0) break;
     data.append(buf, static_cast<size_t>(n));
+    if (security.verify_tls && data.size() > 256 * 1024) {
+      if (err) *err = "authenticated HTTP response exceeds size limit";
+      return std::nullopt;
+    }
     if (data.size() > 12 * 1024 * 1024) break;
   }
 

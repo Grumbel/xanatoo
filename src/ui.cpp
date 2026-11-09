@@ -2847,7 +2847,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
             ImGui::PushID(group.group_id.c_str());
             const std::string href = nostr_group_ref(group.relay, group.group_id);
             const std::string name = group.name.empty() ? group.group_id : group.name;
-            const std::string label = (group.metadata_verification == 2 ? "[sig] " :
+            const std::string label = (group.relay_master_verified ? "[relay] " :
+                                       group.metadata_verification == 2 ? "[sig] " :
                                        group.metadata_verification == 1 ? "[hash] " : "[?] ") +
                 name + " · " + std::to_string(group.message_count) +
                 " messages · " + group.relay;
@@ -2859,7 +2860,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
             if (ImGui::IsItemHovered())
               ImGui::SetTooltip("Group: %s\nRelay: %s\nParent: %s\n%s\n"
                                 "%lld unique group events\n%s%s%s%s\n"
-                                "Relay master key (NIP-11) not checked",
+                                "%s",
                                 group.group_id.c_str(), group.relay.c_str(),
                                 group.parent_id.empty() ? "(root/unknown)" : group.parent_id.c_str(),
                                 group.about.c_str(),
@@ -2867,7 +2868,12 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                                 group.private_group ? "private " : "",
                                 group.hidden ? "hidden " : "",
                                 group.restricted ? "restricted " : "",
-                                group.closed ? "closed" : "");
+                                group.closed ? "closed" : "",
+                                group.relay_master_verified ?
+                                  "Relay master: event signature matches NIP-11 self (verified HTTPS)" :
+                                group.metadata_verification == 2 ?
+                                  "Event signature valid; relay master not authenticated" :
+                                  "Relay master not authenticated (signature unverified)");
             ImGui::PopID();
             ImGui::PopID();
           }

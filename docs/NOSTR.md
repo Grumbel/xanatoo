@@ -75,11 +75,26 @@ cache writes and schema migration.
   standardized NIP-19 share link). Encoding both fields protects the group
   link from Xanatoo's URL-selector and fragment parsing. Cached messages
   remain readable when the relay is unavailable.
-- Metadata signatures and event hashes follow the regular verification rules,
-  but NIP-11 relay **master-key binding is not verified**. Consequently, even
-  a `[sig]` group metadata event is not proof that the relay itself issued or
-  currently enforces that metadata. Membership, moderation, NIP-42 authentication,
-  encrypted private messages and group creation/joining are not implemented.
+- Discovery now fetches NIP-11 information from the relay's corresponding
+  `https://` endpoint (`Accept: application/nostr+json`), requires a trusted
+  certificate chain and hostname, reports whether `supported_nips` advertises
+  NIP-29, and checks the top-level **`self`** public key (not `pubkey`, which
+  identifies an administrator). An event of kind `39000` receives the
+  **`[relay]`** indicator only if its BIP-340 signature is valid AND its
+  signer matches this certificate-verified `self` key. The result is saved
+  with the exact metadata event ID; re-fetching the same event without NIP-11
+  cannot downgrade the recorded result, and an unrelated unverified event
+  cannot replace a previously relay-authenticated metadata record.
+- The weaker indicators remain distinct: `[sig]` = valid event signature but
+  no authenticated binding to the relay's key; `[hash]` = hash only, no verified
+  author. A missing/invalid NIP-11 response, missing TLS CA trust store or
+  build without Schnorr verification leaves metadata **unbound**; discovery
+  still proceeds over WSS and reports the NIP-11 failure. Existing ordinary
+  TLS connections are not yet certificate-verified; this stricter policy is
+  opt-in for NIP-11 identity binding. `[relay]` proves signed provenance at
+  observation time, **not** current membership, moderation, freshness or
+  enforcement of the group's rules. NIP-42 authentication, encrypted private
+  messages and group creation/joining are not implemented.
 - Add active fetch/search controls separately; local search should remain
   functional offline. NIP-50 relay search is optional and capability-gated.
 

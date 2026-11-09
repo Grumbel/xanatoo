@@ -6,6 +6,7 @@
 
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/nostr_relays.hpp"
+#include "xanatoo/nostr_nip11.hpp"
 #include "xanatoo/nostr_store.hpp"
 #include "xanatoo/nostr_verify.hpp"
 #include "xanatoo/util.hpp"
@@ -28,6 +29,7 @@
 #include <vector>
 
 #if defined(XANATOO_NOSTR) && XANATOO_NOSTR
+#include "xanatoo/net_address.hpp"
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -694,26 +696,6 @@ std::string normalize_relay_url(std::string r) {
 
 // Automatically discovered relay hints come from other users' NIP-51 lists.
 // Never let an untrusted hint connect us to loopback, LAN or special addresses.
-bool public_relay_address(const sockaddr* addr) {
-  if (addr->sa_family == AF_INET) {
-    const auto ip = ntohl(reinterpret_cast<const sockaddr_in*>(addr)->sin_addr.s_addr);
-    const unsigned a = ip >> 24, b = (ip >> 16) & 255;
-    return !(a == 0 || a == 10 || a == 127 || a >= 224 ||
-             (a == 100 && b >= 64 && b <= 127) ||
-             (a == 169 && b == 254) ||
-             (a == 172 && b >= 16 && b <= 31) ||
-             (a == 192 && (b == 0 || b == 168)) ||
-             (a == 198 && (b == 18 || b == 19)));
-  }
-  if (addr->sa_family == AF_INET6) {
-    const auto* ip = &reinterpret_cast<const sockaddr_in6*>(addr)->sin6_addr;
-    return !(IN6_IS_ADDR_LOOPBACK(ip) || IN6_IS_ADDR_UNSPECIFIED(ip) ||
-             IN6_IS_ADDR_LINKLOCAL(ip) || IN6_IS_ADDR_MULTICAST(ip) ||
-             IN6_IS_ADDR_V4MAPPED(ip) || (ip->s6_addr[0] & 0xfe) == 0xfc);
-  }
-  return false;
-}
-
 bool ws_connect(WsConn& c, const std::string& url, std::string* err,
                 bool public_only = false) {
   std::string host, path;
@@ -743,7 +725,7 @@ bool ws_connect(WsConn& c, const std::string& url, std::string* err,
   int fd = -1;
   bool attempted = false;
   for (addrinfo* p = res; p; p = p->ai_next) {
-    if (public_only && !public_relay_address(p->ai_addr)) continue;
+    if (public_only && !public_ip_address(p->ai_addr)) continue;
     attempted = true;
     fd = ::socket(p->ai_family, p->ai_socktype, p->ai_protocol);
     if (fd < 0) continue;
@@ -1060,7 +1042,8 @@ std::vector<std::string> default_relays() {
 }
 
 void collect_ws_events(WsConn& c, std::map<std::string, NostrEvent>& by_id,
-                       int timeout_sec, std::string_view relay) {
+                       int timeout_sec, std::string_view relay,
+                       std::string_view verified_relay_self = {}) {
   // Seed from any bytes left after the HTTP upgrade (first WS frames).
   std::string carry = std::move(c.carry);
   std::vector<std::string> downloaded;
@@ -1084,7 +1067,48 @@ void collect_ws_events(WsConn& c, std::map<std::string, NostrEvent>& by_id,
   }
   // Persist every received event kind, including profile events and duplicates
   // from different relays (the DB deduplicates by id and records source).
-  nostr_cache_events(downloaded, relay);
+  nostr_cache_events(downloaded, relay, verified_relay_self);
+}
+
+// A NIP-11 response is authoritative only when its HTTPS certificate chain
+// AND hostname were verified. The ordinary WSS transport currently does not
+// validate certificates; the event's independent BIP-340 signature supplies
+// the second check required for relay-issued group metadata.
+struct RelayNip11Probe {
+  std::string verified_self;
+  std::string status;
+};
+
+RelayNip11Probe probe_relay_nip11(std::string_view relay, bool public_only) {
+  RelayNip11Probe probe;
+  const std::string url = nostr_nip11_url(relay);
+  if (url.empty()) {
+    probe.status = "invalid HTTPS NIP-11 URL";
+    return probe;
+  }
+  std::string err;
+  const auto response = https_request("GET", url, "Xanatoo/0.1 (NIP-11)",
+      "Accept: application/nostr+json\r\n", {}, &err,
+      HttpRequestSecurity{.verify_tls = true, .public_only = public_only});
+  if (!response) {
+    probe.status = "NIP-11 unavailable (" + err + ")";
+    return probe;
+  }
+  if (response->status != 200) {
+    probe.status = "NIP-11 HTTP " + std::to_string(response->status);
+    return probe;
+  }
+  auto info = nostr_parse_nip11(response->body);
+  if (!info) {
+    probe.status = "NIP-11 returned invalid relay JSON";
+    return probe;
+  }
+  probe.verified_self = info->relay_self;
+  probe.status = info->advertises_nip29 ? "NIP-29 advertised" :
+                                            "NIP-29 not advertised";
+  probe.status += probe.verified_self.empty() ? "; no valid NIP-11 self key" :
+                                                "; verified NIP-11 self key";
+  return probe;
 }
 
 void query_relay(const std::string& relay, const std::string& event_id,
@@ -1149,7 +1173,8 @@ std::string quote_nostr_filter(std::string_view s) {
 
 void query_group_metadata(const std::string& relay,
                           std::map<std::string, NostrEvent>& by_id,
-                          std::string* last_err, bool public_only = false) {
+                          std::string* last_err, std::string_view relay_self,
+                          bool public_only = false) {
   WsConn c;
   std::string err;
   if (!ws_connect(c, relay, &err, public_only)) {
@@ -1162,7 +1187,7 @@ void query_group_metadata(const std::string& relay,
     if (last_err) *last_err = "WS send failed";
     return;
   }
-  collect_ws_events(c, by_id, 7, relay);
+  collect_ws_events(c, by_id, 7, relay, relay_self);
   ws_send_text(c, "[\"CLOSE\",\"xanatoo-groups\"]");
 }
 
@@ -1188,7 +1213,7 @@ void query_group_lists(const std::string& relay,
 
 void query_group_timeline(const std::string& relay, std::string_view group_id,
                           std::map<std::string, NostrEvent>& by_id,
-                          std::string* last_err) {
+                          std::string* last_err, std::string_view relay_self) {
   WsConn c;
   std::string err;
   if (!ws_connect(c, relay, &err)) {
@@ -1203,7 +1228,7 @@ void query_group_timeline(const std::string& relay, std::string_view group_id,
     if (last_err) *last_err = "WS send failed";
     return;
   }
-  collect_ws_events(c, by_id, 7, relay);
+  collect_ws_events(c, by_id, 7, relay, relay_self);
   ws_send_text(c, "[\"CLOSE\",\"xanatoo-group\"]");
 }
 
@@ -1309,8 +1334,10 @@ Document group_directory_document(std::string_view relay_filter,
   NodeId intro = doc.create(NodeKind::Paragraph, root);
   doc.append_text(intro,
       "NIP-29 relay-based groups from the local cache. A group is identified "
-      "by its hosting relay AND group ID. Metadata is a relay claim, not yet "
-      "authenticated against the relay's NIP-11 master key.");
+      "by its hosting relay AND group ID. [relay] means a verified event "
+      "signature matches the master key advertised by the relay over "
+      "certificate-checked NIP-11 HTTPS. [sig] alone does not prove relay "
+      "authorship; [hash] only checks event integrity.");
   if (!list_lookup.empty()) {
     NodeId p = doc.create(NodeKind::Paragraph, root);
     doc.append_text(p, std::string("Public NIP-51 list lookup: ") +
@@ -1336,7 +1363,10 @@ Document group_directory_document(std::string_view relay_filter,
     link.href = href;
     link.text = group.name.empty() ? group.group_id : group.name;
     doc.get(p).spans.push_back(std::move(link));
-    doc.append_text(p, " · " + group.relay + " · " +
+    doc.append_text(p, std::string(group.relay_master_verified ? " [relay]" :
+        group.metadata_verification == 2 ? " [sig]" :
+        group.metadata_verification == 1 ? " [hash]" : " [?]") +
+                    " · " + group.relay + " · " +
                     std::to_string(group.message_count) + " observed messages");
     ++shown;
   }
@@ -1354,9 +1384,13 @@ Document group_timeline_document(std::string_view relay, std::string_view group_
   Document doc;
   NodeId root = doc.create(NodeKind::Document);
   std::string name(group_id);
+  std::string metadata_status = "no relay-authenticated metadata in cache";
   for (const auto& group : nostr_cached_groups({}, 500)) {
-    if (group.relay == relay && group.group_id == group_id && !group.name.empty()) {
-      name = group.name;
+    if (group.relay == relay && group.group_id == group_id) {
+      if (!group.name.empty()) name = group.name;
+      metadata_status = group.relay_master_verified ?
+          "metadata signed by HTTPS NIP-11 relay master" :
+          "metadata not authenticated against the relay master";
       break;
     }
   }
@@ -1364,7 +1398,8 @@ Document group_timeline_document(std::string_view relay, std::string_view group_
   NodeId intro = doc.create(NodeKind::Paragraph, root);
   doc.append_text(intro, "NIP-29 group " + std::string(group_id) +
                   " · hosted by " + std::string(relay) +
-                  " · metadata and membership rules belong to the relay.");
+                  " · " + metadata_status +
+                  ". Membership and moderation still belong to the relay.");
   NodeId thread = doc.create(NodeKind::Thread, root);
   doc.get(thread).summary = name + " · observed group messages";
   std::vector<NostrEvent> events;
@@ -1462,15 +1497,19 @@ std::optional<Document> nostr_fetch_thread(std::string_view ref,
     for (const auto& relay : relays) {
       if (probes.size() >= (group_relay.empty() ? kMaxAutoGroupRelays : 1)) break;
       std::string one_err;
+      const bool public_only = group_relay.empty();
+      const auto nip11 = probe_relay_nip11(relay, public_only);
       const size_t before = observed.size();
       if (group_mode)
-        query_group_timeline(relay, group_id, observed, &one_err);
+        query_group_timeline(relay, group_id, observed, &one_err,
+                             nip11.verified_self);
       else
-        query_group_metadata(relay, observed, &one_err, group_relay.empty());
+        query_group_metadata(relay, observed, &one_err,
+                             nip11.verified_self, public_only);
       if (!one_err.empty()) std::cerr << "Nostr group: " << one_err << "\n";
-      probes.push_back({relay, one_err.empty() ?
+      probes.push_back({relay, (one_err.empty() ?
           std::to_string(observed.size() - before) + " new validated events" :
-          "failed: " + one_err});
+          "failed: " + one_err) + " · " + nip11.status});
       // For group timelines, messages are scoped to exactly one relay.
       if (group_mode) break;
     }

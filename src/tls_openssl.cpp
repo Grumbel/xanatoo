@@ -6,6 +6,7 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
+#include <arpa/inet.h>
 #include <unistd.h>
 
 #include <mutex>
@@ -42,7 +43,8 @@ std::string TlsStream::version() {
          " (built against " OPENSSL_VERSION_TEXT ")";
 }
 
-bool TlsStream::connect(int fd, const std::string& host, std::string* err) {
+bool TlsStream::connect(int fd, const std::string& host, std::string* err,
+                        bool verify_peer) {
   close();
   impl_->fd = fd;
   init_once();
@@ -53,7 +55,16 @@ bool TlsStream::connect(int fd, const std::string& host, std::string* err) {
     return false;
   }
   SSL_CTX_set_min_proto_version(impl_->ctx, TLS1_2_VERSION);
-  SSL_CTX_set_verify(impl_->ctx, SSL_VERIFY_NONE, nullptr);
+  if (verify_peer) {
+    if (SSL_CTX_set_default_verify_paths(impl_->ctx) != 1) {
+      if (err) *err = "no system TLS trust store";
+      close();
+      return false;
+    }
+    SSL_CTX_set_verify(impl_->ctx, SSL_VERIFY_PEER, nullptr);
+  } else {
+    SSL_CTX_set_verify(impl_->ctx, SSL_VERIFY_NONE, nullptr);
+  }
   impl_->ssl = SSL_new(impl_->ctx);
   if (!impl_->ssl) {
     if (err) *err = "SSL_new failed";
@@ -62,11 +73,31 @@ bool TlsStream::connect(int fd, const std::string& host, std::string* err) {
   }
   SSL_set_fd(impl_->ssl, fd);
   SSL_set_tlsext_host_name(impl_->ssl, host.c_str());
+  if (verify_peer) {
+    unsigned char ipbuf[16];
+    const bool ip = inet_pton(AF_INET, host.c_str(), ipbuf) == 1 ||
+                    inet_pton(AF_INET6, host.c_str(), ipbuf) == 1;
+    const int rc = ip ? X509_VERIFY_PARAM_set1_ip_asc(
+                            SSL_get0_param(impl_->ssl), host.c_str()) :
+                        SSL_set1_host(impl_->ssl, host.c_str());
+    if (rc != 1) {
+      if (err) *err = "failed to set TLS certificate identity check";
+      close();
+      return false;
+    }
+  }
   const int rc = SSL_connect(impl_->ssl);
   if (rc != 1) {
     if (err)
       *err = "TLS handshake failed (" +
-             std::to_string(SSL_get_error(impl_->ssl, rc)) + ") " + host;
+             std::to_string(SSL_get_error(impl_->ssl, rc)) + ") " + host +
+             (verify_peer ? "; certificate result " +
+                 std::to_string(SSL_get_verify_result(impl_->ssl)) : "");
+    close();
+    return false;
+  }
+  if (verify_peer && SSL_get_verify_result(impl_->ssl) != X509_V_OK) {
+    if (err) *err = "TLS certificate verification failed for " + host;
     close();
     return false;
   }

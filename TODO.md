@@ -6,7 +6,29 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **317** (this delivery is **316**)
+Next bundle number: **318** (this delivery is **317**)
+
+## Status (2026-11-09) — verified relay identity for NIP-29 metadata
+
+- NIP-29 group discovery now attempts a certificate-verified NIP-11 HTTPS GET
+  (`Accept: application/nostr+json`) for each scanned relay. It reports NIP-29
+  support hints, the presence of a valid `self` master key and any failed
+  verification; automatically discovered HTTPS targets use the same public-IP
+  restrictions as their WSS connections.
+- Metadata from a NIP-11 relay receives `[relay]` only when the BIP-340
+  signature checks and the event signer equals the relay's authenticated
+  `self` key. `[sig]` and `[hash]` remain weaker provenance levels. SQLite
+  migration preserves old groups as unbound, and event-ID-aware updates avoid
+  downgrading the verification on a later offline refetch.
+- Opt-in certificate and hostname validation is now available on OpenSSL and
+  Mbed TLS backends. The default TLS behavior is unchanged outside NIP-11;
+  these other network clients still need certificate-verification hardening.
+  No system CA store means no relay-master assertion.
+- Added pure NIP-11 parsing/capability fixtures and signed kind-39000 BIP-340
+  fixtures. OpenSSL and hash-only tests pass, and the SQLite-backed trust,
+  priority, `--no-save`, and migration tests pass against the host SQLite
+  runtime using a temporary compile shim (development headers unavailable).
+  Full CMake/SDL integration and live relay checks still need NixOS validation.
 
 ## Status (2026-11-09) — NIP-29 discovery without manual relay setup
 

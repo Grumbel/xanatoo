@@ -6,6 +6,7 @@
 #include "xanatoo/nostr_store.hpp"
 #include "xanatoo/json_min.hpp"
 #include "xanatoo/nostr.hpp"
+#include "xanatoo/nostr_nip11.hpp"
 #include "xanatoo/nostr_verify.hpp"
 #include "xanatoo/paths.hpp"
 #include "xanatoo/util.hpp"
@@ -71,7 +72,13 @@ sqlite3* open_cache(bool writing) {
   const bool old_events = !table_has_column(db, "events", "verification");
   const bool old_people = !table_has_column(db, "people", "profile_verification");
   const bool missing_groups = !table_has_column(db, "groups", "group_id");
-  if (writing || (!no_save() && (old_events || old_people || missing_groups))) {
+  const bool old_group_event_id = !missing_groups &&
+      !table_has_column(db, "groups", "metadata_event_id");
+  const bool old_group_master = !missing_groups &&
+      !table_has_column(db, "groups", "relay_master_verified");
+  if (writing || (!no_save() && (old_events || old_people ||
+                                 missing_groups || old_group_event_id ||
+                                 old_group_master))) {
     const char* schema =
         "CREATE TABLE IF NOT EXISTS events ("
         " id TEXT PRIMARY KEY, pubkey TEXT NOT NULL, kind INTEGER NOT NULL,"
@@ -107,6 +114,8 @@ sqlite3* open_cache(bool writing) {
         " closed INTEGER NOT NULL DEFAULT 0,"
         " metadata_time INTEGER NOT NULL DEFAULT 0,"
         " metadata_verification INTEGER NOT NULL DEFAULT 0,"
+        " metadata_event_id TEXT NOT NULL DEFAULT '',"
+        " relay_master_verified INTEGER NOT NULL DEFAULT 0,"
         " first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL,"
         " PRIMARY KEY(relay, group_id));"
         "CREATE TABLE IF NOT EXISTS group_events ("
@@ -129,6 +138,12 @@ sqlite3* open_cache(bool writing) {
                       nullptr, nullptr, nullptr) != SQLITE_OK) ||
         (old_people && !table_has_column(db, "people", "profile_verification") &&
          sqlite3_exec(db, "ALTER TABLE people ADD COLUMN profile_verification INTEGER NOT NULL DEFAULT 0",
+                      nullptr, nullptr, nullptr) != SQLITE_OK) ||
+        (old_group_event_id &&
+         sqlite3_exec(db, "ALTER TABLE groups ADD COLUMN metadata_event_id TEXT NOT NULL DEFAULT ''",
+                      nullptr, nullptr, nullptr) != SQLITE_OK) ||
+        (old_group_master &&
+         sqlite3_exec(db, "ALTER TABLE groups ADD COLUMN relay_master_verified INTEGER NOT NULL DEFAULT 0",
                       nullptr, nullptr, nullptr) != SQLITE_OK)) {
       sqlite3_close(db);
       return nullptr;
@@ -178,7 +193,8 @@ void nostr_set_cache_test_path(std::string path) {
 }
 
 void nostr_cache_events(const std::vector<std::string>& events,
-                        std::string_view relay) {
+                        std::string_view relay,
+                        std::string_view verified_relay_self) {
 #if XANATOO_SQLITE
   if (events.empty()) return;
   sqlite3* db = open_cache(true);
@@ -209,10 +225,14 @@ void nostr_cache_events(const std::vector<std::string>& events,
        " (relay,group_id,event_id) VALUES(?,?,?);");
   Statement put_group_meta(db, "UPDATE groups SET name=?,about=?,parent_id=?,"
        " private_group=?,hidden=?,restricted=?,closed=?,"
-       " metadata_time=?,metadata_verification=?"
+       " metadata_time=?,metadata_verification=?,metadata_event_id=?,"
+       " relay_master_verified=CASE WHEN metadata_event_id=?"
+       " THEN MAX(relay_master_verified,?) ELSE ? END"
        " WHERE relay=? AND group_id=? AND"
-       " (metadata_verification<? OR"
-       " (metadata_verification=? AND metadata_time<=?));");
+       " (relay_master_verified<? OR"
+       " (relay_master_verified=? AND metadata_verification<?) OR"
+       " (relay_master_verified=? AND metadata_verification=?"
+       " AND metadata_time<=?));");
   if (!put_event.valid() || !put_person.valid() || !put_profile.valid() ||
       !put_relay.valid() || !put_ref.valid() || !put_group.valid() ||
       !put_group_event.valid() || !put_group_meta.valid() ||
@@ -298,6 +318,9 @@ void nostr_cache_events(const std::vector<std::string>& events,
         put_group.bind(4, observed);
         if (!put_group.exec()) { ok = false; break; }
         if (kind == 39000) {
+          const bool master_verified = nostr_relay_master_matches(
+              verified_relay_self, author,
+              verification == NostrVerification::SignatureValid);
           put_group_meta.reset();
           put_group_meta.bind(1, name);
           put_group_meta.bind(2, about);
@@ -308,11 +331,18 @@ void nostr_cache_events(const std::vector<std::string>& events,
           put_group_meta.bind(7, int64_t(closed));
           put_group_meta.bind(8, timestamp);
           put_group_meta.bind(9, static_cast<int64_t>(verification));
-          put_group_meta.bind(10, relay);
-          put_group_meta.bind(11, gid);
-          put_group_meta.bind(12, static_cast<int64_t>(verification));
-          put_group_meta.bind(13, static_cast<int64_t>(verification));
-          put_group_meta.bind(14, timestamp);
+          put_group_meta.bind(10, id);
+          put_group_meta.bind(11, id);
+          put_group_meta.bind(12, int64_t(master_verified));
+          put_group_meta.bind(13, int64_t(master_verified));
+          put_group_meta.bind(14, relay);
+          put_group_meta.bind(15, gid);
+          put_group_meta.bind(16, int64_t(master_verified));
+          put_group_meta.bind(17, int64_t(master_verified));
+          put_group_meta.bind(18, static_cast<int64_t>(verification));
+          put_group_meta.bind(19, int64_t(master_verified));
+          put_group_meta.bind(20, static_cast<int64_t>(verification));
+          put_group_meta.bind(21, timestamp);
           if (!put_group_meta.exec()) { ok = false; break; }
         } else {
           put_group_event.reset();
@@ -352,7 +382,7 @@ void nostr_cache_events(const std::vector<std::string>& events,
   }
   sqlite3_exec(db, ok ? "COMMIT" : "ROLLBACK", nullptr, nullptr, nullptr);
 #else
-  (void)events; (void)relay;
+  (void)events; (void)relay; (void)verified_relay_self;
 #endif
 }
 
@@ -465,12 +495,16 @@ std::vector<NostrCachedGroup> nostr_cached_groups(std::string_view query,
   sqlite3* db = open_cache(false);
   if (!db) return out;
   DbOwner owner{db};
-  Statement st(db, "SELECT g.relay,g.group_id,"
+  const std::string master_column =
+      table_has_column(db, "groups", "relay_master_verified") ?
+      "g.relay_master_verified" : "0";
+  const std::string sql = std::string("SELECT g.relay,g.group_id,") +
        " CASE WHEN g.metadata_verification>0 THEN g.name ELSE '' END,"
        " CASE WHEN g.metadata_verification>0 THEN g.about ELSE '' END,"
        " CASE WHEN g.metadata_verification>0 THEN g.parent_id ELSE '' END,"
        " COUNT(e.id),COALESCE(SUM(CASE WHEN e.kind IN (1,9,11) THEN 1 ELSE 0 END),0),"
-       " g.last_seen,g.metadata_verification,g.private_group,g.hidden,g.restricted,g.closed"
+       " g.last_seen,g.metadata_verification,g.private_group,g.hidden,g.restricted,g.closed," +
+       master_column +
        " FROM groups g LEFT JOIN group_events ge"
        " ON ge.relay=g.relay AND ge.group_id=g.group_id"
        " LEFT JOIN events e ON e.id=ge.event_id AND e.verification>0"
@@ -480,7 +514,8 @@ std::vector<NostrCachedGroup> nostr_cached_groups(std::string_view query,
        " (g.metadata_verification>0 AND instr(lower(g.about),lower(?))>0) OR"
        " (g.metadata_verification>0 AND instr(lower(g.parent_id),lower(?))>0)"
        " GROUP BY g.relay,g.group_id"
-       " ORDER BY 7 DESC,g.last_seen DESC,g.relay,g.group_id LIMIT ? OFFSET ?;");
+       " ORDER BY 7 DESC,g.last_seen DESC,g.relay,g.group_id LIMIT ? OFFSET ?;";
+  Statement st(db, sql.c_str());
   if (st.valid()) {
     for (int i = 1; i <= 5; ++i) st.bind(i, query);
     st.bind(6, static_cast<int64_t>(std::clamp(limit, 1, 500)));
@@ -496,6 +531,7 @@ std::vector<NostrCachedGroup> nostr_cached_groups(std::string_view query,
       group.message_count = st.integer(6);
       group.last_seen = st.integer(7);
       group.metadata_verification = static_cast<int>(st.integer(8));
+      group.relay_master_verified = st.integer(13) != 0;
       group.private_group = st.integer(9) != 0;
       group.hidden = st.integer(10) != 0;
       group.restricted = st.integer(11) != 0;

@@ -13,10 +13,12 @@
 #include <mbedtls/net_sockets.h>
 #include <mbedtls/ssl.h>
 #include <mbedtls/version.h>
+#include <mbedtls/x509_crt.h>
 #include <psa/crypto.h>
 
 #include <cerrno>
 #include <cstdio>
+#include <initializer_list>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -71,6 +73,7 @@ struct TlsStream::Impl {
   mbedtls_ctr_drbg_context drbg;
   mbedtls_ssl_config conf;
   mbedtls_ssl_context ssl;
+  mbedtls_x509_crt trust;
   int fd = -1;
   bool live = false;  // contexts initialised (free them in close())
   bool ok = false;    // handshake done
@@ -84,7 +87,8 @@ const char* TlsStream::backend() { return "Mbed TLS"; }
 // Linked statically, so the runtime version is the built one.
 std::string TlsStream::version() { return MBEDTLS_VERSION_STRING_FULL; }
 
-bool TlsStream::connect(int fd, const std::string& host, std::string* err) {
+bool TlsStream::connect(int fd, const std::string& host, std::string* err,
+                        bool verify_peer) {
   close();
   Impl& m = *impl_;
   m.fd = fd;
@@ -103,6 +107,7 @@ bool TlsStream::connect(int fd, const std::string& host, std::string* err) {
   mbedtls_ctr_drbg_init(&m.drbg);
   mbedtls_ssl_config_init(&m.conf);
   mbedtls_ssl_init(&m.ssl);
+  mbedtls_x509_crt_init(&m.trust);
   m.live = true;
 
   static const char pers[] = "xanatoo-tls";
@@ -115,7 +120,33 @@ bool TlsStream::connect(int fd, const std::string& host, std::string* err) {
                                    MBEDTLS_SSL_PRESET_DEFAULT);
   if (rc != 0) return fail("TLS config failed", rc);
   mbedtls_ssl_conf_min_tls_version(&m.conf, MBEDTLS_SSL_VERSION_TLS1_2);
-  mbedtls_ssl_conf_authmode(&m.conf, MBEDTLS_SSL_VERIFY_NONE);
+  if (verify_peer) {
+#if defined(MBEDTLS_FS_IO)
+    // Desktop CA bundles and Android's system certificate directory. Never
+    // treat a missing CA store as an authenticated HTTPS connection.
+    int roots = -1;
+    for (const char* file : {"/etc/ssl/certs/ca-certificates.crt",
+                              "/etc/ssl/cert.pem"}) {
+      roots = mbedtls_x509_crt_parse_file(&m.trust, file);
+      if (roots >= 0) break;
+    }
+    if (roots < 0) roots = mbedtls_x509_crt_parse_path(
+        &m.trust, "/system/etc/security/cacerts");
+    if (roots < 0) {
+      if (err) *err = "no system TLS trust store for certificate verification";
+      close();
+      return false;
+    }
+#else
+    if (err) *err = "Mbed TLS filesystem CA loading is unavailable";
+    close();
+    return false;
+#endif
+    mbedtls_ssl_conf_authmode(&m.conf, MBEDTLS_SSL_VERIFY_REQUIRED);
+    mbedtls_ssl_conf_ca_chain(&m.conf, &m.trust, nullptr);
+  } else {
+    mbedtls_ssl_conf_authmode(&m.conf, MBEDTLS_SSL_VERIFY_NONE);
+  }
   mbedtls_ssl_conf_rng(&m.conf, mbedtls_ctr_drbg_random, &m.drbg);
   rc = mbedtls_ssl_setup(&m.ssl, &m.conf);
   if (rc != 0) return fail("TLS setup failed", rc);
@@ -126,6 +157,11 @@ bool TlsStream::connect(int fd, const std::string& host, std::string* err) {
   while ((rc = mbedtls_ssl_handshake(&m.ssl)) != 0) {
     if (rc != MBEDTLS_ERR_SSL_WANT_READ && rc != MBEDTLS_ERR_SSL_WANT_WRITE)
       return fail("TLS handshake failed", rc);
+  }
+  if (verify_peer && mbedtls_ssl_get_verify_result(&m.ssl) != 0) {
+    if (err) *err = "TLS certificate or hostname verification failed (" + host + ")";
+    close();
+    return false;
   }
   m.ok = true;
   return true;
@@ -174,6 +210,7 @@ void TlsStream::close() {
   if (m.live) {
     mbedtls_ssl_free(&m.ssl);
     mbedtls_ssl_config_free(&m.conf);
+    mbedtls_x509_crt_free(&m.trust);
     mbedtls_ctr_drbg_free(&m.drbg);
     mbedtls_entropy_free(&m.entropy);
   }

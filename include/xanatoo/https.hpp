@@ -21,6 +21,14 @@ struct HttpResult {
   std::string content_type;
 };
 
+// Applied at connection time (before DNS-address selection / TLS handshake).
+// Suitable for NIP-11 discovery over HTTPS. Ordinary web requests use their
+// historical connection policy unless explicitly opted in.
+struct HttpRequestSecurity {
+  bool verify_tls = false;    // require trusted CA and hostname match
+  bool public_only = false;   // reject private/local resolved IPs
+};
+
 // Streaming GET for large responses. Headers are delivered before any body
 // bytes; on_body receives decoded transfer chunks, without buffering the
 // entire file. Returning false from either callback aborts the transfer.
@@ -48,7 +56,8 @@ std::optional<HttpResult> https_request(std::string_view method,
                                         std::string_view user_agent,
                                         std::string_view extra_headers,
                                         std::string_view body,
-                                        std::string* err = nullptr);
+                                        std::string* err = nullptr,
+                                        HttpRequestSecurity security = {});
 
 std::optional<HttpResult> https_get(std::string_view url,
                                     std::string_view user_agent,

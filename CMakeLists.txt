@@ -613,6 +613,34 @@ if(OpenSSL_FOUND)
 endif()
 add_test(NAME nostr_verify_tests COMMAND xanatoo_nostr_verify_tests)
 
+# SQLite trust-state migration and precedence need real signature verification,
+# so exercise them independently of the SDL application when OpenSSL is used.
+if(XANATOO_SQLITE AND XANATOO_NEED_OPENSSL AND XANATOO_TLS STREQUAL "openssl")
+  add_executable(xanatoo_nostr_group_store_tests
+    tests/nostr_group_store_tests.cpp
+    src/nostr_store.cpp src/nostr_verify.cpp src/nostr.cpp
+    src/util.cpp src/paths.cpp)
+  target_include_directories(xanatoo_nostr_group_store_tests PRIVATE
+    include ${SDL2_INCLUDE_DIRS})
+  target_compile_definitions(xanatoo_nostr_group_store_tests PRIVATE
+    XANATOO_SQLITE=1 XANATOO_NOSTR=0 XANATOO_NOSTR_VERIFY_OPENSSL=1)
+  target_link_libraries(xanatoo_nostr_group_store_tests PRIVATE
+    xanatoo_sqlite3 OpenSSL::Crypto)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(xanatoo_nostr_group_store_tests PRIVATE
+      -ffunction-sections -fdata-sections)
+    if(APPLE)
+      target_link_options(xanatoo_nostr_group_store_tests PRIVATE -Wl,-dead_strip)
+    else()
+      target_link_options(xanatoo_nostr_group_store_tests PRIVATE -Wl,--gc-sections)
+    endif()
+  elseif(MSVC)
+    target_compile_options(xanatoo_nostr_group_store_tests PRIVATE /Gy)
+    target_link_options(xanatoo_nostr_group_store_tests PRIVATE /OPT:REF)
+  endif()
+  add_test(NAME nostr_group_store_tests COMMAND xanatoo_nostr_group_store_tests)
+endif()
+
 # Parser-only regression tests (no SDL/network/font dependencies). Also useful
 # for the experimental formats while the full application is cross-compiled.
 add_executable(xanatoo_xml_tests

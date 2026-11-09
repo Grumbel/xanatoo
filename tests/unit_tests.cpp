@@ -825,7 +825,9 @@ void test_nostr_local_cache() {
       "\",\"pubkey\":\"" + carol + "\",\"kind\":9,\"created_at\":310,"
       "\"content\":\"Group hello\",\"tags\":[[\"h\",\"tech\"]],"
       "\"sig\":\"" + zeros + zeros + "\"}");
-  nostr_cache_events({metadata_a, group_msg, group_msg}, relay_a);
+  // Even when the supplied NIP-11 self matches, hash-only builds must never
+  // label an unsigned group event as relay-master authenticated.
+  nostr_cache_events({metadata_a, group_msg, group_msg}, relay_a, alice);
   nostr_cache_events({metadata_b, group_msg}, relay_b);
   const std::string group_list = with_valid_id("{\"id\":\"" + zeros +
       "\",\"pubkey\":\"" + alice + "\",\"kind\":10009,\"created_at\":307,"
@@ -855,10 +857,12 @@ void test_nostr_local_cache() {
     EXPECT(group_a->closed);
     EXPECT_EQ(group_a->message_count, int64_t(1));
     EXPECT_EQ(group_a->event_count, int64_t(1));
+    EXPECT(!group_a->relay_master_verified);
   }
   if (group_b != groups.end()) {
     EXPECT_EQ(group_b->name, "Tech talk");
     EXPECT_EQ(group_b->message_count, int64_t(1));
+    EXPECT(!group_b->relay_master_verified);
   }
   EXPECT_EQ(nostr_cached_group_json(relay_a, "tech").size(), size_t(1));
   EXPECT_EQ(nostr_cached_group_json(relay_b, "tech").size(), size_t(1));

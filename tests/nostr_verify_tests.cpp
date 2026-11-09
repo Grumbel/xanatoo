@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 // Official BIP-340 vectors and NIP-01 serialization smoke tests.
 #include "xanatoo/nostr_verify.hpp"
+#include "xanatoo/nostr_nip11.hpp"
 #include <cassert>
 #include <iostream>
 #include <string>
@@ -14,10 +15,28 @@ int main() {
       R"({"id":"da67626634b798564d957125c4105766d6a681ff62eb48a87f5ec4e819ff0b0b","pubkey":"f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9","created_at":123,"kind":1,"tags":[],"content":"hello","sig":"2d5ebb7dc3a294651cbe7ff4d3fe01819ce4ec5f1676e1af0133196cb8a66981ec1ae0a2c01fc6684241556dba3d54ab778ca4ce9c2e0379eb300d0a2f657643"})";
   assert(nostr_event_id(signed_event) ==
          "da67626634b798564d957125c4105766d6a681ff62eb48a87f5ec4e819ff0b0b");
+  // Independent NIP-29 kind-39000 fixture signed by the official BIP-340
+  // private test key 3. A matching relay "self" is still insufficient when
+  // the crypto verifier is missing, or the HTTPS NIP-11 response was not
+  // authenticated; only the real caller may pass a verified relay self.
+  const std::string signed_group =
+      R"({"id":"57be22489918c23cc660b9aaf61d9c871cf28950821da6bcd2e75efdf360548f","pubkey":"f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9","created_at":321,"kind":39000,"tags":[["d","verified-group"],["name","Verified NIP29"]],"content":"","sig":"334111a62a0863f7421baf17d6391e5801f6dfa3f591246c3236976e103f8d0cde5aea92eebb0082283067df8de03c061db66a12e407d73da797f36123929671"})";
+  assert(nostr_event_id(signed_group) ==
+         "57be22489918c23cc660b9aaf61d9c871cf28950821da6bcd2e75efdf360548f");
+  const std::string relay_self =
+      "f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9";
 #if XANATOO_NOSTR_VERIFY_OPENSSL
   assert(nostr_verify_event(signed_event) == NostrVerification::SignatureValid);
+  assert(nostr_verify_event(signed_group) == NostrVerification::SignatureValid);
+  assert(nostr_relay_master_matches(relay_self, relay_self,
+                                   nostr_verify_event(signed_group) ==
+                                       NostrVerification::SignatureValid));
 #else
   assert(nostr_verify_event(signed_event) == NostrVerification::HashOnly);
+  assert(nostr_verify_event(signed_group) == NostrVerification::HashOnly);
+  assert(!nostr_relay_master_matches(relay_self, relay_self,
+                                    nostr_verify_event(signed_group) ==
+                                        NostrVerification::SignatureValid));
 #endif
   std::string altered = signed_event;
   altered.replace(altered.find("hello"), 5, "hallo");

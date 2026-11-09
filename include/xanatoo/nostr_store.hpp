@@ -43,8 +43,9 @@ struct NostrCachedEvent {
 
 // NIP-29 groups are relay-scoped: the same group_id on two different relays
 // denotes two independently governed groups. Metadata is only an observation;
-// verifying its event signature does NOT prove it came from the relay's NIP-11
-// advertised master key.
+// verifying its event signature alone does NOT prove it came from the relay's
+// NIP-11 advertised master key. `relay_master_verified` additionally requires
+// a trusted HTTPS NIP-11 response AND a verified event signature by "self".
 struct NostrCachedGroup {
   std::string relay;
   std::string group_id;
@@ -55,6 +56,7 @@ struct NostrCachedGroup {
   int64_t message_count = 0;  // locally observed kinds 1, 9, 11
   int64_t last_seen = 0;
   int metadata_verification = 0;
+  bool relay_master_verified = false;
   bool private_group = false;
   bool hidden = false;
   bool restricted = false;
@@ -72,7 +74,9 @@ struct NostrLocalIdentity {
 // An unverified relay event is *never* proof of identity. Do not persist with
 // --no-save, or when the SQLite feature is unavailable.
 void nostr_cache_events(const std::vector<std::string>& event_json,
-                        std::string_view relay);
+                        std::string_view relay,
+                        // Set only after certificate-validated HTTPS NIP-11.
+                        std::string_view verified_relay_self = {});
 NostrCacheStats nostr_cache_stats();
 std::vector<NostrCachedPerson> nostr_cached_people(std::string_view query = {},
                                                    int limit = 100,
