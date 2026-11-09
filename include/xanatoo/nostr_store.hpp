@@ -17,6 +17,7 @@ struct NostrCacheStats {
   int64_t relays = 0;
   int64_t signed_events = 0;  // BIP-340 signature-verified events
   int64_t legacy_events = 0;  // observations from before verification
+  int64_t groups = 0;         // distinct (relay, group ID) observations
 };
 
 struct NostrCachedPerson {
@@ -40,6 +41,26 @@ struct NostrCachedEvent {
   int verification = 0;
 };
 
+// NIP-29 groups are relay-scoped: the same group_id on two different relays
+// denotes two independently governed groups. Metadata is only an observation;
+// verifying its event signature does NOT prove it came from the relay's NIP-11
+// advertised master key.
+struct NostrCachedGroup {
+  std::string relay;
+  std::string group_id;
+  std::string name;
+  std::string about;
+  std::string parent_id;
+  int64_t event_count = 0;  // unique validated h-tagged events from this relay
+  int64_t message_count = 0;  // locally observed kinds 1, 9, 11
+  int64_t last_seen = 0;
+  int metadata_verification = 0;
+  bool private_group = false;
+  bool hidden = false;
+  bool restricted = false;
+  bool closed = false;
+};
+
 struct NostrLocalIdentity {
   std::string pubkey;
   std::string label;
@@ -59,6 +80,11 @@ std::vector<NostrCachedPerson> nostr_cached_people(std::string_view query = {},
 std::vector<NostrCachedEvent> nostr_cached_events(std::string_view query = {},
                                                   int limit = 100,
                                                   int offset = 0);
+std::vector<NostrCachedGroup> nostr_cached_groups(std::string_view query = {},
+                                                 int limit = 100,
+                                                 int offset = 0);
+std::vector<std::string> nostr_cached_group_json(std::string_view relay,
+                                                  std::string_view group_id);
 // Exact relay JSON for offline fallback. These are local, unverified copies.
 std::vector<std::string> nostr_cached_thread_json(std::string_view event_id);
 std::vector<std::string> nostr_cached_author_json(std::string_view pubkey);

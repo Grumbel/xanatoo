@@ -792,10 +792,71 @@ void test_nostr_local_cache() {
       "\"content\":\"{\\\"display_name\\\":\\\"Old\\\"}\",\"tags\":[],\"sig\":\"" + zeros + zeros + "\"}");
   nostr_cache_events({old_profile}, "wss://first.example");
   EXPECT_EQ(nostr_cached_people("alice")[0].name, "Alice");
+
+  // NIP-29 group identity is (relay, group ID), not the d/h tag by itself.
+  const std::string relay_a = "wss://groups-a.example";
+  const std::string relay_b = "wss://groups-b.example";
+  const std::string metadata_a = with_valid_id("{\"id\":\"" + zeros +
+      "\",\"pubkey\":\"" + alice + "\",\"kind\":39000,\"created_at\":305,"
+      "\"content\":\"\",\"tags\":[[\"d\",\"tech\"],[\"name\",\"Technology\"],"
+      "[\"about\",\"Tools and hardware\"],[\"parent\",\"community\"],[\"closed\"]],"
+      "\"sig\":\"" + zeros + zeros + "\"}");
+  const std::string metadata_b = with_valid_id("{\"id\":\"" + zeros +
+      "\",\"pubkey\":\"" + bob + "\",\"kind\":39000,\"created_at\":306,"
+      "\"content\":\"\",\"tags\":[[\"d\",\"tech\"],[\"name\",\"Tech talk\"]],"
+      "\"sig\":\"" + zeros + zeros + "\"}");
+  const std::string group_msg = with_valid_id("{\"id\":\"" + zeros +
+      "\",\"pubkey\":\"" + carol + "\",\"kind\":9,\"created_at\":310,"
+      "\"content\":\"Group hello\",\"tags\":[[\"h\",\"tech\"]],"
+      "\"sig\":\"" + zeros + zeros + "\"}");
+  nostr_cache_events({metadata_a, group_msg, group_msg}, relay_a);
+  nostr_cache_events({metadata_b, group_msg}, relay_b);
+  EXPECT_EQ(nostr_cache_stats().groups, int64_t(2));
+  EXPECT_EQ(nostr_cached_groups("tech").size(), size_t(2));
+  EXPECT_EQ(nostr_cached_groups("technology").size(), size_t(1));
+  EXPECT_EQ(nostr_cached_groups("community").size(), size_t(1));
+  EXPECT_EQ(nostr_cached_groups({}, 1, 0).size(), size_t(1));
+  EXPECT_EQ(nostr_cached_groups({}, 1, 1).size(), size_t(1));
+  EXPECT(nostr_cached_groups({}, 1, 2).empty());
+  const auto groups = nostr_cached_groups("tech");
+  const auto group_a = std::find_if(groups.begin(), groups.end(),
+      [&](const auto& g) { return g.relay == relay_a; });
+  const auto group_b = std::find_if(groups.begin(), groups.end(),
+      [&](const auto& g) { return g.relay == relay_b; });
+  EXPECT(group_a != groups.end() && group_b != groups.end());
+  if (group_a != groups.end()) {
+    EXPECT_EQ(group_a->name, "Technology");
+    EXPECT_EQ(group_a->parent_id, "community");
+    EXPECT(group_a->closed);
+    EXPECT_EQ(group_a->message_count, int64_t(1));
+    EXPECT_EQ(group_a->event_count, int64_t(1));
+  }
+  if (group_b != groups.end()) {
+    EXPECT_EQ(group_b->name, "Tech talk");
+    EXPECT_EQ(group_b->message_count, int64_t(1));
+  }
+  EXPECT_EQ(nostr_cached_group_json(relay_a, "tech").size(), size_t(1));
+  EXPECT_EQ(nostr_cached_group_json(relay_b, "tech").size(), size_t(1));
+  EXPECT(nostr_cached_group_json("wss://other.example", "tech").empty());
+  const std::string group_href = nostr_group_ref(relay_a, "Tech/2026");
+  EXPECT(is_nostr_ref(group_href));
+  EXPECT_EQ(parse_locator(group_href).base, group_href);
+  EXPECT(!group_href.empty() && group_href.find('#') == std::string::npos);
+  EXPECT(nostr_group_ref("http://invalid", "tech").empty());
+
+  set_no_save(true);
+  const std::string excluded_group = with_valid_id("{\"id\":\"" + zeros +
+      "\",\"pubkey\":\"" + alice + "\",\"kind\":9,\"created_at\":311,"
+      "\"content\":\"excluded\",\"tags\":[[\"h\",\"excluded\"]],"
+      "\"sig\":\"" + zeros + zeros + "\"}");
+  nostr_cache_events({excluded_group}, relay_a);
+  EXPECT_EQ(nostr_cache_stats().groups, int64_t(2));
+  set_no_save(false);
 #else
   nostr_cache_events({note, profile}, "wss://first.example");
   EXPECT_EQ(nostr_cache_stats().events, int64_t(0));
   EXPECT(nostr_cached_people().empty());
+  EXPECT(nostr_cached_groups().empty());
 #endif
   nostr_set_cache_test_path({});
   std::error_code ec;

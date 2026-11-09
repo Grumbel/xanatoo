@@ -527,9 +527,14 @@ history or distribute patch files.
 - Two native dockable `FloatWindow` panels are exposed in Panels: **Nostr
   Explorer** searches local events/people and shows observed counts; **Nostr
   Accounts** manages multiple named *watch-only* public keys. They use ImGui
-  only for embedded form controls. No signing-capable accounts, private-key
-  input or outbound publication exist yet; add NIP-46/NIP-49 key management
-  before offering actual identity creation or posting.
+  only as controls within the native client frame. Explorer also has a NIP-29
+  Groups tab, with `(relay,group ID)` identity, `kind:39000` metadata and
+  `h`-tagged event counts. `nostr:groups@wss://relay` discovers public group
+  metadata; clicking a group opens its relay-specific timeline. NIP-11 relay
+  master-key binding, membership and private groups remain unimplemented.
+  No signing-capable accounts, private-key input or outbound publication exist
+  yet; add NIP-46/NIP-49 key management before offering actual identity
+  creation or posting.
 - Opens `note1` / `nevent1` / `nostr:…` / 64-hex via Ctrl+L → Thread+Message layout.
 - `npub1` / `nprofile1` open the author's profile + recent notes. Message
   headers link the author (`nostr:npub1…`) and date (`nostr:note1…`) via

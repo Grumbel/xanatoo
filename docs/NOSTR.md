@@ -15,7 +15,9 @@ the network, may omit old events, and can include spam and invalid signatures.
 
 `state_dir()/nostr.sqlite` holds distinct events (event ID), encountered
 public keys (even without profile metadata), event-to-relay observations, and
-local identity aliases. Fetching the same event twice must not increment its
+local identity aliases. NIP-29 group observations are indexed under the pair
+`(relay URL, group ID)`; this is **not** the same as a network-wide group ID.
+Fetching the same event twice must not increment its
 post count. Save all event kinds that a query actually downloads, including
 kind-0 profiles fetched to render a note. Track first/last observation and
 the newest kind-0 profile per key. Index pubkeys from event authors, `p`
@@ -45,6 +47,24 @@ cache writes and schema migration.
 - Click an author to navigate to `nostr:npub1…`; click a note to its thread.
 - Show relay coverage, kinds, hashtags, follow lists, bookmarks, communities,
   and other locally observed structured events when supported.
+- **Groups** tab: list NIP-29 groups observed from relays, their claimed names,
+  parent IDs, privacy/join flags and locally observed message counts. These
+  counts are relay-scoped and deduplicate the same event received twice.
+- **Discover** accepts an explicit `wss://` group relay and fetches up to 250
+  public `kind:39000` metadata events (`nostr:groups@wss://relay.example`).
+  With an empty relay field, `nostr:groups` samples general public relays,
+  which often have no group metadata at all. Selecting a group opens its
+  relay-specific timeline and fetches up to 100 recent `kind:1/9/11`
+  `h`-tagged messages. The internally generated address is
+  `nostr:group@<hex-encoded-relay>.<hex-encoded-group-id>` (not a
+  standardized NIP-19 share link). Encoding both fields protects the group
+  link from Xanatoo's URL-selector and fragment parsing. Cached messages
+  remain readable when the relay is unavailable.
+- Metadata signatures and event hashes follow the regular verification rules,
+  but NIP-11 relay **master-key binding is not verified**. Consequently, even
+  a `[sig]` group metadata event is not proof that the relay itself issued or
+  currently enforces that metadata. Membership, moderation, NIP-42 authentication,
+  encrypted private messages and group creation/joining are not implemented.
 - Add active fetch/search controls separately; local search should remain
   functional offline. NIP-50 relay search is optional and capability-gated.
 

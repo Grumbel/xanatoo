@@ -43,6 +43,7 @@ enum class UiCommand {
   NostrSearchLocal,    // arg = search text
   NostrShowPeople,     // people vs event result tab
   NostrShowEvents,
+  NostrShowGroups,
   NostrRefreshLocal,   // reload DB observations
   NostrPrevPage,       // previous 100 locally observed records
   NostrNextPage,
@@ -236,11 +237,12 @@ struct UiState {
   bool can_show_revisions = false;
   bool nostr_explorer_open = false;
   bool nostr_accounts_open = false;
-  bool nostr_show_people = true;
+  int nostr_tab = 0;
   std::string nostr_search;
   int nostr_page = 0;
   bool nostr_people_more = false;
   bool nostr_events_more = false;
+  bool nostr_groups_more = false;
   int nostr_explorer_x = 0, nostr_explorer_y = 0;
   int nostr_explorer_w = 0, nostr_explorer_h = 0;
   int nostr_accounts_x = 0, nostr_accounts_y = 0;
@@ -248,6 +250,7 @@ struct UiState {
   NostrCacheStats nostr_stats;
   std::vector<NostrCachedPerson> nostr_people;
   std::vector<NostrCachedEvent> nostr_events;
+  std::vector<NostrCachedGroup> nostr_groups;
   std::vector<NostrLocalIdentity> nostr_identities;
   std::string nostr_selected_identity;
   struct AnnotationLayerItem {
@@ -461,6 +464,7 @@ private:
   int url_context_cursor_ = 0;
   char search_input_[512] = {};  // search bar text (kept between searches)
   char nostr_local_search_[512] = {};
+  char nostr_group_relay_[512] = {};
   char nostr_identity_label_[160] = {};
   char nostr_identity_pubkey_[256] = {};
   char reply_input_[16384] = {}; // Markdown draft, not sent to any server

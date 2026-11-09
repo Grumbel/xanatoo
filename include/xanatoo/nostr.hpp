@@ -17,7 +17,13 @@ namespace xanatoo {
 //   nostr:<64-hex>  (raw event id)
 //   npub1…  nprofile1…  nostr:npub1…  (an author's recent notes)
 //   nostr:recent  (live kind-1 sample from public relays)
+//   nostr:groups, nostr:groups@wss://relay.example (NIP-29 discovery)
+//   nostr:group@wss://relay.example#<hex encoded group ID> (group timeline)
 bool is_nostr_ref(std::string_view s);
+
+// Internal, lossless relay-scoped group address (not an official NIP-19 code).
+// Never use a bare group ID as a globally unique identity.
+std::string nostr_group_ref(std::string_view relay, std::string_view group_id);
 
 // Decode NIP-19 note1/nevent1 (or 64-hex) to a 64-char lowercase hex event id.
 // Optionally collect relay hints from nevent TLVs into *relays.

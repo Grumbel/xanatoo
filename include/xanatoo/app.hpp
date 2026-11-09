@@ -744,14 +744,16 @@ struct App {
   bool revision_panel_open = false;
   bool nostr_explorer_open = false;
   bool nostr_accounts_open = false;
-  bool nostr_people_tab = true;
+  int nostr_tab = 0;  // 0: people, 1: events, 2: NIP-29 groups
   std::string nostr_search;
   int nostr_page = 0;
   bool nostr_people_more = false;
   bool nostr_events_more = false;
+  bool nostr_groups_more = false;
   NostrCacheStats nostr_stats;
   std::vector<NostrCachedPerson> nostr_people;
   std::vector<NostrCachedEvent> nostr_events;
+  std::vector<NostrCachedGroup> nostr_groups;
   std::vector<NostrLocalIdentity> nostr_identities;
   std::string nostr_active_identity;
   std::string revision_document_key;

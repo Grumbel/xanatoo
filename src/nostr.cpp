@@ -202,8 +202,30 @@ bool is_nostr_ref(std::string_view s) {
   if (is_hex64(t)) return true;
   std::string low = ascii_lower(t);
   if (low == "recent" || low == "firehose" || low == "latest") return true;
+  if (low == "groups" || low.rfind("groups@", 0) == 0 ||
+      low.rfind("group@", 0) == 0) return true;
   return low.rfind("note1", 0) == 0 || low.rfind("nevent1", 0) == 0 ||
          low.rfind("npub1", 0) == 0 || low.rfind("nprofile1", 0) == 0;
+}
+
+std::string nostr_group_ref(std::string_view relay, std::string_view group_id) {
+  if (relay.rfind("wss://", 0) != 0 || relay.size() > 512 ||
+      group_id.empty() || group_id.size() > 256) return {};
+  constexpr char hex[] = "0123456789abcdef";
+  // Both parts are opaque: '#' would be consumed as an anchor by Locator,
+  // and leaving a relay URL embedded here would expose its '//' selectors.
+  std::string out = "nostr:group@";
+  for (unsigned char c : relay) {
+    out.push_back(hex[c >> 4]);
+    out.push_back(hex[c & 15]);
+  }
+  out.push_back('.');
+  for (unsigned char c : group_id) {
+    if (c < 0x20 || c == 0x7f) return {};
+    out.push_back(hex[c >> 4]);
+    out.push_back(hex[c & 15]);
+  }
+  return out;
 }
 
 std::optional<std::string> nostr_decode_event_id(
@@ -906,7 +928,7 @@ Document events_to_document(const std::string& root_id,
   doc.get(thread).summary = "Nostr discussion";
 
   for (const auto& e : events) {
-    if (e.id == root_id && e.kind == 1) {
+    if (e.id == root_id && (e.kind == 1 || e.kind == 9 || e.kind == 11)) {
       std::string sub = e.content;
       if (sub.size() > 72) {
         sub.resize(72);
@@ -927,7 +949,8 @@ Document events_to_document(const std::string& root_id,
             });
 
   for (const auto& e : events)
-    if (e.kind == 1) add_note_message(doc, thread, e, profiles, true);
+    if (e.kind == 1 || e.kind == 9 || e.kind == 11)
+      add_note_message(doc, thread, e, profiles, true);
 
   if (doc.get(thread).children.empty()) {
     NodeId msg = doc.create(NodeKind::Message, thread);
@@ -1057,7 +1080,7 @@ void query_relay(const std::string& relay, const std::string& event_id,
   std::string req =
       std::string("[\"REQ\",\"") + sub + "\"," +
       "{\"ids\":[\"" + event_id + "\"]}," +
-      "{\"kinds\":[1],\"#e\":[\"" + event_id + "\"],\"limit\":80}]";
+      "{\"kinds\":[1,9,11],\"#e\":[\"" + event_id + "\"],\"limit\":80}]";
   if (!ws_send_text(c, req)) {
     if (last_err) *last_err = "WS send failed";
     return;
@@ -1084,6 +1107,65 @@ void query_recent(const std::string& relay,
   }
   collect_ws_events(c, by_id, 6, relay);
   ws_send_text(c, std::string("[\"CLOSE\",\"") + sub + "\"]");
+}
+
+// JSON-quote untrusted group IDs before putting them into NIP-01 REQ filters.
+std::string quote_nostr_filter(std::string_view s) {
+  constexpr char hex[] = "0123456789abcdef";
+  std::string out = "\"";
+  for (unsigned char c : s) {
+    if (c == '"' || c == '\\') {
+      out.push_back('\\');
+      out.push_back(static_cast<char>(c));
+    } else if (c < 0x20) {
+      out += "\\u00";
+      out.push_back(hex[c >> 4]);
+      out.push_back(hex[c & 15]);
+    } else {
+      out.push_back(static_cast<char>(c));
+    }
+  }
+  return out + '"';
+}
+
+void query_group_metadata(const std::string& relay,
+                          std::map<std::string, NostrEvent>& by_id,
+                          std::string* last_err) {
+  WsConn c;
+  std::string err;
+  if (!ws_connect(c, relay, &err)) {
+    if (last_err) *last_err = err;
+    return;
+  }
+  const std::string req =
+      "[\"REQ\",\"xanatoo-groups\",{\"kinds\":[39000],\"limit\":250}]";
+  if (!ws_send_text(c, req)) {
+    if (last_err) *last_err = "WS send failed";
+    return;
+  }
+  collect_ws_events(c, by_id, 7, relay);
+  ws_send_text(c, "[\"CLOSE\",\"xanatoo-groups\"]");
+}
+
+void query_group_timeline(const std::string& relay, std::string_view group_id,
+                          std::map<std::string, NostrEvent>& by_id,
+                          std::string* last_err) {
+  WsConn c;
+  std::string err;
+  if (!ws_connect(c, relay, &err)) {
+    if (last_err) *last_err = err;
+    return;
+  }
+  const std::string gid = quote_nostr_filter(group_id);
+  const std::string req = "[\"REQ\",\"xanatoo-group\","
+      "{\"kinds\":[39000],\"#d\":[" + gid + "],\"limit\":5},"
+      "{\"kinds\":[1,9,11],\"#h\":[" + gid + "],\"limit\":100}]";
+  if (!ws_send_text(c, req)) {
+    if (last_err) *last_err = "WS send failed";
+    return;
+  }
+  collect_ws_events(c, by_id, 7, relay);
+  ws_send_text(c, "[\"CLOSE\",\"xanatoo-group\"]");
 }
 
 void query_author(const std::string& relay, const std::string& pubkey,
@@ -1138,12 +1220,171 @@ void query_profiles(const std::string& relay,
   }
 }
 
+bool parse_group_address(std::string_view addr, std::string& relay,
+                         std::string& group_id) {
+  if (addr.substr(0, 6) != "group@") return false;
+  addr.remove_prefix(6);
+  const size_t pos = addr.find('.');
+  if (pos == std::string_view::npos || pos == 0 ||
+      pos > 1024 || pos % 2 != 0 ||
+      addr.size() - pos - 1 == 0 || addr.size() - pos - 1 > 512 ||
+      (addr.size() - pos - 1) % 2 != 0) return false;
+  const auto decode_hex = [](std::string_view encoded,
+                             std::string& decoded) -> bool {
+    decoded.clear();
+    for (size_t i = 0; i < encoded.size(); i += 2) {
+      const auto digit = [](unsigned char c) -> int {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        return -1;
+      };
+      const int hi = digit(encoded[i]), lo = digit(encoded[i + 1]);
+      if (hi < 0 || lo < 0) return false;
+      const unsigned char c = static_cast<unsigned char>(hi * 16 + lo);
+      if (c < 0x20 || c == 0x7f) return false;
+      decoded.push_back(static_cast<char>(c));
+    }
+    return true;
+  };
+  std::string decoded_relay;
+  if (!decode_hex(addr.substr(0, pos), decoded_relay) ||
+      !decode_hex(addr.substr(pos + 1), group_id)) return false;
+  relay = normalize_relay_url(decoded_relay);
+  return relay.rfind("wss://", 0) == 0 && relay.size() <= 512 &&
+         !group_id.empty();
+}
+
+Document group_directory_document(std::string_view relay_filter) {
+  Document doc;
+  NodeId root = doc.create(NodeKind::Document);
+  doc.meta.title = "Nostr groups (observed)";
+  const auto groups = nostr_cached_groups(relay_filter, 500);
+  NodeId intro = doc.create(NodeKind::Paragraph, root);
+  doc.append_text(intro,
+      "NIP-29 relay-based groups from the local cache. A group is identified "
+      "by its hosting relay AND group ID. Metadata is a relay claim, not yet "
+      "authenticated against the relay's NIP-11 master key.");
+  int shown = 0;
+  for (const auto& group : groups) {
+    if (!relay_filter.empty() && group.relay != relay_filter) continue;
+    const std::string href = nostr_group_ref(group.relay, group.group_id);
+    if (href.empty()) continue;
+    NodeId p = doc.create(NodeKind::Paragraph, root);
+    InlineSpan link;
+    link.kind = InlineKind::Link;
+    link.href = href;
+    link.text = group.name.empty() ? group.group_id : group.name;
+    doc.get(p).spans.push_back(std::move(link));
+    doc.append_text(p, " · " + group.relay + " · " +
+                    std::to_string(group.message_count) + " observed messages");
+    ++shown;
+  }
+  if (!shown) {
+    NodeId p = doc.create(NodeKind::Paragraph, root);
+    doc.append_text(p,
+        "No group metadata found in the local cache. This relay may not support "
+        "NIP-29, may hide groups, or may be unreachable.");
+  }
+  return doc;
+}
+
+Document group_timeline_document(std::string_view relay, std::string_view group_id,
+                                 std::map<std::string, NostrEvent>& by_id) {
+  Document doc;
+  NodeId root = doc.create(NodeKind::Document);
+  std::string name(group_id);
+  for (const auto& group : nostr_cached_groups({}, 500)) {
+    if (group.relay == relay && group.group_id == group_id && !group.name.empty()) {
+      name = group.name;
+      break;
+    }
+  }
+  doc.meta.title = name;
+  NodeId intro = doc.create(NodeKind::Paragraph, root);
+  doc.append_text(intro, "NIP-29 group " + std::string(group_id) +
+                  " · hosted by " + std::string(relay) +
+                  " · metadata and membership rules belong to the relay.");
+  NodeId thread = doc.create(NodeKind::Thread, root);
+  doc.get(thread).summary = name + " · observed group messages";
+  std::vector<NostrEvent> events;
+  for (auto& kv : by_id) {
+    auto& e = kv.second;
+    if (e.kind != 1 && e.kind != 9 && e.kind != 11) continue;
+    const auto h = std::find_if(e.tags.begin(), e.tags.end(), [&](const auto& t) {
+      return t.size() > 1 && t[0] == "h" && t[1] == group_id;
+    });
+    if (h != e.tags.end()) events.push_back(e);
+  }
+  std::sort(events.begin(), events.end(), [](const auto& a, const auto& b) {
+    return a.created_at == b.created_at ? a.id < b.id :
+           a.created_at < b.created_at;
+  });
+  const std::map<std::string, std::string> no_profiles;
+  for (const auto& e : events)
+    add_note_message(doc, thread, e, no_profiles, false);
+  if (events.empty()) {
+    NodeId p = doc.create(NodeKind::Paragraph, root);
+    doc.append_text(p,
+        "No locally observed public messages for this group. The relay may "
+        "restrict access or its messages may not have been retrieved yet.");
+  }
+  return doc;
+}
+
 }  // namespace
 
 std::optional<Document> nostr_fetch_thread(std::string_view ref,
                                            std::string* err) {
   std::string stripped = strip_nostr_prefix(ref);
   std::string low = ascii_lower(stripped);
+  const bool groups_mode = low == "groups" || low.rfind("groups@", 0) == 0;
+  const bool group_mode = low.rfind("group@", 0) == 0;
+  if (groups_mode || group_mode) {
+    std::string group_relay, group_id;
+    if (group_mode) {
+      if (!parse_group_address(stripped, group_relay, group_id)) {
+        if (err) *err = "invalid relay-scoped NIP-29 group address";
+        return std::nullopt;
+      }
+    } else if (low.rfind("groups@", 0) == 0) {
+      if (stripped.substr(7).rfind("wss://", 0) != 0) {
+        if (err) *err = "NIP-29 discovery requires a wss:// relay";
+        return std::nullopt;
+      }
+      group_relay = normalize_relay_url(stripped.substr(7));
+      if (group_relay.rfind("wss://", 0) != 0 || group_relay.size() > 512) {
+        if (err) *err = "NIP-29 discovery requires a wss:// relay";
+        return std::nullopt;
+      }
+    }
+    const std::vector<std::string> relays = group_relay.empty() ?
+        default_relays() : std::vector<std::string>{group_relay};
+    std::map<std::string, NostrEvent> observed;
+    int tried = 0;
+    for (const auto& relay : relays) {
+      if (tried++ >= (group_relay.empty() ? 3 : 1)) break;
+      std::string one_err;
+      if (group_mode)
+        query_group_timeline(relay, group_id, observed, &one_err);
+      else
+        query_group_metadata(relay, observed, &one_err);
+      if (!one_err.empty()) std::cerr << "Nostr group: " << one_err << "\n";
+      // For group timelines, messages are scoped to exactly one relay.
+      if (group_mode) break;
+    }
+    if (group_mode) {
+      for (const auto& raw : nostr_cached_group_json(group_relay, group_id)) {
+        if (nostr_verify_event(raw) == NostrVerification::Invalid) continue;
+        NostrEvent ev;
+        if (parse_event_json(raw, ev)) observed.try_emplace(ev.id, std::move(ev));
+      }
+      return group_timeline_document(group_relay, group_id, observed);
+    }
+    // This document is also usable offline; the Explorer provides richer
+    // searching, per-relay counts and a click-through to a group timeline.
+    return group_directory_document(group_relay);
+  }
   const bool recent_mode =
       (low == "recent" || low == "firehose" || low == "latest");
 

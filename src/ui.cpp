@@ -2694,6 +2694,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                           static_cast<long long>(state.nostr_stats.events -
                                                  state.nostr_stats.signed_events),
                           static_cast<long long>(state.nostr_stats.legacy_events));
+      ImGui::TextDisabled("%lld relay-scoped NIP-29 groups observed",
+                          static_cast<long long>(state.nostr_stats.groups));
       ImGui::SetNextItemWidth(-80.f * scale_);
       if (ImGui::InputText("##nostr_search", nostr_local_search_,
                            sizeof nostr_local_search_)) {
@@ -2702,13 +2704,29 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       }
       ImGui::SameLine();
       if (ImGui::Button("Refresh")) cmd = UiCommand::NostrRefreshLocal;
-      if (ImGui::RadioButton("People", state.nostr_show_people))
+      if (ImGui::RadioButton("People", state.nostr_tab == 0))
         cmd = UiCommand::NostrShowPeople;
       ImGui::SameLine();
-      if (ImGui::RadioButton("Events", !state.nostr_show_people))
+      if (ImGui::RadioButton("Events", state.nostr_tab == 1))
         cmd = UiCommand::NostrShowEvents;
       ImGui::SameLine();
-      if (ImGui::SmallButton("Fetch recent")) {
+      if (ImGui::RadioButton("Groups", state.nostr_tab == 2))
+        cmd = UiCommand::NostrShowGroups;
+      if (state.nostr_tab == 2) {
+        ImGui::TextDisabled("Discover on a NIP-29 relay (blank = public relay sample):");
+        ImGui::SetNextItemWidth(-95.f * scale_);
+        ImGui::InputText("##nostr_group_relay", nostr_group_relay_,
+                         sizeof nostr_group_relay_);
+        ImGui::SameLine();
+        if (ImGui::Button("Discover")) {
+          cmd = UiCommand::NavigateUrl;
+          result.arg = "nostr:groups";
+          if (nostr_group_relay_[0] != '\0') {
+            result.arg += "@";
+            result.arg += nostr_group_relay_;
+          }
+        }
+      } else if (ImGui::SmallButton("Fetch recent")) {
         cmd = UiCommand::NavigateUrl;
         result.arg = "nostr:recent";
       }
@@ -2718,15 +2736,16 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::SameLine();
       ImGui::Text("Page %d", state.nostr_page + 1);
       ImGui::SameLine();
-      ImGui::BeginDisabled(!(state.nostr_show_people ? state.nostr_people_more :
-                            state.nostr_events_more));
+      ImGui::BeginDisabled(!(state.nostr_tab == 0 ? state.nostr_people_more :
+                            state.nostr_tab == 1 ? state.nostr_events_more :
+                                                   state.nostr_groups_more));
       if (ImGui::SmallButton("Next")) cmd = UiCommand::NostrNextPage;
       ImGui::EndDisabled();
       ImGui::Separator();
       // A child scroll area avoids producing thousands of text widgets when
       // an explorer panel is shrunk or docked beneath another panel.
       if (ImGui::BeginChild("##nostr_results", ImVec2(0.f, 0.f), false)) {
-        if (state.nostr_show_people) {
+        if (state.nostr_tab == 0) {
           if (state.nostr_people.empty())
             ImGui::TextWrapped("No matching public keys cached yet. Fetch recent notes, or open an npub1 / note1 address.");
           for (const auto& person : state.nostr_people) {
@@ -2748,7 +2767,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                                   "Profile signature checked" : "Profile not signature verified");
             ImGui::PopID();
           }
-        } else {
+        } else if (state.nostr_tab == 1) {
           if (state.nostr_events.empty())
             ImGui::TextWrapped("No matching cached events. Only events downloaded by this client appear here.");
           for (const auto& ev : state.nostr_events) {
@@ -2762,12 +2781,45 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                 "kind " + std::to_string(ev.kind) +
                 " · " + name + " · " + summary;
             if (ImGui::Selectable(label.c_str(), false,
-                                  ev.kind == 1 ? 0 : ImGuiSelectableFlags_Disabled)) {
+                                  (ev.kind == 1 || ev.kind == 9 || ev.kind == 11) ?
+                                    0 : ImGuiSelectableFlags_Disabled)) {
               cmd = UiCommand::NavigateUrl;
               result.arg = "nostr:" + nostr_bech32("note", ev.id);
             }
             if (ImGui::IsItemHovered())
               ImGui::SetTooltip("%s\n%s", ev.id.c_str(), ev.pubkey.c_str());
+            ImGui::PopID();
+          }
+        } else {
+          if (state.nostr_groups.empty())
+            ImGui::TextWrapped("No NIP-29 groups cached yet. Discover on a relay, or browse group messages with an h tag.");
+          for (const auto& group : state.nostr_groups) {
+            ImGui::PushID(group.relay.c_str());
+            ImGui::PushID(group.group_id.c_str());
+            const std::string href = nostr_group_ref(group.relay, group.group_id);
+            const std::string name = group.name.empty() ? group.group_id : group.name;
+            const std::string label = (group.metadata_verification == 2 ? "[sig] " :
+                                       group.metadata_verification == 1 ? "[hash] " : "[?] ") +
+                name + " · " + std::to_string(group.message_count) +
+                " messages · " + group.relay;
+            if (ImGui::Selectable(label.c_str(), false,
+                                  href.empty() ? ImGuiSelectableFlags_Disabled : 0)) {
+              cmd = UiCommand::NavigateUrl;
+              result.arg = href;
+            }
+            if (ImGui::IsItemHovered())
+              ImGui::SetTooltip("Group: %s\nRelay: %s\nParent: %s\n%s\n"
+                                "%lld unique group events\n%s%s%s%s\n"
+                                "Relay master key (NIP-11) not checked",
+                                group.group_id.c_str(), group.relay.c_str(),
+                                group.parent_id.empty() ? "(root/unknown)" : group.parent_id.c_str(),
+                                group.about.c_str(),
+                                static_cast<long long>(group.event_count),
+                                group.private_group ? "private " : "",
+                                group.hidden ? "hidden " : "",
+                                group.restricted ? "restricted " : "",
+                                group.closed ? "closed" : "");
+            ImGui::PopID();
             ImGui::PopID();
           }
         }

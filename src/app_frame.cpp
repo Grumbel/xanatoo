@@ -313,14 +313,16 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.revisions_panel_open = app.revision_panel_open;
   ui_state.nostr_explorer_open = app.nostr_explorer_open;
   ui_state.nostr_accounts_open = app.nostr_accounts_open;
-  ui_state.nostr_show_people = app.nostr_people_tab;
+  ui_state.nostr_tab = app.nostr_tab;
   ui_state.nostr_search = app.nostr_search;
   ui_state.nostr_page = app.nostr_page;
   ui_state.nostr_people_more = app.nostr_people_more;
   ui_state.nostr_events_more = app.nostr_events_more;
+  ui_state.nostr_groups_more = app.nostr_groups_more;
   ui_state.nostr_stats = app.nostr_stats;
   ui_state.nostr_people = app.nostr_people;
   ui_state.nostr_events = app.nostr_events;
+  ui_state.nostr_groups = app.nostr_groups;
   ui_state.nostr_identities = app.nostr_identities;
   ui_state.nostr_selected_identity = app.nostr_active_identity;
   if (app.nostr_explorer_open) {
@@ -532,7 +534,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::ToggleAnnotationsPanel || c == C::ToggleRevisionsPanel ||
         c == C::ToggleNostrExplorer || c == C::ToggleNostrAccounts ||
         c == C::NostrSearchLocal || c == C::NostrShowPeople ||
-        c == C::NostrShowEvents || c == C::NostrRefreshLocal ||
+        c == C::NostrShowEvents || c == C::NostrShowGroups ||
+        c == C::NostrRefreshLocal ||
         c == C::NostrPrevPage || c == C::NostrNextPage ||
         c == C::NostrAddWatchIdentity || c == C::NostrSelectIdentity ||
         c == C::NewAnnotationLayer ||
@@ -933,12 +936,17 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       refresh_nostr_catalogue(app);
       break;
     case C::NostrShowPeople:
-      app.nostr_people_tab = true;
+      app.nostr_tab = 0;
       app.nostr_page = 0;
       refresh_nostr_catalogue(app);
       break;
     case C::NostrShowEvents:
-      app.nostr_people_tab = false;
+      app.nostr_tab = 1;
+      app.nostr_page = 0;
+      refresh_nostr_catalogue(app);
+      break;
+    case C::NostrShowGroups:
+      app.nostr_tab = 2;
       app.nostr_page = 0;
       refresh_nostr_catalogue(app);
       break;
@@ -950,7 +958,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       refresh_nostr_catalogue(app);
       break;
     case C::NostrNextPage:
-      if (app.nostr_people_tab ? app.nostr_people_more : app.nostr_events_more)
+      if (app.nostr_tab == 0 ? app.nostr_people_more :
+          app.nostr_tab == 1 ? app.nostr_events_more : app.nostr_groups_more)
         ++app.nostr_page;
       refresh_nostr_catalogue(app);
       break;

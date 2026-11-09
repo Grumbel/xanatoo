@@ -6,7 +6,28 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **311** (this delivery is **310**)
+Next bundle number: **312** (this delivery is **311**)
+
+## Status (2026-11-09) — NIP-29 relay-group catalogue and discovery
+
+- Group indexing now retains `relay + group ID` identities for signed/hash-
+  checked `kind:39000` metadata and group `h`-tagged events; individual relays
+  can host distinct groups sharing an ID. The cache tracks claimed names,
+  about, parent, access flags, and deduplicated group message counts.
+- Nostr Explorer adds a Groups tab and explicit `wss://` relay discovery.
+  `nostr:groups` samples public relays; `nostr:groups@wss://...` targets one
+  relay. Opening a group fetches its `kind:1/9/11` public timeline and falls
+  back to locally cached group messages when offline.
+- Fixed a general SQLite search bug: empty `std::string_view{}` was binding
+  SQL NULL instead of an empty string, hiding all rows in unfiltered searches.
+- Group signatures still do not establish that metadata came from the relay's
+  NIP-11 master key; group discovery never claims authoritative membership.
+- Linked SQLite integration covers relay-scoped group identity, deduplication,
+  metadata, cached group-event retrieval and the previous schema migration. Native
+  GUI compilation/interaction still requires the NixOS development setup.
+- Next: authenticate relay metadata via NIP-11, add NIP-29 membership/admin
+  event views and NIP-19 `naddr` sharing, then NIP-05 lookup, mbedTLS Schnorr
+  verification and local cache retention/export/clear controls.
 
 ## Status (2026-11-09) — Nostr event integrity and cache migration
 

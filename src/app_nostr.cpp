@@ -14,10 +14,14 @@ void refresh_nostr_catalogue(App& app) {
                                          app.nostr_page * kPageSize);
   app.nostr_events = nostr_cached_events(app.nostr_search, kPageSize + 1,
                                          app.nostr_page * kPageSize);
+  app.nostr_groups = nostr_cached_groups(app.nostr_search, kPageSize + 1,
+                                         app.nostr_page * kPageSize);
   app.nostr_people_more = app.nostr_people.size() > kPageSize;
   app.nostr_events_more = app.nostr_events.size() > kPageSize;
+  app.nostr_groups_more = app.nostr_groups.size() > kPageSize;
   if (app.nostr_people_more) app.nostr_people.resize(kPageSize);
   if (app.nostr_events_more) app.nostr_events.resize(kPageSize);
+  if (app.nostr_groups_more) app.nostr_groups.resize(kPageSize);
   app.nostr_identities = nostr_local_identities();
   if (app.nostr_active_identity.empty())
     app.nostr_active_identity = nostr_active_local_identity();
