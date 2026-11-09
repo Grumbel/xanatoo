@@ -6,7 +6,23 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **304** (this delivery is **303**)
+Next bundle number: **305** (this delivery is **304**)
+
+## Status (2026-11-09) — Annotation history restore and clickable tabs
+
+- The active personal annotation layer now has a bounded (24 entries) history
+  browser with timestamps, item counts and a Restore button. Restoring an old
+  snapshot commits it as a new child of the current head instead of deleting
+  later revisions. Wrong-layer restores and stale-head conflicts fail safely.
+- Note tabs share their layout and hit-test geometry. Clicking or
+  right-clicking a tab focuses its passage and opens the independent note
+  editor. Multiple notes near the same anchor offset their tabs.
+- SQLite integration tests verify ancestry, restoring deleted notes,
+  rejection of foreign revisions and stale restore attempts. Source syntax
+  checks pass without SQLite. GUI SDL build and interactive click tests still
+  need a development machine with SDL/FreeType/SQLite headers.
+- Next: per-layer colours and orphan reattachment, broader version history
+  navigation, then native local-database document working/published heads.
 
 ## Status (2026-11-09) — Editable note overlays and revisioned removal
 

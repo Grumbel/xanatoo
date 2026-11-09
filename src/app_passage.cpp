@@ -449,6 +449,42 @@ bool annotation_marks_fresh(const Pane& p) {
          p.annotation_marks.layout_gen == p.layout.generation;
 }
 
+std::vector<AnnotationIcon> annotation_icons(App& app, Pane& p) {
+  std::vector<AnnotationIcon> out;
+  if (!annotation_marks_fresh(p)) return out;
+  const float lh = static_cast<float>(app.fonts.regular.line_height());
+  for (size_t i = 0; i < p.annotation_marks.items.size(); ++i) {
+    const AnnotationMark& mark = p.annotation_marks.items[i];
+    if (mark.kind != "note" || mark.range.empty()) continue;
+    const auto cp = xanatoo::caret_screen_pos(
+        p.layout, mark.range.anchor, p.scroll_y, lh);
+    if (!cp.valid || cp.y < -lh || cp.y > static_cast<float>(p.h) + lh)
+      continue;
+    AnnotationIcon icon;
+    icon.item = i;
+    icon.w = 9.f;
+    icon.h = 10.f;
+    icon.x = std::max(2.f, cp.x - icon.w - 2.f);
+    icon.y = cp.y - cp.height * 0.8f;
+    // Multiple independent layers may annotate the same passage.
+    for (const auto& previous : out)
+      if (std::abs(previous.y - icon.y) < 3.f &&
+          std::abs(previous.x - icon.x) < icon.w + 2.f)
+        icon.x = std::max(2.f, previous.x - icon.w - 3.f);
+    out.push_back(icon);
+  }
+  return out;
+}
+
+const AnnotationMark* annotation_icon_at(App& app, Pane& p,
+                                         float lx, float my) {
+  for (const auto& icon : annotation_icons(app, p))
+    if (lx >= icon.x - 2.f && lx <= icon.x + icon.w + 2.f &&
+        my >= icon.y - 2.f && my <= icon.y + icon.h + 2.f)
+      return &p.annotation_marks.items[icon.item];
+  return nullptr;
+}
+
 void select_annotation(App& app, int pi, const std::string& annotation_id) {
   Pane& p = app.panes[pi];
   update_annotation_marks(app, p);

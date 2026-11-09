@@ -200,6 +200,18 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
     const int at = pane_at(app, mx, static_cast<float>(y));
     float my = content_y(app, static_cast<float>(y), at);
 
+    // Note tabs open their independent layer editor without touching text.
+    if (at >= 0)
+      if (const AnnotationMark* note = annotation_icon_at(
+              app, app.panes[at], local_x(app, mx, at), my)) {
+        const std::string id = note->annotation_id;
+        focus_view(app, at);
+        app.selected_annotation_id = id;
+        app.annotation_panel_open = true;
+        select_annotation(app, at, id);
+        return;
+      }
+
     // A bookmark's margin icon selects its passage.
     if (at >= 0)
       if (const BookmarkMark* bm = bookmark_icon_at(
@@ -652,6 +664,13 @@ static void mouse_right_down(App& app, SDL_Event& ev, bool imgui_mouse) {
         break;
       }
       // A bookmark's margin icon has a menu of its own.
+      if (const AnnotationMark* note = annotation_icon_at(app, p, lx, my)) {
+        const std::string id = note->annotation_id;
+        app.selected_annotation_id = id;
+        app.annotation_panel_open = true;
+        select_annotation(app, app.focus, id);
+        return;
+      }
       if (const BookmarkMark* bm = bookmark_icon_at(app, p, lx, my)) {
         app.bookmark_menu = bm->address;
         app.ui.open_bookmark_menu(static_cast<float>(ev.button.x),
@@ -919,10 +938,16 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
       app.hover.transclude_src.clear();
       app.hover.bookmark.clear();
       app.hover.bookmark_pane = -1;
+      app.hover.annotation.clear();
+      app.hover.annotation_pane = -1;
       app.hover.chrome_notice = on_chrome_notice(hp, lx, my);
       if (const BookmarkMark* bm = bookmark_icon_at(app, hp, lx, my)) {
         app.hover.bookmark = bm->address;
         app.hover.bookmark_pane = hover_pane;
+      }
+      if (const AnnotationMark* note = annotation_icon_at(app, hp, lx, my)) {
+        app.hover.annotation = note->annotation_id;
+        app.hover.annotation_pane = hover_pane;
       }
 
       // Column gutters

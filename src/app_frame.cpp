@@ -308,6 +308,8 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
         !app.hidden_annotation_layers.contains(layer.id),
         layer.id == app.active_annotation_layer, layer.annotations.size()});
   ui_state.annotations.clear();
+  ui_state.annotation_history.clear();
+  ui_state.annotation_history_layer.clear();
   if (app.annotation_panel_open) {
     Pane& pane = focused_pane(app);
     update_annotation_marks(app, pane);
@@ -338,6 +340,24 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
               annotation.id == app.selected_annotation_id});
         }
       }
+    }
+    const auto active = std::find_if(app.annotation_layers.begin(),
+                                      app.annotation_layers.end(),
+                                      [&](const auto& layer) {
+      return layer.id == app.active_annotation_layer && layer.owner == "local";
+    });
+    if (active != app.annotation_layers.end()) {
+      if (app.annotation_history_cached_layer != active->id ||
+          app.annotation_history_cached_head != active->revision) {
+        app.annotation_history_cached_layer = active->id;
+        app.annotation_history_cached_head = active->revision;
+        app.annotation_history_cache =
+            xanatoo::annotation_layer_history(*active, 24);
+      }
+      ui_state.annotation_history_layer = active->id;
+      for (const auto& revision : app.annotation_history_cache)
+        ui_state.annotation_history.push_back({
+            revision.id, revision.time, revision.annotation_count});
     }
   }
   ui_state.location_icon = address_icon(app, ui_state.doc_label);
@@ -465,7 +485,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::SelectAnnotationLayer || c == C::ToggleAnnotationLayer ||
         c == C::AddAnnotationHighlight || c == C::AddAnnotationNote ||
         c == C::SelectAnnotation || c == C::UpdateAnnotationNote ||
-        c == C::RemoveAnnotation ||
+        c == C::RemoveAnnotation || c == C::RestoreAnnotationLayerVersion ||
         c == C::ToggleStylesPanel ||
         c == C::AddBookmark || c == C::BookmarkPage || c == C::RemoveBookmark ||
         c == C::BookmarkPosition || c == C::NewTab ||
@@ -940,6 +960,29 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       ++app.annotation_layers_gen;
       flash_status(app, removed ? "Annotation removed (history preserved)"
                                 : "Annotation note saved to layer history");
+      break;
+    }
+    case C::RestoreAnnotationLayerVersion: {
+      const size_t sep = arg.find('\n');
+      if (sep == std::string::npos) break;
+      const std::string layer_id = arg.substr(0, sep);
+      const std::string revision_id = arg.substr(sep + 1);
+      auto layer = std::find_if(app.annotation_layers.begin(),
+                                app.annotation_layers.end(),
+                                [&](const auto& candidate) {
+        return candidate.id == layer_id && candidate.owner == "local";
+      });
+      if (layer == app.annotation_layers.end() || revision_id.empty() ||
+          !xanatoo::restore_annotation_layer_revision(*layer, revision_id)) {
+        flash_status(app, "Could not restore layer revision (possibly changed elsewhere)");
+        break;
+      }
+      const bool selected_exists = std::any_of(
+          layer->annotations.begin(), layer->annotations.end(),
+          [&](const auto& a) { return a.id == app.selected_annotation_id; });
+      if (!selected_exists) app.selected_annotation_id.clear();
+      ++app.annotation_layers_gen;
+      flash_status(app, "Restored annotation layer as a new revision");
       break;
     }
     case C::AddBookmark:
@@ -2157,22 +2200,21 @@ static void draw_pane_overlays(App& app, int i) {
         app.renderer.draw_selection(rects, ox, c.r, c.g, c.b, c.a);
         if (mark.annotation_id == app.selected_annotation_id)
           app.renderer.draw_selection(rects, ox, c.r, c.g, c.b, c.a);
-        if (mark.kind == "note") {
-          // A small text-box tab at the passage anchor distinguishes a note
-          // from a plain highlight. The note body is edited in the separate
-          // Annotations panel; no node is inserted into the source tree.
-          const auto cp = xanatoo::caret_screen_pos(
-              pane.layout, mark.range.anchor, draw_scroll, lh);
-          if (cp.valid && cp.y >= clip_y && cp.y < clip_y + pane.h) {
-            const int x = static_cast<int>(cp.x + ox) - 11;
-            const int y = static_cast<int>(cp.y - cp.height * 0.8f);
-            const SDL_Rect tab{x, y, 9, 8};
-            SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(app.sdl, c.r, c.g, c.b, 225);
-            xanatoo::sdl::fill_rect(app.sdl, &tab);
-            xanatoo::sdl::draw_line(app.sdl, x + 5, y + 8, x + 7, y + 10);
-          }
-        }
+      }
+      // Note tabs are independently hit-tested; their geometry is shared
+      // with app_events so clicking the tab opens the note editor.
+      for (const AnnotationIcon& icon : annotation_icons(app, pane)) {
+        const AnnotationMark& mark = pane.annotation_marks.items[icon.item];
+        const bool hot = app.hover.annotation_pane == i &&
+                         app.hover.annotation == mark.annotation_id;
+        const int x = static_cast<int>(ox + icon.x);
+        const int y = static_cast<int>(py + icon.y);
+        const SDL_Rect tab{x, y, static_cast<int>(icon.w),
+                           static_cast<int>(icon.h - 2.f)};
+        SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(app.sdl, c.r, c.g, c.b, hot ? 255 : 220);
+        xanatoo::sdl::fill_rect(app.sdl, &tab);
+        xanatoo::sdl::draw_line(app.sdl, x + 5, y + 8, x + 7, y + 10);
       }
     }
     for (const BookmarkMark& bm : pane.bookmark_marks.items) {
@@ -3782,6 +3824,7 @@ void present_frame(App& app) {
   else if (app.hover.grip != xanatoo::INVALID_NODE)
     set_cursor(app, app.cursor_sizeall);
   else if (!app.hover.href.empty() || !app.hover.bookmark.empty() ||
+           !app.hover.annotation.empty() ||
            app.hover.stretch != xanatoo::INVALID_NODE ||
            app.hover.image != xanatoo::INVALID_NODE ||
            app.hover.task != xanatoo::INVALID_NODE || app.hover.chrome_notice ||

@@ -3,6 +3,8 @@
 #pragma once
 
 #include <optional>
+#include <cstdint>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -65,5 +67,21 @@ bool add_annotation(AnnotationLayer& layer, Annotation annotation);
 bool update_annotation_body(AnnotationLayer& layer, std::string_view annotation_id,
                             std::string_view body);
 bool remove_annotation(AnnotationLayer& layer, std::string_view annotation_id);
+
+struct AnnotationLayerRevision {
+  std::string id;
+  int64_t time = 0;
+  size_t annotation_count = 0;
+};
+
+// Newest first. The chain is walked from the caller's revision, not from a
+// mutable global head; useful for a bounded version-history browser.
+std::vector<AnnotationLayerRevision> annotation_layer_history(
+    const AnnotationLayer& layer, size_t limit = 32);
+
+// Restore is a new child of the current head, not a rewind that discards
+// later edits. Optimistic concurrency protects against a stale client.
+bool restore_annotation_layer_revision(AnnotationLayer& layer,
+                                       std::string_view revision);
 
 }  // namespace xanatoo

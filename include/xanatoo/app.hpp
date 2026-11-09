@@ -178,6 +178,10 @@ struct AnnotationMarks {
   std::vector<AnnotationMark> items;
   size_t unresolved = 0;
 };
+struct AnnotationIcon {
+  size_t item = 0;  // into AnnotationMarks::items
+  float x = 0.f, y = 0.f, w = 0.f, h = 0.f;
+};
 // Margin icon of a bookmark mark, in pane-local x / content-relative y
 // (bookmark_icons).
 struct BookmarkIcon {
@@ -360,6 +364,8 @@ struct Hover {
   std::string transclude_src;
   std::string bookmark;  // address of the bookmark whose margin icon is hovered
   int bookmark_pane = -1;
+  std::string annotation;  // note id whose passage tab is hovered
+  int annotation_pane = -1;
   bool chrome_notice = false;  // reader mode notice ("Show all")
 };
 
@@ -730,6 +736,9 @@ struct App {
   uint64_t annotation_note_created_gen = 0;
   uint64_t annotation_layers_gen = 1;
   bool annotation_panel_open = false;
+  std::string annotation_history_cached_layer;
+  std::string annotation_history_cached_head;
+  std::vector<xanatoo::AnnotationLayerRevision> annotation_history_cache;
   uint64_t bookmarks_gen = 1;  // bumped by every change of `bookmarks`
   std::string bookmark_menu;   // bookmark of the open margin-icon menu
   bool history_panel_open = false;
@@ -1188,6 +1197,9 @@ bool bookmark_marks_fresh(const Pane& p);
 void update_annotation_marks(App& app, Pane& p);
 bool annotation_marks_fresh(const Pane& p);
 void select_annotation(App& app, int pi, const std::string& annotation_id);
+std::vector<AnnotationIcon> annotation_icons(App& app, Pane& p);
+const AnnotationMark* annotation_icon_at(App& app, Pane& p,
+                                         float lx, float my);
 // Margin icons of the marks on screen (one per bookmark, those on one line
 // side by side), pane-local x, y relative to the pane's content top.
 std::vector<BookmarkIcon> bookmark_icons(App& app, Pane& p);

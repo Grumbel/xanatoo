@@ -106,9 +106,19 @@ its create operation succeeds. Each successful edit creates an immutable
 revision (identical content does not duplicate revisions). This is a layer
 history, entirely separate from document undo/drafts.
 
-Limitations: the panel has no history browser or undo button for layer edits
-yet, and automatic autosaving happens on idle/blur rather than after every
-keystroke. Annotations use the existing bookmark wash colour; per-layer
+**Local layer history** shows up to 24 ancestor revisions of the active local
+layer, newest first, with timestamps and annotation counts. Restore takes the
+selected historical snapshot and commits it as a *new child of the current
+head*: versions after the selected snapshot remain in history. A stale head
+cannot be overwritten. The history browser can also recover removed notes.
+Clicking or right-clicking a note's passage tab opens the Annotations panel
+and selects the attached note. Tabs from multiple layers on the same line are
+offset to avoid overlapping hit targets.
+
+Limitations: the history browser is bounded to the latest 24 revisions and
+currently restores an entire layer snapshot, not one annotation in isolation.
+Automatic autosaving happens on idle/blur rather than after every keystroke.
+Annotations use the existing bookmark wash colour; per-layer
 colours, interactive margin text boxes, permissions, and anchor reattachment
 are still planned. Published layer exchange and database-native document
 working/published heads remain separate future work.

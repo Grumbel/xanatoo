@@ -44,6 +44,7 @@ enum class UiCommand {
   SelectAnnotation,     // arg = annotation id in visible current page
   UpdateAnnotationNote, // arg = replacement body for selected local note
   RemoveAnnotation,     // arg = annotation id in local layer
+  RestoreAnnotationLayerVersion, // arg = layer id + newline + revision id
   SelectBookmark,  // arg = address: select its passage in the focused view
   CopyText,        // arg = text for the clipboard (an address)
   OpenReply,       // right-clicked Message: start a mock reply draft
@@ -225,6 +226,13 @@ struct UiState {
     bool selected = false;
   };
   std::vector<AnnotationItem> annotations;
+  struct AnnotationHistoryItem {
+    std::string id;
+    int64_t time = 0;
+    size_t count = 0;
+  };
+  std::string annotation_history_layer;
+  std::vector<AnnotationHistoryItem> annotation_history;
   uint64_t annotation_note_created_gen = 0;
   bool hover_preview = false;
   bool auto_updates = false;

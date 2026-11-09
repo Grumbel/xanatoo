@@ -60,6 +60,8 @@ void clear_interaction_hover(App& app) {
   app.hover.transclude_pane = -1;
   app.hover.transclude_src.clear();
   app.hover.chrome_notice = false;
+  app.hover.annotation.clear();
+  app.hover.annotation_pane = -1;
 }
 
 void draw_stick_cursor(App& app, SDL_Renderer* r, int cx, int cy,

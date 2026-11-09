@@ -203,4 +203,34 @@ bool remove_annotation(AnnotationLayer& layer, std::string_view annotation_id) {
   return true;
 }
 
+std::vector<AnnotationLayerRevision> annotation_layer_history(
+    const AnnotationLayer& layer, size_t limit) {
+  std::vector<AnnotationLayerRevision> history;
+  std::unordered_set<std::string> visited;
+  std::string cursor = layer.revision;
+  while (!cursor.empty() && history.size() < limit &&
+         visited.insert(cursor).second) {
+    const auto record = load_object_revision(cursor);
+    // Reject a corrupted/foreign parent before presenting it as restorable.
+    if (!record || record->key != layer.id || record->kind != kKind) break;
+    const auto snapshot = parse_annotation_layer(record->data);
+    if (!snapshot || snapshot->id != layer.id) break;
+    history.push_back({record->id, record->time,
+                       snapshot->annotations.size()});
+    cursor = record->parent;
+  }
+  return history;
+}
+
+bool restore_annotation_layer_revision(AnnotationLayer& layer,
+                                       std::string_view revision) {
+  const auto snapshot = load_annotation_layer(layer.id, revision);
+  if (!snapshot) return false;
+  AnnotationLayer restored = *snapshot;
+  restored.revision = layer.revision;
+  if (!save_annotation_layer(restored)) return false;
+  layer = std::move(restored);
+  return true;
+}
+
 }  // namespace xanatoo

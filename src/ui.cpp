@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <algorithm>
 #include <cstdio>
+#include <ctime>
 #include <cstring>
 #include <filesystem>
 #include <iostream>
@@ -2563,6 +2564,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         std::snprintf(annotation_edit_note_, sizeof(annotation_edit_note_),
                       "%s", selected_body.c_str());
       }
+      bool pending_note_changes = false;
       if (selected) {
         ImGui::Separator();
         ImGui::Text("Selected: %s", selected->kind.c_str());
@@ -2576,6 +2578,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                 sizeof(annotation_edit_note_), ImVec2(-1.f, 88.f));
             if (changed) annotation_note_last_edit_ = ImGui::GetTime();
             const bool pending = selected->body != annotation_edit_note_;
+            pending_note_changes = pending;
             // Commit after typing pauses or the editor loses focus. Each
             // commit creates a layer revision, never a source document edit.
             if (!too_long && pending &&
@@ -2602,6 +2605,35 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
           ImGui::TextDisabled("Previous versions remain in layer history");
         } else {
           ImGui::TextDisabled("Other people's layers are read-only");
+        }
+      }
+      if (!state.annotation_history_layer.empty() &&
+          ImGui::CollapsingHeader("Local layer history")) {
+        ImGui::TextDisabled("Restore creates a new version; it does not erase history");
+        if (pending_note_changes)
+          ImGui::TextDisabled("Finish saving the note before restoring a version");
+        for (size_t i = 0; i < state.annotation_history.size(); ++i) {
+          const auto& revision = state.annotation_history[i];
+          ImGui::PushID(revision.id.c_str());
+          const std::time_t seconds = static_cast<std::time_t>(revision.time);
+          char when[40] = {};
+          if (const std::tm* local = std::localtime(&seconds))
+            std::strftime(when, sizeof(when), "%Y-%m-%d %H:%M", local);
+          ImGui::Text("%s · %zu annotations · %s",
+                      i == 0 ? "Current" : "Earlier",
+                      revision.count, when);
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", revision.id.c_str());
+          if (i != 0) {
+            ImGui::SameLine();
+            ImGui::BeginDisabled(pending_note_changes);
+            if (ImGui::SmallButton("Restore")) {
+              cmd = UiCommand::RestoreAnnotationLayerVersion;
+              result.arg = state.annotation_history_layer + "\n" + revision.id;
+            }
+            ImGui::EndDisabled();
+          }
+          ImGui::PopID();
         }
       }
     }
