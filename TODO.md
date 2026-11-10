@@ -6,7 +6,18 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **346** (this delivery is **345**)
+Next bundle number: **347** (this delivery is **346**)
+
+## Status (2026-11-10) — SDL2 R36S drop-position build fix (bundle 346)
+
+- The SDL2 drop-position fallback called `mouse_position()` before its inline
+  declaration in `sdl.hpp`, failing all R36S translation units that included
+  `app.hpp`. Use SDL2's `SDL_GetMouseState(int*, int*)` directly in that branch;
+  its returned coordinates are identical to the later compatibility wrapper.
+  SDL3 continues to use the event's actual drop x/y coordinates.
+- The existing `tests/sdl_api_compile.cpp` exercises `drop_position` on both
+  SDL variants when their respective headers are available. Full R36S/Nix
+  cross-compilation still requires the toolchain from the user's build host.
 
 ## Status (2026-11-10) — semantic heading tag vocabulary (bundle 345)
 

@@ -490,7 +490,9 @@ inline std::pair<int, int> drop_position(const SDL_Event& event) {
 #else
   (void)event;
   int x = 0, y = 0;
-  mouse_position(&x, &y);
+  // SDL2 already reports integer window coordinates. Call it directly here:
+  // the shared mouse_position() wrapper is defined later in this header.
+  SDL_GetMouseState(&x, &y);
   return {x, y};
 #endif
 }
