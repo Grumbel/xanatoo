@@ -31,9 +31,12 @@ keyboard/mouse behaviour. The dock/tile model is intentionally more flexible.
 ## Toolbar states
 
 - Ordinary toolbar actions have no button frame until hover; they rise on
-  hover and sink only while pressed. **Browse Mode** stays recessed while
-  active, as do toggles that retain the same graphic (native view, outline,
+  hover and sink only while pressed. Browsing is now the default: the
+  **Edit Mode** pencil button (F2) stays recessed when editing is enabled,
+  as do toggles that retain the same graphic (native view, outline,
   history, downloads and the contextual reader/navigation/site-map buttons).
+- The document tab's right-click menu restores normal menu item spacing and
+  window padding instead of inheriting the tightly packed tab-strip style.
 - **Split Panes** becomes **Join Panes** with a different icon while the
   independent two-pane arrangement is active, without remaining recessed.
   That toolbar action keeps the left/top pane when joining. For an explicit

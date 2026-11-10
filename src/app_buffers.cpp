@@ -193,7 +193,7 @@ bool focused_read_only(App& app) {
                app.invalid_xml_paths.contains(b->path));
 }
 
-bool browsing(App& app) { return app.browse_mode || focused_read_only(app); }
+bool browsing(App& app) { return !app.edit_mode || focused_read_only(app); }
 
 xanatoo::Document load_doc_or_placeholder(App& app, const std::string& path) {
   if (is_in_app_remote_url(path)) {

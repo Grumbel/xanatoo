@@ -191,7 +191,7 @@ enum class UiCommand {
   OpenTranscludeOther,  // open include target in the other pane
   ToggleDiff,
   ToggleStructure,
-  ToggleBrowse,  // read-only navigation mode
+  ToggleEdit,  // opt-in editing mode; browsing is the default
   ToggleChrome,  // content only: hide menu bar, toolbars, tabs, status line
   ToggleNative,  // web page ↔ its native xanatoo form (wikipedia:, hn:, …)
   ViewSourceRendered, // leave a source projection and show the document
@@ -355,7 +355,8 @@ struct UiState {
   // Style sheets: (name, title) pairs and the active name.
   std::vector<std::pair<std::string, std::string>> styles;
   std::string style;
-  bool browse = false;  // read-only navigation
+  bool browse = true;  // read-only navigation (default, or foreign content)
+  bool can_edit = false;  // false for foreign/read-only content
   bool chrome_hidden = false;  // content only: no menu bar / toolbars / tabs
   bool virtual_keyboard = false;
   // Gamepad right-stick software pointer (extra; real mouse stays separate)

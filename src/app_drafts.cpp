@@ -231,7 +231,7 @@ bool make_stored_copy(App& app, BufferId id) {
   if (is_stored_original_ref(b->path)) {
     const bool ok = open_stored_document(
         app, app.focus, "db:" + b->path.substr(12));
-    if (ok) app.browse_mode = false;
+    if (ok) app.edit_mode = true;
     return ok;
   }
   if (b->path.empty()) return write_stored_working(app, *b);
@@ -246,7 +246,7 @@ bool make_stored_copy(App& app, BufferId id) {
       return false;
     }
     const bool ok = open_stored_document(app, app.focus, "db:" + existing->key);
-    if (ok) app.browse_mode = false;
+    if (ok) app.edit_mode = true;
     return ok;
   }
   if (remote && !b->raw_source) {
@@ -277,7 +277,7 @@ bool make_stored_copy(App& app, BufferId id) {
   b->draft_due = 0;
   b->dirty = false;
   b->raw_source.reset();
-  app.browse_mode = false;
+  app.edit_mode = true;
   update_title(app);
   return true;
 }

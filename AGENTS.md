@@ -61,7 +61,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_pages.cpp` | paged reading (`docs/PAGED.md`): `Pane::paged` / `PageView`, `paginate_pane` (called by `layout_panes`, cuts the layout with `paginate.hpp`), `page_turn`, page bar + edge zones + column rules (`draw_page_chrome`, `page_pointer_*`); while `pages.on`, `scroll_y` is a multiple of `stride`, `Pane::h` leaves out the bar, `sb_reserve` is 0 — use `pane_max_scroll`, `spread_at`, `page_goto_spread`, never pixel scrolling |
 | `math_parse.cpp` / `math_layout.cpp` / `math_font.cpp` | TeX math (`docs/MATH.md`): `parse_math` (TeX subset → `MathNode`), `layout_math` (TeXbook App. G on a `MathFace`, em units, y up) and the FreeType `MathFont` (MATH table, glyph rasters by glyph id, `draw_math`); `FontSet::math_font()` finds the font on first use. A formula is an `InlineKind::Math` span (`src` = TeX, `display`) laid out as an atom by `layout_paragraph` (`PositionedMath`); never draw math through `Font`. Pure parts are unit-tested with a fake `MathFace` |
 | `app_split.cpp` | Trail-mode linked navigation: first-tile links open the second, second-tile links advance the trail; hover previews (`SplitPreview`, only with `ViewSettings::hover_preview`, off by default) |
-| `theme.cpp` / `ui.cpp` | GTK2 Clearlooks-inspired grey and shared native/ImGui palette; yellow BeOS title bars and consistently sized window controls. **Regular panel buttons stay raised; toolbar actions are flat until hover.** Browse Mode and toggles without alternate graphics stay sunken while active (`tool_button(..., latched)` supplies the state *inside* the style stack); Split/Join and empty/filled Bookmark use alternate SVGs under `icons/svg/` and remain flat, including when active. Reload uses opposed green arrows. Native scrollbar thumbs use `theme::draw_scroll_thumb` (separate from button faces) for strong contrast; ImGui uses matching grab colours. `scrollbar_geometry.hpp` shares full-height, arrowless scrollbar thumb mathematics between paint and mouse paths |
+| `theme.cpp` / `ui.cpp` | GTK2 Clearlooks-inspired grey and shared native/ImGui palette; yellow BeOS title bars and consistently sized window controls. **Regular panel buttons stay raised; toolbar actions are flat until hover.** Edit Mode (opt-in) and toggles without alternate graphics stay sunken while active (`tool_button(..., latched)` supplies the state *inside* the style stack); Split/Join and empty/filled Bookmark use alternate SVGs under `icons/svg/` and remain flat, including when active. Reload uses opposed green arrows. Native scrollbar thumbs use `theme::draw_scroll_thumb` (separate from button faces) for strong contrast; ImGui uses matching grab colours. `scrollbar_geometry.hpp` shares full-height, arrowless scrollbar thumb mathematics between paint and mouse paths |
 | `style.cpp` | document style sheets (`styles/*.xss`, S-expressions): `DocStyle` roles → layout spacing/fonts/glyph colours + renderer decoration colours; `apply_style` in `app_view.cpp` |
 
 Document views: `App::panes[kMaxViews]` — slots 0 / 1 are the centre
@@ -449,10 +449,12 @@ history or distribute patch files.
 - `web_fetch` dispatches on Content-Type; bodies go through
   `detect_charset` / `to_utf8` (util.hpp) first.
 - `external:<url>` hrefs force the system browser (`open_external_url`).
-- Foreign content is read-only: `is_foreign_path` (remote URL, `.html`,
-  any `is_pandoc_path` file, anything under `cache_dir()`) makes `browsing(app)` true.
-  Gate document edits on `browsing(app)`, never on `app.browse_mode`
-  alone (that is only the user's global toggle).
+- Browsing is the default: `App::edit_mode` starts false and F2 / the Edit
+  toolbar toggle opts into editing. Foreign content is read-only:
+  `is_foreign_path` (remote URL, `.html`, any `is_pandoc_path` file,
+  anything under `cache_dir()`) makes `browsing(app)` true even with
+  `app.edit_mode` set. Gate document edits on `browsing(app)`, never on
+  `app.edit_mode` alone. Edit toggle is disabled for foreign content.
 
 ## Inline images and asides
 

@@ -135,12 +135,15 @@ See **Examples → Article / section / header**.
 
 ## Browse mode and gamepad
 
-**F2** toggles **Browse mode** (read-only). Typing, edits, paste, and
+**Browse mode is the default** (read-only). Typing, edits, paste, and
 structure changes are blocked (menus/toolbar included); the status bar turns
-green. Use this for reading and navigating. The edit toolbar, the Format /
-Insert menus and the editing entries of the context menu are hidden; Find,
-Split pane, Heading outline and View tools (line spacing, text width, style
-sheet) move into the browse toolbar.
+green. Press **F2**, use View → **Edit Mode**, or click the pencil toolbar
+button to enable editing (the pencil stays pressed while on). Press F2 again
+to return to browsing. The edit toolbar, Format / Insert menus and editing
+context-menu entries appear only in edit mode; Find, Split pane, Heading
+outline and View tools (line spacing, text width, style sheet) move into the
+browse toolbar otherwise. Foreign pages remain read-only until saved as an
+editable local copy.
 
 **F11** (gamepad **X**) toggles **Content only**: menu bar, toolbars, tabs
 and the status line disappear and only the page is left. Prompts (Ctrl+F,
@@ -168,7 +171,7 @@ default for views not switched themselves. See `docs/PAGED.md`.
 - Arrows / Page / Home / End — move and scroll
 - **Space** or **Enter** — expand/collapse stretch or follow link under caret
 - **Ctrl+[** / **Ctrl+]** — collapse / expand all stretches
-- **F2** — return to edit mode
+- **F2** — toggle editing (only on editable local documents)
 - **F8** — paged reading (ebook style pages instead of scrolling)
 - **F9** — reader mode (hide navigation, sidebars and footers of web pages)
 - **F11** — content only (hide menus, toolbars, tabs, status line)
@@ -185,7 +188,7 @@ default for views not switched themselves. See `docs/PAGED.md`.
 | **LT / RT** | Page up / page down |
 | Left stick | Scroll |
 | Stick click L/R | Collapse all / expand all |
-| **Back** | Toggle browse mode |
+| **Back** | Toggle edit mode (when no navigation history is available) |
 | **Start** | Help |
 
 ## Navigation (history & bookmarks)
@@ -195,7 +198,7 @@ default for views not switched themselves. See `docs/PAGED.md`.
   tab's trail along); the History panel lists every page of the session
 - **Alt+Up** (read-only pages) — Up one level: parent directory, URL path, subreddit
 - **Alt+Home** — Home page (`welcome.md`; toolbar house button)
-- **Browse toolbar** — Back, Forward, Up, Home, Reload, Native view (web page ↔ `wikipedia:` / `hn:` / `reddit:` / `lemmy:` form; pressed while native), Reader mode (F9, pressed while on), location field, Bookmark, display menus, History, Browse mode; in browse mode Find, Split pane, Heading outline and View tools instead of the display menus
+- **Browse toolbar** — Back, Forward, Up, Home, Reload, Native view (web page ↔ `wikipedia:` / `hn:` / `reddit:` / `lemmy:` form; pressed while native), Reader mode (F9, pressed while on), location field, Bookmark, display menus, History, Edit Mode toggle; in browse mode Find, Split pane, Heading outline and View tools instead of the display menus
 - **Edit toolbar** (not in browse mode) — file, clipboard, bold/italic/link; menus for more format, structure, lists, insert; Find, Split pane and Heading outline toggles, and view tools
 - **Services menu** — front pages of the built-in clients: Wikipedia, Hacker News, Reddit, Lemmy, Nostr, Gemini, Standard Ebooks, books and feeds
 - **Ctrl+Shift+H** / **View → History** — session history panel (click to open)

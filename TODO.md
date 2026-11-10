@@ -6,7 +6,23 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **343** (this delivery is **342**)
+Next bundle number: **344** (this delivery is **343**)
+
+## Status (2026-11-10) — tab context menu spacing, edit-mode opt-in (bundle 343)
+
+- Restored ordinary popup window padding, menu item spacing and frame padding
+  inside the document tab's right-click menu. The tab strip itself remains
+  compact; the context menu now matches the proportions of other popups.
+- Inverted the global mode state: `App::edit_mode = false` means browsing is
+  the default, and F2 / the toolbar's pencil / View → Edit Mode enables
+  editing. The Edit Mode button is visibly pressed while on and disabled for
+  foreign read-only pages. All document edit gates still use `browsing(app)`.
+- Converted gamepad/F2 handlers to share the same mode command. Saving a
+  foreign document as an editable local working copy enables editing, while
+  Gemini navigation restores browsing. Updated help and toolbar icon fallback.
+- Vendored headless ImGui panel regression, local URL suggestion test, and
+  the complete SVG-to-PNG fallback rasterization passed. Full SDL/Nix build
+  and visual inspection still require a desktop toolchain.
 
 ## Status (2026-11-10) — URL bar history and toolbar toggle polish (bundle 342)
 

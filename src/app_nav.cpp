@@ -613,7 +613,7 @@ static bool open_page(App& app, int pi, std::string target,
         show_doc_in_pane(app, pi, c->doc, final_url, c->raw_source);
         if (xanatoo::is_gemini_url(final_url)) {
           app.gemini_current_url = final_url;
-          app.browse_mode = true;
+          app.edit_mode = false;
         }
         if (record_history) push_nav_history(app, pi, final_url);
         flash_status(app, "Opened " + final_url);

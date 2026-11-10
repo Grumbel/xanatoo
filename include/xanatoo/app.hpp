@@ -854,7 +854,7 @@ struct App {
   std::vector<xanatoo::DiffWordMark> diff_words[2];
   std::vector<float> diff_overview[2];
   bool structure_mode = false;
-  bool browse_mode = false;
+  bool edit_mode = false;  // opt in to editing; browsing is the default
   // Content only (F11, gamepad X): no menu bar, toolbars, tab strip; the
   // status line only while a prompt or notice needs it.
   bool chrome_hidden = false;
@@ -986,7 +986,7 @@ bool is_in_app_remote_url(std::string_view s);
 // Foreign content — fetched pages, imported HTML / EPUB, anything under
 // cache_dir() — is read-only: browsed, never edited or saved in place.
 bool is_foreign_path(std::string_view path);
-// The focused pane is in browse mode: the global toggle, or foreign content.
+// Browsing is the default; edit mode is opt-in and foreign content stays read-only.
 bool browsing(App& app);
 bool focused_read_only(App& app);
 inline constexpr const char* kReadOnlyNotice =

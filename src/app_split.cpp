@@ -458,7 +458,7 @@ void commit_split_preview(App& app) {
     drop_scratch(app);
     if (xanatoo::is_gemini_url(label)) {
       app.gemini_current_url = label;
-      app.browse_mode = true;
+      app.edit_mode = false;
     }
     push_nav_history(app, 1, label);
   } else if (!path_of(app, r).empty() && r.buf != app.panes[0].buf) {

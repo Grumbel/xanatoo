@@ -302,7 +302,7 @@ const char* menu_icon_for(UiCommand command) {
     case UiCommand::ToggleOutline: return "outline";
     case UiCommand::ToggleStructure: return "structure";
     case UiCommand::ToggleDiff: return "diff";
-    case UiCommand::ToggleBrowse: return "browse";
+    case UiCommand::ToggleEdit: return "edit";
     case UiCommand::ToggleNative: return "native";
     case UiCommand::ToggleReader: return "reader";
     case UiCommand::ToggleHelp: return "help";
@@ -454,7 +454,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
       "strike", "cite", "h1", "h2", "h3", "para", "task", "table",
       "figure", "note", "replace", "outline", "paste", "copy", "new", "open",
       "zoomin", "zoomout", "structure", "diff",
-      "back", "forward", "up", "home", "reload", "stop", "bookmark", "bookmark-outline", "history", "downloads", "browse", "native", "reader", "sitemap",
+      "back", "forward", "up", "home", "reload", "stop", "bookmark", "bookmark-outline", "history", "downloads", "edit", "native", "reader", "sitemap",
       "linespacing", "measure", "style",
       "format", "insert", "view", "lists",
   };
@@ -545,7 +545,7 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
     static const std::unordered_map<std::string, const char*> kShort = {
         {"back", "◀"}, {"forward", "▶"}, {"reload", "⟳"}, {"stop", "✕"},
         {"bookmark", "★"}, {"bookmark-outline", "☆"}, {"join", "Join"},
-        {"history", "Hist"}, {"downloads", "DL"}, {"browse", "Browse"}, {"native", "Native"},
+        {"history", "Hist"}, {"downloads", "DL"}, {"edit", "Edit"}, {"native", "Native"},
         {"reader", "Reader"},
         {"linespacing", "≡↕"}, {"measure", "▣|"},
         {"format", "Aa▾"},
@@ -1398,10 +1398,12 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
                   UiCommand::ToggleHistory, state.history_open);
     toggle_button("tb_downloads", "downloads", "Downloads",
                   UiCommand::ToggleDownloads, state.downloads_open);
-    toggle_button("tb_browse", "browse",
-                  state.browse ? "Browse mode on — F2 to edit"
-                               : "Browse mode (read-only, F2)",
-                  UiCommand::ToggleBrowse, state.browse);
+    tool_button("tb_edit", "edit",
+                !state.can_edit ? "Read-only page — editing unavailable"
+                : state.browse ? "Edit mode (F2)"
+                               : "Edit mode on — F2 to browse",
+                UiCommand::ToggleEdit, cmd, state.can_edit, nullptr,
+                !state.browse);
     // tool_button ends with SameLine, so the cursor sits after the group.
     url_right_w_ = ImGui::GetCursorPosX() - right_x0;
     if (url_own_row) {
@@ -1665,6 +1667,11 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
   // ---- Document tab strip (browser-style) ----
   if (!state.tab_labels.empty()) {
     const float tab_h = 32.f * scale_;
+    // Tab-strip spacing is intentionally tight, but its context popup must
+    // use the same comfortable padding as the other menus.
+    const ImVec2 menu_window_padding = ImGui::GetStyle().WindowPadding;
+    const ImVec2 menu_item_spacing = ImGui::GetStyle().ItemSpacing;
+    const ImVec2 menu_frame_padding = ImGui::GetStyle().FramePadding;
     ImGui::SetNextWindowPos(
         ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
     ImGui::SetNextWindowSize(ImVec2(vp->Size.x, tab_h));
@@ -1759,6 +1766,9 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
           // The popup is attached to the specific tab item, so a right-click
           // does not require selecting the tab first or moving focus.
           ImGui::PushID(static_cast<int>(bid));
+          ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, menu_window_padding);
+          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, menu_item_spacing);
+          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, menu_frame_padding);
           if (ImGui::BeginPopupContextItem("##tab_context",
                                            ImGuiPopupFlags_MouseButtonRight)) {
             if (ImGui::MenuItem("Select Tab", nullptr, i == state.active_tab,
@@ -1781,6 +1791,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
             }
             ImGui::EndPopup();
           }
+          ImGui::PopStyleVar(3);
           ImGui::PopID();
         }
         if (ImGuiTabBar* tb = ImGui::GetCurrentTabBar();
@@ -2097,8 +2108,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleSectionFocus;
       if (ImGui::MenuItem("Structure Highlight", "Ctrl+Shift+L", state.structure))
         cmd = UiCommand::ToggleStructure;
-      if (ImGui::MenuItem("Browse Mode (read-only)", "F2", state.browse))
-        cmd = UiCommand::ToggleBrowse;
+      if (ImGui::MenuItem("Edit Mode", "F2", !state.browse, state.can_edit))
+        cmd = UiCommand::ToggleEdit;
       menu_item_cmd("Content Only (hide menus, toolbars)",
                     UiCommand::ToggleChrome, cmd, true, "F11");
       ImGui::Separator();

@@ -323,6 +323,12 @@ def draw_icon(name: str, size: int = 20) -> bytes:
         px(buf, size, size, S(5), S(5), 0xCC, 0, 0, 255)
         px(buf, size, size, S(7), S(5), 0xCC, 0x99, 0, 255)
         px(buf, size, size, S(9), S(5), 0, 0x99, 0, 255)
+    elif name == "edit":
+        rect(buf, size, size, S(3), S(2), S(12), S(15), INK, PAPER)
+        line(buf, size, size, S(6), S(7), S(11), S(7), INK, 1)
+        line(buf, size, size, S(6), S(10), S(11), S(10), INK, 1)
+        line(buf, size, size, S(9), S(16), S(16), S(9), ACCENT, 2)
+        line(buf, size, size, S(9), S(16), S(11), S(13), INK, 1)
     elif name == "native":
         rect(buf, size, size, S(4), S(3), S(12), S(14), INK, SOFT)
         for yy in (7, 10, 13):

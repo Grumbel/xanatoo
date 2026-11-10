@@ -1315,14 +1315,12 @@ static void on_controllerbuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
       collapse_or_expand_all(app, true);
       break;
     case xanatoo::sdl::button::Back:
-      // Prefer capsule history when available; else toggle browse.
+      // Prefer capsule history when available; else toggle edit mode.
       if (nav_step(app, -1)) {
       } else if (focused_read_only(app)) {
         flash_status(app, kReadOnlyNotice);
       } else {
-        app.browse_mode = !app.browse_mode;
-        flash_status(app,
-                     browsing(app) ? "Browse mode (read-only)" : "Edit mode");
+        execute_command(app, UiCommand::ToggleEdit);
       }
       break;
     case xanatoo::sdl::button::Start:
@@ -1333,14 +1331,7 @@ static void on_controllerbuttondown(App& app, SDL_Event& ev, bool imgui_mouse,
       }
       break;
     case xanatoo::sdl::button::Guide:
-      app.virtual_keyboard = !app.virtual_keyboard;
-      if (app.virtual_keyboard && browsing(app)) {
-        app.browse_mode = false;
-        flash_status(app, "Virtual keyboard — edit mode");
-      } else {
-        flash_status(app, app.virtual_keyboard ? "Virtual keyboard on"
-                                               : "Virtual keyboard off");
-      }
+      execute_command(app, UiCommand::ToggleVirtualKeyboard);
       break;
     default:
       break;
@@ -2013,18 +2004,7 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
       break;
 
     case SDLK_F2:
-      if (focused_read_only(app)) {
-        flash_status(app, kReadOnlyNotice);
-        break;
-      }
-      app.browse_mode = !app.browse_mode;
-      if (browsing(app)) {
-        close_prompt(app);
-        flash_status(app,
-                     "Browse mode — read-only · gamepad navigate · F2 edits");
-      } else {
-        flash_status(app, "Edit mode");
-      }
+      execute_command(app, UiCommand::ToggleEdit);
       break;
 
     case SDLK_EQUALS:

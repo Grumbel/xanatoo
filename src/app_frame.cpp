@@ -221,6 +221,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.style_save_generation = app.style_save_generation;
   ui_state.style_pin_candidates = xanatoo::style_pin_keys(path_of(app, focused_pane(app)));
   ui_state.browse = browsing(app);
+  ui_state.can_edit = !focused_read_only(app);
   ui_state.chrome_hidden = app.chrome_hidden;
   ui_state.virtual_keyboard = app.virtual_keyboard;
   ui_state.help = app.help_mode;
@@ -675,7 +676,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::SelectSearchEngine ||
         c == C::SitemapPrev || c == C::SitemapNext ||
         c == C::OpenTranscludeOther ||
-        c == C::ToggleDiff || c == C::ToggleStructure || c == C::ToggleBrowse ||
+        c == C::ToggleDiff || c == C::ToggleStructure || c == C::ToggleEdit ||
         c == C::ToggleChrome || c == C::ToggleNative ||
         c == C::ToggleReader || c == C::ToggleReaderDefault ||
         c == C::TogglePaged || c == C::TogglePagedDefault ||
@@ -2097,18 +2098,18 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       flash_status(app, app.structure_mode ? "Structure highlight on"
                                            : "Structure highlight off");
       break;
-    case C::ToggleBrowse:
+    case C::ToggleEdit:
       if (focused_read_only(app)) {
         flash_status(app, kReadOnlyNotice);
         break;
       }
-      app.browse_mode = !app.browse_mode;
+      app.edit_mode = !app.edit_mode;
       if (browsing(app)) {
         // Clear any status prompts so they do not trap keys
         close_prompt(app);
         flash_status(
             app,
-            "Browse mode — read-only · F2 exits · gamepad: D-pad move, "
+            "Browse mode — read-only · F2 edits · gamepad: D-pad move, "
             "A open, B collapse, LB/RB headers, LT/RT page");
       } else {
         flash_status(app, "Edit mode");
@@ -2126,8 +2127,13 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     case C::ToggleVirtualKeyboard:
       app.virtual_keyboard = !app.virtual_keyboard;
-      flash_status(app, app.virtual_keyboard ? "Virtual keyboard on (F3)"
-                                             : "Virtual keyboard off");
+      if (app.virtual_keyboard && browsing(app) && !focused_read_only(app)) {
+        app.edit_mode = true;
+        flash_status(app, "Virtual keyboard — edit mode");
+      } else {
+        flash_status(app, app.virtual_keyboard ? "Virtual keyboard on"
+                                               : "Virtual keyboard off");
+      }
       break;
     case C::VirtualKey: {
       if (browsing(app)) {

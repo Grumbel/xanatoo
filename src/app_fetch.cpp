@@ -415,7 +415,7 @@ void finish_navigate(App& app, const FetchJob& job) {
     apply_locator(app, job.pane, job.locator);
   if (xanatoo::is_gemini_url(r.final_url)) {
     app.gemini_current_url = r.final_url;
-    app.browse_mode = true;
+    app.edit_mode = false;
   }
   if (job.record_history)
     push_nav_history(app, job.pane,
