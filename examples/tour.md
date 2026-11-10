@@ -42,30 +42,30 @@ link when clicked. An image without a link opens in the viewer.
 ## Structure
 
 :::article id="structure"
-:::header
+:::heading
 Sections and articles
 :::
 
-A Markdown `#` title becomes a **header** without an h1–h6 rank. Depth
-comes from nesting: a header inside two sections is deeper than one at the
+A Markdown `#` title becomes a **heading** without an h1–h6 rank. Depth
+comes from nesting: a heading inside two sections is deeper than one at the
 top of an article. Group related paragraphs with `:::section` or
 `:::article` so they stay one unit when you move, outline or export them.
 
 :::section id="model"
-:::header
+:::heading
 The model
 :::
 
-- **Header**: the title of the enclosing section or article.
+- **Heading**: the title of the enclosing section or article.
 - **Section**: groups body blocks, and may nest.
 - **Article**: a self-contained composition (essay, RFC, help chapter).
 
 **Format → Structure → Wrap in Section** (`Ctrl+Shift+1`) or **Wrap in
 Article** (`Ctrl+Shift+2`) wraps the block under the caret. `Ctrl+1` makes
-a header.
+a heading.
 
 :::section id="quotable"
-:::header
+:::heading
 A passage to quote
 :::
 

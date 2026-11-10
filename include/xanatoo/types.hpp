@@ -15,7 +15,7 @@ constexpr NodeId INVALID_NODE = 0;
 enum class NodeKind : uint8_t {
   Document,
   Heading,           // legacy ATX depth (prefer Header + Section)
-  Header,            // generic title (HTML <header> role; no h1–h6 rank)
+  Header,            // unranked semantic title (XML <heading>, not layout <header>)
   Article,           // self-contained composition (HTML <article>)
   Section,           // thematic grouping of blocks (HTML <section>)
   Paragraph,

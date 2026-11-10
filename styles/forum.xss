@@ -14,7 +14,7 @@
          (code "IBM Plex Mono" "DejaVu Sans Mono" "monospace"))
   (role article (space-before 1.15em) (space-after 1.15em))
   (role paragraph (space-after 0.68em))
-  (role header (color "#192b3c") (space-before 0.8em) (space-after 0.45em))
+  (role heading (color "#192b3c") (space-before 0.8em) (space-after 0.45em))
   (role section (indent 0) (space-before 0.35em) (space-after 0.5em))
   (role thread (background "#dbe8f2") (color "#214664")
                (space-before 0.8em) (space-after 1.4em) (border "#b6cede"))

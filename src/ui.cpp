@@ -925,7 +925,7 @@ static void menu_structure_items(const UiState& state, UiCommand& cmd) {
   menu_item_cmd("Unwrap Stretch", UiCommand::UnwrapStretch, cmd, state.in_stretch,
                 "Ctrl+Shift+U");
   ImGui::Separator();
-  menu_item_cmd("Header", UiCommand::MakeHeader, cmd, true, "Ctrl+1");
+  menu_item_cmd("Heading", UiCommand::MakeHeader, cmd, true, "Ctrl+1");
   menu_item_cmd("Wrap in Section", UiCommand::WrapSection, cmd, true,
                 "Ctrl+Shift+1");
   menu_item_cmd("Wrap in Article", UiCommand::WrapArticle, cmd, true,
@@ -940,8 +940,8 @@ static void menu_structure_items(const UiState& state, UiCommand& cmd) {
   menu_item_cmd("Move Section Down", UiCommand::MoveSectionDown, cmd, true,
                 "Alt+Shift+Down");
   ImGui::Separator();
-  menu_item_cmd("Header (depth 2)", UiCommand::Heading2, cmd, true, "Ctrl+2");
-  menu_item_cmd("Header (depth 3)", UiCommand::Heading3, cmd, true, "Ctrl+3");
+  menu_item_cmd("Heading (depth 2)", UiCommand::Heading2, cmd, true, "Ctrl+2");
+  menu_item_cmd("Heading (depth 3)", UiCommand::Heading3, cmd, true, "Ctrl+3");
   menu_item_cmd("Paragraph (demote)", UiCommand::ParagraphLevel, cmd, true,
                 "Ctrl+0");
 }
@@ -1591,7 +1591,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       // Structure group
       start_group(1);
       if (edit_menu_begin("tb_structmenu", "structure", "Structure")) {
-        menu_item_cmd("Header", UiCommand::MakeHeader, cmd, true, "Ctrl+1");
+        menu_item_cmd("Heading", UiCommand::MakeHeader, cmd, true, "Ctrl+1");
         menu_item_cmd("Wrap Section", UiCommand::WrapSection, cmd, true,
                       "Ctrl+Shift+1");
         menu_item_cmd("Wrap Article", UiCommand::WrapArticle, cmd, true,

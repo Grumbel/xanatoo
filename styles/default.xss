@@ -29,7 +29,7 @@
 
   ;; Blocks: space-before / space-after / indent are px or em.
   (role paragraph   (space-after 14))
-  (role header      (font heading) (space-before 10) (space-after 12))
+  (role heading     (font heading) (space-before 10) (space-after 12))
   (role section     (space-before 6) (space-after 8) (indent 8))
   (role list        (space-after 8))
   (role list-item   (indent 28) (space-after 8))

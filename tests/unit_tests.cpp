@@ -1161,6 +1161,53 @@ void test_parse_sexpr() {
          out.find("doc") != std::string::npos);
 }
 
+void test_heading_tag_spellings() {
+  using namespace xanatoo;
+
+  const Document sexpr = parse_sexpr(
+      "(doc (section (heading \"New\")) (section (header \"Old\")))");
+  const auto& sections = sexpr.get(sexpr.root).children;
+  EXPECT_EQ(sections.size(), 2u);
+  for (NodeId section : sections) {
+    const Node& title = sexpr.get(sexpr.get(section).children.at(0));
+    EXPECT(title.kind == NodeKind::Header);
+    EXPECT_EQ(title.level, 0);
+  }
+  const std::string canonical = serialize_sexpr(sexpr);
+  EXPECT(canonical.find("(heading") != std::string::npos);
+  EXPECT(canonical.find("(header") == std::string::npos);
+  EXPECT_EQ(serialize_sexpr(parse_sexpr(canonical)), canonical);
+
+  const Document ranked = parse_sexpr(
+      "(doc (heading 3 \"Ranked\") (heading 12 \"Deep\"))");
+  const auto& titles = ranked.get(ranked.root).children;
+  EXPECT_EQ(ranked.get(titles.at(0)).level, 3);
+  EXPECT_EQ(ranked.get(titles.at(1)).level, 12);
+  const std::string ranked_text = serialize_sexpr(ranked);
+  EXPECT(ranked_text.find("(heading 3") != std::string::npos);
+  EXPECT(ranked_text.find("(heading 12") != std::string::npos);
+  EXPECT_EQ(serialize_sexpr(parse_sexpr(ranked_text)), ranked_text);
+
+  const Document fences = parse_markup(
+      ":::heading\nNew\n:::\n\n:::header\nOld\n:::\n");
+  EXPECT_EQ(fences.get(fences.root).children.size(), 2u);
+  const std::string markup = serialize_markup(fences);
+  EXPECT(markup.find(":::heading") != std::string::npos);
+  EXPECT(markup.find(":::header") == std::string::npos);
+  EXPECT_EQ(serialize_markup(parse_markup(markup)), markup);
+
+  DocStyle style = builtin_style();
+  apply_style_source(style,
+      "(stylesheet (role heading (color \"#123456\")))", "heading-test");
+  EXPECT(style.text_color(BlockRole::Header, InlineKind::Text) ==
+         (Rgba{0x12, 0x34, 0x56, 255}));
+  DocStyle legacy = builtin_style();
+  apply_style_source(legacy,
+      "(stylesheet (role header (color \"#123456\")))", "legacy-header-test");
+  EXPECT(legacy.text_color(BlockRole::Header, InlineKind::Text) ==
+         style.text_color(BlockRole::Header, InlineKind::Text));
+}
+
 void test_parse_document_sexpr_path() {
   using namespace xanatoo;
   Document doc = parse_document("(doc (h 1 \"X\"))\n", "note.sexp");
@@ -1505,7 +1552,7 @@ void test_style_sheet_parse() {
              (heading-scale 1.5)
              (body-scale 0.85))
       (role paragraph (space-after gap) (space-before 4px))
-      (role header (color accent) (font code))
+      (role heading (color accent) (font code))
       (role link (color accent) (underline #f))
       (role code (background none))
       (variant warning
@@ -1566,7 +1613,7 @@ void test_named_style_scopes() {
   using namespace xanatoo;
   const std::string source =
       ":::section style=technical\n"
-      ":::header\nTechnical\n:::\n"
+      ":::heading\nTechnical\n:::\n"
       ":::note style=warning kind=tip\nWarning text\n:::\n"
       ":::note\nNormal text\n:::\n"
       ":::\n"
@@ -1587,6 +1634,8 @@ void test_named_style_scopes() {
   EXPECT_EQ(doc.get(warning).style, "warning");
   EXPECT(doc.get(normal).style.empty());
   const std::string saved = serialize_markup(doc);
+  EXPECT(saved.find(":::heading\nTechnical") != std::string::npos);
+  EXPECT(saved.find(":::header") == std::string::npos);
   EXPECT(saved.find(":::section style=technical") != std::string::npos);
   EXPECT(saved.find(":::note style=warning kind=tip") != std::string::npos);
   EXPECT_EQ(serialize_markup(parse_markup(saved)), saved);
@@ -5256,6 +5305,7 @@ int main() {
   test_reddit_json_url_shapes();
   test_path_format_dispatch();
   test_parse_sexpr();
+  test_heading_tag_spellings();
   test_parse_document_sexpr_path();
   test_parse_document_xml_path();
   test_source_view_text();

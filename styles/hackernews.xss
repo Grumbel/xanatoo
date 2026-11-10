@@ -21,7 +21,7 @@
          (code "DejaVu Sans Mono" "monospace"))
 
   (role paragraph   (space-after 0.4em))
-  (role header      (font heading) (color "#000000")
+  (role heading     (font heading) (color "#000000")
                     (space-before 0) (space-after 0.1em))
   (role section     (indent 0) (space-before 0) (space-after 0))
   (role article     (space-after 0.7em))

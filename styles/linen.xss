@@ -14,7 +14,7 @@
          (heading-weight regular) (heading-scale 1.62)
          (code "IBM Plex Mono" "DejaVu Sans Mono" "monospace"))
   (role paragraph (space-after 1.02em))
-  (role header (color "#594333") (space-before 1.22em) (space-after 0.55em))
+  (role heading (color "#594333") (space-before 1.22em) (space-after 0.55em))
   (role section (indent 0) (space-before 0.55em) (space-after 0.8em))
   (role list-item (space-after 0.4em))
   (role block-quote (indent 1.1em) (color "#625b4d") (border "#b6a48b"))

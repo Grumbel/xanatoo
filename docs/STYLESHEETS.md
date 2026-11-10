@@ -2,7 +2,7 @@
 
 A first step from `docs/rethinking-css-for-documents.md`: document
 presentation lives in S-expression style sheets (`styles/*.xss`), kept apart
-from the markup. A sheet styles **semantic roles** (paragraph, header, note,
+from the markup. A sheet styles **semantic roles** (paragraph, heading, note,
 link, …), never markup structure, and there are no selectors or specificity.
 
 Pick one from the toolbar's style button (next to *Text width*) or
@@ -107,7 +107,7 @@ Lowest priority first; a later directory replaces a sheet of the same name:
          (code "Fira Mono" "monospace"))
 
   (role paragraph (space-after gap))
-  (role header (color accent) (space-before 1em))
+  (role heading (color accent) (space-before 1em))
   (role link (color accent) (underline #t)))
 ```
 
@@ -148,7 +148,7 @@ nesting order. There are **no selectors, specificity scores, automatic
 class matching or `!important`**. `style=warning` is an explicit document
 choice, not a change to the meaning of `:::note` or `kind=tip`.
 
-The syntax works on `:::article`, `:::section`, `:::header`, `:::aside`,
+The syntax works on `:::article`, `:::section`, `:::heading`, `:::aside`,
 `:::note` and `:::figure`. An unknown name leaves the block unmodified.
 For now, `page` and `fonts` cannot occur inside variants: they affect an
 entire rendered view rather than a single block. The selected base sheet
@@ -166,11 +166,15 @@ recolours every parent rule that uses `accent` (see `night-amber.xss`).
 - Lengths: `14`, `14px`, or `0.8em`. `em` is the body font size, so it
   follows zoom.
 
-**Block roles:** `paragraph`, `header`, `section`, `list`, `list-item`,
+**Block roles:** `paragraph`, `heading`, `section`, `list`, `list-item`,
 `block-quote`, `note`, `code-block`, `term`, `definition`, `figure`,
 `caption`, `bibliography-entry`, `footnote`, `thread`, `message`,
 `message-alt`, `message-author`, `message-op`, `message-meta`, `table`,
 `rule`, `transclusion`, `aside`, `article`.
+
+`(role header ...)` remains an input alias for older stylesheets, but
+`(role heading ...)` is the preferred spelling. It styles the title node,
+not a page header layout region.
 
 Message headers (forum / Reddit / Lemmy / Nostr comments) colour the author
 with `message-author` (`message-op` when a reply comes from the thread
@@ -186,8 +190,8 @@ Their properties:
 | `indent` | text inset: after the side bar (quote, note, transclusion), list marker slot, code padding, definition / bibliography / footnote hang, nested section inset |
 | `font` | `body`, `bold`, `italic`, `bold-italic`, `heading`, `code`; `small`, `small-bold`, `small-italic`, `small-bold-italic`, `small-code` are the same faces at 0.85 × the body size |
 | `color` | text colour (else the page colour) |
-| `background` | code-block fill, table header fill, message card fill, band behind a `header` / `thread` title |
-| `border` | side bar, rule, table grid, code-block frame, footnote overlay rule, rule under a `header` / `thread` title, aside frame |
+| `background` | code-block fill, table header fill, message card fill, band behind a `heading` / `thread` title |
+| `border` | side bar, rule, table grid, code-block frame, footnote overlay rule, rule under a `heading` / `thread` title, aside frame |
 | `width` | preferred width of a side box (`aside`) or floating `table` |
 | `side` | `left`, `right` or `none`: which side of the page a side box goes to |
 | `placement` | `margin`, `float` or `flow`: where a side box goes (below) |
@@ -263,7 +267,7 @@ status line reports how many there were. The rest of the sheet still applies.
 sites in broad strokes: HN uses Verdana at `body-scale` 0.85 under an orange
 `thread` band, article headings with small inline source hostnames and
 caption-sized points / discussion links; Reddit uses blue authors with zebra
-nesting under a pale blue band; Wikipedia uses serif titles over grey `header`
+nesting under a pale blue band; Wikipedia uses serif titles over grey `heading`
 rules. They are ordinary sheets: pin them per domain/service in the manager,
 or select one as the global fallback.
 

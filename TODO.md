@@ -6,7 +6,23 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **345** (this delivery is **344**)
+Next bundle number: **346** (this delivery is **345**)
+
+## Status (2026-11-10) — semantic heading tag vocabulary (bundle 345)
+
+- The canonical title tag is now `<heading>` in XML, `(heading ...)` in
+  S-expressions and `:::heading` in Markdown; stylesheets use `(role heading
+  ...)`. Exported documents, supplied styles, examples, editor menu items,
+  and documentation use the new spelling.
+- Old `<header>`, `(header ...)`, `:::header`, and `(role header ...)` still
+  parse as titles/roles for compatibility, but are never the canonical output.
+  `header` and `footer` are reserved as layout concepts; HTML `<header>` stays
+  page chrome, distinct from the semantic title node. Internal `Header` type
+  names were left stable, since the legacy ranked `Heading` node also exists.
+- Added XML and main-unit regression coverage for new and old spellings,
+  unranked titles and numeric depth, and canonical round trips. XML tests
+  and a standalone S-expression/Markdown smoke run pass; `parse.cpp` syntax
+  check passes. Full unit/build tests require the desktop FreeType toolchain.
 
 ## Status (2026-11-10) — R36S OpenSSL compatibility (bundle 344)
 

@@ -1795,7 +1795,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       edit(app);
       if (xanatoo::make_header(d, p.sel.focus)) {
         app.needs_layout = true;
-        flash_status(app, "Header");
+        flash_status(app, "Heading");
       }
       break;
     case C::WrapSection:

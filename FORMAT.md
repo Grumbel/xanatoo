@@ -175,13 +175,13 @@ Counter-proposal…
 
 `:::comment` is an alias for `:::message`. Depth in the layout is derived by walking the `in-reply-to` chain within the document.
 
-## Article, section, and header
+## Article, section, and heading
 
 Prefer HTML-like sectioning over ranked `h1`–`h6`:
 
 | Node | Role |
 |------|------|
-| `header` | Title for the enclosing section/article (no rank) |
+| `heading` | Title for the enclosing section/article (no rank) |
 | `section` | Thematic group of blocks; may nest |
 | `article` | Self-contained composition |
 
@@ -189,14 +189,14 @@ Markdown:
 
 ```
 :::article
-:::header
+:::heading
 Title
 :::
 
 Body paragraph…
 
 :::section
-:::header
+:::heading
 Subsection
 :::
 
@@ -205,12 +205,16 @@ More body…
 :::
 ```
 
-S-expression: `(article (header "Title") (p "…") (section (header "…") …))`.
+S-expression: `(article (heading "Title") (p "…") (section (heading "…") …))`.
 
 Outline depth is the nesting count of `section`/`article` ancestors (legacy
-ATX `#` headers may still carry a soft depth hint). Commands: **Header**
+ATX `#` headings may still carry a soft depth hint). Commands: **Heading**
 (`Ctrl+1`), **Wrap in Section** (`Ctrl+Shift+1`), **Wrap in Article**
 (`Ctrl+Shift+2`), **Unwrap Section/Article**.
+
+`:::header`, `(header ...)`, and `<header>` are accepted as legacy title
+spellings on input. Serializers write `heading` consistently; `header` is
+reserved for future layout roles analogous to `footer`.
 
 ## Gemtext (Gemini)
 
@@ -218,7 +222,7 @@ Line-oriented `text/gemini` (extensions `.gmi`, `.gemini`):
 
 | Line | Mapping |
 |------|---------|
-| `#` / `##` / `###` | Header |
+| `#` / `##` / `###` | Heading |
 | `* item` | List / ListItem |
 | `> quote` | BlockQuote |
 | `=> url [label]` | Paragraph with Link span |

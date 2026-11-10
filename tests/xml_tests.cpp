@@ -81,7 +81,7 @@ void test_example() {
 author: Schröder
 </front-matter>
   <section nid="22" label="intro" style="warning" tags="a:b">
-    <header nid="57">Introduction &lt;3</header>
+    <heading nid="57">Introduction &lt;3</heading>
     <p nid="68">A &amp; B <em>emphasis</em> <strong>strong</strong> <strike>strike</strike>
 <a href="#intro" target="57" rel="see-also" datetime="2026-11-07" role="metadata">go</a>
 <code>1 &lt; 2</code><cite href="ref1">[1]</cite><fnref href="f1">[f1]</fnref>
@@ -111,6 +111,10 @@ author: Schröder
   }
   check(linked, "link parsed");
   const std::string xml = serialize_xml(a);
+  check(xml.find("<heading nid=") != std::string::npos,
+        "XML writes heading for a semantic title");
+  check(xml.find("<header") == std::string::npos,
+        "XML does not write legacy title tag");
   const Document b = parse_xml(xml);
   check(same_tree(a, a.root, b, b.root), "semantic round trip");
   check(a.meta.title == b.meta.title && a.meta.lang == b.meta.lang &&
@@ -119,6 +123,17 @@ author: Schröder
   check(xml == serialize_xml(b), "canonical XML serialization is stable");
   check(xml.find("&amp;") != std::string::npos, "XML escapes ampersand");
   check(xml.find("&#13;") != std::string::npos, "XML preserves carriage return");
+}
+
+void test_legacy_header_alias() {
+  const Document old = parse_xml("<doc><section><header>Old title</header></section></doc>");
+  const NodeId section = old.get(old.root).children.at(0);
+  const NodeId title = old.get(section).children.at(0);
+  check(old.get(title).kind == NodeKind::Header, "legacy header still reads as a title");
+  const std::string canonical = serialize_xml(old);
+  check(canonical.find("<heading nid=") != std::string::npos &&
+        canonical.find("<header ") == std::string::npos,
+        "legacy XML title canonicalizes to heading");
 }
 
 void test_all_blocks() {
@@ -272,6 +287,7 @@ void test_rejections() {
 
 int main() {
   test_example();
+  test_legacy_header_alias();
   test_all_blocks();
   test_escapes_and_dispatch();
   test_float_scales();

@@ -15,6 +15,13 @@ Dear ImGui is allowed for chrome (menus/toolbars). No Qt/GTK/KDE.
 - Data-oriented / ECS-friendly: stable IDs for content, separate layout
   geometry from document identity, systems that transform data.
 - Content model is the source of truth; layout and rendering are derived.
+- User-facing semantic titles are spelled `heading`: XML `<heading>`,
+  S-expression `(heading ...)`, Markdown `:::heading`, and stylesheet
+  `(role heading ...)`. `header` is a page-layout word (alongside `footer`),
+  not the canonical title tag. Older `header` title spellings are accepted
+  only as migration aliases; serializers emit `heading`. The internal
+  `NodeKind::Header` and `BlockRole::Header` identifiers remain unchanged for
+  now; `NodeKind::Heading` is the separate legacy ranked kind.
 - Immediate visual feedback after every edit.
 - Local-only for now; network is a later optional layer.
 

@@ -620,8 +620,9 @@ Document parse_markup(std::string_view source) {
       ++i;
       continue;
     }
-    if (starts_with(trimmed, ":::header")) {
-      // Header is a leaf title line (body until :::).
+    if (trimmed == ":::heading" || starts_with(trimmed, ":::heading ") ||
+        trimmed == ":::header" || starts_with(trimmed, ":::header ")) {
+      // Legacy :::header is an input alias; :::heading is canonical.
       NodeId n = doc.create(NodeKind::Header, current_parent());
       read_fence_style(doc, n, trimmed);
       std::string id = fence_attr(trimmed, "id");
@@ -1629,7 +1630,7 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
 
     case NodeKind::Header: {
       out += pad;
-      out += ":::header";
+      out += ":::heading";
       out += style_attr;
       if (!node.label.empty()) {
         out += " id=\"";
@@ -2412,11 +2413,25 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
     return;
   }
 
-  if (tag == "header") {
+  if (tag == "heading" || tag == "header") {
     NodeId n = doc.create(NodeKind::Header, parent);
     std::string label;
-    size_t i = read_kwargs(e.kids, 1, nullptr, nullptr, nullptr, nullptr, nullptr,
+    size_t i = 1;
+    // Historical (heading 2 ...) forms supplied a soft depth hint. Plain
+    // (heading ...) is the unranked title, just like the old (header ...).
+    auto depth_arg = [&](size_t at) {
+      if (tag != "heading" || at >= e.kids.size() ||
+          e.kids[at].kind != SExpr::Kind::Atom) return false;
+      std::string_view value = e.kids[at].text;
+      if (!value.empty() && (value.front() == '-' || value.front() == '+'))
+        value.remove_prefix(1);
+      return !value.empty() && std::all_of(value.begin(), value.end(),
+          [](unsigned char c) { return c >= '0' && c <= '9'; });
+    };
+    if (depth_arg(i)) doc.get(n).level = sexpr_int(e.kids[i++], 0);
+    i = read_kwargs(e.kids, i, nullptr, nullptr, nullptr, nullptr, nullptr,
                            &label);
+    if (depth_arg(i)) doc.get(n).level = sexpr_int(e.kids[i++], 0);
     if (!label.empty()) doc.get(n).label = label;
     fill_inlines(doc.get(n), e.kids, i);
     return;
@@ -2442,7 +2457,7 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
     return;
   }
 
-  if (tag == "h" || tag == "heading") {
+  if (tag == "h") {
     NodeId n = doc.create(NodeKind::Header, parent);
     size_t i = 1;
     int level = 1;
@@ -3152,9 +3167,10 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
       break;
 
     case NodeKind::Heading: {
-      // Legacy path: emit as header with optional depth hint.
+      // Legacy ranked heading, distinct from the unranked title form.
       out += pad;
-      out += "(header";
+      out += "(h ";
+      out += std::to_string(std::max(1, std::min(6, node.level)));
       emit_node_id(node, out);
       emit_label(node, out);
       serialize_sexpr_inlines(node, out);
@@ -3164,7 +3180,11 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
 
     case NodeKind::Header: {
       out += pad;
-      out += "(header";
+      out += "(heading";
+      if (node.level != 0) {
+        out += ' ';
+        out += std::to_string(node.level);
+      }
       emit_node_id(node, out);
       emit_label(node, out);
       serialize_sexpr_inlines(node, out);

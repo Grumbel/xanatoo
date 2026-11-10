@@ -48,8 +48,8 @@ Export via *File → Export as S-expression…* or *Export as Markdown…*.
 - **Ctrl+Shift+E** — Edit stretch summary
 - **Ctrl+Shift+U** — Unwrap stretchtext
 - **Ctrl+0** — Demote to paragraph
-- **Ctrl+1** — Header (no h1–h6 rank)
-- **Ctrl+2**…**Ctrl+6** — Header with soft depth hint
+- **Ctrl+1** — Heading (no h1–h6 rank)
+- **Ctrl+2**…**Ctrl+6** — Heading with soft depth hint
 - **Ctrl+Shift+1** — Wrap block(s) in a Section
 - **Ctrl+Shift+2** — Wrap block(s) in an Article
 - **Ctrl+Shift+Q** — Toggle block quote
@@ -64,7 +64,7 @@ Export via *File → Export as S-expression…* or *Export as Markdown…*.
 - **Ctrl+←** / **→** — Word left / right
 - **Ctrl+F** / **F3** — Leap search / next match
 - **Ctrl+H** — Find and replace
-- **Ctrl+Shift+O** — Outline (headers by section depth)
+- **Ctrl+Shift+O** — Outline (headings by section depth)
 - **Ctrl+K** — Search bar (hidden by default; engine button + field,
   Enter searches, Esc closes). **Ctrl+L** takes `w xanadu` / `ax electron
   spin` too (engine keywords, see the Directory's Search page)
@@ -126,12 +126,12 @@ images are nodes in a tree, not only visual decorations.
 
 Press **F1** or **Esc** to close this window.
 
-## Sectioning (article / section / header)
+## Sectioning (article / section / heading)
 
 Prefer nested **section** / **article** containers over ranked headings.
-A **header** is the title of the enclosing unit. Outline depth follows
-nesting. **Enter** on a header starts a body paragraph (not another title).
-See **Examples → Article / section / header**.
+A **heading** is the title of the enclosing unit. Outline depth follows
+nesting. **Enter** on a heading starts a body paragraph (not another title).
+See **Examples → Article / section / heading**.
 
 ## Browse mode and gamepad
 
@@ -184,7 +184,7 @@ default for views not switched themselves. See `docs/PAGED.md`.
 | **B** | Collapse stretch (or collapse all) |
 | **X** | Content only (hide menus and toolbars) |
 | **Y** | Toggle structure highlight |
-| **LB / RB** | Previous / next header |
+| **LB / RB** | Previous / next heading |
 | **LT / RT** | Page up / page down |
 | Left stick | Scroll |
 | Stick click L/R | Collapse all / expand all |
@@ -213,7 +213,7 @@ Files ending in `.org` parse as an Org-mode subset: outline headings
 with optional `TODO`/`DONE` keywords and `:tags:`, lists and checkboxes,
 pipe tables, `#+BEGIN_SRC` / `QUOTE` / `EXAMPLE`, `[[link][desc]]`,
 and `#+TITLE` / `#+AUTHOR`. Tags live on the node (`Node.tags`);
-TODO keywords use `Header.src`; `:CUSTOM_ID:` becomes the stable label.
+TODO keywords use the heading node's `src`; `:CUSTOM_ID:` becomes the stable label.
 
 ## Gemini (gemtext + gemini://)
 

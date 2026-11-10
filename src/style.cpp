@@ -30,7 +30,8 @@ struct RoleName {
 };
 constexpr RoleName kBlockRoles[] = {
     {"paragraph", BlockRole::Paragraph},
-    {"header", BlockRole::Header},
+    {"heading", BlockRole::Header},
+    {"header", BlockRole::Header},  // legacy stylesheet alias
     {"section", BlockRole::Section},
     {"list", BlockRole::List},
     {"list-item", BlockRole::ListItem},

@@ -8,7 +8,7 @@
   (description "Default colours, tight block spacing")
 
   (role paragraph  (space-after 0.35em))
-  (role header     (space-before 0.4em) (space-after 0.3em))
+  (role heading    (space-before 0.4em) (space-after 0.3em))
   (role section    (space-before 0) (space-after 0.2em) (indent 0))
   (role list       (space-after 0.3em))
   (role list-item  (indent 1.3em) (space-after 0.1em))

@@ -18,7 +18,7 @@
 
   (page (background paper) (color ink) (selection (rgba 90 130 200 110)))
 
-  (role header      (color "#eef1f5"))
+  (role heading     (color "#eef1f5"))
   (role thread      (color "#eef1f5"))
   (role block-quote (color "#b7bcc4") (border dim))
   (role note        (border "#d9a441"))

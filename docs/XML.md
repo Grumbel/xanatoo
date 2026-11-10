@@ -9,7 +9,7 @@ Example:
 ```xml
 <doc title="Little experiment" lang="en">
   <section label="intro">
-    <header>Introduction</header>
+    <heading>Introduction</heading>
     <p>Rock &amp; roll: <em>text</em>, <a href="#intro">links</a>,
       <math src="x^2"/> and <img src="diagram.png" alt="a diagram"/>.</p>
     <ol>
@@ -30,7 +30,7 @@ The parser does **not** implement general XML. It accepts exactly:
   `&gt;`, `&quot;`, `&apos;`, plus decimal/hex numeric character references
   (`&#10;`, `&#xA;`). Invalid XML characters and UTF-8 are rejected.
 - Whitespace between elements in block containers is insignificant. Whitespace
-  inside text-bearing tags (`p`, `header`, `li`, etc.) is content and preserved,
+  inside text-bearing tags (`p`, `heading`, `li`, etc.) is content and preserved,
   except for XML's usual raw CR/LF normalization (use `&#13;` to preserve CR).
   Raw tab/CR/LF in attributes normalize to spaces (use numeric references to
   preserve them).
@@ -46,7 +46,7 @@ error view in the app instead of an editable replacement for the source.
 
 | Role | Block tags |
 | --- | --- |
-| Document and grouping | `doc`, `article`, `section`, `header`, `h`, `chrome`, `aside` |
+| Document and grouping | `doc`, `article`, `section`, `heading`, `h`, `chrome`, `aside` |
 | Paragraphs and lists | `p`, `ul`, `ol`, `li`, `quote`, `hr`, `codeblock`, `note` |
 | Media and layout | `image`, `figure`, `caption`, `stretch`, `columns`, `column`, `include`, `collection` |
 | Definitions and references | `deflist`, `term`, `def`, `biblio`, `ref`, `footnote` |
@@ -56,7 +56,10 @@ error view in the app instead of an editable replacement for the source.
 Inline content within text-bearing blocks: `em`, `strong`, `strike`, `code`,
 `a`, `cite`, `fnref`, `img`, `math`, and `text` (when a text span has metadata).
 An `<image>` is a block node; `<img>` is an inline object. An `<h level="2">`
-is a legacy ranked heading; `<header>` is the unranked semantic title.
+is a legacy ranked heading; `<heading>` is the unranked semantic title.
+Older Xanatoo documents using `<header>` as a title are still accepted on
+import and exported as `<heading>`. The `<header>` name is reserved for future
+page-layout semantics, like `<footer>`; it is not a new layout node yet.
 
 Every block may carry `nid` (the source document's numeric node identity),
 `label`, `style`, `tags`, `level`, `src`, `alt`, `summary`, `expanded` (`true`

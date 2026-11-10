@@ -15,7 +15,7 @@
          (heading-scale 1.7))
 
   (role paragraph   (space-after 1.1em))
-  (role header      (space-before 1em) (space-after 0.8em))
+  (role heading     (space-before 1em) (space-after 0.8em))
   (role list-item   (space-after 0.6em))
   (role block-quote (border strong-line))
   (role note        (border "#b35900"))

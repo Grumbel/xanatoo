@@ -153,7 +153,7 @@ const char* block_tag(const Node& n) {
   switch (n.kind) {
     case NodeKind::Document: return "doc";
     case NodeKind::Heading: return "h";
-    case NodeKind::Header: return "header";
+    case NodeKind::Header: return "heading";
     case NodeKind::Article: return "article";
     case NodeKind::Section: return "section";
     case NodeKind::Paragraph: return "p";
@@ -192,7 +192,8 @@ bool block_kind(std::string_view s, NodeKind& kind, int& level) {
   // Spellings are intentionally fixed; <image> is a block, <img> an inline.
   constexpr std::pair<std::string_view, NodeKind> names[] = {
       {"doc", NodeKind::Document}, {"h", NodeKind::Heading},
-      {"header", NodeKind::Header}, {"article", NodeKind::Article},
+      {"heading", NodeKind::Header}, {"header", NodeKind::Header},
+      {"article", NodeKind::Article},
       {"section", NodeKind::Section}, {"p", NodeKind::Paragraph},
       {"ul", NodeKind::List}, {"ol", NodeKind::List},
       {"li", NodeKind::ListItem}, {"image", NodeKind::Image},

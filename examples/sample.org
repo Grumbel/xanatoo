@@ -28,8 +28,8 @@ Org features map as follows:
 
 | Org construct      | xanatoo node                          |
 |--------------------+---------------------------------------|
-| =* heading=        | Header (depth in =level=)             |
-| =TODO= / =DONE=    | Header.=src=                          |
+| =* heading=        | Heading (depth in =level=)            |
+| =TODO= / =DONE=    | Heading.=src=                         |
 | =:tags:=           | Node.=tags= (=work:urgent=)           |
 | =:CUSTOM_ID:=      | Node.=label= (stable =#anchor=)       |
 | lists / checkboxes | List / ListItem (=task= / =task-done=)|

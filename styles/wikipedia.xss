@@ -25,7 +25,7 @@
          (code "Menlo" "Consolas" "Liberation Mono" "DejaVu Sans Mono" "monospace"))
 
   (role paragraph   (space-after 0.6em))
-  (role header      (color "#000000") (border grey-rule)
+  (role heading     (color "#000000") (border grey-rule)
                     (space-before 1em) (space-after 0.6em))
   (role section     (indent 0))
   (role block-quote (indent 1.2em) (border frame))

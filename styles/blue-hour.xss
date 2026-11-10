@@ -15,7 +15,7 @@
          (heading-scale 1.5)
          (code "JetBrains Mono" "DejaVu Sans Mono" "monospace"))
   (role paragraph (space-after 0.85em))
-  (role header (color "#f0f6fa") (space-before 1.1em) (space-after 0.5em))
+  (role heading (color "#f0f6fa") (space-before 1.1em) (space-after 0.5em))
   (role section (indent 0) (space-after 0.7em))
   (role block-quote (color "#c1ccd6") (border "#5c839e"))
   (role note (color "#e0d0b9") (background "#30303a") (border "#ac9468"))

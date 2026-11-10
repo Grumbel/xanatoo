@@ -18,7 +18,7 @@
   (page (background "#fbfbf7") (color "#222222"))
 
   (role paragraph  (space-after 1em))
-  (role header     (space-before 1.5em) (space-after 1em))
+  (role heading    (space-before 1.5em) (space-after 1em))
   (role code-block (background none) (border "#999999"))
   (role table      (background none))
   (role message    (font small) (background none))

@@ -24,7 +24,7 @@
          (code "Fira Mono" "DejaVu Sans Mono" "monospace"))
 
   (role paragraph   (space-after gap))
-  (role header      (color accent) (space-before 1.1em) (space-after 0.5em))
+  (role heading     (color accent) (space-before 1.1em) (space-after 0.5em))
   (role section     (indent 0))
   (role block-quote (indent 1.2em) (color "#5a4a36") (border muted))
   (role note        (indent 1.2em) (border accent))
