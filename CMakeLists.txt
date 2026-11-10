@@ -427,7 +427,7 @@ target_compile_definitions(xanatoo PRIVATE
 # Toolbar icons: SVG sources → PNG at build time (ImageMagick or pure-Python fallback)
 set(XANATOO_SVG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/icons/svg)
 set(XANATOO_ICON_DIR ${XANATOO_BUILD_DATA_DIR}/icons)
-file(GLOB XANATOO_SVGS "${XANATOO_SVG_DIR}/*.svg")
+file(GLOB XANATOO_SVGS CONFIGURE_DEPENDS "${XANATOO_SVG_DIR}/*.svg")
 add_custom_command(
   OUTPUT ${XANATOO_ICON_DIR}/.stamp
   COMMAND ${CMAKE_COMMAND} -E make_directory ${XANATOO_ICON_DIR}

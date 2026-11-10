@@ -162,6 +162,15 @@ def draw_icon(name: str, size: int = 20) -> bytes:
         rect(buf, size, size, S(3), S(3), S(6), S(14), INK, SOFT)
         rect(buf, size, size, S(11), S(3), S(6), S(14), INK, SOFT)
         line(buf, size, size, S(10), S(3), S(10), S(17), INK, 1)
+    elif name == "join":
+        rect(buf, size, size, S(3), S(3), S(14), S(14), INK, SOFT)
+        line(buf, size, size, S(10), S(4), S(10), S(16), INK, 1)
+        line(buf, size, size, S(5), S(10), S(9), S(10), INK, 1)
+        line(buf, size, size, S(7), S(8), S(9), S(10), INK, 1)
+        line(buf, size, size, S(7), S(12), S(9), S(10), INK, 1)
+        line(buf, size, size, S(15), S(10), S(11), S(10), INK, 1)
+        line(buf, size, size, S(13), S(8), S(11), S(10), INK, 1)
+        line(buf, size, size, S(13), S(12), S(11), S(10), INK, 1)
     elif name == "find":
         circle(buf, size, size, S(9), S(9), S(4), INK)
         line(buf, size, size, S(12), S(12), S(16), S(16), INK, 1)
@@ -283,18 +292,27 @@ def draw_icon(name: str, size: int = 20) -> bytes:
         line(buf, size, size, S(14), S(10), S(8), S(16), INK, 2)
         line(buf, size, size, S(4), S(10), S(14), S(10), INK, 2)
     elif name == "reload":
-        circle(buf, size, size, S(10), S(10), S(6), INK, None)
-        line(buf, size, size, S(14), S(4), S(14), S(8), INK, 2)
-        line(buf, size, size, S(14), S(8), S(10), S(8), INK, 2)
-    elif name == "bookmark":
+        green = (0x83, 0x98, 0x68, 255)
+        line(buf, size, size, S(4), S(9), S(6), S(6), green, 2)
+        line(buf, size, size, S(6), S(6), S(12), S(4), green, 2)
+        line(buf, size, size, S(12), S(4), S(16), S(6), green, 2)
+        line(buf, size, size, S(16), S(11), S(14), S(14), green, 2)
+        line(buf, size, size, S(14), S(14), S(8), S(16), green, 2)
+        line(buf, size, size, S(8), S(16), S(4), S(14), green, 2)
+        line(buf, size, size, S(13), S(3), S(17), S(4), INK, 1)
+        line(buf, size, size, S(17), S(4), S(15), S(8), INK, 1)
+        line(buf, size, size, S(7), S(17), S(3), S(16), INK, 1)
+        line(buf, size, size, S(3), S(16), S(5), S(12), INK, 1)
+    elif name in ("bookmark", "bookmark-outline"):
         line(buf, size, size, S(5), S(3), S(5), S(17), INK, 1)
         line(buf, size, size, S(15), S(3), S(15), S(17), INK, 1)
         line(buf, size, size, S(5), S(3), S(15), S(3), INK, 1)
         line(buf, size, size, S(5), S(17), S(10), S(13), INK, 1)
         line(buf, size, size, S(15), S(17), S(10), S(13), INK, 1)
-        for yy in range(S(4), S(13)):
-            for xx in range(S(6), S(15)):
-                px(buf, size, size, xx, yy, *ACCENT)
+        if name == "bookmark":
+            for yy in range(S(4), S(13)):
+                for xx in range(S(6), S(15)):
+                    px(buf, size, size, xx, yy, 0xD9, 0xB7, 0x6B, 255)
     elif name == "history":
         circle(buf, size, size, S(10), S(10), S(7), INK, SOFT)
         line(buf, size, size, S(10), S(6), S(10), S(10), INK, 2)

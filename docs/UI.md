@@ -28,6 +28,21 @@ keyboard/mouse behaviour. The dock/tile model is intentionally more flexible.
   split while retaining the selected side's view and history. A Trail hover
   preview is reverted first; pending fetches for the discarded side stop.
 
+## Toolbar states
+
+- Ordinary toolbar actions have no button frame until hover; they rise on
+  hover and sink only while pressed. Toggle actions remain recessed until
+  deactivated, including the browse mode, native view, outline, history,
+  downloads and the contextual reader/navigation/site-map buttons.
+- **Split Panes** becomes **Join Panes** with a different icon while the
+  independent two-pane arrangement is active; that toolbar action keeps the
+  left/top pane when joining. For an explicit choice use the divider's
+  **Join Left/Right** (or Top/Bottom) context menu.
+- The bookmark button uses an outlined ribbon when the current address is
+  unbookmarked, and a filled ribbon plus sunken face when bookmarked. A
+  bookmark on *another passage* of the current page does not latch the
+  button. Reload uses an opposing-arrows icon, distinct from Stop.
+
 ## External URL drops
 
 - Dropping a URL from another application navigates the view directly under

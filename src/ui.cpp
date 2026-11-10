@@ -84,29 +84,33 @@ bool near_eq(float a, float b, float eps) { return std::fabs(a - b) < eps; }
 
 // Toolbar buttons are flat until hovered/pressed, unlike the always-raised
 // buttons in dialogs and panels. Icon and text fallbacks share this style.
-int push_toolbar_button_style() {
+int push_toolbar_button_style(bool latched = false) {
   const theme::Palette& p = theme::palette();
   ImGuiStyle& s = ImGui::GetStyle();
   auto color = [](theme::Rgb c, float alpha = 1.f) {
     return ImVec4(c.r / 255.f, c.g / 255.f, c.b / 255.f, alpha);
   };
-  ImGui::PushStyleColor(ImGuiCol_Button, color(p.face_light, 0.f));
-  // Neutral light face reads as raised; blue suggested a selected/pressed tab.
-  ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color(p.highlight));
+  // An inactive tool is flat; an enabled toggle remains sunken even after
+  // hover ends. Set these colours here (not outside the helper): ImageButton
+  // uses the helper's last pushed style, just like the text fallback.
+  ImGui::PushStyleColor(ImGuiCol_Button,
+                        latched ? color(p.face_dark) : color(p.face_light, 0.f));
+  ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                        color(latched ? p.face_dark : p.highlight));
   ImGui::PushStyleColor(ImGuiCol_ButtonActive, color(p.face_dark));
   ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
   ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, s.FrameRounding);
   return 3;
 }
 
-void draw_button_inner_bevel();
+void draw_button_inner_bevel(bool latched = false);
 
 // Only hovered/pressed toolbar items get a raised face. The round outline and
 // light top-left / dark bottom-right inset establish the raised direction;
 // pressing reverses those edges instead of relying on a blue hover fill.
-void draw_toolbar_hover_face() {
-  if (!ImGui::IsItemHovered() && !ImGui::IsItemActive()) return;
-  const bool pressed = ImGui::IsItemActive();
+void draw_toolbar_hover_face(bool latched = false) {
+  if (!latched && !ImGui::IsItemHovered() && !ImGui::IsItemActive()) return;
+  const bool pressed = latched || ImGui::IsItemActive();
   const theme::Palette& p = theme::palette();
   const ImVec2 min = ImGui::GetItemRectMin();
   const ImVec2 max = ImGui::GetItemRectMax();
@@ -118,17 +122,17 @@ void draw_toolbar_hover_face() {
       ImVec2(max.x - 0.5f, max.y - 0.5f),
       IM_COL32(edge.r, edge.g, edge.b, alpha),
       ImGui::GetStyle().FrameRounding);
-  draw_button_inner_bevel();
+  draw_button_inner_bevel(latched);
 }
 
 // Keep the bevel inside ImGui's rounded frame so the highlight and shadow
 // lines do not cut across the corners. Regular buttons show this at rest too.
-void draw_button_inner_bevel() {
+void draw_button_inner_bevel(bool latched) {
   const ImVec2 min = ImGui::GetItemRectMin();
   const ImVec2 max = ImGui::GetItemRectMax();
   if (max.x - min.x < 12.f || max.y - min.y < 12.f) return;
   const theme::Palette& p = theme::palette();
-  const bool pressed = ImGui::IsItemActive();
+  const bool pressed = latched || ImGui::IsItemActive();
   const theme::Rgb edge = pressed ? p.shadow : p.highlight;
   const theme::Rgb lower_edge = pressed ? p.highlight : p.shadow;
   const int alpha = std::clamp(static_cast<int>(255.f * ImGui::GetStyle().Alpha),
@@ -446,11 +450,11 @@ void Ui::load_icons(SDL_Renderer* renderer) {
 
   const char* names[] = {
       "save", "undo", "redo", "bold", "italic", "code", "link", "list",
-      "olist", "quote", "image", "split", "find", "help", "cut",
+      "olist", "quote", "image", "split", "join", "find", "help", "cut",
       "strike", "cite", "h1", "h2", "h3", "para", "task", "table",
       "figure", "note", "replace", "outline", "paste", "copy", "new", "open",
       "zoomin", "zoomout", "structure", "diff",
-      "back", "forward", "up", "home", "reload", "stop", "bookmark", "history", "downloads", "browse", "native", "reader", "sitemap",
+      "back", "forward", "up", "home", "reload", "stop", "bookmark", "bookmark-outline", "history", "downloads", "browse", "native", "reader", "sitemap",
       "linespacing", "measure", "style",
       "format", "insert", "view", "lists",
   };
@@ -516,11 +520,11 @@ const Ui::Icon* Ui::icon(const char* name) const {
 
 bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
                      UiCommand c, UiCommand& out, bool enabled,
-                     bool* right_clicked) {
+                     bool* right_clicked, bool latched) {
   const Icon* ic = icon(icon_name);
   bool pressed = false;
   ImGui::BeginDisabled(!enabled);
-  const int style_colors = push_toolbar_button_style();
+  const int style_colors = push_toolbar_button_style(latched && enabled);
   if (ic) {
     ImGui::PushID(id);
     const ImVec2 size(28.f * scale_, 28.f * scale_);
@@ -533,13 +537,14 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
       pressed = true;
       out = c;
     }
-    draw_toolbar_hover_face();
+    draw_toolbar_hover_face(latched && enabled);
     ImGui::PopStyleVar();
     ImGui::PopID();
   } else {
     // Text fallback when PNG missing (e.g. icons not rasterized yet).
     static const std::unordered_map<std::string, const char*> kShort = {
-        {"back", "◀"}, {"forward", "▶"}, {"reload", "↻"}, {"stop", "✕"}, {"bookmark", "★"},
+        {"back", "◀"}, {"forward", "▶"}, {"reload", "⟳"}, {"stop", "✕"},
+        {"bookmark", "★"}, {"bookmark-outline", "☆"}, {"join", "Join"},
         {"history", "Hist"}, {"downloads", "DL"}, {"browse", "Browse"}, {"native", "Native"},
         {"reader", "Reader"},
         {"linespacing", "≡↕"}, {"measure", "▣|"},
@@ -568,7 +573,7 @@ bool Ui::tool_button(const char* id, const char* icon_name, const char* tip,
       pressed = true;
       out = c;
     }
-    draw_toolbar_hover_face();
+    draw_toolbar_hover_face(latched && enabled);
   }
   pop_toolbar_button_style(style_colors);
   ImGui::EndDisabled();
@@ -990,16 +995,11 @@ static void view_tools_items(const UiState& state, UiCommand& cmd,
 
 // Browse (navigation) row, edit row (not while browsing) and tab strip.
 void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
-  // Frequently used panel toggles: highlighted while on.
+  // These controls are actions as well as toggles. Keep the current mode
+  // sunken, rather than giving it a bright (hover-like) selection wash.
   auto toggle_button = [&](const char* id, const char* icon, const char* tip,
                            UiCommand c, bool on) {
-    if (on) {
-      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                            ImVec4(1.f, 1.f, 1.f, 1.f));
-    }
-    tool_button(id, icon, tip, c, cmd);
-    if (on) ImGui::PopStyleColor(2);
+    tool_button(id, icon, tip, c, cmd, true, nullptr, on);
   };
 
   // ---- Two toolbars: browse (navigation) then edit ----
@@ -1088,14 +1088,9 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
                 "Wikipedia, Hacker News, Reddit, Lemmy)"
           : state.native_view ? "Back to the web page: " + state.alternate_url
                               : "Native view: " + state.alternate_url;
-      if (state.native_view) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                              ImVec4(1.f, 1.f, 1.f, 1.f));
-      }
       tool_button("tb_native", "native", tip.c_str(), UiCommand::ToggleNative,
-                  cmd, !state.alternate_url.empty());
-      if (state.native_view) ImGui::PopStyleColor(2);
+                  cmd, !state.alternate_url.empty(), nullptr,
+                  state.native_view);
     }
 
     if (!url_own_row) toolbar_separator();
@@ -1254,14 +1249,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         ImGui::SameLine(0.f, 0.f);
         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x,
                                        field_pos.y + 3.f * scale_));
-        const int style_colors = push_toolbar_button_style();
-        const theme::Palette& pal = theme::palette();
-        if (on) {
-          const theme::Rgb face = pal.accent_soft;
-          ImGui::PushStyleColor(ImGuiCol_Button,
-                                ImVec4(face.r / 255.f, face.g / 255.f,
-                                       face.b / 255.f, 1.f));
-        }
+        const int style_colors = push_toolbar_button_style(on);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.f * scale_, 3.f * scale_));
         const Icon* ic = icon(icon_name);
         bool pressed;
@@ -1273,9 +1261,8 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
           pressed = ImGui::Button(fallback, ImVec2(28.f * scale_, 26.f * scale_));
           ImGui::PopID();
         }
-        draw_toolbar_hover_face();
+        draw_toolbar_hover_face(on);
         ImGui::PopStyleVar();
-        if (on) ImGui::PopStyleColor();
         pop_toolbar_button_style(style_colors);
         if (pressed) cmd = action;
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", tip);
@@ -1307,24 +1294,25 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
                       ? " · 1 bookmark in this page"
                       : " · " + std::to_string(state.page_bookmarks) +
                             " bookmarks in this page";
-      // Lit while this address or a passage of the page is bookmarked.
-      const bool lit = state.current_bookmarked || state.page_bookmarks > 0;
-      if (lit) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                              ImVec4(1.f, 1.f, 1.f, 1.f));
-      }
-      tool_button("tb_bookmark", "bookmark", bm_tip.c_str(),
+      // Filled ribbon + sunken face only when this address is bookmarked;
+      // another passage having a bookmark does not toggle this control.
+      tool_button("tb_bookmark",
+                  state.current_bookmarked ? "bookmark" : "bookmark-outline",
+                  bm_tip.c_str(),
                   state.current_bookmarked ? UiCommand::RemoveBookmark
                                            : UiCommand::AddBookmark,
-                  cmd, state.has_path || !state.doc_label.empty());
-      if (lit) ImGui::PopStyleColor(2);
+                  cmd, state.has_path || !state.doc_label.empty(), nullptr,
+                  state.current_bookmarked);
     }
     if (state.browse) {
       // The edit row is hidden: its reading tools move here, the display
       // menus into View tools so the row does not grow.
       tool_button("tb_find", "find", "Find (Ctrl+F)", UiCommand::Find, cmd);
-      toggle_button("tb_split", "split", "Independent tiles (Ctrl+\\)",
+      toggle_button("tb_split", state.split && !state.trail && !state.diff
+                                    ? "join" : "split",
+                    state.split && !state.trail && !state.diff
+                        ? "Join panes (keep left, Ctrl+\\)"
+                        : "Independent split panes (Ctrl+\\)",
                     UiCommand::ToggleSplit,
                     state.split && !state.trail && !state.diff);
       toggle_button("tb_trail", "history", "Linked navigation trail",
@@ -1355,38 +1343,14 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         tool_menu_end();
       }
     }
-    {
-      if (state.history_open) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                              ImVec4(1.f, 1.f, 1.f, 1.f));
-      }
-      tool_button("tb_history", "history", "Session history (Ctrl+Shift+H)",
-                  UiCommand::ToggleHistory, cmd);
-      if (state.history_open) ImGui::PopStyleColor(2);
-    }
-    {
-      if (state.downloads_open) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.45f, 0.7f, 1.f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                              ImVec4(1.f, 1.f, 1.f, 1.f));
-      }
-      tool_button("tb_downloads", "downloads", "Downloads",
-                  UiCommand::ToggleDownloads, cmd);
-      if (state.downloads_open) ImGui::PopStyleColor(2);
-    }
-    {
-      if (state.browse) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.55f, 0.4f, 1.f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                              ImVec4(1.f, 1.f, 1.f, 1.f));
-      }
-      tool_button("tb_browse", "browse",
+    toggle_button("tb_history", "history", "Session history (Ctrl+Shift+H)",
+                  UiCommand::ToggleHistory, state.history_open);
+    toggle_button("tb_downloads", "downloads", "Downloads",
+                  UiCommand::ToggleDownloads, state.downloads_open);
+    toggle_button("tb_browse", "browse",
                   state.browse ? "Browse mode on — F2 to edit"
                                : "Browse mode (read-only, F2)",
-                  UiCommand::ToggleBrowse, cmd);
-      if (state.browse) ImGui::PopStyleColor(2);
-    }
+                  UiCommand::ToggleBrowse, state.browse);
     // tool_button ends with SameLine, so the cursor sits after the group.
     url_right_w_ = ImGui::GetCursorPosX() - right_x0;
     if (url_own_row) {
@@ -1622,7 +1586,11 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       start_group(4);
       edit_button("tb_find", "find", "Find (Ctrl+F)", UiCommand::Find);
       before_group_item();
-      toggle_button("tb_split", "split", "Independent tiles (Ctrl+\\)",
+      toggle_button("tb_split", state.split && !state.trail && !state.diff
+                                    ? "join" : "split",
+                    state.split && !state.trail && !state.diff
+                        ? "Join panes (keep left, Ctrl+\\)"
+                        : "Independent split panes (Ctrl+\\)",
                     UiCommand::ToggleSplit,
                     state.split && !state.trail && !state.diff);
       before_group_item();

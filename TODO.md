@@ -6,7 +6,18 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **341** (this delivery is **340**)
+Next bundle number: **342** (this delivery is **341**)
+
+## Status (2026-11-10) — latched toolbar toggles, icon states (bundle 341)
+
+- Give `tool_button` an explicit latched state so active toolbar toggles draw
+  a persistent depressed face instead of losing their colours to the common
+  flat-toolbar style stack. Native view, reader/sidebar extras, split, trail,
+  outline, history, downloads and browse all use the same treatment.
+- Independent Split changes to a Join icon and tooltip while active; the
+  current URL's Bookmark icon switches between an empty and filled ribbon.
+  Reload has a clearer green opposing-arrows icon. SVG build-time rasterization
+  and the no-SVG-renderer fallback both include the new graphics.
 
 ## Status (2026-11-10) — external URL drag-and-drop (bundle 340)
 

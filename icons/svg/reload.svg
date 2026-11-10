@@ -18,5 +18,13 @@
     .detail{fill:none;stroke:#59615f;stroke-width:.75;stroke-linecap:round;stroke-linejoin:round}
     .hi{fill:none;stroke:#fffdf3;stroke-width:.7;stroke-linecap:round;stroke-linejoin:round;opacity:.82}
   </style>
-  <path d="M16.1 8.1A6.4 6.4 0 1 0 16.3 11" fill="none" stroke="#5e7182" stroke-width="1.5" stroke-linecap="round"/><path class="blue border" d="m13.4 4.4 4.3.2-1.8 3.8Z"/><path d="M6.3 5.3c1.1-.8 2.4-1.2 3.8-1.2" stroke="#fff" stroke-width=".7" stroke-linecap="round"/>
+  <!-- Opposed curved arrows: stronger silhouette and contrast at toolbar size. -->
+  <path d="M3.8 9.3A6.5 6.5 0 0 1 14.2 5.3M16.2 10.7A6.5 6.5 0 0 1 5.8 14.7"
+        fill="none" stroke="#405c47" stroke-width="3.4" stroke-linecap="round"/>
+  <path d="M3.8 9.3A6.5 6.5 0 0 1 14.2 5.3M16.2 10.7A6.5 6.5 0 0 1 5.8 14.7"
+        fill="none" stroke="url(#green)" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="m12.6 2.8 5.4 1.6-3.8 4.2Z" fill="url(#green)" stroke="#405c47" stroke-width=".9" stroke-linejoin="round"/>
+  <path d="m7.4 17.2-5.4-1.6 3.8-4.2Z" fill="url(#green)" stroke="#405c47" stroke-width=".9" stroke-linejoin="round"/>
+  <path d="M5.3 7.3c1.2-2.5 3.5-3.5 5.5-3.4M14.7 12.7c-1.2 2.5-3.5 3.5-5.5 3.4"
+        fill="none" stroke="#e6f1cf" stroke-width=".7" stroke-linecap="round" opacity=".9"/>
 </svg>

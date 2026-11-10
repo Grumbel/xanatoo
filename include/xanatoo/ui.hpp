@@ -525,7 +525,7 @@ private:
   const Icon* icon(const char* name) const;
   bool tool_button(const char* id, const char* icon_name, const char* tip,
                    UiCommand c, UiCommand& out, bool enabled = true,
-                   bool* right_clicked = nullptr);
+                   bool* right_clicked = nullptr, bool latched = false);
   bool tool_menu_begin(const char* id, const char* icon_name, const char* tip);
   void toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd);
   void tool_menu_end();

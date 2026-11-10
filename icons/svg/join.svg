@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">
+  <!-- Two sheets become a single sheet; inverse of split.svg. -->
+  <rect x="2.6" y="3" width="14.8" height="14" fill="#f4f2ea" stroke="#505957" stroke-width=".85"/>
+  <path d="M4.1 4.5h5.2v11H4.1Z" fill="#d7e3e9"/>
+  <path d="M10.7 4.5h5.2v11h-5.2Z" fill="#dfe5d1"/>
+  <path d="M10 4.5v11" stroke="#a4aca9" stroke-width=".7" stroke-dasharray="1.5 1.1"/>
+  <path d="M5.2 10h3.5m-1.5-1.6L8.8 10l-1.6 1.6M14.8 10h-3.5m1.5-1.6L11.2 10l1.6 1.6" fill="none" stroke="#4b6570" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M3.5 3.8h13" fill="none" stroke="#fff" stroke-width=".8"/>
+</svg>
