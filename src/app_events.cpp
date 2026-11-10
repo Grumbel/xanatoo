@@ -632,6 +632,16 @@ static void mouse_right_down(App& app, SDL_Event& ev, bool imgui_mouse) {
     // Soft windows / outline / help absorb right-clicks (no doc menu under
     // them).
     const int rx = ev.button.x, ry = ev.button.y;
+    // The title belongs to the native frame, not the document's text. Give
+    // each document window its own context command, regardless of focus.
+    if (FloatWindow* w = float_at(app, rx, ry);
+        w && w->role == WindowRole::Document &&
+        ry >= w->y && ry < w->y + help_title_h &&
+        rx >= w->x && rx < w->x + w->w) {
+      app.ui.open_window_menu(static_cast<float>(rx), static_cast<float>(ry),
+                              app.panes[w->view].buf);
+      return;
+    }
     const bool over_soft = over_float_chrome(app, rx, ry);
     if (!over_soft && !imgui_mouse && app.split) {
       const auto within = [&](const SDL_Rect& rc, int pad = 0) {
@@ -1745,6 +1755,9 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         break;
       case SDLK_v:
         menu = "View";
+        break;
+      case SDLK_l:
+        menu = "Layout";
         break;
       case SDLK_g:
         menu = "Go";

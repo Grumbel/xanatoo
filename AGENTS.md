@@ -91,6 +91,10 @@ scrolls both panes to a normalized position, not an exact aligned hunk.
 `focus_view`, `live_views` (never `pi < 2`), `other_pane` (never
 `1 - app.focus`), `pane_at(app, x, y)` and `content_y(app, y, pi)`;
 after replacing a buffer's document call `refresh_views_of_buf`.
+The tab right-click menu allows targeted tear-off; the native document-window
+title context menu moves a specific window back (only `WindowRole::Document`).
+View source projections (`//source-raw`, `//source-sexpr`, `//source-xml`) are
+pane-local and switch in View → View Source; see `docs/UI.md`.
 To change a page without moving the view, call `keep_views(app)` before the
 change (it needs the old layout): the top line of each view stays on its
 spot through the next `layout_panes`. To hold another spot, set

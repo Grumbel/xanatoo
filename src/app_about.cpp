@@ -133,7 +133,7 @@ AboutSection formats() {
        code_list(xanatoo::pandoc_extensions()) +
            ", read-only through cached Markdown",
        {}, "`pandoc` on PATH"});
-  s.items.push_back({"Style sheets", true, "`styles/*.xss` (View → Style sheet)",
+  s.items.push_back({"Style sheets", true, "`styles/*.xss` (Layout → Style sheet)",
                      {}, {}});
   // TeX formulas need an OpenType math font; without one they show their source.
   const std::string math_font = xanatoo::find_math_font_path();

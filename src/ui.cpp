@@ -816,6 +816,13 @@ void Ui::open_context_menu(float x, float y) {
   context_y_ = y;
 }
 
+void Ui::open_window_menu(float x, float y, uint32_t buffer_id) {
+  window_menu_open_ = true;
+  window_menu_x_ = x;
+  window_menu_y_ = y;
+  window_menu_buffer_id_ = buffer_id;
+}
+
 void Ui::open_tile_menu(float x, float y) {
   tile_menu_open_ = true;
   tile_menu_x_ = x;
@@ -1731,6 +1738,32 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
             cmd = UiCommand::CloseTab;
             result.arg = std::to_string(i);
           }
+          // The popup is attached to the specific tab item, so a right-click
+          // does not require selecting the tab first or moving focus.
+          ImGui::PushID(static_cast<int>(bid));
+          if (ImGui::BeginPopupContextItem("##tab_context",
+                                           ImGuiPopupFlags_MouseButtonRight)) {
+            if (ImGui::MenuItem("Select Tab", nullptr, i == state.active_tab,
+                                i != state.active_tab) && cmd == UiCommand::None) {
+              cmd = UiCommand::SelectTab;
+              result.arg = std::to_string(i);
+            }
+            if (ImGui::MenuItem("Move Tab to Window") &&
+                cmd == UiCommand::None) {
+              cmd = UiCommand::TearTab;
+              const int x = static_cast<int>(vp->Pos.x + vp->Size.x * 0.5f);
+              const int y = static_cast<int>(vp->Pos.y + vp->Size.y * 0.45f);
+              result.arg = std::to_string(bid) + "," + std::to_string(x) +
+                           "," + std::to_string(y);
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Close Tab") && cmd == UiCommand::None) {
+              cmd = UiCommand::CloseTab;
+              result.arg = std::to_string(i);
+            }
+            ImGui::EndPopup();
+          }
+          ImGui::PopID();
         }
         if (ImGuiTabBar* tb = ImGui::GetCurrentTabBar();
             tb && cmd == UiCommand::None && !result.tab_drag_out &&
@@ -1929,6 +1962,43 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       if (ImGui::MenuItem("Reader Mode", "F9", state.reader,
                           state.has_chrome || state.reader))
         cmd = UiCommand::ToggleReader;
+      if (ImGui::BeginMenu("View Source")) {
+        if (ImGui::MenuItem("Rendered Document", nullptr,
+                            state.source_mode.empty()))
+          cmd = UiCommand::ViewSourceRendered;
+        ImGui::Separator();
+        if (ImGui::MenuItem("Raw Source", nullptr,
+                            state.source_mode == "source-raw"))
+          cmd = UiCommand::ViewSourceRaw;
+        if (ImGui::MenuItem("S-expression", nullptr,
+                            state.source_mode == "source-sexpr"))
+          cmd = UiCommand::ViewSourceSexpr;
+        if (ImGui::MenuItem("XML", nullptr,
+                            state.source_mode == "source-xml"))
+          cmd = UiCommand::ViewSourceXml;
+        ImGui::EndMenu();
+      }
+      ImGui::Separator();
+      if (ImGui::MenuItem("Focus current section", "Ctrl+Alt+F", state.section_focus))
+        cmd = UiCommand::ToggleSectionFocus;
+      if (ImGui::MenuItem("Structure Highlight", "Ctrl+Shift+L", state.structure))
+        cmd = UiCommand::ToggleStructure;
+      if (ImGui::MenuItem("Browse Mode (read-only)", "F2", state.browse))
+        cmd = UiCommand::ToggleBrowse;
+      menu_item_cmd("Content Only (hide menus, toolbars)",
+                    UiCommand::ToggleChrome, cmd, true, "F11");
+      ImGui::Separator();
+      menu_item_cmd("Zoom In", UiCommand::ZoomIn, cmd, true, "Ctrl++");
+      menu_item_cmd("Zoom Out", UiCommand::ZoomOut, cmd, true, "Ctrl+-");
+      if (ImGui::MenuItem("Footnote overlay", nullptr, state.footnote_overlay))
+        cmd = UiCommand::ToggleFootnoteOverlay;
+      if (ImGui::MenuItem("Bookmarks in the page", nullptr,
+                          state.bookmark_marks))
+        cmd = UiCommand::ToggleBookmarkMarks;
+      ImGui::EndMenu();
+    }
+    force_menu("Layout");
+    if (ImGui::BeginMenu("Layout")) {
       if (ImGui::MenuItem("Paged Reading", "F8", state.paged))
         cmd = UiCommand::TogglePaged;
       if (ImGui::BeginMenu("Page columns", state.paged)) {
@@ -1956,20 +2026,10 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::TilesColumns;
       if (ImGui::MenuItem("Stacked", nullptr, state.tiles_stacked))
         cmd = UiCommand::TilesRows;
-      if (ImGui::MenuItem("Focus current section", "Ctrl+Alt+F", state.section_focus))
-        cmd = UiCommand::ToggleSectionFocus;
       if (ImGui::MenuItem("Compare tiles", "Ctrl+Shift+D", state.diff,
                           state.can_diff))
         cmd = UiCommand::ToggleDiff;
-      if (ImGui::MenuItem("Structure Highlight", "Ctrl+Shift+L", state.structure))
-        cmd = UiCommand::ToggleStructure;
-      if (ImGui::MenuItem("Browse Mode (read-only)", "F2", state.browse))
-        cmd = UiCommand::ToggleBrowse;
-      menu_item_cmd("Content Only (hide menus, toolbars)",
-                    UiCommand::ToggleChrome, cmd, true, "F11");
       ImGui::Separator();
-      menu_item_cmd("Zoom In", UiCommand::ZoomIn, cmd, true, "Ctrl++");
-      menu_item_cmd("Zoom Out", UiCommand::ZoomOut, cmd, true, "Ctrl+-");
       if (ImGui::BeginMenu("Line spacing")) {
         fill_line_spacing_items(state, cmd);
         ImGui::EndMenu();
@@ -1984,11 +2044,6 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       }
       if (ImGui::MenuItem("Justify lines", nullptr, state.justify))
         cmd = UiCommand::ToggleJustify;
-      if (ImGui::MenuItem("Footnote overlay", nullptr, state.footnote_overlay))
-        cmd = UiCommand::ToggleFootnoteOverlay;
-      if (ImGui::MenuItem("Bookmarks in the page", nullptr,
-                          state.bookmark_marks))
-        cmd = UiCommand::ToggleBookmarkMarks;
       if (ImGui::BeginMenu("Style sheet")) {
         fill_style_items(state, cmd, result.arg);
         ImGui::EndMenu();
@@ -2173,6 +2228,17 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       cmd = UiCommand::TilesColumns;
     if (ImGui::MenuItem("Stacked", nullptr, state.tiles_stacked))
       cmd = UiCommand::TilesRows;
+    ImGui::Separator();
+    if (ImGui::MenuItem("Swap Panes", nullptr, false, state.split))
+      cmd = UiCommand::SwapPanes;
+    if (ImGui::MenuItem(state.tiles_stacked ? "Join Top (keep top)"
+                                             : "Join Left (keep left)",
+                        nullptr, false, state.split))
+      cmd = UiCommand::JoinLeftPane;
+    if (ImGui::MenuItem(state.tiles_stacked ? "Join Bottom (keep bottom)"
+                                             : "Join Right (keep right)",
+                        nullptr, false, state.split))
+      cmd = UiCommand::JoinRightPane;
     ImGui::EndPopup();
   }
 
@@ -2295,6 +2361,20 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     menu_item_cmd("Find…", UiCommand::Find, cmd, true, "Ctrl+F");
     if (!state.browse)
       menu_item_cmd("Replace…", UiCommand::Replace, cmd, true, "Ctrl+H");
+    ImGui::EndPopup();
+  }
+
+  if (window_menu_open_) {
+    ImGui::SetNextWindowPos(ImVec2(window_menu_x_, window_menu_y_),
+                            ImGuiCond_Appearing);
+    ImGui::OpenPopup("##document_window_menu");
+    window_menu_open_ = false;
+  }
+  if (ImGui::BeginPopup("##document_window_menu")) {
+    if (ImGui::MenuItem("Move Window to Tab")) {
+      cmd = UiCommand::PopIn;
+      result.arg = std::to_string(window_menu_buffer_id_);
+    }
     ImGui::EndPopup();
   }
 

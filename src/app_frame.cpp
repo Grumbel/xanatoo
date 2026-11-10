@@ -146,6 +146,24 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
        fs::is_regular_file(focused_path, source_ec)) &&
       !buf(app, focused_pane(app).buf).placeholder;
   ui_state.has_path = !path_of(app, focused_pane(app)).empty();
+  {
+    const Pane& p = focused_pane(app);
+    if (p.source_buf == p.buf && p.source_doc &&
+        p.locator_buf == p.buf && !p.locator.pipes.empty() &&
+        xanatoo::is_source_pipe(p.locator.pipes.front().kind))
+      switch (p.locator.pipes.front().kind) {
+        case xanatoo::SelectorKind::SourceRaw:
+          ui_state.source_mode = "source-raw";
+          break;
+        case xanatoo::SelectorKind::SourceSexpr:
+          ui_state.source_mode = "source-sexpr";
+          break;
+        case xanatoo::SelectorKind::SourceXml:
+          ui_state.source_mode = "source-xml";
+          break;
+        default: break;
+      }
+  }
   ui_state.split = app.split;
   ui_state.trail = app.split && app.tile_mode == TileMode::Trail;
   ui_state.tiles_stacked = app.tile_axis == TileAxis::Rows;
@@ -515,7 +533,9 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
     ui_state.tab_icons.push_back(tab_buffer ? address_icon(app, tab_buffer->path) : nullptr);
     if (bi == app.panes[app.centre_focus].buf) ui_state.active_tab = ti;
   }
-  ui_state.has_floating = !app.soft_wins.empty();
+  ui_state.has_floating = std::any_of(
+      app.soft_wins.begin(), app.soft_wins.end(),
+      [](const FloatWindow& w) { return w.role == WindowRole::Document; });
   // Right-stick software cursor (extra pointer; never touches OS mouse).
   bool stick_active = false;
   if (app.gamepad) {
@@ -617,7 +637,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::AddBookmark || c == C::BookmarkPage || c == C::RemoveBookmark ||
         c == C::BookmarkPosition || c == C::NewTab ||
         c == C::CloseTab || c == C::NextTab || c == C::PrevTab ||
-        c == C::SelectTab || c == C::PopOut || c == C::PopIn || c == C::Save ||
+        c == C::SelectTab || c == C::TearTab || c == C::PopOut || c == C::PopIn ||
+        c == C::ViewSourceRendered || c == C::ViewSourceRaw ||
+        c == C::ViewSourceSexpr || c == C::ViewSourceXml || c == C::Save ||
         c == C::Publish || c == C::EditLocalCopy || c == C::ViewOriginal ||
         c == C::SaveAs || c == C::ExportSexpr || c == C::ExportXml ||
         c == C::ExportMarkdown ||
@@ -630,6 +652,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::Find || c == C::ToggleSplit || c == C::ToggleTrail ||
         c == C::TilesIndependent || c == C::TilesTrail ||
         c == C::TilesCompare || c == C::TilesColumns || c == C::TilesRows ||
+        c == C::SwapPanes || c == C::JoinLeftPane || c == C::JoinRightPane ||
         c == C::ToggleOutline ||
         c == C::ToggleBacklinks || c == C::ToggleSitemap || c == C::TogglePage ||
         c == C::ToggleSearchBar || c == C::FocusSearchBar || c == C::Search ||
@@ -929,15 +952,31 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::PopOut:
       pop_out_focused(app);
       break;
-    case C::PopIn:
-      // The focused window, else the top one.
-      if (FloatWindow* w = window_of_view(app, app.focus))
-        pop_in_soft(app, static_cast<size_t>(w - app.soft_wins.data()));
-      else if (!app.soft_wins.empty())
-        pop_in_soft(app, app.soft_wins.size() - 1);
-      else
-        flash_status(app, "No floating window to dock");
+    case C::PopIn: {
+      // A window's context menu names its buffer explicitly. File → Move
+      // Window to Tab uses the focused document window, or the topmost
+      // document window; never accidentally convert a utility panel.
+      BufferId requested = kNoBuffer;
+      if (!arg.empty()) {
+        try { requested = static_cast<BufferId>(std::stoul(arg)); }
+        catch (...) { break; }
+      }
+      size_t target = app.soft_wins.size();
+      for (size_t i = app.soft_wins.size(); i-- > 0;) {
+        const FloatWindow& w = app.soft_wins[i];
+        if (w.role != WindowRole::Document ||
+            (requested != kNoBuffer && app.panes[w.view].buf != requested))
+          continue;
+        if (requested != kNoBuffer || w.view == app.focus) {
+          target = i;
+          break;
+        }
+        if (target == app.soft_wins.size()) target = i;
+      }
+      if (target != app.soft_wins.size()) pop_in_soft(app, target);
+      else flash_status(app, "No document window to move to a tab");
       break;
+    }
     case C::OpenDrafts:
       navigate_to_url(app, kDraftsPage);
       break;
@@ -1306,6 +1345,27 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         flash_status(app, "Viewing immutable original; Back returns to working copy");
       else
         flash_status(app, "This document has no imported original");
+      break;
+    }
+    case C::ViewSourceRendered:
+    case C::ViewSourceRaw:
+    case C::ViewSourceSexpr:
+    case C::ViewSourceXml: {
+      // These are pane-local representations of the already loaded buffer.
+      // Do not re-open draft:/db:/remote pages just to change projection.
+      const std::string previous = pane_address(app, p);
+      xanatoo::Locator loc;
+      if (cmd == C::ViewSourceRaw)
+        loc.pipes.push_back({xanatoo::SelectorKind::SourceRaw, {}});
+      else if (cmd == C::ViewSourceSexpr)
+        loc.pipes.push_back({xanatoo::SelectorKind::SourceSexpr, {}});
+      else if (cmd == C::ViewSourceXml)
+        loc.pipes.push_back({xanatoo::SelectorKind::SourceXml, {}});
+      if (!previous.empty())
+        nav_history_capture(p.nav, previous, p.sel, p.scroll_y);
+      apply_locator(app, app.focus, std::move(loc));
+      if (!previous.empty())
+        push_nav_history(app, app.focus, pane_address(app, p));
       break;
     }
     case C::Publish:
@@ -1901,6 +1961,55 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       app.tile_axis = cmd == C::TilesRows ? TileAxis::Rows : TileAxis::Columns;
       app.needs_layout = true;
       break;
+    case C::SwapPanes:
+    case C::JoinLeftPane:
+    case C::JoinRightPane: {
+      if (!app.split) break;
+      // An active Trail hover temporarily replaces the second view with a
+      // preview. Put its real document back before swapping or collapsing.
+      revert_split_preview(app);
+      app.split_preview.hover.clear();
+      app.split_preview.shown.clear();
+      app.split_preview.pending.clear();
+      if (cmd != C::JoinLeftPane) {
+        // A Pane owns selection, history, source projections and render
+        // caches. Swap the whole view, then restore its physical viewport.
+        // This also works for source views and independently scrolled tabs.
+        std::swap(app.panes[0], app.panes[1]);
+        for (FetchJob& job : app.fetches)
+          if (job.purpose == FetchPurpose::Navigate &&
+              job.pane >= 0 && job.pane < kCentreViews)
+            job.pane = 1 - job.pane;
+        for (int i = 0; i < kCentreViews; ++i) {
+          Pane& v = app.panes[i];
+          v.layout = {};
+          v.layout_buf = kNoBuffer;
+          v.height_cache.clear();
+          v.raster.valid = false;
+        }
+      }
+      app.split_history = {};
+      app.split_trail = {};
+      if (cmd != C::SwapPanes) {
+        app.split = false;
+        app.tile_mode = TileMode::Independent;
+        app.diff_mode = false;
+        cancel_fetches(app, 1);  // the discarded view must not update later
+        focus_view(app, 0);
+        const BufferId kept = app.panes[0].buf;
+        if (find_buf(app, kept) &&
+            std::find(app.tab_order.begin(), app.tab_order.end(), kept) ==
+                app.tab_order.end())
+          app.tab_order.push_back(kept);
+        flash_status(app, "Joined panes");
+      } else {
+        flash_status(app, "Swapped panes");
+      }
+      refresh_diff(app);
+      app.needs_layout = true;
+      update_title(app);
+      break;
+    }
     case C::ToggleOutline:
       app.outline_mode = !app.outline_mode;
       if (app.outline_mode) {
@@ -2323,7 +2432,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       if (app.view_settings.justify) {
         if (app.view_settings.measure_chars == 0)
           flash_status(
-              app, "Justify on — View→Text width 72 for book-like width");
+              app, "Justify on — Layout→Text width 72 for book-like width");
         else
           flash_status(app, "Justify on");
       } else {

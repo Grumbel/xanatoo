@@ -7,6 +7,27 @@ The desktop UI takes the classic GNOME 2 HIG as a useful baseline: predictable
 window controls, visible interactive targets, restrained chrome, and consistent
 keyboard/mouse behaviour. The dock/tile model is intentionally more flexible.
 
+## Navigation and layout menus
+
+- **View → View Source** switches the current pane between the rendered
+  document, raw source, S-expression and XML. It reuses the loaded document
+  (including database-native and unsaved documents) instead of opening a
+  second page or fetching the remote URL again. Source representations are
+  read-only pane-local projections, not edits to the underlying buffer.
+- **Layout** holds page columns, collection layout, split/tile arrangement,
+  margins, text width, line spacing, justification and style sheets. **View**
+  holds reading modes, document/source representations and viewing overlays;
+  edit-only **Format** remains reserved for document formatting actions.
+- Right-click a document **tab** to select it, move it into a document window
+  or close it. Right-click a document **window title** to move that *specific*
+  window back to a tab, even when another window has focus. Moving a view
+  preserves its own navigation history, source projection, scroll and selection.
+  Utility panels (Bookmarks, Styles, etc.) cannot be converted into tabs.
+- The centre tile-divider badge/right-click menu offers **Swap Panes** and
+  **Join Left/Right** (or **Top/Bottom** in stacked mode). Join collapses the
+  split while retaining the selected side's view and history. A Trail hover
+  preview is reverted first; pending fetches for the discarded side stop.
+
 ## Native panels and ImGui
 
 - A panel that can be docked, detached, resized, or maximized is a `FloatWindow`.

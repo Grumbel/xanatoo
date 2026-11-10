@@ -89,9 +89,9 @@ enum class UiCommand {
   PrevTab,
   SelectTab,       // arg = tab index in tab_order
   ReorderTabs,     // arg = buffer ids "3,1,2", the new tab_order (dragged)
-  TearTab,         // arg = "id,x,y": a tab dragged off the strip → window
+  TearTab,         // arg = "id,x,y": move a specific tab to a document window
   PopOut,          // focused buffer → floating window
-  PopIn,           // top floating window → tab in focused pane
+  PopIn,           // arg = optional buffer id: document window → centre tab
   Save,
   Publish,       // snapshot current database-native working revision locally
   EditLocalCopy, // preserve source; switch to editable local database document
@@ -174,6 +174,9 @@ enum class UiCommand {
   TilesCompare,
   TilesColumns,
   TilesRows,
+  SwapPanes,       // exchange two centre views, including navigation state
+  JoinLeftPane,    // collapse split, retaining the left/top view
+  JoinRightPane,   // collapse split, retaining the right/bottom view
   ToggleOutline,
   ToggleBacklinks,
   ToggleSitemap,  // site structure panel of the focused web page
@@ -190,6 +193,10 @@ enum class UiCommand {
   ToggleBrowse,  // read-only navigation mode
   ToggleChrome,  // content only: hide menu bar, toolbars, tabs, status line
   ToggleNative,  // web page ↔ its native xanatoo form (wikipedia:, hn:, …)
+  ViewSourceRendered, // leave a source projection and show the document
+  ViewSourceRaw,      // focused document's raw source (if available)
+  ViewSourceSexpr,    // focused document's S-expression representation
+  ViewSourceXml,      // focused document's XML representation
   ToggleReader,  // focused view: hide / show the page chrome (nav, aside, …)
   TogglePaged,        // focused view: scrolling ↔ ebook style pages (F8)
   TogglePagedDefault, // Preferences: paged reading for new views
@@ -377,6 +384,7 @@ struct UiState {
   std::string alternate_url;
   std::string up_url;  // parent page of the focused one ("" at the top)
   bool native_view = false;  // focused page is a native ref (alternate = web)
+  std::string source_mode;  // empty = rendered, otherwise source-raw/sexpr/xml
   // Caret / right-click inside a Collection: its current view for the
   // Collection menus (layout 0 grid, 1 list, 2 full; sort 0 doc, 1 name,
   // 2 name reversed; card size in px).
@@ -488,6 +496,8 @@ public:
 
   // Request a context menu at window coordinates (call from main on right-click).
   void open_context_menu(float x, float y);
+  // Right-click on the chrome of a document FloatWindow (exact buffer id).
+  void open_window_menu(float x, float y, uint32_t buffer_id);
   // Divider badge / right-click: relationship and orientation menu.
   void open_tile_menu(float x, float y);
   // The menu of a bookmark's margin icon (UiState::bookmark_menu).
@@ -529,6 +539,10 @@ private:
   std::unordered_map<std::string, Icon> icons_;
 
   bool context_open_ = false;
+  bool window_menu_open_ = false;
+  uint32_t window_menu_buffer_id_ = 0;
+  float window_menu_x_ = 0.f;
+  float window_menu_y_ = 0.f;
   bool tile_menu_open_ = false;
   bool bookmark_menu_open_ = false;
   float context_x_ = 0.f;

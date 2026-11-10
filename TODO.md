@@ -6,7 +6,27 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **339** (this delivery is **338**)
+Next bundle number: **340** (this delivery is **339**)
+
+## Status (2026-11-10) — source/layout menus, window conversion, split joining (bundle 339)
+
+- Added **View → View Source** to switch between rendered, raw,
+  S-expression and XML representations of the loaded document. The current
+  source mode is checked in the menu. Projection switches stay local to the
+  view and avoid refetching draft/database/remote content.
+- Moved page columns, collection view, tile arrangement, line spacing,
+  margins, measure, justification and stylesheet selection into an always
+  available **Layout** menu (`Alt+L`). The edit-only **Format** menu stays.
+- Added per-tab context menus (**Select**, **Move to Window**, **Close**) and
+  per-document-window title context menus (**Move Window to Tab**). Targeted
+  move-back selects the clicked document window and excludes utility panels.
+  Tab/window moves preserve source projections, navigation, selection,
+  reader/paged settings and scroll state.
+- Added **Swap Panes** and **Join Left/Right** to the tile divider menu
+  (Top/Bottom labels when stacked). Joins retain the chosen view and cancel
+  updates for the discarded pane. Active Trail previews are reverted first.
+- Vendored ImGui panel regression and whitespace checks passed. Full desktop
+  SDL/Nix build and pointer-interaction verification remain pending here.
 
 ## Status (2026-11-10) — active document tab emphasis
 

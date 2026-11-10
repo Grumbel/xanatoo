@@ -557,13 +557,21 @@ void pop_out_focused(App& app) {
     return;
   }
   const xanatoo::Selection sel = p.sel;
-  const float scroll = p.scroll_y;
   FloatWindow* w = new_doc_window(app, bi);
   if (!w) return;
   Pane& v = app.panes[w->view];
   v.nav = p.nav;  // the window takes the tab's trail along
   v.sel = sel;
-  v.scroll_y = scroll;
+  v.scroll_y = p.scroll_y;
+  v.locator = p.locator;
+  v.locator_buf = p.locator_buf;
+  v.source_doc = p.source_doc;
+  v.source_buf = p.source_buf;
+  v.cut = p.cut;
+  v.marks = p.marks;
+  v.section_focus = p.section_focus;
+  v.reader = p.reader;
+  v.paged = p.paged;
   focus_view(app, w->view);
   flash_status(app, "Popped out to window");
 }
@@ -581,6 +589,17 @@ void tear_tab(App& app, BufferId bi, int mx, int my) {
   const xanatoo::Selection sel = from ? from->sel : xanatoo::Selection{};
   const float scroll = from ? from->scroll_y : 0.f;
   const NavHistory nav = from ? from->nav : NavHistory{};
+  const xanatoo::Locator locator = from ? from->locator : xanatoo::Locator{};
+  const BufferId locator_buf = from ? from->locator_buf : kNoBuffer;
+  const std::optional<xanatoo::Document> source_doc =
+      from ? from->source_doc : std::nullopt;
+  const BufferId source_buf = from ? from->source_buf : kNoBuffer;
+  const xanatoo::NodeId cut = from ? from->cut : xanatoo::INVALID_NODE;
+  const std::vector<xanatoo::Selection> marks =
+      from ? from->marks : std::vector<xanatoo::Selection>{};
+  const bool section_focus = from && from->section_focus;
+  const std::optional<bool> reader = from ? from->reader : std::nullopt;
+  const std::optional<bool> paged = from ? from->paged : std::nullopt;
   FloatWindow* w = new_doc_window(app, bi);
   if (!w) return;
   w->x = std::max(0, mx - w->w / 2);
@@ -591,6 +610,15 @@ void tear_tab(App& app, BufferId bi, int mx, int my) {
   v.nav = nav;
   v.sel = sel;
   v.scroll_y = scroll;
+  v.locator = locator;
+  v.locator_buf = locator_buf;
+  v.source_doc = source_doc;
+  v.source_buf = source_buf;
+  v.cut = cut;
+  v.marks = marks;
+  v.section_focus = section_focus;
+  v.reader = reader;
+  v.paged = paged;
   const int view = w->view;
   leave_tab(app, bi);
   // new_doc_window may have moved soft_wins; look the window up again.
@@ -607,21 +635,33 @@ void tear_tab(App& app, BufferId bi, int mx, int my) {
 
 void pop_in_soft(App& app, size_t si) {
   if (si >= app.soft_wins.size()) return;
+  if (app.soft_wins[si].role != WindowRole::Document) return;
   const int view = app.soft_wins[si].view;
   Pane& v = app.panes[view];
   const int to = app.centre_focus;
   if (find_buf(app, v.buf)) {
     Pane& c = app.panes[to];
     c.buf = v.buf;
+    c.nav = std::move(v.nav);
     c.sel = v.sel;
     c.scroll_y = v.scroll_y;
+    c.locator = std::move(v.locator);
+    c.locator_buf = v.locator_buf;
+    c.source_doc = std::move(v.source_doc);
+    c.source_buf = v.source_buf;
+    c.cut = v.cut;
+    c.marks = std::move(v.marks);
+    c.section_focus = v.section_focus;
+    c.reader = v.reader;
+    c.paged = v.paged;
     c.layout = {};
+    c.layout_buf = kNoBuffer;
+    c.pages = {};
     c.height_cache.clear();
     xanatoo::ensure_valid_caret(doc_of(app, c), c.sel.focus);
     if (std::find(app.tab_order.begin(), app.tab_order.end(), c.buf) ==
         app.tab_order.end())
       app.tab_order.push_back(c.buf);
-    push_nav_history(app, to, path_of(app, c));
   }
   release_view(app, view);
   app.soft_wins.erase(app.soft_wins.begin() + static_cast<std::ptrdiff_t>(si));
