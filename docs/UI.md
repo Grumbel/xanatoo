@@ -28,6 +28,20 @@ keyboard/mouse behaviour. The dock/tile model is intentionally more flexible.
   split while retaining the selected side's view and history. A Trail hover
   preview is reverted first; pending fetches for the discarded side stop.
 
+## External URL drops
+
+- Dropping a URL from another application navigates the view directly under
+  the pointer. With two centre panes, either side can receive the drop;
+  linked Trail navigation does not redirect it to the other pane. A document
+  floating window also accepts drops, while utility panels block drops onto
+  pages behind them.
+- SDL text drops accept plain URLs and the first URL in a `text/uri-list`
+  (ignoring blank/comment lines). A `file://` URL to a local path is decoded
+  and opened as a document. Regular file drops still open documents in
+  windows, and dropping images onto a document still inserts at its caret.
+- SDL3 supplies exact coordinates for the drop. SDL2's drop event lacks them,
+  so the compatibility path uses the mouse position at the time of dropping.
+
 ## Native panels and ImGui
 
 - A panel that can be docked, detached, resized, or maximized is a `FloatWindow`.

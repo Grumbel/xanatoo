@@ -13,6 +13,7 @@
 #include <optional>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/drop_url.hpp"
 #include "xanatoo/html_page.hpp"
 #include "xanatoo/platform.hpp"
 #include "xanatoo/epub_import.hpp"
@@ -49,11 +50,52 @@ static void on_windowevent(App& app, SDL_Event& ev, bool imgui_mouse,
   return;
 }
 
+static int drop_view_at(App& app, const SDL_Event& ev) {
+  const auto [mx, my] = xanatoo::sdl::drop_position(ev);
+  if (mx < 0 || my < 0 || mx >= app.win_w || my >= app.win_h) return -1;
+  // Never navigate a hidden page through a utility panel. Document windows
+  // accept drops anywhere within their frame, including the title bar.
+  if (const FloatWindow* w = float_at(app, mx, my))
+    return w->role == WindowRole::Document ? w->view : -1;
+  // Within the document area, choose the tile under the drop, not the
+  // previously focused tile and not the right-hand Trail destination.
+  if (static_cast<float>(my) >= app.ui_top &&
+      my < app.win_h - status_bar_h)
+    return pane_at(app, static_cast<float>(mx), static_cast<float>(my));
+  // Drops on a toolbar/tab strip go to the currently focused view.
+  return view_live(app, app.focus) ? app.focus : app.centre_focus;
+}
+
+static void open_dropped_url(App& app, const SDL_Event& ev,
+                             const std::string& target) {
+  const int pane = drop_view_at(app, ev);
+  if (pane < 0) return;
+  focus_view(app, pane);
+  // Unlike clicking a hyperlink in Trail mode, a drop explicitly names its
+  // destination view. Use pane-local navigation without trail redirection.
+  if (!navigate_pane(app, pane, target, /*record_history=*/true))
+    flash_status(app, "Could not open dropped URL: " + target);
+}
+
+static void on_droptext(App& app, SDL_Event& ev, bool imgui_mouse,
+                        bool imgui_keys) {
+  const std::string target = xanatoo::dropped_navigation_target(
+      xanatoo::sdl::take_drop_data(ev));
+  if (!target.empty()) open_dropped_url(app, ev, target);
+}
+
 static void on_dropfile(App& app, SDL_Event& ev, bool imgui_mouse,
                         bool imgui_keys) {
   // Drag-and-drop: documents open in a soft window; images insert at caret.
   std::string fpath = xanatoo::sdl::take_drop_filename(ev);
   if (fpath.empty()) return;
+  // Some desktop drag sources report an address as a file drop rather than
+  // text/plain or text/uri-list. Treat an actual URL as navigation first.
+  if (const std::string target = xanatoo::dropped_navigation_target(fpath);
+      !target.empty()) {
+    open_dropped_url(app, ev, target);
+    return;
+  }
 
   auto lower_ext = [](std::string p) {
     for (char& c : p)
@@ -91,8 +133,7 @@ static void on_dropfile(App& app, SDL_Event& ev, bool imgui_mouse,
     return;
   }
 
-  int mx = 0, my_raw = 0;
-  xanatoo::sdl::mouse_position(&mx, &my_raw);
+  const auto [mx, my_raw] = xanatoo::sdl::drop_position(ev);
   if (static_cast<float>(my_raw) < app.ui_top) return;
   if (my_raw >= app.win_h - status_bar_h) return;
 
@@ -2710,6 +2751,9 @@ void handle_event(App& app, SDL_Event& ev) {
       break;
     case EventKind::DropFile:
       on_dropfile(app, ev, imgui_mouse, imgui_keys);
+      break;
+    case EventKind::DropText:
+      on_droptext(app, ev, imgui_mouse, imgui_keys);
       break;
     case EventKind::MouseWheel:
       on_mousewheel(app, ev, imgui_mouse, imgui_keys);

@@ -95,6 +95,10 @@ The tab right-click menu allows targeted tear-off; the native document-window
 title context menu moves a specific window back (only `WindowRole::Document`).
 View source projections (`//source-raw`, `//source-sexpr`, `//source-xml`) are
 pane-local and switch in View → View Source; see `docs/UI.md`.
+SDL `DropText` and URL-shaped `DropFile` events navigate the specific view at
+the drop location via `drop_view_at` / `navigate_pane` (`app_events.cpp`), not
+the linked Trail click handler. `drop_url.hpp` parses plain text/URI lists;
+test URL parsing without SDL in `tests/drop_url_tests.cpp`.
 To change a page without moving the view, call `keep_views(app)` before the
 change (it needs the old layout): the top line of each view stays on its
 spot through the next `layout_panes`. To hold another spot, set

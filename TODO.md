@@ -6,7 +6,21 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **340** (this delivery is **339**)
+Next bundle number: **341** (this delivery is **340**)
+
+## Status (2026-11-10) — external URL drag-and-drop (bundle 340)
+
+- Recognize SDL2/SDL3 **text drops** in addition to file drops, including
+  browser URLs and `text/uri-list` values (comment lines and multiple links).
+  Local `file://` paths are percent-decoded; non-navigation text and unsafe
+  schemes are ignored. URL-looking file drops also use this navigation path.
+- Route dropped URLs to the centre pane under the actual drop coordinates,
+  or to a document FloatWindow, even in linked Trail mode. Dropping onto a
+  utility panel does not navigate through it. SDL2 uses current mouse
+  position because its drop event lacks coordinates; SDL3 uses event x/y.
+- Existing ordinary file-window opening and image-at-caret insertion remain
+  unchanged. Added a standalone C++ parser test to CTest and SDL API compile
+  surface checks. Full desktop SDL/Nix end-to-end testing remains pending.
 
 ## Status (2026-11-10) — source/layout menus, window conversion, split joining (bundle 339)
 

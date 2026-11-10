@@ -54,6 +54,8 @@ void compile_sdl_render_api(SDL_Window* window, SDL_Renderer* renderer, SDL_Text
   (void)sdl::gamepad_event_button(event);
   (void)sdl::gamepad_event_id(event);
   (void)sdl::take_drop_filename(event);
+  (void)sdl::take_drop_data(event);
+  (void)sdl::drop_position(event);
   SDL_TouchFingerEvent finger{};
   (void)sdl::touch_id(finger);
   (void)sdl::finger_id(finger);

@@ -81,6 +81,7 @@
 #endif
 
 #include <string>
+#include <utility>
 
 namespace xanatoo::sdl {
 
@@ -280,6 +281,7 @@ enum class EventKind {
   Quit,
   WindowResized,
   DropFile,
+  DropText,
   MouseWheel,
   MouseButtonDown,
   MouseButtonUp,
@@ -397,6 +399,7 @@ inline EventKind event_kind(const SDL_Event& event) {
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED: return EventKind::Quit;
     case SDL_EVENT_WINDOW_RESIZED: return EventKind::WindowResized;
     case SDL_EVENT_DROP_FILE: return EventKind::DropFile;
+    case SDL_EVENT_DROP_TEXT: return EventKind::DropText;
     case SDL_EVENT_MOUSE_WHEEL: return EventKind::MouseWheel;
     case SDL_EVENT_MOUSE_BUTTON_DOWN: return EventKind::MouseButtonDown;
     case SDL_EVENT_MOUSE_BUTTON_UP: return EventKind::MouseButtonUp;
@@ -424,6 +427,7 @@ inline EventKind event_kind(const SDL_Event& event) {
                  ? EventKind::WindowResized
                  : EventKind::Other;
     case SDL_DROPFILE: return EventKind::DropFile;
+    case SDL_DROPTEXT: return EventKind::DropText;
     case SDL_MOUSEWHEEL: return EventKind::MouseWheel;
     case SDL_MOUSEBUTTONDOWN: return EventKind::MouseButtonDown;
     case SDL_MOUSEBUTTONUP: return EventKind::MouseButtonUp;
@@ -461,16 +465,33 @@ inline SDL_JoystickID gamepad_event_id(const SDL_Event& event) {
 #endif
 }
 
-inline std::string take_drop_filename(SDL_Event& event) {
+inline std::string take_drop_data(SDL_Event& event) {
 #if defined(XANATOO_SDL3) && XANATOO_SDL3
-  // SDL3 owns the event's drop data and releases it at the appropriate time.
+  // SDL3 owns the data for file and text drops, and frees it after the event.
   return event.drop.data ? event.drop.data : "";
 #else
-  char* filename = event.drop.file;
-  std::string result = filename ? filename : "";
-  SDL_free(filename);
+  // Both SDL_DROPFILE and SDL_DROPTEXT use the `file` payload in SDL2.
+  char* data = event.drop.file;
+  std::string result = data ? data : "";
+  SDL_free(data);
   event.drop.file = nullptr;
   return result;
+#endif
+}
+
+inline std::string take_drop_filename(SDL_Event& event) {
+  return take_drop_data(event);
+}
+
+// SDL2's SDL_DropEvent has no x/y; SDL3 records the actual drop position.
+inline std::pair<int, int> drop_position(const SDL_Event& event) {
+#if defined(XANATOO_SDL3) && XANATOO_SDL3
+  return {static_cast<int>(event.drop.x), static_cast<int>(event.drop.y)};
+#else
+  (void)event;
+  int x = 0, y = 0;
+  mouse_position(&x, &y);
+  return {x, y};
 #endif
 }
 
