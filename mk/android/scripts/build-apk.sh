@@ -46,6 +46,9 @@ for f in "$APP_SRC_DIR"/src/*.cpp; do
     *) cp "$f" src/jni/src/src/ ;;
   esac
 done
+# Keep private headers beside their source files: quoted local includes in
+# src/*.cpp are resolved relative to this staged directory by the NDK.
+cp "$APP_SRC_DIR"/src/*.hpp src/jni/src/src/
 cp -r "$APP_SRC_DIR"/include src/jni/src/include
 cp -r "$APP_SRC_DIR"/external src/jni/src/external
 

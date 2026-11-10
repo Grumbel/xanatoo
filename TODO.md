@@ -6,7 +6,14 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **347** (this delivery is **346**)
+Next bundle number: **348** (this delivery is **347**)
+
+## Status (2026-11-10) — Android private UI header staging (bundle 347)
+
+- Stage `src/*.hpp` alongside `src/*.cpp` in the Android NDK source tree.
+  This includes `ui_panel_imgui_order.hpp`, which `ui.cpp` includes locally.
+- Shell syntax and staged-header presence verified; Android compilation itself
+  remains untested locally (Nix/NDK unavailable).
 
 ## Status (2026-11-10) — SDL2 R36S drop-position build fix (bundle 346)
 
