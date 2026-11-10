@@ -169,8 +169,10 @@ std::string up_url(std::string_view url) {
     // Communities and posts sit under the instance, which has no native
     // view: up leaves for its web page.
     std::string_view rest = after_prefix(url, kLemmyPrefix);
-    return "https://" + std::string(rest.substr(0, rest.find_first_of("/?#"))) +
-           "/";
+    std::string result = "https://";
+    result += rest.substr(0, rest.find_first_of("/?#"));
+    result += '/';
+    return result;
   }
   return {};
 }

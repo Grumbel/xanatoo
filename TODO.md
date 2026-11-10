@@ -6,7 +6,20 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **344** (this delivery is **343**)
+Next bundle number: **345** (this delivery is **344**)
+
+## Status (2026-11-10) — R36S OpenSSL compatibility (bundle 344)
+
+- Use `SSL_get_peer_certificate` with the pre-3.0 OpenSSL headers in the R36S
+  ArkOS sysroot, and `SSL_get1_peer_certificate` with OpenSSL 3.x; both return
+  an owned X509 reference that must be released with `X509_free`. This fixes
+  the two missing-symbol compile errors in `tls_openssl.cpp`.
+- Avoid `const char* + std::string` temporary concatenations in
+  `format_locator` and `up_url`, which triggered GCC 9 array-bounds warnings
+  in the R36S build. Resulting URL/locator text is unchanged.
+- OpenSSL 3 host TLS peer-certificate regression passed, and the affected
+  URL/locator translation units passed syntax checks. R36S's old OpenSSL
+  cross-build still needs verification with the Nix toolchain.
 
 ## Status (2026-11-10) — tab context menu spacing, edit-mode opt-in (bundle 343)
 

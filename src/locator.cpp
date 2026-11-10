@@ -387,8 +387,14 @@ Locator parse_locator(std::string_view address) {
 
 std::string format_locator(const Locator& loc) {
   std::string out = loc.base;
-  for (const Selector& sel : loc.pipes) out += "//" + format_selector(sel);
-  if (loc.point) out += "#" + format_point(*loc.point);
+  for (const Selector& sel : loc.pipes) {
+    out += "//";
+    out += format_selector(sel);
+  }
+  if (loc.point) {
+    out += '#';
+    out += format_point(*loc.point);
+  }
   return out;
 }
 

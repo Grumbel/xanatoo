@@ -29,6 +29,18 @@ void init_once() {
   });
 }
 
+// SSL_get1_peer_certificate was introduced in OpenSSL 3.0. The older
+// SSL_get_peer_certificate has identical ownership semantics (the caller
+// owns one reference), so both paths must be paired with X509_free().
+X509* peer_certificate_owned(SSL* ssl) {
+#if defined(OPENSSL_VERSION_MAJOR) && OPENSSL_VERSION_MAJOR >= 3 && \
+    !defined(LIBRESSL_VERSION_NUMBER)
+  return SSL_get1_peer_certificate(ssl);
+#else
+  return SSL_get_peer_certificate(ssl);
+#endif
+}
+
 std::string certificate_name(X509_NAME* name) {
   if (!name) return {};
   BIO* output = BIO_new(BIO_s_mem());
@@ -152,7 +164,7 @@ bool TlsStream::connected() const { return impl_->ssl != nullptr; }
 
 std::optional<std::string> TlsStream::peer_certificate_sha256() const {
   if (!connected()) return std::nullopt;
-  X509* cert = SSL_get1_peer_certificate(impl_->ssl);
+  X509* cert = peer_certificate_owned(impl_->ssl);
   if (!cert) return std::nullopt;
   unsigned char digest[EVP_MAX_MD_SIZE];
   unsigned int size = 0;
@@ -171,7 +183,7 @@ std::optional<std::string> TlsStream::peer_certificate_sha256() const {
 
 std::optional<TlsPeerCertificate> TlsStream::peer_certificate_details() const {
   if (!connected()) return std::nullopt;
-  X509* cert = SSL_get1_peer_certificate(impl_->ssl);
+  X509* cert = peer_certificate_owned(impl_->ssl);
   if (!cert) return std::nullopt;
   TlsPeerCertificate details;
   details.subject = certificate_name(X509_get_subject_name(cert));

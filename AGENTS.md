@@ -239,6 +239,10 @@ the SDL2 backend must detect external cursor changes to restore its I-beam.
 ## Shared network helpers
 
 - `include/xanatoo/tls.hpp` — `TlsStream` (connect over a socket fd with SNI, peer certificate SHA-256, write_all / read / pending; owns the fd). Backends `src/tls_openssl.cpp` (desktop default) and `src/tls_mbedtls.cpp` (Android; `-DXANATOO_TLS=mbedtls`). Certificate-chain/hostname verification defaults ON; Gemini explicitly opts out of CA verification and enforces `gemini_tofu.cpp` pins before sending URLs. Never call OpenSSL / Mbed TLS directly elsewhere.
+- The R36S ArkOS sysroot uses OpenSSL older than 3.0: fetch peer certificates
+  through `peer_certificate_owned` in `tls_openssl.cpp`, which selects the
+  available OpenSSL API and requires `X509_free` on the returned reference.
+  Keep both old and new APIs building when changing TLS code.
 - `TlsStream::peer_certificate_details()` supplies printable subject/issuer,
   UTC validity dates and self-issuance/self-signature status for Gemini trust
   review. OpenSSL checks the actual self-signature; Mbed TLS reports unknown
