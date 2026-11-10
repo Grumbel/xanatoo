@@ -4,6 +4,7 @@
 
 #include "xanatoo/sdl.hpp"
 #include "xanatoo/history_menu.hpp"
+#include "xanatoo/urlbar_suggestions.hpp"
 #include "xanatoo/nostr_store.hpp"
 #include "xanatoo/lemmy_directory.hpp"
 #include "xanatoo/style.hpp"
@@ -379,6 +380,8 @@ struct UiState {
   bool can_nav_forward = false;
   std::vector<HistoryMenuItem> back_history;
   std::vector<HistoryMenuItem> forward_history;
+  // Address bar suggestions: open tabs, bookmarks, recent visits, newest first.
+  std::vector<UrlBarSuggestion> urlbar_entries;
   // Other view of the focused page ("" = none): the native ref of a web
   // page (wikipedia:Title, hn:item?id=1) or the web URL of a native view.
   std::string alternate_url;
@@ -528,6 +531,8 @@ private:
                    bool* right_clicked = nullptr, bool latched = false);
   bool tool_menu_begin(const char* id, const char* icon_name, const char* tip);
   void toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd);
+  void draw_url_suggestions(const UiState& state, UiFrameResult& result,
+                            UiCommand& cmd);
   void tool_menu_end();
 
   bool ready_ = false;
@@ -557,6 +562,13 @@ private:
   char url_input_[2048] = {};
   std::string url_synced_from_;  // last doc_label pushed into url_input_
   bool focus_url_bar_ = false;   // Ctrl+L / Open URL menu
+  bool url_suggestions_open_ = false;
+  bool url_suggestions_dismissed_ = false;  // Esc until next focus/edit
+  bool url_field_active_ = false;
+  int url_suggestion_selected_ = -1;  // no suggestion: Enter uses typed URL
+  std::string url_suggestion_query_;
+  float url_suggestion_x_ = 0.f, url_suggestion_y_ = 0.f;
+  float url_suggestion_w_ = 0.f;
   bool select_url_bar_ = false;  // context menu: select current field contents
   bool url_context_selection_ = false;
   int url_context_begin_ = 0;

@@ -35,6 +35,13 @@ void push_nav_history(App& app, int pi, const std::string& url) {
     if (static_cast<int>(app.visited.size()) > kMaxNavHistory)
       app.visited.erase(app.visited.begin());
   }
+  // The URL bar's history is also the existing persistent URL minibuffer
+  // ring. A single line per address, most recent last, honours --no-save.
+  if (url.find('\n') == std::string::npos &&
+      url.find('\r') == std::string::npos) {
+    xanatoo::push_minibuffer_history(app.minibuf_hist_url, url);
+    xanatoo::save_minibuffer_history("url", app.minibuf_hist_url);
+  }
   split_history_note(app, pi, url);  // no-op unless split browsing
   Pane& p = app.panes[pi];
   NavHistory& h = p.nav;

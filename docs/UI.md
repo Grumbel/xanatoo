@@ -31,17 +31,33 @@ keyboard/mouse behaviour. The dock/tile model is intentionally more flexible.
 ## Toolbar states
 
 - Ordinary toolbar actions have no button frame until hover; they rise on
-  hover and sink only while pressed. Toggle actions remain recessed until
-  deactivated, including the browse mode, native view, outline, history,
-  downloads and the contextual reader/navigation/site-map buttons.
+  hover and sink only while pressed. **Browse Mode** stays recessed while
+  active, as do toggles that retain the same graphic (native view, outline,
+  history, downloads and the contextual reader/navigation/site-map buttons).
 - **Split Panes** becomes **Join Panes** with a different icon while the
-  independent two-pane arrangement is active; that toolbar action keeps the
-  left/top pane when joining. For an explicit choice use the divider's
-  **Join Left/Right** (or Top/Bottom) context menu.
+  independent two-pane arrangement is active, without remaining recessed.
+  That toolbar action keeps the left/top pane when joining. For an explicit
+  choice use the divider's **Join Left/Right** (or Top/Bottom) context menu.
 - The bookmark button uses an outlined ribbon when the current address is
-  unbookmarked, and a filled ribbon plus sunken face when bookmarked. A
-  bookmark on *another passage* of the current page does not latch the
-  button. Reload uses an opposing-arrows icon, distinct from Stop.
+  unbookmarked, and a filled ribbon when bookmarked. Both states use the
+  same flat/hover face. A bookmark on *another passage* of the current page
+  does not change the button. Reload uses an opposing-arrows icon, distinct
+  from Stop.
+
+## URL bar suggestions
+
+- Focusing the location field (including **Ctrl+L**) opens a list of up to
+  eight matches from open tabs, bookmarks and recently visited addresses.
+  Selecting all the location text presents recent suggestions; typing filters
+  addresses and bookmark/tab titles case-insensitively. Matching and ranking
+  are local; typing does not contact a search engine.
+- **Up/Down** chooses a suggestion, **Enter** opens it (or switches to its
+  existing tab), and clicking a result does the same. Without a selected
+  suggestion, Enter navigates to the text as entered. **Escape** or **Tab**
+  dismisses the list without navigating. A new edit or focus reopens it.
+- Visited URLs are added to the existing `minibuf-url.history` ring in the
+  state directory. It is bounded to 200 distinct recent addresses and obeys
+  `--no-save`; the per-pane Back/Forward history remains separate.
 
 ## External URL drops
 

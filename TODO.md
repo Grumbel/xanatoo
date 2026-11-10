@@ -6,7 +6,24 @@
 
 Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
-Next bundle number: **342** (this delivery is **341**)
+Next bundle number: **343** (this delivery is **342**)
+
+## Status (2026-11-10) — URL bar history and toolbar toggle polish (bundle 342)
+
+- Location bar completion offers up to eight locally ranked results from open
+  tabs, bookmarks and the persistent recent-URL history, with case-insensitive
+  address/title matching, deduplication, Up/Down/Enter, mouse selection and
+  Escape dismissal. Selecting a tab suggestion switches to that tab.
+- Normal navigation is now recorded in the existing bounded URL minibuffer
+  history, including persistence across restarts and `--no-save` handling.
+  Suggestions do not send remote queries while typing.
+- Split/Join and outlined/filled Bookmark toolbar controls now show their
+  different icons **without** a permanently depressed button face. Browse Mode
+  stays visibly pressed when active; toggles without alternate artwork retain
+  their existing recessed states.
+- Pure C++ suggestion unit tests cover matching, ranking, duplicate URLs and
+  limits. Complete SDL/ImGui visual testing still requires a full desktop
+  build environment.
 
 ## Status (2026-11-10) — latched toolbar toggles, icon states (bundle 341)
 

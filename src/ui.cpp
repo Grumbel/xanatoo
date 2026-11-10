@@ -1160,9 +1160,47 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       const int cursor = input ? input->GetCursorPos()
                                : static_cast<int>(std::strlen(url_input_));
       const bool url_active = ImGui::IsItemActive();
+      url_field_active_ = url_active;
+      url_suggestion_x_ = field_pos.x;
+      url_suggestion_y_ = field_end.y + 2.f * scale_;
+      url_suggestion_w_ = field_w;
+      if (url_active) {
+        if (ImGui::IsItemActivated() || ImGui::IsItemEdited()) {
+          url_suggestions_dismissed_ = false;
+          if (ImGui::IsItemActivated()) url_suggestion_selected_ = -1;
+        }
+        if (!url_suggestions_dismissed_) url_suggestions_open_ = true;
+        // Ctrl+L selects the whole location: offer recent pages rather than
+        // matching only the current address. Editing replaces that query.
+        const bool all_selected = has_selection && selection_start == 0 &&
+            selection_end == static_cast<int>(std::strlen(url_input_));
+        std::string query = all_selected ? "" : url_input_;
+        if (!ImGui::IsItemEdited() && url_suggestion_selected_ >= 0)
+          query = url_suggestion_query_;  // arrows mustn't change the query
+        if (query != url_suggestion_query_) {
+          url_suggestion_query_ = std::move(query);
+          url_suggestion_selected_ = -1;
+        }
+        const auto candidates = xanatoo::urlbar_suggestions(
+            url_suggestion_query_, state.urlbar_entries);
+        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow) && !candidates.empty())
+          url_suggestion_selected_ = std::min(
+              url_suggestion_selected_ + 1,
+              static_cast<int>(candidates.size()) - 1);
+        if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && !candidates.empty())
+          url_suggestion_selected_ = url_suggestion_selected_ <= 0
+              ? static_cast<int>(candidates.size()) - 1
+              : url_suggestion_selected_ - 1;
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+          url_suggestions_open_ = false;
+          url_suggestions_dismissed_ = true;
+        }
+      }
       const bool url_right_clicked = ImGui::IsItemHovered() &&
           ImGui::IsMouseReleased(ImGuiMouseButton_Right);
       if (url_right_clicked) {
+        url_suggestions_open_ = false;
+        url_suggestions_dismissed_ = true;
         // Keep the selection while the popup takes keyboard focus.
         url_context_selection_ = has_selection;
         url_context_begin_ = selection_start;
@@ -1184,7 +1222,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       url_bar_editing_ = url_active;
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
         ImGui::SetTooltip(
-            "Location — path or gemini:// URL · Enter to open · Ctrl+L focuses");
+            "Location — URL or path · Ctrl+L · ↑↓ suggestions · Enter opens");
       if (url_right_clicked) ImGui::OpenPopup("##url_context");
       if (ImGui::BeginPopup("##url_context")) {
         const std::string value = url_input_;
@@ -1240,8 +1278,24 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       if (enter) {
         cmd = UiCommand::NavigateUrl;
         result.arg = url_input_;
-        url_synced_from_ = result.arg;
+        std::string selected_address = result.arg;
+        if (url_suggestions_open_ && url_suggestion_selected_ >= 0) {
+          const auto candidates = xanatoo::urlbar_suggestions(
+              url_suggestion_query_, state.urlbar_entries);
+          if (url_suggestion_selected_ < static_cast<int>(candidates.size())) {
+            const auto& choice = candidates[static_cast<size_t>(url_suggestion_selected_)];
+            cmd = choice.source == xanatoo::UrlBarSource::Tab
+                ? UiCommand::SelectTab : UiCommand::NavigateUrl;
+            result.arg = cmd == UiCommand::SelectTab
+                ? std::to_string(choice.tab_index) : choice.address;
+            selected_address = choice.address;
+          }
+        }
+        url_synced_from_ = selected_address;
         url_bar_editing_ = false;
+        url_suggestions_open_ = false;
+        url_suggestions_dismissed_ = true;
+        url_suggestion_selected_ = -1;
         ImGui::ClearActiveID();
       }
       auto extra = [&](const char* id, const char* icon_name, const char* fallback,
@@ -1294,27 +1348,24 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
                       ? " · 1 bookmark in this page"
                       : " · " + std::to_string(state.page_bookmarks) +
                             " bookmarks in this page";
-      // Filled ribbon + sunken face only when this address is bookmarked;
-      // another passage having a bookmark does not toggle this control.
+      // The empty/filled ribbon conveys state without a latched button face.
       tool_button("tb_bookmark",
                   state.current_bookmarked ? "bookmark" : "bookmark-outline",
                   bm_tip.c_str(),
                   state.current_bookmarked ? UiCommand::RemoveBookmark
                                            : UiCommand::AddBookmark,
-                  cmd, state.has_path || !state.doc_label.empty(), nullptr,
-                  state.current_bookmarked);
+                  cmd, state.has_path || !state.doc_label.empty());
     }
     if (state.browse) {
       // The edit row is hidden: its reading tools move here, the display
       // menus into View tools so the row does not grow.
       tool_button("tb_find", "find", "Find (Ctrl+F)", UiCommand::Find, cmd);
-      toggle_button("tb_split", state.split && !state.trail && !state.diff
+      tool_button("tb_split", state.split && !state.trail && !state.diff
                                     ? "join" : "split",
                     state.split && !state.trail && !state.diff
                         ? "Join panes (keep left, Ctrl+\\)"
                         : "Independent split panes (Ctrl+\\)",
-                    UiCommand::ToggleSplit,
-                    state.split && !state.trail && !state.diff);
+                    UiCommand::ToggleSplit, cmd);
       toggle_button("tb_trail", "history", "Linked navigation trail",
                     UiCommand::ToggleTrail, state.trail);
       toggle_button("tb_outline", "outline", "Heading outline (Ctrl+Shift+O)",
@@ -1586,13 +1637,12 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       start_group(4);
       edit_button("tb_find", "find", "Find (Ctrl+F)", UiCommand::Find);
       before_group_item();
-      toggle_button("tb_split", state.split && !state.trail && !state.diff
+      tool_button("tb_split", state.split && !state.trail && !state.diff
                                     ? "join" : "split",
                     state.split && !state.trail && !state.diff
                         ? "Join panes (keep left, Ctrl+\\)"
                         : "Independent split panes (Ctrl+\\)",
-                    UiCommand::ToggleSplit,
-                    state.split && !state.trail && !state.diff);
+                    UiCommand::ToggleSplit, cmd);
       before_group_item();
       toggle_button("tb_trail", "history", "Linked navigation trail",
                     UiCommand::ToggleTrail, state.trail);
@@ -1791,10 +1841,106 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
   }
 }
 
+void Ui::draw_url_suggestions(const UiState& state, UiFrameResult& result,
+                              UiCommand& cmd) {
+  if (state.chrome_hidden || !url_suggestions_open_ || url_suggestion_w_ <= 0.f)
+    return;
+  if (ImGui::IsKeyPressed(ImGuiKey_Tab)) {
+    url_suggestions_open_ = false;
+    url_suggestions_dismissed_ = true;
+    return;
+  }
+  const auto matches = xanatoo::urlbar_suggestions(
+      url_suggestion_query_, state.urlbar_entries);
+  if (matches.empty()) return;
+
+  ImGuiViewport* vp = ImGui::GetMainViewport();
+  const float row_h = std::max(36.f * scale_, ImGui::GetTextLineHeight() * 2.f + 8.f);
+  const float width = std::min(std::max(190.f * scale_, url_suggestion_w_),
+                               std::max(1.f, vp->Size.x - 12.f));
+  const float x = std::clamp(url_suggestion_x_, vp->Pos.x + 6.f,
+                              vp->Pos.x + vp->Size.x - width - 6.f);
+  const float available_h = std::max(0.f,
+      vp->Pos.y + vp->Size.y - url_suggestion_y_ - 8.f -
+          (state.virtual_keyboard
+               ? (vp->Size.y < 500.f ? 200.f : 220.f) * scale_ : 0.f));
+  const float height = std::min(row_h * static_cast<float>(matches.size()) + 8.f,
+                                 available_h);
+  if (height < row_h) return;
+
+  const ImVec2 a(x, url_suggestion_y_);
+  const ImVec2 b(x + width, url_suggestion_y_ + height);
+  // Keep the field's keyboard focus. A click on a result may focus the popup
+  // for that frame; it closes immediately after issuing the navigation.
+  if (!url_field_active_ && !ImGui::IsMouseHoveringRect(a, b, false)) {
+    url_suggestions_open_ = false;
+    url_suggestions_dismissed_ = true;
+    return;
+  }
+
+  ImGui::SetNextWindowPos(a);
+  ImGui::SetNextWindowSize(ImVec2(width, height));
+  const ImGuiWindowFlags flags =
+      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+      ImGuiWindowFlags_NoNavFocus;
+  if (ImGui::Begin("##url_suggestions", nullptr, flags)) {
+    const auto& pal = theme::palette();
+    auto col = [](theme::Rgb c) { return IM_COL32(c.r, c.g, c.b, 255); };
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 0.f));
+    ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(.80f, .83f, .82f, 1.f));
+    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(.94f, .96f, .94f, 1.f));
+    for (int i = 0; i < static_cast<int>(matches.size()); ++i) {
+      const UrlBarSuggestion& entry = matches[static_cast<size_t>(i)];
+      ImGui::PushID(i);
+      const bool activated = ImGui::Selectable(
+          "##suggestion", url_suggestion_selected_ == i, 0,
+          ImVec2(0.f, row_h));
+      if (ImGui::IsItemHovered()) url_suggestion_selected_ = i;
+      const ImVec2 min = ImGui::GetItemRectMin();
+      const ImVec2 max = ImGui::GetItemRectMax();
+      const char* kind = entry.source == UrlBarSource::Tab ? "Tab" :
+                         entry.source == UrlBarSource::Bookmark ? "Bookmark" :
+                         "History";
+      const float kind_w = ImGui::CalcTextSize(kind).x;
+      ImDrawList* draw = ImGui::GetWindowDrawList();
+      draw->PushClipRect(ImVec2(min.x + 8.f, min.y),
+                         ImVec2(max.x - kind_w - 16.f, max.y), true);
+      const std::string primary = entry.title.empty() ? entry.address : entry.title;
+      draw->AddText(ImVec2(min.x + 8.f, min.y + 2.f), col(pal.text),
+                    primary.c_str());
+      draw->AddText(ImVec2(min.x + 8.f, min.y + row_h * .50f),
+                    col(pal.text_dim), entry.address.c_str());
+      draw->PopClipRect();
+      draw->AddText(ImVec2(max.x - kind_w - 8.f, min.y + 2.f),
+                    col(pal.text_dim), kind);
+      if (activated) {
+        cmd = entry.source == UrlBarSource::Tab
+                  ? UiCommand::SelectTab : UiCommand::NavigateUrl;
+        result.arg = entry.source == UrlBarSource::Tab
+                  ? std::to_string(entry.tab_index) : entry.address;
+        url_synced_from_ = entry.address;
+        url_bar_editing_ = false;
+        url_suggestions_open_ = false;
+        url_suggestions_dismissed_ = true;
+        url_suggestion_selected_ = -1;
+        ImGui::ClearActiveID();
+      }
+      ImGui::PopID();
+    }
+    ImGui::PopStyleColor(2);
+    ImGui::PopStyleVar();
+  }
+  ImGui::End();
+}
+
 UiFrameResult Ui::begin_frame(const UiState& state) {
   UiFrameResult result;
   if (!ready_) return result;
   render_prepared_ = false;
+  url_field_active_ = false;
+  if (state.chrome_hidden) url_suggestions_open_ = false;
 
 #if defined(XANATOO_SDL3) && XANATOO_SDL3
   xanatoo::imgui_sdl3::new_frame();
@@ -3664,6 +3810,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     ImGui::End();
   }
 
+  // Draw last among normal windows so it sits above all chrome and dockable
+  // panel bodies, without stealing focus from the location text editor.
+  draw_url_suggestions(state, result, cmd);
   result.cmd = cmd;
 
   // ---- On-screen keyboard (handheld / no physical keyboard) ----

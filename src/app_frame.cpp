@@ -533,6 +533,22 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
     ui_state.tab_icons.push_back(tab_buffer ? address_icon(app, tab_buffer->path) : nullptr);
     if (bi == app.panes[app.centre_focus].buf) ui_state.active_tab = ti;
   }
+  ui_state.urlbar_entries.clear();
+  for (int ti = 0; ti < static_cast<int>(app.tab_order.size()); ++ti) {
+    if (const DocBuffer* b = find_buf(app, app.tab_order[static_cast<size_t>(ti)]);
+        b && !b->path.empty())
+      ui_state.urlbar_entries.push_back(
+          {b->path, ui_state.tab_labels[static_cast<size_t>(ti)],
+           xanatoo::UrlBarSource::Tab, ti});
+  }
+  for (auto it = app.bookmarks.rbegin(); it != app.bookmarks.rend(); ++it)
+    ui_state.urlbar_entries.push_back(
+        {it->address, xanatoo::bookmark_label(*it),
+         xanatoo::UrlBarSource::Bookmark});
+  for (auto it = app.minibuf_hist_url.rbegin();
+       it != app.minibuf_hist_url.rend(); ++it)
+    ui_state.urlbar_entries.push_back(
+        {*it, {}, xanatoo::UrlBarSource::History});
   ui_state.has_floating = std::any_of(
       app.soft_wins.begin(), app.soft_wins.end(),
       [](const FloatWindow& w) { return w.role == WindowRole::Document; });

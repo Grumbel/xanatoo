@@ -61,7 +61,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_pages.cpp` | paged reading (`docs/PAGED.md`): `Pane::paged` / `PageView`, `paginate_pane` (called by `layout_panes`, cuts the layout with `paginate.hpp`), `page_turn`, page bar + edge zones + column rules (`draw_page_chrome`, `page_pointer_*`); while `pages.on`, `scroll_y` is a multiple of `stride`, `Pane::h` leaves out the bar, `sb_reserve` is 0 — use `pane_max_scroll`, `spread_at`, `page_goto_spread`, never pixel scrolling |
 | `math_parse.cpp` / `math_layout.cpp` / `math_font.cpp` | TeX math (`docs/MATH.md`): `parse_math` (TeX subset → `MathNode`), `layout_math` (TeXbook App. G on a `MathFace`, em units, y up) and the FreeType `MathFont` (MATH table, glyph rasters by glyph id, `draw_math`); `FontSet::math_font()` finds the font on first use. A formula is an `InlineKind::Math` span (`src` = TeX, `display`) laid out as an atom by `layout_paragraph` (`PositionedMath`); never draw math through `Font`. Pure parts are unit-tested with a fake `MathFace` |
 | `app_split.cpp` | Trail-mode linked navigation: first-tile links open the second, second-tile links advance the trail; hover previews (`SplitPreview`, only with `ViewSettings::hover_preview`, off by default) |
-| `theme.cpp` / `ui.cpp` | GTK2 Clearlooks-inspired grey and shared native/ImGui palette; yellow BeOS title bars and consistently sized window controls. **Regular panel buttons stay raised; toolbar actions are flat until hover, toggle buttons stay sunken while active**, including icon/text fallbacks and URL actions (`tool_button(..., latched)` supplies the state *inside* the style stack). Split/Join and empty/filled Bookmark use alternate SVGs under `icons/svg/`; Reload uses opposed green arrows. Native scrollbar thumbs use `theme::draw_scroll_thumb` (separate from button faces) for strong contrast; ImGui uses matching grab colours. `scrollbar_geometry.hpp` shares full-height, arrowless scrollbar thumb mathematics between paint and mouse paths |
+| `theme.cpp` / `ui.cpp` | GTK2 Clearlooks-inspired grey and shared native/ImGui palette; yellow BeOS title bars and consistently sized window controls. **Regular panel buttons stay raised; toolbar actions are flat until hover.** Browse Mode and toggles without alternate graphics stay sunken while active (`tool_button(..., latched)` supplies the state *inside* the style stack); Split/Join and empty/filled Bookmark use alternate SVGs under `icons/svg/` and remain flat, including when active. Reload uses opposed green arrows. Native scrollbar thumbs use `theme::draw_scroll_thumb` (separate from button faces) for strong contrast; ImGui uses matching grab colours. `scrollbar_geometry.hpp` shares full-height, arrowless scrollbar thumb mathematics between paint and mouse paths |
 | `style.cpp` | document style sheets (`styles/*.xss`, S-expressions): `DocStyle` roles → layout spacing/fonts/glyph colours + renderer decoration colours; `apply_style` in `app_view.cpp` |
 
 Document views: `App::panes[kMaxViews]` — slots 0 / 1 are the centre
@@ -115,7 +115,10 @@ captures the current position and completes deferred restores after fetching.
 `forward_nav_link` feeds the non-document link wash in `draw_pane_overlays`;
 link clicks pass their `NavLink` through `navigate_to_url`; same-document
 anchors use `navigate_anchor_link` so Back can return to the source. `App::visited`
-is only the session log for the History panel. Only in Trail mode do the
+is only the session log for the History panel. `push_nav_history` additionally
+adds normal visits to the persistent `minibuf_hist_url` ring, shared with the
+location bar's local suggestions (`urlbar_suggestions.hpp`, also matches open
+tabs and bookmarks). Only in Trail mode do the
 centre panes share one trail instead (`App::split_history`, levels = left
 page + pages opened from it on the right): `push_nav_history` forwards to
 it and `nav_step` / `can_nav_step` walk it (`app_split.cpp`). The split trail
