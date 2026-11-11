@@ -3975,13 +3975,13 @@ void test_search() {
   EXPECT_EQ(search_target("search:nope:x", eng), "");
   EXPECT_EQ(search_target("https://x.org/", eng), "");
 
-  // Every built-in is well formed: unique id / keyword, one %s, https.
+  // Every built-in is well formed: unique id / keyword, one %s, https (or a native youtube: ref).
   std::unordered_set<std::string> ids, keys;
   for (const SearchEngine& e : eng) {
     EXPECT(ids.insert(e.id).second);
     if (!e.keyword.empty()) EXPECT(keys.insert(e.keyword).second);
     EXPECT(!e.name.empty() && !e.badge.empty());
-    EXPECT(starts_with(e.url, "https://"));
+    EXPECT(starts_with(e.url, "https://") || starts_with(e.url, "youtube:"));
     const size_t at = e.url.find("%s");
     EXPECT(at != std::string::npos && e.url.find("%s", at + 2) == std::string::npos);
     EXPECT(is_search_ref(search_ref(e.id, "x")));

@@ -13,6 +13,7 @@ account, no posting. It is unofficial and can change without notice.
 | `youtube:@handle[?page=N]` | uploads grid (also `channel/UC…`, `c/name`, `user/name`) |
 | `youtube:playlist?list=ID[&page=N]` | playlist items |
 | `youtube:watch?v=ID[&comments=N][&sort=new]` | thumbnail, description, comments |
+| `youtube:results?search_query=Q[&page=N]` | video search (`search` endpoint; also the `youtube` / `yt` engine of the search bar) |
 
 `@handle`, `c/` and `user/` go through `navigation/resolve_url` first.
 Plain `https://www.youtube.com/…` / `youtu.be/…` URLs open as web pages; the
@@ -29,7 +30,7 @@ header's engagement panels carry unrelated ones.
 ## Limits
 
 - Comment replies are not fetched (counts only).
-- Shorts / Live tabs, search and recommendations are not covered.
+- Shorts / Live tabs and recommendations are not covered; search lists videos only (no channel / playlist hits, no filters).
 - Replies are Message nodes; likes and reply counts are in the caption.
 
 ## Code

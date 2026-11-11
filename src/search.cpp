@@ -124,6 +124,8 @@ const std::vector<SearchEngine>& builtin_engines() {
        "https://marginalia-search.com/search?query=%s", "page", "+"},
       {"wiby", "Wiby (old web)", "wb", "Wb", "https://wiby.me/?q=%s", "page",
        "+"},
+      {"youtube", "YouTube", "yt", "YT",
+       "youtube:results?search_query=%s", "page", "+"},
       {"duckduckgo", "DuckDuckGo", "dd", "DDG",
        "https://html.duckduckgo.com/html/?q=%s", "page", "+"},
   };

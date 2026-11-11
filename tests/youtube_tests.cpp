@@ -58,6 +58,13 @@ static void test_refs() {
   assert(youtube_ref_string(*r) == "youtube:playlist?list=PLabc_-1&page=2");
   assert(parse_youtube_ref("youtube:channel/UC_x5XG1OV2P6uZZ5FSM9Ttw"));
   assert(!parse_youtube_ref("youtube:channel/xyz"));
+  r = parse_youtube_ref("youtube:results?search_query=rust+lang%C3%BC&page=2");
+  assert(r && r->kind == YtRef::Kind::Search && r->page == 2);
+  assert(youtube_ref_string(*r) == "youtube:results?search_query=rust+lang%C3%BC&page=2");
+  assert(parse_youtube_ref("youtube:results?search_query=a%20b")->id == "a+b");
+  assert(!parse_youtube_ref("youtube:results?search_query="));
+  assert(youtube_ref_from_web_url("https://www.youtube.com/results?search_query=a+b") ==
+         "youtube:results?search_query=a+b");
   assert(!parse_youtube_ref("youtube:watch?v="));
   assert(!parse_youtube_ref("youtube:watch?v=a\"b"));
   assert(!parse_youtube_ref("youtube:"));

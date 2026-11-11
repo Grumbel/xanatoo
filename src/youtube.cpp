@@ -10,6 +10,7 @@
 #include "xanatoo/youtube.hpp"
 
 #include "xanatoo/html_page.hpp"  // kExternalPrefix
+#include "xanatoo/search.hpp"     // search_encode / search_decode
 #include "xanatoo/util.hpp"
 
 #if defined(XANATOO_YOUTUBE) && XANATOO_YOUTUBE
@@ -307,6 +308,12 @@ std::optional<YtRef> parse_youtube_ref(std::string_view s) {
     r.id = query_param(query, "list");
     if (!id_chars(r.id, false)) return std::nullopt;
     r.page = parse_page(query_param(query, "page"));
+  } else if (path == "results") {
+    r.kind = YtRef::Kind::Search;
+    // Re-encode so '+', %20 and raw blanks all give one canonical query.
+    r.id = search_encode(search_decode(query_param(query, "search_query")));
+    if (r.id.empty() || r.id.size() > 600) return std::nullopt;
+    r.page = parse_page(query_param(query, "page"));
   } else if (path == "watch") {
     r.kind = YtRef::Kind::Video;
     r.id = query_param(query, "v");
@@ -326,9 +333,11 @@ std::string youtube_ref_string(const YtRef& r) {
     case YtRef::Kind::Named: s += r.id; break;
     case YtRef::Kind::Playlist: s += "playlist?list=" + r.id; break;
     case YtRef::Kind::Video: s += "watch?v=" + r.id; break;
+    case YtRef::Kind::Search: s += "results?search_query=" + r.id; break;
   }
   const bool video = r.kind == YtRef::Kind::Video;
-  char sep = video || r.kind == YtRef::Kind::Playlist ? '&' : '?';
+  char sep = video || r.kind == YtRef::Kind::Playlist || r.kind == YtRef::Kind::Search
+                 ? '&' : '?';
   if (r.page > 1) {
     s += sep;
     s += (video ? "comments=" : "page=") + std::to_string(r.page);
@@ -344,6 +353,8 @@ std::string youtube_web_url(const YtRef& r) {
     case YtRef::Kind::Named: return "https://www.youtube.com/" + r.id;
     case YtRef::Kind::Playlist: return "https://www.youtube.com/playlist?list=" + r.id;
     case YtRef::Kind::Video: return "https://www.youtube.com/watch?v=" + r.id;
+    case YtRef::Kind::Search:
+      return "https://www.youtube.com/results?search_query=" + r.id;
   }
   return {};
 }
@@ -380,6 +391,11 @@ std::string youtube_ref_from_web_url(std::string_view url) {
   if (path == "watch") return video(query_param(query, "v"));
   for (std::string_view p : {"shorts/", "live/", "embed/"})
     if (starts_with(path, p)) return video(path.substr(p.size()));
+  if (path == "results") {
+    r.kind = YtRef::Kind::Search;
+    r.id = search_encode(search_decode(query_param(query, "search_query")));
+    return r.id.empty() || r.id.size() > 600 ? std::string() : youtube_ref_string(r);
+  }
   if (path == "playlist") {
     r.kind = YtRef::Kind::Playlist;
     r.id = query_param(query, "list");
@@ -470,7 +486,9 @@ const char* kDot = " \xC2\xB7 ";
 Document yt_listing_document(const YtListing& l, const YtRef& ref, bool has_prev) {
   Document doc;
   NodeId root = doc.create(NodeKind::Document);
-  const std::string title = l.title.empty() ? ref.id : l.title;
+  const bool search = ref.kind == YtRef::Kind::Search;
+  const std::string title =
+      search ? "Search: " + search_decode(ref.id) : l.title.empty() ? ref.id : l.title;
   doc.meta.title = title + " \xE2\x80\x93 YouTube";
 
   NodeId head = doc.create(NodeKind::Header, root);
@@ -505,19 +523,19 @@ Document yt_listing_document(const YtListing& l, const YtRef& ref, bool has_prev
   }
   if (l.videos.empty()) {
     NodeId p = doc.create(NodeKind::Paragraph, root);
-    doc.append_text(p, "No videos found.", InlineKind::Emphasis);
+    doc.append_text(p, search ? "No videos match." : "No videos found.", InlineKind::Emphasis);
   }
 
   NodeId nav = doc.create(NodeKind::Paragraph, root);
   YtRef other = ref;
   if (has_prev) {
     other.page = ref.page - 1;
-    add_link(doc, nav, "\xE2\x86\x90 Newer", youtube_ref_string(other));
+    add_link(doc, nav, search ? "\xE2\x86\x90 Previous" : "\xE2\x86\x90 Newer", youtube_ref_string(other));
     add_meta(doc, nav, kDot);
   }
   if (!l.next.empty()) {
     other.page = ref.page + 1;
-    add_link(doc, nav, "Older \xE2\x86\x92", youtube_ref_string(other));
+    add_link(doc, nav, search ? "More \xE2\x86\x92" : "Older \xE2\x86\x92", youtube_ref_string(other));
     add_meta(doc, nav, kDot);
   }
   add_meta(doc, nav, "page " + std::to_string(ref.page) + kDot);
@@ -675,6 +693,8 @@ std::optional<Document> fetch_listing(const YtRef& ref, std::string* err) {
     case YtRef::Kind::Playlist:
       browse_id = starts_with(ref.id, "VL") ? ref.id : "VL" + ref.id;
       break;
+    case YtRef::Kind::Search:
+      break;
     default: {
       auto r = innertube("navigation/resolve_url",
                          "\"url\":" + json_quote("https://www.youtube.com/" + ref.id), err);
@@ -687,10 +707,17 @@ std::optional<Document> fetch_listing(const YtRef& ref, std::string* err) {
       params = kVideosTab;
     }
   }
-  std::string fields = "\"browseId\":" + json_quote(browse_id);
-  if (!params.empty() && starts_with(browse_id, "UC"))
-    fields += ",\"params\":" + json_quote(params);
-  auto reply = innertube("browse", fields, err);
+  const bool search = ref.kind == YtRef::Kind::Search;
+  std::string fields;
+  if (search) {
+    fields = "\"query\":" + json_quote(search_decode(ref.id));
+  } else {
+    fields = "\"browseId\":" + json_quote(browse_id);
+    if (!params.empty() && starts_with(browse_id, "UC"))
+      fields += ",\"params\":" + json_quote(params);
+  }
+  const char* endpoint = search ? "search" : "browse";
+  auto reply = innertube(endpoint, fields, err);
   if (!reply) return std::nullopt;
   YtListing head = yt_parse_browse(*reply);
   YtListing chunk = head;
@@ -699,11 +726,11 @@ std::optional<Document> fetch_listing(const YtRef& ref, std::string* err) {
       if (err) *err = "That page is past the last video.";
       return std::nullopt;
     }
-    auto more = innertube("browse", continuation_fields(chunk.next), err);
+    auto more = innertube(endpoint, continuation_fields(chunk.next), err);
     if (!more) return std::nullopt;
     chunk = yt_parse_browse(*more);
   }
-  if (head.title.empty() && head.videos.empty()) {
+  if (head.title.empty() && head.videos.empty() && !search) {
     if (err) *err = "YouTube returned no channel or playlist data";
     return std::nullopt;
   }

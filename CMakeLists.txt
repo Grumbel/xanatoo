@@ -731,7 +731,7 @@ target_include_directories(xanatoo_lemmy_discovery_tests PRIVATE include)
 add_test(NAME lemmy_discovery_tests COMMAND xanatoo_lemmy_discovery_tests)
 add_executable(xanatoo_youtube_tests
   tests/youtube_tests.cpp src/youtube.cpp src/util.cpp src/paths.cpp
-  src/version.cpp src/document.cpp)
+  src/version.cpp src/document.cpp src/search.cpp)
 target_include_directories(xanatoo_youtube_tests PRIVATE include ${SDL2_INCLUDE_DIRS})
 target_link_libraries(xanatoo_youtube_tests PRIVATE ${SDL2_LIBRARIES})
 target_compile_definitions(xanatoo_youtube_tests PRIVATE XANATOO_YOUTUBE=0

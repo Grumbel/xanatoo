@@ -9,6 +9,7 @@
 //   youtube:channel/UC…[?page=N]      c/name, user/name)
 //   youtube:playlist?list=PL…[&page=N]
 //   youtube:watch?v=ID[&comments=N][&sort=new]   description + comments
+//   youtube:results?search_query=Q[&page=N]      video search (Q percent-encoded)
 //
 // The parsers are pure (JSON text in, structs / Document out) and unit-tested
 // with recorded replies; only youtube_fetch touches the network.
@@ -24,10 +25,11 @@
 namespace xanatoo {
 
 struct YtRef {
-  enum class Kind { Channel, Named, Playlist, Video };
+  enum class Kind { Channel, Named, Playlist, Video, Search };
   Kind kind = Kind::Video;
   // Channel: UC… id. Named: "@handle", "c/name" or "user/name" (needs a
-  // lookup). Playlist: list id. Video: 11-character video id.
+  // lookup). Playlist: list id. Video: 11-character video id. Search: the
+  // query, percent-encoded with '+' for blanks (search_encode form).
   std::string id;
   int page = 1;      // Channel / Playlist: grid chunk; Video: comment chunk
   bool newest = false;  // Video: comments sorted newest first
