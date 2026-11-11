@@ -21,6 +21,15 @@ Next bundle number: **348** (this delivery is **347**)
   scheme, link-aware features reading `span.href` (Page panel, backlinks).
 - Not run: GUI check (this shell was outside `nix develop`, link step failed).
 
+## Status (2026-11-11) — video sites (`peertube:` / `odysee:` / `dailymotion:`)
+
+- `src/video_sites.cpp`, `XANATOO_VIDEO` (default ON, TLS). Listings,
+  channels, search, video pages with comments and replies, Watch / mpv
+  links; see `docs/VIDEO_SITES.md`. Live-checked against video.blender.org,
+  framatube.org, sepiasearch.org, Odysee, Dailymotion.
+- Open: Dailymotion comments unverified on a commented video; Odysee
+  comment sort; Piped / Rumble / Vimeo / Bilibili not done.
+
 ## Status (2026-11-11) — YouTube via InnerTube (`youtube:` refs)
 
 - `src/youtube.cpp`, `XANATOO_YOUTUBE` (default ON, needs TLS): read-only

@@ -36,7 +36,7 @@ if(WIN32 OR EMSCRIPTEN)
 endif()
 option(XANATOO_MINIMAL_PORT "Offline, dependency-light cross-platform build" ${_minimal_port_default})
 if(XANATOO_MINIMAL_PORT)
-  foreach(_feature FONTCONFIG SQLITE THUMTOO GEMINI NOSTR REDDIT LEMMY HN YOUTUBE
+  foreach(_feature FONTCONFIG SQLITE THUMTOO GEMINI NOSTR REDDIT LEMMY HN YOUTUBE VIDEO
                    EBOOKS FEEDS WEB WIKIPEDIA)
     set(XANATOO_${_feature} OFF CACHE BOOL "Disabled by XANATOO_MINIMAL_PORT" FORCE)
   endforeach()
@@ -102,6 +102,7 @@ option(XANATOO_NOSTR "Enable Nostr note/thread fetch (TLS WebSocket)" ON)
 option(XANATOO_REDDIT "Enable Reddit .json fetch (TLS HTTPS)" ON)
 option(XANATOO_LEMMY "Enable Lemmy API v3 fetch (TLS HTTPS)" ON)
 option(XANATOO_YOUTUBE "Enable YouTube channel / video / comment fetch (InnerTube, TLS HTTPS)" ON)
+option(XANATOO_VIDEO "Enable PeerTube / Odysee / Dailymotion fetch (public JSON APIs, TLS HTTPS)" ON)
 option(XANATOO_HN "Enable Hacker News fetch (Firebase + Algolia APIs, TLS HTTPS)" ON)
 option(XANATOO_EBOOKS "Enable Standard Ebooks / remote EPUB downloads (TLS HTTPS)" ON)
 option(XANATOO_FEEDS "Enable RSS / Atom feed fetch (TLS HTTPS)" ON)
@@ -185,6 +186,7 @@ add_executable(xanatoo
   src/lemmy_directory.cpp
   src/hackernews.cpp
   src/youtube.cpp
+  src/video_sites.cpp
   src/time.cpp
   src/ebooks.cpp
   src/feed.cpp
@@ -289,7 +291,7 @@ endif()
 
 set(XANATOO_NEED_OPENSSL OFF)
 if(XANATOO_GEMINI OR XANATOO_NOSTR OR XANATOO_REDDIT OR XANATOO_LEMMY OR
-   XANATOO_HN OR XANATOO_YOUTUBE OR XANATOO_EBOOKS OR XANATOO_FEEDS OR XANATOO_WEB OR
+   XANATOO_HN OR XANATOO_YOUTUBE OR XANATOO_VIDEO OR XANATOO_EBOOKS OR XANATOO_FEEDS OR XANATOO_WEB OR
    XANATOO_WIKIPEDIA)
   set(XANATOO_NEED_OPENSSL ON)
 endif()
@@ -350,6 +352,14 @@ if(XANATOO_LEMMY)
 else()
   target_compile_definitions(xanatoo PRIVATE XANATOO_LEMMY=0)
   message(STATUS "Lemmy API client: OFF")
+endif()
+
+if(XANATOO_VIDEO)
+  target_compile_definitions(xanatoo PRIVATE XANATOO_VIDEO=1)
+  message(STATUS "Video sites (PeerTube, Odysee, Dailymotion): ON (HTTPS, ${XANATOO_TLS})")
+else()
+  target_compile_definitions(xanatoo PRIVATE XANATOO_VIDEO=0)
+  message(STATUS "Video sites: OFF")
 endif()
 
 if(XANATOO_YOUTUBE)
@@ -538,6 +548,7 @@ add_executable(xanatoo_tests
   src/lemmy_directory.cpp
   src/hackernews.cpp
   src/youtube.cpp
+  src/video_sites.cpp
   src/time.cpp
   src/ebooks.cpp
   src/feed.cpp
@@ -590,6 +601,7 @@ target_compile_definitions(xanatoo_tests PRIVATE
   XANATOO_LEMMY=0
   XANATOO_HN=0
   XANATOO_YOUTUBE=0
+  XANATOO_VIDEO=0
   XANATOO_EBOOKS=0
   XANATOO_FEEDS=0
   XANATOO_WEB=0
@@ -738,6 +750,15 @@ target_compile_definitions(xanatoo_youtube_tests PRIVATE XANATOO_YOUTUBE=0
   XANATOO_SDL3=$<BOOL:${XANATOO_SDL3}>
   "XANATOO_VERSION=\"${PROJECT_VERSION_FULL}\"")
 add_test(NAME youtube_tests COMMAND xanatoo_youtube_tests)
+add_executable(xanatoo_video_sites_tests
+  tests/video_sites_tests.cpp src/video_sites.cpp src/util.cpp src/paths.cpp
+  src/version.cpp src/document.cpp src/search.cpp src/html_min.cpp)
+target_include_directories(xanatoo_video_sites_tests PRIVATE include ${SDL2_INCLUDE_DIRS})
+target_link_libraries(xanatoo_video_sites_tests PRIVATE ${SDL2_LIBRARIES})
+target_compile_definitions(xanatoo_video_sites_tests PRIVATE XANATOO_VIDEO=0
+  XANATOO_SDL3=$<BOOL:${XANATOO_SDL3}>
+  "XANATOO_VERSION=\"${PROJECT_VERSION_FULL}\"")
+add_test(NAME video_sites_tests COMMAND xanatoo_video_sites_tests)
 add_executable(xanatoo_ui_panel_imgui_tests
   tests/ui_panel_imgui_tests.cpp
   external/imgui/imgui.cpp

@@ -671,6 +671,14 @@ history or distribute patch files.
   `youtube:watch?v=ID`, … Parsers are pure (`json_dom.hpp`) and tested with
   recorded replies; never post or log in. See `docs/YOUTUBE.md`.
 
+## Video sites
+
+- `src/video_sites.cpp`, gated by `XANATOO_VIDEO` (default ON; needs TLS).
+  Read-only PeerTube / Odysee / Dailymotion clients over public JSON APIs:
+  `peertube:HOST/w/ID`, `odysee:@chan:8/slug:e`, `dailymotion:xID`, plus
+  channel and search refs and comments. Parsers are pure and tested; never
+  post or log in. See `docs/VIDEO_SITES.md`.
+
 ## Lemmy
 
 - Read-only client via Lemmy **API v3** JSON (`/api/v3/post/list`, `/api/v3/post`).

@@ -3981,7 +3981,9 @@ void test_search() {
     EXPECT(ids.insert(e.id).second);
     if (!e.keyword.empty()) EXPECT(keys.insert(e.keyword).second);
     EXPECT(!e.name.empty() && !e.badge.empty());
-    EXPECT(starts_with(e.url, "https://") || starts_with(e.url, "youtube:"));
+    EXPECT(starts_with(e.url, "https://") || starts_with(e.url, "youtube:") ||
+           starts_with(e.url, "peertube:") || starts_with(e.url, "odysee:") ||
+           starts_with(e.url, "dailymotion:"));
     const size_t at = e.url.find("%s");
     EXPECT(at != std::string::npos && e.url.find("%s", at + 2) == std::string::npos);
     EXPECT(is_search_ref(search_ref(e.id, "x")));

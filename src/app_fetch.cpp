@@ -21,6 +21,7 @@
 #include "xanatoo/sitemap.hpp"
 #include "xanatoo/wikipedia.hpp"
 #include "xanatoo/lemmy.hpp"
+#include "xanatoo/video_sites.hpp"
 #include "xanatoo/youtube.hpp"
 #include "xanatoo/native.hpp"
 #include "xanatoo/nostr.hpp"
@@ -140,6 +141,11 @@ void fetch_page(std::string url, std::shared_ptr<FetchShared> out,
 #if defined(XANATOO_YOUTUBE) && XANATOO_YOUTUBE
     out->service = "YouTube";
     out->doc = xanatoo::youtube_fetch(url, &out->error);
+#endif
+  } else if (xanatoo::is_video_site_ref(url)) {
+#if defined(XANATOO_VIDEO) && XANATOO_VIDEO
+    out->service = xanatoo::video_site_name(xanatoo::parse_video_site_ref(url)->site);
+    out->doc = xanatoo::video_site_fetch(url, &out->error);
 #endif
   } else if (xanatoo::is_hn_ref(url)) {
 #if defined(XANATOO_HN) && XANATOO_HN
@@ -493,6 +499,13 @@ bool remote_fetch_supported(std::string_view url, std::string* why) {
     return true;
 #else
     return no("YouTube needs build with -DXANATOO_YOUTUBE=ON");
+#endif
+  }
+  if (xanatoo::is_video_site_ref(url)) {
+#if defined(XANATOO_VIDEO) && XANATOO_VIDEO
+    return true;
+#else
+    return no("Video sites need build with -DXANATOO_VIDEO=ON");
 #endif
   }
   if (xanatoo::is_hn_ref(url)) {

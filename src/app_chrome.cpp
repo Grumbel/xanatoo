@@ -21,6 +21,7 @@
 #include "xanatoo/wikipedia.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/native.hpp"
+#include "xanatoo/video_sites.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/theme.hpp"
@@ -414,7 +415,11 @@ StatusLine compute_status(App& app) {
       label = "Hacker News: ";
     else if (xanatoo::is_youtube_ref(app.hover.href))
       label = "YouTube: ";
-    else if (!xanatoo::ebook_download_url(app.hover.href).empty())
+    else if (auto vs = xanatoo::parse_video_site_ref(app.hover.href)) {
+      static std::string vlabel;
+      vlabel = std::string(xanatoo::video_site_name(vs->site)) + ": ";
+      label = vlabel.c_str();
+    } else if (!xanatoo::ebook_download_url(app.hover.href).empty())
       label = "Ebook (download): ";
     else if (xanatoo::is_standard_ebooks_url(app.hover.href))
       label = "Standard Ebooks: ";

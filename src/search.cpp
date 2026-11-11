@@ -126,6 +126,11 @@ const std::vector<SearchEngine>& builtin_engines() {
        "+"},
       {"youtube", "YouTube", "yt", "YT",
        "youtube:results?search_query=%s", "page", "+"},
+      {"peertube", "PeerTube (SepiaSearch)", "pt", "PT",
+       "peertube:sepiasearch.org/search?search=%s", "page", "+"},
+      {"odysee", "Odysee", "od", "Od", "odysee:search?s=%s", "page", "+"},
+      {"dailymotion", "Dailymotion", "dm", "DM",
+       "dailymotion:search?search=%s", "page", "+"},
       {"duckduckgo", "DuckDuckGo", "dd", "DDG",
        "https://html.duckduckgo.com/html/?q=%s", "page", "+"},
   };

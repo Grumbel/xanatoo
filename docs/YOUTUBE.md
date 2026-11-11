@@ -38,3 +38,4 @@ header's engagement panels carry unrelated ones.
 `yt_parse_*` (pure, JSON in) → `yt_listing_document` / `yt_video_document`
 (Document out); `youtube_fetch` is the only networked entry point, called
 from `app_fetch.cpp`. Tests: `tests/youtube_tests.cpp`.
+See also `docs/VIDEO_SITES.md` (PeerTube, Odysee, Dailymotion).
