@@ -350,7 +350,64 @@ struct Entry {
   const XmlNode* body = nullptr;
   bool body_html = false;  // untyped body is HTML (RSS) rather than text
   std::vector<const XmlNode*> enclosures;  // RSS <enclosure> / Atom rel=enclosure
+  // Media RSS (<media:group>, YouTube): thumbnail, statistics, rating.
+  std::string thumb;                // media:thumbnail url
+  std::string views;                // media:statistics views
+  std::string rating_avg, rating_count;  // media:starRating
+  std::string video_id, channel_id;      // yt:videoId / yt:channelId
 };
+
+// Media RSS elements live in <media:group> (YouTube) or directly in the item.
+void read_media(const XmlTree& t, const XmlNode& e, Entry& en) {
+  const XmlNode* g = child(t, e, "media:group");
+  for (const XmlNode* scope : {g, &e}) {
+    if (!scope) continue;
+    if (en.thumb.empty())
+      if (const XmlNode* th = child(t, *scope, "media:thumbnail"))
+        en.thumb = html_attr(th->attrs, "url");
+    if (const XmlNode* c = child(t, *scope, "media:community")) {
+      if (const XmlNode* st = child(t, *c, "media:starrating")) {
+        if (en.rating_avg.empty()) en.rating_avg = html_attr(st->attrs, "average");
+        if (en.rating_count.empty()) en.rating_count = html_attr(st->attrs, "count");
+      }
+      if (const XmlNode* v = child(t, *c, "media:statistics"))
+        if (en.views.empty()) en.views = html_attr(v->attrs, "views");
+    }
+  }
+  en.video_id = child_text(t, e, "yt:videoid");
+  en.channel_id = child_text(t, e, "yt:channelid");
+}
+
+// 1234567 → "1,234,567".
+std::string group_digits(const std::string& n) {
+  if (n.empty() || n.find_first_not_of("0123456789") != std::string::npos) return n;
+  std::string out;
+  for (size_t i = 0; i < n.size(); ++i) {
+    if (i && (n.size() - i) % 3 == 0) out += ',';
+    out += n[i];
+  }
+  return out;
+}
+
+std::string media_stats_line(const Entry& e) {
+  std::string out;
+  auto add = [&](const std::string& s) {
+    if (!out.empty()) out += " · ";
+    out += s;
+  };
+  if (!e.views.empty()) add(group_digits(e.views) + " views");
+  if (!e.rating_avg.empty()) {
+    std::string r = e.rating_avg;
+    if (double v = std::atof(r.c_str()); v > 0) {
+      char buf[16];
+      std::snprintf(buf, sizeof(buf), "%.2f", v);
+      r = buf;
+    }
+    add("★ " + r + "/5");
+    if (!e.rating_count.empty()) out += " (" + group_digits(e.rating_count) + " ratings)";
+  }
+  return out;
+}
 
 struct FeedInfo {
   std::string title, subtitle, link, author;
@@ -386,6 +443,7 @@ void read_atom(const XmlTree& t, std::string_view src, const XmlNode& feed,
     if (!en.body)  // YouTube: <media:group><media:description>
       if (const XmlNode* g = child(t, *e, "media:group"))
         en.body = child(t, *g, "media:description");
+    read_media(t, *e, en);
     out.entries.push_back(std::move(en));
   }
 }
@@ -416,6 +474,7 @@ void read_rss(const XmlTree& t, const XmlNode& channel,
     if (!en.body || trimmed(en.body->text).empty()) en.body = child(t, *it, "description");
     en.body_html = true;
     en.enclosures = children(t, *it, "enclosure");
+    read_media(t, *it, en);
     out.entries.push_back(std::move(en));
   }
 }
@@ -450,6 +509,19 @@ Document build_document(const FeedInfo& f, std::string_view src,
     }
     if (!e.title.empty())
       append_link_para(doc, msg, e.title, e.link, InlineKind::Strong);
+    if (!e.thumb.empty()) {
+      NodeId im = doc.create(NodeKind::Image, msg);
+      doc.get(im).src = resolve_url(url, e.thumb);
+      doc.get(im).alt = e.title;
+    }
+    if (std::string stats = media_stats_line(e); !stats.empty())
+    {
+      NodeId sp = doc.create(NodeKind::Paragraph, msg);
+      InlineSpan ss;
+      ss.text = std::move(stats);
+      ss.role = InlineRole::Metadata;
+      doc.get(sp).spans.push_back(std::move(ss));
+    }
     if (e.body) {
       const std::string base = e.link.empty() ? url : e.link;
       append_content(doc, msg, src, *e.body, base, e.body_html);

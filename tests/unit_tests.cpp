@@ -4309,6 +4309,35 @@ void test_parse_feeds() {
     }
   }
 
+  auto yt = parse_feed(
+      "<feed xmlns=\"http://www.w3.org/2005/Atom\" "
+      "xmlns:yt=\"http://www.youtube.com/xml/schemas/2015\" "
+      "xmlns:media=\"http://search.yahoo.com/mrss/\"><title>Chan</title>"
+      "<entry><yt:videoId>abc</yt:videoId><title>Vid</title>"
+      "<link rel=\"alternate\" href=\"https://www.youtube.com/watch?v=abc\"/>"
+      "<published>2026-10-01T08:30:00+00:00</published><media:group>"
+      "<media:thumbnail url=\"https://i.ytimg.com/vi/abc/hqdefault.jpg\" "
+      "width=\"480\" height=\"360\"/><media:description>Desc</media:description>"
+      "<media:community><media:starRating count=\"1234\" average=\"4.50\" "
+      "min=\"1\" max=\"5\"/><media:statistics views=\"1234567\"/>"
+      "</media:community></media:group></entry></feed>",
+      "https://www.youtube.com/feeds/videos.xml?channel_id=x");
+  EXPECT(yt.has_value());
+  if (yt) {
+    const Node* thread = first_of_kind(*yt, NodeKind::Thread);
+    if (thread && thread->children.size() == 1) {
+      const Node& e = yt->get(thread->children[0]);
+      EXPECT_EQ(e.children.size(), 4u);  // title, thumbnail, stats, description
+      if (e.children.size() == 4) {
+        EXPECT_EQ(yt->get(e.children[1]).src, "https://i.ytimg.com/vi/abc/hqdefault.jpg");
+        EXPECT_EQ(yt->get(e.children[2]).spans.at(0).text,
+                  "1,234,567 views · ★ 4.50/5 (1,234 ratings)");
+      }
+    } else {
+      EXPECT(false);
+    }
+  }
+
   auto rdf = parse_feed(
       "<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\" "
       "xmlns=\"http://purl.org/rss/1.0/\"><channel><title>R</title></channel>"
