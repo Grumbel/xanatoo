@@ -8,6 +8,21 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **348** (this delivery is **347**)
 
+## Status (2026-11-11) — PDF, DjVu, CBZ / CBR pages
+
+- `docs/FIXED_LAYOUT.md`: fixed-layout files open as ordinary documents of
+  `NodeKind::Page` nodes (thumtoo page URI + real size), grouped into Sections
+  from the PDF / DjVu outline; archive members in natural name order. Pages
+  serialize in Markdown (`:::page`), S-expressions and XML; style role `page`.
+- Sizes only from thumtoo (never guessed): opening waits until every page is
+  sized; unreadable pages become a notice paragraph.
+- Tiles via thumtoo's LOD layer (`app_pagetiles.cpp`), drawn over the raster
+  each frame; paged mode starts every sheet on a new screen page.
+- Checked under Xvfb with thumtoo's hello.pdf / pages.djvu fixtures and a
+  3-page CBZ (scrolling and F8 paged reading). Unit tests for the pure parts.
+- Open: see "Open items" in `docs/FIXED_LAYOUT.md` (CBZ spread splitting,
+  `#page:N`, zoom modes, progressive loading, text layers / links).
+
 ## Status (2026-11-11) — Internet Archive (`ia:`)
 
 - `src/archive.cpp` (`docs/ARCHIVE.md`): `ia:ID` items (details, description,

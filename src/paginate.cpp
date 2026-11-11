@@ -16,6 +16,7 @@ struct Atom {
   float top = 0.f;
   float bottom = 0.f;
   bool heading = false;
+  bool page = false;  // a fixed-layout page: always starts a page of its own
 };
 
 constexpr float kEps = 0.5f;
@@ -87,7 +88,7 @@ private:
     }
     for (size_t i = 0; i < in_.images.size(); ++i) {
       const PositionedImage& im = in_.images[i];
-      atoms_.push_back({im.y, im.y + img_h_[i], false});
+      atoms_.push_back({im.y, im.y + img_h_[i], false, im.page_w > 0});
     }
     for (const PositionedMath& m : in_.maths)
       atoms_.push_back({m.y - m.box->ascent * m.px, m.y + m.box->depth * m.px,
@@ -102,6 +103,7 @@ private:
       if (!u.empty() && std::abs(u.back().top - a.top) < kEps &&
           std::abs(u.back().bottom - a.bottom) < kEps) {
         u.back().heading = u.back().heading || a.heading;
+        u.back().page = u.back().page || a.page;
         continue;
       }
       u.push_back(a);
@@ -166,6 +168,17 @@ private:
         end = std::max(y_end, start + 1.f);
       } else {
         end = safe_cut(e, start);
+      }
+      // A fixed-layout page after other content on this page starts the next.
+      bool content = false;  // anything on this page before atom j
+      for (size_t j = atom_at(start); j < atoms_.size() &&
+                                      atoms_[j].top < end - kEps;
+           ++j) {
+        if (atoms_[j].page && content) {
+          end = atoms_[j].top;
+          break;
+        }
+        content = true;
       }
       map_.pages.push_back({start, end, 0});
       if (end >= y_end - kEps) break;

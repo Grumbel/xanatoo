@@ -55,6 +55,7 @@ constexpr RoleName kBlockRoles[] = {
     {"transclusion", BlockRole::Transclusion},
     {"aside", BlockRole::Aside},
     {"article", BlockRole::Article},
+    {"page", BlockRole::Page},
 };
 
 struct InlineName {
@@ -589,6 +590,12 @@ DocStyle builtin_style() {
     b.color = {74, 66, 50, 255};
     b.background = {238, 232, 216, 200};
     b.border = {200, 190, 165, 255};
+  }
+  {
+    BlockStyle& b = blk(BlockRole::Page);
+    b.space_after = px(12);
+    b.background = {255, 255, 255, 255};
+    b.border = {200, 196, 184, 255};
   }
 
   auto inl = [&](InlineKind k) -> InlineStyle& {

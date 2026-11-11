@@ -184,6 +184,7 @@ const char* block_tag(const Node& n) {
     case NodeKind::Collection: return "collection";
     case NodeKind::Chrome: return "chrome";
     case NodeKind::Aside: return "aside";
+    case NodeKind::Page: return "page";
   }
   throw std::invalid_argument("XML export: unknown node kind");
 }
@@ -209,7 +210,7 @@ bool block_kind(std::string_view s, NodeKind& kind, int& level) {
       {"th", NodeKind::TableCell}, {"thread", NodeKind::Thread},
       {"message", NodeKind::Message}, {"footnote", NodeKind::Footnote},
       {"collection", NodeKind::Collection}, {"chrome", NodeKind::Chrome},
-      {"aside", NodeKind::Aside}};
+      {"aside", NodeKind::Aside}, {"page", NodeKind::Page}};
   for (auto [name, value] : names) {
     if (name != s) continue;
     kind = value;
@@ -324,6 +325,8 @@ void write_node(const Document& doc, NodeId id, std::string& out,
     attr(out, "level", std::to_string(node.level));
   if (node.col_span != 1) attr(out, "colspan", std::to_string(node.col_span));
   if (node.row_span != 1) attr(out, "rowspan", std::to_string(node.row_span));
+  if (node.width) attr(out, "width", std::to_string(node.width));
+  if (node.height) attr(out, "height", std::to_string(node.height));
   if (!node.alt.empty()) attr(out, "alt", node.alt);
   if (!node.src.empty()) attr(out, "src", node.src);
   if (!node.expanded) attr(out, "expanded", "false");
@@ -579,6 +582,8 @@ private:
     } else if (key == "level") node.level = signed_number(value);
     else if (key == "colspan") node.col_span = signed_number(value);
     else if (key == "rowspan") node.row_span = signed_number(value);
+    else if (key == "width") node.width = signed_number(value);
+    else if (key == "height") node.height = signed_number(value);
     else if (key == "alt") node.alt = value;
     else if (key == "src") node.src = value;
     else if (key == "expanded") node.expanded = boolean(value);

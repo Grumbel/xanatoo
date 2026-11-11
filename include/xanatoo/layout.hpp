@@ -56,6 +56,11 @@ struct PositionedImage {
   // its InlineKind::Image span. Not resizable; a click follows its link.
   bool in_text = false;
   size_t span_index = 0;
+  // > 0: a fixed-layout Page (`src` = thumtoo location), drawn from tiles
+  // over a scale-0 grid of page_w × page_h (app_pagetiles.cpp), never
+  // through ImageCache. Not resizable.
+  int page_w = 0;
+  int page_h = 0;
 };
 
 // A TeX formula set in running text (InlineKind::Math): `y` is its baseline,

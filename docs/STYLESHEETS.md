@@ -170,7 +170,9 @@ recolours every parent rule that uses `accent` (see `night-amber.xss`).
 `block-quote`, `note`, `code-block`, `term`, `definition`, `figure`,
 `caption`, `bibliography-entry`, `footnote`, `thread`, `message`,
 `message-alt`, `message-author`, `message-op`, `message-meta`, `table`,
-`rule`, `transclusion`, `aside`, `article`.
+`rule`, `transclusion`, `aside`, `article`, `page` (sheet of a PDF / DjVu /
+comic page: `background` = paper before tiles arrive, `border`, `space-after`;
+`docs/FIXED_LAYOUT.md`).
 
 `(role header ...)` remains an input alias for older stylesheets, but
 `(role heading ...)` is the preferred spelling. It styles the title node,

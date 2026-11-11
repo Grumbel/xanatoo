@@ -13,6 +13,7 @@
 #include <optional>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/fixed_layout.hpp"
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/lemmy.hpp"
@@ -692,6 +693,12 @@ static bool open_page(App& app, int pi, std::string target,
     }
   }
   if (!stash_or_confirm(app, p.buf)) return false;
+  // PDF / DjVu / comics: page sizes come from thumtoo on a worker, which may
+  // take a while (docs/FIXED_LAYOUT.md); poll_fetches shows the result.
+  if (xanatoo::is_fixed_layout_path(path)) {
+    start_fetch(app, FetchPurpose::Navigate, pi, path, record_history);
+    return true;
+  }
   {
     const bool was_import = xanatoo::is_pandoc_path(path);
     std::string open_path = resolve_open_path(app, path);

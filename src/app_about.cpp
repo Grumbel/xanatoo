@@ -147,6 +147,22 @@ AboutSection formats() {
        code_list(xanatoo::pandoc_extensions()) +
            ", read-only through cached Markdown",
        {}, "`pandoc` on PATH"});
+  // Fixed-layout pages (docs/FIXED_LAYOUT.md): page lists, sizes and tiles
+  // all come from thumtoo.
+#if XANATOO_THUMTOO
+  s.items.push_back({"PDF", thumtoo::feature_mupdf(),
+                     "`.pdf` pages with outline, read-only", {},
+                     "thumtoo with MuPDF"});
+  s.items.push_back({"DjVu", thumtoo::feature_djvu(),
+                     "`.djvu`, `.djv` pages with outline, read-only", {},
+                     "thumtoo with DjVuLibre"});
+  s.items.push_back({"Comic archives", true,
+                     "`.cbz`, `.cbr`, `.cb7`, `.cbt` pages in name order, read-only",
+                     {}, {}});
+#else
+  s.items.push_back({"PDF, DjVu, comic archives", false, "fixed-layout pages", {},
+                     "`-DXANATOO_THUMTOO=ON`"});
+#endif
   s.items.push_back({"Style sheets", true, "`styles/*.xss` (Layout → Style sheet)",
                      {}, {}});
   // TeX formulas need an OpenType math font; without one they show their source.

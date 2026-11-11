@@ -6,6 +6,7 @@
 #include "xanatoo/about.hpp"
 #include "xanatoo/ebooks.hpp"
 #include "xanatoo/feed.hpp"
+#include "xanatoo/fixed_layout.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/html_min.hpp"
 #include "xanatoo/html_page.hpp"
@@ -4841,6 +4842,101 @@ void test_nearest_caret() {
   EXPECT(near && near->node == 2);
 }
 
+void test_fixed_layout() {
+  using namespace xanatoo;
+  EXPECT(is_fixed_layout_path("/a/Book.PDF"));
+  EXPECT(is_fixed_layout_path("x.djvu") && is_fixed_layout_path("c.cbz") &&
+         is_fixed_layout_path("c.cbr"));
+  EXPECT(!is_fixed_layout_path("a.pdf.md") && !is_fixed_layout_path("a.md"));
+  EXPECT(!is_fixed_layout_path("https://example.com/a.pdf"));
+  EXPECT(!is_fixed_layout_path("dir.pdf/notes"));
+
+  EXPECT(natural_less("page2.jpg", "page10.jpg"));
+  EXPECT(!natural_less("page10.jpg", "page2.jpg"));
+  EXPECT(natural_less("a/001.png", "a/002.png"));
+  EXPECT(natural_less("Ch1/p9", "ch1/p10"));  // case does not decide first
+  EXPECT(natural_less("1", "01") && !natural_less("01", "1"));
+  EXPECT(!natural_less("x", "x"));
+
+  FixedLayoutSource src;
+  src.title = "book.pdf";
+  for (int i = 1; i <= 5; ++i)
+    src.pages.push_back({"file:///b.pdf//page:" + std::to_string(i),
+                         std::to_string(i), 100, 150, {}});
+  src.pages[3].width = 0;  // page 4: thumtoo had no size
+  src.pages[3].error = "broken";
+  src.outline = {{1, "One", 2}, {2, "One.A", 3}, {1, "Two", 5}};
+  const Document doc = fixed_layout_document(src);
+  EXPECT(doc.meta.title == "book.pdf");
+  const Node& root = doc.get(doc.root);
+  // page 1, Section One, Section Two
+  EXPECT(root.children.size() == 3);
+  const Node& p1 = doc.get(root.children[0]);
+  EXPECT(p1.kind == NodeKind::Page && p1.width == 100 && p1.height == 150 &&
+         p1.label == "page-1" && p1.src == "file:///b.pdf//page:1");
+  const Node& one = doc.get(root.children[1]);
+  EXPECT(one.kind == NodeKind::Section && one.children.size() == 3);
+  EXPECT(doc.get(one.children[0]).kind == NodeKind::Header);
+  EXPECT(doc.get(one.children[1]).label == "page-2");
+  const Node& sub = doc.get(one.children[2]);
+  EXPECT(sub.kind == NodeKind::Section && sub.children.size() == 3);
+  EXPECT(doc.get(sub.children[1]).label == "page-3");
+  // No size: a notice, never a page of made-up size.
+  EXPECT(doc.get(sub.children[2]).kind == NodeKind::Paragraph);
+  const Node& two = doc.get(root.children[2]);
+  EXPECT(doc.get(two.children[1]).label == "page-5");
+
+  // Markup round trips.
+  const std::string md = serialize_markup(doc);
+  EXPECT(md.find(":::page src=\"file:///b.pdf//page:1\" width=100 height=150") !=
+         std::string::npos);
+  const Document back = parse_markup(md);
+  int pages = 0;
+  for (const Node& n : back.nodes)
+    if (n.kind == NodeKind::Page) {
+      ++pages;
+      EXPECT(n.width == 100 && n.height == 150 && !n.label.empty());
+    }
+  EXPECT(pages == 4);
+  const Document sx = parse_sexpr(serialize_sexpr(doc));
+  pages = 0;
+  for (const Node& n : sx.nodes)
+    if (n.kind == NodeKind::Page && n.width == 100 && n.height == 150 &&
+        n.src.rfind("file:///b.pdf//page:", 0) == 0)
+      ++pages;
+  EXPECT(pages == 4);
+  const Document xd = parse_xml(serialize_xml(doc));
+  pages = 0;
+  for (const Node& n : xd.nodes)
+    if (n.kind == NodeKind::Page && n.width == 100 && n.height == 150) ++pages;
+  EXPECT(pages == 4);
+
+  // Paged reading: every fixed page starts a page of its own, even when two
+  // would fit on one.
+  LayoutResult l;
+  for (int i = 0; i < 3; ++i) {
+    PositionedImage im;
+    im.node = static_cast<NodeId>(i + 1);
+    im.y = 24.f + 110.f * static_cast<float>(i);
+    im.width = 100.f;
+    im.height = 100.f;
+    im.page_w = 100;
+    im.page_h = 100;
+    l.images.push_back(im);
+  }
+  l.content_height = 24.f + 330.f + 24.f;
+  PageSpec spec;
+  spec.page_h = 600.f;
+  spec.pad_top = 24.f;
+  spec.pad_bottom = 24.f;
+  spec.columns = 1;
+  spec.first_y = 24.f;
+  spec.extents.assign(11, GlyphExtent{14.f, 4.f});
+  PageMap map;
+  paginate(l, spec, map);
+  EXPECT(map.pages.size() == 3);
+}
+
 void test_paginate() {
   using namespace xanatoo;
   // 100 lines of 20 px from y = 24, a heading at line 20, a code box over
@@ -5295,6 +5391,7 @@ int main() {
   test_sitemap();
   test_nearest_caret();
   test_paginate();
+  test_fixed_layout();
   test_inflate();
   test_sha256();
   test_revstore();

@@ -3822,6 +3822,7 @@ void draw_pane(App& app, int i) {
   } else {
     draw_pane_layer(app, i, clip, static_cast<float>(pane.x), draw_scroll);
   }
+  draw_page_tiles(app, i, clip, draw_scroll);
 
   draw_pane_overlays(app, i);
   draw_footnote_overlay(app, i, clip);
@@ -4487,6 +4488,7 @@ void run_frame(App& app) {
   relayout_if_needed(app);
   apply_pending_scroll(app);
   poll_images(app);
+  pump_page_tiles(app);
   draw_panes(app);
   draw_split_chrome(app);
   // Freeze ImGui's draw lists before painting native frames. Rich panel forms

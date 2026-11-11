@@ -7,6 +7,7 @@
 #include "xanatoo/sexpr.hpp"
 #include "xanatoo/util.hpp"
 #include <cctype>
+#include <charconv>
 #include <algorithm>
 #include <vector>
 #include <cstdio>
@@ -906,6 +907,25 @@ Document parse_markup(std::string_view source) {
       ++i;
       continue;
     }
+    // Self-closing fixed-layout page (docs/FIXED_LAYOUT.md):
+    //   :::page src="file:///a.pdf//page:3" width=1224 height=1584 alt="3"
+    if (trimmed == ":::page" || starts_with(trimmed, ":::page ")) {
+      NodeId n = doc.create(NodeKind::Page, current_parent());
+      Node& pg = doc.get(n);
+      pg.src = fence_attr(trimmed, "src");
+      pg.alt = fence_attr(trimmed, "alt");
+      pg.label = fence_attr(trimmed, "id");
+      auto num = [&](const char* key) {
+        const std::string v = fence_attr(trimmed, key);
+        int out = 0;
+        auto [p, ec] = std::from_chars(v.data(), v.data() + v.size(), out);
+        return ec == std::errc{} && p == v.data() + v.size() && out > 0 ? out : 0;
+      };
+      pg.width = num("width");
+      pg.height = num("height");
+      ++i;
+      continue;
+    }
     if (starts_with(trimmed, ":::collection")) {
       NodeId n = doc.create(NodeKind::Collection, current_parent());
       doc.get(n).summary = fence_attr(trimmed, "view");
@@ -1739,6 +1759,17 @@ void serialize_node(const Document& doc, NodeId id, std::string& out,
       break;
     }
 
+    case NodeKind::Page: {
+      out += pad;
+      out += ":::page src=\"" + node.src + "\"";
+      out += " width=" + std::to_string(node.width);
+      out += " height=" + std::to_string(node.height);
+      if (!node.label.empty()) out += " id=\"" + node.label + "\"";
+      if (!node.alt.empty()) out += " alt=\"" + node.alt + "\"";
+      out += "\n\n";
+      break;
+    }
+
     case NodeKind::Aside: {
       out += pad;
       out += ":::aside";
@@ -2499,6 +2530,25 @@ void parse_sexpr_node(Document& doc, NodeId parent, const SExpr& e) {
 
   // (aside :side "left" (p …) …): a box of blocks beside the flow; an
   // aside of plain text stays a note, as before.
+  // (page :label "page-3" :src "file:///a.pdf//page:3" :width 1224 :height 1584)
+  if (tag == "page") {
+    NodeId n = doc.create(NodeKind::Page, parent);
+    Node& pg = doc.get(n);
+    for (size_t i = 1; i + 1 < e.kids.size(); i += 2) {
+      if (e.kids[i].kind != SExpr::Kind::Atom) break;
+      const std::string& k = e.kids[i].text;
+      const std::string v = sexpr_text(e.kids[i + 1]);
+      int num = 0;
+      std::from_chars(v.data(), v.data() + v.size(), num);
+      if (k == ":src") pg.src = v;
+      else if (k == ":alt") pg.alt = v;
+      else if (k == ":label" || k == ":anchor") pg.label = v;
+      else if (k == ":width") pg.width = std::max(0, num);
+      else if (k == ":height") pg.height = std::max(0, num);
+    }
+    return;
+  }
+
   if (tag == "aside") {
     bool blocks = false;
     for (size_t k = 1; k < e.kids.size(); ++k) {
@@ -3469,6 +3519,23 @@ void serialize_sexpr_node(const Document& doc, NodeId id, std::string& out,
       out += " :expanded ";
       out += node.expanded ? "#t" : "#f";
       serialize_sexpr_children(doc, node, out, indent + 2);
+      out += ")";
+      break;
+    }
+
+    case NodeKind::Page: {
+      out += pad;
+      out += "(page";
+      emit_node_id(node, out);
+      emit_label(node, out);
+      out += " :src ";
+      escape_sexpr_string(node.src, out);
+      out += " :width " + std::to_string(node.width);
+      out += " :height " + std::to_string(node.height);
+      if (!node.alt.empty()) {
+        out += " :alt ";
+        escape_sexpr_string(node.alt, out);
+      }
       out += ")";
       break;
     }

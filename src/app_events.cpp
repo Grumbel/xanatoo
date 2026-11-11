@@ -351,7 +351,7 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
     {
       const float hs = 12.f;
       for (const auto& pi : p.layout.images) {
-        if (pi.thumb > 0 || pi.in_text) continue;  // cards / inline: fixed
+        if (pi.thumb > 0 || pi.in_text || pi.page_w > 0) continue;  // fixed
         float hx = pi.x + pi.width - hs;
         float hy = pi.y + pi.height - hs - p.scroll_y;
         if (lx >= hx && lx <= hx + hs && my >= hy && my <= hy + hs) {
@@ -1027,7 +1027,8 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
         for (const auto& pi : hp.layout.images) {
           float ix0 = pi.x, iy0 = pi.y - hp.scroll_y;
           float ix1 = ix0 + pi.width, iy1 = iy0 + pi.height;
-          if (pi.in_text) continue;  // a link / text, not a resizable block
+          // A link / text, or a fixed-layout page: not a resizable block.
+          if (pi.in_text || pi.page_w > 0) continue;
           if (lx >= ix0 && lx <= ix1 && my >= iy0 && my <= iy1) {
             app.hover.image = pi.node;
             app.hover.image_pane = hover_pane;

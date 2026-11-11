@@ -474,6 +474,8 @@ struct FetchShared {
 
 // Remote image downloads (app_images.cpp): URLs ImageCache asked for,
 // fetched by a few worker threads into cache_dir()/images/.
+struct PageTiles;  // app_pagetiles.cpp
+
 struct ImageFetchShared {
   std::mutex mutex;
   std::deque<std::string> queue;
@@ -912,6 +914,8 @@ struct App {
   uint64_t next_fetch_id = 1;
   std::shared_ptr<ImageFetchShared> image_fetch =
       std::make_shared<ImageFetchShared>();
+  // Fixed-layout page tiles (app_pagetiles.cpp): loaders, views, textures.
+  std::shared_ptr<PageTiles> page_tiles;
   std::vector<CachedPage> page_cache;
   SplitPreview split_preview;
   SplitTrail split_trail;
@@ -1422,6 +1426,16 @@ bool lightbox_event(App& app, const SDL_Event& ev);
 bool lightbox_touch_target(const App& app, float x, float y);
 void lightbox_touch_zoom(App& app, float factor, float x, float y);
 void draw_lightbox(App& app);
+
+// ---- fixed-layout pages (app_pagetiles.cpp, docs/FIXED_LAYOUT.md) ----
+// Once per frame before drawing: run thumtoo's tile scheduler when it asked
+// for it, drop views / textures that went off screen.
+void pump_page_tiles(App& app);
+// Paint the visible Page images of view `pi` from tiles (screen y =
+// content y - draw_scroll), inside `clip`; after the pane raster.
+void draw_page_tiles(App& app, int pi, const SDL_Rect& clip, float draw_scroll);
+// Shutdown: textures and outstanding requests.
+void release_page_tiles(App& app);
 
 // ---- remote images (app_images.cpp) ----
 // Start downloads ImageCache asked for and apply finished ones (relayout).

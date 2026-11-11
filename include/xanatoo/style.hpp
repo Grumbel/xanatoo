@@ -64,6 +64,7 @@ enum class BlockRole : uint8_t {
   Transclusion,
   Aside,          // text box beside the flow (in the page margin)
   Article,        // gap (space-before / -after) between articles on one page
+  Page,           // fixed-layout page: gap after, sheet while loading, frame
   Count
 };
 constexpr size_t kBlockRoleCount = static_cast<size_t>(BlockRole::Count);

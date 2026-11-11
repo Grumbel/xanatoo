@@ -11,6 +11,7 @@
 
 #include "xanatoo/app.hpp"
 #include "xanatoo/epub_import.hpp"
+#include "xanatoo/fixed_layout.hpp"
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/nostr.hpp"
@@ -270,6 +271,8 @@ void app_shutdown(App& app) {
   save_session(app);
   xanatoo::sdl::stop_text_input(app.window);
   release_pane_rasters(app);
+  release_page_tiles(app);
+  xanatoo::release_page_client();
   app.ui.shutdown();
   if (app.gamepad) {
     xanatoo::sdl::close_gamepad(app.gamepad);

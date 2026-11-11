@@ -1867,6 +1867,22 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
       break;
     }
 
+    case NodeKind::Page: {
+      // Fit the column width; the size is the page's own (never guessed).
+      if (node.width <= 0 || node.height <= 0) break;
+      y = clear_floats(x, max_width, y);
+      const float w = max_width;
+      const float h = w * static_cast<float>(node.height) /
+                      static_cast<float>(node.width);
+      PositionedImage pi{id, x, y, w, h, node.src, image_base_};
+      pi.page_w = node.width;
+      pi.page_h = node.height;
+      out.images.push_back(std::move(pi));
+      out.boxes.push_back({id, x, y, w, h});
+      y += h + after(BlockRole::Page);
+      break;
+    }
+
     case NodeKind::Image: {
       const float em = static_cast<float>(fonts_.regular.pixel_size());
       const float gap = em;

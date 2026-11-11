@@ -111,6 +111,8 @@ option(XANATOO_WIKIPEDIA "wikipedia: articles via the Wikimedia REST API (TLS HT
 
 add_executable(xanatoo
   src/main.cpp
+  src/fixed_layout.cpp
+  src/app_pagetiles.cpp
   src/app_init.cpp
   src/app_buffers.cpp
   src/app_view.cpp
@@ -281,7 +283,8 @@ if(XANATOO_THUMTOO)
   set(THUMTOO_BUILD_TESTS OFF)
   set(THUMTOO_BUILD_TOOLS OFF)
   add_subdirectory(external/thumtoo ${CMAKE_BINARY_DIR}/thumtoo EXCLUDE_FROM_ALL)
-  target_sources(xanatoo PRIVATE src/images_thumtoo.cpp)
+  target_sources(xanatoo PRIVATE src/images_thumtoo.cpp
+    src/fixed_layout_thumtoo.cpp)
   target_link_libraries(xanatoo PRIVATE thumtoo::thumtoo)
   target_compile_definitions(xanatoo PRIVATE XANATOO_THUMTOO=1)
   message(STATUS "Images: thumtoo (libvips)")
@@ -527,6 +530,7 @@ include(CTest)
 if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
 add_executable(xanatoo_tests
   tests/unit_tests.cpp
+  src/fixed_layout.cpp
   src/paginate.cpp
   src/about.cpp
   src/util.cpp

@@ -15,6 +15,7 @@
 #include <stdexcept>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/fixed_layout.hpp"
 #include "xanatoo/ebooks.hpp"
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/feed.hpp"
@@ -110,6 +111,15 @@ xanatoo::Document load_doc(App& app, std::string path) {
     }
     path = std::move(md);
   }
+  if (xanatoo::is_fixed_layout_path(path)) {
+    // Synchronous path (new tab, session restore): waits for every page
+    // size; navigation goes through the fetch worker instead.
+    std::string why;
+    if (auto src = xanatoo::read_fixed_layout(path, &why))
+      return xanatoo::fixed_layout_document(*src);
+    return xanatoo::parse_document(
+        "# Cannot open " + path_title(path) + "\n\n" + why + "\n", {});
+  }
   std::error_code ec;
   if (fs::is_directory(path, ec)) {
     fs::path dir = fs::weakly_canonical(path, ec);
@@ -176,7 +186,9 @@ bool is_foreign_path(std::string_view path) {
   if (is_in_app_remote_url(path) || xanatoo::starts_with(path, "http://") ||
       xanatoo::starts_with(path, "https://"))
     return true;
-  if (xanatoo::path_uses_html(path) || xanatoo::is_pandoc_path(path)) return true;
+  if (xanatoo::path_uses_html(path) || xanatoo::is_pandoc_path(path) ||
+      xanatoo::is_fixed_layout_path(path))
+    return true;
   if (path == kDraftsPage || path == kDocumentsPage || path == kAboutPage ||
       is_stored_original_ref(path))
     return true;

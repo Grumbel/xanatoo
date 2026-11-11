@@ -46,6 +46,7 @@ enum class NodeKind : uint8_t {
   Collection,      // ordered set of items (Image / Figure) shown as cards
   Chrome,          // web page chrome (nav, aside, footer, …); reader mode hides it
   Aside,           // text box beside the flow (HTML <aside>, sidebar, pull quote)
+  Page,            // fixed-layout page (PDF / DjVu / comic), drawn from tiles
 };
 
 enum class InlineKind : uint8_t {
@@ -115,6 +116,8 @@ struct Node {
   std::string summary;            // stretchtext collapsed label
   std::string float_side;        // image, figure or table: "left", "right", or flow
   float display_scale = 1.f;      // image interactive scale (1 = natural fit)
+  int width = 0;                  // Page: intrinsic size in source pixels,
+  int height = 0;                 //       as thumtoo reports it (never guessed)
   std::string label;              // stable semantic anchor (links: #label)
   std::string tags;               // org-style tags without outer colons ("work:urgent")
   std::string style;              // optional named .xss variant for this subtree
@@ -135,6 +138,10 @@ struct Node {
   //        empty = the style's); floats beside the following blocks.
   // Chrome: summary = what it is ("navigation", "sidebar", "page header",
   //         …); body blocks are children. Only HTML pages make these.
+  // Page: src = thumtoo location of one page (`file:///a.pdf//page:3`,
+  //       `file:///a.cbz//archive:001.jpg`), width / height its size
+  //       (scale-0 tile grid), alt = page label, label = "page-N" anchor.
+  //       A leaf; see docs/FIXED_LAYOUT.md.
 };
 
 // Document-level semantic metadata (not layout).

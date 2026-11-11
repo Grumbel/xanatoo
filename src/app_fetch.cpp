@@ -13,6 +13,7 @@
 #include <thread>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/fixed_layout.hpp"
 #include "xanatoo/ebooks.hpp"
 #include "xanatoo/feed.hpp"
 #include "xanatoo/gemini.hpp"
@@ -88,6 +89,14 @@ void fetch_gemini(const std::string& url, FetchShared& out) {
 void fetch_page(std::string url, std::shared_ptr<FetchShared> out,
                 bool allow_download) {
   out->final_url = url;
+  // Local PDF / DjVu / comic: thumtoo sizes every page on this worker.
+  if (xanatoo::is_fixed_layout_path(url)) {
+    out->service = "Pages";
+    if (auto src = xanatoo::read_fixed_layout(url, &out->error))
+      out->doc = xanatoo::fixed_layout_document(*src);
+    out->done.store(true, std::memory_order_release);
+    return;
+  }
   // A search is its expanded URL, fetched like any page; the address stays.
   if (xanatoo::is_search_ref(url)) {
     const std::string shown = url;

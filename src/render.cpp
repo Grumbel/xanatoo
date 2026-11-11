@@ -148,6 +148,22 @@ void Renderer::draw(const LayoutResult& layout, float scroll_y, float origin_x) 
 
   if (images_) {
     for (const auto& pi : layout.images) {
+      if (pi.page_w > 0) {
+        // Fixed-layout page: only its sheet and frame live in the raster;
+        // the tiles are painted over it every frame (app_pagetiles.cpp).
+        SDL_Rect r{static_cast<int>(pi.x + origin_x), px(pi.y - scroll_y),
+                   static_cast<int>(pi.width), static_cast<int>(pi.height)};
+        if (!visible(r.x, r.y, r.w, r.h)) continue;
+        const BlockStyle& ps = layout.style_for(pi.node, st)[BlockRole::Page];
+        SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_BLEND);
+        set_color(sdl_, ps.background);
+        xanatoo::sdl::fill_rect(sdl_, &r);
+        SDL_Rect frame{r.x - 1, r.y - 1, r.w + 2, r.h + 2};
+        set_color(sdl_, ps.border);
+        xanatoo::sdl::draw_rect(sdl_, &frame);
+        SDL_SetRenderDrawBlendMode(sdl_, SDL_BLENDMODE_NONE);
+        continue;
+      }
       const Image& img = pi.thumb > 0 ? images_->thumb(pi.src, pi.base, pi.thumb)
                                       : images_->get(pi.src, pi.base);
       SDL_Rect dst{
