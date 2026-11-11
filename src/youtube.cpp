@@ -610,6 +610,9 @@ Document yt_video_document(const YtVideoInfo& v, const YtComments& c,
     NodeId watch = doc.create(NodeKind::Paragraph, root);
     add_link(doc, watch, "\xE2\x96\xB6 Watch on YouTube",
              external("https://www.youtube.com/watch?v=" + v.id));
+    add_meta(doc, watch, kDot);
+    add_link(doc, watch, "\xE2\x96\xB6 Watch with mpv",
+             external("mpv:https://www.youtube.com/watch?v=" + v.id));
     if (!v.description.empty()) append_plain(doc, root, v.description);
   }
 

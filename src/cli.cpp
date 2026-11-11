@@ -219,6 +219,29 @@ void open_external_url(const std::string& url_in) {
   const std::string url = url_in.rfind("external:", 0) == 0
                               ? url_in.substr(9)
                               : url_in;
+#if defined(__linux__) || defined(__APPLE__)
+  // "external:mpv:https://…" plays the page with mpv (which uses yt-dlp).
+  if (url.rfind("mpv:", 0) == 0) {
+    const std::string target = url.substr(4);
+    if (target.rfind("http://", 0) != 0 && target.rfind("https://", 0) != 0) {
+      std::cerr << "Refusing to play non-http(s) URL: " << target << "\n";
+      return;
+    }
+    pid_t pid = fork();
+    if (pid == 0) {
+      if (fork() > 0) _exit(0);
+      setsid();
+      execlp("mpv", "mpv", "--", target.c_str(), static_cast<char*>(nullptr));
+      _exit(127);
+    } else if (pid > 0) {
+      int status = 0;
+      waitpid(pid, &status, 0);
+    } else {
+      std::cerr << "fork failed for mpv\n";
+    }
+    return;
+  }
+#endif
   if (url.rfind("http://", 0) != 0 && url.rfind("https://", 0) != 0 &&
       url.rfind("mailto:", 0) != 0) {
     std::cerr << "Refusing to open non-http(s)/mailto URL: " << url << "\n";
