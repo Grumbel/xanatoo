@@ -1868,8 +1868,10 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
         k == SDLK_TAB || k == SDLK_RETURN || k == SDLK_KP_ENTER ||
         k == SDLK_SPACE || k == SDLK_LEFTBRACKET || k == SDLK_RIGHTBRACKET ||
         // Ctrl+C / A / S: copy, select, save an editable Markdown copy.
+        // Ctrl+T / W: new / close tab (not document edits).
         (ctrl && (k == SDLK_q || k == SDLK_o || k == SDLK_f || k == SDLK_g ||
                   k == SDLK_c || k == SDLK_a || k == SDLK_s ||
+                  k == SDLK_t || k == SDLK_w ||
                   k == SDLK_BACKSLASH || k == SDLK_l ||
                   k == SDLK_EQUALS || k == SDLK_MINUS || k == SDLK_PLUS ||
                   k == SDLK_KP_PLUS || k == SDLK_KP_MINUS)) ||
