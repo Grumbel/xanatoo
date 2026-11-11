@@ -34,11 +34,12 @@ int tcp_connect(const std::string& host, int port, std::string* err,
   hints.ai_family = AF_UNSPEC;
   addrinfo* res = nullptr;
   std::string port_s = std::to_string(port);
-  if (getaddrinfo(host.c_str(), port_s.c_str(), &hints, &res) != 0) {
-    if (err) *err = "DNS failed for " + host;
+  if (const int gai = getaddrinfo(host.c_str(), port_s.c_str(), &hints, &res)) {
+    if (err) *err = "DNS lookup failed for " + host + " (" + gai_strerror(gai) + ")";
     return -1;
   }
   int fd = -1;
+  int last_errno = 0;
   bool attempted = false;
   for (addrinfo* p = res; p; p = p->ai_next) {
     if (public_only && !public_ip_address(p->ai_addr)) continue;
@@ -71,11 +72,14 @@ int tcp_connect(const std::string& host, int port, std::string* err,
     } else if (::connect(fd, p->ai_addr, p->ai_addrlen) == 0) {
       break;
     }
+    last_errno = errno;
     ::close(fd);
     fd = -1;
   }
   freeaddrinfo(res);
-  if (fd < 0 && err) *err = attempted ? "connect failed to " + host :
+  if (fd < 0 && err) *err = attempted ? "connect failed to " + host + ":" +
+                                            port_s + " (" +
+                                            std::strerror(last_errno) + ")" :
                           "private/local address excluded for " + host;
   return fd;
 }
@@ -126,11 +130,19 @@ public:
     for (;;) {
       const ssize_t n = ::recv(plain_fd_, dst, size, 0);
       if (n < 0 && errno == EINTR) continue;
+      if (n < 0) read_errno_ = errno;
       return static_cast<int>(n);
     }
   }
 
+  // Reason for the last failed read() (empty if unknown).
+  std::string last_error() const {
+    if (secure_) return tls_.last_error();
+    return std::strerror(read_errno_);
+  }
+
 private:
+  int read_errno_ = 0;
   int plain_fd_ = -1;
   bool secure_ = false;
   TlsStream tls_;
@@ -375,13 +387,24 @@ bool stream_once(const std::string& url, std::string_view agent,
   bool is_chunked = false;
   int64_t left = -1;
   char buf[8192];
+  uint64_t total_read = 0;
   for (;;) {
     const int n = conn.read(buf, sizeof(buf));
     if (n < 0) {
-      if (err) *err = "HTTP receive failed or timed out";
+      if (err) {
+        std::string where = have_headers
+            ? "while receiving the response body (" +
+                  std::to_string(total_read) + " bytes received" +
+                  (left >= 0 ? " of " + std::to_string(total_read + left) : "") +
+                  (is_chunked ? ", chunked" : "") + ")"
+            : "while waiting for the response headers (" +
+                  std::to_string(total_read) + " bytes received)";
+        *err = "Network error " + where + ": " + conn.last_error();
+      }
       return false;
     }
     if (n == 0) break;
+    total_read += static_cast<uint64_t>(n);
     std::string_view data(buf, static_cast<size_t>(n));
     if (!have_headers) {
       pending.append(data);
@@ -403,6 +426,9 @@ bool stream_once(const std::string& url, std::string_view agent,
       result.location = header_value(headers, "location");
       result.content_type = header_value(headers, "content-type");
       result.content_disposition = header_value(headers, "content-disposition");
+      result.server = header_value(headers, "server");
+      result.cf_mitigated = header_value(headers, "cf-mitigated");
+      result.retry_after = header_value(headers, "retry-after");
       const std::string length = header_value(headers, "content-length");
       if (!length.empty()) {
         auto [p, ec] = std::from_chars(length.data(),

@@ -11,6 +11,9 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cerrno>
+#include <cstring>
+#include <string>
 #include <cstdlib>
 #include <ctime>
 #include <mutex>
@@ -76,7 +79,44 @@ struct TlsStream::Impl {
   SSL_CTX* ctx = nullptr;
   SSL* ssl = nullptr;
   int fd = -1;
+  std::string last_error;
 };
+
+namespace {
+
+// Turn the failed SSL call `r` into text: the OpenSSL error queue (reason
+// such as "unexpected eof while reading"), else the socket's errno.
+std::string describe_ssl_failure(SSL* ssl, int r, int saved_errno) {
+  const int code = SSL_get_error(ssl, r);
+  std::string out;
+  switch (code) {
+    case SSL_ERROR_ZERO_RETURN: return "closed by peer (TLS close_notify)";
+    case SSL_ERROR_WANT_READ:
+    case SSL_ERROR_WANT_WRITE:
+      out = "timed out waiting for data (SO_RCVTIMEO)"; break;
+    case SSL_ERROR_SYSCALL:
+      if (saved_errno == EAGAIN || saved_errno == EWOULDBLOCK)
+        out = "timed out waiting for data (no bytes for 15 s)";
+      else if (saved_errno)
+        out = std::string("socket error: ") + std::strerror(saved_errno);
+      else
+        out = "connection closed by peer without TLS close_notify";
+      break;
+    case SSL_ERROR_SSL: out = "TLS protocol error"; break;
+    default: out = "SSL_get_error=" + std::to_string(code); break;
+  }
+  unsigned long e;
+  while ((e = ERR_get_error()) != 0) {
+    char buf[256];
+    ERR_error_string_n(e, buf, sizeof(buf));
+    out += "; "; out += buf;
+  }
+  return out;
+}
+
+}  // namespace
+
+const std::string& TlsStream::last_error() const { return impl_->last_error; }
 
 TlsStream::TlsStream() : impl_(std::make_unique<Impl>()) {}
 TlsStream::~TlsStream() { close(); }
@@ -144,11 +184,28 @@ bool TlsStream::connect(int fd, const std::string& host, std::string* err,
   }
   const int rc = SSL_connect(impl_->ssl);
   if (rc != 1) {
-    if (err)
-      *err = "TLS handshake failed (" +
-             std::to_string(SSL_get_error(impl_->ssl, rc)) + ") " + host +
-             (verify_peer ? "; certificate result " +
-                 std::to_string(SSL_get_verify_result(impl_->ssl)) : "");
+    if (err) {
+      const int code = SSL_get_error(impl_->ssl, rc);
+      const int saved_errno = errno;
+      std::string msg = "TLS handshake with " + host + " failed";
+      const long vr = verify_peer ? SSL_get_verify_result(impl_->ssl) : X509_V_OK;
+      if (vr != X509_V_OK)
+        msg += ": certificate rejected: " +
+               std::string(X509_verify_cert_error_string(vr)) +
+               " (X509 code " + std::to_string(vr) + ")";
+      else if (code == SSL_ERROR_SYSCALL)
+        msg += saved_errno == EAGAIN || saved_errno == EWOULDBLOCK
+                   ? ": timed out"
+                   : saved_errno ? std::string(": ") + std::strerror(saved_errno)
+                                 : ": connection closed during handshake";
+      unsigned long e;
+      while ((e = ERR_get_error()) != 0) {
+        char buf[256];
+        ERR_error_string_n(e, buf, sizeof(buf));
+        msg += "; "; msg += buf;
+      }
+      *err = msg;
+    }
     close();
     return false;
   }
@@ -220,9 +277,28 @@ bool TlsStream::write_all(const void* data, size_t n) {
 
 int TlsStream::read(void* buf, size_t n) {
   if (!impl_->ssl) return -1;
+  ERR_clear_error();
+  errno = 0;
   const int r = SSL_read(impl_->ssl, buf, static_cast<int>(n));
   if (r > 0) return r;
-  return SSL_get_error(impl_->ssl, r) == SSL_ERROR_ZERO_RETURN ? 0 : -1;
+  const int saved = errno;
+  const int code = SSL_get_error(impl_->ssl, r);
+  if (code == SSL_ERROR_ZERO_RETURN) return 0;
+  // Many servers (YouTube, ...) end a close-delimited HTTP body by closing
+  // the TCP connection without a TLS close_notify. OpenSSL 3 reports that as
+  // an SSL error; curl and browsers treat it as end-of-data. Callers that
+  // know the expected length (Content-Length / chunked) still detect
+  // truncation themselves.
+#ifdef SSL_R_UNEXPECTED_EOF_WHILE_READING  // OpenSSL >= 3.0
+  if (code == SSL_ERROR_SSL &&
+      ERR_GET_REASON(ERR_peek_error()) == SSL_R_UNEXPECTED_EOF_WHILE_READING) {
+    impl_->last_error = "connection closed by peer without TLS close_notify";
+    ERR_clear_error();
+    return 0;
+  }
+#endif
+  impl_->last_error = describe_ssl_failure(impl_->ssl, r, saved);
+  return -1;
 }
 
 bool TlsStream::pending() const {

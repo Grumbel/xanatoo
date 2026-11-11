@@ -121,3 +121,15 @@ HTTPS/WSS alone does not
 authenticate Nostr event authors, relay group membership, NIP-11 master-key
 claims, or API authorization. Each has its own cryptographic and
 application-level checks.
+
+## Error reporting and close-delimited bodies
+
+- `TlsStream::last_error()` says why the last read failed (OpenSSL error
+  queue, errno, timeout, Mbed TLS code). `https.cpp` adds the stage (connect,
+  handshake, waiting for headers, body at N bytes) and `html_page.cpp` adds
+  hints for refused pages (Cloudflare `cf-mitigated`, CAPTCHA, "requires
+  JavaScript", `Retry-After`, `Server`).
+- Servers such as YouTube end a body that has neither `Content-Length` nor
+  chunking by closing TCP without a TLS `close_notify`. OpenSSL 3 raises
+  "unexpected eof while reading"; like curl, `TlsStream::read` returns 0 (EOF)
+  for it. Length-delimited and chunked bodies still fail as "incomplete".

@@ -295,6 +295,36 @@ std::string http_status_line(int status) {
 
 #if defined(XANATOO_WEB) && XANATOO_WEB
 
+namespace {
+
+// Why a server refused or gutted the answer: bot checks, rate limits and
+// script-only pages leave traces in headers and body. Empty when unknown.
+std::string refusal_hint(const HttpStreamHeaders& h, std::string_view body) {
+  const std::string low = ascii_lower(body.substr(0, 64 * 1024));
+  auto has = [&](const char* s) { return low.find(s) != std::string::npos; };
+  std::string out;
+  auto add = [&](const std::string& s) {
+    if (!out.empty()) out += "; ";
+    out += s;
+  };
+  if (!h.cf_mitigated.empty())
+    add("Cloudflare bot check (cf-mitigated: " + h.cf_mitigated + ")");
+  else if (has("cf-challenge") || has("challenge-platform") ||
+           has("just a moment..."))
+    add("Cloudflare bot-check page (needs JavaScript)");
+  if (has("captcha") || has("unusual traffic") || has("are you a robot") ||
+      has("verify you are human"))
+    add("CAPTCHA / bot check");
+  if (has("enable javascript") || has("requires javascript") ||
+      has("javascript is required") || has("javascript is disabled"))
+    add("page requires JavaScript");
+  if (!h.retry_after.empty()) add("Retry-After: " + h.retry_after);
+  if (!out.empty() && !h.server.empty()) add("Server: " + h.server);
+  return out;
+}
+
+}  // namespace
+
 std::optional<Document> web_fetch(std::string_view url_in, std::string* err,
                                   std::string* final_url, int* http_status,
                                   std::string* raw_source,
@@ -374,7 +404,12 @@ std::optional<Document> web_fetch(std::string_view url_in, std::string* err,
   const bool failed = headers.status != 200;
   if (http_status) *http_status = failed ? headers.status : 0;
   if (failed) {
-    if (err) *err = http_status_line(headers.status);
+    if (err) {
+      *err = http_status_line(headers.status);
+      const std::string hint = refusal_hint(headers, body_bytes);
+      if (!hint.empty()) *err += " (" + hint + ")";
+      else if (!headers.server.empty()) *err += " (Server: " + headers.server + ")";
+    }
     // 4xx / 5xx pages are content too (a site's own 404 page); anything
     // else without a usable body is just an error.
     if (headers.status < 400 || headers.status > 599) return std::nullopt;

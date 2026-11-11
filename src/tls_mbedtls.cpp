@@ -142,7 +142,10 @@ struct TlsStream::Impl {
   int fd = -1;
   bool live = false;  // contexts initialised (free them in close())
   bool ok = false;    // handshake done
+  std::string last_error;
 };
+
+const std::string& TlsStream::last_error() const { return impl_->last_error; }
 
 TlsStream::TlsStream() : impl_(std::make_unique<Impl>()) {}
 TlsStream::~TlsStream() { close(); }
@@ -281,6 +284,11 @@ int TlsStream::read(void* buf, size_t n) {
 #ifdef MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET
     if (r == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET) continue;
 #endif
+    char msg[160];
+    mbedtls_strerror(r, msg, sizeof(msg));
+    impl_->last_error = std::string(msg) + " (-0x" + [&] {
+      char h[16]; std::snprintf(h, sizeof(h), "%04x", -r); return std::string(h);
+    }() + ")";
     return -1;
   }
 }

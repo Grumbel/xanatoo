@@ -42,6 +42,9 @@ struct HttpStreamHeaders {
   std::string content_type;
   std::string content_disposition;
   int64_t content_length = -1; // unknown, e.g. chunked
+  std::string server;          // Server: (who answered: cloudflare, ESF, ...)
+  std::string cf_mitigated;    // cf-mitigated: challenge (Cloudflare bot check)
+  std::string retry_after;     // Retry-After: (rate limiting)
 };
 using HttpHeaderCallback = std::function<bool(const HttpStreamHeaders&)>;
 using HttpBodyCallback = std::function<bool(std::string_view)>;

@@ -58,6 +58,9 @@ class TlsStream {
   // Up to n bytes: > 0 read, 0 = closed by peer, < 0 = error / timeout
   // (the socket's SO_RCVTIMEO).
   int read(void* buf, size_t n);
+  // Why the last read() / write_all() failed (library error string, errno
+  // text, "timed out", "connection reset" ...); empty after success.
+  const std::string& last_error() const;
   // Decrypted bytes buffered inside TLS (readable without blocking).
   bool pending() const;
 
