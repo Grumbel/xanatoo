@@ -1882,15 +1882,22 @@ void LayoutEngine::layout_node(const Document& doc, NodeId id,
           }
         }
         float bottom = top;
+        const size_t first_img = out.images.size();
         in_image_float_ = true;
         layout_node(doc, id, bx, bottom, fw, out);
         in_image_float_ = false;
         if (bottom > top) {
+          // The image may be narrower than the room reserved for it (a
+          // remote thumbnail has a fixed edge): wrap text at what is drawn
+          // (left floats; a right float stays against the column edge).
+          float used = fw;
+          for (size_t k = first_img; k < out.images.size(); ++k)
+            if (out.images[k].node == id) used = std::min(fw, out.images[k].width);
           FloatBox fb;
           fb.top = top; fb.bottom = bottom;
           fb.side = right ? FloatSide::Right : FloatSide::Left;
           fb.left = right ? bx - gap : bx;
-          fb.right = right ? bx + fw : bx + fw + gap;
+          fb.right = right ? bx + fw : bx + used + gap;
           floats_.push_back(fb);
         }
         break;
