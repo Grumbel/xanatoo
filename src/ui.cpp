@@ -2288,6 +2288,57 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       }
       ImGui::EndMenu();
     }
+    force_menu("History");
+    if (ImGui::BeginMenu("History")) {
+      menu_item_cmd("Back", UiCommand::NavBack, cmd, state.can_nav_back, "Alt+Left");
+      menu_item_cmd("Forward", UiCommand::NavForward, cmd, state.can_nav_forward,
+                    "Alt+Right");
+      if (ImGui::MenuItem("Show History…", "Ctrl+Shift+H", state.history_open))
+        cmd = UiCommand::ToggleHistory;
+      if (!state.recent_visited.empty()) {
+        ImGui::Separator();
+        int i = 0;
+        for (const std::string& url : state.recent_visited) {
+          std::string label = url.size() > 64 ? elide_middle(url, 28) : url;
+          ImGui::PushID(i++);
+          if (ImGui::MenuItem(label.c_str())) {
+            cmd = UiCommand::NavigateUrl;
+            result.arg = url;
+          }
+          ImGui::PopID();
+        }
+      }
+      ImGui::EndMenu();
+    }
+    force_menu("Subscriptions");
+    if (ImGui::BeginMenu("Subscriptions")) {
+      if (ImGui::MenuItem(state.current_subscribed ? "Unsubscribe current feed" :
+                          "Subscribe to current feed", nullptr, false,
+                          state.current_subscribed || state.current_subscribable)) {
+        cmd = state.current_subscribed ? UiCommand::Unsubscribe : UiCommand::Subscribe;
+        result.arg = state.subscription_address;
+      }
+      if (ImGui::MenuItem("Show Subscriptions…", nullptr, state.subscriptions_open))
+        cmd = UiCommand::ToggleSubscriptions;
+      menu_item_cmd("Refresh All", UiCommand::SubscriptionRefresh, cmd,
+                    !state.subscriptions.empty());
+      if (!state.subscriptions.empty()) {
+        ImGui::Separator();
+        int i = 0;
+        for (const auto& sub : state.subscriptions) {
+          std::string label = sub.title.empty() ? sub.address : sub.title;
+          if (label.size() > 64) label = elide_middle(label, 28);
+          if (sub.unread) label += " (" + std::to_string(sub.unread) + " new)";
+          ImGui::PushID(i++);
+          if (ImGui::MenuItem(label.c_str())) {
+            cmd = UiCommand::SubscriptionOpen;
+            result.arg = sub.address;
+          }
+          ImGui::PopID();
+        }
+      }
+      ImGui::EndMenu();
+    }
     force_menu("Services");
     if (ImGui::BeginMenu("Services")) {
       for (const UiService& s : state.services) {

@@ -401,6 +401,7 @@ struct UiState {
   float collection_thumb = 160.f;
   bool loading = false;  // a page fetch is running (Reload becomes Stop)
   bool history_open = false;
+  std::vector<std::string> recent_visited;  // newest first, for the History menu
   bool downloads_open = false;
   bool styles_open = false;
   int styles_x = 0, styles_y = 0, styles_w = 0, styles_h = 0;

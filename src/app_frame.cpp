@@ -335,6 +335,9 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   }
   ui_state.can_nav_forward = can_nav_step(app, 1);
   ui_state.history_open = app.history_panel_open;
+  ui_state.recent_visited.clear();
+  for (size_t i = app.visited.size(), n = 0; i > 0 && n < 25; --i, ++n)
+    ui_state.recent_visited.push_back(app.visited[i - 1]);
   ui_state.downloads_open = app.downloads_panel_open;
   ui_state.styles_open = app.styles_panel_open;
   if (app.styles_panel_open) {
