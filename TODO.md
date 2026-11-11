@@ -13,7 +13,7 @@ Next bundle number: **348** (this delivery is **347**)
 - `feed.cpp` reads `media:thumbnail`, `media:community` (`media:starRating`,
   `media:statistics views`) from `<media:group>` or directly on an entry
   (Atom and RSS), plus `yt:videoId` / `yt:channelId`. Entries show the
-  thumbnail as a remote Image and a muted "N views · ★ x/5 (n ratings)" line
+  thumbnail as a left-floating remote Image (no alt, so no duplicate caption) and a muted "N views · ★ x/5 (n ratings)" line
   before the description. Unit test added in `test_parse_feeds`.
 - Next step (not done): YouTube comments. No feed exists; needs the Data API
   v3 (`commentThreads`, API key) or Invidious/Piped instances. Decide route.

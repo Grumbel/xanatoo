@@ -512,7 +512,7 @@ Document build_document(const FeedInfo& f, std::string_view src,
     if (!e.thumb.empty()) {
       NodeId im = doc.create(NodeKind::Image, msg);
       doc.get(im).src = resolve_url(url, e.thumb);
-      doc.get(im).alt = e.title;
+      doc.get(im).float_side = "left";  // text and stats run beside it
     }
     if (std::string stats = media_stats_line(e); !stats.empty())
     {
