@@ -21,6 +21,9 @@ namespace xanatoo {
 bool is_hn_ref(std::string_view s);
 bool is_reddit_ref(std::string_view s);
 bool is_lemmy_ref(std::string_view s);
+// youtube:@handle, youtube:watch?v=ID, … (youtube.hpp; plain youtube.com
+// URLs stay web pages, the Native view toggle switches).
+bool is_youtube_ref(std::string_view s);
 
 // Web URL → ref ("" when the URL is not a page of that service).
 std::string hn_ref_from_url(std::string_view url);

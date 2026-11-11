@@ -663,6 +663,14 @@ history or distribute patch files.
   reader, without silently retrying another endpoint. Reddit announced that
   its first-party RSS feeds will end on 2026-11-13.
 
+## YouTube
+
+- `src/youtube.cpp`, gated by `XANATOO_YOUTUBE` (default ON; needs TLS).
+  Read-only InnerTube client (unofficial JSON API, no key/account) for
+  channel / playlist video lists and video comments: `youtube:@handle`,
+  `youtube:watch?v=ID`, … Parsers are pure (`json_dom.hpp`) and tested with
+  recorded replies; never post or log in. See `docs/YOUTUBE.md`.
+
 ## Lemmy
 
 - Read-only client via Lemmy **API v3** JSON (`/api/v3/post/list`, `/api/v3/post`).

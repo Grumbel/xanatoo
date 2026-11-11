@@ -77,6 +77,10 @@ AboutSection services() {
   s.items.push_back({"Wikipedia", XANATOO_WIKIPEDIA,
                      "`wikipedia:Title` articles via the Wikimedia REST API",
                      "wikipedia:Project_Xanadu", "`-DXANATOO_WIKIPEDIA=ON`"});
+  s.items.push_back({"YouTube", XANATOO_YOUTUBE,
+                     "`youtube:@handle` channels with every upload, playlists "
+                     "and `youtube:watch?v=ID` pages with comments (InnerTube)",
+                     "youtube:@GoogleDevelopers", "`-DXANATOO_YOUTUBE=ON`"});
   s.items.push_back({"Hacker News", XANATOO_HN,
                      "`hn:` lists and threads (Firebase + Algolia APIs)",
                      "hn:", "`-DXANATOO_HN=ON`"});

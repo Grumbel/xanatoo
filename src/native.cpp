@@ -8,6 +8,7 @@
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/util.hpp"
 #include "xanatoo/wikipedia.hpp"
+#include "xanatoo/youtube.hpp"
 
 namespace xanatoo {
 
@@ -58,6 +59,10 @@ bool is_lemmy_ref(std::string_view s) {
          s[kLemmyPrefix.size()] != '/';
 }
 
+bool is_youtube_ref(std::string_view s) {
+  return parse_youtube_ref(s).has_value();
+}
+
 std::string hn_ref_from_url(std::string_view url) {
   if (!is_hn_url(url)) return {};
   std::string host, rest;
@@ -96,6 +101,7 @@ std::string web_url_for(std::string_view ref) {
            std::string(after_prefix(ref, kRedditPrefix));
   if (is_lemmy_ref(ref))
     return "https://" + std::string(after_prefix(ref, kLemmyPrefix));
+  if (auto r = parse_youtube_ref(ref)) return youtube_web_url(*r);
   if (auto r = parse_wikipedia_ref(ref)) {
     std::string url = wikipedia_page_url(*r);
     if (!r->fragment.empty()) url += "#" + r->fragment;
@@ -109,6 +115,7 @@ std::string native_url_for(std::string_view url) {
   if (std::string r = hn_ref_from_url(url); !r.empty()) return r;
   if (std::string r = reddit_ref_from_url(url); !r.empty()) return r;
   if (std::string r = lemmy_ref_from_url(url); !r.empty()) return r;
+  if (std::string r = youtube_ref_from_web_url(url); !r.empty()) return r;
   return {};
 }
 

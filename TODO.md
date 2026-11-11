@@ -21,6 +21,23 @@ Next bundle number: **348** (this delivery is **347**)
   scheme, link-aware features reading `span.href` (Page panel, backlinks).
 - Not run: GUI check (this shell was outside `nix develop`, link step failed).
 
+## Status (2026-11-11) — YouTube via InnerTube (`youtube:` refs)
+
+- `src/youtube.cpp`, `XANATOO_YOUTUBE` (default ON, needs TLS): read-only
+  client of the unofficial InnerTube JSON API (no key, no account).
+  `youtube:@handle[?page=N]`, `channel/UC…`, `c/x`, `user/x`,
+  `playlist?list=ID`, `watch?v=ID[&comments=N][&sort=new]`. Plain
+  youtube.com URLs stay web pages; "Native view" maps them (`native.hpp`).
+  Full docs: `docs/YOUTUBE.md`. Tests: `xanatoo_youtube_tests` (recorded
+  shapes, pure parsers) + `json_dom.hpp`.
+- Fixed on the way: `https_request` could not read the last response header,
+  so a chunked body (YouTube POSTs) stayed chunk-encoded.
+- Live-checked: channel pages 1-3, playlist, video + comments.
+- Limits: comment replies are not fetched (counts only); tokens are
+  re-walked per page (page N = N requests); Shorts / Live tabs, search and
+  the video owner / description block are unverified or unsupported;
+  InnerTube changes without notice.
+
 ## Status (2026-11-11) — Media RSS in feeds (YouTube)
 
 - `feed.cpp` reads `media:thumbnail`, `media:community` (`media:starRating`,
@@ -28,8 +45,7 @@ Next bundle number: **348** (this delivery is **347**)
   (Atom and RSS), plus `yt:videoId` / `yt:channelId`. Entries show the
   thumbnail as a left-floating remote Image (no alt, so no duplicate caption) and a muted "N views · ★ x/5 (n ratings)" line
   before the description. Unit test added in `test_parse_feeds`.
-- Next step (not done): YouTube comments. No feed exists; needs the Data API
-  v3 (`commentThreads`, API key) or Invidious/Piped instances. Decide route.
+- Comments / channel lists: done below (InnerTube, 2026-11-11).
 
 ## Status (2026-11-10) — Android private UI header staging (bundle 347)
 

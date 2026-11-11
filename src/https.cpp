@@ -249,7 +249,9 @@ std::optional<HttpResult> https_request(std::string_view method,
     if (loc == std::string::npos) return {};
     size_t v0 = headers.find(':', loc);
     size_t v1 = headers.find("\r\n", v0);
-    if (v0 == std::string::npos || v1 == std::string::npos) return {};
+    if (v0 == std::string::npos) return {};
+    // The block has no CRLF after its last header.
+    if (v1 == std::string::npos) v1 = headers.size();
     std::string val = headers.substr(v0 + 1, v1 - v0 - 1);
     while (!val.empty() && (val.front() == ' ' || val.front() == '\t'))
       val.erase(val.begin());
