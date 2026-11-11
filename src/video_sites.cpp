@@ -146,7 +146,11 @@ std::string date_unix(long long t) {
   if (t <= 0) return {};
   const std::time_t tt = static_cast<std::time_t>(t);
   std::tm tm{};
+#if defined(_WIN32)
+  gmtime_s(&tm, &tt);
+#else
   gmtime_r(&tt, &tm);
+#endif
   char buf[16];
   std::strftime(buf, sizeof buf, "%Y-%m-%d", &tm);
   return buf;

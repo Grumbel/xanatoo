@@ -245,7 +245,11 @@ std::string format_time(int64_t ts) {
   time_t t = static_cast<time_t>(ts);
   char buf[64];
   struct tm tm {};
+#if defined(_WIN32)
+  gmtime_s(&tm, &t);
+#else
   gmtime_r(&t, &tm);
+#endif
   if (std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M UTC", &tm) == 0)
     return {};
   return buf;
