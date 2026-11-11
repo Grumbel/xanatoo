@@ -2311,7 +2311,17 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGui::EndMenu();
     }
     force_menu("Subscriptions");
-    if (ImGui::BeginMenu("Subscriptions")) {
+    uint32_t subs_unread = 0;
+    for (const auto& sub : state.subscriptions) subs_unread += sub.unread;
+    // New-items marker: an orange dot after the menu title.
+    const bool subs_open = ImGui::BeginMenu("Subscriptions");
+    if (subs_unread) {
+      const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
+      ImGui::GetWindowDrawList()->AddCircleFilled(
+          ImVec2(b.x - 3.0f, a.y + 5.0f), 3.5f,
+          IM_COL32(240, 130, 20, 255));
+    }
+    if (subs_open) {
       if (ImGui::MenuItem(state.current_subscribed ? "Unsubscribe current feed" :
                           "Subscribe to current feed", nullptr, false,
                           state.current_subscribed || state.current_subscribable)) {
@@ -2328,11 +2338,18 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         for (const auto& sub : state.subscriptions) {
           std::string label = sub.title.empty() ? sub.address : sub.title;
           if (label.size() > 64) label = elide_middle(label, 28);
-          if (sub.unread) label += " (" + std::to_string(sub.unread) + " new)";
+          if (sub.unread)
+            label = "    " + label + " (" + std::to_string(sub.unread) + " new)";
           ImGui::PushID(i++);
           if (ImGui::MenuItem(label.c_str())) {
             cmd = UiCommand::SubscriptionOpen;
             result.arg = sub.address;
+          }
+          if (sub.unread) {
+            const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
+            ImGui::GetWindowDrawList()->AddCircleFilled(
+                ImVec2(a.x + 12.0f, a.y + (b.y - a.y) * 0.5f), 3.5f,
+                IM_COL32(240, 130, 20, 255));
           }
           ImGui::PopID();
         }
