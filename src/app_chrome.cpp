@@ -341,7 +341,7 @@ StatusLine compute_status(App& app) {
     tone = StatusTone::Browse;
   } else if (app.structure_mode) {
     label =
-        "Structure highlight — colour bars + kind tags on the right · "
+        "Structure highlight — nested boxes + small kind tags · "
         "Ctrl+Shift+L toggles";
     tone = StatusTone::Info;
   } else if (focused_pane(app).section_focus) {

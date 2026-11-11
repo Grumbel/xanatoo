@@ -69,6 +69,7 @@ inline int float_close_w = 28;  // close box hit zone at the title's right
 // Canvas chrome text (status line, window titles, outline / backlinks);
 // matches the ImGui menu font and ignores document style + zoom.
 inline int kUiFontPx = 14;
+inline constexpr int kStructTagPx = 9;
 inline int help_pad = 12;
 inline int help_edge = 6;
 inline int help_grip_h = 14;  // strip under the client well: resize grip / h-scroll
@@ -684,6 +685,7 @@ struct App {
   bool ui_scale_pending = false;  // applied after the current ImGui frame renders
   xanatoo::Font ui_font;       // chrome text (see kUiFontPx)
   xanatoo::Font ui_font_bold;  // outline top level, emphasis in chrome
+  xanatoo::Font ui_font_tiny;  // structure highlight tags (kStructTagPx)
   std::vector<DocBuffer> buffers;  // dense storage; address by BufferId
   // Documents whose strict XML import failed stay read-only until reloaded
   // successfully. An error preview must never overwrite the original file.

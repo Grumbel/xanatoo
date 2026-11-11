@@ -3019,7 +3019,7 @@ static void draw_pane_overlays(App& app, int i) {
     SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
   }
 
-  // Logical structure overlay: colour bars + wash by NodeKind + right labels
+  // Logical structure overlay: nested outlined boxes by NodeKind + small corner tags
   if (app.structure_mode) {
     SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_BLEND);
     const auto& ddoc = buf(app, pane.buf).doc;
@@ -3121,17 +3121,28 @@ static void draw_pane_overlays(App& app, int i) {
           return nullptr;
       }
     };
-    // Prefer mono for compact gutter tags; fall back to body.
+    // Small chrome-face tags sit inside each box's top-left corner, so they
+    // follow the nesting indent instead of piling up at the right edge.
     xanatoo::Font& tag_font =
-        app.fonts.mono.loaded() ? app.fonts.mono : app.fonts.regular;
+        app.ui_font_tiny.loaded() ? app.ui_font_tiny : app.ui_font;
     const int tag_lh = tag_font.line_height();
+    // Nesting depth: parent chain up to the Document.
+    auto depth_of = [&ddoc](xanatoo::NodeId id) {
+      int d = 0;
+      for (xanatoo::NodeId pid = ddoc.get(id).parent;
+           pid != xanatoo::INVALID_NODE && pid < ddoc.next_id &&
+           static_cast<size_t>(pid - 1) < ddoc.nodes.size();
+           pid = ddoc.get(pid).parent)
+        ++d;
+      return d;
+    };
     for (const auto& box : pane.layout.boxes) {
       if (box.node == xanatoo::INVALID_NODE) continue;
       const auto& node = ddoc.get(box.node);
       const auto kind = node.kind;
       // Skip pure container shells that span the whole doc
       if (kind == xanatoo::NodeKind::Document) continue;
-      uint8_t r = 120, g = 120, b = 130, a_bar = 200, a_wash = 28;
+      uint8_t r = 120, g = 120, b = 130, a_bar = 170, a_wash = 22;
       switch (kind) {
         case xanatoo::NodeKind::Heading:
         case xanatoo::NodeKind::Header:
@@ -3241,38 +3252,40 @@ static void draw_pane_overlays(App& app, int i) {
       int by = static_cast<int>(box.y - pane.scroll_y + py);
       int bh = static_cast<int>(box.height);
       if (by + bh < clip_y || by > app.win_h - status_bar_h) continue;
-      // Leave room on the right for the kind tag.
-      const int tag_gutter = 56;
-      int wash_w = pane.w - 14 - tag_gutter;
-      if (wash_w < 20) wash_w = pane.w - 14;
-      SDL_SetRenderDrawColor(app.sdl, r, g, b, a_bar);
-      SDL_Rect mark{pane.x + 1, by, 5, bh};
-      xanatoo::sdl::fill_rect(app.sdl, &mark);
+      // Each box is outlined at its own geometry; outer boxes grow outward
+      // by 2 px per level above the deepest (capped), so every box visibly
+      // encloses its children.
+      const int depth = depth_of(box.node);
+      const int grow = 2 * (6 - std::min(depth, 6));
+      const int bx = pane.x + static_cast<int>(box.x) + 0;
+      int bw = static_cast<int>(box.width);
+      if (bw < 4) continue;
+      SDL_Rect frame{std::max(bx - grow, pane.x + 1), by, bw + 2 * grow, bh};
+      if (frame.x + frame.w > pane.x + pane.w - 12)
+        frame.w = pane.x + pane.w - 12 - frame.x;
       SDL_SetRenderDrawColor(app.sdl, r, g, b, a_wash);
-      SDL_Rect wash{pane.x + 6, by, wash_w, bh};
-      xanatoo::sdl::fill_rect(app.sdl, &wash);
+      xanatoo::sdl::fill_rect(app.sdl, &frame);
+      SDL_SetRenderDrawColor(app.sdl, r, g, b, a_bar);
+      xanatoo::sdl::draw_rect(app.sdl, &frame);
+      SDL_Rect mark{frame.x, by, 3, bh};
+      xanatoo::sdl::fill_rect(app.sdl, &mark);
 
-      // Small kind label on the right edge of the region.
-      // Skip pure table-row shells and plain paragraphs — the wash is
-      // enough for para; tags stay for structural kinds.
+      // Tag in the top-left corner, clipped to the box width. Plain
+      // paragraphs and table-row shells stay untagged (the frame is enough).
       const char* tag = kind_label(node);
       if (tag && kind != xanatoo::NodeKind::TableRow &&
-          kind != xanatoo::NodeKind::Paragraph && bh >= 10 &&
+          kind != xanatoo::NodeKind::Paragraph && bh >= tag_lh &&
           tag_font.loaded()) {
         int tw = tag_font.measure(tag);
-        int tx = pane.x + pane.w - tw - 8;
-        if (tx < pane.x + 10) tx = pane.x + 10;
-        // Baseline near the top of the box so stacked regions stay readable.
-        float baseline = static_cast<float>(by) +
-                         static_cast<float>(std::min(bh, tag_lh + 2)) - 3.f;
+        if (tw + 8 > bw) continue;
+        SDL_SetRenderDrawColor(app.sdl, 248, 246, 240, 215);
+        SDL_Rect chip{frame.x + 3, by + 1, tw + 4, std::min(bh - 2, tag_lh)};
+        if (chip.h > 4) xanatoo::sdl::fill_rect(app.sdl, &chip);
+        float baseline = static_cast<float>(chip.y + chip.h) - 3.f;
         if (baseline < static_cast<float>(clip_y) + 8.f)
           baseline = static_cast<float>(clip_y) + 8.f;
-        // Soft chip behind the tag for contrast on wash.
-        SDL_SetRenderDrawColor(app.sdl, 248, 246, 240, 200);
-        SDL_Rect chip{tx - 3, by + 1, tw + 6, std::min(bh - 2, tag_lh + 2)};
-        if (chip.h > 4) xanatoo::sdl::fill_rect(app.sdl, &chip);
-        app.renderer.draw_text(tag_font, static_cast<float>(tx), baseline, tag,
-                               r, g, b);
+        app.renderer.draw_text(tag_font, static_cast<float>(chip.x + 2),
+                               baseline, tag, r, g, b);
       }
     }
     SDL_SetRenderDrawBlendMode(app.sdl, SDL_BLENDMODE_NONE);
