@@ -412,6 +412,8 @@ StatusLine compute_status(App& app) {
       label = "Lemmy: ";
     else if (xanatoo::is_hn_ref(app.hover.href))
       label = "Hacker News: ";
+    else if (xanatoo::is_youtube_ref(app.hover.href))
+      label = "YouTube: ";
     else if (!xanatoo::ebook_download_url(app.hover.href).empty())
       label = "Ebook (download): ";
     else if (xanatoo::is_standard_ebooks_url(app.hover.href))

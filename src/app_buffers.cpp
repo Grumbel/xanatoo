@@ -161,7 +161,8 @@ static bool web_in_app(std::string_view s) {
 bool is_in_app_remote_url(std::string_view s) {
   return xanatoo::is_gemini_url(s) || xanatoo::is_reddit_ref(s) ||
          xanatoo::is_lemmy_ref(s) || xanatoo::is_nostr_ref(s) ||
-         xanatoo::is_hn_ref(s) || xanatoo::is_ebook_url(s) ||
+         xanatoo::is_hn_ref(s) || xanatoo::is_youtube_ref(s) ||
+         xanatoo::is_ebook_url(s) ||
          xanatoo::is_feed_url(s) || xanatoo::is_wikipedia_ref(s) ||
          xanatoo::is_sitemap_ref(s) || xanatoo::is_search_ref(s) ||
          web_in_app(s);
