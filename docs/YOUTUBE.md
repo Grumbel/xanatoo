@@ -12,7 +12,7 @@ account, no posting. It is unofficial and can change without notice.
 |-----|-------|
 | `youtube:@handle[?page=N]` | uploads grid (also `channel/UC…`, `c/name`, `user/name`) |
 | `youtube:playlist?list=ID[&page=N]` | playlist items |
-| `youtube:watch?v=ID[&comments=N][&sort=new]` | thumbnail, description, comments |
+| `youtube:watch?v=ID[&comments=N][&sort=new][&replies=TOKEN]` | thumbnail, description, comments; `replies=` shows one comment's replies |
 | `youtube:results?search_query=Q[&page=N]` | video search (`search` endpoint; also the `youtube` / `yt` engine of the search bar) |
 
 `@handle`, `c/` and `user/` go through `navigation/resolve_url` first.
@@ -29,7 +29,7 @@ header's engagement panels carry unrelated ones.
 
 ## Limits
 
-- Comment replies are not fetched (counts only).
+- Replies load on demand: a thread's "N replies →" link opens `replies=TOKEN` (the thread's reply continuation, one request per ~10 replies, nothing extra for the video page). The replies page does not repeat the parent comment (the reply reply carries only the replies).
 - Shorts / Live tabs and recommendations are not covered; search lists videos only (no channel / playlist hits, no filters).
 - Replies are Message nodes; likes and reply counts are in the caption.
 

@@ -33,6 +33,9 @@ struct YtRef {
   std::string id;
   int page = 1;      // Channel / Playlist: grid chunk; Video: comment chunk
   bool newest = false;  // Video: comments sorted newest first
+  // Video: continuation token of one comment's replies (from a thread's
+  // "N replies" link); shows just those replies, `page` pages through them.
+  std::string replies;
 };
 
 // "youtube:…" → ref; nullopt for anything else or an empty / odd id.
@@ -57,6 +60,7 @@ struct YtListing {
 struct YtComment {
   std::string id, author, channel_id, text, published, likes;
   int replies = 0;
+  std::string reply_token;  // continuation token that loads the replies
 };
 
 struct YtComments {

@@ -240,6 +240,7 @@ YtComments yt_parse_comments(const Json& reply) {
     for (const Json& m : muts->items)
       if (const Json* e = json_path(m, "payload/commentEntityPayload"))
         entities.emplace_back(json_string(json_get(*e, "key")), e);
+  std::vector<std::string> used;
   json_walk(reply, [&](std::string_view k, const Json& v) {
     if (k != "commentThreadRenderer") return true;
     const std::string key =
@@ -254,6 +255,30 @@ YtComments yt_parse_comments(const Json& reply) {
       c.channel_id = json_string(json_path(*e, "author/channelId"));
       c.likes = json_string(json_path(*e, "toolbar/likeCountNotliked"));
       c.replies = static_cast<int>(json_number(json_path(*e, "toolbar/replyCount")));
+      std::vector<const Json*> conts;
+      json_find_all(v, "continuationItemRenderer", conts);
+      if (!conts.empty()) c.reply_token = json_string(json_find(*conts.front(), "token"));
+      used.push_back(key);
+      out.comments.push_back(std::move(c));
+      break;
+    }
+    return true;
+  });
+  // A reply continuation lists bare comment view models (no thread wrapper).
+  json_walk(reply, [&](std::string_view k, const Json& v) {
+    if (k != "commentViewModel") return true;
+    const std::string key = json_string(json_get(v, "commentKey"));
+    if (key.empty() || std::find(used.begin(), used.end(), key) != used.end()) return true;
+    for (const auto& [ekey, e] : entities) {
+      if (ekey != key) continue;
+      YtComment c;
+      c.id = json_string(json_path(*e, "properties/commentId"));
+      c.text = yt_text(json_path(*e, "properties/content"));
+      c.published = json_string(json_path(*e, "properties/publishedTime"));
+      c.author = json_string(json_path(*e, "author/displayName"));
+      c.channel_id = json_string(json_path(*e, "author/channelId"));
+      c.likes = json_string(json_path(*e, "toolbar/likeCountNotliked"));
+      used.push_back(key);
       out.comments.push_back(std::move(c));
       break;
     }
@@ -320,6 +345,12 @@ std::optional<YtRef> parse_youtube_ref(std::string_view s) {
     if (r.id.size() < 6 || !id_chars(r.id, false)) return std::nullopt;
     r.page = parse_page(query_param(query, "comments"));
     r.newest = query_param(query, "sort") == "new";
+    r.replies = query_param(query, "replies");
+    if (r.replies.size() > 4000 ||
+        r.replies.find_first_not_of(
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_%=.") !=
+            std::string::npos)
+      r.replies.clear();
   } else {
     return std::nullopt;
   }
@@ -343,7 +374,11 @@ std::string youtube_ref_string(const YtRef& r) {
     s += (video ? "comments=" : "page=") + std::to_string(r.page);
     sep = '&';
   }
-  if (video && r.newest) s += std::string(1, sep) + "sort=new";
+  if (video && r.newest) {
+    s += std::string(1, sep) + "sort=new";
+    sep = '&';
+  }
+  if (video && !r.replies.empty()) s += std::string(1, sep) + "replies=" + r.replies;
   return s;
 }
 
@@ -548,12 +583,19 @@ Document yt_video_document(const YtVideoInfo& v, const YtComments& c,
                            const YtRef& ref) {
   Document doc;
   NodeId root = doc.create(NodeKind::Document);
-  const std::string title = v.title.empty() ? v.id : v.title;
+  const bool replies_page = !ref.replies.empty();
+  const std::string title = replies_page ? "Replies" : v.title.empty() ? v.id : v.title;
   doc.meta.title = title + " \xE2\x80\x93 YouTube";
 
   NodeId head = doc.create(NodeKind::Header, root);
   doc.append_text(head, title, InlineKind::Strong);
   NodeId by = doc.create(NodeKind::Paragraph, root);
+  if (replies_page) {
+    YtRef back = ref;
+    back.replies.clear();
+    back.page = 1;
+    add_link(doc, by, "\xE2\x86\x90 Back to the video", youtube_ref_string(back));
+  }
   if (!v.owner.empty()) {
     if (v.owner_id.empty()) add_meta(doc, by, v.owner);
     else add_link(doc, by, v.owner, "youtube:channel/" + v.owner_id);
@@ -561,7 +603,7 @@ Document yt_video_document(const YtVideoInfo& v, const YtComments& c,
   for (const std::string* part : {&v.views, &v.date})
     if (!part->empty()) add_meta(doc, by, (doc.get(by).spans.empty() ? "" : kDot) + *part);
 
-  if (ref.page == 1) {
+  if (ref.page == 1 && !replies_page) {
     NodeId im = doc.create(NodeKind::Image, root);
     doc.get(im).src = thumb_url(v.id);
     doc.get(im).float_side = "left";
@@ -572,6 +614,7 @@ Document yt_video_document(const YtVideoInfo& v, const YtComments& c,
   }
 
   NodeId label = doc.create(NodeKind::Paragraph, root);
+  if (!replies_page) {
   doc.append_text(label, "Comments" + (c.total.empty() ? std::string() : " (" + c.total + ")"),
                   InlineKind::Strong);
   YtRef sort = ref;
@@ -580,6 +623,7 @@ Document yt_video_document(const YtVideoInfo& v, const YtComments& c,
   add_meta(doc, label, kDot);
   add_link(doc, label, ref.newest ? "Show top comments" : "Show newest first",
            youtube_ref_string(sort), InlineRole::Metadata);
+  }
 
   NodeId thread = doc.create(NodeKind::Thread, root);
   doc.get(thread).summary = title;
@@ -598,12 +642,26 @@ Document yt_video_document(const YtVideoInfo& v, const YtComments& c,
     append_plain(doc, msg, cm.text);
     std::string meta;
     if (!cm.likes.empty() && cm.likes != "0") meta = "\xE2\x96\xB2 " + cm.likes;
-    if (cm.replies > 0)
-      meta += (meta.empty() ? "" : kDot) + std::to_string(cm.replies) +
-              (cm.replies == 1 ? " reply" : " replies");
+    NodeId cap = INVALID_NODE;
     if (!meta.empty()) {
-      NodeId cap = doc.create(NodeKind::Caption, msg);
+      cap = doc.create(NodeKind::Caption, msg);
       doc.append_text(cap, meta);
+    }
+    if (cm.replies > 0) {
+      const std::string label = std::to_string(cm.replies) +
+                                (cm.replies == 1 ? " reply" : " replies");
+      if (cm.reply_token.empty()) {
+        if (cap == INVALID_NODE) cap = doc.create(NodeKind::Caption, msg);
+        add_meta(doc, cap, (doc.get(cap).spans.empty() ? "" : kDot) + label);
+      } else {
+        if (cap == INVALID_NODE) cap = doc.create(NodeKind::Caption, msg);
+        else add_meta(doc, cap, kDot);
+        YtRef rr = ref;
+        rr.page = 1;
+        rr.replies = cm.reply_token;
+        add_link(doc, cap, label + " \xE2\x86\x92", youtube_ref_string(rr),
+                 InlineRole::Metadata);
+      }
     }
   }
   if (c.comments.empty()) {
@@ -611,6 +669,7 @@ Document yt_video_document(const YtVideoInfo& v, const YtComments& c,
     doc.get(msg).src = "xanatoo";
     doc.append_text(doc.create(NodeKind::Paragraph, msg),
                     ref.page > 1 ? "No more comments."
+                    : replies_page ? "No replies found."
                                  : "No comments (they may be turned off).");
   }
 
@@ -626,7 +685,6 @@ Document yt_video_document(const YtVideoInfo& v, const YtComments& c,
     add_link(doc, nav, "More comments \xE2\x86\x92", youtube_ref_string(other));
     add_meta(doc, nav, kDot);
   }
-  add_meta(doc, nav, "replies are not shown" + std::string(kDot));
   add_link(doc, nav, "Open on YouTube", external(youtube_web_url(ref)),
            InlineRole::Metadata);
   return doc;
@@ -740,16 +798,21 @@ std::optional<Document> fetch_listing(const YtRef& ref, std::string* err) {
 }
 
 std::optional<Document> fetch_video(const YtRef& ref, std::string* err) {
-  auto reply = innertube("next", "\"videoId\":" + json_quote(ref.id), err);
-  if (!reply) return std::nullopt;
-  YtVideoInfo info = yt_parse_video(*reply, ref.id);
-  if (info.title.empty() && info.owner.empty()) {
-    if (err) *err = "YouTube returned no data for video " + ref.id;
-    return std::nullopt;
+  YtVideoInfo info;
+  info.id = ref.id;
+  std::string token = ref.replies;
+  if (token.empty()) {  // a replies page needs no video data, one request per chunk
+    auto reply = innertube("next", "\"videoId\":" + json_quote(ref.id), err);
+    if (!reply) return std::nullopt;
+    info = yt_parse_video(*reply, ref.id);
+    if (info.title.empty() && info.owner.empty()) {
+      if (err) *err = "YouTube returned no data for video " + ref.id;
+      return std::nullopt;
+    }
+    token = ref.newest && !info.comments_new.empty() ? info.comments_new
+                                                     : info.comments_top;
   }
   YtComments comments;
-  std::string token = ref.newest && !info.comments_new.empty() ? info.comments_new
-                                                               : info.comments_top;
   for (int page = 1; page <= ref.page && !token.empty(); ++page) {
     auto more = innertube("next", continuation_fields(token), err);
     if (!more) {

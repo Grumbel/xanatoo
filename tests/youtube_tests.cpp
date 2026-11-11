@@ -187,11 +187,30 @@ static void test_video() {
   assert(t.find("A talk") != std::string::npos);
   assert(t.find("@alice|2 days ago") != std::string::npos);
   assert(t.find("3 replies") != std::string::npos);
+  assert(c.comments[0].reply_token == "REPLY-TOKEN");
+  assert(has_href(d, "youtube:watch?v=rsOiZE19RVo&replies=REPLY-TOKEN"));
   assert(has_href(d, "youtube:channel/UCabc"));
   assert(has_href(d, "youtube:channel/UCalice"));
   assert(has_href(d, "youtube:watch?v=rsOiZE19RVo&comments=2"));
   assert(has_href(d, "youtube:watch?v=rsOiZE19RVo&sort=new"));
   assert(has_href(d, "external:https://www.youtube.com/watch?v=rsOiZE19RVo"));
+
+  // Reply continuation: bare comment view models, no thread wrapper.
+  Json rj = parse(R"({"onResponseReceivedEndpoints":[{"appendContinuationItemsAction":{"continuationItems":[
+      {"commentViewModel":{"commentViewModel":{"commentKey":"R1"}}},
+      {"continuationItemRenderer":{"continuationEndpoint":{"continuationCommand":{"token":"MORE-REPLIES"}}}}]}}],
+    "frameworkUpdates":{"entityBatchUpdate":{"mutations":[
+    {"payload":{"commentEntityPayload":{"key":"R1","properties":{"commentId":"c1.r1","content":{"content":"A reply"},"publishedTime":"1 hour ago"},
+      "author":{"displayName":"@carol","channelId":"UCcarol"},"toolbar":{"likeCountNotliked":"","replyCount":""}}}}]}}})");
+  YtComments rc = yt_parse_comments(rj);
+  assert(rc.comments.size() == 1 && rc.comments[0].text == "A reply");
+  assert(rc.next == "MORE-REPLIES");
+  YtRef rref = *parse_youtube_ref("youtube:watch?v=rsOiZE19RVo&replies=REPLY-TOKEN%3D");
+  assert(rref.replies == "REPLY-TOKEN%3D");
+  assert(youtube_ref_string(rref) == "youtube:watch?v=rsOiZE19RVo&replies=REPLY-TOKEN%3D");
+  Document rd = yt_video_document(v, rc, rref);
+  assert(all_text(rd).find("A reply") != std::string::npos);
+  assert(has_href(rd, "youtube:watch?v=rsOiZE19RVo"));
 
   assert(yt_parse_resolved_id(parse(R"({"endpoint":{"browseEndpoint":{"browseId":"UCxyz"}}})")) == "UCxyz");
 }
