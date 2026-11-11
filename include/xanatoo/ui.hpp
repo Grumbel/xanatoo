@@ -82,6 +82,9 @@ enum class UiCommand {
   CopyText,        // arg = text for the clipboard (an address)
   OpenLinkInTab,   // arg = href of a link in the focused view: new tab
   DownloadUrl,     // arg = http(s) URL: save to Downloads, never show
+  DownloadAction,  // arg = action on App::download_menu (right-clicked
+                   // Downloads row): open / open-tab / system / folder /
+                   // copy-path / copy-url / cancel / forget
   OpenReply,       // right-clicked Message: start a mock reply draft
   EditReply,       // arg = Markdown currently in the reply editor
   SendReply,       // mock only: never sends to an external service
@@ -408,6 +411,12 @@ struct UiState {
   bool history_open = false;
   std::vector<std::string> recent_visited;  // newest first, for the History menu
   bool downloads_open = false;
+  // The Downloads row of an open right-click menu (empty name: none).
+  struct DownloadMenu {
+    std::string name, path, url;
+    bool active = false;    // still transferring: only Cancel applies
+    bool complete = false;  // finished and the file still exists
+  } download_menu;
   bool styles_open = false;
   int styles_x = 0, styles_y = 0, styles_w = 0, styles_h = 0;
   std::vector<StyleEntry> style_entries;
@@ -514,6 +523,8 @@ public:
   void open_tile_menu(float x, float y);
   // The menu of a bookmark's margin icon (UiState::bookmark_menu).
   void open_bookmark_menu(float x, float y);
+  // The menu of a Downloads panel row (UiState::download_menu).
+  void open_download_menu(float x, float y);
 
   UiFrameResult begin_frame(const UiState& state);
   // Finalize ImGui's command lists before native panels are painted. Each
@@ -559,6 +570,7 @@ private:
   float window_menu_y_ = 0.f;
   bool tile_menu_open_ = false;
   bool bookmark_menu_open_ = false;
+  bool download_menu_open_ = false;
   float context_x_ = 0.f;
   float context_y_ = 0.f;
   float tile_menu_x_ = 0.f;

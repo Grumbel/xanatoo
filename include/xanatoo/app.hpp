@@ -921,6 +921,8 @@ struct App {
   Touch touch;
   std::vector<FetchJob> fetches;
   std::vector<std::shared_ptr<xanatoo::DownloadProgress>> downloads;
+  // The row of the open Downloads right-click menu.
+  std::shared_ptr<xanatoo::DownloadProgress> download_menu;
   uint64_t next_fetch_id = 1;
   std::shared_ptr<ImageFetchShared> image_fetch =
       std::make_shared<ImageFetchShared>();
@@ -1407,6 +1409,10 @@ void draw_load_indicator(App& app, int pi);
 // Browser-style downloads panel: active transfers and completed files.
 void draw_downloads_panel(App& app);
 void click_downloads_panel(App& app, int mx, int my);
+// Right-click on a Downloads row: remember it, open the row menu.
+bool right_click_downloads_panel(App& app, int mx, int my);
+// UiCommand::DownloadAction on App::download_menu.
+void download_action(App& app, const std::string& action);
 void load_download_history(App& app);
 void save_download_history(const App& app);
 

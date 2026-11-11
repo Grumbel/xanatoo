@@ -970,6 +970,11 @@ Next bundle number: **348** (this delivery is **347**)
 - Added a dockable Downloads panel with bytes/progress, cancel, completion,
   failed transfer status, saved file path and containing-folder action; a
   toolbar button opens it without navigating away.
+- Downloads rows have a right-click menu: Open / Open in New Tab (in
+  xanatoo, e.g. downloaded PDFs and comics), Open with System Application,
+  Open Containing Folder, Copy Path / Download Link, Cancel (active) and
+  Remove from List (keeps the file). The Dir button and these go through
+  `xdg-open` (SDL_OpenURL); failures now show SDL's error in the status bar.
 - Save temporary partial files in the user's Downloads directory, atomically
   avoiding existing filenames. Filename/MIME rules and non-overwrite handling
   have standalone checks. Completed files are remembered in the state dir;

@@ -342,6 +342,20 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   for (size_t i = app.visited.size(), n = 0; i > 0 && n < 25; --i, ++n)
     ui_state.recent_visited.push_back(app.visited[i - 1]);
   ui_state.downloads_open = app.downloads_panel_open;
+  ui_state.download_menu = {};
+  if (const auto& d = app.download_menu) {
+    const auto phase = d->phase.load(std::memory_order_acquire);
+    ui_state.download_menu.name = d->name;
+    ui_state.download_menu.url = d->url;
+    ui_state.download_menu.active = phase == xanatoo::DownloadPhase::Active;
+    if (phase == xanatoo::DownloadPhase::Complete) {
+      std::error_code ec;
+      ui_state.download_menu.name = d->final_name;
+      ui_state.download_menu.path = d->path;
+      ui_state.download_menu.complete =
+          !d->path.empty() && std::filesystem::exists(d->path, ec);
+    }
+  }
   ui_state.styles_open = app.styles_panel_open;
   if (app.styles_panel_open) {
     auto [x, y, w, h] = float_client_rect(app, app.styles_win);
@@ -635,6 +649,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::NavJump ||
         c == C::GoHome || c == C::GoUp ||
         c == C::ToggleHistory || c == C::ToggleDownloads || c == C::ToggleBookmarks ||
+        c == C::DownloadAction ||
         c == C::ToggleSubscriptions || c == C::Subscribe ||
         c == C::Unsubscribe || c == C::SubscriptionOpen ||
         c == C::SubscriptionMarkRead || c == C::SubscriptionRefresh ||
@@ -1539,6 +1554,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     case C::DownloadUrl:
       if (!arg.empty()) start_download(app, arg);
+      break;
+    case C::DownloadAction:
+      download_action(app, arg);
       break;
     case C::CopyText:
       if (!arg.empty()) {

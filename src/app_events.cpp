@@ -683,6 +683,11 @@ static void mouse_right_down(App& app, SDL_Event& ev, bool imgui_mouse) {
                               app.panes[w->view].buf);
       return;
     }
+    // A Downloads row has its own menu (open, folder, copy, cancel…).
+    if (FloatWindow* w = float_at(app, rx, ry);
+        w && w->role == WindowRole::Downloads &&
+        right_click_downloads_panel(app, rx, ry))
+      return;
     const bool over_soft = over_float_chrome(app, rx, ry);
     if (!over_soft && !imgui_mouse && app.split) {
       const auto within = [&](const SDL_Rect& rc, int pad = 0) {

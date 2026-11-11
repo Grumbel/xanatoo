@@ -840,6 +840,12 @@ void Ui::open_bookmark_menu(float x, float y) {
   context_y_ = y;
 }
 
+void Ui::open_download_menu(float x, float y) {
+  download_menu_open_ = true;
+  context_x_ = x;
+  context_y_ = y;
+}
+
 static bool menu_item_cmd(const char* label, UiCommand c, UiCommand& out,
                           bool enabled = true, const char* shortcut = nullptr) {
   if (menu_item_with_icon(label, menu_icon_for(c), shortcut, false, enabled)) {
@@ -2462,6 +2468,46 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       item("Remove Bookmark", UiCommand::RemoveBookmark, bm.address);
       if (ImGui::MenuItem("Show Bookmarks…", nullptr, state.bookmarks_open))
         cmd = UiCommand::ToggleBookmarks;
+    }
+    ImGui::EndPopup();
+  }
+
+  // ---- Menu of a Downloads panel row ----
+  if (download_menu_open_) {
+    ImGui::SetNextWindowPos(ImVec2(context_x_, context_y_), ImGuiCond_Appearing);
+    ImGui::OpenPopup("##download_menu");
+    download_menu_open_ = false;
+  }
+  if (ImGui::BeginPopup("##download_menu")) {
+    const auto& dm = state.download_menu;
+    if (dm.name.empty() && dm.url.empty()) {
+      ImGui::CloseCurrentPopup();
+    } else {
+      std::string label = dm.name;
+      if (label.size() > 64) label = elide_middle(label, 28);
+      ImGui::TextDisabled("%s", label.c_str());
+      ImGui::Separator();
+      auto item = [&](const char* text, const char* action, bool enabled) {
+        if (ImGui::MenuItem(text, nullptr, false, enabled)) {
+          cmd = UiCommand::DownloadAction;
+          result.arg = action;
+        }
+      };
+      if (dm.active) {
+        item("Cancel Download", "cancel", true);
+      } else {
+        item("Open", "open", dm.complete);
+        item("Open in New Tab", "open-tab", dm.complete);
+        item("Open with System Application", "system", dm.complete);
+        item("Open Containing Folder", "folder", dm.complete);
+      }
+      ImGui::Separator();
+      item("Copy Path", "copy-path", dm.complete);
+      item("Copy Download Link", "copy-url", !dm.url.empty());
+      if (!dm.active) {
+        ImGui::Separator();
+        item("Remove from List", "forget", true);
+      }
     }
     ImGui::EndPopup();
   }
