@@ -147,7 +147,7 @@ void open_node_page(App& app, int node) {
   }
   // The selection already shows it; don't jump back on arrival.
   app.sitemap.page = url;
-  navigate_to_url(app, url);
+  open_address(app, url);
 }
 
 // Recounts the shown pages per subtree after new pages were seen.

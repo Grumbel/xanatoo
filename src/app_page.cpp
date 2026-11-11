@@ -147,9 +147,9 @@ void activate(App& app, const PageRow& r) {
     if (!resolved.empty()) abs = resolved;
   }
   if (is_in_app_remote_url(abs)) {
-    navigate_to_url(app, std::move(abs));
+    open_address(app, abs);
   } else if (is_inapp_doc_href(app, abs)) {
-    navigate_to_url(app, resolve_doc_href(app, abs));
+    open_address(app, resolve_doc_href(app, abs));
   } else {
     flash_status(app, "Opening " + r.href);
     xanatoo::open_external_url(r.href);

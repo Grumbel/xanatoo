@@ -302,6 +302,13 @@ void show_doc_in_pane(App& app, int pi, xanatoo::Document doc,
   update_title(app);
 }
 
+void open_address(App& app, const std::string& url) {
+  if (app.click_new_tab)
+    open_link_in_tab(app, app.focus, url);
+  else
+    navigate_to_url(app, url);
+}
+
 void open_link_in_tab(App& app, int pi, const std::string& href) {
   const LinkTarget t = resolve_link(app, pi, href);
   BufferId bi = kNoBuffer;

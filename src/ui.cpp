@@ -69,6 +69,16 @@ namespace {
 // menus. Keep their current renderer's icon textures available for the frame.
 std::unordered_map<std::string, SDL_Texture*> menu_icon_textures;
 
+// Middle-click on the item just drawn: open `addr` in a new tab instead.
+bool middle_open(UiCommand& cmd, std::string& arg, const std::string& addr) {
+  if (addr.empty() || !ImGui::IsItemHovered() ||
+      !ImGui::IsMouseReleased(ImGuiMouseButton_Middle))
+    return false;
+  cmd = UiCommand::OpenLinkInTab;
+  arg = addr;
+  return true;
+}
+
 // First and last `keep` bytes (on character boundaries) around an ellipsis.
 std::string elide_middle(const std::string& s, size_t keep) {
   auto cont = [&](size_t i) {
@@ -1949,6 +1959,15 @@ void Ui::draw_url_suggestions(const UiState& state, UiFrameResult& result,
           "##suggestion", url_suggestion_selected_ == i, 0,
           ImVec2(0.f, row_h));
       if (ImGui::IsItemHovered()) url_suggestion_selected_ = i;
+      if (entry.source != UrlBarSource::Tab &&
+          middle_open(cmd, result.arg, entry.address)) {
+        url_synced_from_ = entry.address;
+        url_bar_editing_ = false;
+        url_suggestions_open_ = false;
+        url_suggestions_dismissed_ = true;
+        url_suggestion_selected_ = -1;
+        ImGui::ClearActiveID();
+      }
       const ImVec2 min = ImGui::GetItemRectMin();
       const ImVec2 max = ImGui::GetItemRectMax();
       const char* kind = entry.source == UrlBarSource::Tab ? "Tab" :
@@ -2328,6 +2347,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
             cmd = UiCommand::NavigateUrl;
             result.arg = b.address;
           }
+          middle_open(cmd, result.arg, b.address);
           ImGui::PopID();
         }
       }
@@ -2350,6 +2370,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
             cmd = UiCommand::NavigateUrl;
             result.arg = url;
           }
+          middle_open(cmd, result.arg, url);
           ImGui::PopID();
         }
       }
@@ -2409,6 +2430,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
           cmd = s.example ? UiCommand::OpenExample : UiCommand::NavigateUrl;
           result.arg = s.target;
         }
+        if (!s.example && s.enabled) middle_open(cmd, result.arg, s.target);
         if (!s.tip.empty() &&
             ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled |
                                  ImGuiHoveredFlags_DelayShort))
@@ -3257,6 +3279,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
               result.arg = b.address;
             }
           }
+          middle_open(cmd, result.arg, b.address);
           if (ImGui::IsItemHovered() && label != b.address)
             ImGui::SetTooltip("%s", b.address.c_str());
           if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(1)) {
@@ -3683,6 +3706,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
               cmd = UiCommand::NavigateUrl;
               result.arg = "nostr:" + nostr_bech32("npub", person.pubkey);
             }
+            middle_open(cmd, result.arg, "nostr:" + nostr_bech32("npub", person.pubkey));
             if (ImGui::BeginPopupContextItem("##nostr_person_sub")) {
               if (ImGui::MenuItem("Subscribe to author")) {
                 cmd = UiCommand::Subscribe;
@@ -3718,6 +3742,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
               cmd = UiCommand::NavigateUrl;
               result.arg = "nostr:" + nostr_bech32("note", ev.id);
             }
+            if (ev.kind == 1 || ev.kind == 9 || ev.kind == 11)
+              middle_open(cmd, result.arg, "nostr:" + nostr_bech32("note", ev.id));
             if (ImGui::IsItemHovered())
               ImGui::SetTooltip("%s\n%s", ev.id.c_str(), ev.pubkey.c_str());
             ImGui::PopID();
@@ -3740,6 +3766,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
               cmd = UiCommand::NavigateUrl;
               result.arg = href;
             }
+            middle_open(cmd, result.arg, href);
             if (!href.empty() && ImGui::BeginPopupContextItem("##nostr_group_sub")) {
               if (ImGui::MenuItem("Subscribe to group")) {
                 cmd = UiCommand::Subscribe;

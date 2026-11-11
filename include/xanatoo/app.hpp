@@ -730,6 +730,7 @@ struct App {
   TileAxis tile_axis = TileAxis::Columns;
   TileMode tile_mode = TileMode::Independent;
   bool dragging_sel = false;
+  bool click_new_tab = false;  // middle-click in progress: panels open in a new tab
   bool dragging_split = false;
   bool dragging_diff_overview = false;
   bool dragging_scroll = false;
@@ -1363,6 +1364,12 @@ LinkTarget resolve_link(App& app, int pi, const std::string& href);
 // Middle click: open `href` (in pane `pi`) in a new tab right after the
 // current one; the view stays. Anchors into the page itself just jump.
 void open_link_in_tab(App& app, int pi, const std::string& href);
+// Panel rows (History, Sitemap, Page…) open an address here: a new tab while
+// `App::click_new_tab` is set (middle-click), else the focused view.
+void open_address(App& app, const std::string& url);
+// Middle-click on a panel row: same as a click, but pages open in a new tab.
+// Returns true when a panel row consumed it.
+bool middle_click_float(App& app, int mx, int my);
 // Put a freshly loaded page into pane `pi`: reuses the pane's buffer unless
 // the other visible pane shows it too or it has unsaved edits.
 void show_doc_in_pane(App& app, int pi, xanatoo::Document doc,

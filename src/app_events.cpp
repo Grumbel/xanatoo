@@ -632,6 +632,8 @@ static void mouse_middle_down(App& app, SDL_Event& ev, bool imgui_mouse) {
     if (imgui_mouse) return;
     const int mxw = ev.button.x, myw = ev.button.y;
     const bool over_soft = over_float_chrome(app, mxw, myw);
+    // Rows of History / Sitemap / Page panels: open in a new tab.
+    if (over_soft && middle_click_float(app, mxw, myw)) return;
     // On a link: open it in a new tab.
     if (!over_soft) {
       const float mx = static_cast<float>(mxw);

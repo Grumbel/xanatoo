@@ -317,7 +317,7 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
       if (row >= 0 && row < static_cast<int>(app.visited.size())) {
         const std::string& url =
             app.visited[app.visited.size() - 1 - static_cast<size_t>(row)];
-        navigate_to_url(app, url);
+        open_address(app, url);
       }
       break;
     }
@@ -571,6 +571,23 @@ bool float_press(App& app, int mx, int my) {
     return true;
   }
   return false;
+}
+
+bool middle_click_float(App& app, int mx, int my) {
+  FloatWindow* w = float_at(app, mx, my);
+  if (!w || my < w->y + help_title_h) return false;
+  switch (w->role) {
+    case WindowRole::History:
+    case WindowRole::Sitemap:
+    case WindowRole::Page:
+      break;
+    default:
+      return false;
+  }
+  app.click_new_tab = true;
+  press_client(app, *w, mx, my);
+  app.click_new_tab = false;
+  return true;
 }
 
 bool float_motion(App& app, int mx, int my) {
