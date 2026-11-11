@@ -597,7 +597,9 @@ private:
   int url_context_begin_ = 0;
   int url_context_end_ = 0;
   int url_context_cursor_ = 0;
-  float url_context_scroll_x_ = 0.f;
+  bool url_restore_selection_ = false;
+  bool url_context_was_open_ = false;
+  bool url_context_acted_ = false;
   char search_input_[512] = {};  // search bar text (kept between searches)
   char subscription_input_[1024] = {};
   std::string subscription_remove_confirm_;

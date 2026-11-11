@@ -1126,6 +1126,9 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         std::snprintf(url_input_, sizeof(url_input_), "%s", want.c_str());
         url_synced_from_ = want;
         focus_url_bar_ = false;
+      } else if (url_restore_selection_) {
+        // The context menu took focus: give it back, selection follows below.
+        ImGui::SetKeyboardFocusHere();
       } else if (select_url_bar_) {
         // AutoSelectAll on InputText selects the existing edited address.
         ImGui::SetKeyboardFocusHere();
@@ -1149,6 +1152,16 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
           ImGuiInputTextFlags_EnterReturnsTrue |
               ImGuiInputTextFlags_AutoSelectAll);
       const ImGuiID url_id = ImGui::GetItemID();
+      if (url_restore_selection_) {
+        url_restore_selection_ = false;
+        if (ImGuiInputTextState* st = ImGui::GetInputTextState(url_id)) {
+          const int len = static_cast<int>(std::strlen(url_input_));
+          // Applied by InputText on the next frame.
+          st->WantReloadUserBuf = true;
+          st->ReloadSelectionStart = std::min(url_context_begin_, len);
+          st->ReloadSelectionEnd = std::min(url_context_end_, len);
+        }
+      }
       const ImGuiInputTextState* input = ImGui::GetInputTextState(url_id);
       const bool has_selection = input && input->HasSelection();
       const int selection_start = has_selection ? input->GetSelectionStart() : 0;
@@ -1202,7 +1215,6 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         url_context_begin_ = selection_start;
         url_context_end_ = selection_end;
         url_context_cursor_ = cursor;
-        url_context_scroll_x_ = input ? input->Scroll.x : 0.f;
       }
       if (state.location_icon) {
         const ImVec2 p = ImGui::GetItemRectMin();
@@ -1221,28 +1233,18 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         ImGui::SetTooltip(
             "Location — URL or path · Ctrl+L · ↑↓ suggestions · Enter opens");
       if (url_right_clicked) ImGui::OpenPopup("##url_context");
-      if (url_context_selection_ && !url_active &&
-          ImGui::IsPopupOpen("##url_context")) {
-        // The popup takes focus and ImGui stops drawing the selection:
-        // paint it ourselves so the user sees what Cut / Copy act on.
-        const float pad_x = (state.location_icon ? 30.f : 6.f) * scale_;
-        const std::string text = url_input_;
-        const size_t b = std::min(static_cast<size_t>(url_context_begin_), text.size());
-        const size_t e = std::min(static_cast<size_t>(url_context_end_), text.size());
-        const float x0 = field_pos.x + pad_x - url_context_scroll_x_ +
-            ImGui::CalcTextSize(text.c_str(), text.c_str() + b).x;
-        const float x1 = field_pos.x + pad_x - url_context_scroll_x_ +
-            ImGui::CalcTextSize(text.c_str(), text.c_str() + e).x;
-        const float fs = ImGui::GetFontSize();
-        const float ty = field_pos.y + (field_h - fs) * 0.5f;
-        draw->PushClipRect(ImVec2(field_pos.x + pad_x, field_pos.y),
-                           field_end, true);
-        draw->AddRectFilled(
-            ImVec2(x0, ty), ImVec2(x1, ty + fs),
-            ImGui::GetColorU32(ImGuiCol_TextSelectedBg));
-        draw->PopClipRect();
-      }
+      if (url_context_was_open_ && !ImGui::IsPopupOpen("##url_context") &&
+          !url_context_acted_ && url_context_selection_)
+        url_restore_selection_ = true;
+      url_context_was_open_ = ImGui::IsPopupOpen("##url_context");
+      if (url_right_clicked) url_context_acted_ = false;
       if (ImGui::BeginPopup("##url_context")) {
+        auto url_item = [&](const char* label, const char* sc = nullptr,
+                            bool sel = false, bool enabled = true) {
+          const bool hit = ImGui::MenuItem(label, sc, sel, enabled);
+          if (hit) url_context_acted_ = true;
+          return hit;
+        };
         const std::string value = url_input_;
         const bool selected = url_context_selection_;
         const int from = url_context_begin_;
@@ -1262,32 +1264,32 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
             st->ReloadUserBufAndMoveToEnd();
           url_bar_editing_ = true;
         };
-        if (ImGui::MenuItem("Cut", nullptr, false, selected)) {
+        if (url_item("Cut", nullptr, false, selected)) {
           ImGui::SetClipboardText(value.substr(from, to - from).c_str());
           edit_url("");
         }
-        if (ImGui::MenuItem("Copy", nullptr, false, selected))
+        if (url_item("Copy", nullptr, false, selected))
           ImGui::SetClipboardText(value.substr(from, to - from).c_str());
-        if (ImGui::MenuItem("Paste", nullptr, false, !clipboard.empty()))
+        if (url_item("Paste", nullptr, false, !clipboard.empty()))
           edit_url(clipboard);
-        if (ImGui::MenuItem("Select All")) select_url_bar_ = true;
+        if (url_item("Select All")) select_url_bar_ = true;
         ImGui::Separator();
-        if (ImGui::MenuItem("Copy Address", nullptr, false, !value.empty()))
+        if (url_item("Copy Address", nullptr, false, !value.empty()))
           ImGui::SetClipboardText(value.c_str());
-        if (ImGui::MenuItem("Open Address", nullptr, false, !value.empty())) {
+        if (url_item("Open Address", nullptr, false, !value.empty())) {
           cmd = UiCommand::NavigateUrl;
           result.arg = value;
         }
-        if (ImGui::MenuItem("Paste and Go", nullptr, false, !clipboard.empty())) {
+        if (url_item("Paste and Go", nullptr, false, !clipboard.empty())) {
           cmd = UiCommand::NavigateUrl;
           result.arg = clipboard;
         }
         if (state.has_path) {
           ImGui::Separator();
           if (state.page_bookmarked) {
-            if (ImGui::MenuItem("Remove Page Bookmark"))
+            if (url_item("Remove Page Bookmark"))
               cmd = UiCommand::RemoveBookmark;
-          } else if (ImGui::MenuItem("Bookmark This Page")) {
+          } else if (url_item("Bookmark This Page")) {
             cmd = UiCommand::BookmarkPage;
           }
         }
