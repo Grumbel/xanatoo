@@ -2634,10 +2634,11 @@ static const xanatoo::LayoutBox* reply_card_box(App& app, Pane& pane) {
 template <typename Match, typename Fn>
 static void for_each_link_run(App& app, const Pane& pane, Match match,
                               Fn fn) {
-  float run_x0 = 0.f, run_x1 = 0.f, run_top = 0.f, run_base = 0.f;
+  float run_x0 = 0.f, run_x1 = 0.f, run_top = 0.f, run_base = 0.f,
+        run_bot = 0.f;
   bool in_run = false;
   auto flush = [&]() {
-    if (in_run) fn(run_x0, run_x1, run_top, run_base);
+    if (in_run) fn(run_x0, run_x1, run_top, run_base, run_bot);
     in_run = false;
   };
   for (const auto& pg : pane.layout.glyphs) {
@@ -2650,14 +2651,18 @@ static void for_each_link_run(App& app, const Pane& pane, Match match,
     float adv = static_cast<float>((g.advance >> 6) > 0 ? (g.advance >> 6)
                                                         : (g.width + 1));
     float top = pg.y - static_cast<float>(font.ascender());
-    if (in_run && std::abs(top - run_top) < 0.5f && pg.x <= run_x1 + 2.f) {
+    float bot = top + static_cast<float>(font.line_height());
+    if (in_run && std::abs(pg.y - run_base) < 0.5f && pg.x <= run_x1 + 2.f) {
       run_x1 = pg.x + adv;
+      run_top = std::min(run_top, top);
+      run_bot = std::max(run_bot, bot);
       continue;
     }
     flush();
     run_x0 = pg.x;
     run_x1 = pg.x + adv;
     run_top = top;
+    run_bot = bot;
     run_base = pg.y;
     in_run = true;
   }
@@ -2706,11 +2711,11 @@ static void draw_pane_overlays(App& app, int i) {
             return pg.span_index < n.spans.size() &&
                    n.spans[pg.span_index].href == trail;
           },
-          [&](float x0, float x1, float top, float base) {
+          [&](float x0, float x1, float top, float base, float bot) {
             SDL_Rect r{static_cast<int>(x0 + ox) - 2,
                        static_cast<int>(top - draw_scroll) - 2,
                        static_cast<int>(x1 - x0) + 4,
-                       app.fonts.regular.line_height() + 4};
+                       static_cast<int>(bot - top) + 4};
             SDL_SetRenderDrawColor(app.sdl, 230, 160, 30, 70);
             xanatoo::sdl::fill_rect(app.sdl, &r);
             const int uy = static_cast<int>(base + 3.f - draw_scroll);
@@ -2755,11 +2760,11 @@ static void draw_pane_overlays(App& app, int i) {
             return pg.span_index < n.spans.size() &&
                    n.spans[pg.span_index].href == next->href;
           },
-          [&](float x0, float x1, float top, float base) {
+          [&](float x0, float x1, float top, float base, float bot) {
             SDL_Rect r{static_cast<int>(x0 + ox) - 2,
                        static_cast<int>(top - draw_scroll) - 2,
                        static_cast<int>(x1 - x0) + 4,
-                       app.fonts.regular.line_height() + 4};
+                       static_cast<int>(bot - top) + 4};
             SDL_SetRenderDrawColor(app.sdl, accent.r, accent.g, accent.b, 58);
             xanatoo::sdl::fill_rect(app.sdl, &r);
             const int uy = static_cast<int>(base + 3.f - draw_scroll);
@@ -2874,11 +2879,11 @@ static void draw_pane_overlays(App& app, int i) {
       for_each_link_run(
           app, pane,
           [&](const xanatoo::PositionedGlyph& pg) { return pg.node == target; },
-          [&](float x0, float x1, float top, float) {
+          [&](float x0, float x1, float top, float, float bot) {
             SDL_Rect r{static_cast<int>(x0 + ox) - 2,
                        static_cast<int>(top - draw_scroll) - 2,
                        static_cast<int>(x1 - x0) + 4,
-                       app.fonts.regular.line_height() + 4};
+                       static_cast<int>(bot - top) + 4};
             SDL_SetRenderDrawColor(app.sdl, 230, 160, 30, 70);
             xanatoo::sdl::fill_rect(app.sdl, &r);
             if (first.w == 0) first = r;
@@ -2907,11 +2912,11 @@ static void draw_pane_overlays(App& app, int i) {
                     pg.kind == xanatoo::InlineKind::Cite ||
                     pg.kind == xanatoo::InlineKind::FootnoteRef);
           },
-          [&](float x0, float x1, float top, float base) {
+          [&](float x0, float x1, float top, float base, float bot) {
             int x = static_cast<int>(x0 + ox) - 2;
             int y = static_cast<int>(top - draw_scroll) - 2;
             int w = static_cast<int>(x1 - x0) + 4;
-            int h = app.fonts.regular.line_height() + 4;
+            int h = static_cast<int>(bot - top) + 4;
             SDL_SetRenderDrawColor(app.sdl, 40, 110, 220, 45);
             SDL_Rect r{x, y, w, h};
             xanatoo::sdl::fill_rect(app.sdl, &r);
