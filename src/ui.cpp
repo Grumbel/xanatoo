@@ -1202,6 +1202,7 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         url_context_begin_ = selection_start;
         url_context_end_ = selection_end;
         url_context_cursor_ = cursor;
+        url_context_scroll_x_ = input ? input->Scroll.x : 0.f;
       }
       if (state.location_icon) {
         const ImVec2 p = ImGui::GetItemRectMin();
@@ -1220,6 +1221,27 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         ImGui::SetTooltip(
             "Location — URL or path · Ctrl+L · ↑↓ suggestions · Enter opens");
       if (url_right_clicked) ImGui::OpenPopup("##url_context");
+      if (url_context_selection_ && !url_active &&
+          ImGui::IsPopupOpen("##url_context")) {
+        // The popup takes focus and ImGui stops drawing the selection:
+        // paint it ourselves so the user sees what Cut / Copy act on.
+        const float pad_x = (state.location_icon ? 30.f : 6.f) * scale_;
+        const std::string text = url_input_;
+        const size_t b = std::min(static_cast<size_t>(url_context_begin_), text.size());
+        const size_t e = std::min(static_cast<size_t>(url_context_end_), text.size());
+        const float x0 = field_pos.x + pad_x - url_context_scroll_x_ +
+            ImGui::CalcTextSize(text.c_str(), text.c_str() + b).x;
+        const float x1 = field_pos.x + pad_x - url_context_scroll_x_ +
+            ImGui::CalcTextSize(text.c_str(), text.c_str() + e).x;
+        const float fs = ImGui::GetFontSize();
+        const float ty = field_pos.y + (field_h - fs) * 0.5f;
+        draw->PushClipRect(ImVec2(field_pos.x + pad_x, field_pos.y),
+                           field_end, true);
+        draw->AddRectFilled(
+            ImVec2(x0, ty), ImVec2(x1, ty + fs),
+            ImGui::GetColorU32(ImGuiCol_TextSelectedBg));
+        draw->PopClipRect();
+      }
       if (ImGui::BeginPopup("##url_context")) {
         const std::string value = url_input_;
         const bool selected = url_context_selection_;
