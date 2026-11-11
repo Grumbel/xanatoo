@@ -1027,10 +1027,11 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
   const float min_url_w = 200.f * scale_;
   const float button_w = 32.f * scale_ + 8.f + ImGui::GetStyle().ItemSpacing.x;
   const int right_buttons = state.browse ? 7 : 6;
-  const int url_extras = (state.has_chrome ? 1 : 0) +
+  const int url_extras = (state.alternate_url.empty() ? 0 : 1) +
+                         (state.has_chrome ? 1 : 0) +
                          (state.has_nav ? 1 : 0) + (state.has_site ? 1 : 0);
   const bool url_own_row = vp->Size.x <
-      12.f + (6 + right_buttons) * button_w + 15.f + min_url_w +
+      12.f + (5 + right_buttons) * button_w + 15.f + min_url_w +
           url_extras * (30.f * scale_ + 2.f);
   const float browse_h = button_row_h + (url_own_row ? button_row_h : 0.f);
   ImGui::SetNextWindowPos(ImVec2(vp->Pos.x, vp->Pos.y + result.top_reserved));
@@ -1080,18 +1081,6 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
     else
       tool_button("tb_reload", "reload", "Reload (Ctrl+R)", UiCommand::Reload,
                   cmd, state.has_path);
-    {
-      // Pressed while showing the native form; a click flips to the other.
-      const std::string tip =
-          state.alternate_url.empty()
-              ? "Native view (only for pages xanatoo has a native form of: "
-                "Wikipedia, Hacker News, Reddit, Lemmy)"
-          : state.native_view ? "Back to the web page: " + state.alternate_url
-                              : "Native view: " + state.alternate_url;
-      tool_button("tb_native", "native", tip.c_str(), UiCommand::ToggleNative,
-                  cmd, !state.alternate_url.empty(), nullptr,
-                  state.native_view);
-    }
 
     if (!url_own_row) toolbar_separator();
 
@@ -1321,6 +1310,12 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         if (pressed) cmd = action;
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) ImGui::SetTooltip("%s", tip);
       };
+      if (!state.alternate_url.empty())
+        // Pressed while showing the native form; a click flips to the other.
+        extra("url_native", "native", "W",
+              state.native_view ? ("Back to the web page: " + state.alternate_url).c_str()
+                                : ("Native view: " + state.alternate_url).c_str(),
+              UiCommand::ToggleNative, state.native_view);
       if (state.has_chrome)
         extra("url_reader", "reader", "R", state.reader ? "Show the whole page (F9)" : "Reader mode (F9)",
               UiCommand::ToggleReader, state.reader);
