@@ -448,11 +448,16 @@ enum class FetchPurpose : uint8_t {
   Preview,   // split-pane hover preview: goes to the page cache
   Tab,       // fill the stand-in buffer `buf` of a background tab
   Subscription, // check a watched source without opening/altering its view
+  Download,  // "Download Link": every answer goes to Downloads, nothing shown
 };
 
 // Written by the worker, read by the main thread once `done` is set.
 struct FetchShared {
   std::atomic<bool> done{false};
+  // The job was cancelled (navigated elsewhere): long transfers that only
+  // feed the view, such as a PDF shown as pages, stop early.
+  std::atomic<bool> abandoned{false};
+  bool force_download = false;  // set before the worker starts
   std::optional<xanatoo::Document> doc;
   std::optional<std::string> raw_source;
   std::shared_ptr<xanatoo::DownloadProgress> download;
@@ -905,6 +910,11 @@ struct App {
   // Right-clicked HN Message, not necessarily the current text selection.
   std::string context_comment_native;
   std::string context_comment_web;
+  // Right-clicked link: its target as the address bar would show it, and
+  // whether it is a web URL ("Download Link").
+  std::string context_link;
+  std::string context_link_href;  // as written in the page (new tab)
+  bool context_link_web = false;
   BufferId context_reply_buffer = kNoBuffer;
   xanatoo::NodeId context_reply_node = xanatoo::INVALID_NODE;
   float context_reply_y = -1.f;
@@ -1369,6 +1379,9 @@ bool remote_fetch_supported(std::string_view url, std::string* why);
 uint64_t start_fetch(App& app, FetchPurpose purpose, int pane,
                      const std::string& url, bool record_history = true,
                      BufferId tab_buf = kNoBuffer);
+// "Download Link": save the http(s) answer to Downloads whatever its type
+// (a PDF that would otherwise open as pages, or even an HTML page).
+void start_download(App& app, const std::string& url);
 // Apply finished jobs (once per frame).
 void poll_fetches(App& app);
 // Subscriptions use the same read-only fetch workers, never a pane or tab.

@@ -229,6 +229,9 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.selection = !focused_pane(app).sel.empty();
   ui_state.context_comment_native = app.context_comment_native;
   ui_state.context_comment_web = app.context_comment_web;
+  ui_state.context_link = app.context_link;
+  ui_state.context_link_href = app.context_link_href;
+  ui_state.context_link_web = app.context_link_web;
   ui_state.context_can_reply =
       app.context_reply_buffer != kNoBuffer &&
       app.context_reply_node != xanatoo::INVALID_NODE;
@@ -669,6 +672,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::OpenAbout ||
         c == C::Copy ||
         c == C::CopyPageUrl || c == C::SelectAll || c == C::SelectBlock ||
+        c == C::CopyText || c == C::OpenLinkInTab || c == C::DownloadUrl ||
         c == C::OpenReply || c == C::EditReply || c == C::SendReply ||
         c == C::Find || c == C::ToggleSplit || c == C::ToggleTrail ||
         c == C::TilesIndependent || c == C::TilesTrail ||
@@ -1529,6 +1533,12 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     }
     case C::SelectBookmark:
       if (!arg.empty()) select_bookmark(app, app.focus, arg);
+      break;
+    case C::OpenLinkInTab:
+      if (!arg.empty()) open_link_in_tab(app, app.focus, arg);
+      break;
+    case C::DownloadUrl:
+      if (!arg.empty()) start_download(app, arg);
       break;
     case C::CopyText:
       if (!arg.empty()) {

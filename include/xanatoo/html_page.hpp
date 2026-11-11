@@ -11,6 +11,7 @@
 #include "xanatoo/types.hpp"
 #include "xanatoo/download.hpp"
 
+#include <atomic>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -51,11 +52,24 @@ std::string http_status_line(int status);
 // after redirects (fragment dropped). A 4xx / 5xx answer with a readable
 // body returns that body as the document *and* sets `err` and
 // `http_status`, so the caller can show it under an error banner.
+//
+// `pages` (may be null): an answer that can be shown as pages (PDF, DjVu,
+// comic archive; `fixed_layout_response_name`) streams into
+// cache_dir()/documents/ instead of Downloads; web_fetch then returns
+// nullopt with `pages->path` set and the caller opens that file.
+// `force_download`: every 200 answer goes to Downloads ("Download Link").
+struct WebPagesFile {
+  std::string path;  // local copy, set once complete
+  std::string name;  // file name the server gave (document title)
+  const std::atomic<bool>* stop = nullptr;  // the view gave up waiting
+};
 std::optional<Document> web_fetch(std::string_view url, std::string* err,
                                   std::string* final_url = nullptr,
                                   int* http_status = nullptr,
                                   std::string* raw_source = nullptr,
-                                  DownloadProgress* download = nullptr);
+                                  DownloadProgress* download = nullptr,
+                                  WebPagesFile* pages = nullptr,
+                                  bool force_download = false);
 #endif
 
 }  // namespace xanatoo

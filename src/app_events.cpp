@@ -704,6 +704,23 @@ static void mouse_right_down(App& app, SDL_Event& ev, bool imgui_mouse) {
       float lx = local_x(app, mx, app.focus);
       app.context_comment_native.clear();
       app.context_comment_web.clear();
+      app.context_link.clear();
+      app.context_link_href.clear();
+      app.context_link_web = false;
+      if (auto hit = xanatoo::hit_test_link_ex(doc_of(app, p), p.layout, lx,
+                                               my, p.scroll_y);
+          hit && !hit->href.empty() &&
+          doc_of(app, p).get(hit->node).kind != xanatoo::NodeKind::Stretch) {
+        const LinkTarget t = resolve_link(app, app.focus, hit->href);
+        app.context_link_href = hit->href;
+        if (t.kind == LinkKind::Remote || t.kind == LinkKind::External) {
+          app.context_link = t.url;
+          app.context_link_web = xanatoo::starts_with_ci(t.url, "https://") ||
+                                 xanatoo::starts_with_ci(t.url, "http://");
+        } else if (t.kind == LinkKind::Doc) {
+          app.context_link = t.url + t.fragment;
+        }
+      }
       app.context_reply_buffer = kNoBuffer;
       app.context_reply_node = xanatoo::INVALID_NODE;
       app.context_reply_y = -1.f;

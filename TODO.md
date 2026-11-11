@@ -20,6 +20,12 @@ Next bundle number: **348** (this delivery is **347**)
   each frame; paged mode starts every sheet on a new screen page.
 - Checked under Xvfb with thumtoo's hello.pdf / pages.djvu fixtures and a
   3-page CBZ (scrolling and F8 paged reading). Unit tests for the pure parts.
+- Web PDF / DjVu / comics open as pages too (streamed to
+  `cache_dir()/documents/`, attachment or not); right-click on a link has
+  Open Link in New Tab / Copy Link Address / Download Link (forces Downloads).
+  Checked under Xvfb with arxiv.org/pdf/1706.03762 (15 pages, 22 outline
+  headings) and Download Link into a scratch XDG_DOWNLOAD_DIR. CopyText was
+  missing from the browse-mode command list (bookmark / HN copy items).
 - Open: see "Open items" in `docs/FIXED_LAYOUT.md` (CBZ spread splitting,
   `#page:N`, zoom modes, progressive loading, text layers / links).
 

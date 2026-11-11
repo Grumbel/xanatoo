@@ -80,6 +80,8 @@ enum class UiCommand {
   RestoreAnnotationLayerVersion, // arg = layer id + newline + revision id
   SelectBookmark,  // arg = address: select its passage in the focused view
   CopyText,        // arg = text for the clipboard (an address)
+  OpenLinkInTab,   // arg = href of a link in the focused view: new tab
+  DownloadUrl,     // arg = http(s) URL: save to Downloads, never show
   OpenReply,       // right-clicked Message: start a mock reply draft
   EditReply,       // arg = Markdown currently in the reply editor
   SendReply,       // mock only: never sends to an external service
@@ -371,6 +373,9 @@ struct UiState {
   std::string context_comment_native;  // passage address for a right-clicked HN comment
   std::string context_comment_web;     // external HN per-comment permalink
   bool context_can_reply = false;
+  std::string context_link;       // right-clicked link target, if any
+  std::string context_link_href;  // … as written in the page
+  bool context_link_web = false;  // … and it is http(s): can be downloaded
   bool reply_open = false;
   uint64_t reply_generation = 0;
   std::string reply_author, reply_page, reply_label, reply_text;

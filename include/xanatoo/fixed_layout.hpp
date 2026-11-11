@@ -27,6 +27,21 @@ bool is_fixed_layout_path(std::string_view path);
 // (case-insensitive). Comic archives list members in archive order.
 bool natural_less(std::string_view a, std::string_view b);
 
+// An http(s) answer that can be shown as pages: the file name to keep it
+// under (with a fixed-layout extension), else empty. A page type (PDF,
+// DjVu, comic book MIME) decides by itself; a generic binary type (empty,
+// octet-stream, zip, rar, …) needs a fixed-layout file name. A text or
+// HTML answer never counts, whatever its URL says. `Content-Disposition:
+// attachment` does not stop it: viewing is the default, saving is the
+// explicit "Download Link".
+std::string fixed_layout_response_name(std::string_view url,
+                                       std::string_view content_type,
+                                       std::string_view disposition);
+
+// This build can show `name` as pages (thumtoo with the needed backend:
+// MuPDF for PDF, DjVuLibre for DjVu; archives always).
+bool fixed_layout_supported(std::string_view name);
+
 struct FixedPage {
   std::string uri;       // thumtoo location of the page
   std::string label;     // page number or member name

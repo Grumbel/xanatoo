@@ -31,6 +31,8 @@ namespace {
 constexpr int kMaxWorkers = 4;
 constexpr uint64_t kImageCacheBytes = 256ull * 1024 * 1024;
 constexpr uint64_t kThumbCacheBytes = 128ull * 1024 * 1024;
+// Web PDFs / DjVu / comics shown as pages (html_page.cpp `PagesCopy`).
+constexpr uint64_t kDocumentCacheBytes = 1024ull * 1024 * 1024;
 
 // Download `url` to its cache file and build the inline thumbnail.
 bool download_image(const std::string& url) {
@@ -131,6 +133,7 @@ void prune_image_caches() {
   std::thread([dir] {
     prune_cache_dir((fs::path(dir) / "images").string(), kImageCacheBytes);
     prune_cache_dir((fs::path(dir) / "thumbs").string(), kThumbCacheBytes);
+    prune_cache_dir((fs::path(dir) / "documents").string(), kDocumentCacheBytes);
   }).detach();
 #endif
 }

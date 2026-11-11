@@ -4858,6 +4858,29 @@ void test_fixed_layout() {
   EXPECT(natural_less("1", "01") && !natural_less("01", "1"));
   EXPECT(!natural_less("x", "x"));
 
+  // Web answers shown as pages: by MIME, or generic binary + file name.
+  EXPECT(fixed_layout_response_name("https://a.org/x/paper.pdf",
+                                    "application/pdf", "") == "paper.pdf");
+  EXPECT(fixed_layout_response_name("https://arxiv.org/pdf/2401.00001",
+                                    "application/pdf; qs=0.001", "") ==
+         "2401.00001.pdf");
+  EXPECT(fixed_layout_response_name("https://a.org/get?id=3",
+                                    "application/octet-stream",
+                                    "attachment; filename=\"Comic 1.cbz\"") ==
+         "Comic 1.cbz");
+  EXPECT(fixed_layout_response_name("https://a.org/b.djv", "image/vnd.djvu",
+                                    "") == "b.djv");
+  EXPECT(fixed_layout_response_name("https://a.org/b", "image/vnd.djvu", "") ==
+         "b.djvu");
+  EXPECT(fixed_layout_response_name("https://a.org/c.cbr", "", "") == "c.cbr");
+  // An HTML error page at a .pdf URL stays a web page.
+  EXPECT(fixed_layout_response_name("https://a.org/x.pdf", "text/html", "")
+             .empty());
+  EXPECT(fixed_layout_response_name("https://a.org/x.zip", "application/zip",
+                                    "").empty());
+  EXPECT(fixed_layout_response_name("https://a.org/x", "application/octet-stream",
+                                    "").empty());
+
   FixedLayoutSource src;
   src.title = "book.pdf";
   for (int i = 1; i <= 5; ++i)

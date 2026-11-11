@@ -5,6 +5,7 @@
 
 #include "xanatoo/fixed_layout.hpp"
 
+#include "xanatoo/download.hpp"
 #include "xanatoo/util.hpp"
 
 #include <algorithm>
@@ -51,6 +52,55 @@ bool natural_less(std::string_view a, std::string_view b) {
   }
   if (a.size() - i != b.size() - j) return a.size() - i < b.size() - j;
   return a < b;  // equal ignoring case: a stable, total order
+}
+
+std::string fixed_layout_response_name(std::string_view url,
+                                       std::string_view content_type,
+                                       std::string_view disposition) {
+  std::string type = ascii_lower(content_type.substr(0, content_type.find(';')));
+  std::string_view tv = type;
+  trim_ascii(tv);
+  type = std::string(tv);
+  std::string name = download_filename(url, disposition);
+  struct PageType {
+    const char* mime;
+    const char* ext;
+  };
+  static constexpr PageType kPageTypes[] = {
+      {"application/pdf", ".pdf"},
+      {"application/x-pdf", ".pdf"},
+      {"image/vnd.djvu", ".djvu"},
+      {"image/x-djvu", ".djvu"},
+      {"image/djvu", ".djvu"},
+      {"application/vnd.comicbook+zip", ".cbz"},
+      {"application/x-cbz", ".cbz"},
+      {"application/vnd.comicbook-rar", ".cbr"},
+      {"application/x-cbr", ".cbr"},
+      {"application/x-cb7", ".cb7"},
+      {"application/x-cbt", ".cbt"},
+  };
+  const size_t dot = name.rfind('.');
+  const std::string ext =
+      dot == std::string::npos ? std::string() : ascii_lower(std::string_view(name).substr(dot));
+  for (const PageType& pt : kPageTypes) {
+    if (type != pt.mime) continue;
+    // Keep the server's name when it already says what it is; the
+    // extension is what thumtoo and is_fixed_layout_path go by.
+    const bool named = ext == pt.ext || (ext == ".djv" && std::string_view(pt.ext) == ".djvu");
+    if (!named) name += pt.ext;
+    return name;
+  }
+  static constexpr const char* kGeneric[] = {
+      "", "application/octet-stream", "binary/octet-stream",
+      "application/download", "application/force-download",
+      "application/x-download", "application/zip", "application/x-zip",
+      "application/x-zip-compressed", "application/vnd.rar",
+      "application/x-rar", "application/x-rar-compressed",
+      "application/x-7z-compressed", "application/x-tar",
+  };
+  for (const char* g : kGeneric)
+    if (type == g) return is_fixed_layout_path(name) ? name : std::string();
+  return {};
 }
 
 namespace {
@@ -123,6 +173,7 @@ std::optional<FixedLayoutSource> read_fixed_layout(const std::string&,
   return std::nullopt;
 }
 
+bool fixed_layout_supported(std::string_view) { return false; }
 std::shared_ptr<thumtoo::Client> page_client() { return nullptr; }
 void release_page_client() {}
 #endif

@@ -190,10 +190,23 @@ void fetch_page(std::string url, std::shared_ptr<FetchShared> out,
 #if defined(XANATOO_WEB) && XANATOO_WEB
     out->service = "Web";
     std::string body;
+    xanatoo::WebPagesFile pages;
+    pages.stop = &out->abandoned;
     out->doc = xanatoo::web_fetch(url, &out->error, &out->final_url,
                                   &out->http_status, &body,
-                                  allow_download ? out->download.get() : nullptr);
+                                  allow_download ? out->download.get() : nullptr,
+                                  allow_download ? &pages : nullptr,
+                                  out->force_download);
     if (out->doc) out->raw_source = std::move(body);
+    // PDF / DjVu / comic answer: open the cached copy as pages; the
+    // address stays the web URL.
+    if (!out->doc && !pages.path.empty()) {
+      out->service = "Pages";
+      if (auto src = xanatoo::read_fixed_layout(pages.path, &out->error)) {
+        src->title = pages.name;
+        out->doc = xanatoo::fixed_layout_document(*src);
+      }
+    }
 #endif
   }
   if (!out->doc && out->error.empty() &&
@@ -584,6 +597,7 @@ uint64_t start_fetch(App& app, FetchPurpose purpose, int pane,
   job.buf = tab_buf;
   job.started = xanatoo::sdl::ticks();
   job.shared = std::make_shared<FetchShared>();
+  job.shared->force_download = purpose == FetchPurpose::Download;
   if (purpose != FetchPurpose::Preview && purpose != FetchPurpose::Subscription) {
     job.shared->download = std::make_shared<xanatoo::DownloadProgress>();
     job.shared->download->url = url;
@@ -602,6 +616,16 @@ uint64_t start_fetch(App& app, FetchPurpose purpose, int pane,
 #endif
   app.fetches.push_back(std::move(job));
   return app.fetches.back().id;
+}
+
+void start_download(App& app, const std::string& url) {
+  if (!xanatoo::starts_with_ci(url, "https://") &&
+      !xanatoo::starts_with_ci(url, "http://")) {
+    flash_status(app, "Only web links can be downloaded: " + url);
+    return;
+  }
+  start_fetch(app, FetchPurpose::Download, -1, url, false);
+  flash_status(app, "Downloading " + url);
 }
 
 void poll_fetches(App& app) {
@@ -637,6 +661,14 @@ void poll_fetches(App& app) {
       finish_navigate(app, job);
     } else if (job.purpose == FetchPurpose::Tab) {
       finish_tab(app, job);
+    } else if (job.purpose == FetchPurpose::Download) {
+      // Success shows in the Downloads panel; say why when nothing came.
+      const auto& d = job.shared->download;
+      if (!d || d->phase.load() == xanatoo::DownloadPhase::Pending ||
+          d->phase.load() == xanatoo::DownloadPhase::Skipped)
+        flash_status(app, "Download failed: " +
+                              (job.shared->error.empty() ? job.url
+                                                         : job.shared->error));
     } else {
       if (job.shared->doc) cache_page(app, job);
       // update_split_preview shows it if the link is still hovered.
@@ -677,8 +709,10 @@ bool cancel_fetches(App& app, int pi) {
   app.fetches.erase(
       std::remove_if(app.fetches.begin(), app.fetches.end(),
                      [&](const FetchJob& j) {
-                       return j.purpose == FetchPurpose::Navigate &&
-                              (pi < 0 || j.pane == pi);
+                       const bool drop = j.purpose == FetchPurpose::Navigate &&
+                                         (pi < 0 || j.pane == pi);
+                       if (drop) j.shared->abandoned.store(true);
+                       return drop;
                      }),
       app.fetches.end());
   return app.fetches.size() != before;

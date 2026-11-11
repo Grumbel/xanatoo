@@ -84,6 +84,15 @@ Sizing per format:
   foreign, so always read-only (`is_foreign_path`).
 - Navigation (`open_page`) reads the file on a fetch worker (service
   "Pages", with the usual loading indicator).
+- **Web:** an http(s) answer that `fixed_layout_response_name` accepts (a
+  PDF / DjVu / comic MIME type, or a generic binary type with such a file
+  name; never text or HTML) and `fixed_layout_supported` can show streams
+  into `cache_dir()/documents/<fnv>.<ext>` (`web_fetch`, `WebPagesFile`);
+  `fetch_page` then opens that copy as pages. The address stays the web URL;
+  the title is the server's file name. `Content-Disposition: attachment`
+  does not prevent it. Right-click → **Download Link** (`FetchPurpose::
+  Download`, `start_download`) saves to Downloads instead. A cancelled view
+  stops the transfer (`FetchShared::abandoned`); the size limit is 2 GiB.
 - `load_doc` (tabs, session restore) reads synchronously.
 - Without thumtoo (minimal ports) the file shows an error page, and
   `app_pagetiles.cpp` is a stub. Android's thumtoo has no MuPDF or DjVu,
@@ -103,3 +112,7 @@ Sizing per format:
 - PDF zoom floor from the page profile (`decide_zoom_floor`) instead of
   the fixed `-2`.
 - Coarser-tile `src_uv` is truncated to whole pixels.
+- Web documents are fetched again on every visit (no conditional request);
+  the stable cache name lets thumtoo reuse sizes and tiles when unchanged.
+- No byte progress for a web document while it streams (only the loading
+  indicator).

@@ -2473,6 +2473,22 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     context_open_ = false;
   }
   if (ImGui::BeginPopup("##doc_context")) {
+    if (!state.context_link.empty()) {
+      if (ImGui::MenuItem("Open Link in New Tab")) {
+        cmd = UiCommand::OpenLinkInTab;
+        result.arg = state.context_link_href;
+      }
+      if (ImGui::MenuItem("Copy Link Address")) {
+        cmd = UiCommand::CopyText;
+        result.arg = state.context_link;
+      }
+      if (ImGui::MenuItem("Download Link", nullptr, false,
+                          state.context_link_web)) {
+        cmd = UiCommand::DownloadUrl;
+        result.arg = state.context_link;
+      }
+      ImGui::Separator();
+    }
     if (state.collection) {
       if (ImGui::BeginMenu("Collection")) {
         menu_collection_items(state, cmd, result.arg);

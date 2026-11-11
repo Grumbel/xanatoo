@@ -9,12 +9,14 @@
 #include "xanatoo/fixed_layout.hpp"
 
 #include "xanatoo/paths.hpp"
+#include "xanatoo/util.hpp"
 
 #include <thumtoo/archive.hpp>
 #include <thumtoo/client.hpp>
 #include <thumtoo/expand.hpp>
 #include <thumtoo/image.hpp>
 #include <thumtoo/text.hpp>
+#include <thumtoo/version.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -70,6 +72,14 @@ bool probe_sizes(thumtoo::Client& client, const std::vector<std::string>& uris) 
 }
 
 }  // namespace
+
+bool fixed_layout_supported(std::string_view name) {
+  if (!is_fixed_layout_path(name)) return false;
+  const std::string ext = ascii_lower(name.substr(name.rfind('.')));
+  if (ext == ".pdf") return thumtoo::feature_mupdf();
+  if (ext == ".djvu" || ext == ".djv") return thumtoo::feature_djvu();
+  return true;  // comic archives: libarchive is always there
+}
 
 std::shared_ptr<thumtoo::Client> page_client() {
   std::lock_guard<std::mutex> lock(g_client_mutex);

@@ -4,6 +4,7 @@
 #include "xanatoo/html_page.hpp"
 
 #include "xanatoo/feed.hpp"
+#include "xanatoo/fixed_layout.hpp"
 #include "xanatoo/html_min.hpp"
 #include "xanatoo/parse.hpp"
 #include "xanatoo/util.hpp"
@@ -11,10 +12,14 @@
 #if defined(XANATOO_WEB) && XANATOO_WEB
 #include "xanatoo/https.hpp"
 #include "xanatoo/version.hpp"
+#include "xanatoo/paths.hpp"
 #endif
 
 #include <array>
 #include <cctype>
+#include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 
 namespace xanatoo {
@@ -323,12 +328,80 @@ std::string refusal_hint(const HttpStreamHeaders& h, std::string_view body) {
   return out;
 }
 
+// A PDF / DjVu / comic answer streamed into cache_dir()/documents/, one
+// file per URL (FNV-1a, like remote images), so a page opened again keeps
+// its file name and thumtoo finds its sizes and tiles already cached.
+struct PagesCopy {
+  static constexpr uint64_t kMaxBytes = 2ull * 1024 * 1024 * 1024;
+  bool active = false;
+  bool failed = false;
+  uint64_t size = 0;
+  std::string name, path, part;
+  std::ofstream out;
+
+  bool begin(std::string_view url, std::string_view type,
+             std::string_view disposition, std::string* err) {
+    name = fixed_layout_response_name(url, type, disposition);
+    if (name.empty() || !fixed_layout_supported(name)) return false;
+    const std::string cache = cache_dir();
+    if (cache.empty()) return false;  // no cache: plain download instead
+    uint64_t h = 1469598103934665603ull;
+    for (unsigned char c : url) {
+      h ^= c;
+      h *= 1099511628211ull;
+    }
+    char hex[32];
+    std::snprintf(hex, sizeof(hex), "%016llx", static_cast<unsigned long long>(h));
+    const std::string dir = (std::filesystem::path(cache) / "documents").string();
+    ensure_dir(dir);
+    path = (std::filesystem::path(dir) /
+            (hex + name.substr(name.rfind('.')))).string();
+    part = path + ".part";
+    out.open(part, std::ios::binary | std::ios::trunc);
+    if (!out) {
+      failed = true;
+      if (err) *err = "cannot write " + part;
+      return false;
+    }
+    active = true;
+    return true;
+  }
+  bool append(std::string_view bytes, std::string* err) {
+    size += bytes.size();
+    if (size > kMaxBytes) {
+      if (err) *err = "document exceeds 2 GiB";
+      return false;
+    }
+    out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+    if (!out && err) *err = "cannot write " + part;
+    return static_cast<bool>(out);
+  }
+  bool finish(std::string* err) {
+    out.close();
+    std::error_code ec;
+    if (out.fail() || size == 0) {
+      if (err) *err = size == 0 ? "empty document" : "cannot write " + part;
+      return false;
+    }
+    std::filesystem::rename(part, path, ec);
+    if (ec && err) *err = "cannot write " + path + ": " + ec.message();
+    return !ec;
+  }
+  ~PagesCopy() {
+    if (out.is_open()) out.close();
+    std::error_code ec;
+    if (!part.empty()) std::filesystem::remove(part, ec);
+  }
+};
+
 }  // namespace
 
 std::optional<Document> web_fetch(std::string_view url_in, std::string* err,
                                   std::string* final_url, int* http_status,
                                   std::string* raw_source,
-                                  DownloadProgress* download) {
+                                  DownloadProgress* download,
+                                  WebPagesFile* pages,
+                                  bool force_download) {
   static const std::string kUserAgent =
       std::string("Mozilla/5.0 (compatible; xanatoo/") + version_string() +
       "; +https://github.com/Grumbel/xanatoo)";
@@ -339,16 +412,23 @@ std::optional<Document> web_fetch(std::string_view url_in, std::string* err,
   std::string body_bytes;
   DownloadFile file;
   bool downloading = false;
+  PagesCopy copy;
   const bool ok = https_get_follow_stream(url, kUserAgent,
       [&](const HttpStreamHeaders& h) {
         headers = h;
+        // PDF / DjVu / comic: shown as pages, not saved to Downloads.
+        if (h.status == 200 && pages && !force_download &&
+            copy.begin(url, h.content_type, h.content_disposition, err))
+          return true;
+        if (copy.failed) return false;
         if (h.status == 200 && !download &&
             download_response(url, h.content_type, h.content_disposition)) {
           if (err) *err = "preview unavailable for " + h.content_type;
           return false;
         }
         downloading = h.status == 200 && download &&
-            download_response(url, h.content_type, h.content_disposition);
+            (force_download ||
+             download_response(url, h.content_type, h.content_disposition));
         if (!downloading) return true;
         const std::string name = download_filename(url, h.content_disposition);
         download->name = name;
@@ -362,6 +442,13 @@ std::optional<Document> web_fetch(std::string_view url_in, std::string* err,
         if (download && download->cancel.load(std::memory_order_relaxed)) {
           if (err) *err = "download cancelled";
           return false;
+        }
+        if (copy.active) {
+          if (pages->stop && pages->stop->load(std::memory_order_relaxed)) {
+            if (err) *err = "cancelled";
+            return false;
+          }
+          return copy.append(bytes, err);
         }
         if (downloading) {
           if (!file.append(bytes, err)) return false;
@@ -386,6 +473,12 @@ std::optional<Document> web_fetch(std::string_view url_in, std::string* err,
     return std::nullopt;
   }
   if (final_url) *final_url = fin;
+  if (copy.active) {
+    if (!copy.finish(err)) return std::nullopt;
+    pages->path = copy.path;
+    pages->name = copy.name;
+    return std::nullopt;  // the caller opens the pages
+  }
   if (downloading) {
     if (download->cancel.load(std::memory_order_relaxed) ||
         !file.finish(err)) {
