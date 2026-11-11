@@ -244,7 +244,11 @@ void LayoutEngine::layout_children_sequential(
     const bool floating = (kind == NodeKind::Image || kind == NodeKind::Figure ||
                            kind == NodeKind::Table) &&
                           !doc.get(child).float_side.empty();
-    if (!floats_.empty() && clears_floats(kind) && !floating)
+    // An Article is self-contained: like <br clear=all>, no float of a
+    // previous sibling runs into it. Sections are not cleared on purpose
+    // (an infobox may float past a heading, see unit_tests "infobox").
+    const bool sectioning = kind == NodeKind::Article;
+    if (!floats_.empty() && (clears_floats(kind) || sectioning) && !floating)
       y = clear_floats(x, max_width, y);
     // Side boxes may not advance y: their box height is no hint.
     if (kind != NodeKind::Aside && !floating &&
