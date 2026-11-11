@@ -34,7 +34,7 @@ Search is an address, not a widget in the document and not a panel.
 |------|---------|-------------------|
 | `wikipedia` | Wikipedia en / de | `list=search` JSON → list with `wikipedia:` links (parentheses percent-encoded), matched words bold |
 | `hn` | Hacker News | Algolia JSON → story link + `hn:item?id=` thread link |
-| `archive` | Internet Archive | `advancedsearch … output=json`, most downloaded first → `archive.org/details/…` |
+| `archive` | Internet Archive | `advancedsearch … output=json`, most downloaded first → `ia:` links (`docs/ARCHIVE.md`) |
 | `gutendex` | Project Gutenberg | Gutendex JSON → `gutenberg.org/ebooks/N` (opens as epub) |
 | `lemmy` | Lemmy (lemmy.world) | `/api/v3/search` → `lemmy:host/post/N` |
 | `bluesky` | Bluesky | `searchPosts` → one card per post, link to bsky.app |

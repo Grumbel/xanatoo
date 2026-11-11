@@ -213,7 +213,7 @@ std::string map_archive(const SearchPlan& plan, std::string_view json) {
     if (id.empty()) continue;
     std::string title = first_string(d, "title");
     if (title.empty()) title = id;
-    md += "- " + link(title, "https://archive.org/details/" + id);
+    md += "- " + link(title, "ia:" + id);
     std::string meta;
     const std::string type = json_str_field(top, "mediatype");
     if (!type.empty()) meta += type;

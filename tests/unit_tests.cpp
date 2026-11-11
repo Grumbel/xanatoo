@@ -4108,7 +4108,7 @@ void test_search_results() {
       "\"description\":[\"Films <b>from</b> the archive\"],\"identifier\":\"prelinger\","
       "\"mediatype\":\"collection\",\"title\":\"Prelinger Archives\"}]}}");
   EXPECT(has(ia, "16292 items match"));
-  EXPECT(has(ia, "[Prelinger Archives](https://archive.org/details/prelinger)"));
+  EXPECT(has(ia, "[Prelinger Archives](ia:prelinger)"));
   EXPECT(has(ia, "collection · Rick Prelinger. Films from the archive"));
 
   // Lemmy: native post refs on the engine's instance.

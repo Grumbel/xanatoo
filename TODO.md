@@ -8,6 +8,17 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **348** (this delivery is **347**)
 
+## Status (2026-11-11) — Internet Archive (`ia:`)
+
+- `src/archive.cpp` (`docs/ARCHIVE.md`): `ia:ID` items (details, description,
+  files, mpv link for movies / audio) and collections (members, paged) from
+  the `/metadata` and `advancedsearch` JSON APIs, via Markdown (`ia_markdown`).
+  The `ia` search engine and `archive.org/details|download|stream|embed/ID`
+  (native toggle) map to it. Live-checked mapper output against a Gutenberg
+  item and the Prelinger collection; the in-app GUI path was not run.
+- Open: reviews, Wayback Machine, full-text viewer; lending-only items show
+  metadata but their files will not download.
+
 ## Status (2026-11-11) — Clickable web addresses
 
 - `ViewSettings::auto_links` (`auto_links=` in view.conf, default on; View menu

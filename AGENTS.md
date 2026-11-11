@@ -679,6 +679,14 @@ history or distribute patch files.
   channel and search refs and comments. Parsers are pure and tested; never
   post or log in. See `docs/VIDEO_SITES.md`.
 
+## Internet Archive
+
+- `src/archive.cpp`, no feature switch of its own (needs `XANATOO_HTTPS`).
+  Read-only `ia:ID` items and collections over the public `/metadata` and
+  `advancedsearch` JSON APIs; `ia_markdown` (pure, tested) writes Markdown that
+  the ordinary parser turns into the page. archive.org itself needs
+  JavaScript. The `ia` search engine links to `ia:`. See `docs/ARCHIVE.md`.
+
 ## Lemmy
 
 - Read-only client via Lemmy **API v3** JSON (`/api/v3/post/list`, `/api/v3/post`).

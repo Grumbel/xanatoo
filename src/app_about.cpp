@@ -86,6 +86,11 @@ AboutSection services() {
                      "`dailymotion:xID` listings, search and video pages with "
                      "comments and a Watch-with-mpv link (public JSON APIs)",
                      "peertube:video.blender.org", "`-DXANATOO_VIDEO=ON`"});
+  s.items.push_back({"Internet Archive", XANATOO_HTTPS,
+                     "`ia:ID` items (details, description, downloads, Watch-with-mpv) "
+                     "and collections with their members, from the public JSON "
+                     "APIs; archive.org itself needs JavaScript",
+                     "ia:prelinger", "a build with a network feature"});
   s.items.push_back({"Hacker News", XANATOO_HN,
                      "`hn:` lists and threads (Firebase + Algolia APIs)",
                      "hn:", "`-DXANATOO_HN=ON`"});

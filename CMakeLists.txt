@@ -187,6 +187,7 @@ add_executable(xanatoo
   src/hackernews.cpp
   src/youtube.cpp
   src/video_sites.cpp
+  src/archive.cpp
   src/time.cpp
   src/ebooks.cpp
   src/feed.cpp
@@ -549,6 +550,7 @@ add_executable(xanatoo_tests
   src/hackernews.cpp
   src/youtube.cpp
   src/video_sites.cpp
+  src/archive.cpp
   src/time.cpp
   src/ebooks.cpp
   src/feed.cpp
@@ -759,6 +761,15 @@ target_compile_definitions(xanatoo_video_sites_tests PRIVATE XANATOO_VIDEO=0
   XANATOO_SDL3=$<BOOL:${XANATOO_SDL3}>
   "XANATOO_VERSION=\"${PROJECT_VERSION_FULL}\"")
 add_test(NAME video_sites_tests COMMAND xanatoo_video_sites_tests)
+add_executable(xanatoo_archive_tests
+  tests/archive_tests.cpp src/archive.cpp src/util.cpp src/paths.cpp
+  src/version.cpp src/document.cpp src/html_min.cpp)
+target_include_directories(xanatoo_archive_tests PRIVATE include ${SDL2_INCLUDE_DIRS})
+target_link_libraries(xanatoo_archive_tests PRIVATE ${SDL2_LIBRARIES})
+target_compile_definitions(xanatoo_archive_tests PRIVATE XANATOO_HTTPS=0
+  XANATOO_SDL3=$<BOOL:${XANATOO_SDL3}>
+  "XANATOO_VERSION=\"${PROJECT_VERSION_FULL}\"")
+add_test(NAME archive_tests COMMAND xanatoo_archive_tests)
 add_executable(xanatoo_ui_panel_imgui_tests
   tests/ui_panel_imgui_tests.cpp
   external/imgui/imgui.cpp

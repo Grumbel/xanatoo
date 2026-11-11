@@ -8,6 +8,7 @@
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/util.hpp"
 #include "xanatoo/video_sites.hpp"
+#include "xanatoo/archive.hpp"
 #include "xanatoo/wikipedia.hpp"
 #include "xanatoo/youtube.hpp"
 
@@ -104,6 +105,7 @@ std::string web_url_for(std::string_view ref) {
     return "https://" + std::string(after_prefix(ref, kLemmyPrefix));
   if (auto r = parse_youtube_ref(ref)) return youtube_web_url(*r);
   if (auto r = parse_video_site_ref(ref)) return video_site_web_url(*r);
+  if (auto r = parse_ia_ref(ref)) return ia_web_url(*r);
   if (auto r = parse_wikipedia_ref(ref)) {
     std::string url = wikipedia_page_url(*r);
     if (!r->fragment.empty()) url += "#" + r->fragment;
@@ -119,6 +121,7 @@ std::string native_url_for(std::string_view url) {
   if (std::string r = lemmy_ref_from_url(url); !r.empty()) return r;
   if (std::string r = youtube_ref_from_web_url(url); !r.empty()) return r;
   if (std::string r = video_site_ref_from_web_url(url); !r.empty()) return r;
+  if (std::string r = ia_ref_from_web_url(url); !r.empty()) return r;
   return {};
 }
 
