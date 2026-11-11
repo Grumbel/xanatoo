@@ -253,6 +253,11 @@ target_compile_definitions(xanatoo PRIVATE
   XANATOO_SQLITE=$<BOOL:${XANATOO_SQLITE}>
   XANATOO_FONTCONFIG=$<BOOL:${XANATOO_FONTCONFIG}>)
 
+# nix/r36s.nix: newer GCC than the sysroot's libstdc++ 9 (__cxa_call_terminate).
+if(XANATOO_R36S)
+  target_sources(xanatoo PRIVATE src/r36s_abi.cpp)
+endif()
+
 if(NOT EMSCRIPTEN)
   find_package(Threads REQUIRED)
   set(XANATOO_THREADS Threads::Threads)
