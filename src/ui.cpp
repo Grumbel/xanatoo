@@ -1933,6 +1933,10 @@ void Ui::draw_url_suggestions(const UiState& state, UiFrameResult& result,
       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
       ImGuiWindowFlags_NoNavFocus;
   if (ImGui::Begin("##url_suggestions", nullptr, flags)) {
+    // A plain window: clicking the tab strip or toolbar raises *their*
+    // window above it. The dropdown must stay over all chrome (draw and
+    // hit-test order alike).
+    ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
     const auto& pal = theme::palette();
     auto col = [](theme::Rgb c) { return IM_COL32(c.r, c.g, c.b, 255); };
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 0.f));
