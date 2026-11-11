@@ -3993,6 +3993,21 @@ void test_search() {
   EXPECT(is_json_search_kind("hn") && !is_json_search_kind("feed") &&
          !is_json_search_kind("page") && !is_search_kind("nope"));
 
+  // Location bar search button: which engine searches an address.
+  EXPECT_EQ(engine_for_address("hn:item?id=1", eng), "hn");
+  EXPECT_EQ(engine_for_address("https://news.ycombinator.com/item?id=1", eng), "hn");
+  EXPECT_EQ(engine_for_address("wikipedia:Xanadu", eng), "wikipedia");
+  EXPECT_EQ(engine_for_address("wikipedia:de:Xanadu", eng), "wikipedia-de");
+  EXPECT_EQ(engine_for_address("https://de.wikipedia.org/wiki/X", eng), "wikipedia-de");
+  EXPECT_EQ(engine_for_address("https://fr.wikipedia.org/wiki/X", eng), "wikipedia");
+  EXPECT_EQ(engine_for_address("https://www.reddit.com/r/linux/", eng), "reddit");
+  EXPECT_EQ(engine_for_address("https://notreddit.com/", eng), "");  // no partial host
+  EXPECT_EQ(engine_for_address("search:arxiv:spin", eng), "arxiv");
+  EXPECT_EQ(engine_for_address("search:nope:x", eng), "");
+  EXPECT_EQ(engine_for_address("https://example.org/", eng), "");
+  EXPECT_EQ(engine_for_address("notes.md", eng), "");
+  EXPECT_EQ(engine_for_address("", eng), "");
+
   // Ctrl+L keywords.
   EXPECT_EQ(search_from_keyword("ax electron spin", eng), "search:arxiv:electron+spin");
   EXPECT_EQ(search_from_keyword("w xanadu", eng), "search:wikipedia:xanadu");
@@ -4021,6 +4036,14 @@ void test_search() {
     EXPECT_EQ(k.size(), static_cast<size_t>(2));
     EXPECT(k.size() == 2 && k[0].kind == "lemmy" && k[1].kind == "page");
     EXPECT_EQ(w2.size(), static_cast<size_t>(1));
+  }
+  {
+    auto k = parse_engines("(engine \"s\" (url \"https://x.org/%s\") "
+                           "(site \"x.org\" \"xr:\") (site \"y.org\"))");
+    EXPECT(k.size() == 1 && k[0].sites.size() == 3);
+    EXPECT_EQ(engine_for_address("https://www.x.org/a", k), "s");
+    EXPECT_EQ(engine_for_address("xr:thing", k), "s");
+    EXPECT_EQ(engine_for_address("https://y.org/", k), "s");
   }
   if (!user.empty()) {
     EXPECT(user[0].kind == "feed" && user[0].badge == "M" && user[0].space == "+");

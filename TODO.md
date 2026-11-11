@@ -8,6 +8,16 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **348** (this delivery is **347**)
 
+## Status (2026-11-11) — Search button in the location bar
+
+- Magnifier beside the address when an engine searches the focused page's
+  service (`engine_for_address`, `SearchEngine::sites`; `(site …)` in
+  search.sexp). Click → search bar with that engine (`UiCommand::SearchSite`),
+  latched while it shows that engine; a second click hides it. Unit-tested;
+  checked under Xvfb on `hn:news`.
+- Open: the icon is the same `find` magnifier as Find in page on the right of
+  the toolbar; a distinct "search service" icon would help.
+
 ## Status (2026-11-11) — PDF, DjVu, CBZ / CBR pages
 
 - `docs/FIXED_LAYOUT.md`: fixed-layout files open as ordinary documents of

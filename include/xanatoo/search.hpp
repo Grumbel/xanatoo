@@ -15,7 +15,8 @@
 // Built-in engines live in the table in search.cpp; the user adds or replaces
 // engines in `user_data_dir()/search.sexp`:
 //   (engine "id" (name "Title") (keyword "k") (badge "T")
-//                (url "https://host/find?q=%s") (kind feed) (space "+"))
+//                (url "https://host/find?q=%s") (kind feed) (space "+")
+//                (site "host" "ref:"))
 // `kind` says how the answer becomes a document: page (default, a web page
 // or any page xanatoo opens), feed (RSS / Atom) or the name of a JSON
 // mapper in search_results.hpp (wikipedia, hn, archive, lemmy, bluesky,
@@ -39,6 +40,10 @@ struct SearchEngine {
   std::string url;      // template with one %s for the encoded query
   std::string kind = "page";  // page | feed | a JSON mapper (see above)
   std::string space = "+";  // what a blank becomes in the URL
+  // Addresses this engine searches, for the location bar's search button:
+  // an entry with ':' is an address prefix ("hn:", "wikipedia:de:"), any
+  // other a host that also matches its subdomains ("ycombinator.com").
+  std::vector<std::string> sites;
 };
 
 // The engines shipped with xanatoo, in menu order.
@@ -93,6 +98,12 @@ std::string search_target(std::string_view ref,
 // word is an engine keyword and a query follows.
 std::string search_from_keyword(std::string_view text,
                                 const std::vector<SearchEngine>& engines);
+
+// The engine that searches the service an address belongs to: the engine of
+// a search: address, else the longest matching `sites` entry. Empty when no
+// engine claims the address.
+std::string engine_for_address(std::string_view address,
+                               const std::vector<SearchEngine>& engines);
 
 // Query of a search address, decoded for display ("" for other addresses).
 std::string search_query_text(std::string_view ref);

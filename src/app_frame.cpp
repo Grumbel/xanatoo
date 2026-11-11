@@ -202,6 +202,8 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
 #endif
   ui_state.searchbar = app.search.open;
   ui_state.search_engine = search_engine_id(app);
+  ui_state.site_search = xanatoo::engine_for_address(
+      path_of(app, focused_pane(app)), app.search.engines);
   ui_state.search_engines.clear();
   for (const auto& e : app.search.engines)
     ui_state.search_engines.push_back({e.id, e.name, e.keyword, e.badge});
@@ -696,7 +698,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::ToggleOutline ||
         c == C::ToggleBacklinks || c == C::ToggleSitemap || c == C::TogglePage ||
         c == C::ToggleSearchBar || c == C::FocusSearchBar || c == C::Search ||
-        c == C::SelectSearchEngine ||
+        c == C::SelectSearchEngine || c == C::SearchSite ||
         c == C::SitemapPrev || c == C::SitemapNext ||
         c == C::OpenTranscludeOther ||
         c == C::ToggleDiff || c == C::ToggleStructure || c == C::ToggleEdit ||
@@ -2088,6 +2090,9 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     case C::SelectSearchEngine:
       select_search_engine(app, arg);
+      break;
+    case C::SearchSite:
+      search_site(app, arg);
       break;
     case C::SitemapPrev:
     case C::SitemapNext:

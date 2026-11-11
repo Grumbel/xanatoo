@@ -1035,7 +1035,8 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
   const int right_buttons = state.browse ? 7 : 6;
   const int url_extras = (state.alternate_url.empty() ? 0 : 1) +
                          (state.has_chrome ? 1 : 0) +
-                         (state.has_nav ? 1 : 0) + (state.has_site ? 1 : 0);
+                         (state.has_nav ? 1 : 0) + (state.has_site ? 1 : 0) +
+                         (state.site_search.empty() ? 0 : 1);
   const bool url_own_row = vp->Size.x <
       12.f + (5 + right_buttons) * button_w + 15.f + min_url_w +
           url_extras * (30.f * scale_ + 2.f);
@@ -1322,6 +1323,16 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
               state.native_view ? ("Back to the web page: " + state.alternate_url).c_str()
                                 : ("Native view: " + state.alternate_url).c_str(),
               UiCommand::ToggleNative, state.native_view);
+      if (!state.site_search.empty()) {
+        std::string name = state.site_search;
+        for (const UiSearchEngine& e : state.search_engines)
+          if (e.id == state.site_search) name = e.name;
+        const bool on = state.searchbar && state.search_engine == state.site_search;
+        const std::string tip = on ? "Close the search bar"
+                                   : "Search " + name + " in the search bar";
+        extra("url_search", "find", "?", tip.c_str(), UiCommand::SearchSite, on);
+        if (cmd == UiCommand::SearchSite) result.arg = state.site_search;
+      }
       if (state.has_chrome)
         extra("url_reader", "reader", "R", state.reader ? "Show the whole page (F9)" : "Reader mode (F9)",
               UiCommand::ToggleReader, state.reader);

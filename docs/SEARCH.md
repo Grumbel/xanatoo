@@ -18,11 +18,17 @@ Search is an address, not a widget in the document and not a panel.
   button with a dropdown (badge letters, no per-engine art yet), a field,
   Go. It only issues `UiCommand::Search`; `run_search` builds the address and
   navigates. The engine in use is `ViewSettings::search_engine` (view.conf).
+- **Location bar button:** a magnifier beside the address when an engine
+  searches the focused page's service (`engine_for_address`: the engine of a
+  `search:` address, else the longest `sites` entry, an address prefix like
+  `hn:` or a host with its subdomains). It issues `UiCommand::SearchSite`:
+  `search_site` shows the bar with that engine (and makes it the engine in
+  use); while the bar shows that engine it is latched and a click hides it.
 - **Keywords:** Ctrl+L text `<keyword> <words>` becomes the same address
   (`search_from_location`), unless a file of that name exists.
 - **Engines:** the table in `search.cpp` plus `user_data_dir()/search.sexp`
   (`(engine "id" (name …) (keyword …) (badge …) (url "…%s…") (kind feed)
-  (space "+"))`; a built-in id is replaced, a new one appended). `kind` is
+  (space "+") (site "host" "ref:"))`; a built-in id is replaced, a new one appended). `kind` is
   `page` (default), `feed` or a JSON mapper (below).
 - **No forms in documents.** A document can *link* to a search
   (`[x](search:arxiv:electron+spin)`); it cannot contain an input. That keeps
@@ -68,5 +74,6 @@ Instagram / TikTok have nothing public.
 
 Mastodon `/api/v2/search` for accounts / hashtags, Reddit `search.json`
 (the feed is enough), per-engine icons, a toolbar toggle button, suggestions
-while typing, "search this site" for the focused page's host, paging
+while typing, "search this site" for hosts no engine covers (a site's own
+OpenSearch description), paging
 ("more results" links: Wikipedia `sroffset`, Algolia `page`, Lemmy `page`).

@@ -190,6 +190,7 @@ enum class UiCommand {
   FocusSearchBar,     // show the search bar and focus its field
   Search,             // search bar committed (arg = what was typed)
   SelectSearchEngine, // arg = engine id (search.hpp)
+  SearchSite,         // location bar button: search bar with engine arg
   TogglePage,     // navigation / side bars of the focused page, as a panel
   SitemapPrev,    // previous / next page in the site map's order
   SitemapNext,
@@ -349,6 +350,7 @@ struct UiState {
   bool searchbar = false;  // the search bar row is shown
   std::vector<UiSearchEngine> search_engines;
   std::string search_engine;  // id of the engine in use
+  std::string site_search;  // engine that searches the focused page's service
   bool has_nav = false;  // focused page has navigation for the panel
   bool has_site = false; // focused address has a site to search for a sitemap
   bool diff = false;

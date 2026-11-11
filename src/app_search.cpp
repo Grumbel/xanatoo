@@ -53,6 +53,15 @@ void select_search_engine(App& app, const std::string& id) {
   }
 }
 
+void search_site(App& app, const std::string& id) {
+  if (app.search.open && search_engine_id(app) == id) {
+    toggle_search_bar(app);
+    return;
+  }
+  show_search_bar(app);
+  if (search_engine_id(app) != id) select_search_engine(app, id);
+}
+
 void run_search(App& app, const std::string& text) {
   const std::string ref = xanatoo::search_ref(search_engine_id(app), text);
   if (ref.empty()) {

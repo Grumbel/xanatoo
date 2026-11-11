@@ -70,6 +70,20 @@ bool read_text(const std::string& path, std::string& out) {
   return true;
 }
 
+// Lower-case host of an http(s) URL, "" for anything else.
+std::string http_host(std::string_view url) {
+  const size_t p = url.find("://");
+  if (p == std::string_view::npos) return {};
+  const std::string scheme = ascii_lower(url.substr(0, p));
+  if (scheme != "http" && scheme != "https") return {};
+  std::string_view h = url.substr(p + 3);
+  h = h.substr(0, h.find_first_of("/?#"));
+  if (const size_t at = h.rfind('@'); at != std::string_view::npos)
+    h.remove_prefix(at + 1);
+  h = h.substr(0, h.find(':'));
+  return ascii_lower(h);
+}
+
 const SearchEngine* find_engine(const std::vector<SearchEngine>& engines,
                                 std::string_view id) {
   for (const SearchEngine& e : engines)
@@ -80,59 +94,78 @@ const SearchEngine* find_engine(const std::vector<SearchEngine>& engines,
 }  // namespace
 
 const std::vector<SearchEngine>& builtin_engines() {
-  // id, name, keyword, badge, url, kind, space
+  // id, name, keyword, badge, url, kind, space, sites
   static const std::vector<SearchEngine> k = {
       {"wikipedia", "Wikipedia", "w", "W",
        "https://en.wikipedia.org/w/api.php?action=query&list=search"
        "&srsearch=%s&srlimit=30&format=json&formatversion=2",
-       "wikipedia", "+"},
+       "wikipedia", "+",
+       {"wikipedia:", "wikipedia.org"}},
       {"wikipedia-de", "Wikipedia (Deutsch)", "wd", "Wd",
        "https://de.wikipedia.org/w/api.php?action=query&list=search"
        "&srsearch=%s&srlimit=30&format=json&formatversion=2",
-       "wikipedia", "+"},
+       "wikipedia", "+",
+       {"wikipedia:de:", "de.wikipedia.org"}},
       {"hn", "Hacker News", "hn", "HN",
        "https://hn.algolia.com/api/v1/search?query=%s&tags=story"
        "&hitsPerPage=30",
-       "hn", "+"},
+       "hn", "+",
+       {"hn:", "news.ycombinator.com", "hn.algolia.com"}},
       {"arxiv", "arXiv", "ax", "arX",
        "https://export.arxiv.org/api/query?search_query=all:%s&max_results=50",
-       "feed", "+AND+all:"},  // every word must match (a bare blank is OR)
+       "feed", "+AND+all:",
+       {"arxiv.org"}},  // every word must match (a bare blank is OR)
       {"archive", "Internet Archive", "ia", "IA",
        "https://archive.org/advancedsearch.php?q=%s&fl%5B%5D=identifier"
        "&fl%5B%5D=title&fl%5B%5D=description&fl%5B%5D=mediatype"
        "&fl%5B%5D=creator&sort%5B%5D=downloads+desc&rows=40&output=json",
-       "archive", "+"},
+       "archive", "+",
+       {"ia:", "archive.org"}},
       {"standard-ebooks", "Standard Ebooks", "se", "SE",
-       "https://standardebooks.org/ebooks?query=%s", "page", "+"},
+       "https://standardebooks.org/ebooks?query=%s", "page", "+",
+       {"standardebooks.org"}},
       {"gutenberg", "Project Gutenberg", "pg", "PG",
-       "https://gutendex.com/books/?search=%s", "gutendex", "+"},
+       "https://gutendex.com/books/?search=%s", "gutendex", "+",
+       {"gutenberg.org", "gutendex.com"}},
       {"reddit", "Reddit", "r", "R", "https://www.reddit.com/search.rss?q=%s",
-       "feed", "+"},
+       "feed", "+",
+       {"reddit:", "reddit.com"}},
       {"lemmy", "Lemmy (lemmy.world)", "l", "Lm",
        "https://lemmy.world/api/v3/search?q=%s&type_=Posts&limit=30", "lemmy",
-       "+"},
+       "+",
+       {"lemmy:", "lemmy.world"}},
       {"bluesky", "Bluesky", "bs", "Bs",
        "https://api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=%s&limit=30",
-       "bluesky", "+"},
+       "bluesky", "+",
+       {"bsky.app", "bsky.social"}},
       {"mastodon-tag", "Mastodon hashtag", "mt", "#",
-       "https://mastodon.social/tags/%s.rss", "feed", ""},
+       "https://mastodon.social/tags/%s.rss", "feed", "",
+       {"mastodon.social"}},
       {"flickr", "Flickr tags", "fl", "Fl",
        "https://www.flickr.com/services/feeds/photos_public.gne?tags=%s"
        "&format=rss2",
-       "feed", ","},
+       "feed", ",",
+       {"flickr.com"}},
       {"marginalia", "Marginalia (small web)", "mg", "Mg",
-       "https://marginalia-search.com/search?query=%s", "page", "+"},
+       "https://marginalia-search.com/search?query=%s", "page", "+",
+       {"marginalia-search.com", "search.marginalia.nu"}},
       {"wiby", "Wiby (old web)", "wb", "Wb", "https://wiby.me/?q=%s", "page",
-       "+"},
+       "+",
+       {"wiby.me"}},
       {"youtube", "YouTube", "yt", "YT",
-       "youtube:results?search_query=%s", "page", "+"},
+       "youtube:results?search_query=%s", "page", "+",
+       {"youtube:", "youtube.com", "youtu.be"}},
       {"peertube", "PeerTube (SepiaSearch)", "pt", "PT",
-       "peertube:sepiasearch.org/search?search=%s", "page", "+"},
-      {"odysee", "Odysee", "od", "Od", "odysee:search?s=%s", "page", "+"},
+       "peertube:sepiasearch.org/search?search=%s", "page", "+",
+       {"peertube:", "sepiasearch.org"}},
+      {"odysee", "Odysee", "od", "Od", "odysee:search?s=%s", "page", "+",
+       {"odysee:", "odysee.com"}},
       {"dailymotion", "Dailymotion", "dm", "DM",
-       "dailymotion:search?search=%s", "page", "+"},
+       "dailymotion:search?search=%s", "page", "+",
+       {"dailymotion:", "dailymotion.com"}},
       {"duckduckgo", "DuckDuckGo", "dd", "DDG",
-       "https://html.duckduckgo.com/html/?q=%s", "page", "+"},
+       "https://html.duckduckgo.com/html/?q=%s", "page", "+",
+       {"duckduckgo.com"}},
   };
   return k;
 }
@@ -178,6 +211,12 @@ std::vector<SearchEngine> parse_engines(std::string_view source,
           warn("engine " + e.id + ": unknown kind " + val);
       }
       else if (key == "space") e.space = val;
+      else if (key == "site") {
+        for (size_t j = 1; j < p.kids.size(); ++j) {
+          std::string site = sexpr_text(p.kids[j]);
+          if (!site.empty()) e.sites.push_back(std::move(site));
+        }
+      }
       else warn("engine " + e.id + ": unknown property " + key);
     }
     const size_t pct = e.url.find("%s");
@@ -287,6 +326,35 @@ std::string search_from_keyword(std::string_view text,
     if (!e.keyword.empty() && e.keyword == word)
       return search_ref(e.id, text.substr(sp + 1));
   return {};
+}
+
+std::string engine_for_address(std::string_view address,
+                               const std::vector<SearchEngine>& engines) {
+  trim_ascii(address);
+  if (auto r = parse_search_ref(address))
+    return find_engine(engines, r->engine) ? r->engine : std::string();
+  const std::string host = http_host(address);
+  const std::string lower = ascii_lower(address);
+  std::string best;
+  size_t best_len = 0;
+  for (const SearchEngine& e : engines) {
+    for (const std::string& site : e.sites) {
+      const std::string s = ascii_lower(site);
+      bool hit;
+      if (s.find(':') != std::string::npos)
+        hit = starts_with(lower, s);
+      else
+        hit = !host.empty() &&
+              (host == s || (host.size() > s.size() &&
+                             ends_with(host, s) &&
+                             host[host.size() - s.size() - 1] == '.'));
+      if (hit && s.size() > best_len) {
+        best = e.id;
+        best_len = s.size();
+      }
+    }
+  }
+  return best;
 }
 
 std::string search_query_text(std::string_view ref) {

@@ -1543,6 +1543,9 @@ std::string search_engine_id(const App& app);  // the engine in use
 void show_search_bar(App& app);                // open and focus
 void toggle_search_bar(App& app);
 void select_search_engine(App& app, const std::string& id);
+// Location bar search button: show the bar with this engine, or hide it
+// when it is already showing that engine.
+void search_site(App& app, const std::string& id);
 void run_search(App& app, const std::string& text);  // → search: address
 // Ctrl+L text "w xanadu" → search address ("" when it is no keyword search).
 std::string search_from_location(const App& app, const std::string& text);
