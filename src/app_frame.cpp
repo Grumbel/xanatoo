@@ -177,6 +177,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.footnote_overlay = app.view_settings.footnote_overlay;
   ui_state.bookmark_marks = app.view_settings.bookmark_marks;
   ui_state.hover_preview = app.view_settings.hover_preview;
+  ui_state.auto_links = app.view_settings.auto_links;
   ui_state.auto_updates = app.view_settings.auto_updates;
   ui_state.reader_default = app.view_settings.reader_mode;
   ui_state.reader = pane_reader(app, focused_pane(app));
@@ -690,7 +691,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::ViewLineSpacingLoose || c == C::ViewMargins ||
         c == C::ViewMeasure ||
         c == C::ToggleSectionFocus || c == C::ToggleJustify ||
-        c == C::ToggleHoverPreview || c == C::ToggleAutoUpdates || c == C::TogglePreferences ||
+        c == C::ToggleHoverPreview || c == C::ToggleAutoLinks ||
+        c == C::ToggleAutoUpdates || c == C::TogglePreferences ||
         c == C::SaveRedditCredentials || c == C::ClearRedditCredentials ||
         c == C::SetUiScale ||
         c == C::SelectStyle || c == C::ReloadStyles;
@@ -2403,6 +2405,13 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
                             ? "Automatic update checks on"
                             : "Automatic update checks off");
       break;
+    case C::ToggleAutoLinks:
+      app.view_settings.auto_links = !app.view_settings.auto_links;
+      apply_view_settings(app, true);
+      flash_status(app, app.view_settings.auto_links
+                            ? "Web addresses in text are links"
+                            : "Web addresses in text are plain text");
+      break;
     case C::ToggleHoverPreview:
       app.view_settings.hover_preview = !app.view_settings.hover_preview;
       xanatoo::save_view_settings(app.view_settings);
@@ -2857,6 +2866,7 @@ static void draw_pane_overlays(App& app, int i) {
           [&](const xanatoo::PositionedGlyph& pg) {
             return pg.node == app.hover.link_node &&
                    pg.span_index == app.hover.link_span &&
+                   pg.auto_link == app.hover.link_auto &&
                    (pg.kind == xanatoo::InlineKind::Link ||
                     pg.kind == xanatoo::InlineKind::Cite ||
                     pg.kind == xanatoo::InlineKind::FootnoteRef);

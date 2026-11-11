@@ -314,6 +314,7 @@ struct LinkHit {
   InlineKind kind = InlineKind::Link;
   NodeId node = INVALID_NODE;
   size_t span_index = 0;
+  uint32_t auto_link = 0;  // PositionedGlyph::auto_link of the hit text
 };
 std::optional<LinkHit> hit_test_link_ex(const Document& doc,
                                         const LayoutResult& layout,

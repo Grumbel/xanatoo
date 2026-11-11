@@ -8,6 +8,19 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **348** (this delivery is **347**)
 
+## Status (2026-11-11) — Clickable web addresses
+
+- `ViewSettings::auto_links` (`auto_links=` in view.conf, default on; View menu
+  and Edit → Preferences "Make web addresses clickable", `UiCommand::ToggleAutoLinks`).
+  Display-time only: `layout_paragraph` runs `find_urls` (`autolink.hpp`, pure,
+  `tests/autolink_tests.cpp`) over Text/Emphasis/Strong/Strike runs (not code)
+  and lays the characters out as Link. The span stays Text, so carets and
+  editing are untouched; the target lives in `LayoutResult::auto_links`,
+  referenced by `PositionedGlyph::auto_link` (also `LinkHit`, `Hover::link_auto`).
+- Not covered: URLs split over several spans (e.g. bold half), `www.` without
+  scheme, link-aware features reading `span.href` (Page panel, backlinks).
+- Not run: GUI check (this shell was outside `nix develop`, link step failed).
+
 ## Status (2026-11-11) — Media RSS in feeds (YouTube)
 
 - `feed.cpp` reads `media:thumbnail`, `media:community` (`media:starRating`,

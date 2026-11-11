@@ -979,6 +979,7 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
       app.hover.preview.clear();
       app.hover.link_node = xanatoo::INVALID_NODE;
       app.hover.link_span = 0;
+      app.hover.link_auto = 0;
       app.hover.link_pane = -1;
       app.hover.stretch = xanatoo::INVALID_NODE;
       app.hover.stretch_pane = -1;
@@ -1067,6 +1068,7 @@ void pointer_motion(App& app, int x, int y, bool imgui_mouse) {
             app.hover.is_cite = (hit->kind == xanatoo::InlineKind::Cite);
             app.hover.link_node = hit->node;
             app.hover.link_span = hit->span_index;
+            app.hover.link_auto = hit->auto_link;
             app.hover.link_pane = hover_pane;
             if (auto prev = xanatoo::link_preview_text(hd, hit->href)) {
               app.hover.preview = *prev;

@@ -43,6 +43,7 @@ void clear_interaction_hover(App& app) {
   app.hover.is_cite = false;
   app.hover.link_node = xanatoo::INVALID_NODE;
   app.hover.link_span = 0;
+  app.hover.link_auto = 0;
   app.hover.link_pane = -1;
   app.hover.stretch = xanatoo::INVALID_NODE;
   app.hover.stretch_pane = -1;

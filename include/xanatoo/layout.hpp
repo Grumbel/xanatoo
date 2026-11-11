@@ -26,6 +26,9 @@ struct PositionedGlyph {
   NodeId node = INVALID_NODE;
   size_t span_index = 0;
   size_t char_index = 0;
+  // 1 + index into LayoutResult::auto_links: a URL found in plain text, laid
+  // out as a Link although its span is not one. 0 = the span decides.
+  uint32_t auto_link = 0;
   InlineKind kind = InlineKind::Text;
   FontRole font = FontRole::Body;
   Rgba color;  // computed from the style sheet (block role + inline kind)
@@ -102,6 +105,7 @@ struct LayoutResult {
     return it == node_style_index.end() ? base : scoped_styles[it->second - 1];
   }
   std::vector<PositionedGlyph> glyphs;
+  std::vector<std::string> auto_links;  // targets of PositionedGlyph::auto_link
   std::vector<LayoutBox> boxes;
   std::vector<PositionedImage> images;
   std::vector<PositionedMath> maths;
@@ -210,6 +214,8 @@ struct LayoutOptions {
   float line_spacing = 1.30f;
   int measure_chars = 0;     // column cap in body-font characters; 0 = fill
   bool justify = false;
+  // Plain text URLs are laid out as links (ViewSettings::auto_links).
+  bool auto_links = false;
   // Display scale for px lengths (style sheet px, margins).
   float px_scale = 1.f;
 
@@ -221,6 +227,7 @@ struct LayoutOptions {
     o.line_spacing = v.line_spacing;
     o.measure_chars = v.measure_chars;
     o.justify = v.justify;
+    o.auto_links = v.auto_links;
     o.px_scale = px_scale;
     return o;
   }

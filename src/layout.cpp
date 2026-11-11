@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/layout.hpp"
+#include "xanatoo/autolink.hpp"
 #include "xanatoo/math_font.hpp"
 #include "xanatoo/images.hpp"
 #include "xanatoo/parse.hpp"
@@ -2468,6 +2469,7 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
     size_t char_idx;
     InlineKind kind;
     FontRole role;
+    uint32_t auto_link = 0;  // see PositionedGlyph::auto_link
     float rise = 0.f;  // baseline lift (footnote marks without superscripts)
     float img_w = 0.f;  // inline image: an atom of this size (else 0)
     float img_h = 0.f;
@@ -2528,6 +2530,33 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
                           c.remote);
       }
       chars.push_back(c);
+    }
+  }
+
+  // Plain-text URLs become links for this layout only (the span stays Text).
+  if (options_.auto_links && base_role != FontRole::Code &&
+      base_role != FontRole::SmallCode) {
+    for (size_t lo = 0; lo < chars.size();) {
+      size_t hi = lo;
+      while (hi < chars.size() && chars[hi].span_idx == chars[lo].span_idx) ++hi;
+      const InlineKind k = chars[lo].kind;
+      if (k == InlineKind::Text || k == InlineKind::Emphasis ||
+          k == InlineKind::Strong || k == InlineKind::Strike) {
+        std::vector<uint32_t> cps;
+        cps.reserve(hi - lo);
+        for (size_t i = lo; i < hi; ++i) cps.push_back(chars[i].cp);
+        for (const auto& [b, e] : find_urls(cps)) {
+          std::string href;
+          for (size_t i = b; i < e; ++i) autolink_append_utf8(href, cps[i]);
+          out.auto_links.push_back(std::move(href));
+          const uint32_t id = static_cast<uint32_t>(out.auto_links.size());
+          for (size_t i = lo + b; i < lo + e; ++i) {
+            chars[i].kind = InlineKind::Link;
+            chars[i].auto_link = id;
+          }
+        }
+      }
+      lo = hi;
     }
   }
 
@@ -2645,6 +2674,7 @@ void LayoutEngine::layout_paragraph(const Document& doc, const Node& node,
       pg.node = node.id;
       pg.span_index = c.span_idx;
       pg.char_index = c.char_idx;
+      pg.auto_link = c.auto_link;
       pg.kind = c.kind;
       pg.font = c.role;
       const InlineRole semantic = node.spans[c.span_idx].role;

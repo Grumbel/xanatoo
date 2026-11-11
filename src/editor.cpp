@@ -2355,6 +2355,7 @@ std::optional<LinkHit> hit_test_link_ex(const Document& doc,
            layout.glyphs[j + 1].kind == g.kind &&
            layout.glyphs[j + 1].node == g.node &&
            layout.glyphs[j + 1].span_index == g.span_index &&
+           layout.glyphs[j + 1].auto_link == g.auto_link &&
            std::abs(layout.glyphs[j + 1].y - g.y) < 0.5f) {
       ++j;
       x1 = layout.glyphs[j].x + std::max(1.f, layout.glyphs[j].advance);
@@ -2363,6 +2364,16 @@ std::optional<LinkHit> hit_test_link_ex(const Document& doc,
     float y1 = g.y + 6.f;
     if (mx >= x0 && mx <= x1 && adj_y >= y0 && adj_y <= y1) {
       const Node& n = doc.get(g.node);
+      if (g.auto_link != 0 && g.auto_link <= layout.auto_links.size()) {
+        // A URL in plain text: the target is the text itself.
+        LinkHit hit;
+        hit.kind = InlineKind::Link;
+        hit.node = g.node;
+        hit.span_index = g.span_index;
+        hit.auto_link = g.auto_link;
+        hit.href = layout.auto_links[g.auto_link - 1];
+        return hit;
+      }
       if (g.span_index < n.spans.size()) {
         const auto& sp = n.spans[g.span_index];
         LinkHit hit;

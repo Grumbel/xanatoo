@@ -105,6 +105,8 @@ bool load_view_settings(ViewSettings& out) {
         out.bookmark_marks = (val == "1" || val == "true" || val == "yes");
       else if (key == "hover_preview")
         out.hover_preview = (val == "1" || val == "true" || val == "yes");
+      else if (key == "auto_links")
+        out.auto_links = (val == "1" || val == "true" || val == "yes");
       else if (key == "auto_updates")
         out.auto_updates = (val == "1" || val == "true" || val == "yes");
       else if (key == "reader_mode")
@@ -142,6 +144,7 @@ bool save_view_settings(const ViewSettings& in) {
   out << "footnotes=" << (v.footnote_overlay ? "1" : "0") << "\n";
   out << "bookmark_marks=" << (v.bookmark_marks ? "1" : "0") << "\n";
   out << "hover_preview=" << (v.hover_preview ? "1" : "0") << "\n";
+  out << "auto_links=" << (v.auto_links ? "1" : "0") << "\n";
   out << "auto_updates=" << (v.auto_updates ? "1" : "0") << "\n";
   out << "reader_mode=" << (v.reader_mode ? "1" : "0") << "\n";
   out << "paged=" << (v.paged ? "1" : "0") << "\n";

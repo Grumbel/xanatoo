@@ -2120,6 +2120,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       if (ImGui::MenuItem("Bookmarks in the page", nullptr,
                           state.bookmark_marks))
         cmd = UiCommand::ToggleBookmarkMarks;
+      if (ImGui::MenuItem("Make web addresses clickable", nullptr,
+                          state.auto_links))
+        cmd = UiCommand::ToggleAutoLinks;
       ImGui::EndMenu();
     }
     force_menu("Layout");
@@ -2646,6 +2649,9 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       toggle("Preview links on hover", state.hover_preview,
              UiCommand::ToggleHoverPreview,
              "Split view: a link hovered on the left shows on the right");
+      toggle("Make web addresses clickable", state.auto_links,
+             UiCommand::ToggleAutoLinks,
+             "http:// and https:// text in any document becomes a link");
       toggle("Reader mode by default", state.reader_default,
              UiCommand::ToggleReaderDefault,
              "Web pages without navigation, sidebars and footers (F9 per view)");

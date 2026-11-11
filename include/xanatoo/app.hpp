@@ -373,6 +373,7 @@ struct Hover {
   std::string preview;
   xanatoo::NodeId link_node = xanatoo::INVALID_NODE;
   size_t link_span = 0;
+  uint32_t link_auto = 0;  // PositionedGlyph::auto_link of the hovered text
   int link_pane = -1;
   xanatoo::NodeId stretch = xanatoo::INVALID_NODE;
   int stretch_pane = -1;
