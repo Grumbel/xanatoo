@@ -678,7 +678,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::AddBookmark || c == C::BookmarkPage || c == C::RemoveBookmark ||
         c == C::BookmarkPosition || c == C::NewTab ||
         c == C::CloseTab || c == C::NextTab || c == C::PrevTab ||
-        c == C::SelectTab || c == C::TearTab || c == C::PopOut || c == C::PopIn ||
+        c == C::SelectTab || c == C::ReorderTabs || c == C::TearTab || c == C::PopOut || c == C::PopIn ||
         c == C::ViewSourceRendered || c == C::ViewSourceRaw ||
         c == C::ViewSourceSexpr || c == C::ViewSourceXml || c == C::Save ||
         c == C::Publish || c == C::EditLocalCopy || c == C::ViewOriginal ||
@@ -2552,6 +2552,7 @@ void run_chrome(App& app) {
   // so its mouse capture stays.
   if (ui_frame.cmd != xanatoo::UiCommand::None &&
       ui_frame.cmd != xanatoo::UiCommand::SelectTab &&
+      ui_frame.cmd != xanatoo::UiCommand::ReorderTabs &&
       ui_frame.cmd != xanatoo::UiCommand::EditReply &&
       ui_frame.cmd != xanatoo::UiCommand::LemmySetSearch &&
       ui_frame.cmd != xanatoo::UiCommand::NostrSearchLocal)
