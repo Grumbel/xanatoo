@@ -25,6 +25,7 @@
 #include "xanatoo/archive.hpp"
 #include "xanatoo/nostr.hpp"
 #include "xanatoo/reddit.hpp"
+#include "xanatoo/search_results.hpp"
 #include "xanatoo/theme.hpp"
 #include "xanatoo/util.hpp"
 

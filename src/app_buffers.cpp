@@ -32,6 +32,7 @@
 #include "xanatoo/parse.hpp"
 #include "xanatoo/paths.hpp"
 #include "xanatoo/reddit.hpp"
+#include "xanatoo/search_results.hpp"
 #include "xanatoo/revstore.hpp"
 #include "xanatoo/sidestore.hpp"
 #include "xanatoo/util.hpp"
