@@ -18,6 +18,7 @@
 
 #include "xanatoo/app.hpp"
 #include "xanatoo/reddit_credentials.hpp"
+#include "xanatoo/catalog_credentials.hpp"
 #include "xanatoo/platform.hpp"
 #include "xanatoo/epub_import.hpp"
 #include "xanatoo/gemini.hpp"
@@ -186,6 +187,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
   ui_state.page_columns = app.view_settings.page_columns;
   ui_state.has_chrome = focused_pane(app).chrome_parts > 0;
   ui_state.preferences_open = app.preferences_open;
+  ui_state.credentials_open = app.credentials_open;
   ui_state.backlinks = app.backlinks_mode;
   ui_state.sitemap = app.sitemap.shown;
   ui_state.page_panel = app.page.shown;
@@ -717,6 +719,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::ToggleSectionFocus || c == C::ToggleJustify ||
         c == C::ToggleHoverPreview || c == C::ToggleAutoLinks ||
         c == C::ToggleAutoUpdates || c == C::TogglePreferences ||
+        c == C::ToggleCredentials || c == C::SaveCatalogCredentials ||
+        c == C::ClearCatalogCredentials ||
         c == C::SaveRedditCredentials || c == C::ClearRedditCredentials ||
         c == C::SetUiScale ||
         c == C::SelectStyle || c == C::ReloadStyles;
@@ -2471,6 +2475,21 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     }
     case C::TogglePreferences:
       app.preferences_open = !app.preferences_open;
+      break;
+    case C::ToggleCredentials:
+      app.credentials_open = !app.credentials_open;
+      break;
+    case C::SaveCatalogCredentials: {
+      const auto values = xanatoo::parse_catalog_credentials_command(arg);
+      const bool saved = values && xanatoo::save_catalog_credentials(*values);
+      flash_status(app, saved ? "Catalog credentials saved locally"
+                              : "Could not save catalog credentials");
+      break;
+    }
+    case C::ClearCatalogCredentials:
+      flash_status(app, xanatoo::save_catalog_credentials({})
+                            ? "Saved catalog credentials removed"
+                            : "Could not remove catalog credentials");
       break;
     case C::SaveRedditCredentials: {
       const size_t split = arg.find('\n');

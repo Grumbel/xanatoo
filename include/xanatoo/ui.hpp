@@ -2,6 +2,8 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 #pragma once
 
+#include "xanatoo/catalog_credentials.hpp"
+
 #include "xanatoo/sdl.hpp"
 #include "xanatoo/history_menu.hpp"
 #include "xanatoo/urlbar_suggestions.hpp"
@@ -236,6 +238,9 @@ enum class UiCommand {
   ToggleHoverPreview,       // split view: preview hovered links on the right
   ToggleReaderDefault,      // Preferences: reader mode for new views
   TogglePreferences,        // Edit → Preferences window
+  ToggleCredentials,        // Edit → Credentials dialog
+  SaveCatalogCredentials,   // arg = six newline-separated private values
+  ClearCatalogCredentials,  // remove all saved catalog keys
   SaveRedditCredentials,    // arg = client_id + newline + client_secret
   ClearRedditCredentials,   // remove locally saved Reddit credentials
   SetUiScale,               // Preferences: scale chrome and default text
@@ -344,6 +349,7 @@ struct UiState {
   int page_columns = 0;         // ViewSettings::page_columns
   bool has_chrome = false;      // focused page has page chrome to hide
   bool preferences_open = false;
+  bool credentials_open = false;
   bool backlinks = false;
   bool sitemap = false;
   bool page_panel = false;
@@ -632,6 +638,9 @@ private:
   struct ReplySelection { int begin = 0, end = 0; } reply_selection_;
   bool reply_focus_ = false;
   bool reply_restore_selection_ = false;
+  char catalog_credential_input_[catalog_key_count][512] = {};
+  bool catalog_credential_shown_[catalog_key_count] = {};
+  bool catalog_credentials_loaded_ = false;
   char reddit_client_id_[256] = {};
   char reddit_client_secret_[256] = {};
   bool reddit_credentials_loaded_ = false;

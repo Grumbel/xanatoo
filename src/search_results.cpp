@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/search_results.hpp"
+#include "xanatoo/catalog_credentials.hpp"
 
 #include "xanatoo/html_min.hpp"
 #include "xanatoo/json_min.hpp"
@@ -909,15 +910,10 @@ std::string search_results_markdown(const SearchPlan& plan, std::string_view jso
 
 #if defined(XANATOO_HTTPS) && XANATOO_HTTPS
 namespace {
-// Provider credentials are opt-in environment variables, not URL templates:
+// Credentials come from private local storage or environment, not URL templates.
 // search: and media: addresses (history, bookmarks, sessions) never carry them.
 // Auth is restricted to the provider's exact host, including for user-defined
 // search.sexp engines with a built-in JSON kind.
-std::string catalog_env(const char* name) {
-  const char* value = std::getenv(name);
-  return value ? std::string(value) : std::string();
-}
-
 bool safe_header_token(std::string_view v) {
   if (v.empty()) return false;
   for (unsigned char c : v)
@@ -965,10 +961,10 @@ std::optional<HttpResult> catalog_get(const SearchPlan& plan, bool record,
     return std::nullopt;
   }
   if (igdb) {
-    secret = catalog_env("XANATOO_IGDB_ACCESS_TOKEN");
-    const std::string client = catalog_env("XANATOO_IGDB_CLIENT_ID");
+    secret = effective_catalog_credential(CatalogKey::IgdbAccessToken);
+    const std::string client = effective_catalog_credential(CatalogKey::IgdbClientId);
     if (!safe_header_token(secret) || !safe_header_token(client)) {
-      if (err) *err = "IGDB needs XANATOO_IGDB_CLIENT_ID and XANATOO_IGDB_ACCESS_TOKEN";
+      if (err) *err = "IGDB needs a client ID and access token (Edit → Credentials)";
       return std::nullopt;
     }
     headers = "Client-ID: " + client + "\r\nAuthorization: Bearer " +
@@ -997,30 +993,30 @@ std::optional<HttpResult> catalog_get(const SearchPlan& plan, bool record,
     }
     url = "https://graphql.anilist.co/";
   } else if (tmdb) {
-    const std::string token = catalog_env("XANATOO_TMDB_READ_TOKEN");
+    const std::string token = effective_catalog_credential(CatalogKey::TmdbReadToken);
     if (safe_header_token(token)) {
       headers = "Authorization: Bearer " + token + "\r\n";
     } else {
-      secret = catalog_env("XANATOO_TMDB_API_KEY");
-      if (secret.empty()) {
-        if (err) *err = "TMDB needs XANATOO_TMDB_READ_TOKEN or XANATOO_TMDB_API_KEY";
+      secret = effective_catalog_credential(CatalogKey::TmdbApiKey);
+      if (!safe_header_token(secret)) {
+        if (err) *err = "TMDB needs a read token or v3 API key (Edit → Credentials)";
         return std::nullopt;
       }
       url += (url.find('?') == std::string::npos ? "?api_key=" : "&api_key=") +
              search_encode(secret);
     }
   } else if (rawg) {
-    secret = catalog_env("XANATOO_RAWG_API_KEY");
-    if (secret.empty()) {
-      if (err) *err = "RAWG needs XANATOO_RAWG_API_KEY";
+    secret = effective_catalog_credential(CatalogKey::RawgApiKey);
+    if (!safe_header_token(secret)) {
+      if (err) *err = "RAWG needs an API key (Edit → Credentials)";
       return std::nullopt;
     }
     url += (url.find('?') == std::string::npos ? "?key=" : "&key=") +
            search_encode(secret);
   } else if (discogs) {
-    secret = catalog_env("XANATOO_DISCOGS_TOKEN");
+    secret = effective_catalog_credential(CatalogKey::DiscogsToken);
     if (!safe_header_token(secret)) {
-      if (err) *err = "Discogs needs XANATOO_DISCOGS_TOKEN";
+      if (err) *err = "Discogs needs a token (Edit → Credentials)";
       return std::nullopt;
     }
     headers = "Authorization: Discogs token=" + secret + "\r\n";

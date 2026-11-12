@@ -135,7 +135,18 @@ Existing `openlibrary`, `tvmaze`, `musicbrainz`, `wikidata`, `openalex`,
 
 #### Optional credentials
 
-Only provide the variables required by services you actually use. Examples:
+Use **Edit → Credentials…** (also linked from Preferences) to enter,
+replace or remove API keys for IGDB, RAWG, TMDB and Discogs. The same dialog
+manages Reddit OAuth client credentials. Saved catalog credentials are stored
+as plain text in `config_dir()/catalog-credentials.conf`, created with `0600`
+permissions on Unix and atomically replaced. The Reddit pair stays in
+`config_dir()/reddit.conf` for compatibility. Saving is disabled with
+`--no-save`. The dialog masks keys by default, supports showing individual
+values and opens the providers' official credential pages. Empty a field and
+click **Save catalog keys** to remove an individual value.
+
+Environment variables remain supported and override saved values. Only
+provide variables required by services you actually use. Examples:
 
 ```sh
 export XANATOO_TMDB_READ_TOKEN='…'       # alternatively: XANATOO_TMDB_API_KEY
@@ -153,7 +164,8 @@ only sends authentication to an exact built-in API host, over HTTPS, and
 inserted only for the outgoing request. Twitch OAuth tokens expire and must be
 replaced when invalid; this implementation does not perform automatic OAuth
 login. Do not store these values in Nix store strings or a world-readable
-configuration file.
+configuration file. The local files are **not encrypted**, so protect
+backups and avoid copying them into repositories.
 
 The global search engine dropdown is intentionally also the provider selector;
 no independent media search panel or giant local replica is introduced.

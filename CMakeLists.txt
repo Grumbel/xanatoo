@@ -183,6 +183,7 @@ add_executable(xanatoo
   src/nostr_store.cpp
   src/reddit.cpp
   src/reddit_credentials.cpp
+  src/catalog_credentials.cpp
   src/lemmy.cpp
   src/lemmy_discovery.cpp
   src/lemmy_directory.cpp
@@ -553,6 +554,7 @@ add_executable(xanatoo_tests
   src/editor.cpp
   src/reddit.cpp
   src/reddit_credentials.cpp
+  src/catalog_credentials.cpp
   src/lemmy.cpp
   src/lemmy_discovery.cpp
   src/lemmy_directory.cpp

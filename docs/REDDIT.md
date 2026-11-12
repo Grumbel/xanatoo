@@ -24,8 +24,8 @@ does **not** sign in to your Reddit account or access private messages.
    After creating it, the **client ID** appears just beneath its name and
    the **client secret** is labeled `secret`. Do not choose **installed app**
    for this workflow: it has no secret and uses a different OAuth grant.
-4. In Xanatoo, open **Edit → Preferences → Reddit API**, enter the ID and
-   secret, and click **Save credentials**. Reload the Reddit page. If the
+4. In Xanatoo, open **Edit → Credentials… → Reddit**, enter the ID and
+   secret, and click **Save Reddit credentials**. Reload the Reddit page. If the
    environment variables below are set, they override the saved pair.
 
 The settings page links to the official access-request and app-management
@@ -35,7 +35,7 @@ The instructions above describe Reddit's
 [legacy OAuth app flow](https://github.com/reddit-archive/reddit/wiki/OAuth2),
 which Reddit may no longer allow for new registrations.
 
-You can still use environment variables instead of the Preferences UI:
+You can still use environment variables instead of the Credentials dialog:
 
 ```sh
 export XANATOO_REDDIT_CLIENT_ID='your-client-id'
@@ -46,7 +46,7 @@ The UI stores its credentials in `config_dir()/reddit.conf` (normally
 `~/.config/xanatoo/reddit.conf`), separately from `view.conf`. On Unix,
 the file is created or replaced atomically with owner-only permissions
 (`0600`). It is plain text, **not encrypted**, so protect backups and do
-not commit it. **Clear saved credentials** removes this file.
+not commit it. **Remove Reddit credentials** removes this file.
 `--no-save` disables writing credentials. Environment variables are not
 written to disk by Xanatoo. Credential changes take effect on the next
 Reddit request.

@@ -27,6 +27,7 @@
 #include "xanatoo/nostr_verify.hpp"
 #include "xanatoo/reddit.hpp"
 #include "xanatoo/reddit_credentials.hpp"
+#include "xanatoo/catalog_credentials.hpp"
 #include "xanatoo/reply.hpp"
 #include "xanatoo/inflate.hpp"
 #include "xanatoo/search.hpp"
@@ -2252,6 +2253,72 @@ void test_reddit_credentials() {
     ::setenv("XANATOO_REDDIT_CLIENT_SECRET", saved_secret.c_str(), 1);
   else
     ::unsetenv("XANATOO_REDDIT_CLIENT_SECRET");
+  fs::remove_all(dir);
+}
+
+void test_catalog_credentials() {
+  using namespace xanatoo;
+  namespace fs = std::filesystem;
+  const char* old_xdg = std::getenv("XDG_CONFIG_HOME");
+  const char* old_rawg = std::getenv("XANATOO_RAWG_API_KEY");
+  const std::string saved_xdg = old_xdg ? old_xdg : "";
+  const std::string saved_rawg = old_rawg ? old_rawg : "";
+  const fs::path dir = fs::temp_directory_path() /
+                       ("xanatoo-catalog-credentials-test-" +
+                        std::to_string(process_id()));
+  fs::create_directories(dir);
+  ::setenv("XDG_CONFIG_HOME", dir.c_str(), 1);
+  ::unsetenv("XANATOO_RAWG_API_KEY");
+
+  EXPECT(load_catalog_credentials().empty());
+  CatalogCredentials values;
+  values[CatalogKey::IgdbClientId] = "sample-client";
+  values[CatalogKey::IgdbAccessToken] = "sample-token";
+  values[CatalogKey::RawgApiKey] = "sample-key";
+  values[CatalogKey::TmdbReadToken] = "sample-read-token";
+  values[CatalogKey::TmdbApiKey] = "sample-api-key";
+  values[CatalogKey::DiscogsToken] = "sample-discogs";
+  EXPECT(save_catalog_credentials(values));
+  EXPECT(load_catalog_credentials().values == values.values);
+  EXPECT(effective_catalog_credential(CatalogKey::RawgApiKey) == "sample-key");
+  EXPECT(!catalog_credential_from_environment(CatalogKey::RawgApiKey));
+#ifndef _WIN32
+  const fs::perms mode = fs::status(catalog_credentials_path()).permissions();
+  EXPECT((mode & fs::perms::owner_read) != fs::perms::none);
+  EXPECT((mode & fs::perms::owner_write) != fs::perms::none);
+  EXPECT((mode & fs::perms::group_all) == fs::perms::none);
+  EXPECT((mode & fs::perms::others_all) == fs::perms::none);
+#endif
+  ::setenv("XANATOO_RAWG_API_KEY", "environment-value", 1);
+  EXPECT(catalog_credential_from_environment(CatalogKey::RawgApiKey));
+  EXPECT(effective_catalog_credential(CatalogKey::RawgApiKey) == "environment-value");
+  ::unsetenv("XANATOO_RAWG_API_KEY");
+  EXPECT(effective_catalog_credential(CatalogKey::RawgApiKey) == "sample-key");
+
+  auto encoded = catalog_credentials_command(values);
+  auto decoded = parse_catalog_credentials_command(encoded);
+  EXPECT(decoded.has_value());
+  if (decoded) EXPECT(decoded->values == values.values);
+  EXPECT(!parse_catalog_credentials_command("not-enough-fields"));
+  EXPECT(!parse_catalog_credentials_command(encoded + "\nextra"));
+  EXPECT(!parse_catalog_credentials_command("a\nb\nc\nd\ne\nf\nextra"));
+  EXPECT(!valid_catalog_credential("bad\nvalue"));
+  EXPECT(!valid_catalog_credential(std::string(512, 'a')));
+  values[CatalogKey::RawgApiKey] = "bad\nvalue";
+  EXPECT(!save_catalog_credentials(values));
+  EXPECT(load_catalog_credentials()[CatalogKey::RawgApiKey] == "sample-key");
+
+  set_no_save(true);
+  EXPECT(!save_catalog_credentials({}));
+  EXPECT(load_catalog_credentials()[CatalogKey::RawgApiKey] == "sample-key");
+  set_no_save(false);
+  EXPECT(save_catalog_credentials({}));
+  EXPECT(!fs::exists(catalog_credentials_path()));
+
+  if (old_xdg) ::setenv("XDG_CONFIG_HOME", saved_xdg.c_str(), 1);
+  else ::unsetenv("XDG_CONFIG_HOME");
+  if (old_rawg) ::setenv("XANATOO_RAWG_API_KEY", saved_rawg.c_str(), 1);
+  else ::unsetenv("XANATOO_RAWG_API_KEY");
   fs::remove_all(dir);
 }
 
@@ -5634,6 +5701,7 @@ int main() {
   test_tour_example();
   test_view_settings_migration();
   test_reddit_credentials();
+  test_catalog_credentials();
   test_style_sheet_parse();
   test_named_style_scopes();
   test_layout_article_gaps();

@@ -11,6 +11,7 @@
 #include "xanatoo/paths.hpp"
 #include "xanatoo/platform.hpp"
 #include "xanatoo/reddit_credentials.hpp"
+#include "xanatoo/catalog_credentials.hpp"
 #include "xanatoo/reply.hpp"
 #include "xanatoo/util.hpp"
 #include "ui_panel_imgui_order.hpp"
@@ -2114,6 +2115,7 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                     "Ctrl+Shift+Enter");
       ImGui::Separator();
       menu_item_cmd("Preferences…", UiCommand::TogglePreferences, cmd);
+      menu_item_cmd("Credentials…", UiCommand::ToggleCredentials, cmd);
       ImGui::EndMenu();
     }
     // Format / Insert only edit: not shown while browsing.
@@ -2880,8 +2882,114 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         ImGui::EndCombo();
       }
       ImGui::TextDisabled("32 px icons at the platform default; text scales too.");
+      ImGui::SeparatorText("Accounts and APIs");
+      ImGui::TextWrapped("API keys are managed in a separate dialog, not in "
+                         "view.conf or a document.");
+      if (classic_button("Credentials…")) cmd = UiCommand::ToggleCredentials;
+      ImGui::Spacing();
+      ImGui::TextDisabled("Display preferences are saved to view.conf.");
+      if (classic_button("Close")) open = false;
+    }
+    ImGui::End();
+    if (!open) cmd = UiCommand::TogglePreferences;
+  }
+
+  // ---- Credentials (all API clients) ----
+  if (state.credentials_open) {
+    bool open = true;
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_FirstUseEver,
+                            ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(610.f * scale_, 620.f * scale_),
+                            ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Credentials", &open)) {
+      if (!catalog_credentials_loaded_) {
+        const CatalogCredentials stored = load_catalog_credentials();
+        for (size_t i = 0; i < catalog_key_count; ++i) {
+          std::snprintf(catalog_credential_input_[i],
+                        sizeof(catalog_credential_input_[i]), "%s",
+                        stored.values[i].c_str());
+          catalog_credential_shown_[i] = false;
+        }
+        catalog_credentials_loaded_ = true;
+      }
+      ImGui::TextWrapped("Keys are stored only on this device, separate from "
+                         "history, bookmarks and documents. Environment "
+                         "variables override saved values. Leave a field "
+                         "empty and Save to remove that key.");
+      if (no_save())
+        ImGui::TextDisabled("--no-save: credential changes are disabled.");
+
+      const CatalogCredentials stored = load_catalog_credentials();
+      auto catalog_field = [&](CatalogKey key, const char* label) {
+        const size_t i = catalog_key_index(key);
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::SetNextItemWidth(-92.f * scale_);
+        ImGui::InputText(label, catalog_credential_input_[i],
+                         sizeof(catalog_credential_input_[i]),
+                         catalog_credential_shown_[i] ? 0 : ImGuiInputTextFlags_Password);
+        ImGui::SameLine();
+        ImGui::Checkbox("Show", &catalog_credential_shown_[i]);
+        if (catalog_credential_from_environment(key)) {
+          ImGui::TextDisabled("  Environment override: %s",
+                              catalog_key_info[i].environment);
+        } else if (!stored.values[i].empty()) {
+          ImGui::TextDisabled("  Saved locally");
+        } else {
+          ImGui::TextDisabled("  Not configured");
+        }
+        if (!valid_catalog_credential(catalog_credential_input_[i]))
+          ImGui::TextDisabled("  Invalid value (ASCII token, max 511 bytes, no spaces)");
+        ImGui::PopID();
+      };
+
+      ImGui::SeparatorText("IGDB / Twitch (games)");
+      catalog_field(CatalogKey::IgdbClientId, "Client ID");
+      catalog_field(CatalogKey::IgdbAccessToken, "Access token");
+      ImGui::TextDisabled("The Twitch app access token expires and must be renewed.");
+      if (classic_button("IGDB API docs"))
+        xanatoo::sdl::open_url("https://api-docs.igdb.com/");
+
+      ImGui::SeparatorText("RAWG (games)");
+      catalog_field(CatalogKey::RawgApiKey, "API key");
+      if (classic_button("RAWG API docs"))
+        xanatoo::sdl::open_url("https://rawg.io/apidocs");
+
+      ImGui::SeparatorText("TMDB (movies and TV)");
+      catalog_field(CatalogKey::TmdbReadToken, "API read token");
+      catalog_field(CatalogKey::TmdbApiKey, "API key v3");
+      ImGui::TextDisabled("Read token is preferred; API key v3 is a fallback.");
+      if (classic_button("TMDB API settings"))
+        xanatoo::sdl::open_url("https://www.themoviedb.org/settings/api");
+
+      ImGui::SeparatorText("Discogs (music)");
+      catalog_field(CatalogKey::DiscogsToken, "Personal token");
+      if (classic_button("Discogs developer settings"))
+        xanatoo::sdl::open_url("https://www.discogs.com/settings/developers");
+
+      ImGui::Spacing();
+      bool catalog_values_valid = true;
+      for (const auto& input : catalog_credential_input_)
+        if (!valid_catalog_credential(input)) catalog_values_valid = false;
+      ImGui::BeginDisabled(no_save() || !catalog_values_valid);
+      if (classic_button("Save catalog keys")) {
+        CatalogCredentials values;
+        for (size_t i = 0; i < catalog_key_count; ++i)
+          values.values[i] = catalog_credential_input_[i];
+        cmd = UiCommand::SaveCatalogCredentials;
+        result.arg = catalog_credentials_command(values);
+      }
+      ImGui::EndDisabled();
+      ImGui::SameLine();
+      ImGui::BeginDisabled(no_save());
+      if (classic_button("Remove all catalog keys")) {
+        cmd = UiCommand::ClearCatalogCredentials;
+        for (auto& input : catalog_credential_input_) input[0] = '\0';
+      }
+      ImGui::EndDisabled();
+
 #if defined(XANATOO_REDDIT) && XANATOO_REDDIT
-      ImGui::SeparatorText("Reddit API (optional)");
+      ImGui::SeparatorText("Reddit (read-only OAuth)");
       if (!reddit_credentials_loaded_) {
         const RedditCredentials c = load_reddit_credentials();
         std::snprintf(reddit_client_id_, sizeof(reddit_client_id_), "%s",
@@ -2890,74 +2998,60 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
                       c.client_secret.c_str());
         reddit_credentials_loaded_ = true;
       }
-      ImGui::TextWrapped("Reddit may block anonymous requests (HTTP 403). "
-                         "Approved Data API clients can use app-only OAuth credentials.");
-      if (reddit_credentials_from_environment()) {
+      ImGui::TextWrapped("For approved Reddit Data API clients. Do not enter "
+                         "your Reddit account password.");
+      if (reddit_credentials_from_environment())
         ImGui::TextDisabled("Environment variables override saved credentials.");
-      } else if (load_reddit_credentials().complete()) {
-        ImGui::TextDisabled("Saved credentials configured locally.");
-      } else {
-        ImGui::TextDisabled("No local credentials configured.");
-      }
-      ImGui::InputText("Client ID", reddit_client_id_, sizeof(reddit_client_id_));
-      ImGui::InputText("Client secret", reddit_client_secret_,
+      else if (load_reddit_credentials().complete())
+        ImGui::TextDisabled("Saved locally");
+      else
+        ImGui::TextDisabled("Not configured");
+      ImGui::InputText("Client ID##reddit", reddit_client_id_,
+                       sizeof(reddit_client_id_));
+      ImGui::InputText("Client secret##reddit", reddit_client_secret_,
                        sizeof(reddit_client_secret_),
                        reddit_secret_visible_ ? 0 : ImGuiInputTextFlags_Password);
       ImGui::SameLine();
-      ImGui::Checkbox("Show", &reddit_secret_visible_);
-      if (no_save()) ImGui::TextDisabled("Saving is disabled for this session.");
-      const bool complete = reddit_client_id_[0] && reddit_client_secret_[0];
-      ImGui::BeginDisabled(!complete || no_save());
-      if (classic_button("Save credentials")) {
+      ImGui::Checkbox("Show##reddit", &reddit_secret_visible_);
+      ImGui::BeginDisabled(no_save() || !reddit_client_id_[0] ||
+                           !reddit_client_secret_[0]);
+      if (classic_button("Save Reddit credentials")) {
         cmd = UiCommand::SaveRedditCredentials;
-        result.arg = std::string(reddit_client_id_) + "\n" +
-                     reddit_client_secret_;
+        result.arg = std::string(reddit_client_id_) + "\n" + reddit_client_secret_;
       }
       ImGui::EndDisabled();
       ImGui::SameLine();
       ImGui::BeginDisabled(no_save());
-      if (classic_button("Clear saved credentials")) {
+      if (classic_button("Remove Reddit credentials")) {
         cmd = UiCommand::ClearRedditCredentials;
         reddit_client_id_[0] = reddit_client_secret_[0] = '\0';
       }
       ImGui::EndDisabled();
-      if (ImGui::TreeNode("How to obtain credentials")) {
-        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 455.f * scale_);
-        ImGui::TextWrapped("1. Sign in to Reddit and request Data API access "
-                           "for Xanatoo (a read-only desktop client). "
-                           "Reddit requires approval for external apps.");
-        ImGui::TextWrapped("2. If approved, create a personal 'script' OAuth "
-                           "app (not 'installed') in app settings. Copy the ID "
-                           "beneath its name and the client secret.");
-        ImGui::TextWrapped("3. Paste both values above and click Save. "
-                           "You do not need to enter a Reddit password here.");
-        ImGui::TextWrapped("Devvit apps do not provide credentials for "
-                           "external clients. Reddit plans to end legacy "
-                           "public API access in March 2027.");
-        ImGui::PopTextWrapPos();
-        if (classic_button("Request API access"))
-          xanatoo::sdl::open_url(
-              "https://support.reddithelp.com/hc/en-us/requests/new?"
-              "ticket_form_id=14868593862164");
-        ImGui::SameLine();
-        if (classic_button("OAuth app settings"))
-          xanatoo::sdl::open_url("https://www.reddit.com/prefs/apps");
-        ImGui::TreePop();
-      }
+      if (classic_button("Request Reddit API access"))
+        xanatoo::sdl::open_url("https://support.reddithelp.com/hc/en-us/requests/new?"
+                               "ticket_form_id=14868593862164");
+      ImGui::SameLine();
+      if (classic_button("Reddit app settings"))
+        xanatoo::sdl::open_url("https://www.reddit.com/prefs/apps");
 #endif
-      ImGui::Spacing();
-#if defined(XANATOO_REDDIT) && XANATOO_REDDIT
-      ImGui::TextDisabled("Display options: view.conf; Reddit keys: reddit.conf.");
-#else
-      ImGui::TextDisabled("Saved to view.conf; layout options are in View.");
-#endif
-      if (classic_button("Close")) open = false;
+      ImGui::Separator();
+      ImGui::TextDisabled("Stored in catalog-credentials.conf and reddit.conf "
+                           "in the private config directory.");
+      if (classic_button("Close##credentials")) open = false;
     }
     ImGui::End();
-    if (!open) cmd = UiCommand::TogglePreferences;
+    if (!open) cmd = UiCommand::ToggleCredentials;
   } else {
+    if (catalog_credentials_loaded_ || reddit_credentials_loaded_) {
+      for (auto& input : catalog_credential_input_)
+        std::memset(input, 0, sizeof(input));
+      std::memset(reddit_client_id_, 0, sizeof(reddit_client_id_));
+      std::memset(reddit_client_secret_, 0, sizeof(reddit_client_secret_));
+    }
+    catalog_credentials_loaded_ = false;
     reddit_credentials_loaded_ = false;
     reddit_secret_visible_ = false;
+    for (bool& shown : catalog_credential_shown_) shown = false;
   }
 
   // ---- Style sheet manager / editor, embedded in its native FloatWindow ----

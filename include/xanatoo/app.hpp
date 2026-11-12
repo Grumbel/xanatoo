@@ -836,6 +836,7 @@ struct App {
   uint64_t style_save_generation = 0;
   bool downloads_panel_open = false;
   bool preferences_open = false;  // Edit → Preferences (ImGui window)
+  bool credentials_open = false;  // Edit → Credentials (ImGui window)
   bool bookmarks_panel_open = false;
   std::string status_notice;
   Uint32 status_notice_until = 0;
