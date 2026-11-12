@@ -106,3 +106,83 @@ All providers go through the existing configured search engine, history,
 bookmark and HTTP infrastructure. Custom search engines still live in
 `search.sexp`. HTTPS-disabled minimal builds report that remote media records
 are unavailable, instead of trying a local file or unsafe network fallback.
+
+### Expanded catalog engines (2026-11-12)
+
+These are native search-result documents, not web-page scraping; clicking a
+result opens a validated `media:<source>:<id>` address. Search fetches the
+source's query API; clicking a record fetches its detail API. No remote data
+is bulk-imported.
+
+| Media | Search engine (`search:<id>:…`) | Native record | Authentication |
+|---|---|---|---|
+| Video games | `steam` | `media:steam:<appid>` | None; Steam **undocumented** store JSON endpoint, limited to its small search result set |
+| Video games | `igdb` | `media:igdb:<id>` | Twitch Client ID + OAuth app access token |
+| Video games | `rawg` | `media:rawg:<id>` | RAWG API key; noncommercial free tier and attribution |
+| Interactive fiction | `ifdb` | `media:ifdb:<tuid>` | None; IFDB requests low-volume use |
+| Books | `googlebooks` | `media:googlebooks:<volume-id>` | None for the public search endpoint, quota dependent |
+| Books/works | `bookbrainz-work`, `bookbrainz-edition` | `media:bookbrainz-work:<uuid>` / `media:bookbrainz-edition:<uuid>` | None, alpha API |
+| Movies, TV | `tmdb-movie`, `tmdb-tv` | `media:tmdb-movie:<id>` / `media:tmdb-tv:<id>` | TMDB API key or read token |
+| Anime, manga | `anilist-anime`, `anilist-manga` | `media:anilist-anime:<id>` / `media:anilist-manga:<id>` | None; POST GraphQL, rate limited |
+| Periodicals | `zdb` | `media:zdb:<ZDB-ID>` | None; serial **titles**, not every issue |
+| Comics | `gcd` | `media:gcd:<series-id>` | Anonymous test quota; may require account in future |
+| Historic books, papers, film, music | `loc-books`, `loc-newspapers`, `loc-films`, `loc-music` | `media:loc:<item-id>` | None; digitized Library of Congress holdings, not the whole bibliographic catalog |
+| Music releases | `discogs` | `media:discogs:<release-id>` | Discogs personal token |
+
+Existing `openlibrary`, `tvmaze`, `musicbrainz`, `wikidata`, `openalex`,
+`crossref`, `archive`, and `gutenberg` remain unchanged. This expands search
+*and* linked record browsing within the existing toolbar and address bar.
+
+#### Optional credentials
+
+Only provide the variables required by services you actually use. Examples:
+
+```sh
+export XANATOO_TMDB_READ_TOKEN='…'       # alternatively: XANATOO_TMDB_API_KEY
+export XANATOO_RAWG_API_KEY='…'
+export XANATOO_IGDB_CLIENT_ID='…'
+export XANATOO_IGDB_ACCESS_TOKEN='…'     # short-lived Twitch app OAuth token
+export XANATOO_DISCOGS_TOKEN='…'
+nix run .#xanatoo
+```
+
+Credentials are **not** included in `search:` or `media:` URLs, history,
+bookmarks or serialized sessions. For a credentialed provider, the fetch path
+only sends authentication to an exact built-in API host, over HTTPS, and
+**does not follow redirects**. API keys requiring a query argument are
+inserted only for the outgoing request. Twitch OAuth tokens expire and must be
+replaced when invalid; this implementation does not perform automatic OAuth
+login. Do not store these values in Nix store strings or a world-readable
+configuration file.
+
+The global search engine dropdown is intentionally also the provider selector;
+no independent media search panel or giant local replica is introduced.
+
+Examples: `search:steam:portal`, `search:ifdb:anchorhead`,
+`search:loc-newspapers:space`, `search:zdb:c64`, `search:gcd:batman`,
+`search:tmdb-movie:alien` (requires token), `search:anilist-manga:akira`.
+
+#### Boundaries and follow-on work
+
+The client currently offers user-initiated lookup only, not background
+crawling, pagination or data synchronization. Provider rate limits still
+apply. The `gcd` integration searches **series**, not individual issues. ZDB
+covers **periodical titles**, not issue-level page scans. Steam's store API is
+undocumented and may change. The GCD API allows only a small anonymous testing
+quota; do not use it for a bulk mirror. Most record views intentionally show a
+brief summary and link to the authoritative source rather than reconstructing
+all nested provider data.
+
+IGDB, TMDB, RAWG and Discogs have access or licensing restrictions; no keys are
+bundled. MobyGames is transitioning from API v1 to v2, while Comic Vine and
+Metron require credentials. GOGDB, IMDb, Libretro, Open Library, MusicBrainz,
+and ZDB *bulk data* need a separate import/index subsystem rather than an
+interactive query mapper. These sources are **not** silently scraped and no
+local mirror is claimed here.
+
+Source specs: https://api-docs.igdb.com/ ; https://rawg.io/apidocs ;
+https://developer.themoviedb.org/docs/authentication-application ;
+https://docs.anilist.co/guide/graphql/ ;
+https://zeitschriftendatenbank.de/services/schnittstellen/json-api ;
+https://www.comics.org/api/ ; https://ifdb.org/api/ ;
+https://www.loc.gov/apis/json-and-yaml/ ; https://api.bookbrainz.org/1/docs/ .

@@ -4193,6 +4193,95 @@ void test_search_results() {
        R"({"id":5,"name":"Fringe","summary":"<p>Science fiction</p>"})"),
        "# Fringe"));
 
+  // Additional native catalog search + record routing.
+  EXPECT(has(search_results_markdown(
+      plan("steam", "https://store.steampowered.com/api/storesearch/", "portal"),
+      R"({"items":[{"type":"app","name":"Portal","id":400},
+          {"type":"sub","name":"Package","id":99}]})"),
+      "[Portal](media:steam:400)"));
+  EXPECT(!has(search_results_markdown(
+      plan("steam", "https://store.steampowered.com/api/storesearch/", "portal"),
+      R"({"items":[{"type":"sub","name":"Package","id":99}]})"),
+      "media:steam:99"));
+  EXPECT(has(search_results_markdown(
+      plan("igdb", "https://api.igdb.com/v4/games", "portal"),
+      R"([{"id":1942,"name":"Portal"}])"),
+      "[Portal](media:igdb:1942)"));
+  EXPECT(has(search_results_markdown(
+      plan("anilist-anime", "https://graphql.anilist.co/", "cowboy"),
+      R"({"data":{"Page":{"media":[{"id":1,"title":{"romaji":"Cowboy Bebop"}}]}}})"),
+      "[Cowboy Bebop](media:anilist-anime:1)"));
+  EXPECT(has(search_results_markdown(
+      plan("rawg", "https://api.rawg.io/api/games", "portal"),
+      R"({"results":[{"id":1,"name":"Portal","released":"2007-10-10"}]})"),
+      "[Portal](media:rawg:1)"));
+  EXPECT(has(search_results_markdown(
+      plan("tmdb", "https://api.themoviedb.org/3/search/movie", "alien"),
+      R"({"results":[{"id":348,"title":"Alien","release_date":"1979-05-25"}]})"),
+      "[Alien](media:tmdb-movie:348)"));
+  EXPECT(has(search_results_markdown(
+      plan("tmdb", "https://api.themoviedb.org/3/search/tv", "fringe"),
+      R"({"results":[{"id":1705,"name":"Fringe"}]})"),
+      "[Fringe](media:tmdb-tv:1705)"));
+  EXPECT(has(search_results_markdown(
+      plan("ifdb", "https://ifdb.org/search?json&game", "drifter"),
+      R"({"games":[{"tuid":"k82q3libhff6ks8l","title":"Deep Space Drifter","author":"Roberts"}]})"),
+      "[Deep Space Drifter](media:ifdb:k82q3libhff6ks8l)"));
+  EXPECT(has(search_results_markdown(
+      plan("bookbrainz", "https://api.bookbrainz.org/1/search?type=work", "dune"),
+      R"({"searchResult":[{"bbid":"12345678-1234-1234-1234-123456789abc", "defaultAlias":{"name":"Dune"}}]})"),
+      "[Dune](media:bookbrainz-work:12345678-1234-1234-1234-123456789abc)"));
+  EXPECT(has(search_results_markdown(
+      plan("googlebooks", "https://www.googleapis.com/books/v1/volumes", "dune"),
+      R"({"items":[{"id":"book_A-12","volumeInfo":{"title":"Dune", "authors":["Frank Herbert"]}}]})"),
+      "[Dune](media:googlebooks:book_A-12)"));
+  EXPECT(has(search_results_markdown(
+      plan("loc", "https://www.loc.gov/books", "music"),
+      R"({"results":[{"id":"https://www.loc.gov/item/2012735123/","title":"Songbook"}]})"),
+      "[Songbook](media:loc:2012735123)"));
+  EXPECT(has(search_results_markdown(
+      plan("zdb", "https://zeitschriftendatenbank.de/api/tit.jsonld", "c64"),
+      R"({"member":[{"identifier":"873319-3","title":"Retro magazine", "temporal":"1980-2000"}]})"),
+      "[Retro magazine](media:zdb:873319-3)"));
+  EXPECT(has(search_results_markdown(
+      plan("gcd", "https://www.comics.org/api/series/name/", "batman"),
+      R"({"results":[{"id":7096,"name":"Batman","year_began":1940}]})"),
+      "[Batman](media:gcd:7096)"));
+  EXPECT(has(search_results_markdown(
+      plan("discogs", "https://api.discogs.com/database/search", "x"),
+      R"({"results":[{"id":123,"type":"release","title":"An Album"}]})"),
+      "[An Album](media:discogs:123)"));
+  EXPECT(media_plan("media:steam:400")->url ==
+         "https://store.steampowered.com/api/appdetails?appids=400&l=english&cc=us");
+  EXPECT(media_plan("media:zdb:873319-3")->url ==
+         "https://zeitschriftendatenbank.de/api/tit/873319-3.jsonld");
+  EXPECT(media_plan("media:loc:2012735123")->url ==
+         "https://www.loc.gov/item/2012735123/?fo=json");
+  EXPECT(media_plan("media:igdb:1942")->url == "https://api.igdb.com/v4/games");
+  EXPECT(!media_plan("media:steam:1/../../bad"));
+  EXPECT(!media_plan("media:googlebooks:http.example"));
+  EXPECT(!media_plan("media:tmdb-movie:Q1"));
+  EXPECT(!media_plan("media:zdb:../host"));
+  EXPECT(media_plan("media:zdb:12345-X").has_value());
+  EXPECT(!media_plan("media:bookbrainz-work:------bad------"));
+  EXPECT(!media_plan("media:igdb:1%3Blimit+1000"));
+  EXPECT(has(media_results_markdown(*media_plan("media:steam:400"),
+      R"({"400":{"success":true,"data":{"name":"Portal","short_description":"<p>Puzzles</p>"}}})"),
+      "# Portal"));
+  EXPECT(has(media_results_markdown(*media_plan("media:googlebooks:abc"),
+      R"({"volumeInfo":{"title":"A Book","description":"A description"}})"),
+      "# A Book"));
+  EXPECT(has(media_results_markdown(*media_plan("media:anilist-manga:2"),
+      R"({"data":{"Media":{"id":2,"title":{"romaji":"Manga"}}}})"),
+      "# Manga"));
+  for (const auto& engine : builtin_engines()) {
+    if (!is_json_search_kind(engine.kind)) continue;
+    EXPECT(is_search_kind(engine.kind));
+    auto p = search_plan(search_ref(engine.id, "test search"), builtin_engines());
+    EXPECT(p.has_value());
+    EXPECT(p && p->url.starts_with("https://"));
+  }
+
   // Gutendex.
   const std::string gu = search_results_markdown(
       plan("gutendex", "https://gutendex.com/books/?search=x", "wells"),

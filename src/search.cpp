@@ -141,6 +141,60 @@ const std::vector<SearchEngine>& builtin_engines() {
       {"crossref", "Crossref", "cr", "CR",
        "https://api.crossref.org/works?query=%s&rows=25", "crossref", "+",
        {"crossref.org", "doi.org"}},
+      // More published-media sources: native JSON catalogs, no scraping.
+      {"steam", "Steam games", "st", "St",
+       "https://store.steampowered.com/api/storesearch/?term=%s&l=english&cc=us",
+       "steam", "+", {"store.steampowered.com", "steamcommunity.com"}},
+      {"igdb", "IGDB games (Twitch token)", "ig", "IG",
+       "https://api.igdb.com/v4/games?search=%s", "igdb", "+", {"igdb.com"}},
+      {"anilist-anime", "AniList anime", "anime", "An",
+       "https://graphql.anilist.co/?search=%s", "anilist-anime", "+",
+       {"anilist.co"}},
+      {"anilist-manga", "AniList manga", "manga", "Mn",
+       "https://graphql.anilist.co/?search=%s", "anilist-manga", "+",
+       {"anilist.co"}},
+      {"rawg", "RAWG games (API key)", "rw", "Rw",
+       "https://api.rawg.io/api/games?search=%s&page_size=25", "rawg", "+",
+       {"rawg.io"}},
+      {"tmdb-movie", "TMDB movies (API key)", "tm", "Tm",
+       "https://api.themoviedb.org/3/search/movie?query=%s", "tmdb", "+",
+       {"themoviedb.org"}},
+      {"tmdb-tv", "TMDB series (API key)", "tt", "Tt",
+       "https://api.themoviedb.org/3/search/tv?query=%s", "tmdb", "+",
+       {"themoviedb.org"}},
+      {"ifdb", "IFDB interactive fiction", "if", "IF",
+       "https://ifdb.org/search?json&game&searchfor=%s", "ifdb", "+",
+       {"ifdb.org"}},
+      {"bookbrainz-work", "BookBrainz works", "bw", "Bw",
+       "https://api.bookbrainz.org/1/search?q=%s&type=work&size=25&from=0",
+       "bookbrainz", "+", {"bookbrainz.org"}},
+      {"bookbrainz-edition", "BookBrainz editions", "be", "Be",
+       "https://api.bookbrainz.org/1/search?q=%s&type=edition&size=25&from=0",
+       "bookbrainz", "+", {"bookbrainz.org"}},
+      {"googlebooks", "Google Books", "gb", "Gb",
+       "https://www.googleapis.com/books/v1/volumes?q=%s&maxResults=25",
+       "googlebooks", "+", {"books.google.com"}},
+      {"loc-books", "Library of Congress books", "lc", "LC",
+       "https://www.loc.gov/books/?q=%s&fo=json&c=25", "loc", "+",
+       {"loc.gov"}},
+      {"loc-newspapers", "Library of Congress newspapers", "ln", "Ln",
+       "https://www.loc.gov/newspapers/?q=%s&fo=json&c=25", "loc", "+",
+       {"loc.gov"}},
+      {"loc-films", "Library of Congress film", "lf", "Lf",
+       "https://www.loc.gov/film-and-videos/?q=%s&fo=json&c=25", "loc", "+",
+       {"loc.gov"}},
+      {"loc-music", "Library of Congress sheet music", "lm", "Lm",
+       "https://www.loc.gov/notated-music/?q=%s&fo=json&c=25", "loc", "+",
+       {"loc.gov"}},
+      {"zdb", "ZDB periodicals", "zdb", "ZDB",
+       "https://zeitschriftendatenbank.de/api/tit.jsonld?q=%s&size=25",
+       "zdb", "+", {"zeitschriftendatenbank.de", "zdb-katalog.de"}},
+      {"gcd", "Grand Comics Database series", "gcd", "GCD",
+       "https://www.comics.org/api/series/name/%s/", "gcd", "%20",
+       {"comics.org"}},
+      {"discogs", "Discogs releases (token)", "dg", "Dg",
+       "https://api.discogs.com/database/search?q=%s&type=release&per_page=25",
+       "discogs", "+", {"discogs.com"}},
       {"standard-ebooks", "Standard Ebooks", "se", "SE",
        "https://standardebooks.org/ebooks?query=%s", "page", "+",
        {"standardebooks.org"}},
@@ -195,7 +249,12 @@ bool is_json_search_kind(std::string_view kind) {
          kind == "lemmy" || kind == "bluesky" || kind == "gutendex" ||
          kind == "openlibrary" || kind == "tvmaze" ||
          kind == "musicbrainz" || kind == "wikidata" ||
-         kind == "openalex" || kind == "crossref";
+         kind == "openalex" || kind == "crossref" || kind == "steam" ||
+         kind == "igdb" || kind == "rawg" || kind == "tmdb" ||
+         kind == "anilist-anime" || kind == "anilist-manga" ||
+         kind == "googlebooks" || kind == "loc" || kind == "zdb" ||
+         kind == "ifdb" || kind == "bookbrainz" ||
+         kind == "gcd" || kind == "discogs";
 }
 
 bool is_search_kind(std::string_view kind) {
