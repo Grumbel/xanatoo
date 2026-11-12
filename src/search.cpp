@@ -121,6 +121,26 @@ const std::vector<SearchEngine>& builtin_engines() {
        "&fl%5B%5D=creator&sort%5B%5D=downloads+desc&rows=40&output=json",
        "archive", "+",
        {"ia:", "archive.org"}},
+      // Published media: public, unauthenticated catalog APIs.
+      {"openlibrary", "Open Library", "ol", "OL",
+       "https://openlibrary.org/search.json?q=%s&limit=30", "openlibrary", "+",
+       {"openlibrary.org"}},
+      {"tvmaze", "TVmaze", "tv", "TV",
+       "https://api.tvmaze.com/search/shows?q=%s", "tvmaze", "+",
+       {"tvmaze.com", "api.tvmaze.com"}},
+      {"musicbrainz", "MusicBrainz (releases)", "mb", "MB",
+       "https://musicbrainz.org/ws/2/release-group/?query=%s&fmt=json&limit=25",
+       "musicbrainz", "+", {"musicbrainz.org"}},
+      {"wikidata", "Wikidata", "wdt", "WD",
+       "https://www.wikidata.org/w/api.php?action=wbsearchentities&search=%s"
+       "&language=en&limit=30&format=json", "wikidata", "+",
+       {"wikidata.org"}},
+      {"openalex", "OpenAlex", "oa", "OA",
+       "https://api.openalex.org/works?search=%s&per-page=25", "openalex", "+",
+       {"openalex.org"}},
+      {"crossref", "Crossref", "cr", "CR",
+       "https://api.crossref.org/works?query=%s&rows=25", "crossref", "+",
+       {"crossref.org", "doi.org"}},
       {"standard-ebooks", "Standard Ebooks", "se", "SE",
        "https://standardebooks.org/ebooks?query=%s", "page", "+",
        {"standardebooks.org"}},
@@ -172,7 +192,10 @@ const std::vector<SearchEngine>& builtin_engines() {
 
 bool is_json_search_kind(std::string_view kind) {
   return kind == "wikipedia" || kind == "hn" || kind == "archive" ||
-         kind == "lemmy" || kind == "bluesky" || kind == "gutendex";
+         kind == "lemmy" || kind == "bluesky" || kind == "gutendex" ||
+         kind == "openlibrary" || kind == "tvmaze" ||
+         kind == "musicbrainz" || kind == "wikidata" ||
+         kind == "openalex" || kind == "crossref";
 }
 
 bool is_search_kind(std::string_view kind) {

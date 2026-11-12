@@ -120,6 +120,21 @@ void fetch_page(std::string url, std::shared_ptr<FetchShared> out,
     out->final_url = shown;
     return;
   }
+  if (xanatoo::is_media_ref(url)) {
+    const auto plan = xanatoo::media_plan(url);
+    if (!plan) {
+      out->error = "Invalid media record: " + url;
+    } else {
+#if defined(XANATOO_HTTPS) && XANATOO_HTTPS
+      out->service = "Media";
+      out->doc = xanatoo::media_fetch(*plan, &out->error);
+#else
+      out->error = "Media records require HTTPS support";
+#endif
+    }
+    out->done.store(true, std::memory_order_release);
+    return;
+  }
   // Feeds first: /.rss, /feeds/… and /rss on Reddit / Lemmy / HN are feeds.
   if (xanatoo::is_feed_url(url)) {
 #if defined(XANATOO_FEEDS) && XANATOO_FEEDS
@@ -486,6 +501,14 @@ bool remote_fetch_supported(std::string_view url, std::string* why) {
     }
     return remote_fetch_supported(xanatoo::search_target(url, xanatoo::load_engines()),
                                   why);
+  }
+  if (xanatoo::is_media_ref(url)) {
+    if (!xanatoo::media_plan(url)) return no("invalid media record");
+#if defined(XANATOO_HTTPS) && XANATOO_HTTPS
+    return true;
+#else
+    return no("media records require HTTPS support");
+#endif
   }
   if (xanatoo::is_feed_url(url)) {
 #if defined(XANATOO_FEEDS) && XANATOO_FEEDS

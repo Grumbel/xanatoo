@@ -314,6 +314,115 @@ std::string map_gutendex(const SearchPlan& plan, std::string_view json) {
   return md;
 }
 
+// ---- Published-media catalogs --------------------------------------------
+
+std::string metadata(std::string_view title, std::string_view details) {
+  if (details.empty()) return {};
+  return " — " + search_md_escape(one_line(details, 230));
+}
+
+std::string media_link(std::string_view title, std::string_view source,
+                       std::string_view id) {
+  return link(title, "media:" + std::string(source) + ":" + std::string(id));
+}
+
+std::string map_openlibrary(const SearchPlan& plan, std::string_view json) {
+  auto hits = json_object_array_after_key(json, "docs");
+  std::string md = header("Open Library", plan);
+  if (hits.empty()) return md + "No results.\n";
+  for (const auto& hit : hits) {
+    const std::string top = json_top_level(hit);
+    const std::string key = json_str_field(top, "key");
+    const std::string title = json_str_field(top, "title");
+    if (key.empty() || title.empty()) continue;
+    const std::string id = key.substr(key.find_last_of('/') + 1);
+    md += "- " + media_link(title, "openlibrary", id);
+    md += metadata("", first_string(hit, "author_name"));
+    const int64_t year = json_int_field(top, "first_publish_year");
+    if (year > 0) md += " · " + std::to_string(year);
+    md += "\n";
+  }
+  return md;
+}
+
+std::string map_tvmaze(const SearchPlan& plan, std::string_view json) {
+  // The API returns an array of {score, show}; unlike named arrays in other APIs.
+  std::string md = header("TVmaze", plan);
+  const auto shows = json_object_array_after_key(
+      std::string("{\"items\":") + std::string(json) + "}", "items");
+  for (const auto& item : shows) {
+    const std::string show = std::string(json_object_after_key(item, "show"));
+    const std::string top = json_top_level(show);
+    const int64_t id = json_int_field(top, "id");
+    const std::string name = json_str_field(top, "name");
+    if (id <= 0 || name.empty()) continue;
+    md += "- " + media_link(name, "tvmaze", std::to_string(id));
+    md += metadata("", json_str_field(top, "premiered"));
+    md += "\n";
+  }
+  return md;
+}
+
+std::string map_musicbrainz(const SearchPlan& plan, std::string_view json) {
+  std::string md = header("MusicBrainz", plan);
+  for (const auto& hit : json_object_array_after_key(json, "release-groups")) {
+    const std::string top = json_top_level(hit);
+    const std::string id = json_str_field(top, "id");
+    const std::string title = json_str_field(top, "title");
+    if (id.empty() || title.empty()) continue;
+    md += "- " + media_link(title, "musicbrainz", id);
+    md += metadata("", json_str_field(top, "first-release-date"));
+    md += "\n";
+  }
+  return md;
+}
+
+std::string map_wikidata(const SearchPlan& plan, std::string_view json) {
+  std::string md = header("Wikidata", plan);
+  for (const auto& hit : json_object_array_after_key(json, "search")) {
+    const std::string top = json_top_level(hit);
+    const std::string id = json_str_field(top, "id");
+    const std::string title = json_str_field(top, "label");
+    if (id.empty() || title.empty()) continue;
+    md += "- " + media_link(title, "wikidata", id);
+    md += metadata("", json_str_field(top, "description"));
+    md += "\n";
+  }
+  return md;
+}
+
+std::string map_openalex(const SearchPlan& plan, std::string_view json) {
+  std::string md = header("OpenAlex", plan);
+  for (const auto& hit : json_object_array_after_key(json, "results")) {
+    const std::string top = json_top_level(hit);
+    const std::string id = json_str_field(top, "id");
+    const std::string title = json_str_field(top, "display_name");
+    if (id.empty() || title.empty()) continue;
+    // The returned URL is an API identifier, not an arbitrary URL.
+    const std::string key = id.substr(id.find_last_of('/') + 1);
+    md += "- " + media_link(title, "openalex", key);
+    const int64_t year = json_int_field(top, "publication_year");
+    if (year > 0) md += " — " + std::to_string(year);
+    md += "\n";
+  }
+  return md;
+}
+
+std::string map_crossref(const SearchPlan& plan, std::string_view json) {
+  std::string md = header("Crossref", plan);
+  const std::string message = std::string(json_object_after_key(json, "message"));
+  for (const auto& hit : json_object_array_after_key(message, "items")) {
+    const std::string top = json_top_level(hit);
+    const std::string doi = json_str_field(top, "DOI");
+    const std::string title = first_string(hit, "title");
+    if (doi.empty() || title.empty()) continue;
+    md += "- " + link(title, "https://doi.org/" + doi);
+    md += metadata("", first_string(hit, "publisher"));
+    md += "\n";
+  }
+  return md;
+}
+
 }  // namespace
 
 std::string search_md_escape(std::string_view text) {
@@ -346,6 +455,82 @@ std::string search_md_escape(std::string_view text) {
   return out;
 }
 
+bool is_media_ref(std::string_view ref) {
+  return starts_with(ref, "media:");
+}
+
+std::optional<SearchPlan> media_plan(std::string_view ref) {
+  if (!is_media_ref(ref)) return std::nullopt;
+  ref.remove_prefix(6);
+  const size_t sep = ref.find(':');
+  if (sep == std::string_view::npos) return std::nullopt;
+  const std::string source(ref.substr(0, sep));
+  const std::string id(ref.substr(sep + 1));
+  if (id.empty() || id.size() > 120) return std::nullopt;
+  for (unsigned char c : id)
+    if (!std::isalnum(c) && c != '-' && c != '_' && c != '.') return std::nullopt;
+  SearchPlan p;
+  p.kind = source;
+  p.query = id;
+  if (source == "openlibrary" && id.size() > 3 && id.starts_with("OL") &&
+      id.back() == 'W')
+    p.url = "https://openlibrary.org/works/" + id + ".json";
+  else if (source == "tvmaze" && id.find_first_not_of("0123456789") == std::string::npos)
+    p.url = "https://api.tvmaze.com/shows/" + id;
+  else if (source == "musicbrainz" && id.size() == 36)
+    p.url = "https://musicbrainz.org/ws/2/release-group/" + id + "?fmt=json";
+  else if (source == "wikidata" && id[0] == 'Q' && id.size() > 1 &&
+           id.substr(1).find_first_not_of("0123456789") == std::string::npos)
+    p.url = "https://www.wikidata.org/wiki/Special:EntityData/" + id + ".json";
+  else if (source == "openalex" && id[0] == 'W' && id.size() > 1 &&
+           id.substr(1).find_first_not_of("0123456789") == std::string::npos)
+    p.url = "https://api.openalex.org/works/" + id;
+  if (p.url.empty()) return std::nullopt;
+  return p;
+}
+
+std::string media_results_markdown(const SearchPlan& plan, std::string_view json) {
+  const std::string top = json_top_level(json);
+  std::string title;
+  std::string desc;
+  std::string external;
+  if (plan.kind == "openlibrary") {
+    title = json_str_field(top, "title");
+    desc = json_str_field(top, "description");
+    if (desc.empty()) desc = json_str_field(
+        json_top_level(std::string(json_object_after_key(json, "description"))), "value");
+    external = "https://openlibrary.org/works/" + plan.query;
+  } else if (plan.kind == "tvmaze") {
+    title = json_str_field(top, "name");
+    desc = one_line(html_to_plain(json_str_field(top, "summary")));
+    external = "https://www.tvmaze.com/shows/" + plan.query;
+  } else if (plan.kind == "musicbrainz") {
+    title = json_str_field(top, "title");
+    desc = json_str_field(top, "first-release-date");
+    external = "https://musicbrainz.org/release-group/" + plan.query;
+  } else if (plan.kind == "wikidata") {
+    const std::string entities = std::string(json_object_after_key(json, "entities"));
+    const std::string entity = std::string(json_object_after_key(entities, plan.query));
+    const std::string labels = std::string(json_object_after_key(entity, "labels"));
+    const std::string en = std::string(json_object_after_key(labels, "en"));
+    title = json_str_field(en, "value");
+    const std::string descriptions = std::string(json_object_after_key(entity, "descriptions"));
+    desc = json_str_field(std::string(json_object_after_key(descriptions, "en")), "value");
+    external = "https://www.wikidata.org/wiki/" + plan.query;
+  } else if (plan.kind == "openalex") {
+    title = json_str_field(top, "display_name");
+    const int64_t year = json_int_field(top, "publication_year");
+    if (year > 0) desc = std::to_string(year);
+    external = "https://openalex.org/" + plan.query;
+  }
+  if (title.empty()) title = plan.query;
+  std::string md = "# " + search_md_escape(title) + "\n\n";
+  if (!desc.empty()) md += search_md_escape(desc) + "\n\n";
+  md += "**Source:** " + search_md_escape(plan.kind) + " · " +
+        link("View original record", external) + "\n";
+  return md;
+}
+
 std::string search_results_markdown(const SearchPlan& plan, std::string_view json) {
   if (plan.kind == "wikipedia") return map_wikipedia(plan, json);
   if (plan.kind == "hn") return map_hn(plan, json);
@@ -353,11 +538,28 @@ std::string search_results_markdown(const SearchPlan& plan, std::string_view jso
   if (plan.kind == "lemmy") return map_lemmy(plan, json);
   if (plan.kind == "bluesky") return map_bluesky(plan, json);
   if (plan.kind == "gutendex") return map_gutendex(plan, json);
+  if (plan.kind == "openlibrary") return map_openlibrary(plan, json);
+  if (plan.kind == "tvmaze") return map_tvmaze(plan, json);
+  if (plan.kind == "musicbrainz") return map_musicbrainz(plan, json);
+  if (plan.kind == "wikidata") return map_wikidata(plan, json);
+  if (plan.kind == "openalex") return map_openalex(plan, json);
+  if (plan.kind == "crossref") return map_crossref(plan, json);
   return "# " + search_md_escape(plan.query) + "\n\nNo reader for the engine kind " +
          search_md_escape(plan.kind) + ".\n";
 }
 
 #if defined(XANATOO_HTTPS) && XANATOO_HTTPS
+std::optional<Document> media_fetch(const SearchPlan& plan, std::string* err) {
+  static const std::string ua = user_agent("media");
+  auto r = https_get_follow(plan.url, ua, err);
+  if (!r) return std::nullopt;
+  if (r->status != 200) {
+    if (err) *err = "HTTP " + std::to_string(r->status) + " from " + host_of(plan.url);
+    return std::nullopt;
+  }
+  return parse_document(media_results_markdown(plan, r->body), "media.md");
+}
+
 std::optional<Document> search_fetch(const SearchPlan& plan, std::string* err) {
   static const std::string ua = user_agent("search");
   auto r = https_get_follow(plan.url, ua, err);

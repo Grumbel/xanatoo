@@ -4155,6 +4155,44 @@ void test_search_results() {
   EXPECT(has(bs, "\\#xanadu \\* rules\nline 2"));
   EXPECT(has(bs, "(https://bsky.app/profile/rick.bsky.social/post/3mzg) · 2 replies · 5 likes"));
 
+  // Media catalogs: stable record links, and malformed record rejection.
+  EXPECT(has(search_results_markdown(
+      plan("openlibrary", "https://openlibrary.org/search.json", "dune"),
+      R"({"docs":[{"key":"/works/OL893415W","title":"Dune","
+         "author_name":["Frank Herbert"],"first_publish_year":1965}]})"),
+      "[Dune](media:openlibrary:OL893415W)"));
+  EXPECT(has(search_results_markdown(
+      plan("tvmaze", "https://api.tvmaze.com/search/shows", "fringe"),
+      R"([{"score":0.9,"show":{"id":5,"name":"Fringe","premiered":"2008-09-09"}}])"),
+      "[Fringe](media:tvmaze:5)"));
+  EXPECT(has(search_results_markdown(
+      plan("musicbrainz", "https://musicbrainz.org/ws/2", "test"),
+      R"({"release-groups":[{"id":"12345678-1234-1234-1234-123456789abc","
+         "title":"Test Album","first-release-date":"1995-01-01"}]})"),
+      "[Test Album](media:musicbrainz:12345678-1234-1234-1234-123456789abc)"));
+  EXPECT(has(search_results_markdown(
+      plan("wikidata", "https://www.wikidata.org/w/api.php", "xanadu"),
+      R"({"search":[{"id":"Q1","label":"Universe","description":"everything"}]})"),
+      "[Universe](media:wikidata:Q1)"));
+  EXPECT(has(search_results_markdown(
+      plan("openalex", "https://api.openalex.org/works", "test"),
+      R"({"results":[{"id":"https://openalex.org/W1234","
+          "display_name":"A paper","publication_year":2020}]})"),
+      "[A paper](media:openalex:W1234)"));
+  EXPECT(has(search_results_markdown(
+      plan("crossref", "https://api.crossref.org/works", "test"),
+      R"({"message":{"items":[{"DOI":"10.1000/xyz123","title":["A study"]}]}})"),
+      "[A study](https://doi.org/10.1000/xyz123)"));
+  EXPECT(is_media_ref("media:tvmaze:5"));
+  EXPECT(media_plan("media:tvmaze:5").has_value());
+  EXPECT(media_plan("media:openlibrary:OL893415W").has_value());
+  EXPECT(!media_plan("media:openlibrary:../../etc/passwd"));
+  EXPECT(!media_plan("media:tvmaze:https://evil.example/"));
+  EXPECT(!media_plan("media:wikidata:Q1%2Fetc"));
+  EXPECT(has(media_results_markdown(*media_plan("media:tvmaze:5"),
+       R"({"id":5,"name":"Fringe","summary":"<p>Science fiction</p>"})"),
+       "# Fringe"));
+
   // Gutendex.
   const std::string gu = search_results_markdown(
       plan("gutendex", "https://gutendex.com/books/?search=x", "wells"),

@@ -178,6 +178,7 @@ bool is_in_app_remote_url(std::string_view s) {
          xanatoo::is_ebook_url(s) ||
          xanatoo::is_feed_url(s) || xanatoo::is_wikipedia_ref(s) ||
          xanatoo::is_sitemap_ref(s) || xanatoo::is_search_ref(s) ||
+         xanatoo::is_media_ref(s) ||
          web_in_app(s);
 }
 
