@@ -10,6 +10,7 @@
 
 #include "xanatoo/types.hpp"
 #include "xanatoo/download.hpp"
+#include "xanatoo/http_status.hpp"
 
 #include <atomic>
 #include <optional>
@@ -42,9 +43,6 @@ Document parse_html_page(std::string_view html, std::string_view page_url = {},
 
 // text/plain body: blank-line separated chunks as code blocks.
 Document plain_text_document(std::string_view text);
-
-// "HTTP 404 Not Found" (reason phrase only for the common codes).
-std::string http_status_line(int status);
 
 #if defined(XANATOO_WEB) && XANATOO_WEB
 // GET (redirects followed) and convert by Content-Type: HTML pages, feeds,

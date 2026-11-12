@@ -712,6 +712,11 @@ add_executable(xanatoo_xml_tests
 )
 target_include_directories(xanatoo_xml_tests PRIVATE include)
 add_test(NAME xml_tests COMMAND xanatoo_xml_tests)
+
+add_executable(xanatoo_http_status_tests tests/http_status_tests.cpp)
+target_include_directories(xanatoo_http_status_tests PRIVATE include)
+add_test(NAME http_status_tests COMMAND xanatoo_http_status_tests)
+
 add_executable(xanatoo_http_url_tests
   tests/http_url_tests.cpp
   src/http_url.cpp

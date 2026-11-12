@@ -272,32 +272,6 @@ Document plain_text_document(std::string_view text) {
   return doc;
 }
 
-std::string http_status_line(int status) {
-  const char* reason = "";
-  switch (status) {
-    case 400: reason = "Bad Request"; break;
-    case 401: reason = "Unauthorized"; break;
-    case 403: reason = "Forbidden"; break;
-    case 404: reason = "Not Found"; break;
-    case 405: reason = "Method Not Allowed"; break;
-    case 406: reason = "Not Acceptable"; break;
-    case 408: reason = "Request Timeout"; break;
-    case 410: reason = "Gone"; break;
-    case 418: reason = "I'm a teapot"; break;
-    case 429: reason = "Too Many Requests"; break;
-    case 451: reason = "Unavailable For Legal Reasons"; break;
-    case 500: reason = "Internal Server Error"; break;
-    case 501: reason = "Not Implemented"; break;
-    case 502: reason = "Bad Gateway"; break;
-    case 503: reason = "Service Unavailable"; break;
-    case 504: reason = "Gateway Timeout"; break;
-    default: break;
-  }
-  std::string s = "HTTP " + std::to_string(status);
-  if (*reason) s += std::string(" ") + reason;
-  return s;
-}
-
 #if defined(XANATOO_WEB) && XANATOO_WEB
 
 namespace {
@@ -498,7 +472,7 @@ std::optional<Document> web_fetch(std::string_view url_in, std::string* err,
   if (http_status) *http_status = failed ? headers.status : 0;
   if (failed) {
     if (err) {
-      *err = http_status_line(headers.status);
+      *err = http_status_error(headers.status);
       const std::string hint = refusal_hint(headers, body_bytes);
       if (!hint.empty()) *err += " (" + hint + ")";
       else if (!headers.server.empty()) *err += " (Server: " + headers.server + ")";

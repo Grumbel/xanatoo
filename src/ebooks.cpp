@@ -7,6 +7,7 @@
 // any direct .epub link take the download path as well.
 
 #include "xanatoo/ebooks.hpp"
+#include "xanatoo/http_status.hpp"
 #include "xanatoo/paths.hpp"
 #include "xanatoo/util.hpp"
 
@@ -263,7 +264,7 @@ std::optional<Document> fetch_listing(const std::string& url, std::string* err) 
   auto resp = https_get_follow(url, kUserAgent, err);
   if (!resp) return std::nullopt;
   if (resp->status != 200) {
-    if (err) *err = "HTTP " + std::to_string(resp->status);
+    if (err) *err = http_status_error(resp->status);
     return std::nullopt;
   }
   return parse_standard_ebooks_listing(resp->body, url);
@@ -283,7 +284,7 @@ std::optional<Document> fetch_book(const std::string& epub_url,
     auto resp = https_get_follow(epub_url, kUserAgent, err);
     if (!resp) return std::nullopt;
     if (resp->status != 200) {
-      if (err) *err = "HTTP " + std::to_string(resp->status);
+      if (err) *err = http_status_error(resp->status);
       return std::nullopt;
     }
     if (!starts_with(resp->body, "PK")) {

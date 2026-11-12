@@ -6,6 +6,7 @@
 // namespace prefixes on the element names are tolerated.
 
 #include "xanatoo/sitemap.hpp"
+#include "xanatoo/http_status.hpp"
 
 #include "xanatoo/inflate.hpp"
 #include "xanatoo/util.hpp"
@@ -474,7 +475,7 @@ std::optional<SiteTree> sitemap_fetch_tree(std::string_view host_in,
     std::string e;
     auto r = https_get_follow(url, kUserAgent, &e);
     if (!r || r->status != 200) {
-      last_err = r ? url + ": HTTP " + std::to_string(r->status) : e;
+      last_err = r ? url + ": " + http_status_error(r->status) : e;
       continue;
     }
     // *.xml.gz (sitemaps.org allows gzip; a sitemap is ≤ 50 MB unpacked).

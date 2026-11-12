@@ -3,6 +3,7 @@
 
 #include "xanatoo/search_results.hpp"
 #include "xanatoo/catalog_credentials.hpp"
+#include "xanatoo/http_status.hpp"
 
 #include "xanatoo/html_min.hpp"
 #include "xanatoo/json_min.hpp"
@@ -1038,7 +1039,7 @@ std::optional<Document> media_fetch(const SearchPlan& plan, std::string* err) {
   auto r = catalog_get(plan, true, ua, err);
   if (!r) return std::nullopt;
   if (r->status != 200) {
-    if (err) *err = "HTTP " + std::to_string(r->status) + " from " + host_of(plan.url);
+    if (err) *err = http_status_error(r->status, host_of(plan.url));
     return std::nullopt;
   }
   return parse_document(media_results_markdown(plan, r->body), "media.md");
@@ -1049,7 +1050,7 @@ std::optional<Document> search_fetch(const SearchPlan& plan, std::string* err) {
   auto r = catalog_get(plan, false, ua, err);
   if (!r) return std::nullopt;
   if (r->status != 200) {
-    if (err) *err = "HTTP " + std::to_string(r->status) + " from " + host_of(plan.url);
+    if (err) *err = http_status_error(r->status, host_of(plan.url));
     return std::nullopt;
   }
   return parse_document(search_results_markdown(plan, r->body), "search.md");

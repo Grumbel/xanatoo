@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/archive.hpp"
+#include "xanatoo/http_status.hpp"
 
 #include "xanatoo/html_min.hpp"
 #include "xanatoo/json_dom.hpp"
@@ -364,7 +365,7 @@ std::optional<std::string> get(const std::string& url, std::string* err) {
   auto r = https_get_follow(url, ua, err);
   if (!r) return std::nullopt;
   if (r->status != 200) {
-    if (err) *err = "HTTP " + std::to_string(r->status) + " from archive.org";
+    if (err) *err = http_status_error(r->status, "archive.org");
     return std::nullopt;
   }
   return std::move(r->body);

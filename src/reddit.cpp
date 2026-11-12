@@ -5,6 +5,7 @@
 // Maps listings / posts into Thread + Message document nodes.
 
 #include "xanatoo/reddit.hpp"
+#include "xanatoo/http_status.hpp"
 #include "xanatoo/reddit_credentials.hpp"
 
 #include "xanatoo/https.hpp"
@@ -216,8 +217,9 @@ std::string reddit_oauth_token(std::string* err) {
                             "grant_type=client_credentials", err);
   if (!resp || resp->status != 200) {
     if (err && err->empty())
-      *err = "OAuth token request failed (HTTP " +
-             std::to_string(resp ? resp->status : 0) + ")";
+      *err = "OAuth token request failed (" +
+             (resp ? http_status_error(resp->status) :
+                     "no response from the server") + ")";
     return {};
   }
   // "access_token":"..."
@@ -529,7 +531,7 @@ std::optional<Document> reddit_fetch(std::string_view url_in, std::string* err) 
         (resp->body[0] == '{' || resp->body[0] == '['))
       break;
     if (resp) {
-      last_err = "HTTP " + std::to_string(resp->status);
+      last_err = http_status_error(resp->status);
       if (resp->status == 403)
         last_err +=
             " (Reddit denied access. See Edit > Preferences > Reddit API "
@@ -553,7 +555,7 @@ std::optional<Document> reddit_fetch(std::string_view url_in, std::string* err) 
   }
   if (resp->status != 200) {
     if (err) *err = last_err.empty()
-                        ? ("HTTP " + std::to_string(resp->status))
+                        ? (http_status_error(resp->status))
                         : last_err;
     return std::nullopt;
   }

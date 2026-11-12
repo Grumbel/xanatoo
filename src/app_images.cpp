@@ -14,6 +14,7 @@
 #include <thread>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/http_status.hpp"
 #include "xanatoo/paths.hpp"
 #include "xanatoo/util.hpp"
 #if defined(XANATOO_HTTPS) && XANATOO_HTTPS
@@ -41,7 +42,7 @@ bool download_image(const std::string& url) {
   auto r = xanatoo::https_get_follow(url, xanatoo::user_agent("image fetch"), &err);
   if (!r || r->status != 200 || r->body.empty()) {
     std::cerr << "image: " << url << ": "
-              << (r ? "HTTP " + std::to_string(r->status) : err) << "\n";
+              << (r ? http_status_error(r->status) : err) << "\n";
     return false;
   }
   // https_request stops reading at 12 MiB: anything that size is cut off.

@@ -6,6 +6,7 @@
 // video pages become Thread + Article / Message documents like YouTube's.
 
 #include "xanatoo/video_sites.hpp"
+#include "xanatoo/http_status.hpp"
 
 #include "xanatoo/html_min.hpp"   // html_to_plain
 #include "xanatoo/html_page.hpp"  // kExternalPrefix
@@ -1019,9 +1020,7 @@ std::optional<Json> get_json(const std::string& url, std::string* err) {
   }
   if (resp->status != 200) {
     if (err) {
-      *err = url_host(url) + " answered HTTP " + std::to_string(resp->status);
-      if (resp->status == 404) *err += " (not found)";
-      if (resp->status == 429) *err += " (rate limited, try again later)";
+      *err = url_host(url) + " answered " + http_status_error(resp->status);
     }
     return std::nullopt;
   }
@@ -1035,7 +1034,7 @@ std::optional<Json> post_json(const std::string& url, const std::string& body, s
   auto resp = https_request("POST", url, ua, "Content-Type: application/json\r\n", body, err);
   if (!resp) return std::nullopt;
   if (resp->status != 200) {
-    if (err) *err = url_host(url) + " answered HTTP " + std::to_string(resp->status);
+    if (err) *err = url_host(url) + " answered " + http_status_error(resp->status);
     return std::nullopt;
   }
   auto json = json_parse(resp->body);

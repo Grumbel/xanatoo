@@ -5,6 +5,7 @@
 // Maps posts/comments into Thread + Message document nodes.
 
 #include "xanatoo/lemmy.hpp"
+#include "xanatoo/http_status.hpp"
 #include "xanatoo/lemmy_directory.hpp"
 #include "xanatoo/native.hpp"
 #include "xanatoo/util.hpp"
@@ -451,7 +452,7 @@ std::optional<Document> lemmy_fetch(std::string_view url_in, std::string* err) {
 
   if (!resp || resp->status != 200) {
     if (err)
-      *err = "HTTP " + std::to_string(resp ? resp->status : 0) +
+      *err = http_status_error(resp ? resp->status : 0) +
              (resp && resp->status == 403
                   ? " (instance blocked this client)"
                   : "");

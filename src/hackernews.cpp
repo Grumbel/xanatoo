@@ -8,6 +8,7 @@
 // Thread + Message nodes.
 
 #include "xanatoo/hackernews.hpp"
+#include "xanatoo/http_status.hpp"
 #include "xanatoo/html_min.hpp"
 #include "xanatoo/util.hpp"
 
@@ -167,7 +168,7 @@ std::optional<std::string> get_json(const std::string& url, std::string* err) {
   auto resp = https_get_follow(url, kUserAgent, err);
   if (!resp) return std::nullopt;
   if (resp->status != 200) {
-    if (err) *err = "HTTP " + std::to_string(resp->status) + " from " + url;
+    if (err) *err = http_status_error(resp->status, url);
     return std::nullopt;
   }
   return std::move(resp->body);

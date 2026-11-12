@@ -8,6 +8,7 @@
 // following fixed paths, and accept the old and the new layout.
 
 #include "xanatoo/youtube.hpp"
+#include "xanatoo/http_status.hpp"
 
 #include "xanatoo/html_page.hpp"  // kExternalPrefix
 #include "xanatoo/search.hpp"     // search_encode / search_decode
@@ -730,8 +731,7 @@ std::optional<Json> innertube(std::string_view endpoint, const std::string& fiel
   if (!resp) return std::nullopt;
   if (resp->status != 200) {
     if (err)
-      *err = "YouTube answered HTTP " + std::to_string(resp->status) +
-             (resp->status == 429 ? " (rate limited, try again later)" : "");
+      *err = "YouTube answered " + http_status_error(resp->status);
     return std::nullopt;
   }
   auto json = json_parse(resp->body);

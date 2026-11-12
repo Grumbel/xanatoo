@@ -5,6 +5,7 @@
 // mapped into Thread / Message document nodes.
 
 #include "xanatoo/nostr.hpp"
+#include "xanatoo/http_status.hpp"
 #include "xanatoo/nostr_relays.hpp"
 #include "xanatoo/nostr_nip11.hpp"
 #include "xanatoo/nostr_store.hpp"
@@ -1097,7 +1098,7 @@ RelayNip11Probe probe_relay_nip11(std::string_view relay, bool public_only) {
     return probe;
   }
   if (response->status != 200) {
-    probe.status = "NIP-11 HTTP " + std::to_string(response->status);
+    probe.status = "NIP-11 " + http_status_error(response->status);
     return probe;
   }
   auto info = nostr_parse_nip11(response->body);

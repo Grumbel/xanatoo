@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Ingo Ruhnke <grumbel@gmail.com>
 
 #include "xanatoo/wikipedia.hpp"
+#include "xanatoo/http_status.hpp"
 
 #include "xanatoo/html_min.hpp"
 #include "xanatoo/html_page.hpp"
@@ -228,7 +229,7 @@ std::optional<Document> wikipedia_fetch(std::string_view ref_in,
     return std::nullopt;
   }
   if (resp->status != 200) {
-    if (err) *err = "HTTP " + std::to_string(resp->status);
+    if (err) *err = http_status_error(resp->status);
     return std::nullopt;
   }
   std::string body = to_utf8(std::move(resp->body), "utf-8");

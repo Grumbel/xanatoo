@@ -7,6 +7,7 @@
 // html_min.
 
 #include "xanatoo/feed.hpp"
+#include "xanatoo/http_status.hpp"
 #include "xanatoo/util.hpp"
 
 #include "xanatoo/html_min.hpp"
@@ -679,7 +680,7 @@ std::optional<Document> feed_fetch(std::string_view url_in, std::string* err) {
     auto resp = https_get_follow(url, kUserAgent, err, &final_url);
     if (!resp) return std::nullopt;
     if (resp->status != 200) {
-      if (err) *err = "HTTP " + std::to_string(resp->status);
+      if (err) *err = http_status_error(resp->status);
       return std::nullopt;
     }
     const std::string charset = detect_charset(resp->content_type, resp->body);
