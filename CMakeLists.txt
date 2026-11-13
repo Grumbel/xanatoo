@@ -529,8 +529,12 @@ if(EMSCRIPTEN)
   # A standalone site: index.html + JavaScript + Wasm + preloaded /data.
   # Remote services, persistence and subprocess imports are intentionally off.
   set_target_properties(xanatoo PROPERTIES SUFFIX ".html")
+  set(XANATOO_VERSION "${PROJECT_VERSION_FULL}")
+  configure_file(mk/wasm/shell.html ${CMAKE_CURRENT_BINARY_DIR}/shell.html @ONLY)
+  set_property(TARGET xanatoo APPEND PROPERTY LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/shell.html)
   target_link_options(xanatoo PRIVATE
-    "SHELL:--shell-file ${CMAKE_CURRENT_SOURCE_DIR}/mk/wasm/shell.html"
+    "SHELL:--shell-file ${CMAKE_CURRENT_BINARY_DIR}/shell.html"
+    --profiling-funcs
     "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/examples@/data/examples"
     "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/styles@/data/styles"
     "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/data/fonts@/data/fonts"

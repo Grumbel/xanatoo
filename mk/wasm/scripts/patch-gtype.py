@@ -12,6 +12,7 @@ import sys
 
 path = sys.argv[1]
 s = open(path).read()
+gobject_c = path.replace("gtype.h", "gobject.c")
 
 
 def sub(old, new):
@@ -36,3 +37,11 @@ sub("static void     type_name##_default_init        (TypeName##Interface *klass
 sub("(GClassInitFunc)(void (*)(void)) type_name##_default_init, \\",
     "(GClassInitFunc) type_name##_default_init_adapter, \\")
 open(path, "w").write(s)
+
+# GObject's own root class is registered with a one-argument class_init.
+s = open(gobject_c).read()
+sub("static void\tg_object_do_class_init\t\t\t(GObjectClass\t*class);",
+    "static void\tg_object_do_class_init\t\t\t(GObjectClass\t*class, gpointer class_data);")
+sub("g_object_do_class_init (GObjectClass *class)\n{",
+    "g_object_do_class_init (GObjectClass *class, gpointer class_data G_GNUC_UNUSED)\n{")
+open(gobject_c, "w").write(s)
