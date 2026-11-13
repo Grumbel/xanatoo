@@ -165,7 +165,8 @@ The browser's rules apply:
 - No `User-Agent` / `Host` control; redirects are followed by the browser
   (`final_url` = requested URL); only CORS-safelisted response headers are seen.
 - No raw sockets: Gemini and Nostr (WSS needs a WebSocket backend) stay off,
-  and so do Reddit, YouTube and Ebooks (no CORS / downloads).
+  and so do Reddit and YouTube (no CORS). Ebooks are on (native EPUB reader,
+  no pandoc), but only work for hosts that send CORS headers.
 - Remote images and downloads still do not work (`app_images.cpp`,
   `download.cpp` assume files and a worker pool).
 - Cross-origin isolation (COEP `require-corp`) is compatible with CORS fetches.

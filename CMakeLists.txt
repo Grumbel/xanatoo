@@ -46,11 +46,11 @@ if(XANATOO_MINIMAL_PORT)
   # Browser fetch (src/https_wasm.cpp) replaces sockets + TLS. Synchronous
   # fetches must run on worker threads, so this needs the pthreads build.
   # Only services whose APIs are CORS-open can work: Gemini / Nostr / Reddit /
-  # YouTube / Ebooks stay off.
+  # YouTube stay off. Ebooks use the native EPUB reader (no pandoc).
   set(XANATOO_WASM_FETCH OFF)
   if(EMSCRIPTEN AND XANATOO_WASM_DEPS_ROOT)
     set(XANATOO_WASM_FETCH ON)
-    foreach(_f LEMMY HN VIDEO FEEDS WEB WIKIPEDIA)
+    foreach(_f LEMMY HN VIDEO EBOOKS FEEDS WEB WIKIPEDIA)
       list(REMOVE_ITEM _minimal_off ${_f})
     endforeach()
   endif()
