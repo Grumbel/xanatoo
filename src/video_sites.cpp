@@ -415,6 +415,7 @@ std::string video_site_ref_from_web_url(std::string_view url) {
     r.host = host;
     const size_t sl = path.find('/');
     const std::string_view head = path.substr(0, sl);
+    std::string search_id;  // backs `tail` for search refs
     std::string_view tail = sl == std::string_view::npos ? std::string_view() : path.substr(sl + 1);
     tail = tail.substr(0, tail.find('/'));
     if (head == "w") r.kind = VsRef::Kind::Video;
@@ -426,7 +427,8 @@ std::string video_site_ref_from_web_url(std::string_view url) {
     else if (head == "accounts") r.kind = VsRef::Kind::Account;
     else if (path == "search") {
       r.kind = VsRef::Kind::Search;
-      tail = query_param(query, "search");
+      search_id = query_param(query, "search");
+      tail = search_id;
     } else return {};
     r.id = std::string(tail);
     // /w/ is too common a path (wikis): only a short or full video uuid counts.

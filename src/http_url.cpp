@@ -131,10 +131,12 @@ std::optional<std::string> resolve_http_redirect(std::string_view base,
   if (location.front() == '#') return std::string(base.substr(0, base.find('#')))
       + std::string(location);
   if (location.front() == '?') {
-    const std::string_view path = url->target.substr(0, url->target.find('?'));
+    const std::string_view target = url->target;
+    const std::string_view path = target.substr(0, target.find('?'));
     return origin + std::string(path) + std::string(location);
   }
-  const std::string_view path = url->target.substr(0, url->target.find('?'));
+  const std::string_view target = url->target;
+  const std::string_view path = target.substr(0, target.find('?'));
   const size_t slash = path.rfind('/');
   const std::string_view parent = slash == std::string_view::npos ?
       std::string_view("/") : path.substr(0, slash + 1);

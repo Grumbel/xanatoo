@@ -390,7 +390,6 @@ void Ui::apply_classic_theme() {
   auto P = [](theme::Rgb c) { return ImVec4(c.r / 255.f, c.g / 255.f, c.b / 255.f, 1.f); };
   const ImVec4 bg = P(pal.face);
   const ImVec4 bg2 = P(pal.face_light);
-  const ImVec4 bg3 = P(pal.face_dark);
   const ImVec4 border = P(pal.frame);
   const ImVec4 text = P(pal.text);
   const ImVec4 text_dis = P(pal.text_dim);

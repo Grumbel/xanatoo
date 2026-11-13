@@ -33,6 +33,7 @@ bool hex_string(std::string_view s, size_t length) {
       });
 }
 
+#if XANATOO_NOSTR_VERIFY_OPENSSL
 unsigned char hex_digit(char c) {
   if (c >= '0' && c <= '9') return static_cast<unsigned char>(c - '0');
   if (c >= 'a' && c <= 'f') return static_cast<unsigned char>(c - 'a' + 10);
@@ -46,6 +47,7 @@ std::vector<unsigned char> from_hex(std::string_view h) {
     out.push_back(static_cast<unsigned char>((hex_digit(h[i]) << 4) | hex_digit(h[i + 1])));
   return out;
 }
+#endif
 
 void skip_ws(std::string_view s, size_t& i) {
   while (i < s.size() && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r')) ++i;
