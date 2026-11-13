@@ -45,3 +45,29 @@ sub("static void\tg_object_do_class_init\t\t\t(GObjectClass\t*class);",
 sub("g_object_do_class_init (GObjectClass *class)\n{",
     "g_object_do_class_init (GObjectClass *class, gpointer class_data G_GNUC_UNUSED)\n{")
 open(gobject_c, "w").write(s)
+
+# GParamSpecTypeInfo::instance_init takes only the instance but is registered
+# as a GInstanceInitFunc: call it through an adapter that finds it again by type.
+gparam_c = path.replace("gtype.h", "gparam.c")
+s = open(gparam_c).read()
+sub("GType\ng_param_type_register_static (const gchar              *name,",
+    "static void\nparam_instance_init_adapter (GTypeInstance *instance, gpointer g_class)\n"
+    "{\n"
+    "  void (*init) (GParamSpec *) = g_type_get_qdata (G_TYPE_FROM_CLASS (g_class),\n"
+    "                                                  g_quark_from_static_string (\"xanatoo-pspec-init\"));\n"
+    "  if (init)\n"
+    "    init ((GParamSpec *) instance);\n"
+    "}\n\n"
+    "GType\n"
+    "g_param_type_register_static (const gchar              *name,")
+sub("  info.instance_init = (GInstanceInitFunc) pspec_info->instance_init;",
+    "  info.instance_init = pspec_info->instance_init ? param_instance_init_adapter : NULL;")
+sub("  return g_type_register_static (G_TYPE_PARAM, name, &info, 0);\n}",
+    "  {\n"
+    "    GType type = g_type_register_static (G_TYPE_PARAM, name, &info, 0);\n"
+    "    if (type && pspec_info->instance_init)\n"
+    "      g_type_set_qdata (type, g_quark_from_static_string (\"xanatoo-pspec-init\"),\n"
+    "                        (gpointer) pspec_info->instance_init);\n"
+    "    return type;\n"
+    "  }\n}")
+open(gparam_c, "w").write(s)

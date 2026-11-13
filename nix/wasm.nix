@@ -198,12 +198,17 @@ let
     program = toString (pkgs.writeShellScript "xanatoo-wasm-serve" ''
       set -e
       export PATH=${pkgs.python3}/bin:${pkgs.xdg-utils}/bin:$PATH
-      echo "Serving xanatoo at http://127.0.0.1:8765/"
-      python3 ${../mk/wasm/scripts/serve.py} ${xanatooWasm} 8765 &
+      echo "xanatoo ${version} (wasm)"
+      # Port 0: a free port each run, so a browser never reuses a cached
+      # older build from the previous origin. The server prints its URL.
+      url_file=$(mktemp)
+      python3 ${../mk/wasm/scripts/serve.py} ${xanatooWasm} 0 > "$url_file" &
       server_pid=$!
-      trap 'kill "$server_pid" 2>/dev/null || true' EXIT
-      sleep 0.4
-      xdg-open http://127.0.0.1:8765/ >/dev/null 2>&1 || true
+      trap 'kill "$server_pid" 2>/dev/null || true; rm -f "$url_file"' EXIT
+      for _ in $(seq 50); do [ -s "$url_file" ] && break; sleep 0.1; done
+      url=$(head -n1 "$url_file")
+      echo "Serving xanatoo $url"
+      xdg-open "$url" >/dev/null 2>&1 || true
       wait "$server_pid"
     '');
     meta.description = "Serve the WASM build on localhost";
