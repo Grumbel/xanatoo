@@ -90,6 +90,7 @@ endian = 'little'
 needs_exe_wrapper = true
 EOT
 CROSS="$PWD/cross.ini"
+python3 "$PATCH_GTYPE" glib/gobject/gtype.h
 ( cd glib
   # No DNS in the browser: gio's resolver wants res_query().
   sed -i "s/error('Could not find res_query()')/message('no res_query (wasm)')/" gio/meson.build
@@ -170,6 +171,10 @@ cm arch -DENABLE_TEST=OFF -DENABLE_TAR=OFF -DENABLE_CPIO=OFF -DENABLE_CAT=OFF \
 echo "==> libvips"
 unpack vips "$VIPS_SRC"
 fix_shebangs vips
+# G_IMPLEMENT_INTERFACE calls the init with two arguments (see patch-gtype.py).
+sed -i -e 's/vips_g_input_stream_seekable_iface_init(GSeekableIface \*iface)/vips_g_input_stream_seekable_iface_init(GSeekableIface *iface, gpointer data G_GNUC_UNUSED)/' \
+  vips/libvips/iofuncs/ginputsource.c
+grep -q 'iface, gpointer data G_GNUC_UNUSED' vips/libvips/iofuncs/ginputsource.c
 ( cd vips
   meson setup b --cross-file "$CROSS" --prefix="$P" --default-library=static \
     -Dprefer_static=true -Ddeprecated=false -Dexamples=false -Dcplusplus=false \

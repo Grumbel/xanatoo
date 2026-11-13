@@ -100,6 +100,7 @@ let
       meson pkg-config autoconf automake libtool glib.dev gettext bzip2
     ]);
     env = {
+      PATCH_GTYPE = "${../mk/wasm/scripts/patch-gtype.py}";
       ZLIB_SRC = "${pkgs.zlib.src}";
       LIBFFI_SRC = "${pkgs.libffi.src}";
       PCRE2_SRC = "${pkgs.pcre2.src}";
