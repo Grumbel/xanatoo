@@ -21,6 +21,7 @@
 #include "xanatoo/wikipedia.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/native.hpp"
+#include "xanatoo/wayback.hpp"
 #include "xanatoo/video_sites.hpp"
 #include "xanatoo/archive.hpp"
 #include "xanatoo/nostr.hpp"
@@ -419,6 +420,8 @@ StatusLine compute_status(App& app) {
       label = "YouTube: ";
     else if (xanatoo::is_ia_ref(app.hover.href))
       label = "Internet Archive: ";
+    else if (xanatoo::is_wayback_ref(app.hover.href))
+      label = "Wayback Machine: ";
     else if (auto vs = xanatoo::parse_video_site_ref(app.hover.href)) {
       static std::string vlabel;
       vlabel = std::string(xanatoo::video_site_name(vs->site)) + ": ";

@@ -3601,3 +3601,13 @@ under the title, left inset only, scrollbar flush at the right edge, and a
 horizontal scrollbar). Not yet done: History / Bookmarks (ImGui) vs Outline
 should become the same `FloatWindow` kind of list panel; ImGui windows have
 no bottom grip strip. Not checked visually — look at it in the running app.
+
+## Wayback / WASM network (2026-11-13)
+
+Done: `wayback:` refs, View → Old Version (archive.org) / Live Page, 404 banner
+link (`docs/ARCHIVE.md`). Next: WASM `fetch` transport behind `https_request`
+(emscripten_fetch, sync on worker threads, `-sFETCH=1`); CORS measured with
+curl: Wikipedia REST, HN Algolia/Firebase and `archive.org/wayback/available`
+are open, ordinary pages and `web.archive.org` snapshots are not. Then an
+opt-in CORS proxy prefix setting (cors.dev or a self-hosted worker; the proxy
+sees every URL).

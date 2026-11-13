@@ -35,6 +35,7 @@
 #include "xanatoo/time.hpp"
 #include "xanatoo/util.hpp"
 #include "xanatoo/native.hpp"
+#include "xanatoo/wayback.hpp"
 #include "xanatoo/wikipedia.hpp"
 
 namespace fs = std::filesystem;
@@ -288,6 +289,13 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
     ui_state.alternate_url = xanatoo::alternate_view_url(path);
     ui_state.native_view = !ui_state.alternate_url.empty() &&
                            xanatoo::native_url_for(path).empty();
+    if (auto snap = xanatoo::wayback_ref_from_snapshot_url(path)) {
+      ui_state.archive_view = true;
+      ui_state.archive_url = snap->url;
+    } else {
+      ui_state.archive_view = false;
+      ui_state.archive_url = xanatoo::wayback_lookup_ref(path);
+    }
     ui_state.up_url = page_up_url(app);
   }
   if (ui_state.services.empty()) {
@@ -704,7 +712,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::SitemapPrev || c == C::SitemapNext ||
         c == C::OpenTranscludeOther ||
         c == C::ToggleDiff || c == C::ToggleStructure || c == C::ToggleEdit ||
-        c == C::ToggleChrome || c == C::ToggleNative ||
+        c == C::ToggleChrome || c == C::ToggleNative || c == C::ToggleArchive ||
         c == C::ToggleReader || c == C::ToggleReaderDefault ||
         c == C::TogglePaged || c == C::TogglePagedDefault ||
         c == C::PageColumns ||
@@ -805,6 +813,16 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         flash_status(app, "No native view for this page");
       else
         navigate_to_url(app, other);
+      break;
+    }
+    case C::ToggleArchive: {
+      const std::string& cur = path_of(app, p);
+      if (auto snap = xanatoo::wayback_ref_from_snapshot_url(cur))
+        navigate_to_url(app, snap->url);
+      else if (std::string ref = xanatoo::wayback_lookup_ref(cur); !ref.empty())
+        navigate_to_url(app, ref);
+      else
+        flash_status(app, "No archived version for this page");
       break;
     }
     case C::ToggleReader:

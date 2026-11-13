@@ -26,6 +26,7 @@
 #include "xanatoo/gemini.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/native.hpp"
+#include "xanatoo/wayback.hpp"
 #include "xanatoo/video_sites.hpp"
 #include "xanatoo/archive.hpp"
 #include "xanatoo/nostr.hpp"
@@ -176,7 +177,7 @@ bool is_in_app_remote_url(std::string_view s) {
          xanatoo::is_lemmy_ref(s) || xanatoo::is_nostr_ref(s) ||
          xanatoo::is_hn_ref(s) || xanatoo::is_youtube_ref(s) ||
          xanatoo::is_video_site_ref(s) || xanatoo::is_ia_ref(s) ||
-         xanatoo::is_ebook_url(s) ||
+         xanatoo::is_ebook_url(s) || xanatoo::is_wayback_ref(s) ||
          xanatoo::is_feed_url(s) || xanatoo::is_wikipedia_ref(s) ||
          xanatoo::is_sitemap_ref(s) || xanatoo::is_search_ref(s) ||
          xanatoo::is_media_ref(s) ||

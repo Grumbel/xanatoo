@@ -689,6 +689,13 @@ history or distribute patch files.
   the ordinary parser turns into the page. archive.org itself needs
   JavaScript. The `ia` search engine links to `ia:`. See `docs/ARCHIVE.md`.
 
+## Wayback Machine
+
+- `wayback:[TS/]URL` (`wayback.hpp`, pure, `tests/wayback_tests.cpp`) fetches
+  `web.archive.org/web/<ts>id_/URL` through `web_fetch`; View → Old Version /
+  Live Page is `UiCommand::ToggleArchive`; HTTP error banners link to it
+  (`add_http_banner`). See `docs/ARCHIVE.md`.
+
 ## Lemmy
 
 - Read-only client via Lemmy **API v3** JSON (`/api/v3/post/list`, `/api/v3/post`).

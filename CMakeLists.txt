@@ -206,6 +206,7 @@ add_executable(xanatoo
   src/youtube.cpp
   src/video_sites.cpp
   src/archive.cpp
+  src/wayback.cpp
   src/time.cpp
   src/ebooks.cpp
   src/feed.cpp
@@ -587,6 +588,7 @@ add_executable(xanatoo_tests
   src/youtube.cpp
   src/video_sites.cpp
   src/archive.cpp
+  src/wayback.cpp
   src/time.cpp
   src/ebooks.cpp
   src/feed.cpp
@@ -811,6 +813,15 @@ target_compile_definitions(xanatoo_archive_tests PRIVATE XANATOO_HTTPS=0
   XANATOO_SDL3=$<BOOL:${XANATOO_SDL3}>
   "XANATOO_VERSION=\"${PROJECT_VERSION_FULL}\"")
 add_test(NAME archive_tests COMMAND xanatoo_archive_tests)
+add_executable(xanatoo_wayback_tests
+  tests/wayback_tests.cpp src/wayback.cpp src/util.cpp src/paths.cpp
+  src/version.cpp src/document.cpp)
+target_include_directories(xanatoo_wayback_tests PRIVATE include ${SDL2_INCLUDE_DIRS})
+target_link_libraries(xanatoo_wayback_tests PRIVATE ${SDL2_LIBRARIES})
+target_compile_definitions(xanatoo_wayback_tests PRIVATE
+  XANATOO_SDL3=$<BOOL:${XANATOO_SDL3}>
+  "XANATOO_VERSION=\"${PROJECT_VERSION_FULL}\"")
+add_test(NAME wayback_tests COMMAND xanatoo_wayback_tests)
 add_executable(xanatoo_ui_panel_imgui_tests
   tests/ui_panel_imgui_tests.cpp
   external/imgui/imgui.cpp

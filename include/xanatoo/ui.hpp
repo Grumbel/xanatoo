@@ -202,6 +202,7 @@ enum class UiCommand {
   ToggleEdit,  // opt-in editing mode; browsing is the default
   ToggleChrome,  // content only: hide menu bar, toolbars, tabs, status line
   ToggleNative,  // web page ↔ its native xanatoo form (wikipedia:, hn:, …)
+  ToggleArchive,  // web page ↔ its nearest Wayback Machine snapshot
   ViewSourceRendered, // leave a source projection and show the document
   ViewSourceRaw,      // focused document's raw source (if available)
   ViewSourceSexpr,    // focused document's S-expression representation
@@ -404,6 +405,10 @@ struct UiState {
   // Other view of the focused page ("" = none): the native ref of a web
   // page (wikipedia:Title, hn:item?id=1) or the web URL of a native view.
   std::string alternate_url;
+  // Wayback Machine: where ToggleArchive goes ("" = not available), and
+  // whether the focused page already is a snapshot (target = the live page).
+  std::string archive_url;
+  bool archive_view = false;
   std::string up_url;  // parent page of the focused one ("" at the top)
   bool native_view = false;  // focused page is a native ref (alternate = web)
   std::string source_mode;  // empty = rendered, otherwise source-raw/sexpr/xml

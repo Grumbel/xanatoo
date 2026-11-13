@@ -315,6 +315,7 @@ const char* menu_icon_for(UiCommand command) {
     case UiCommand::ToggleDiff: return "diff";
     case UiCommand::ToggleEdit: return "edit";
     case UiCommand::ToggleNative: return "native";
+    case UiCommand::ToggleArchive: return "archive";
     case UiCommand::ToggleReader: return "reader";
     case UiCommand::ToggleHelp: return "help";
     case UiCommand::ZoomIn: return "zoomin";
@@ -2144,6 +2145,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
     if (ImGui::BeginMenu("View")) {
       menu_item_cmd(state.native_view ? "Web Page View" : "Native View",
                     UiCommand::ToggleNative, cmd, !state.alternate_url.empty());
+      menu_item_cmd(state.archive_view ? "Live Page" : "Old Version (archive.org)",
+                    UiCommand::ToggleArchive, cmd, !state.archive_url.empty());
       if (ImGui::MenuItem("Reader Mode", "F9", state.reader,
                           state.has_chrome || state.reader))
         cmd = UiCommand::ToggleReader;

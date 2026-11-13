@@ -20,6 +20,7 @@
 #include "xanatoo/hackernews.hpp"
 #include "xanatoo/html_page.hpp"
 #include "xanatoo/sitemap.hpp"
+#include "xanatoo/wayback.hpp"
 #include "xanatoo/wikipedia.hpp"
 #include "xanatoo/lemmy.hpp"
 #include "xanatoo/video_sites.hpp"
@@ -201,6 +202,18 @@ void fetch_page(std::string url, std::shared_ptr<FetchShared> out,
     out->service = "Wikipedia";
     out->doc = xanatoo::wikipedia_fetch(url, &out->error, &out->final_url);
 #endif
+  } else if (xanatoo::is_wayback_ref(url)) {
+#if defined(XANATOO_WEB) && XANATOO_WEB
+    // The snapshot is an ordinary page; the address becomes its snapshot URL
+    // (the redirect carries the actual capture time).
+    out->service = "Wayback Machine";
+    std::string body;
+    out->doc = xanatoo::web_fetch(
+        xanatoo::wayback_snapshot_url(*xanatoo::parse_wayback_ref(url)),
+        &out->error, &out->final_url, &out->http_status, &body, nullptr,
+        nullptr, false);
+    if (out->doc) out->raw_source = std::move(body);
+#endif
   } else if (xanatoo::is_web_url(url)) {
 #if defined(XANATOO_WEB) && XANATOO_WEB
     out->service = "Web";
@@ -373,6 +386,16 @@ void add_http_banner(xanatoo::Document& doc, const FetchJob& job) {
   doc.append_text(n, " \u2014 " + job.url +
                          " could not be loaded; this is the page the server "
                          "sent instead.");
+  // A page that is gone may still be in the Wayback Machine.
+  if (const std::string ref = xanatoo::wayback_lookup_ref(job.url);
+      !ref.empty() && (job.shared->http_status == 404 ||
+                       job.shared->http_status == 410 ||
+                       job.shared->http_status >= 500)) {
+    doc.append_text(n, "  ");
+    doc.append_text(n, "Look for an old version at archive.org",
+                    xanatoo::InlineKind::Link);
+    doc.get(n).spans.back().href = ref;
+  }
   auto& kids = doc.get(doc.root).children;
   std::rotate(kids.begin(), kids.end() - 1, kids.end());
 }
@@ -592,6 +615,13 @@ bool remote_fetch_supported(std::string_view url, std::string* why) {
     return true;
 #else
     return no("wikipedia: needs build with -DXANATOO_WIKIPEDIA=ON");
+#endif
+  }
+  if (xanatoo::is_wayback_ref(url)) {
+#if defined(XANATOO_WEB) && XANATOO_WEB
+    return true;
+#else
+    return no("wayback: needs build with -DXANATOO_WEB=ON");
 #endif
   }
   if (xanatoo::is_web_url(url)) {

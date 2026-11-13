@@ -26,7 +26,28 @@ JSON → Markdown mapping (`ia_markdown`) are pure and tested offline in
 
 ## Limits
 
-- Reviews, the full-text viewer, Wayback Machine (`web.archive.org`) and
-  uploads are not supported.
+- Reviews, the full-text viewer and uploads are not supported.
 - Items with restricted access (`is_dark`, lending-only books) only show what
   the metadata API reveals; the files may not download.
+
+## Wayback Machine (`wayback:`)
+
+Old versions of ordinary web pages (`src/wayback.cpp`, `wayback.hpp`; needs
+`XANATOO_WEB`):
+
+- `wayback:URL` is the nearest snapshot, `wayback:20150301/URL` the one nearest
+  to a date (4–14 digits). The fetch is the ordinary web page reader on
+  `https://web.archive.org/web/<ts>id_/URL` (`id_` = as archived, without the
+  Wayback toolbar). The Wayback redirect supplies the real capture time; the
+  pane address becomes that snapshot URL, which View → Live Page maps back.
+- View → **Old Version (archive.org)** opens the focused http(s) page's
+  snapshot; on a snapshot the same entry reads **Live Page**.
+- A page that fails with 404 / 410 / 5xx gets a "Look for an old version at
+  archive.org" link in its error banner.
+- Links inside a snapshot are the archived page's own (absolute links go to the
+  live web; relative ones stay inside the archive).
+- No availability-API lookup yet: the redirect already picks the nearest
+  capture; a page without captures shows the archive's 404.
+- Not CORS-open: `web.archive.org` snapshots send no `Access-Control-Allow-Origin`
+  (only the `archive.org/wayback/available` JSON does), so this feature will
+  need a proxy in the WebAssembly build.
