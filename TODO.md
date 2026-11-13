@@ -8,6 +8,16 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **348** (this delivery is **347**)
 
+## Status (2026-11-13) — PDF / DjVu / CBR on Android
+
+- `nix/android-imagelibs.nix` cross-builds MuPDF 1.28.5 (system libjpeg-turbo,
+  `-DTOFU -DTOFU_CJK`, armv7 `fseeko` shim), DjVuLibre (libdjvu only) and
+  libunarr per ABI and merges them into `libimagedeps.a`; `Android.mk` for
+  thumtoo uses the real MuPDF / unarr backends and defines the `HAVE_*` macros.
+- `nix build .#xanatoo-android` succeeds (APK ≈ 54 MB). **Not tested on a
+  device** (`adb logcat -s xanatoo`): open a PDF, DjVu and CBR.
+- Next: Windows / WASM / R36S still lack thumtoo (minimal port).
+
 ## Status (2026-11-11) — Search button in the location bar
 
 - Magnifier beside the address when an engine searches the focused page's

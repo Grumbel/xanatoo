@@ -153,8 +153,65 @@ let
     ];
   };
 
-  libDirs = map lib.getLib [ vips libarchive glib expat libjpeg libpng libwebp zlib.static libffi pcre2 libiconv ];
-  incDirs = map lib.getDev [ vips libarchive glib ];
+  # libunarr: RAR / zip / tar / 7z reader for CBR / CBZ (plain C).
+  unarr = sstd.mkDerivation {
+    pname = "unarr-android";
+    inherit (pkgs.libunarr) version src;
+    nativeBuildInputs = [ pkgs.buildPackages.cmake ];
+    cmakeFlags = [ "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" "-DBUILD_SHARED_LIBS=OFF" "-DENABLE_7Z=ON" "-DUSE_SYSTEM_BZ2=OFF" "-DUSE_SYSTEM_LZMA=OFF" "-DUSE_SYSTEM_ZLIB=OFF" ];
+  };
+
+  # DjVuLibre: the C++ decoder library only (no tools, no JPEG, no threads
+  # beyond pthreads). Built with the NDK's libc++, like the app.
+  djvulibre = sstd.mkDerivation {
+    pname = "djvulibre-android";
+    inherit (pkgs.djvulibre) version src;
+    configureFlags = [
+      "--disable-shared" "--enable-static" "--disable-desktopfiles"
+      "--disable-xmltools" "--without-jpeg" "--disable-i18n"
+    ];
+    buildPhase = "make -C libdjvu -j$NIX_BUILD_CORES libdjvulibre.la";
+    installPhase = ''
+      mkdir -p $out/lib $out/include/libdjvu
+      cp libdjvu/.libs/libdjvulibre.a $out/lib/
+      cp libdjvu/ddjvuapi.h libdjvu/miniexp.h $out/include/libdjvu/
+    '';
+    outputs = [ "out" ];
+  };
+
+  # MuPDF: PDF / XPS / EPUB / CBZ renderer with its bundled third-party
+  # libraries (freetype, harfbuzz, jpeg, openjpeg, jbig2dec, mujs, zlib);
+  # libraries only, no viewers or network.
+  mupdf = sstd.mkDerivation {
+    pname = "mupdf-android";
+    # The 1.28.5 pin of thumtoo's flake (pinMupdf): nixpkgs' 1.27 lacks the
+    # passthrough device / image digest API pdf_mupdf.cpp uses.
+    version = "1.28.5";
+    src = pkgs.fetchurl {
+      url = "https://mupdf.com/downloads/archive/mupdf-1.28.5-source.tar.gz";
+      hash = "sha256-mKXBDNogw5ks33b/ayoRScMr15zHltP3AyMLEYW36TQ=";
+    };
+    dontConfigure = true;
+    # 32-bit bionic declares fseeko / ftello only from API 24 (we target 21).
+    extraCflags = lib.optionalString (abi == "armeabi-v7a") "-Dfseeko=fseek -Dftello=ftell";
+    makeFlags = [
+      "build=release" "shared=no" "USE_SYSTEM_LIBS=no" "USE_SYSTEM_LIBJPEG=yes" "HAVE_X11=no" "HAVE_GLUT=no"
+      "HAVE_CURL=no" "HAVE_LIBCRYPTO=no" "HAVE_OBJCOPY=no" "HAVE_PTHREAD=yes"
+      "barcode=no" "OS=Linux"
+    ];
+    buildPhase = ''
+      make $makeFlags "XCFLAGS=-DTOFU -DTOFU_CJK $extraCflags" "SYS_LIBJPEG_CFLAGS=-I${lib.getDev libjpeg}/include" "SYS_LIBJPEG_LIBS=" CC="$CC" CXX="$CXX" AR="$AR" RANLIB="$RANLIB" -j$NIX_BUILD_CORES libs
+    '';
+    installPhase = ''
+      mkdir -p $out/lib $out/include
+      cp $(find build -name libmupdf.a) $(find build -name libmupdf-third.a) $out/lib/
+      cp -r include/mupdf $out/include/
+    '';
+    outputs = [ "out" ];
+  };
+
+  libDirs = map lib.getLib [ vips libarchive glib expat libjpeg libpng libwebp zlib.static libffi pcre2 libiconv unarr djvulibre mupdf ];
+  incDirs = map lib.getDev [ vips libarchive glib unarr djvulibre mupdf ];
 
 in pkgs.buildPackages.stdenvNoCC.mkDerivation {
   pname = "xanatoo-android-imagelibs-${abi}";
@@ -183,5 +240,5 @@ in pkgs.buildPackages.stdenvNoCC.mkDerivation {
     chmod -R u+w $out/include
     cp ${lib.getLib glib}/lib/glib-2.0/include/glibconfig.h $out/include/glib-2.0/
   '';
-  passthru = { inherit vips glib libarchive; };
+  passthru = { inherit vips glib libarchive unarr djvulibre mupdf; };
 }

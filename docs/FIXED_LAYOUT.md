@@ -95,8 +95,9 @@ Sizing per format:
   stops the transfer (`FetchShared::abandoned`); the size limit is 2 GiB.
 - `load_doc` (tabs, session restore) reads synchronously.
 - Without thumtoo (minimal ports) the file shows an error page, and
-  `app_pagetiles.cpp` is a stub. Android's thumtoo has no MuPDF or DjVu,
-  so there only archives work.
+  `app_pagetiles.cpp` is a stub. Android's thumtoo has MuPDF (PDF, EPUB),
+  DjVuLibre and libunarr (solid RAR), cross-built per ABI by
+  `nix/android-imagelibs.nix`; no Tesseract OCR there.
 
 ## Open items
 

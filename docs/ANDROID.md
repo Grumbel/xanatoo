@@ -26,6 +26,14 @@ SQLite (side store: persisted folds) is the amalgamation generated from
 nixpkgs' `sqlite.src` (`sqliteAmalgamation` in `nix/android.nix`) and built
 as a static module (`mk/android/sqlite/Android.mk`).
 
+Fixed-layout documents (PDF, DjVu, CBZ / CBR) go through thumtoo with
+MuPDF 1.28.5 (thumtoo's `pinMupdf` version; libraries only, Base-14 fonts, the
+app's libjpeg-turbo instead of MuPDF's bundled one), DjVuLibre (`libdjvu`
+only) and libunarr, all static in `libimagedeps.a`
+(`nix/android-imagelibs.nix`, `mk/android/thumtoo/Android.mk` defines
+`THUMTOO_HAVE_MUPDF/DJVU/UNARR`). The APK grows by roughly 10 MB.
+Not yet tried on a device.
+
 The APK is `android:debuggable` (debug-signed development build), so
 `adb shell run-as org.grumbel.xanatoo ls files` inspects its data.
 
