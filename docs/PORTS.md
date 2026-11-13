@@ -147,6 +147,31 @@ if the user has a local file open in another browser tab. Refreshing the
 page restarts the welcome document. A browser-to-app file import/export
 bridge and persistent storage (for example, IndexedDB) are future work.
 
+## Network in the browser
+
+With `XANATOO_WASM_DEPS_ROOT` (the pthreads build above) the Wasm build turns
+on the web reader, Wikipedia, Hacker News, feeds, Lemmy and the video sites.
+`src/https_wasm.cpp` replaces the socket / TLS client behind `https.hpp` with
+`emscripten_fetch` (`-sFETCH=1`, synchronous, so every request runs on a
+worker thread: `app_fetch.cpp` spawns threads when pthreads exist).
+
+The browser's rules apply:
+
+- **CORS.** A site is readable only if it sends `Access-Control-Allow-Origin`.
+  Measured: Wikipedia REST, HN (Firebase + Algolia) and the
+  `archive.org/wayback/available` lookup are open; ordinary web pages and
+  `web.archive.org` snapshots are not. A refused request shows "request failed
+  or blocked by the browser" (the browser does not say why).
+- No `User-Agent` / `Host` control; redirects are followed by the browser
+  (`final_url` = requested URL); only CORS-safelisted response headers are seen.
+- No raw sockets: Gemini and Nostr (WSS needs a WebSocket backend) stay off,
+  and so do Reddit, YouTube and Ebooks (no CORS / downloads).
+- Remote images and downloads still do not work (`app_images.cpp`,
+  `download.cpp` assume files and a worker pool).
+- Cross-origin isolation (COEP `require-corp`) is compatible with CORS fetches.
+
+Next: an opt-in CORS proxy prefix for sites without CORS.
+
 ## Verification and further work
 
 Run the minimal profile on Linux to exercise most shared code without either

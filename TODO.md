@@ -3611,3 +3611,8 @@ curl: Wikipedia REST, HN Algolia/Firebase and `archive.org/wayback/available`
 are open, ordinary pages and `web.archive.org` snapshots are not. Then an
 opt-in CORS proxy prefix setting (cors.dev or a self-hosted worker; the proxy
 sees every URL).
+
+Done (WASM fetch transport): `src/https_wasm.cpp`, Wikipedia / HN / web reader
+verified in Firefox (Xvfb). Remaining: opt-in CORS proxy prefix; remote
+images and downloads in the browser; WebSocket Nostr; `final_url` after
+browser redirects.

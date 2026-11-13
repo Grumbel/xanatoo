@@ -43,6 +43,17 @@ set(XANATOO_WASM_DEPS_ROOT "" CACHE PATH "Emscripten prefix with thumtoo's libra
 if(XANATOO_MINIMAL_PORT)
   set(_minimal_off FONTCONFIG SQLITE THUMTOO GEMINI NOSTR REDDIT LEMMY HN YOUTUBE VIDEO
                    EBOOKS FEEDS WEB WIKIPEDIA)
+  # Browser fetch (src/https_wasm.cpp) replaces sockets + TLS. Synchronous
+  # fetches must run on worker threads, so this needs the pthreads build.
+  # Only services whose APIs are CORS-open can work: Gemini / Nostr / Reddit /
+  # YouTube / Ebooks stay off.
+  set(XANATOO_WASM_FETCH OFF)
+  if(EMSCRIPTEN AND XANATOO_WASM_DEPS_ROOT)
+    set(XANATOO_WASM_FETCH ON)
+    foreach(_f LEMMY HN VIDEO FEEDS WEB WIKIPEDIA)
+      list(REMOVE_ITEM _minimal_off ${_f})
+    endforeach()
+  endif()
   if(EMSCRIPTEN AND XANATOO_WASM_DEPS_ROOT)
     list(REMOVE_ITEM _minimal_off THUMTOO)
     set(XANATOO_THUMTOO ON CACHE BOOL "thumtoo from XANATOO_WASM_DEPS_ROOT" FORCE)
@@ -50,7 +61,7 @@ if(XANATOO_MINIMAL_PORT)
     set(ENV{PKG_CONFIG_PATH} "${XANATOO_WASM_DEPS_ROOT}/lib/pkgconfig")
     set(ENV{PKG_CONFIG_LIBDIR} "${XANATOO_WASM_DEPS_ROOT}/lib/pkgconfig")
     add_compile_options(-pthread)
-    add_link_options(-pthread -sPTHREAD_POOL_SIZE=4 "-L${XANATOO_WASM_DEPS_ROOT}/lib")
+    add_link_options(-pthread -sPTHREAD_POOL_SIZE=8 "-L${XANATOO_WASM_DEPS_ROOT}/lib")
   endif()
   foreach(_feature ${_minimal_off})
     set(XANATOO_${_feature} OFF CACHE BOOL "Disabled by XANATOO_MINIMAL_PORT" FORCE)
@@ -330,7 +341,12 @@ endif()
 # Mbed TLS (what the Android build uses).
 set(XANATOO_TLS "openssl" CACHE STRING "TLS backend: openssl or mbedtls")
 set_property(CACHE XANATOO_TLS PROPERTY STRINGS openssl mbedtls)
-if(XANATOO_NEED_OPENSSL)
+if(XANATOO_NEED_OPENSSL AND XANATOO_WASM_FETCH)
+  target_sources(xanatoo PRIVATE src/https_wasm.cpp)
+  target_compile_definitions(xanatoo PRIVATE XANATOO_HTTPS=1)
+  target_link_options(xanatoo PRIVATE -sFETCH=1)
+  message(STATUS "HTTP transport: browser fetch (CORS applies)")
+elseif(XANATOO_NEED_OPENSSL)
   target_sources(xanatoo PRIVATE src/https.cpp)
   # https.hpp is available: remote images download (app_images.cpp).
   target_compile_definitions(xanatoo PRIVATE XANATOO_HTTPS=1)

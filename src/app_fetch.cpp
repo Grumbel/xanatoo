@@ -656,9 +656,11 @@ uint64_t start_fetch(App& app, FetchPurpose purpose, int pane,
     job.shared->download->url = url;
     app.downloads.push_back(job.shared->download);
   }
-  // There is no pthread runtime in the initial browser build. Its network
-  // services are disabled, so resolve unsupported fetches synchronously.
-#ifdef __EMSCRIPTEN__
+  // The browser build without pthreads has no network services, so
+  // unsupported fetches resolve synchronously. With pthreads (the build that
+  // has the fetch transport) they run on workers: browsers forbid blocking
+  // requests on the main thread.
+#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
   fetch_page(url, job.shared, purpose != FetchPurpose::Preview &&
                               purpose != FetchPurpose::Subscription);
 #else
