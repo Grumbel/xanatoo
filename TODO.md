@@ -8,6 +8,29 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **348** (this delivery is **347**)
 
+## Status (2026-11-13) — PDF / DjVu / CBR in the browser (WASM)
+
+- thumtoo is back in the Emscripten build: `nix/wasm.nix` builds libvips +
+  glib, libarchive, SQLite, libunarr, DjVuLibre
+  (`mk/wasm/scripts/build-imagelibs.sh`) and MuPDF 1.28.5
+  (`build-mupdf.sh`) as static wasm32 libraries with **pthreads**; the
+  CMake option `XANATOO_WASM_DEPS_ROOT` (set by the flake) turns thumtoo on in
+  the minimal port. SDL3 and FreeType are now built with `-pthread` too.
+- glib needed Emscripten patches (size_t probe, stubs for
+  `pthread_getname_np`, `pthread_getaffinity_np`, `posix_spawnp`, `res_query`).
+- Browser bridge: "Open file…" button / drop on the canvas →
+  `/upload/<name>` in MEMFS → `xanatoo_web_open` → `open_browse`
+  (`main.cpp`, `mk/wasm/shell.html`); `on_dropfile` also accepts fixed-layout
+  paths. `mk/wasm/scripts/serve.py` (used by `nix run .#xanatoo-wasm`) sends
+  the COOP/COEP headers pthreads need; hosts that cannot (GitHub Pages) need a
+  service-worker shim.
+- `nix build .#xanatoo-wasm` succeeds (wasm ≈ 9.5 MB). **Never run in a
+  browser**: no working headless browser here (chromium / glibc mismatch).
+  To check: serve, open `hello.pdf` / `pages.djvu` from
+  `external/thumtoo/tests/fixtures/`, watch the console for pthread / MuPDF
+  errors and whether the unchanged non-pthread preview still starts.
+- Not done: Windows and R36S thumtoo; no OCR; persistent storage.
+
 ## Status (2026-11-13) — PDF / DjVu / CBR on Android
 
 - `nix/android-imagelibs.nix` cross-builds MuPDF 1.28.5 (system libjpeg-turbo,

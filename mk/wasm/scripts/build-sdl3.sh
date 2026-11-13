@@ -30,7 +30,8 @@ emcmake cmake ../SDL3-src \
   -DSDL_SHARED=OFF \
   -DSDL_STATIC=ON \
   -DSDL_TEST=OFF \
-  -DSDL_STATIC_PIC=ON
+  -DSDL_STATIC_PIC=ON \
+  -DCMAKE_C_FLAGS=-pthread -DCMAKE_CXX_FLAGS=-pthread
 emmake make -j"${NIX_BUILD_CORES:-${JOBS:-$(nproc)}}"
 emmake make install
 cd ..

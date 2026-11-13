@@ -8,7 +8,8 @@ before bringing additional network and storage backends across platforms.
 `XANATOO_MINIMAL_PORT` defaults to **ON** for Windows (32- and 64-bit) and
 Emscripten, and **OFF** elsewhere. It disables:
 
-- FontConfig, SQLite and thumtoo/libvips;
+- FontConfig, SQLite and thumtoo/libvips (the WebAssembly build brings thumtoo
+  back, see below);
 - the native TLS/HTTP clients (Gemini, Hacker News, Reddit, Lemmy, Nostr,
   feeds, Wikipedia, web pages, and remote ebooks).
 
@@ -113,7 +114,7 @@ emcmake cmake -S . -B build/wasm -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DXANATOO_SDL3=ON -DXANATOO_WASM_SDL3_ROOT=/tmp/sdl3-wasm
 cmake --build build/wasm --parallel
 cmake --install build/wasm --prefix dist/web
-python3 -m http.server --directory dist/web 8000
+python3 mk/wasm/scripts/serve.py dist/web 8000
 ```
 
 Open `http://localhost:8000/`. The deployment includes `index.html`,
@@ -123,6 +124,21 @@ icons, and fallback fonts into `/data` in Emscripten's virtual filesystem.
 It also includes every example document and its relative images, plus
 `FORMAT.md`. The browser drives `run_frame()` via Emscripten's main loop, not
 a blocking native SDL loop.
+
+**Fixed-layout documents (PDF, DjVu, CBZ/CBR) in the browser.** With
+`-DXANATOO_WASM_DEPS_ROOT=<prefix>` (the flake sets it; the prefix is
+`.#imagelibs-wasm`, built by `mk/wasm/scripts/build-imagelibs.sh`) the Wasm
+build keeps thumtoo: libvips, glib, libarchive, SQLite, MuPDF 1.28.5,
+DjVuLibre and libunarr as static wasm32 libraries. They need **pthreads**
+(thumtoo's tile workers, the page reader), so the page must be cross-origin
+isolated: serve it with `Cross-Origin-Opener-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp` (`mk/wasm/scripts/serve.py` and
+`nix run .#xanatoo-wasm` do; GitHub Pages cannot send these headers, use a
+service-worker shim or another host). The "Open file…" button and drops on
+the canvas copy a file into `/upload` of the virtual filesystem and open it
+(`xanatoo_web_open`, `main.cpp`); nothing is uploaded anywhere. Glib is
+patched for Emscripten's libc (stubs for `pthread_getname_np`,
+`pthread_getaffinity_np`, `posix_spawnp`, `res_query`).
 
 This **preview is ephemeral**: file-system persistence, native file dialogs,
 host-file imports, subprocesses, and network service clients are not yet

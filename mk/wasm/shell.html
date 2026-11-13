@@ -21,11 +21,25 @@
 </head>
 <body>
   <header><span><strong>Xanatóo</strong> — interactive hypertext</span>
-    <span id="status">Starting…</span></header>
+    <span><button id="open" type="button" title="Open a document, PDF, DjVu or comic archive">Open file…</button>
+    <input id="file" type="file" hidden>
+    <span id="status">Starting…</span></span></header>
   <main><canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas></main>
   <footer>Offline preview: local documents, editing, and navigation. Changes are not saved.
     <a href="https://github.com/Grumbel/xanatoo">Source</a></footer>
   <script>
+    // Files go into the virtual filesystem and are opened by the app
+    // (xanatoo_web_open); nothing leaves the browser.
+    function openFile(file) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        try { Module.FS.mkdir('/upload'); } catch (e) {}
+        var path = '/upload/' + file.name.replace(/[\\/]/g, '_');
+        Module.FS.writeFile(path, new Uint8Array(reader.result));
+        Module.ccall('xanatoo_web_open', null, ['string'], [path]);
+      };
+      reader.readAsArrayBuffer(file);
+    }
     var canvas = document.getElementById('canvas');
     var status = document.getElementById('status');
     var Module = {
@@ -33,7 +47,17 @@
       print: function (text) { console.log(text); },
       printErr: function (text) { console.error(text); },
       setStatus: function (text) { status.textContent = text || 'Ready'; },
-      onRuntimeInitialized: function () { canvas.focus(); },
+      onRuntimeInitialized: function () {
+        canvas.focus();
+        var input = document.getElementById('file');
+        document.getElementById('open').onclick = function () { input.click(); };
+        input.onchange = function () { if (input.files[0]) openFile(input.files[0]); input.value = ''; };
+        canvas.addEventListener('dragover', function (e) { e.preventDefault(); });
+        canvas.addEventListener('drop', function (e) {
+          e.preventDefault();
+          if (e.dataTransfer.files[0]) openFile(e.dataTransfer.files[0]);
+        });
+      },
       onAbort: function (reason) { status.textContent = 'Error: ' + reason; }
     };
   </script>

@@ -194,6 +194,7 @@
               xanatoo-wasm = wasm.xanatooWasm;
               sdl3-wasm = wasm.sdl3Wasm;
               freetype-wasm = wasm.freetypeWasm;
+              imagelibs-wasm = wasm.imageLibsWasm;
             }
           else { }
         ));

@@ -68,8 +68,18 @@ struct BrowserRuntime {
   std::unique_ptr<xanatoo::app::App> app;
 };
 
+// A file the page wrote into the virtual filesystem (shell.html: the Open
+// button and drops on the canvas); opened by the next frame, on this thread.
+std::string g_web_open_path;  // NOLINT: set from JavaScript on the main thread
+
 void browser_frame(void* ctx) {
   auto* runtime = static_cast<BrowserRuntime*>(ctx);
+  if (!g_web_open_path.empty()) {
+    const std::string path = std::move(g_web_open_path);
+    g_web_open_path.clear();
+    xanatoo::app::open_browse(*runtime->app, path,
+                              std::filesystem::path(path).filename().string());
+  }
   xanatoo::app::run_frame(*runtime->app);
   if (runtime->app->running) return;
   emscripten_cancel_main_loop();
@@ -83,6 +93,12 @@ void browser_frame(void* ctx) {
 #endif
 
 }  // namespace
+
+#ifdef __EMSCRIPTEN__
+extern "C" EMSCRIPTEN_KEEPALIVE void xanatoo_web_open(const char* path) {
+  if (path) g_web_open_path = path;
+}
+#endif
 
 int main(int argc, char** argv) {
   // Logs are usually a pipe (PortMaster's tee, a terminal paste): keep

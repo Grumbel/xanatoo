@@ -35,9 +35,24 @@ if(WIN32 OR EMSCRIPTEN)
   set(_minimal_port_default ON)
 endif()
 option(XANATOO_MINIMAL_PORT "Offline, dependency-light cross-platform build" ${_minimal_port_default})
+# Browser build with fixed-layout documents: a prefix holding the Emscripten
+# builds of thumtoo's libraries (libvips, glib, libarchive, SQLite, MuPDF,
+# DjVuLibre, libunarr; nix/wasm-imagelibs.nix). thumtoo then needs pthreads,
+# so the page must be cross-origin isolated (docs/PORTS.md).
+set(XANATOO_WASM_DEPS_ROOT "" CACHE PATH "Emscripten prefix with thumtoo's libraries")
 if(XANATOO_MINIMAL_PORT)
-  foreach(_feature FONTCONFIG SQLITE THUMTOO GEMINI NOSTR REDDIT LEMMY HN YOUTUBE VIDEO
+  set(_minimal_off FONTCONFIG SQLITE THUMTOO GEMINI NOSTR REDDIT LEMMY HN YOUTUBE VIDEO
                    EBOOKS FEEDS WEB WIKIPEDIA)
+  if(EMSCRIPTEN AND XANATOO_WASM_DEPS_ROOT)
+    list(REMOVE_ITEM _minimal_off THUMTOO)
+    set(XANATOO_THUMTOO ON CACHE BOOL "thumtoo from XANATOO_WASM_DEPS_ROOT" FORCE)
+    list(APPEND CMAKE_PREFIX_PATH "${XANATOO_WASM_DEPS_ROOT}")
+    set(ENV{PKG_CONFIG_PATH} "${XANATOO_WASM_DEPS_ROOT}/lib/pkgconfig")
+    set(ENV{PKG_CONFIG_LIBDIR} "${XANATOO_WASM_DEPS_ROOT}/lib/pkgconfig")
+    add_compile_options(-pthread)
+    add_link_options(-pthread -sPTHREAD_POOL_SIZE=4 "-L${XANATOO_WASM_DEPS_ROOT}/lib")
+  endif()
+  foreach(_feature ${_minimal_off})
     set(XANATOO_${_feature} OFF CACHE BOOL "Disabled by XANATOO_MINIMAL_PORT" FORCE)
   endforeach()
 endif()
@@ -292,6 +307,10 @@ if(XANATOO_THUMTOO)
   target_sources(xanatoo PRIVATE src/images_thumtoo.cpp
     src/fixed_layout_thumtoo.cpp)
   target_link_libraries(xanatoo PRIVATE thumtoo::thumtoo)
+  if(EMSCRIPTEN AND XANATOO_WASM_DEPS_ROOT)
+    # libwebp's static archives need it after themselves.
+    target_link_libraries(xanatoo PRIVATE "${XANATOO_WASM_DEPS_ROOT}/lib/libsharpyuv.a")
+  endif()
   target_compile_definitions(xanatoo PRIVATE XANATOO_THUMTOO=1)
   message(STATUS "Images: thumtoo (libvips)")
 else()
@@ -517,7 +536,9 @@ if(EMSCRIPTEN)
     "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/data/fonts@/data/fonts"
     "SHELL:--preload-file ${XANATOO_ICON_DIR}@/data/icons"
     "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/FORMAT.md@/data/FORMAT.md"
-    -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -sENVIRONMENT=web)
+    -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -sENVIRONMENT=web
+    -sEXPORTED_FUNCTIONS=_main,_xanatoo_web_open
+    -sEXPORTED_RUNTIME_METHODS=ccall,FS)
   add_dependencies(xanatoo xanatoo_icons)
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/xanatoo.html
                 ${CMAKE_CURRENT_BINARY_DIR}/xanatoo.js

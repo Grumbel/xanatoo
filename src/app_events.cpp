@@ -13,6 +13,7 @@
 #include <optional>
 
 #include "xanatoo/app.hpp"
+#include "xanatoo/fixed_layout.hpp"
 #include "xanatoo/drop_url.hpp"
 #include "xanatoo/html_page.hpp"
 #include "xanatoo/platform.hpp"
@@ -110,7 +111,7 @@ static void on_dropfile(App& app, SDL_Event& ev, bool imgui_mouse,
        xanatoo::ends_with(low, ".txt") ||
        xanatoo::ends_with(low, ".org") || xanatoo::ends_with(low, ".gmi") ||
        xanatoo::ends_with(low, ".gemini") || xanatoo::path_uses_html(low) ||
-       xanatoo::is_pandoc_path(low));
+       xanatoo::is_pandoc_path(low) || xanatoo::is_fixed_layout_path(low));
 
   if (is_doc) {
     if (!std::filesystem::exists(fpath)) {
