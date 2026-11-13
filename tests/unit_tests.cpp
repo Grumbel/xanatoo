@@ -4225,7 +4225,7 @@ void test_search_results() {
   // Media catalogs: stable record links, and malformed record rejection.
   EXPECT(has(search_results_markdown(
       plan("openlibrary", "https://openlibrary.org/search.json", "dune"),
-      R"({"docs":[{"key":"/works/OL893415W","title":"Dune","
+      R"({"docs":[{"key":"/works/OL893415W","title":"Dune",
          "author_name":["Frank Herbert"],"first_publish_year":1965}]})"),
       "[Dune](media:openlibrary:OL893415W)"));
   EXPECT(has(search_results_markdown(
@@ -4234,7 +4234,7 @@ void test_search_results() {
       "[Fringe](media:tvmaze:5)"));
   EXPECT(has(search_results_markdown(
       plan("musicbrainz", "https://musicbrainz.org/ws/2", "test"),
-      R"({"release-groups":[{"id":"12345678-1234-1234-1234-123456789abc","
+      R"({"release-groups":[{"id":"12345678-1234-1234-1234-123456789abc",
          "title":"Test Album","first-release-date":"1995-01-01"}]})"),
       "[Test Album](media:musicbrainz:12345678-1234-1234-1234-123456789abc)"));
   EXPECT(has(search_results_markdown(
@@ -4243,7 +4243,7 @@ void test_search_results() {
       "[Universe](media:wikidata:Q1)"));
   EXPECT(has(search_results_markdown(
       plan("openalex", "https://api.openalex.org/works", "test"),
-      R"({"results":[{"id":"https://openalex.org/W1234","
+      R"({"results":[{"id":"https://openalex.org/W1234",
           "display_name":"A paper","publication_year":2020}]})"),
       "[A paper](media:openalex:W1234)"));
   EXPECT(has(search_results_markdown(
