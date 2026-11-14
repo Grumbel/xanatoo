@@ -71,7 +71,7 @@ bool app_init(App& app) {
                          &app.annotation_win, &app.revision_win,
                          &app.nostr_explorer_win, &app.nostr_accounts_win,
                          &app.bookmarks_win, &app.subscriptions_win,
-                         &app.lemmy_explorer_win}) {
+                         &app.lemmy_explorer_win, &app.certs_win}) {
     w->x = static_cast<int>(std::lround(w->x * app.ui_scale));
     w->y = static_cast<int>(std::lround(w->y * app.ui_scale));
     w->w = static_cast<int>(std::lround(w->w * app.ui_scale));
@@ -84,7 +84,7 @@ bool app_init(App& app) {
                          &app.annotation_win, &app.revision_win,
                          &app.nostr_explorer_win, &app.nostr_accounts_win,
                          &app.bookmarks_win, &app.subscriptions_win,
-                         &app.lemmy_explorer_win}) {
+                         &app.lemmy_explorer_win, &app.certs_win}) {
     w->restore_x = w->x;
     w->restore_y = w->y;
     w->restore_w = w->w;
@@ -97,6 +97,7 @@ bool app_init(App& app) {
   app.revision_win.dock = Dock::Right;
   app.nostr_explorer_win.dock = Dock::Right;
   app.nostr_accounts_win.dock = Dock::Right;
+  app.certs_win.dock = Dock::Right;
   // Preferred paths are optional — FontConfig resolves a full family set.
   auto existing_font = [](std::string path) {
     if (!path.empty() && !fs::exists(path)) {

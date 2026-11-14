@@ -168,12 +168,11 @@ std::string resolve_gemini_url(std::string_view base, std::string_view ref) {
 static std::optional<GeminiResponse> gemini_fetch_once(const GeminiUrl& u,
                                                        std::string* err,
                                                        GeminiCertificateChange* changed,
-                                                       GeminiCertificateFirstUse* first_use,
-                                                       std::optional<TlsPeerCertificate>* review_cert) {
+                                                       GeminiPeer* peer) {
   int fd = tcp_connect_host(u.host, u.port, err);
   if (fd < 0) return std::nullopt;
-  // Gemini commonly uses self-signed certificates. Verify the persisted
-  // TOFU fingerprint after the handshake but BEFORE sending the URL.
+  // Gemini commonly uses self-signed certificates. Check the TOFU pin after
+  // the handshake but BEFORE sending the URL.
   TlsStream tls;
   if (!tls.connect(fd, u.host, err, false)) return std::nullopt;
   const auto fingerprint = tls.peer_certificate_sha256();
@@ -181,13 +180,24 @@ static std::optional<GeminiResponse> gemini_fetch_once(const GeminiUrl& u,
     if (err) *err = "Gemini peer did not provide a usable certificate";
     return std::nullopt;
   }
+  if (peer) {
+    // A redirect within the same server keeps "pinned on this visit".
+    const bool again = peer->first_contact && peer->host == u.host &&
+                       peer->port == u.port;
+    *peer = {u.host, u.port, *fingerprint, again,
+             tls.peer_certificate_details()};
+  }
+  GeminiCertificateFirstUse first_use;
   if (!gemini_tofu_check(state_dir(), !no_save(), u.host, u.port,
-                         *fingerprint, err, changed, first_use)) {
-    if (review_cert &&
-        ((changed && !changed->host.empty()) ||
-         (first_use && !first_use->host.empty())))
-      *review_cert = tls.peer_certificate_details();
-    return std::nullopt;
+                         *fingerprint, err, changed, &first_use)) {
+    if (first_use.host.empty()) return std::nullopt;  // changed, or store error
+    // First visit: trust on first use. The pin is written compare-and-set,
+    // so a concurrent fetch that pinned another certificate still wins.
+    if (!gemini_tofu_approve_first_use(state_dir(), !no_save(), first_use,
+                                       err))
+      return std::nullopt;
+    if (err) err->clear();
+    if (peer) peer->first_contact = true;
   }
 
   std::string req = u.canonical + "\r\n";
@@ -232,15 +242,9 @@ static std::optional<GeminiResponse> gemini_fetch_once(const GeminiUrl& u,
 std::optional<GeminiResponse> gemini_fetch(std::string_view url,
                                            std::string* err,
                                            GeminiCertificateChange* changed,
-                                           GeminiCertificateFirstUse* first_use,
-                                           std::optional<TlsPeerCertificate>* review_cert) {
+                                           GeminiPeer* peer) {
   if (changed) *changed = {};
-  if (review_cert) *review_cert = std::nullopt;
-  // Never permit silent first-use pinning even when a caller does not ask
-  // for the structured review output.
-  GeminiCertificateFirstUse ignored_first_use;
-  if (!first_use) first_use = &ignored_first_use;
-  *first_use = {};
+  if (peer) *peer = {};
   auto u = parse_gemini_url(url);
   if (!u) {
     if (err) *err = "not a gemini:// URL";
@@ -248,7 +252,7 @@ std::optional<GeminiResponse> gemini_fetch(std::string_view url,
   }
 
   for (int hop = 0; hop < 5; ++hop) {
-    auto resp = gemini_fetch_once(*u, err, changed, first_use, review_cert);
+    auto resp = gemini_fetch_once(*u, err, changed, peer);
     if (!resp) return std::nullopt;
     if (resp->status == 30 || resp->status == 31) {
       // redirect — meta is new URL

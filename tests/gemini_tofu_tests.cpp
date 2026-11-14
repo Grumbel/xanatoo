@@ -171,6 +171,36 @@ int main() {
         "stale confirmation refuses an independently updated stored pin");
   check(!tofu(false, "example.org", 1965, c),
         "changing the saved pin invalidates an existing session override");
+  // Listing and forgetting pins (Certificates panel).
+  {
+    auto pins = xanatoo::gemini_tofu_list(dir.string(), &err);
+    bool other = false, example = false;
+    for (const auto& pin : pins) {
+      if (pin.host == "other.org" && pin.port == 1965 && pin.sha256 == c &&
+          pin.saved) other = true;
+      if (pin.host == "example.org") example = true;
+    }
+    check(other && example, "list decodes stored hosts and fingerprints");
+    bool ephemeral = false;
+    for (const auto& pin : pins)
+      if (pin.host == "ephemeral.org" && pin.sha256 == b && !pin.saved)
+        ephemeral = true;
+    check(ephemeral, "list includes session-only pins");
+    check(xanatoo::gemini_tofu_forget(dir.string(), true, "OTHER.org", 1965, &err),
+          "forget a stored pin");
+    for (const auto& pin : xanatoo::gemini_tofu_list(dir.string(), &err))
+      check(pin.host != "other.org", "forgotten pin is gone from the list");
+    xanatoo::GeminiCertificateFirstUse again;
+    check(!xanatoo::gemini_tofu_check(dir.string(), true, "other.org", 1965, a,
+                                      &err, &changed, &again) &&
+          again.host == "other.org" && changed.host.empty(),
+          "after forgetting, the next certificate is a first contact");
+    check(xanatoo::gemini_tofu_forget(dir.string(), false, "ephemeral.org",
+                                      1965, &err),
+          "forget a session-only pin under --no-save");
+    check(tofu(false, "ephemeral.org", 1965, c),
+          "forgotten session pin trusts the next certificate");
+  }
   {
     std::ofstream corrupt(file, std::ios::trunc);
     corrupt << "this is not a trusted pin\n";

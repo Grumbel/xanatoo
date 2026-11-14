@@ -62,6 +62,11 @@ enum class UiCommand {
   LemmySetSort,        // arg = Hot, New, Active, TopDay, TopWeek
   LemmyToggleInstanceOnly,
   ToggleNostrAccounts, // local watch-only identities, signer management later
+  ToggleCertificates,  // Certificates panel; arg = host:port opens it on that row
+  CertAccept,          // arg = host:port: trust the changed certificate
+  CertReject,          // arg = host:port: keep the old pin
+  CertForget,          // arg = host:port: remove the pin
+  CertSelect,          // arg = host:port: show that row in detail
   NostrSearchLocal,    // arg = search text
   NostrShowPeople,     // people vs event result tab
   NostrShowEvents,
@@ -313,6 +318,32 @@ struct UiState {
   int nostr_explorer_w = 0, nostr_explorer_h = 0;
   int nostr_accounts_x = 0, nostr_accounts_y = 0;
   int nostr_accounts_w = 0, nostr_accounts_h = 0;
+  // Site identity in the address bar (the favicon's place): a Gemini page
+  // shows the Gemini icon, a refused changed certificate a warning.
+  enum class SiteIdentity { None, Gemini, GeminiChanged };
+  SiteIdentity site_identity = SiteIdentity::None;
+  std::string site_identity_key;  // host:port, the panel row it opens
+  std::string site_identity_tip;
+  // Certificates panel: one row per known server (pins + seen this session).
+  struct CertRow {
+    std::string key, host;
+    int port = 1965;
+    std::string sha256;           // trusted (pinned) fingerprint, may be empty
+    std::string presented;        // what the server showed this session
+    std::string previous;         // pending change: the pin it differs from
+    bool saved = false;           // in the pin store (else session only)
+    bool seen = false;            // connected this session
+    bool first_contact = false;   // pinned on this session's first visit
+    bool changed = false;         // pending change, nothing sent
+    bool current = false;         // the focused page's server
+    std::string subject, issuer, not_before, not_after, self_signed;
+  };
+  bool certs_open = false;
+  int certs_x = 0, certs_y = 0, certs_w = 0, certs_h = 0;
+  std::vector<CertRow> cert_rows;
+  std::string cert_selected;
+  std::string cert_error;
+  bool cert_no_save = false;
   NostrCacheStats nostr_stats;
   std::vector<NostrCachedPerson> nostr_people;
   std::vector<NostrCachedEvent> nostr_events;

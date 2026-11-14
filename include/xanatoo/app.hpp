@@ -21,6 +21,7 @@
 #include "xanatoo/download.hpp"
 #include "xanatoo/editor.hpp"
 #include "xanatoo/font.hpp"
+#include "xanatoo/gemini.hpp"
 #include "xanatoo/gemini_tofu.hpp"
 #include "xanatoo/images.hpp"
 #include "xanatoo/layout.hpp"
@@ -273,7 +274,7 @@ enum class Dock : uint8_t { None = 0, Left, Right, Top, Bottom, Max };
 enum class WindowRole : uint8_t {
   Help, Outline, Backlinks, Sitemap, Page, History, Styles, Bookmarks, Downloads, Reply,
   Annotations, Revisions, NostrExplorer, NostrAccounts, LemmyExplorer,
-  Subscriptions, Document
+  Subscriptions, Certificates, Document
 };
 
 inline UiPanelLayer embedded_panel_layer(WindowRole role) {
@@ -286,6 +287,7 @@ inline UiPanelLayer embedded_panel_layer(WindowRole role) {
     case WindowRole::NostrExplorer: return UiPanelLayer::NostrExplorer;
     case WindowRole::NostrAccounts: return UiPanelLayer::NostrAccounts;
     case WindowRole::LemmyExplorer: return UiPanelLayer::LemmyExplorer;
+    case WindowRole::Certificates: return UiPanelLayer::Certificates;
     default: return UiPanelLayer::Chrome;
   }
 }
@@ -471,10 +473,8 @@ struct FetchShared {
   // Populated only for a structured Gemini TOFU pin mismatch; distinct
   // from generic TLS failures, which must never offer a trust bypass.
   std::optional<xanatoo::GeminiCertificateChange> gemini_change;
-  // First-contact TLS handshake completed, but no request was sent and no
-  // pin was written. Requires explicit confirmation on the main thread.
-  std::optional<xanatoo::GeminiCertificateFirstUse> gemini_first_use;
-  std::optional<xanatoo::TlsPeerCertificate> gemini_certificate;
+  // The certificate a Gemini server presented (pinned on first contact).
+  std::optional<xanatoo::GeminiPeer> gemini_peer;
 };
 
 // Remote image downloads (app_images.cpp): URLs ImageCache asked for,
@@ -646,7 +646,6 @@ enum class PromptKind : uint8_t {
   EditLink,
   EditCite,
   EditSummary,
-  GeminiTrust,  // explicit approval of first-contact / changed certificate
 };
 
 struct Prompt {
@@ -657,10 +656,25 @@ struct Prompt {
   // Target of EditLink / EditCite / EditSummary.
   xanatoo::NodeId node = xanatoo::INVALID_NODE;
   size_t span = 0;
-  std::optional<xanatoo::GeminiCertificateChange> gemini_change;
-  std::optional<xanatoo::GeminiCertificateFirstUse> gemini_first_use;
-  std::string gemini_retry_url;
-  int gemini_trust_pane = -1;
+};
+
+// A Gemini server's certificate as last seen this session (app_certs.cpp),
+// shown by the address bar's site icon and the Certificates panel.
+struct GeminiSiteCert {
+  xanatoo::GeminiPeer peer;  // host, port, presented SHA-256, details
+  // The server presents another certificate than the pinned one: nothing
+  // was sent; the user accepts or rejects it in the Certificates panel.
+  std::optional<xanatoo::GeminiCertificateChange> change;
+  std::string url;  // the page that met the change, reloaded on accept
+  int pane = -1;
+};
+
+// Certificates panel (WindowRole::Certificates).
+struct CertPanel {
+  bool open = false;
+  std::string selected;  // gemini_cert_key of the row shown in detail
+  std::vector<xanatoo::GeminiPin> pins;  // gemini_tofu_list, re-read on change
+  std::string error;     // last store / action error
 };
 
 // Scroll position from the last session, put back once the page is there
@@ -785,6 +799,9 @@ struct App {
   std::vector<std::string> minibuf_hist_path;
   std::vector<std::string> minibuf_hist_url;
   std::string gemini_current_url;
+  // Gemini certificates met this session, by gemini_cert_key (host:port).
+  std::unordered_map<std::string, GeminiSiteCert> gemini_certs;
+  CertPanel certs;
   // Pages opened this session in any view, oldest first (History panel);
   // Back / Forward use each view's own `Pane::nav`.
   std::vector<std::string> visited;
@@ -903,6 +920,7 @@ struct App {
   FloatWindow nostr_explorer_win = make_float_panel(WindowRole::NostrExplorer, 180, 120, 560, 520);
   FloatWindow lemmy_explorer_win = make_float_panel(WindowRole::LemmyExplorer, 190, 130, 560, 520);
   FloatWindow nostr_accounts_win = make_float_panel(WindowRole::NostrAccounts, 200, 150, 440, 440);
+  FloatWindow certs_win = make_float_panel(WindowRole::Certificates, 160, 120, 520, 460);
   ReplyDraft reply;
   SitemapPanel sitemap;
   SearchBar search;
@@ -1405,6 +1423,23 @@ void request_subscription_refresh(App& app, const std::string& address = {});
 void set_subscription_interval(App& app, const std::string& address, int minutes);
 void poll_subscriptions(App& app);
 void finish_subscription_fetch(App& app, const FetchJob& job);
+// Gemini certificates (app_certs.cpp): "host:port", the key of App::gemini_certs.
+std::string gemini_cert_key(std::string_view host, int port);
+// Record what a finished fetch met; a changed certificate opens the panel.
+void note_gemini_peer(App& app, const FetchJob& job);
+// The certificate record of the page view `pi` shows, or null.
+GeminiSiteCert* pane_gemini_cert(App& app, int pi);
+// Address-bar site icon and Certificates panel rows for this frame.
+void cert_ui_state(App& app, xanatoo::UiState& st);
+// Open the Certificates panel on `key` (empty: the focused page's server).
+void show_certificates(App& app, const std::string& key = {});
+void refresh_cert_pins(App& app);
+// Trust the changed certificate of `key` and reload the page that met it.
+void accept_gemini_cert(App& app, const std::string& key);
+// Keep the old pin: the new certificate stays refused.
+void reject_gemini_cert(App& app, const std::string& key);
+// Remove the pin: the next visit trusts what the server presents then.
+void forget_gemini_cert(App& app, const std::string& key);
 // Drop pane `pi`'s running navigation (-1: all navigations). True if any.
 bool cancel_fetches(App& app, int pi = -1);
 void cancel_preview_fetch(App& app);

@@ -8,6 +8,24 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **348** (this delivery is **347**)
 
+## Status (2026-11-14) — Gemini certificates: TOFU without prompts, Certificates panel
+
+- First visit pins the server certificate silently (`gemini_fetch` →
+  `GeminiPeer::first_contact`); the Enter/Esc `PromptKind::GeminiTrust`
+  is gone (unusable on touch, pointless on first contact).
+- A changed certificate still stops the request before the URL is sent: an
+  explanation page, a warning variant of the Gemini icon in the address bar
+  (favicon place, `icons/svg/gemini*.svg`) and the dockable Certificates
+  panel (`app_certs.cpp`, `WindowRole::Certificates`) with Trust new / Keep
+  old. The panel lists pins (`gemini_tofu_list`) with subject / issuer /
+  validity for servers met this session; Forget (`gemini_tofu_forget`).
+- Checked under Xvfb against geminiprotocol.net: first visit, tampered pin →
+  warning → Trust new → reload; icon toggles the panel. Unit tests for
+  list / forget.
+- Open: certificate details are only known for servers connected this
+  session (the store keeps fingerprints only); no first-seen dates; HTTPS
+  pages have no site-identity icon yet.
+
 ## Status (2026-11-13) — PDF / DjVu / CBR in the browser (WASM)
 
 - thumtoo is back in the Emscripten build: `nix/wasm.nix` builds libvips +

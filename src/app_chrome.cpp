@@ -65,7 +65,7 @@ void apply_ui_scale(App& app) {
                          &app.annotation_win, &app.revision_win,
                          &app.nostr_explorer_win, &app.nostr_accounts_win,
                          &app.lemmy_explorer_win, &app.bookmarks_win,
-                         &app.subscriptions_win}) {
+                         &app.subscriptions_win, &app.certs_win}) {
     w->x = static_cast<int>(std::lround(w->x * ratio));
     w->y = static_cast<int>(std::lround(w->y * ratio));
     w->w = static_cast<int>(std::lround(w->w * ratio));
@@ -270,19 +270,6 @@ StatusLine compute_status(App& app) {
       case PromptKind::EditSummary:
         label = "Stretch summary: " + shown_or_dots;
         label += "    Enter confirm · Esc cancel";
-        break;
-      case PromptKind::GeminiTrust:
-        label = pr.gemini_first_use ? "Gemini FIRST CONTACT" :
-                                       "Gemini certificate CHANGED";
-        if (pr.gemini_change)
-          label += " for " + pr.gemini_change->host + ":" +
-                   std::to_string(pr.gemini_change->port);
-        else if (pr.gemini_first_use)
-          label += " for " + pr.gemini_first_use->host + ":" +
-                   std::to_string(pr.gemini_first_use->port);
-        label += pr.gemini_first_use ?
-            "  ·  Review fingerprint · Enter trust server · Esc cancel" :
-            "  ·  Review hashes · Enter trust replacement · Esc keep old";
         break;
       case PromptKind::Replace:
         label = "Find: " + shown_or_dots;

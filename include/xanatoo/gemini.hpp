@@ -27,6 +27,17 @@ std::optional<GeminiUrl> parse_gemini_url(std::string_view url);
 // or path-relative). Returns empty if unresolvable.
 std::string resolve_gemini_url(std::string_view base, std::string_view ref);
 
+// The server certificate of the last connection a fetch made (after
+// redirects, the final host). `first_contact`: nothing was pinned for
+// host:port, so this certificate was trusted and pinned now (TOFU).
+struct GeminiPeer {
+  std::string host;
+  int port = 1965;
+  std::string sha256;
+  bool first_contact = false;
+  std::optional<TlsPeerCertificate> details;
+};
+
 #if defined(XANATOO_GEMINI) && XANATOO_GEMINI
 struct GeminiResponse {
   int status = 0;
@@ -35,15 +46,14 @@ struct GeminiResponse {
   std::string final_url;  // after limited redirects
 };
 
-// Fetch over TLS, requiring review of a first certificate per host:port and
-// refusing changed certificates before sending any URL (session-only with
-// --no-save). A caller that omits `first_use` still fails closed on first use.
-// Follows at most a few 30/31 redirects. On failure, nullopt and err set.
+// Fetch over TLS. A first certificate per host:port is trusted and pinned
+// (session-only with --no-save); a changed one is refused before any URL is
+// sent and reported through `changed` (the user decides in the Certificates
+// panel). Follows at most a few 30/31 redirects. On failure, nullopt and err.
 std::optional<GeminiResponse> gemini_fetch(std::string_view url,
                                            std::string* err = nullptr,
                                            GeminiCertificateChange* changed = nullptr,
-                                           GeminiCertificateFirstUse* first_use = nullptr,
-                                           std::optional<TlsPeerCertificate>* review_cert = nullptr);
+                                           GeminiPeer* peer = nullptr);
 #endif
 
 }  // namespace xanatoo

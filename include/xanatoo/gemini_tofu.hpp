@@ -4,6 +4,7 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace xanatoo {
 
@@ -54,5 +55,25 @@ bool gemini_tofu_approve_first_use(std::string_view directory, bool persist,
 bool gemini_tofu_replace(std::string_view directory, bool persist,
                          const GeminiCertificateChange& change,
                          std::string* err = nullptr);
+
+// One trusted certificate: from the pin store (`saved`) or, with --no-save
+// or a session-only replacement, held in memory for this process.
+struct GeminiPin {
+  std::string host;  // lower-case, as keyed
+  int port = 1965;
+  std::string sha256;
+  bool saved = false;
+};
+
+// Every pin, store and session, sorted by host and port. A store that cannot
+// be read yields what the session has and sets `err`.
+std::vector<GeminiPin> gemini_tofu_list(std::string_view directory,
+                                        std::string* err = nullptr);
+
+// Forget the pin of host:port (store and session). The next connection
+// trusts whatever certificate the server presents then, like a first visit.
+bool gemini_tofu_forget(std::string_view directory, bool persist,
+                        std::string_view host, int port,
+                        std::string* err = nullptr);
 
 }  // namespace xanatoo

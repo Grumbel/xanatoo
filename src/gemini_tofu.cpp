@@ -83,6 +83,18 @@ bool valid_key(std::string_view key) {
   return value >= 1 && value <= 65535;
 }
 
+// Inverse of make_key; false for a malformed key.
+bool split_key(std::string_view key, std::string& host, int& port) {
+  if (!valid_key(key)) return false;
+  const size_t colon = key.rfind(':');
+  host.clear();
+  auto nibble = [](char c) { return c <= '9' ? c - '0' : c - 'a' + 10; };
+  for (size_t i = 0; i < colon; i += 2)
+    host += static_cast<char>(nibble(key[i]) * 16 + nibble(key[i + 1]));
+  port = std::stoi(std::string(key.substr(colon + 1)));
+  return true;
+}
+
 bool load(const fs::path& path, Pins& pins, std::string* err) {
   std::error_code ec;
   if (!fs::exists(path, ec)) {
@@ -313,6 +325,72 @@ bool gemini_tofu_replace(std::string_view directory, bool persist,
   }
   session->second = change.received_sha256;
   return true;
+}
+
+std::vector<GeminiPin> gemini_tofu_list(std::string_view directory,
+                                        std::string* err) {
+  const std::lock_guard guard(pin_mutex());
+  const fs::path path = directory.empty() ? fs::path{} :
+      fs::path(directory) / "gemini-known-hosts";
+  Pins saved;
+  if (!path.empty() && !load(path, saved, err)) saved.clear();
+  std::map<std::string, GeminiPin> all;  // by key: sorted, de-duplicated
+  for (const auto& [key, fingerprint] : saved) {
+    GeminiPin pin;
+    if (!split_key(key, pin.host, pin.port)) continue;
+    pin.sha256 = fingerprint;
+    pin.saved = true;
+    all[key] = std::move(pin);
+  }
+  const std::string prefix = std::string(directory) + '\n';
+  // Same precedence as gemini_tofu_check: a session-only override over the
+  // store, the store over session pins, session pins for the rest.
+  auto session_entry = [&](const std::string& session_key,
+                           const std::string& fingerprint, bool override) {
+    if (session_key.compare(0, prefix.size(), prefix) != 0) return;
+    const std::string key = session_key.substr(prefix.size());
+    GeminiPin pin;
+    if (!split_key(key, pin.host, pin.port)) return;
+    auto it = all.find(key);
+    if (it != all.end()) {
+      if (override && it->second.sha256 != fingerprint) {
+        it->second.sha256 = fingerprint;
+        it->second.saved = false;
+      }
+      return;
+    }
+    pin.sha256 = fingerprint;
+    all[key] = std::move(pin);
+  };
+  for (const auto& [k, fps] : session_overrides())
+    session_entry(k, fps.second, true);
+  for (const auto& [k, fp] : session_pins()) session_entry(k, fp, false);
+  std::vector<GeminiPin> out;
+  for (auto& [key, pin] : all) out.push_back(std::move(pin));
+  return out;
+}
+
+bool gemini_tofu_forget(std::string_view directory, bool persist,
+                        std::string_view host, int port, std::string* err) {
+  if (host.empty() || host.size() > 255 || port < 1 || port > 65535)
+    return fail(err, "invalid Gemini host or port");
+  const std::lock_guard guard(pin_mutex());
+  const std::string key = make_key(host, port);
+  const std::string session_key = std::string(directory) + '\n' + key;
+  session_pins().erase(session_key);
+  session_overrides().erase(session_key);
+  const fs::path path = directory.empty() ? fs::path{} :
+      fs::path(directory) / "gemini-known-hosts";
+  if (path.empty()) return true;
+  Pins saved;
+  if (!load(path, saved, err)) return false;
+  if (saved.erase(key) == 0) return true;
+  if (!persist) {
+    // The store stays as it is; hide its pin for this session by trusting
+    // nothing until the next connection pins anew in memory.
+    return fail(err, "--no-save: the saved pin stays in the store");
+  }
+  return save(path, saved, err);
 }
 
 }  // namespace xanatoo

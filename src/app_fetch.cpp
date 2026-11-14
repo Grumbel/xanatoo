@@ -45,11 +45,10 @@ constexpr Uint32 kPageCacheTtl = 5 * 60 * 1000;
 void fetch_gemini(const std::string& url, FetchShared& out) {
   out.service = "Gemini";
   xanatoo::GeminiCertificateChange changed;
-  xanatoo::GeminiCertificateFirstUse first_use;
-  auto resp = xanatoo::gemini_fetch(url, &out.error, &changed, &first_use,
-                                   &out.gemini_certificate);
+  xanatoo::GeminiPeer peer;
+  auto resp = xanatoo::gemini_fetch(url, &out.error, &changed, &peer);
   if (!changed.host.empty()) out.gemini_change = std::move(changed);
-  if (!first_use.host.empty()) out.gemini_first_use = std::move(first_use);
+  if (!peer.host.empty()) out.gemini_peer = std::move(peer);
   if (!resp) return;
   out.final_url = resp->final_url;
   if (resp->status == 10 || resp->status == 11) {
@@ -281,13 +280,13 @@ void cache_page(App& app, const FetchJob& job) {
 }
 
 xanatoo::Document load_error_doc(const FetchJob& job) {
-  const bool certificate_review = job.shared->gemini_change ||
-                                  job.shared->gemini_first_use;
+  const bool certificate_review = job.shared->gemini_change.has_value();
   std::string md;
   if (certificate_review) {
-    md = "# Gemini certificate review\n\n"
-         "The TLS handshake completed, but the request URL was not sent. "
-         "Check the certificate details independently before trusting it.\n";
+    md = "# Server certificate changed\n\n"
+         "This server presented a different certificate than on your earlier "
+         "visit, so the request was not sent. Servers renew certificates, but "
+         "this can also mean that someone intercepts the connection.\n";
   } else {
     md = "# Could not load page\n\n`" + job.url + "`\n\n" +
          job.shared->error + "\n";
@@ -317,18 +316,12 @@ xanatoo::Document load_error_doc(const FetchJob& job) {
       return grouped;
     };
     field("Requested URL", job.url);
-    if (job.shared->gemini_change) {
-      const auto& change = *job.shared->gemini_change;
-      field("Trust state", "The certificate differs from the saved pin");
-      field("Previously trusted SHA-256", fingerprint(change.previous_sha256));
-      field("Presented SHA-256", fingerprint(change.received_sha256));
-    } else if (job.shared->gemini_first_use) {
-      field("Trust state", "First contact; no certificate is pinned yet");
-      field("Presented SHA-256",
-            fingerprint(job.shared->gemini_first_use->fingerprint_sha256));
-    }
-    if (job.shared->gemini_certificate) {
-      const auto& cert = *job.shared->gemini_certificate;
+    const auto& change = *job.shared->gemini_change;
+    field("Previously trusted SHA-256", fingerprint(change.previous_sha256));
+    field("Presented SHA-256", fingerprint(change.received_sha256));
+    const auto& peer = job.shared->gemini_peer;
+    if (peer && peer->details) {
+      const auto& cert = *peer->details;
       field("Subject", cert.subject);
       field("Issuer", cert.issuer);
       field("Valid from", cert.not_before);
@@ -343,7 +336,9 @@ xanatoo::Document load_error_doc(const FetchJob& job) {
     } else {
       field("Certificate metadata", "Unavailable from the TLS backend");
     }
-    field("Action", "Enter: trust this certificate and retry; Esc: cancel");
+    field("What now", "The warning icon in the address bar opens the "
+          "Certificates panel: trust the new certificate and reload, or keep "
+          "the old one.");
   }
   if (std::string_view(job.shared->service) == "Reddit" &&
       xanatoo::starts_with(job.shared->error, "HTTP 403")) {
@@ -463,17 +458,9 @@ void finish_navigate(App& app, const FetchJob& job) {
     app.panes[job.pane].nav.restoring = -1;
     flash_status(app, service + " failed: " + r.error);
     std::cerr << service << ": " << r.error << "\n";
-    if (show_load_error(app, job) &&
-        (r.gemini_change || r.gemini_first_use)) {
-      // The error document shows the presented SHA-256 fingerprint (and
-      // the old pin on replacements). No URL was sent to an unknown peer.
-      focus_view(app, job.pane);
-      open_prompt(app, PromptKind::GeminiTrust);
-      app.prompt.gemini_change = r.gemini_change;
-      app.prompt.gemini_first_use = r.gemini_first_use;
-      app.prompt.gemini_retry_url = job.url;
-      app.prompt.gemini_trust_pane = job.pane;
-    }
+    // A changed Gemini certificate: the page explains, the Certificates
+    // panel (opened by note_gemini_peer) decides. No URL was sent.
+    show_load_error(app, job);
     return;
   }
   const bool http_error = r.http_status != 0;
@@ -707,6 +694,7 @@ void poll_fetches(App& app) {
     if (std::string_view(job.shared->service) == "Nostr" &&
         (app.nostr_explorer_open || app.nostr_accounts_open))
       refresh_nostr_catalogue(app);
+    note_gemini_peer(app, job);
     if (job.shared->download && job.shared->download->phase.load() ==
                                     xanatoo::DownloadPhase::Pending)
       job.shared->download->phase.store(xanatoo::DownloadPhase::Skipped);

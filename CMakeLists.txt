@@ -156,6 +156,7 @@ add_executable(xanatoo
   src/app_fetch.cpp
   src/app_subscriptions.cpp
   src/app_downloads.cpp
+  src/app_certs.cpp
   src/app_split.cpp
   src/app_footnotes.cpp
   src/app_sitemap.cpp

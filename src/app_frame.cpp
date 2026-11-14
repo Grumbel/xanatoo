@@ -523,6 +523,7 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
     }
   }
   ui_state.location_icon = address_icon(app, ui_state.doc_label);
+  cert_ui_state(app, ui_state);
   // Imported EPUBs are stored as content.md beside their extracted media.
   // Use the first image in that document as its cover when present.
   const std::string current = path_of(app, focused_pane(app));
@@ -668,6 +669,8 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         c == C::SubscriptionInterval ||
         c == C::ToggleAnnotationsPanel || c == C::ToggleRevisionsPanel ||
         c == C::ToggleNostrExplorer || c == C::ToggleNostrAccounts ||
+        c == C::ToggleCertificates || c == C::CertAccept ||
+        c == C::CertReject || c == C::CertForget || c == C::CertSelect ||
         c == C::ToggleLemmyExplorer || c == C::LemmySetTab ||
         c == C::LemmySetSearch || c == C::LemmySetInstance ||
         c == C::LemmyAddInstance || c == C::LemmySetSort ||
@@ -1159,6 +1162,26 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     case C::LemmyToggleInstanceOnly:
       app.lemmy_instance_only = !app.lemmy_instance_only;
+      break;
+    case C::ToggleCertificates:
+      // From the address bar's site icon (arg = its server): show that row;
+      // a second click closes the panel again, like a browser's popover.
+      if (app.certs.open && (arg.empty() || arg == app.certs.selected))
+        app.certs.open = false;
+      else
+        show_certificates(app, arg);
+      break;
+    case C::CertSelect:
+      app.certs.selected = arg;
+      break;
+    case C::CertAccept:
+      accept_gemini_cert(app, arg);
+      break;
+    case C::CertReject:
+      reject_gemini_cert(app, arg);
+      break;
+    case C::CertForget:
+      forget_gemini_cert(app, arg);
       break;
     case C::ToggleNostrAccounts:
       app.nostr_accounts_open = !app.nostr_accounts_open;

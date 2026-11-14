@@ -61,6 +61,7 @@ behaviour is free functions ("systems") taking `App&`:
 | `app_windows.cpp` / `ui.cpp` | Bookmarks panel (`WindowRole::Bookmarks`): native dockable `FloatWindow`, not a standalone ImGui window; the bookmark list and actions are ImGui widgets inside its client. Preferences remains a separate settings dialog, not a dockable work panel |
 | `app_subscriptions.cpp` / `subscriptions.cpp` | Subscriptions panel (`WindowRole::Subscriptions`): a dockable persistent read-only watchlist for changing Lemmy, Nostr, RSS/Atom, HN and Reddit collections. Reuses `FetchPurpose::Subscription` workers with two concurrent checks and staggered automatic requests; compares stable Message IDs for unread counts. `state_dir()/subscriptions.txt` stores the rolling snapshot, counts, intervals and check times. See `docs/SUBSCRIPTIONS.md` |
 | `ui_panel_layers.hpp` / `src/ui_panel_imgui_order.hpp` / `ui.cpp` | Embedded ImGui panels are classified by exact root/child names, drawn after their native FloatWindow, and reordered for ImGui hit-testing in `float_stack` order. Native foreground frames mask obscured editor mouse events; popups/menus/dialogs remain foreground. Old SDL2 fallback renderer keeps one full UI pass. See `docs/UI.md` |
+| `app_certs.cpp` | Gemini certificates: `GeminiSiteCert` per server met this session (`App::gemini_certs`), address-bar site icon (`cert_ui_state`), dockable Certificates panel (`WindowRole::Certificates`; ImGui body in `ui.cpp`) to view, accept / keep a changed certificate, or forget a pin (`gemini_tofu_list` / `gemini_tofu_forget`) |
 | `app_sitemap.cpp` | Sitemap panel (`WindowRole::Sitemap`, `SitemapPanel`): site tree of the focused page's host, one `SiteCache` per host loaded on a worker thread; "Page" opens `sitemap:host` |
 | `app_downloads.cpp` / `download.cpp` | Downloads panel (`WindowRole::Downloads`): MIME/attachment routing, streaming files, live progress/cancel, and persisted completed-file history; `https_get_follow_stream` decodes HTTP transfer chunks without buffering binaries |
 | `http_url.cpp` / `https.cpp` | Scheme-preserving URL parsing/redirect resolution plus HTTP/1.1 over plain TCP (`http://`) or TLS (`https://`); historical `https_*` entry points accept both; parser is tested without network dependencies |
@@ -644,11 +645,16 @@ history or distribute patch files.
 - Gemtext parser is always built (`.gmi` / `.gemini`).
 - Network client is gated by `XANATOO_GEMINI` (default ON; needs OpenSSL).
 - URL entry is Ctrl+L / `UiCommand::OpenUrlBar` → `navigate_to_url`.
-- After the TLS handshake, unknown host:port leaf SHA-256 fingerprints must be
-  reviewed and explicitly trusted before sending any Gemini URL or saving a
-  pin. Changed certificates also require explicit review. Review state goes
-  from the fetch worker to a foreground prompt; approval is compare-and-swap
-  against saved/session trust and the retry forces a fresh TLS handshake.
+- TOFU without questions: a first host:port certificate is pinned and the
+  request sent (`gemini_fetch` reports it in `GeminiPeer::first_contact`).
+  Only a **changed** certificate stops the fetch before the URL is sent.
+  There are no Enter/Esc prompts (touch has neither): `note_gemini_peer`
+  (`app_certs.cpp`) records what each fetch met in `App::gemini_certs`, the
+  address bar shows the Gemini icon in the favicon's place (warning variant
+  on a change, `UiState::site_identity`), and a click opens the dockable
+  Certificates panel (`WindowRole::Certificates`, `CertPanel`): view pins,
+  Trust new / Keep old for a change, Forget. Acceptance is compare-and-swap
+  against saved/session trust and the reload forces a fresh TLS handshake.
   `--no-save` approvals stay in memory. See `docs/TLS.md` and the pure
   `gemini_tofu_tests.cpp` suite; do not bypass this with another fetch path.
 

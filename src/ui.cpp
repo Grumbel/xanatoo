@@ -310,6 +310,7 @@ const char* menu_icon_for(UiCommand command) {
     case UiCommand::RemoveBookmark: return "bookmark";
     case UiCommand::ToggleHistory: return "history";
     case UiCommand::ToggleDownloads: return "downloads";
+    case UiCommand::ToggleCertificates: return "gemini";
     case UiCommand::ToggleOutline: return "outline";
     case UiCommand::ToggleStructure: return "structure";
     case UiCommand::ToggleDiff: return "diff";
@@ -466,7 +467,7 @@ void Ui::load_icons(SDL_Renderer* renderer) {
       "figure", "note", "replace", "outline", "paste", "copy", "new", "open",
       "zoomin", "zoomout", "structure", "diff",
       "back", "forward", "up", "home", "reload", "stop", "bookmark", "bookmark-outline", "history", "downloads", "edit", "native", "reader", "sitemap",
-      "linespacing", "measure", "style",
+      "linespacing", "measure", "style", "gemini", "gemini-changed",
       "format", "insert", "view", "lists",
   };
 
@@ -1154,10 +1155,24 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
       ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.f, 0.f, 0.f, 0.f));
       ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.f, 0.f, 0.f, 0.f));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
+      // Site identity takes the favicon's place: Gemini has no favicons, its
+      // icon opens the certificate (and warns when that changed).
+      SDL_Texture* loc_icon = state.location_icon;
+      const bool site_button =
+          state.site_identity != UiState::SiteIdentity::None;
+      if (site_button) {
+        const Icon* ic = icon(state.site_identity ==
+                                      UiState::SiteIdentity::GeminiChanged
+                                  ? "gemini-changed" : "gemini");
+        loc_icon = ic ? ic->texture : nullptr;
+      }
+      const bool has_loc_icon = loc_icon || site_button;
       ImGui::PushStyleVar(
           ImGuiStyleVar_FramePadding,
-          ImVec2((state.location_icon ? 30.f : 6.f) * scale_,
+          ImVec2((has_loc_icon ? 30.f : 6.f) * scale_,
                  std::max(0.f, (field_h - ImGui::GetFontSize()) * 0.5f)));
+      // The site button below overlaps the field's left padding.
+      if (site_button) ImGui::SetNextItemAllowOverlap();
       bool enter = ImGui::InputText(
           "##urlbar", url_input_, sizeof(url_input_),
           ImGuiInputTextFlags_EnterReturnsTrue |
@@ -1227,20 +1242,57 @@ void Ui::toolbars(const UiState& state, UiFrameResult& result, UiCommand& cmd) {
         url_context_end_ = selection_end;
         url_context_cursor_ = cursor;
       }
-      if (state.location_icon) {
+      const bool url_hovered =
+          ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal);
+      if (has_loc_icon) {
         const ImVec2 p = ImGui::GetItemRectMin();
         const float side = 20.f * scale_;
-        const ImVec2 size = icon_size(state.location_icon, side);
-        const float y = p.y + (field_h - size.y) * 0.5f;
-        ImGui::GetWindowDrawList()->AddImage(
-            reinterpret_cast<ImTextureID>(state.location_icon),
-            ImVec2(p.x + 5.f * scale_ + (side - size.x) * 0.5f, y),
-            ImVec2(p.x + 5.f * scale_ + (side + size.x) * 0.5f, y + size.y));
+        const float x0 = p.x + 5.f * scale_;
+        if (site_button) {
+          // A button the size of the icon box: tap / click opens the
+          // Certificates panel on this server (touch has no Enter / Esc).
+          // ItemAdd + ButtonBehavior: a real item for hit-testing that
+          // places nothing, so the row's SameLine layout is unchanged.
+          const float pad = 3.f * scale_;
+          const float by = p.y + (field_h - side) * 0.5f - pad;
+          const ImRect bb(ImVec2(x0 - pad, by),
+                          ImVec2(x0 + side + pad, by + side + 2 * pad));
+          const ImGuiID id = ImGui::GetID("##site_identity");
+          bool hot = false, held = false;
+          if (ImGui::ItemAdd(bb, id) &&
+              ImGui::ButtonBehavior(bb, id, &hot, &held) &&
+              cmd == UiCommand::None) {
+            cmd = UiCommand::ToggleCertificates;
+            result.arg = state.site_identity_key;
+          }
+          if (hot || held)
+            ImGui::GetWindowDrawList()->AddRectFilled(
+                bb.Min, bb.Max,
+                ImGui::GetColorU32(held ? ImGuiCol_ButtonActive
+                                        : ImGuiCol_ButtonHovered),
+                ImGui::GetStyle().FrameRounding);
+          if (hot) ImGui::SetTooltip("%s", state.site_identity_tip.c_str());
+        }
+        if (loc_icon) {
+          const ImVec2 size = icon_size(loc_icon, side);
+          const float y = p.y + (field_h - size.y) * 0.5f;
+          ImGui::GetWindowDrawList()->AddImage(
+              reinterpret_cast<ImTextureID>(loc_icon),
+              ImVec2(x0 + (side - size.x) * 0.5f, y),
+              ImVec2(x0 + (side + size.x) * 0.5f, y + size.y));
+        } else if (site_button) {
+          // No icon files (no --data-dir): a plain marker still works.
+          ImGui::GetWindowDrawList()->AddText(
+              ImVec2(x0, p.y + (field_h - ImGui::GetFontSize()) * 0.5f),
+              ImGui::GetColorU32(ImGuiCol_Text),
+              state.site_identity == UiState::SiteIdentity::GeminiChanged
+                  ? "!" : "G");
+        }
       }
       ImGui::PopStyleVar(2);
       ImGui::PopStyleColor(3);
       url_bar_editing_ = url_active;
-      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+      if (url_hovered && !(site_button && ImGui::IsItemHovered()))
         ImGui::SetTooltip(
             "Location — URL or path · Ctrl+L · ↑↓ suggestions · Enter opens");
       if (url_right_clicked) ImGui::OpenPopup("##url_context");
@@ -2260,6 +2312,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
         cmd = UiCommand::ToggleDownloads;
       if (ImGui::MenuItem("Subscriptions", nullptr, state.subscriptions_open))
         cmd = UiCommand::ToggleSubscriptions;
+      if (ImGui::MenuItem("Certificates", nullptr, state.certs_open))
+        cmd = UiCommand::ToggleCertificates;
       if (ImGui::MenuItem("Style Sheets", nullptr, state.styles_open))
         cmd = UiCommand::ToggleStylesPanel;
       if (ImGui::MenuItem("Annotations", nullptr, state.annotations_panel_open))
@@ -4110,6 +4164,129 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       }
       ImGui::Separator();
       ImGui::TextWrapped("Creating an account with a signing key needs secure NIP-46 remote signing or encrypted NIP-49 key storage. No private keys are accepted here.");
+    }
+    ImGui::End();
+  }
+
+  // ---- Certificates: Gemini TOFU pins in a native dockable panel ----
+  if (state.certs_open) {
+    ImGui::SetNextWindowPos(ImVec2(float(state.certs_x + 3),
+                                  float(state.certs_y + 3)));
+    ImGui::SetNextWindowSize(ImVec2(float(std::max(1, state.certs_w - 6)),
+                                   float(std::max(1, state.certs_h - 6))));
+    if (ImGui::Begin("##certificates_body", nullptr, embedded_panel_flags)) {
+      auto grouped = [](const std::string& hash) {
+        std::string out;
+        for (size_t i = 0; i < hash.size(); i += 8) {
+          if (i) out += ' ';
+          out += hash.substr(i, 8);
+        }
+        return out;
+      };
+      const ImVec4 warn(0.70f, 0.16f, 0.10f, 1.f);
+      ImGui::TextWrapped("Gemini servers are trusted on the first visit. "
+                         "You are only warned when a server later presents "
+                         "a different certificate.");
+      if (state.cert_no_save)
+        ImGui::TextDisabled("--no-save: new trust lasts for this session only.");
+      if (!state.cert_error.empty())
+        ImGui::TextColored(warn, "%s", state.cert_error.c_str());
+      const UiState::CertRow* sel = nullptr;
+      for (const auto& row : state.cert_rows)
+        if (row.key == state.cert_selected) sel = &row;
+      if (state.cert_rows.empty()) {
+        ImGui::TextDisabled("No Gemini servers known yet.");
+      } else {
+        const float list_h = sel ? std::max(80.f, ImGui::GetContentRegionAvail().y * 0.35f)
+                                 : 0.f;
+        if (ImGui::BeginChild("##cert_list", ImVec2(0.f, list_h),
+                              ImGuiChildFlags_Borders)) {
+          for (const auto& row : state.cert_rows) {
+            ImGui::PushID(row.key.c_str());
+            std::string label = row.key;
+            if (row.changed) label = "[!] " + label + "  CHANGED";
+            else if (row.current) label += "  (this page)";
+            const char* tag = row.changed ? "" :
+                row.sha256.empty() ? "  not pinned" :
+                row.first_contact ? "  new this session" :
+                row.saved ? "" : "  session only";
+            label += tag;
+            if (row.changed) ImGui::PushStyleColor(ImGuiCol_Text, warn);
+            if (ImGui::Selectable(label.c_str(), &row == sel) &&
+                cmd == UiCommand::None) {
+              cmd = UiCommand::CertSelect;
+              result.arg = &row == sel ? std::string{} : row.key;
+            }
+            if (row.changed) ImGui::PopStyleColor();
+            ImGui::PopID();
+          }
+        }
+        ImGui::EndChild();
+      }
+      if (sel) {
+        ImGui::Separator();
+        ImGui::PushID(sel->key.c_str());
+        auto field = [&](const char* label, const std::string& value) {
+          ImGui::TextDisabled("%s", label);
+          ImGui::Indent();
+          ImGui::TextWrapped("%s", value.empty() ? "Unavailable" : value.c_str());
+          ImGui::Unindent();
+        };
+        ImGui::TextUnformatted(sel->key.c_str());
+        if (sel->changed) {
+          ImGui::PushStyleColor(ImGuiCol_Text, warn);
+          ImGui::TextWrapped("This server presented a different certificate "
+                             "than before. Nothing was sent to it. Servers "
+                             "renew certificates, but this can also mean that "
+                             "someone intercepts the connection.");
+          ImGui::PopStyleColor();
+          field("Previously trusted SHA-256", grouped(sel->previous));
+          field("Presented SHA-256", grouped(sel->presented));
+          if (classic_button("Trust new certificate") && cmd == UiCommand::None) {
+            cmd = UiCommand::CertAccept;
+            result.arg = sel->key;
+          }
+          ImGui::SameLine();
+          if (classic_button("Keep old certificate") && cmd == UiCommand::None) {
+            cmd = UiCommand::CertReject;
+            result.arg = sel->key;
+          }
+        } else if (!sel->sha256.empty()) {
+          ImGui::TextWrapped("%s", sel->first_contact ?
+              "Trusted automatically on the first visit in this session." :
+              sel->saved ? "Trusted; the pin is saved." :
+                           "Trusted for this session only.");
+          field("Trusted SHA-256", grouped(sel->sha256));
+        } else {
+          ImGui::TextWrapped("Not pinned: the next visit trusts the "
+                             "certificate the server presents then.");
+        }
+        if (sel->seen && !sel->subject.empty()) {
+          field("Subject", sel->subject);
+          field("Issuer", sel->issuer);
+          field("Valid from", sel->not_before);
+          field("Valid until", sel->not_after);
+          field("Self-signed", sel->self_signed);
+        } else if (!sel->seen) {
+          ImGui::TextDisabled("Visit the server to see certificate details.");
+        }
+        const std::string& fp = sel->changed ? sel->presented : sel->sha256;
+        if (!fp.empty() && classic_button("Copy fingerprint"))
+          ImGui::SetClipboardText(fp.c_str());
+        if (!sel->sha256.empty() || sel->changed) {
+          ImGui::SameLine();
+          if (classic_button("Forget") && cmd == UiCommand::None) {
+            cmd = UiCommand::CertForget;
+            result.arg = sel->key;
+          }
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Remove the pin: the next visit trusts the "
+                              "certificate the server presents then.");
+        }
+        ImGui::PopID();
+      } else if (!state.cert_rows.empty()) {
+        ImGui::TextDisabled("Select a server to see its certificate.");
+      }
     }
     ImGui::End();
   }

@@ -209,14 +209,13 @@ working when those services change.
 server certificate and matching hostname. Missing CA stores and invalid
 certificates fail closed (see [TLS notes](docs/TLS.md)); this change has not
 yet been device-tested on all Android targets. Gemini permits self-signed
-certificates using TOFU pinning. A first-contact review shows the server's
-SHA-256 certificate fingerprint and requires Enter to trust or Esc to cancel
-before sending the URL. This does not authenticate the **first** connection.
-On later certificate changes, the failed page shows both fingerprints;
-Enter trusts the replacement and reconnects, while Esc keeps the old pin.
-Verify fingerprints independently before accepting them.
-The Gemini review page also displays certificate subject, issuer, validity
-dates, and self-signature status (when the TLS backend can verify it).
+certificates using TOFU pinning: the first certificate of a server is
+trusted and pinned automatically, which does not authenticate the **first**
+connection. A later certificate change stops the request before the URL is
+sent and shows a warning; the Gemini icon in the address bar opens the
+dockable Certificates panel, where the new certificate is trusted or the old
+one kept, and pins are viewed (subject, issuer, validity, fingerprints) or
+forgotten. Verify fingerprints independently when that matters.
 Plain `http://` URLs are supported but carry data without encryption or
 authentication. Redirects may upgrade HTTP to HTTPS, never downgrade HTTPS
 to HTTP.
