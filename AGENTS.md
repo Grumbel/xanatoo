@@ -154,10 +154,14 @@ buffer call `attach_draft` (`add_buffer` / `show_doc_in_pane` do); after
 writing it, `note_saved`. Mark edits with `mark_dirty` / `note_edit`, not
 `dirty = true`. Design and roadmap: `docs/REVISIONS.md`.
 
-Keyboard focus: `App::key_focus` (`KeyFocus::Document/Outline/Backlinks/Sitemap/Page/Styles`).
+Keyboard focus: `App::key_focus` (`KeyFocus::Document/Outline/Backlinks/Sitemap/Page/Styles/Panel`).
 Panels handle plain keys only while `panel_has_keys(app, …)`; opening or
 clicking a panel focuses it, a pane click / jump / unused plain key returns
 focus to the document. Never let a panel consume keys just because it is open.
+Panels without native keys (embedded ImGui panels, Help, Revisions,
+Downloads) share `KeyFocus::Panel` + `App::panel_focus` (`focus_panel`,
+`focus_float`). The lit (yellow) title bar is `float_active(app, w)` for
+every role — never pass a constant `active` to `draw_floating_frame`.
 
 Context menus: `ui.cpp` keeps page-content actions separate from View/Panels
 controls. The location `InputText` has clipboard/address/bookmark actions;

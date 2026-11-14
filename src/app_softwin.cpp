@@ -255,7 +255,7 @@ void toggle_shade(App& app, FloatWindow& w) {
   w.resize = 0;
   w.scroll_dragging = false;
   // A rolled-up panel has nothing to type into.
-  if (w.shaded && app.key_focus == float_key_focus(w))
+  if (w.shaded && float_active(app, w))
     app.key_focus = KeyFocus::Document;
   app.needs_layout = true;
   place_windows(app);

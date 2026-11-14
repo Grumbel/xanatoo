@@ -111,6 +111,7 @@ GeminiSiteCert* pane_gemini_cert(App& app, int pi) {
 
 void show_certificates(App& app, const std::string& key) {
   app.certs.open = true;
+  focus_panel(app, WindowRole::Certificates);
   app.certs.selected = key.empty() ? pane_cert_key(app, app.focus) : key;
   refresh_cert_pins(app);
 }

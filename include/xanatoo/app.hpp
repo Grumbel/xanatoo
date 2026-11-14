@@ -640,8 +640,10 @@ struct StatusLine {
 
 // Who receives plain keys (arrows, Enter, digits). Panels only while open;
 // see panel_has_keys(). Status prompts / minibuffer take precedence anyway.
+// Panel: a panel without native keys of its own (embedded ImGui panels, Help,
+// Revisions, Downloads) is the active window; which one is App::panel_focus.
 enum class KeyFocus : uint8_t {
-  Document, Outline, Backlinks, Sitemap, Page, History, Styles
+  Document, Outline, Backlinks, Sitemap, Page, History, Styles, Panel
 };
 
 // The single active status-bar prompt (at most one at a time).
@@ -746,6 +748,8 @@ struct App {
   int focus = 0;         // view with the caret (any slot)
   int centre_focus = 0;  // last focused centre slot (tabs, closing windows)
   KeyFocus key_focus = KeyFocus::Document;
+  // The panel meant by KeyFocus::Panel (ignored for any other key_focus).
+  WindowRole panel_focus = WindowRole::Document;
   // A panel consumed a printable key (outline 1–9): drop the TEXTINPUT
   // SDL sends right after it so the digit is not typed into the document.
   bool eat_text_input = false;
@@ -1254,6 +1258,12 @@ inline bool panel_has_keys(const App& app, KeyFocus panel) {
   }
 }
 
+// Give KeyFocus::Panel to `role` (a panel without native keys), e.g. on open.
+inline void focus_panel(App& app, WindowRole role) {
+  app.key_focus = KeyFocus::Panel;
+  app.panel_focus = role;
+}
+
 inline bool prompt_active(const App& app) {
   return app.prompt.kind != PromptKind::None;
 }
@@ -1575,8 +1585,13 @@ void toggle_maximize(App& app, FloatWindow& w);
 // (or, for a band whose panels are all rolled up, the panes) take the room.
 // No-op for free and maximized windows.
 void toggle_shade(App& app, FloatWindow& w);
-// The keyboard focus a click on `w` gives (Document for most roles).
+// The keyboard focus a click on `w` gives (Panel for roles without keys of
+// their own, Document for document windows).
 KeyFocus float_key_focus(const FloatWindow& w);
+// Make `w` the active window (a rolled-up panel gives focus to the document).
+void focus_float(App& app, const FloatWindow& w);
+// `w` is the active window: its title bar is drawn lit. At most one is.
+bool float_active(const App& app, const FloatWindow& w);
 // Derive docked / maximized geometry, keep floating windows on screen.
 void place_windows(App& app);
 const std::string& soft_path(App& app, const FloatWindow& sw);

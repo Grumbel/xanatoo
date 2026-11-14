@@ -80,6 +80,8 @@ void close_window(App& app, FloatWindow& w) {
   w.dragging = false;
   w.resize = 0;
   w.scroll_dragging = false;
+  if (w.role != WindowRole::Document && float_active(app, w))
+    app.key_focus = KeyFocus::Document;
   switch (w.role) {
     case WindowRole::Help:
       app.help_mode = false;
@@ -378,8 +380,27 @@ KeyFocus float_key_focus(const FloatWindow& w) {
     case WindowRole::Page: return KeyFocus::Page;
     case WindowRole::History: return KeyFocus::History;
     case WindowRole::Styles: return KeyFocus::Styles;
-    default: return KeyFocus::Document;
+    case WindowRole::Document: return KeyFocus::Document;
+    default: return KeyFocus::Panel;
   }
+}
+
+void focus_float(App& app, const FloatWindow& w) {
+  if (float_shaded(w)) {
+    app.key_focus = KeyFocus::Document;
+    return;
+  }
+  app.key_focus = float_key_focus(w);
+  if (app.key_focus == KeyFocus::Panel) app.panel_focus = w.role;
+}
+
+bool float_active(const App& app, const FloatWindow& w) {
+  const KeyFocus kf = float_key_focus(w);
+  if (w.role == WindowRole::Document)
+    return app.key_focus == KeyFocus::Document && app.focus == w.view;
+  if (kf == KeyFocus::Panel)
+    return app.key_focus == KeyFocus::Panel && app.panel_focus == w.role;
+  return panel_has_keys(app, kf);
 }
 
 std::vector<FloatWindow*> float_stack(App& app) {
@@ -564,8 +585,7 @@ bool float_press(App& app, int mx, int my) {
     if (!bits && !inside) continue;
     // Clicking a panel gives it the keyboard; any other window, the document.
     // A rolled-up panel has nothing to type into.
-    app.key_focus =
-        float_shaded(*w) ? KeyFocus::Document : float_key_focus(*w);
+    focus_float(app, *w);
     if (w->role == WindowRole::Document) {
       // Raise to top of the document stack; `w` is stale afterwards.
       const size_t idx = static_cast<size_t>(w - app.soft_wins.data());
@@ -745,7 +765,7 @@ static void draw_soft_window(App& app, FloatWindow& sw) {
     sw.w = std::max(sw.w, 280);
     sw.h = std::max(sw.h, 200);
   }
-  if (!draw_floating_frame(app, sw, soft_title(app, sw), app.focus == sw.view))
+  if (!draw_floating_frame(app, sw, soft_title(app, sw), float_active(app, sw)))
     return;
   if (!view_live(app, sw.view)) return;
   const Pane& p = app.panes[sw.view];
@@ -779,45 +799,45 @@ void draw_floats(App& app) {
         draw_history_panel(app);
         break;
       case WindowRole::Styles:
-        if (draw_floating_frame(app, *w, "Style Sheets", true))
+        if (draw_floating_frame(app, *w, "Style Sheets", float_active(app, *w)))
           app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Styles);
         break;
       case WindowRole::Bookmarks:
-        if (draw_floating_frame(app, *w, "Bookmarks", true))
+        if (draw_floating_frame(app, *w, "Bookmarks", float_active(app, *w)))
           app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Bookmarks);
         break;
       case WindowRole::Subscriptions:
-        if (draw_floating_frame(app, *w, "Subscriptions", true))
+        if (draw_floating_frame(app, *w, "Subscriptions", float_active(app, *w)))
           app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Subscriptions);
         break;
       case WindowRole::Downloads:
         draw_downloads_panel(app);
         break;
       case WindowRole::Reply:
-        if (draw_floating_frame(app, *w, "Reply (mockup)", true))
+        if (draw_floating_frame(app, *w, "Reply (mockup)", float_active(app, *w)))
           app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Reply);
         break;
       case WindowRole::Annotations:
-        if (draw_floating_frame(app, *w, "Annotations", true))
+        if (draw_floating_frame(app, *w, "Annotations", float_active(app, *w)))
           app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Annotations);
         break;
       case WindowRole::Revisions:
         draw_revision_panel(app);
         break;
       case WindowRole::NostrExplorer:
-        if (draw_floating_frame(app, *w, "Nostr Explorer", true))
+        if (draw_floating_frame(app, *w, "Nostr Explorer", float_active(app, *w)))
           app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::NostrExplorer);
         break;
       case WindowRole::LemmyExplorer:
-        if (draw_floating_frame(app, *w, "Lemmy Explorer", true))
+        if (draw_floating_frame(app, *w, "Lemmy Explorer", float_active(app, *w)))
           app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::LemmyExplorer);
         break;
       case WindowRole::NostrAccounts:
-        if (draw_floating_frame(app, *w, "Nostr Accounts", true))
+        if (draw_floating_frame(app, *w, "Nostr Accounts", float_active(app, *w)))
           app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::NostrAccounts);
         break;
       case WindowRole::Certificates:
-        if (draw_floating_frame(app, *w, "Certificates", true))
+        if (draw_floating_frame(app, *w, "Certificates", float_active(app, *w)))
           app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Certificates);
         break;
       case WindowRole::Help:

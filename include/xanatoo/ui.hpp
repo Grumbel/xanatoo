@@ -545,6 +545,9 @@ public:
   // depend on where the mouse was last frame, so touches can be routed.
   bool captures_point(float x, float y,
                       std::optional<UiPanelLayer> native_top = std::nullopt) const;
+  // The embedded panel body under (x, y), nullopt for chrome, popups (an open
+  // one covers everything) or no ImGui window.
+  std::optional<UiPanelLayer> panel_at(float x, float y) const;
   // Used by event routing so a hidden embedded editor does not receive a
   // queued mouse press/wheel before ImGui's next NewFrame().
   bool pointer_obscured(float x, float y,

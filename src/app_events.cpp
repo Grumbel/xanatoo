@@ -219,8 +219,15 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
     // Menus/dialogs and the controls embedded in native panels cover their
     // own hit areas. A native window behind one must not steal the click.
     if (app.ui.captures_point(static_cast<float>(x), static_cast<float>(y),
-                              float_layer_at(app, x, y)))
+                              float_layer_at(app, x, y))) {
+      // A click on an embedded panel's widgets still makes it the active one.
+      const auto layer = app.ui.panel_at(static_cast<float>(x),
+                                         static_cast<float>(y));
+      if (const FloatWindow* w = float_at(app, mxw, myw);
+          w && layer && embedded_panel_layer(w->role) == layer)
+        focus_float(app, *w);
       return;
+    }
     // The previous ImGui text field may still own keyboard focus even though
     // a native frame now covers it. Clicking the foreground frame transfers
     // focus away from the invisible editor as well as blocking its mouse hit.
@@ -236,8 +243,15 @@ void pointer_left_down(App& app, int x, int y, bool imgui_mouse) {
     // before the ImGui capture check and before the document panes.
     if (float_press(app, mxw, myw)) return;
 
-    // Below soft windows: let ImGui keep the event if it wants it.
-    if (imgui_mouse) return;
+    // Below soft windows: let ImGui keep the event if it wants it. No ImGui
+    // window is under the pointer (captures_point above), so this is a widget
+    // still active from an earlier click, e.g. a panel's text field: the
+    // document gets the focus even though ImGui eats the click.
+    if (imgui_mouse) {
+      if (pane_at(app, static_cast<float>(x), static_cast<float>(y)) >= 0)
+        app.key_focus = KeyFocus::Document;
+      return;
+    }
 
     if (app.split) {
       const auto within = [&](const SDL_Rect& rc, int pad = 0) {
@@ -1873,6 +1887,9 @@ static void on_keydown(App& app, SDL_Event& ev, bool imgui_mouse,
   if (!status_prompt && handle_sitemap_key(app, ev, ctrl, alt)) return;
   if (!status_prompt && handle_page_key(app, ev, ctrl, alt)) return;
   if (!status_prompt && handle_styles_key(app, ev, ctrl, alt)) return;
+  // A panel whose keys ImGui did not take: the key goes to the document.
+  if (!status_prompt && app.key_focus == KeyFocus::Panel)
+    panel_key_unused(app, ev, ctrl, alt);
 
   // Paged reading, read-only: ← → turn the page like PgUp / PgDn.
   if (!status_prompt && browsing(app) && focused_pane(app).pages.on && !ctrl &&

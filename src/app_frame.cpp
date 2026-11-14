@@ -753,6 +753,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
           d.get(id).kind != xanatoo::NodeKind::Message) break;
       const auto& message = d.get(id);
       app.reply.open = true;
+      focus_panel(app, WindowRole::Reply);
       app.reply.buffer = p.buf;
       app.reply.node = id;
       app.reply.page = path_of(app, p);
@@ -1068,6 +1069,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     case C::ToggleDownloads:
       app.downloads_panel_open = !app.downloads_panel_open;
+      if (app.downloads_panel_open) focus_panel(app, WindowRole::Downloads);
       break;
     case C::ToggleStylesPanel:
       app.styles_panel_open = !app.styles_panel_open;
@@ -1079,9 +1081,11 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     case C::ToggleBookmarks:
       app.bookmarks_panel_open = !app.bookmarks_panel_open;
+      if (app.bookmarks_panel_open) focus_panel(app, WindowRole::Bookmarks);
       break;
     case C::ToggleSubscriptions:
       app.subscriptions_panel_open = !app.subscriptions_panel_open;
+      if (app.subscriptions_panel_open) focus_panel(app, WindowRole::Subscriptions);
       break;
     case C::Subscribe:
       add_subscription(app, arg.empty() ? parse_locator(pane_address(app, p)).base : arg);
@@ -1110,6 +1114,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     }
     case C::ToggleAnnotationsPanel:
       app.annotation_panel_open = !app.annotation_panel_open;
+      if (app.annotation_panel_open) focus_panel(app, WindowRole::Annotations);
       break;
     case C::ToggleRevisionsPanel:
       if (app.revision_panel_open) {
@@ -1126,15 +1131,20 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
         app.revision_published.clear();
         app.revision_win.scroll = 0.f;
         app.revision_panel_open = true;
+        focus_panel(app, WindowRole::Revisions);
         refresh_revision_panel(app);
       }
       break;
     case C::ToggleNostrExplorer:
       app.nostr_explorer_open = !app.nostr_explorer_open;
-      if (app.nostr_explorer_open) refresh_nostr_catalogue(app);
+      if (app.nostr_explorer_open) {
+        refresh_nostr_catalogue(app);
+        focus_panel(app, WindowRole::NostrExplorer);
+      }
       break;
     case C::ToggleLemmyExplorer:
       app.lemmy_explorer_open = !app.lemmy_explorer_open;
+      if (app.lemmy_explorer_open) focus_panel(app, WindowRole::LemmyExplorer);
       break;
     case C::LemmySetTab:
       if (arg.size() == 1 && arg[0] >= '0' && arg[0] <= '3')
@@ -1189,7 +1199,10 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
       break;
     case C::ToggleNostrAccounts:
       app.nostr_accounts_open = !app.nostr_accounts_open;
-      if (app.nostr_accounts_open) refresh_nostr_catalogue(app);
+      if (app.nostr_accounts_open) {
+        refresh_nostr_catalogue(app);
+        focus_panel(app, WindowRole::NostrAccounts);
+      }
       break;
     case C::NostrSearchLocal:
       app.nostr_search = arg;
@@ -2208,6 +2221,7 @@ void execute_command(App& app, xanatoo::UiCommand cmd, const std::string& arg) {
     case C::ToggleHelp:
       app.help_mode = !app.help_mode;
       if (app.help_mode) {
+        focus_panel(app, WindowRole::Help);
         ensure_help_doc(app);
         app.help_needs_layout = true;
       }
@@ -4305,7 +4319,8 @@ void draw_help_window(App& app) {
       if (app.help.scroll > max_s) app.help.scroll = max_s;
     }
 
-    if (!draw_floating_frame(app, app.help, "Help — xanatoo", true)) return;
+    if (!draw_floating_frame(app, app.help, "Help — xanatoo",
+                             float_active(app, app.help))) return;
 
     auto [cx, cy, cw, ch] = help_client_rect(app);
     SDL_Rect clip{cx, cy, cw, ch};

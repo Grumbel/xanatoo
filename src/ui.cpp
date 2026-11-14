@@ -808,6 +808,19 @@ bool Ui::captures_point(float x, float y,
   return hovered && !ui_panel_obscured(ui_panel_layer(hovered->Name), native_top);
 }
 
+std::optional<UiPanelLayer> Ui::panel_at(float x, float y) const {
+  if (!ready_) return std::nullopt;
+  if (ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId |
+                                 ImGuiPopupFlags_AnyPopupLevel))
+    return std::nullopt;
+  ImGuiWindow* hovered = nullptr;
+  ImGui::FindHoveredWindowEx(ImVec2(x, y), true, &hovered, nullptr);
+  if (!hovered) return std::nullopt;
+  const UiPanelLayer layer = ui_panel_layer(hovered->Name);
+  if (layer == UiPanelLayer::Chrome) return std::nullopt;
+  return layer;
+}
+
 void Ui::release_input_capture() {
   if (!ready_) return;
   // Drop the active widget (menu item / toolbar button) and clear keyboard

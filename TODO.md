@@ -8,6 +8,18 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **348** (this delivery is **347**)
 
+## Status (2026-11-14) — Active panel: one lit title bar
+
+- Embedded ImGui panels (Subscriptions, Bookmarks, Styles, Nostr / Lemmy,
+  Certificates, Reply, Annotations), Help and Revisions drew their title
+  lit unconditionally. Now `float_active` decides for every role:
+  `KeyFocus::Panel` + `App::panel_focus` for panels without native keys,
+  `panel_has_keys` for the native ones, focused view for document windows.
+- Clicks on embedded ImGui widgets focus their panel (`Ui::panel_at`);
+  opening a panel focuses it; a pane click returns focus to the document
+  even when a still-active ImGui field swallows that click. Checked under
+  Xvfb.
+
 ## Status (2026-11-14) — Panel title controls: close left, shade for docks
 
 - Close box moved to the title's left edge, maximize / restore stays at the
