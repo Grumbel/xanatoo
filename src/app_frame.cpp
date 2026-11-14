@@ -368,6 +368,10 @@ static void build_ui_state(App& app, xanatoo::UiState& ui_state) {
           !d->path.empty() && std::filesystem::exists(d->path, ec);
     }
   }
+  ui_state.shaded_panels = 0;
+  for (const FloatWindow* w : float_stack(app))
+    if (float_shaded(*w))
+      ui_state.shaded_panels |= xanatoo::ui_panel_bit(embedded_panel_layer(w->role));
   ui_state.styles_open = app.styles_panel_open;
   if (app.styles_panel_open) {
     auto [x, y, w, h] = float_client_rect(app, app.styles_win);
@@ -4087,11 +4091,11 @@ void draw_outline_panel(App& app) {
     const SDL_Rect fb = outline_focus_rect(app, outer);
     // Title tab + selection are lit only while the outline has the keyboard.
     const bool keys = panel_has_keys(app, KeyFocus::Outline);
-    draw_floating_frame(app, outer, ol_title, keys, app.ol.dock == Dock::None,
-                        title_max_zone(outer).x - fb.x,
-                        app.ol.dock == Dock::Max);
-    // Focus toggle (section isolation): latched push button left of close.
+    const bool open = draw_floating_frame(app, app.ol, ol_title, keys,
+                                          title_shade_zone(outer).x - fb.x);
+    // Focus toggle (section isolation): latched push button left of shade.
     draw_title_button(app, fb, "Focus", section_focus);
+    if (!open) return;
 
     SDL_Rect clip{cx, cy, cw, ch};
     xanatoo::sdl::set_clip_rect(app.sdl, &clip);
@@ -4182,12 +4186,12 @@ void draw_backlinks_panel(App& app) {
       float max_s = std::max(0.f, content_h - static_cast<float>(ch));
       if (app.bl.scroll > max_s) app.bl.scroll = max_s;
     }
-    draw_floating_frame(app, SDL_Rect{app.bl.x, app.bl.y, app.bl.w, app.bl.h},
-                        app.backlinks_label.empty()
-                            ? "Backlinks (no label under caret)"
-                            : ("Backlinks → #" + app.backlinks_label),
-                        panel_has_keys(app, KeyFocus::Backlinks),
-                        app.bl.dock == Dock::None, 0, app.bl.dock == Dock::Max);
+    if (!draw_floating_frame(app, app.bl,
+                             app.backlinks_label.empty()
+                                 ? "Backlinks (no label under caret)"
+                                 : ("Backlinks → #" + app.backlinks_label),
+                             panel_has_keys(app, KeyFocus::Backlinks)))
+      return;
     SDL_Rect clip{cx, cy, cw, ch};
     xanatoo::sdl::set_clip_rect(app.sdl, &clip);
     xanatoo::Font& font = app.ui_font;
@@ -4246,11 +4250,9 @@ void draw_history_panel(App& app) {
   const float max_s = std::max(0.f, content_h - static_cast<float>(ch));
   w.scroll = std::clamp(w.scroll, 0.f, max_s);
 
-  const SDL_Rect outer{w.x, w.y, w.w, w.h};
-  draw_floating_frame(app, outer, "History",
-                      panel_has_keys(app, KeyFocus::History),
-                      w.dock == Dock::None, 0,
-                      w.dock == Dock::Max);
+  if (!draw_floating_frame(app, w, "History",
+                           panel_has_keys(app, KeyFocus::History)))
+    return;
   SDL_Rect clip{cx, cy, cw, ch};
   xanatoo::sdl::set_clip_rect(app.sdl, &clip);
   const auto& pal = xanatoo::theme::palette();
@@ -4303,10 +4305,7 @@ void draw_help_window(App& app) {
       if (app.help.scroll > max_s) app.help.scroll = max_s;
     }
 
-    draw_floating_frame(
-        app, SDL_Rect{app.help.x, app.help.y, app.help.w, app.help.h},
-        "Help — xanatoo", true, app.help.dock == Dock::None, 0,
-        app.help.dock == Dock::Max);
+    if (!draw_floating_frame(app, app.help, "Help — xanatoo", true)) return;
 
     auto [cx, cy, cw, ch] = help_client_rect(app);
     SDL_Rect clip{cx, cy, cw, ch};

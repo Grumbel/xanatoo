@@ -147,6 +147,10 @@ the SDL2 triangle-renderer fallback (which still uses one draw pass).
   Dragging changes the two neighbours' relative lengths; other panels and
   the outer dock width/height do not change. The shares are saved in the
   session and scale with the main window.
+- Shaded (rolled-up) docked panel: no resize edges and no separator grips
+  next to it; a side column gives its height to the open panels, a band
+  gives its width (`dock_slices_shaded`). A band of only shaded panels is a
+  single title strip high and cannot be resized until one is rolled out.
 - Undocked window: its right/bottom edges and lower-right corner show the
   matching resize pointer. Resizing keeps the pointer shape until release.
 - ImGui text inputs and other widgets retain their own I-beam/hand pointers;

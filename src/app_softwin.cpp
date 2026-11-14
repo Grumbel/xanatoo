@@ -93,7 +93,26 @@ int column_w(App& app, Dock side) {
 // Bands keep at least kMinPaneRows px for the panes between them.
 constexpr int kMinPaneRows = 160;
 
+// Height of a shaded panel: the title strip and the frame line below it.
+int shaded_h() { return help_title_h + 1; }
+
+// Width of a shaded panel in a band: the three title controls plus a
+// readable piece of the title.
+int shaded_band_w() { return 8 * float_close_w; }
+
+bool all_shaded(App& app, Dock side) {
+  bool any = false;
+  for (FloatWindow* w : float_stack(app)) {
+    if (w->dock != side) continue;
+    if (!float_shaded(*w)) return false;
+    any = true;
+  }
+  return any;
+}
+
 int band_h(App& app, Dock side) {
+  // A band whose panels are all rolled up gives the rest to the panes.
+  if (all_shaded(app, side)) return shaded_h();
   const Dock other = side == Dock::Top ? Dock::Bottom : Dock::Top;
   auto [top, bottom, ch] = soft_client_bounds(app);
   (void)top;
@@ -195,6 +214,7 @@ void dock_window(App& app, FloatWindow& w, Dock d, int mx, int my) {
     return;
   }
   save_free_geom(w);
+  if (d != w.dock) w.shaded = false;
   if (d != w.dock && d != Dock::Max)
     w.dock_share = 1.f;
   if (d == Dock::Max) {
@@ -221,10 +241,24 @@ void dock_window(App& app, FloatWindow& w, Dock d, int mx, int my) {
 void undock_window(App& app, FloatWindow& w) {
   if (w.dock == Dock::None) return;
   w.dock = Dock::None;
+  w.shaded = false;
   w.restore_dock = Dock::None;
   set_geom(app, w, w.restore_x, w.restore_y, w.restore_w, w.restore_h);
   snap_soft_geom(app, w.x, w.y, w.w, w.h);
   app.needs_layout = true;
+}
+
+void toggle_shade(App& app, FloatWindow& w) {
+  if (!float_docked(w)) return;
+  w.shaded = !w.shaded;
+  w.dragging = false;
+  w.resize = 0;
+  w.scroll_dragging = false;
+  // A rolled-up panel has nothing to type into.
+  if (w.shaded && app.key_focus == float_key_focus(w))
+    app.key_focus = KeyFocus::Document;
+  app.needs_layout = true;
+  place_windows(app);
 }
 
 void toggle_maximize(App& app, FloatWindow& w) {
@@ -248,12 +282,28 @@ void place_windows(App& app) {
     auto [x, y, bw, bh] = dock_rect(app, side);
     const int n = static_cast<int>(row.size());
     std::vector<float> shares;
-    for (const FloatWindow* w : row) shares.push_back(w->dock_share);
-    const auto edges = xanatoo::dock_slices(shares, bw);
+    std::vector<bool> shaded;
+    for (const FloatWindow* w : row) {
+      shares.push_back(w->dock_share);
+      shaded.push_back(float_shaded(*w));
+    }
+    const auto edges =
+        xanatoo::dock_slices_shaded(shares, shaded, bw, shaded_band_w());
+    // A shaded panel keeps a narrow title strip at the band's top, in line
+    // with its neighbours' titles.
+    const bool all = all_shaded(app, side);
     for (int i = 0; i < n; ++i) {
-      const int x0 = x + edges[static_cast<size_t>(i)];
-      const int x1 = x + edges[static_cast<size_t>(i + 1)];
-      set_geom(app, *row[static_cast<size_t>(i)], x0, y, x1 - x0, bh);
+      const size_t k = static_cast<size_t>(i);
+      int x0 = x + edges[k];
+      int x1 = x + edges[k + 1];
+      // All rolled up: the strips share the band's width again.
+      if (all) {
+        const auto even = xanatoo::dock_slices(shares, bw);
+        x0 = x + even[k];
+        x1 = x + even[k + 1];
+      }
+      const int h = shaded[k] ? std::min(bh, shaded_h()) : bh;
+      set_geom(app, *row[k], x0, y, x1 - x0, h);
     }
   }
   for (Dock side : {Dock::Left, Dock::Right}) {
@@ -263,8 +313,13 @@ void place_windows(App& app) {
     (void)h;
     const int n = static_cast<int>(col.size());
     std::vector<float> shares;
-    for (const FloatWindow* w : col) shares.push_back(w->dock_share);
-    const auto edges = xanatoo::dock_slices(shares, ch);
+    std::vector<bool> shaded;
+    for (const FloatWindow* w : col) {
+      shares.push_back(w->dock_share);
+      shaded.push_back(float_shaded(*w));
+    }
+    const auto edges =
+        xanatoo::dock_slices_shaded(shares, shaded, ch, shaded_h());
     for (int i = 0; i < n; ++i) {
       const int y0 = top + edges[static_cast<size_t>(i)];
       const int y1 = top + edges[static_cast<size_t>(i + 1)];
@@ -310,6 +365,7 @@ DockSplitHit find_dock_split(App& app, int mx, int my) {
     const bool horizontal = is_band(side);  // left/right neighbours
     for (size_t i = 0; i + 1 < col.size(); ++i) {
       const FloatWindow& a = *col[i];
+      if (float_shaded(a) || float_shaded(*col[i + 1])) continue;
       const int edge = horizontal ? a.x + a.w : a.y + a.h;
       const int along = horizontal ? mx : my;
       const int cross = horizontal ? my : mx;

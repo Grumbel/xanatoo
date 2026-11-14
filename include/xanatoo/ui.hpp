@@ -420,6 +420,9 @@ struct UiState {
   std::string context_link_href;  // … as written in the page
   bool context_link_web = false;  // … and it is http(s): can be downloaded
   bool reply_open = false;
+  // Embedded panels whose native window is rolled up (`ui_panel_bit`): their
+  // ImGui body is not built while the frame shows only its title.
+  unsigned shaded_panels = 0;
   uint64_t reply_generation = 0;
   std::string reply_author, reply_page, reply_label, reply_text;
   int reply_x = 0, reply_y = 0, reply_w = 0, reply_h = 0;

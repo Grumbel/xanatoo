@@ -173,7 +173,14 @@ are sized by `FloatWindow::dock_share`, not forced equal; shared separator
 dragging updates only the adjacent pair. The size per
 side is `App::dock_w[4]` (L, R, T, B). Max overlays the client area; every
 frame has the close box at the title's left edge and the maximize /
-restore box at its right edge (`title_close_zone` / `title_max_zone`).
+restore box at its right edge, the shade box just left of it
+(`title_close_zone` / `title_max_zone` / `title_shade_zone`). Shade
+(`toggle_shade`, `FloatWindow::shaded`) rolls a *docked* window up to its
+title strip so its neighbours get the room (a band whose panels are all
+shaded shrinks to one strip and the panes get the height); it is greyed out
+for free / maximized windows and cleared when the window leaves its dock.
+Test `float_shaded(w)`, never the raw flag; `draw_floating_frame` returns
+false for a shaded window — draw no client content then.
 Tabs ↔ windows: dragging a tab past the strip (ImGui, `UiCommand::TearTab`
 → `tear_tab`) opens its buffer in a window (docked at a zone), dragging a
 window title onto the strip (`over_tab_strip`) runs `pop_in_soft`; tab

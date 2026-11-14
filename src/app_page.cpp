@@ -245,9 +245,7 @@ void draw_page_panel(App& app) {
   xanatoo::Font& bold =
       app.ui_font_bold.loaded() ? app.ui_font_bold : app.ui_font;
   const bool keys = panel_has_keys(app, KeyFocus::Page);
-  const SDL_Rect outer{w.x, w.y, w.w, w.h};
-  draw_floating_frame(app, outer, "Page", keys, w.dock == Dock::None, 0,
-                      w.dock == Dock::Max);
+  if (!draw_floating_frame(app, w, "Page", keys)) return;
 
   auto [cx, cy, cw, ch] = page_client_rect(app);
   w.scroll = std::min(w.scroll, page_max_scroll(app));

@@ -2752,7 +2752,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
 
   // ---- Reply composer: custom floating/dockable frame underneath, ImGui
   // text widget and Markdown tools above it. Nothing here sends a request.
-  if (state.reply_open) {
+  if (state.reply_open &&
+      !(state.shaded_panels & ui_panel_bit(UiPanelLayer::Reply))) {
     if (reply_generation_seen_ != state.reply_generation) {
       reply_generation_seen_ = state.reply_generation;
       std::snprintf(reply_input_, sizeof(reply_input_), "%s",
@@ -3111,7 +3112,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   }
 
   // ---- Style sheet manager / editor, embedded in its native FloatWindow ----
-  if (state.styles_open) {
+  if (state.styles_open &&
+      !(state.shaded_panels & ui_panel_bit(UiPanelLayer::Styles))) {
     if (state.style_save_generation != style_save_seen_) {
       style_save_seen_ = state.style_save_generation;
       style_editor_dirty_ = false;
@@ -3387,7 +3389,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   }
 
   // ---- Bookmarks manager panel ----
-  if (state.bookmarks_open) {
+  if (state.bookmarks_open &&
+      !(state.shaded_panels & ui_panel_bit(UiPanelLayer::Bookmarks))) {
     // Like Reply / Annotations, this is an editor *inside* the native
     // FloatWindow. It must never have an independent ImGui title or geometry.
     ImGui::SetNextWindowPos(ImVec2(float(state.bookmarks_x + 3),
@@ -3463,7 +3466,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   }
 
   // ---- Subscriptions: changing remote feeds (distinct from static bookmarks) ----
-  if (state.subscriptions_open) {
+  if (state.subscriptions_open &&
+      !(state.shaded_panels & ui_panel_bit(UiPanelLayer::Subscriptions))) {
     ImGui::SetNextWindowPos(ImVec2(float(state.subscriptions_x + 3),
                                   float(state.subscriptions_y + 3)));
     ImGui::SetNextWindowSize(ImVec2(float(std::max(1, state.subscriptions_w - 6)),
@@ -3592,7 +3596,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   }
 
   // ---- Independent annotation layers (source documents remain untouched) ----
-  if (state.annotations_panel_open) {
+  if (state.annotations_panel_open &&
+      !(state.shaded_panels & ui_panel_bit(UiPanelLayer::Annotations))) {
     if (annotation_note_created_seen_ != state.annotation_note_created_gen) {
       annotation_note_created_seen_ = state.annotation_note_created_gen;
       annotation_new_note_[0] = '\0';
@@ -3771,7 +3776,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
       ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
       ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoCollapse;
-  if (state.nostr_explorer_open) {
+  if (state.nostr_explorer_open &&
+      !(state.shaded_panels & ui_panel_bit(UiPanelLayer::NostrExplorer))) {
     ImGui::SetNextWindowPos(ImVec2(float(state.nostr_explorer_x + 3),
                                   float(state.nostr_explorer_y + 3)));
     ImGui::SetNextWindowSize(ImVec2(float(std::max(1, state.nostr_explorer_w - 6)),
@@ -3952,7 +3958,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   }
 
   // ---- Lemmy discovery catalogue, inside its native dockable panel ----
-  if (state.lemmy_explorer_open) {
+  if (state.lemmy_explorer_open &&
+      !(state.shaded_panels & ui_panel_bit(UiPanelLayer::LemmyExplorer))) {
     ImGui::SetNextWindowPos(ImVec2(float(state.lemmy_explorer_x + 3),
                                   float(state.lemmy_explorer_y + 3)));
     ImGui::SetNextWindowSize(ImVec2(
@@ -4127,7 +4134,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   }
 
   // ---- Account aliases: separate native panel, deliberately watch-only ----
-  if (state.nostr_accounts_open) {
+  if (state.nostr_accounts_open &&
+      !(state.shaded_panels & ui_panel_bit(UiPanelLayer::NostrAccounts))) {
     ImGui::SetNextWindowPos(ImVec2(float(state.nostr_accounts_x + 3),
                                   float(state.nostr_accounts_y + 3)));
     ImGui::SetNextWindowSize(ImVec2(float(std::max(1, state.nostr_accounts_w - 6)),
@@ -4169,7 +4177,8 @@ UiFrameResult Ui::begin_frame(const UiState& state) {
   }
 
   // ---- Certificates: Gemini TOFU pins in a native dockable panel ----
-  if (state.certs_open) {
+  if (state.certs_open &&
+      !(state.shaded_panels & ui_panel_bit(UiPanelLayer::Certificates))) {
     ImGui::SetNextWindowPos(ImVec2(float(state.certs_x + 3),
                                   float(state.certs_y + 3)));
     ImGui::SetNextWindowSize(ImVec2(float(std::max(1, state.certs_w - 6)),

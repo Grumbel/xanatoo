@@ -145,10 +145,15 @@ SDL_Rect title_max_zone(const SDL_Rect& outer) {
                   help_title_h};
 }
 
+SDL_Rect title_shade_zone(const SDL_Rect& outer) {
+  return SDL_Rect{outer.x + outer.w - 2 * float_close_w, outer.y,
+                  float_close_w, help_title_h};
+}
+
 SDL_Rect title_button_rect(App& app, const SDL_Rect& outer, const char* label) {
   const int w = app.ui_font.measure(label) + 16;
   const int h = help_title_h - static_cast<int>(std::lround(8.f * app.ui_scale));
-  return SDL_Rect{title_max_zone(outer).x - 4 - w,
+  return SDL_Rect{title_shade_zone(outer).x - 4 - w,
                   outer.y + (help_title_h - h) / 2, w, h};
 }
 
@@ -171,42 +176,51 @@ SDL_Rect outline_focus_rect(App& app, const SDL_Rect& outer) {
   return title_button_rect(app, outer, "Focus");
 }
 
-void draw_floating_frame(App& app, const SDL_Rect& outer,
+bool draw_floating_frame(App& app, const FloatWindow& win,
                          const std::string& title, bool active,
-                         bool resizable, int title_reserve, bool maximized) {
+                         int title_reserve) {
   namespace th = xanatoo::theme;
+  const SDL_Rect outer{win.x, win.y, win.w, win.h};
+  const bool shaded = float_shaded(win);
   th::WindowChrome w;
   w.outer = outer;
   w.title_h = help_title_h;
   w.active = active;
-  w.resizable = resizable;
-  w.maximized = maximized;
+  w.resizable = win.dock == Dock::None;
+  w.maximized = win.dock == Dock::Max;
+  w.shade_enabled = float_docked(win);
+  w.shaded = shaded;
   w.scale = app.ui_scale;
   const SDL_Rect close_zone = title_close_zone(outer);
   const SDL_Rect max_zone = title_max_zone(outer);
+  const SDL_Rect shade_zone = title_shade_zone(outer);
   const auto hot = [&](const SDL_Rect& z) {
     return active && app.mouse_x >= z.x && app.mouse_x < z.x + z.w &&
            app.mouse_y >= z.y && app.mouse_y < z.y + z.h;
   };
   w.close_hot = hot(close_zone);
   w.max_hot = hot(max_zone);
+  w.shade_hot = hot(shade_zone);
   th::draw_window_chrome(app.sdl, w);
   const th::Palette& p = th::palette();
   // Document well: paper surface in a sunken frame under the title strip.
-  const SDL_Rect well{outer.x + 4, outer.y + help_title_h + 4, outer.w - 8,
-                      outer.h - help_title_h - 4 - help_grip_h};
-  th::fill(app.sdl, well, p.paper);
-  th::bevel(app.sdl, well, th::Bevel::Sunken);
+  if (!shaded) {
+    const SDL_Rect well{outer.x + 4, outer.y + help_title_h + 4, outer.w - 8,
+                        outer.h - help_title_h - 4 - help_grip_h};
+    th::fill(app.sdl, well, p.paper);
+    th::bevel(app.sdl, well, th::Bevel::Sunken);
+  }
   const th::Rgb ink = active ? p.tab_text : p.text_dim;
   xanatoo::Font& font = app.ui_font_bold.loaded() ? app.ui_font_bold
                                                   : app.ui_font;
   const int title_x = close_zone.x + close_zone.w + 4;
-  const int title_w = max_zone.x - title_reserve - 8 - title_x;
+  const int title_w = shade_zone.x - title_reserve - 8 - title_x;
   const int ty = outer.y + (help_title_h - font.line_height()) / 2 +
                  font.ascender();
   app.renderer.draw_text(font, static_cast<float>(title_x),
                          static_cast<float>(ty), fit_text(font, title, title_w),
                          ink.r, ink.g, ink.b);
+  return !shaded;
 }
 
 void draw_client_scrollbar(App& app, int cx, int cy, int cw, int ch,

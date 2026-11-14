@@ -160,9 +160,7 @@ void draw_revision_panel(App& app) {
   FloatWindow& w = app.revision_win;
   auto [cx, cy, cw, ch] = float_client_rect(app, w);
   w.scroll = std::clamp(w.scroll, 0.f, revision_panel_max_scroll(app, ch));
-  const SDL_Rect outer{w.x, w.y, w.w, w.h};
-  draw_floating_frame(app, outer, "Document Revisions", true,
-                      w.dock == Dock::None, 0, w.dock == Dock::Max);
+  if (!draw_floating_frame(app, w, "Document Revisions", true)) return;
   const SDL_Rect clip{cx, cy, cw, ch};
   xanatoo::sdl::set_clip_rect(app.sdl, &clip);
   const auto& pal = xanatoo::theme::palette();

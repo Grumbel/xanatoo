@@ -20,6 +20,19 @@ int main() {
   assert((dock_slices({0.f, -1.f, NAN}, 300) ==
           std::vector<int>{0, 100, 200, 300}));
 
+  using xanatoo::dock_slices_shaded;
+  // Shaded panels keep their title strip, the others share the rest.
+  assert((dock_slices_shaded({1.f, 1.f, 1.f}, {false, true, false}, 330, 30) ==
+          std::vector<int>{0, 150, 180, 330}));
+  assert((dock_slices_shaded({1.f, 1.f}, {false, false}, 200, 30) ==
+          std::vector<int>{0, 100, 200}));
+  // All shaded: strips at the start, the rest of the column unused.
+  assert((dock_slices_shaded({1.f, 1.f}, {true, true}, 300, 30) ==
+          std::vector<int>{0, 30, 60}));
+  // Strips that do not fit shrink evenly.
+  assert((dock_slices_shaded({1.f, 1.f}, {true, true}, 40, 30) ==
+          std::vector<int>{0, 20, 40}));
+
   auto [a, b] = dock_resize_pair(1.f, 1.f, 100, 100, 40);
   assert(std::abs(a - 1.4f) < 0.001f);
   assert(std::abs(b - 0.6f) < 0.001f);

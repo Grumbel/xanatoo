@@ -78,8 +78,12 @@ struct WindowChrome {
   bool resizable = true;  // SE grip
   bool max_box = true;    // right-aligned maximize / restore (last 28px)
   bool maximized = false;  // shows the restore glyph
+  bool shade_box = true;   // roll-up widget left of the maximize box
+  bool shade_enabled = true;  // false: greyed out (window not docked)
+  bool shaded = false;     // shows the roll-down glyph
   bool close_hot = false;
   bool max_hot = false;
+  bool shade_hot = false;
   float scale = 1.f;      // ui scale: close box size
 };
 

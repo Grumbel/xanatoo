@@ -306,6 +306,9 @@ struct FloatWindow {
   Dock restore_dock = Dock::None;  // placement to return to from Max
   int dock_seq = 0;                // order within a dock column
   float dock_share = 1.f;          // relative size within that column / band
+  // Rolled up to the title strip; only takes effect while docked to a side or
+  // band (`float_shaded`), cleared whenever the window leaves its dock.
+  bool shaded = false;
   int restore_x = 120, restore_y = 70, restore_w = 540, restore_h = 440;
   Uint32 last_title_click = 0;
   // Geometry + interaction (all roles):
@@ -320,6 +323,16 @@ struct FloatWindow {
   float scroll = 0.f;  // panel roles; a document view scrolls its Pane
   bool scroll_dragging = false;
 };
+
+// Docked to a side column or a band (not free, not maximized).
+inline bool float_docked(const FloatWindow& w) {
+  return w.dock != Dock::None && w.dock != Dock::Max;
+}
+
+// Shown as its title strip only: no client area, no resize edges.
+inline bool float_shaded(const FloatWindow& w) {
+  return w.shaded && float_docked(w);
+}
 
 inline FloatWindow make_float_panel(WindowRole role, int x, int y, int w,
                                     int h) {
@@ -1558,6 +1571,12 @@ void dock_window(App& app, FloatWindow& w, Dock d, int mx, int my);
 void undock_window(App& app, FloatWindow& w);
 // Max ↔ previous placement (title double-click).
 void toggle_maximize(App& app, FloatWindow& w);
+// Roll a docked window up to its title strip and back; its dock neighbours
+// (or, for a band whose panels are all rolled up, the panes) take the room.
+// No-op for free and maximized windows.
+void toggle_shade(App& app, FloatWindow& w);
+// The keyboard focus a click on `w` gives (Document for most roles).
+KeyFocus float_key_focus(const FloatWindow& w);
 // Derive docked / maximized geometry, keep floating windows on screen.
 void place_windows(App& app);
 const std::string& soft_path(App& app, const FloatWindow& sw);
@@ -1652,20 +1671,23 @@ void fill_doc_paper(App& app, const SDL_Rect& rect);
 // `text` cut to `max_w` px in `font`, with a trailing "…" when shortened.
 std::string fit_text(xanatoo::Font& font, const std::string& text, int max_w);
 // Title-bar control hit zones of a floating frame (paint + hit-test): the
-// close box sits at the title's left edge, maximize / restore at its right.
+// close box sits at the title's left edge, maximize / restore at its right,
+// shade (roll up, docked windows only) just left of maximize.
 SDL_Rect title_close_zone(const SDL_Rect& outer);
 SDL_Rect title_max_zone(const SDL_Rect& outer);
-// Outline title-bar "Focus" toggle, left of the maximize box (paint + hit-test).
+SDL_Rect title_shade_zone(const SDL_Rect& outer);
+// Outline title-bar "Focus" toggle, left of the shade box (paint + hit-test).
 SDL_Rect outline_focus_rect(App& app, const SDL_Rect& outer);
-// Push button `label` in a window title, left of the maximize box.
+// Push button `label` in a window title, left of the shade box.
 SDL_Rect title_button_rect(App& app, const SDL_Rect& outer, const char* label);
 void draw_title_button(App& app, const SDL_Rect& r, const char* label,
                        bool latched);
-// `title_reserve`: px kept free left of the maximize box (title buttons).
-void draw_floating_frame(App& app, const SDL_Rect& outer,
+// Frame of `win` (title, controls, grip and the client well).
+// `title_reserve`: px kept free left of the shade box (title buttons).
+// Returns false when the window is shaded: draw no client content then.
+bool draw_floating_frame(App& app, const FloatWindow& win,
                          const std::string& title, bool active,
-                         bool resizable = true, int title_reserve = 0,
-                         bool maximized = false);
+                         int title_reserve = 0);
 void draw_client_scrollbar(App& app, int cx, int cy, int cw, int ch,
                            float scroll, float max_scroll);
 

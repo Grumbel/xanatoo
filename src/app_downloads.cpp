@@ -141,8 +141,7 @@ void draw_downloads_panel(App& app) {
   const int step = row_height(app);
   const float max_scroll = std::max(0.f, static_cast<float>(entries.size() * step + 8 - ch));
   w.scroll = std::clamp(w.scroll, 0.f, max_scroll);
-  draw_floating_frame(app, SDL_Rect{w.x, w.y, w.w, w.h}, "Downloads", false,
-                      w.dock == Dock::None, 0, w.dock == Dock::Max);
+  if (!draw_floating_frame(app, w, "Downloads", false)) return;
   const auto& pal = xanatoo::theme::palette();
   SDL_Rect clip{cx, cy, cw, ch};
   xanatoo::sdl::set_clip_rect(app.sdl, &clip);

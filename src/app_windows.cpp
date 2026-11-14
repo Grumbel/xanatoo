@@ -55,10 +55,6 @@ std::pair<int, int> min_size(const FloatWindow& w) {
   return {280, 160};
 }
 
-bool docked(const FloatWindow& w) {
-  return w.dock != Dock::None && w.dock != Dock::Max;
-}
-
 // Pointer travel before a title press on a docked window tears it off.
 constexpr int kTearOffPx = 8;
 
@@ -252,6 +248,11 @@ void press_title(App& app, FloatWindow& w, int mx, int my) {
     w.last_title_click = 0;
     return;
   }
+  if (mx >= title_shade_zone(outer).x) {
+    toggle_shade(app, w);  // greyed out (no-op) unless docked
+    w.last_title_click = 0;
+    return;
+  }
   if (w.role == WindowRole::Sitemap) {
     // "Page" button just left of the maximize box.
     const SDL_Rect pb = title_button_rect(app, outer, "Page");
@@ -369,6 +370,18 @@ void press_client(App& app, FloatWindow& w, int mx, int my) {
 
 }  // namespace
 
+KeyFocus float_key_focus(const FloatWindow& w) {
+  switch (w.role) {
+    case WindowRole::Outline: return KeyFocus::Outline;
+    case WindowRole::Backlinks: return KeyFocus::Backlinks;
+    case WindowRole::Sitemap: return KeyFocus::Sitemap;
+    case WindowRole::Page: return KeyFocus::Page;
+    case WindowRole::History: return KeyFocus::History;
+    case WindowRole::Styles: return KeyFocus::Styles;
+    default: return KeyFocus::Document;
+  }
+}
+
 std::vector<FloatWindow*> float_stack(App& app) {
   std::vector<FloatWindow*> st;
   if (app.outline_mode) st.push_back(&app.ol);
@@ -418,6 +431,7 @@ std::optional<UiPanelLayer> float_layer_at(App& app, int x, int y) {
 // Keep pointer feedback and actual resize initiation in sync. The small
 // outside-edge tolerance is intentional: thin frame edges remain grabbable.
 static int float_resize_bits(const FloatWindow& w, int mx, int my) {
+  if (float_shaded(w)) return 0;  // the dock is resized from its open panels
   if (mx < w.x - help_edge || mx > w.x + w.w + help_edge ||
       my < w.y - help_edge || my > w.y + w.h + help_edge)
     return 0;
@@ -549,13 +563,9 @@ bool float_press(App& app, int mx, int my) {
     const int bits = float_resize_bits(*w, mx, my);
     if (!bits && !inside) continue;
     // Clicking a panel gives it the keyboard; any other window, the document.
-    app.key_focus = w->role == WindowRole::Outline     ? KeyFocus::Outline
-                    : w->role == WindowRole::Backlinks ? KeyFocus::Backlinks
-                    : w->role == WindowRole::Sitemap   ? KeyFocus::Sitemap
-                    : w->role == WindowRole::Page      ? KeyFocus::Page
-                    : w->role == WindowRole::History   ? KeyFocus::History
-                    : w->role == WindowRole::Styles    ? KeyFocus::Styles
-                                                       : KeyFocus::Document;
+    // A rolled-up panel has nothing to type into.
+    app.key_focus =
+        float_shaded(*w) ? KeyFocus::Document : float_key_focus(*w);
     if (w->role == WindowRole::Document) {
       // Raise to top of the document stack; `w` is stale afterwards.
       const size_t idx = static_cast<size_t>(w - app.soft_wins.data());
@@ -628,7 +638,7 @@ bool float_motion(App& app, int mx, int my) {
     if (w->resize) {
       const int dx = mx - w->resize_start_x;
       const int dy = my - w->resize_start_y;
-      if (docked(*w)) {
+      if (float_docked(*w)) {
         // Column width / band height, shared by every window docked there.
         if (w->dock == Dock::Top || w->dock == Dock::Bottom) {
           int& bh = app.dock_w[w->dock == Dock::Bottom ? 3 : 2];
@@ -735,9 +745,8 @@ static void draw_soft_window(App& app, FloatWindow& sw) {
     sw.w = std::max(sw.w, 280);
     sw.h = std::max(sw.h, 200);
   }
-  draw_floating_frame(app, SDL_Rect{sw.x, sw.y, sw.w, sw.h},
-                      soft_title(app, sw), app.focus == sw.view,
-                      sw.dock == Dock::None, 0, sw.dock == Dock::Max);
+  if (!draw_floating_frame(app, sw, soft_title(app, sw), app.focus == sw.view))
+    return;
   if (!view_live(app, sw.view)) return;
   const Pane& p = app.panes[sw.view];
   SDL_Rect clip{p.x, p.y, p.w, p.h};
@@ -770,64 +779,46 @@ void draw_floats(App& app) {
         draw_history_panel(app);
         break;
       case WindowRole::Styles:
-        draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
-                            "Style Sheets", true, w->dock == Dock::None,
-                            0, w->dock == Dock::Max);
-        app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Styles);
+        if (draw_floating_frame(app, *w, "Style Sheets", true))
+          app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Styles);
         break;
       case WindowRole::Bookmarks:
-        draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
-                            "Bookmarks", true, w->dock == Dock::None,
-                            0, w->dock == Dock::Max);
-        app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Bookmarks);
+        if (draw_floating_frame(app, *w, "Bookmarks", true))
+          app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Bookmarks);
         break;
       case WindowRole::Subscriptions:
-        draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
-                            "Subscriptions", true, w->dock == Dock::None,
-                            0, w->dock == Dock::Max);
-        app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Subscriptions);
+        if (draw_floating_frame(app, *w, "Subscriptions", true))
+          app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Subscriptions);
         break;
       case WindowRole::Downloads:
         draw_downloads_panel(app);
         break;
       case WindowRole::Reply:
-        draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
-                            "Reply (mockup)", true, w->dock == Dock::None,
-                            0, w->dock == Dock::Max);
-        app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Reply);
+        if (draw_floating_frame(app, *w, "Reply (mockup)", true))
+          app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Reply);
         break;
       case WindowRole::Annotations:
-        draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
-                            "Annotations", true, w->dock == Dock::None,
-                            0, w->dock == Dock::Max);
-        app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Annotations);
+        if (draw_floating_frame(app, *w, "Annotations", true))
+          app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Annotations);
         break;
       case WindowRole::Revisions:
         draw_revision_panel(app);
         break;
       case WindowRole::NostrExplorer:
-        draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
-                            "Nostr Explorer", true, w->dock == Dock::None,
-                            0, w->dock == Dock::Max);
-        app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::NostrExplorer);
+        if (draw_floating_frame(app, *w, "Nostr Explorer", true))
+          app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::NostrExplorer);
         break;
       case WindowRole::LemmyExplorer:
-        draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
-                            "Lemmy Explorer", true, w->dock == Dock::None,
-                            0, w->dock == Dock::Max);
-        app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::LemmyExplorer);
+        if (draw_floating_frame(app, *w, "Lemmy Explorer", true))
+          app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::LemmyExplorer);
         break;
       case WindowRole::NostrAccounts:
-        draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
-                            "Nostr Accounts", true, w->dock == Dock::None,
-                            0, w->dock == Dock::Max);
-        app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::NostrAccounts);
+        if (draw_floating_frame(app, *w, "Nostr Accounts", true))
+          app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::NostrAccounts);
         break;
       case WindowRole::Certificates:
-        draw_floating_frame(app, SDL_Rect{w->x, w->y, w->w, w->h},
-                            "Certificates", true, w->dock == Dock::None,
-                            0, w->dock == Dock::Max);
-        app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Certificates);
+        if (draw_floating_frame(app, *w, "Certificates", true))
+          app.ui.render_embedded_panel(app.sdl, xanatoo::UiPanelLayer::Certificates);
         break;
       case WindowRole::Help:
         draw_help_window(app);
@@ -851,6 +842,7 @@ void draw_floats(App& app) {
     const bool horizontal = side == Dock::Top || side == Dock::Bottom;
     for (size_t i = 0; i + 1 < col.size(); ++i) {
       const FloatWindow& a = *col[i];
+      if (float_shaded(a) || float_shaded(*col[i + 1])) continue;
       const int cx = horizontal ? a.x + a.w : a.x + a.w / 2;
       const int cy = horizontal ? a.y + a.h / 2 : a.y + a.h;
       const FloatWindow* covering = float_at(app, cx, cy);

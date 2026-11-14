@@ -144,6 +144,7 @@ std::string session_text(App& app) {
     out << r.name << ".dock=" << static_cast<int>(w.dock) << " "
         << static_cast<int>(w.restore_dock) << " " << w.dock_seq << "\n";
     out << r.name << ".share=" << w.dock_share << "\n";
+    out << r.name << ".shaded=" << (w.shaded ? 1 : 0) << "\n";
     out << r.name << ".geom=" << unscale(app, w.x) << " "
         << unscale(app, w.y) << " " << unscale(app, w.w) << " "
         << unscale(app, w.h) << "\n";
@@ -211,6 +212,8 @@ void restore_session(App& app) {
           w.dock_seq = d[2];
         }
       }
+      if (const std::string* v = get(n + ".shaded"))
+        w.shaded = *v == "1";
       if (const std::string* v = get(n + ".share")) {
         const float share = std::stof(*v);
         if (std::isfinite(share) && share >= 0.01f && share <= 100.f)

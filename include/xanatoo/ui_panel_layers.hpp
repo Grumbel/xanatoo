@@ -13,6 +13,11 @@ namespace xanatoo {
 enum class UiPanelLayer { Chrome, Reply, Bookmarks, Subscriptions, Styles, Annotations,
                           NostrExplorer, NostrAccounts, LemmyExplorer, Certificates };
 
+// Bit of `layer` in a set of embedded panels (UiState::shaded_panels).
+inline unsigned ui_panel_bit(UiPanelLayer layer) {
+  return 1u << static_cast<unsigned>(layer);
+}
+
 inline const char* ui_panel_root(UiPanelLayer layer) {
   switch (layer) {
     case UiPanelLayer::Reply: return "##reply_editor";

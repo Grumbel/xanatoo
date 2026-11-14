@@ -412,10 +412,10 @@ void draw_sitemap_panel(App& app) {
   const SDL_Rect pb = title_button_rect(app, outer, kPageButton);
   const std::string title =
       app.sitemap.host.empty() ? "Site map" : "Site map — " + app.sitemap.host;
-  draw_floating_frame(app, outer, title, keys, w.dock == Dock::None,
-                      title_max_zone(outer).x - pb.x,
-                      w.dock == Dock::Max);
+  const bool open = draw_floating_frame(app, w, title, keys,
+                                        title_shade_zone(outer).x - pb.x);
   draw_title_button(app, pb, kPageButton, false);
+  if (!open) return;
 
   auto [cx, cy, cw, ch] = sitemap_client_rect(app);
   w.scroll = std::min(w.scroll, sitemap_max_scroll(app));

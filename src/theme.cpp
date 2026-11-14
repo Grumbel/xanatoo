@@ -167,15 +167,16 @@ void draw_window_chrome(SDL_Renderer* r, const WindowChrome& w) {
   const auto px = [&](int v) { return static_cast<int>(v * w.scale + 0.5f); };
   const int slot = px(28);
   const int side = std::min(px(20), std::max(px(12), w.title_h - px(6)));
-  // Close at the title's left edge, maximize / restore at its right edge.
-  auto control_rect = [&](bool left) {
-    const int zone_x = left ? o.x : o.x + o.w - slot;
+  // Close at the title's left edge; maximize / restore at its right edge,
+  // shade just left of it.
+  auto control_rect = [&](int from_right) {
+    const int zone_x = from_right < 0 ? o.x : o.x + o.w - (from_right + 1) * slot;
     return SDL_Rect{zone_x + (slot - side) / 2,
                     o.y + (w.title_h - side) / 2, side, side};
   };
   // Matching, centred 20px controls inside the existing 28px hit zones.
   if (w.close_box) {
-    const SDL_Rect cb = control_rect(true);
+    const SDL_Rect cb = control_rect(-1);
     draw_button_face(r, cb, false, w.close_hot);
     set(r, p.text);
     const int cx = cb.x + cb.w / 2, cy = cb.y + cb.h / 2;
@@ -185,7 +186,7 @@ void draw_window_chrome(SDL_Renderer* r, const WindowChrome& w) {
   }
   // Maximize / restore box in the rightmost hit zone (28px)
   if (w.max_box) {
-    const SDL_Rect mb = control_rect(false);
+    const SDL_Rect mb = control_rect(0);
     draw_button_face(r, mb, false, w.max_hot);
     set(r, p.text);
     const int a = std::max(2, px(4));
@@ -199,6 +200,21 @@ void draw_window_chrome(SDL_Renderer* r, const WindowChrome& w) {
       SDL_Rect sq{cx - a, cy - a, a * 2 + 1, a * 2 + 1};
       xanatoo::sdl::draw_rect(r, &sq);
       xanatoo::sdl::draw_line(r, sq.x, sq.y + 1, sq.x + sq.w - 1, sq.y + 1);
+    }
+  }
+  // Shade box: a triangle pointing up rolls the window up to its title,
+  // pointing down rolls it out again. Greyed out where it does nothing.
+  if (w.shade_box) {
+    const SDL_Rect sb = control_rect(1);
+    draw_button_face(r, sb, false, w.shade_enabled && w.shade_hot);
+    set(r, w.shade_enabled ? p.text : p.face_dark);
+    const int a = std::max(2, px(4));
+    const int cx = sb.x + sb.w / 2, cy = sb.y + sb.h / 2;
+    const int half = a / 2 + 1;  // rows of the triangle around the centre
+    for (int i = 0; i <= a; ++i) {
+      // Row i from the apex: width grows by one pixel each side.
+      const int y = w.shaded ? cy + half - i : cy - half + i;
+      xanatoo::sdl::draw_line(r, cx - i, y, cx + i, y);
     }
   }
   // Resize grip (SE): diagonal ridges in light/dark pairs
