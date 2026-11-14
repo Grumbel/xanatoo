@@ -8,6 +8,19 @@ Base commit of this work line: `568a91b` (Initial checkin of PROPOSAL.md)
 
 Next bundle number: **348** (this delivery is **347**)
 
+## Status (2026-11-14) — Panel title controls: close left, shade for docks
+
+- Close box moved to the title's left edge, maximize / restore stays at the
+  right; title zones are shared helpers (`title_close_zone` /
+  `title_max_zone` / `title_shade_zone`) for paint, hover and clicks.
+- New shade box left of maximize: rolls a *docked* panel up to its title
+  strip; column / band neighbours take the room, an all-shaded band shrinks
+  to one strip and gives the panes the height. Greyed out while free or
+  maximized (undocked shading was judged not useful); cleared on leaving
+  the dock; saved in the session. Checked under Xvfb.
+- Open: an all-shaded side column still keeps its full width (title strips
+  are horizontal); a partly shaded band leaves blank face under the strip.
+
 ## Status (2026-11-14) — Gemini certificates: TOFU without prompts, Certificates panel
 
 - First visit pins the server certificate silently (`gemini_fetch` →
