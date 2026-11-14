@@ -4088,7 +4088,7 @@ void draw_outline_panel(App& app) {
     // Title tab + selection are lit only while the outline has the keyboard.
     const bool keys = panel_has_keys(app, KeyFocus::Outline);
     draw_floating_frame(app, outer, ol_title, keys, app.ol.dock == Dock::None,
-                        outer.x + outer.w - 2 * float_close_w - fb.x,
+                        title_max_zone(outer).x - fb.x,
                         app.ol.dock == Dock::Max);
     // Focus toggle (section isolation): latched push button left of close.
     draw_title_button(app, fb, "Focus", section_focus);

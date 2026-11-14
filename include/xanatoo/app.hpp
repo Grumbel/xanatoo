@@ -66,7 +66,7 @@ inline int status_bar_h = 28;       // 0 while content only hides it
 inline int status_bar_full_h = 28;  // scaled height when shown
 constexpr int kMaxNavHistory = 100;
 inline int help_title_h = 28;
-inline int float_close_w = 28;  // close box hit zone at the title's right
+inline int float_close_w = 28;  // width of one title control hit zone
 // Canvas chrome text (status line, window titles, outline / backlinks);
 // matches the ImGui menu font and ignores document style + zoom.
 inline int kUiFontPx = 14;
@@ -1651,13 +1651,17 @@ StatusLine compute_status(App& app);
 void fill_doc_paper(App& app, const SDL_Rect& rect);
 // `text` cut to `max_w` px in `font`, with a trailing "…" when shortened.
 std::string fit_text(xanatoo::Font& font, const std::string& text, int max_w);
-// Outline title-bar "Focus" toggle, left of the close box (paint + hit-test).
+// Title-bar control hit zones of a floating frame (paint + hit-test): the
+// close box sits at the title's left edge, maximize / restore at its right.
+SDL_Rect title_close_zone(const SDL_Rect& outer);
+SDL_Rect title_max_zone(const SDL_Rect& outer);
+// Outline title-bar "Focus" toggle, left of the maximize box (paint + hit-test).
 SDL_Rect outline_focus_rect(App& app, const SDL_Rect& outer);
-// Push button `label` in a window title, left of the close box.
+// Push button `label` in a window title, left of the maximize box.
 SDL_Rect title_button_rect(App& app, const SDL_Rect& outer, const char* label);
 void draw_title_button(App& app, const SDL_Rect& r, const char* label,
                        bool latched);
-// `title_reserve`: px kept free left of the close box (title buttons).
+// `title_reserve`: px kept free left of the maximize box (title buttons).
 void draw_floating_frame(App& app, const SDL_Rect& outer,
                          const std::string& title, bool active,
                          bool resizable = true, int title_reserve = 0,

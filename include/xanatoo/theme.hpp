@@ -74,9 +74,9 @@ struct WindowChrome {
   SDL_Rect outer{};       // whole window incl. frame
   int title_h = 28;       // height of the title strip
   bool active = true;     // yellow tab vs. grey
-  bool close_box = true;  // right-aligned close widget (hit zone: last 28px)
+  bool close_box = true;  // left-aligned close widget (hit zone: first 28px)
   bool resizable = true;  // SE grip
-  bool max_box = true;    // maximize / restore widget left of the close box
+  bool max_box = true;    // right-aligned maximize / restore (last 28px)
   bool maximized = false;  // shows the restore glyph
   bool close_hot = false;
   bool max_hot = false;

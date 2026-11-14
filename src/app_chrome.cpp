@@ -136,10 +136,19 @@ std::string fit_text(xanatoo::Font& font, const std::string& text,
   return out + ell;
 }
 
+SDL_Rect title_close_zone(const SDL_Rect& outer) {
+  return SDL_Rect{outer.x, outer.y, float_close_w, help_title_h};
+}
+
+SDL_Rect title_max_zone(const SDL_Rect& outer) {
+  return SDL_Rect{outer.x + outer.w - float_close_w, outer.y, float_close_w,
+                  help_title_h};
+}
+
 SDL_Rect title_button_rect(App& app, const SDL_Rect& outer, const char* label) {
   const int w = app.ui_font.measure(label) + 16;
   const int h = help_title_h - static_cast<int>(std::lround(8.f * app.ui_scale));
-  return SDL_Rect{outer.x + outer.w - 2 * float_close_w - 4 - w,
+  return SDL_Rect{title_max_zone(outer).x - 4 - w,
                   outer.y + (help_title_h - h) / 2, w, h};
 }
 
@@ -173,12 +182,14 @@ void draw_floating_frame(App& app, const SDL_Rect& outer,
   w.resizable = resizable;
   w.maximized = maximized;
   w.scale = app.ui_scale;
-  const bool in_title = active && app.mouse_y >= outer.y &&
-      app.mouse_y < outer.y + help_title_h;
-  w.close_hot = in_title && app.mouse_x >= outer.x + outer.w - float_close_w &&
-      app.mouse_x < outer.x + outer.w;
-  w.max_hot = in_title && app.mouse_x >= outer.x + outer.w - 2 * float_close_w &&
-      app.mouse_x < outer.x + outer.w - float_close_w;
+  const SDL_Rect close_zone = title_close_zone(outer);
+  const SDL_Rect max_zone = title_max_zone(outer);
+  const auto hot = [&](const SDL_Rect& z) {
+    return active && app.mouse_x >= z.x && app.mouse_x < z.x + z.w &&
+           app.mouse_y >= z.y && app.mouse_y < z.y + z.h;
+  };
+  w.close_hot = hot(close_zone);
+  w.max_hot = hot(max_zone);
   th::draw_window_chrome(app.sdl, w);
   const th::Palette& p = th::palette();
   // Document well: paper surface in a sunken frame under the title strip.
@@ -189,9 +200,8 @@ void draw_floating_frame(App& app, const SDL_Rect& outer,
   const th::Rgb ink = active ? p.tab_text : p.text_dim;
   xanatoo::Font& font = app.ui_font_bold.loaded() ? app.ui_font_bold
                                                   : app.ui_font;
-  const int title_x = outer.x + 10;
-  const int title_w =
-      outer.x + outer.w - 2 * float_close_w - title_reserve - 8 - title_x;
+  const int title_x = close_zone.x + close_zone.w + 4;
+  const int title_w = max_zone.x - title_reserve - 8 - title_x;
   const int ty = outer.y + (help_title_h - font.line_height()) / 2 +
                  font.ascender();
   app.renderer.draw_text(font, static_cast<float>(title_x),

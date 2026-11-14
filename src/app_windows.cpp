@@ -241,27 +241,28 @@ void click_help(App& app, FloatWindow& w, int mx, int my) {
 }
 
 void press_title(App& app, FloatWindow& w, int mx, int my) {
-  if (mx >= w.x + w.w - float_close_w) {
+  const SDL_Rect outer{w.x, w.y, w.w, w.h};
+  if (mx >= outer.x &&
+      mx < title_close_zone(outer).x + title_close_zone(outer).w) {
     close_window(app, w);
     return;
   }
-  if (mx >= w.x + w.w - 2 * float_close_w) {
+  if (mx >= title_max_zone(outer).x) {
     toggle_maximize(app, w);
     w.last_title_click = 0;
     return;
   }
   if (w.role == WindowRole::Sitemap) {
-    // "Page" button just left of ×.
-    const SDL_Rect pb =
-        title_button_rect(app, SDL_Rect{w.x, w.y, w.w, w.h}, "Page");
+    // "Page" button just left of the maximize box.
+    const SDL_Rect pb = title_button_rect(app, outer, "Page");
     if (mx >= pb.x - 2 && mx < pb.x + pb.w + 2) {
       click_sitemap(app, mx, my);
       return;
     }
   }
   if (w.role == WindowRole::Outline) {
-    // Focus toggle sits just left of ×.
-    const SDL_Rect fb = outline_focus_rect(app, SDL_Rect{w.x, w.y, w.w, w.h});
+    // Focus toggle sits just left of the maximize box.
+    const SDL_Rect fb = outline_focus_rect(app, outer);
     if (mx >= fb.x - 2 && mx < fb.x + fb.w + 2) {
       toggle_section_focus_mode(app);
       return;

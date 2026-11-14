@@ -167,13 +167,15 @@ void draw_window_chrome(SDL_Renderer* r, const WindowChrome& w) {
   const auto px = [&](int v) { return static_cast<int>(v * w.scale + 0.5f); };
   const int slot = px(28);
   const int side = std::min(px(20), std::max(px(12), w.title_h - px(6)));
-  auto control_rect = [&](int index) {
-    return SDL_Rect{o.x + o.w - (index + 1) * slot + (slot - side) / 2,
+  // Close at the title's left edge, maximize / restore at its right edge.
+  auto control_rect = [&](bool left) {
+    const int zone_x = left ? o.x : o.x + o.w - slot;
+    return SDL_Rect{zone_x + (slot - side) / 2,
                     o.y + (w.title_h - side) / 2, side, side};
   };
   // Matching, centred 20px controls inside the existing 28px hit zones.
   if (w.close_box) {
-    const SDL_Rect cb = control_rect(0);
+    const SDL_Rect cb = control_rect(true);
     draw_button_face(r, cb, false, w.close_hot);
     set(r, p.text);
     const int cx = cb.x + cb.w / 2, cy = cb.y + cb.h / 2;
@@ -181,9 +183,9 @@ void draw_window_chrome(SDL_Renderer* r, const WindowChrome& w) {
     xanatoo::sdl::draw_line(r, cx - arm, cy - arm, cx + arm, cy + arm);
     xanatoo::sdl::draw_line(r, cx - arm, cy + arm, cx + arm, cy - arm);
   }
-  // Maximize / restore box, one hit zone (28px) left of the close box
+  // Maximize / restore box in the rightmost hit zone (28px)
   if (w.max_box) {
-    const SDL_Rect mb = control_rect(1);
+    const SDL_Rect mb = control_rect(false);
     draw_button_face(r, mb, false, w.max_hot);
     set(r, p.text);
     const int a = std::max(2, px(4));

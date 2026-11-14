@@ -172,7 +172,8 @@ by `dock_seq`; `dock_band_h`, used by `place_centre_rows`). Dock neighbours
 are sized by `FloatWindow::dock_share`, not forced equal; shared separator
 dragging updates only the adjacent pair. The size per
 side is `App::dock_w[4]` (L, R, T, B). Max overlays the client area; every
-frame has a maximize / restore box left of the close box.
+frame has the close box at the title's left edge and the maximize /
+restore box at its right edge (`title_close_zone` / `title_max_zone`).
 Tabs ↔ windows: dragging a tab past the strip (ImGui, `UiCommand::TearTab`
 → `tear_tab`) opens its buffer in a window (docked at a zone), dragging a
 window title onto the strip (`over_tab_strip`) runs `pop_in_soft`; tab
